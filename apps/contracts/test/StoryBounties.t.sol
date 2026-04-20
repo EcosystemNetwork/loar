@@ -23,8 +23,16 @@ contract StoryBountiesTest is Test {
     uint256 constant REWARD = 100e18;
     uint256 constant MIN_BOUNTY = 10e18;
 
-    event BountyCreated(uint256 indexed bountyId, address indexed poster, uint256 universeId, uint256 reward, string contentType);
-    event BountyClaimed(uint256 indexed bountyId, address indexed winner, uint256 reward, uint256 platformFee);
+    event BountyCreated(
+        uint256 indexed bountyId,
+        address indexed poster,
+        uint256 universeId,
+        uint256 reward,
+        string contentType
+    );
+    event BountyClaimed(
+        uint256 indexed bountyId, address indexed winner, uint256 reward, uint256 platformFee
+    );
     event BountyCancelled(uint256 indexed bountyId, uint256 refund, uint256 fee);
     event BountyExpired(uint256 indexed bountyId);
 
@@ -36,10 +44,14 @@ contract StoryBountiesTest is Test {
 
         vm.startPrank(deployer);
         StoryBounties impl = new StoryBounties();
-        sb = StoryBounties(address(new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(StoryBounties.initialize, (address(loar), treasury, platform))
-        )));
+        sb = StoryBounties(
+            address(
+                new ERC1967Proxy(
+                    address(impl),
+                    abi.encodeCall(StoryBounties.initialize, (address(loar), treasury, platform))
+                )
+            )
+        );
         vm.stopPrank();
 
         // Fund poster and approve
@@ -57,13 +69,13 @@ contract StoryBountiesTest is Test {
 
     function _createDefaultBounty() internal returns (uint256) {
         vm.prank(poster);
-        return sb.createBounty(
-            1, REWARD, "Test Bounty", "QmHash", "story", block.timestamp + 30 days
-        );
+        return
+            sb.createBounty(1, REWARD, "Test Bounty", "QmHash", "story", block.timestamp + 30 days);
     }
 
     function _createBounty(address _poster, uint256 universeId, uint256 reward, uint256 deadline)
-        internal returns (uint256)
+        internal
+        returns (uint256)
     {
         vm.prank(_poster);
         return sb.createBounty(universeId, reward, "Bounty", "QmHash", "story", deadline);
@@ -316,8 +328,8 @@ contract StoryBountiesTest is Test {
         uint256 reward = 333e18;
         uint256 bountyId = _createBounty(poster, 1, reward, block.timestamp + 30 days);
 
-        uint256 expectedFee = (reward * 500) / 10_000;  // 16.65e18
-        uint256 expectedWinner = reward - expectedFee;    // 316.35e18
+        uint256 expectedFee = (reward * 500) / 10_000; // 16.65e18
+        uint256 expectedWinner = reward - expectedFee; // 316.35e18
 
         vm.prank(poster);
         sb.awardBounty(bountyId, winner, bytes32("x"));

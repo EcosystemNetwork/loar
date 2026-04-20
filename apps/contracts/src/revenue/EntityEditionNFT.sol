@@ -4,7 +4,9 @@ pragma solidity =0.8.30;
 import {ERC1155Upgradeable} from "@openzeppelin-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 import {ERC2981Upgradeable} from "@openzeppelin-upgradeable/token/common/ERC2981Upgradeable.sol";
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
@@ -14,8 +16,19 @@ import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 ///         in multiples: things, lore, species, technology.
 ///         Each token ID is a unique entity definition; minting copies = edition.
 ///         Free or paid — payment routed through PaymentRouter.
-contract EntityEditionNFT is Initializable, ERC1155Upgradeable, ERC2981Upgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
-    enum EntityKind { THING, LORE, SPECIES, TECHNOLOGY }
+contract EntityEditionNFT is
+    Initializable,
+    ERC1155Upgradeable,
+    ERC2981Upgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable
+{
+    enum EntityKind {
+        THING,
+        LORE,
+        SPECIES,
+        TECHNOLOGY
+    }
 
     struct Edition {
         uint256 universeId;
@@ -23,8 +36,8 @@ contract EntityEditionNFT is Initializable, ERC1155Upgradeable, ERC2981Upgradeab
         string name;
         bytes32 contentHash;
         address creator;
-        uint256 mintPrice;   // ETH per copy (0 = free)
-        uint256 maxSupply;   // 0 = open edition
+        uint256 mintPrice; // ETH per copy (0 = free)
+        uint256 maxSupply; // 0 = open edition
         uint256 minted;
         bool active;
     }
@@ -68,7 +81,9 @@ contract EntityEditionNFT is Initializable, ERC1155Upgradeable, ERC2981Upgradeab
     uint16 public constant MAX_FEE_BPS = 5000;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(
         uint256 _universeId,
@@ -91,8 +106,15 @@ contract EntityEditionNFT is Initializable, ERC1155Upgradeable, ERC2981Upgradeab
         royaltyBps = _royaltyBps;
     }
 
-    function pause() external { if (msg.sender != platform) revert NotPlatform(); _pause(); }
-    function unpause() external { if (msg.sender != platform) revert NotPlatform(); _unpause(); }
+    function pause() external {
+        if (msg.sender != platform) revert NotPlatform();
+        _pause();
+    }
+
+    function unpause() external {
+        if (msg.sender != platform) revert NotPlatform();
+        _unpause();
+    }
 
     /// @notice Register a new edition for minting
     /// @param _universeId Universe this entity belongs to
@@ -169,7 +191,9 @@ contract EntityEditionNFT is Initializable, ERC1155Upgradeable, ERC2981Upgradeab
 
     /// @notice Get editions in a universe filtered by kind (paginated)
     function getByUniverse(uint256 _universeId, EntityKind kind, uint256 startId, uint256 count)
-        external view returns (uint256[] memory ids)
+        external
+        view
+        returns (uint256[] memory ids)
     {
         uint256[] memory temp = new uint256[](count);
         uint256 found = 0;
@@ -179,7 +203,9 @@ contract EntityEditionNFT is Initializable, ERC1155Upgradeable, ERC2981Upgradeab
             }
         }
         ids = new uint256[](found);
-        for (uint256 j = 0; j < found; j++) ids[j] = temp[j];
+        for (uint256 j = 0; j < found; j++) {
+            ids[j] = temp[j];
+        }
     }
 
     function uri(uint256 editionId) public view override returns (string memory) {
@@ -193,7 +219,10 @@ contract EntityEditionNFT is Initializable, ERC1155Upgradeable, ERC2981Upgradeab
     }
 
     function supportsInterface(bytes4 interfaceId)
-        public view override(ERC1155Upgradeable, ERC2981Upgradeable) returns (bool)
+        public
+        view
+        override(ERC1155Upgradeable, ERC2981Upgradeable)
+        returns (bool)
     {
         return super.supportsInterface(interfaceId);
     }

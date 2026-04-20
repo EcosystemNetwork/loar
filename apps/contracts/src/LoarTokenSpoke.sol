@@ -46,11 +46,14 @@ contract LoarTokenSpoke is ERC20, ERC20Permit, ERC20Burnable, Ownable, Pausable 
         if (!minters[msg.sender] && msg.sender != owner()) revert NotMinter();
     }
 
-    constructor(
-        address _treasury,
-        address _nttManager
-    ) ERC20("LOAR", "LOAR") ERC20Permit("LOAR") Ownable(msg.sender) {
-        if (_treasury == address(0) || _nttManager == address(0)) revert ZeroAddress();
+    constructor(address _treasury, address _nttManager)
+        ERC20("LOAR", "LOAR")
+        ERC20Permit("LOAR")
+        Ownable(msg.sender)
+    {
+        if (_treasury == address(0) || _nttManager == address(0)) {
+            revert ZeroAddress();
+        }
         treasury = _treasury;
 
         // NTT Manager is the sole minter on spoke chains
@@ -89,8 +92,13 @@ contract LoarTokenSpoke is ERC20, ERC20Permit, ERC20Burnable, Ownable, Pausable 
     }
 
     /// @notice Emergency pause — halts all transfers. Only callable by owner.
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     /// @notice Set fee exemption for an address
     function setFeeExempt(address account, bool exempt) external onlyOwner {

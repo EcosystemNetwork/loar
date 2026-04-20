@@ -2,11 +2,17 @@
 pragma solidity =0.8.30;
 
 import {ERC721Upgradeable} from "@openzeppelin-upgradeable/token/ERC721/ERC721Upgradeable.sol";
-import {ERC721EnumerableUpgradeable} from "@openzeppelin-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
-import {ERC721URIStorageUpgradeable} from "@openzeppelin-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
+import {
+    ERC721EnumerableUpgradeable
+} from "@openzeppelin-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
+import {
+    ERC721URIStorageUpgradeable
+} from "@openzeppelin-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
 import {ERC2981Upgradeable} from "@openzeppelin-upgradeable/token/common/ERC2981Upgradeable.sol";
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
@@ -14,11 +20,18 @@ import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 /// @title CharacterNFT
 /// @notice Characters as ownable NFTs. Owners earn when their character appears in episodes.
 ///         Supports appearance tracking and royalty accumulation.
-contract CharacterNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URIStorageUpgradeable, ERC2981Upgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+contract CharacterNFT is
+    Initializable,
+    ERC721EnumerableUpgradeable,
+    ERC721URIStorageUpgradeable,
+    ERC2981Upgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable
+{
     struct Character {
         uint256 universeId;
         string name;
-        bytes32 visualHash;        // hash of character visual description/image
+        bytes32 visualHash; // hash of character visual description/image
         address creator;
         uint256 appearanceCount;
         uint256 accumulatedRoyalties;
@@ -39,10 +52,14 @@ contract CharacterNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URISt
     address public platform;
     IRightsRegistry public rightsRegistry;
     IPaymentRouter public paymentRouter;
-    uint16 public appearanceFeeBps;    // fee taken from episode mint when character appears
+    uint16 public appearanceFeeBps; // fee taken from episode mint when character appears
 
-    event CharacterCreated(uint256 indexed characterId, uint256 universeId, string name, address creator);
-    event CharacterAppearance(uint256 indexed characterId, uint256 indexed episodeId, uint256 reward);
+    event CharacterCreated(
+        uint256 indexed characterId, uint256 universeId, string name, address creator
+    );
+    event CharacterAppearance(
+        uint256 indexed characterId, uint256 indexed episodeId, uint256 reward
+    );
     event RoyaltyClaimed(uint256 indexed characterId, address owner, uint256 amount);
 
     error NotOwner();
@@ -71,7 +88,9 @@ contract CharacterNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URISt
     mapping(uint256 => uint256) public characterOriginalToken;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(
         uint256 _universeId,
@@ -94,8 +113,15 @@ contract CharacterNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URISt
         appearanceFeeBps = _appearanceFeeBps;
     }
 
-    function pause() external { require(msg.sender == platform, "Only platform"); _pause(); }
-    function unpause() external { require(msg.sender == platform, "Only platform"); _unpause(); }
+    function pause() external {
+        require(msg.sender == platform, "Only platform");
+        _pause();
+    }
+
+    function unpause() external {
+        require(msg.sender == platform, "Only platform");
+        _unpause();
+    }
 
     /// @notice Create a new character listing (free or paid). Creator becomes first owner.
     /// @param _universeId Universe this character belongs to
@@ -149,7 +175,13 @@ contract CharacterNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URISt
     /// @notice Mint (purchase) a character NFT edition. Payment routed through PaymentRouter.
     /// @param characterId The character to mint an edition of
     /// @param tokenURI_ Metadata URI for this specific edition token
-    function mintCharacter(uint256 characterId, string calldata tokenURI_) external payable nonReentrant whenNotPaused returns (uint256 tokenId) {
+    function mintCharacter(uint256 characterId, string calldata tokenURI_)
+        external
+        payable
+        nonReentrant
+        whenNotPaused
+        returns (uint256 tokenId)
+    {
         if (!characterActive[characterId]) revert CharacterNotActive();
         uint256 maxSup = characterMaxSupply[characterId];
         if (maxSup > 0 && characterMinted[characterId] >= maxSup) revert CharacterExists();
@@ -179,11 +211,17 @@ contract CharacterNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URISt
     }
 
     // Reuse EpisodeMinted event shape for character mints
-    event EpisodeMinted(uint256 indexed tokenId, uint256 indexed characterId, address buyer, uint256 price);
+    event EpisodeMinted(
+        uint256 indexed tokenId, uint256 indexed characterId, address buyer, uint256 price
+    );
 
     /// @notice Record a character appearance in an episode and accrue reward for owner
     /// @dev Called by the platform when an episode featuring this character is minted
-    function recordAppearance(uint256 characterId, uint256 episodeId) external payable whenNotPaused {
+    function recordAppearance(uint256 characterId, uint256 episodeId)
+        external
+        payable
+        whenNotPaused
+    {
         require(msg.sender == platform, "Only platform");
         Character storage c = characters[characterId];
         c.appearanceCount++;
@@ -214,7 +252,9 @@ contract CharacterNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URISt
 
     /// @notice Get all characters in a universe
     function getCharactersByUniverse(uint256 _universeId, uint256 startId, uint256 count)
-        external view returns (uint256[] memory ids)
+        external
+        view
+        returns (uint256[] memory ids)
     {
         uint256[] memory temp = new uint256[](count);
         uint256 found = 0;
@@ -231,19 +271,36 @@ contract CharacterNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URISt
 
     // ---- Overrides ----
 
-    function tokenURI(uint256 tokenId) public view override(ERC721Upgradeable, ERC721URIStorageUpgradeable) returns (string memory) {
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
+        returns (string memory)
+    {
         return super.tokenURI(tokenId);
     }
 
-    function supportsInterface(bytes4 interfaceId) public view override(ERC721EnumerableUpgradeable, ERC721URIStorageUpgradeable, ERC2981Upgradeable) returns (bool) {
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC721EnumerableUpgradeable, ERC721URIStorageUpgradeable, ERC2981Upgradeable)
+        returns (bool)
+    {
         return super.supportsInterface(interfaceId);
     }
 
-    function _update(address to, uint256 tokenId, address auth) internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable) returns (address) {
+    function _update(address to, uint256 tokenId, address auth)
+        internal
+        override(ERC721Upgradeable, ERC721EnumerableUpgradeable)
+        returns (address)
+    {
         return super._update(to, tokenId, auth);
     }
 
-    function _increaseBalance(address account, uint128 value) internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable) {
+    function _increaseBalance(address account, uint128 value)
+        internal
+        override(ERC721Upgradeable, ERC721EnumerableUpgradeable)
+    {
         super._increaseBalance(account, value);
     }
 

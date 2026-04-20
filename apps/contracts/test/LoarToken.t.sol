@@ -26,7 +26,13 @@ contract LoarTokenTest is Test {
     function test_constructor_distribution() public view {
         // 70% to treasury (40% + 20% community + 10% reserve)
         uint256 treasuryExpected = (MAX_SUPPLY * 40) / 100 + (MAX_SUPPLY * 20) / 100
-            + (MAX_SUPPLY - (MAX_SUPPLY * 40) / 100 - (MAX_SUPPLY * 30) / 100 - (MAX_SUPPLY * 20) / 100);
+            + (MAX_SUPPLY
+                - (MAX_SUPPLY * 40)
+                / 100
+                - (MAX_SUPPLY * 30)
+                / 100
+                - (MAX_SUPPLY * 20)
+                / 100);
         uint256 holderExpected = (MAX_SUPPLY * 30) / 100;
 
         assertEq(token.balanceOf(treasury), treasuryExpected);

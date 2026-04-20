@@ -28,10 +28,7 @@ interface IHookEvents {
      * the liquidity modifier, `feeAmount0` and `feeAmount1` the fees charged in currency0 and currency1, defined by the `poolId`.
      */
     event HookFee(
-        bytes32 indexed poolId,
-        address indexed sender,
-        uint128 feeAmount0,
-        uint128 feeAmount1
+        bytes32 indexed poolId, address indexed sender, uint128 feeAmount0, uint128 feeAmount1
     );
 
     /**
@@ -39,10 +36,7 @@ interface IHookEvents {
      * `amount0` and `amount1` the amounts added or removed in currency0 and currency1, defined by the `poolId`.
      */
     event HookModifyLiquidity(
-        bytes32 indexed poolId,
-        address indexed sender,
-        int128 amount0,
-        int128 amount1
+        bytes32 indexed poolId, address indexed sender, int128 amount0, int128 amount1
     );
 
     /**

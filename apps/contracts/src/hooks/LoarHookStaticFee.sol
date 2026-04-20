@@ -17,20 +17,12 @@ contract LoarHookStaticFee is LoarHook, ILoarHookStaticFee {
     mapping(PoolId => uint24) public loarFee;
     mapping(PoolId => uint24) public pairedFee;
 
-    constructor(
-        address _poolManager,
-        address _factory,
-        address _weth
-    ) LoarHook(_poolManager, _factory, _weth) {}
+    constructor(address _poolManager, address _factory, address _weth)
+        LoarHook(_poolManager, _factory, _weth)
+    {}
 
-    function _initializePoolData(
-        PoolKey memory poolKey,
-        bytes memory poolData
-    ) internal override {
-        PoolStaticConfigVars memory _poolConfigVars = abi.decode(
-            poolData,
-            (PoolStaticConfigVars)
-        );
+    function _initializePoolData(PoolKey memory poolKey, bytes memory poolData) internal override {
+        PoolStaticConfigVars memory _poolConfigVars = abi.decode(poolData, (PoolStaticConfigVars));
 
         if (_poolConfigVars.loarFee > MAX_LP_FEE) {
             revert LoarFeeTooHigh();
@@ -43,18 +35,11 @@ contract LoarHookStaticFee is LoarHook, ILoarHookStaticFee {
         loarFee[poolKey.toId()] = _poolConfigVars.loarFee;
         pairedFee[poolKey.toId()] = _poolConfigVars.pairedFee;
 
-        emit PoolInitialized(
-            poolKey.toId(),
-            _poolConfigVars.loarFee,
-            _poolConfigVars.pairedFee
-        );
+        emit PoolInitialized(poolKey.toId(), _poolConfigVars.loarFee, _poolConfigVars.pairedFee);
     }
 
     // set the LP fee according to the loar/paired fee configuration
-    function _setFee(
-        PoolKey calldata poolKey,
-        SwapParams calldata swapParams
-    ) internal override {
+    function _setFee(PoolKey calldata poolKey, SwapParams calldata swapParams) internal override {
         uint24 fee = swapParams.zeroForOne != loarIsToken0[poolKey.toId()]
             ? pairedFee[poolKey.toId()]
             : loarFee[poolKey.toId()];

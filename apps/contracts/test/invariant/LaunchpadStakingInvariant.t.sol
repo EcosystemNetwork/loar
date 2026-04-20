@@ -47,7 +47,10 @@ contract LaunchpadStakingHandler is Test {
         amount = bound(amount, 1e18, bal);
         vm.startPrank(actor);
         loar.approve(address(staking), amount);
-        try staking.stake(amount) { stakeCount++; } catch {}
+        try staking.stake(amount) {
+            stakeCount++;
+        }
+            catch {}
         vm.stopPrank();
     }
 
@@ -61,7 +64,10 @@ contract LaunchpadStakingHandler is Test {
         // Fast-forward past lock period occasionally so unstakes can succeed without penalty edge cases.
         if (fraction % 3 == 0) vm.warp(block.timestamp + 8 days);
         vm.prank(actor);
-        try staking.unstake(amount) { unstakeCount++; } catch {}
+        try staking.unstake(amount) {
+            unstakeCount++;
+        }
+            catch {}
     }
 
     function stakeInUniverse(uint256 actorSeed, uint256 universeSeed, uint256 amount) external {
@@ -72,11 +78,16 @@ contract LaunchpadStakingHandler is Test {
         amount = bound(amount, 1e18, bal);
         vm.startPrank(actor);
         loar.approve(address(staking), amount);
-        try staking.stakeInUniverse(universeId, amount) { universeStakeCount++; } catch {}
+        try staking.stakeInUniverse(universeId, amount) {
+            universeStakeCount++;
+        }
+            catch {}
         vm.stopPrank();
     }
 
-    function unstakeFromUniverse(uint256 actorSeed, uint256 universeSeed, uint256 fraction) external {
+    function unstakeFromUniverse(uint256 actorSeed, uint256 universeSeed, uint256 fraction)
+        external
+    {
         address actor = actors[actorSeed % actors.length];
         uint256 universeId = universeIds[universeSeed % universeIds.length];
         (uint256 amt,,) = staking.universeStakes(actor, universeId);
@@ -86,13 +97,27 @@ contract LaunchpadStakingHandler is Test {
         if (amount == 0) return;
         if (fraction % 3 == 0) vm.warp(block.timestamp + 8 days);
         vm.prank(actor);
-        try staking.unstakeFromUniverse(universeId, amount) { universeUnstakeCount++; } catch {}
+        try staking.unstakeFromUniverse(universeId, amount) {
+            universeUnstakeCount++;
+        }
+            catch {}
     }
 
-    function actorCount() external view returns (uint256) { return actors.length; }
-    function getActor(uint256 i) external view returns (address) { return actors[i % actors.length]; }
-    function universeCount() external view returns (uint256) { return universeIds.length; }
-    function getUniverse(uint256 i) external view returns (uint256) { return universeIds[i % universeIds.length]; }
+    function actorCount() external view returns (uint256) {
+        return actors.length;
+    }
+
+    function getActor(uint256 i) external view returns (address) {
+        return actors[i % actors.length];
+    }
+
+    function universeCount() external view returns (uint256) {
+        return universeIds.length;
+    }
+
+    function getUniverse(uint256 i) external view returns (uint256) {
+        return universeIds[i % universeIds.length];
+    }
 }
 
 /// @notice STAKE-02 — invariant tests for LaunchpadStaking dual-pool accounting.
@@ -111,8 +136,8 @@ contract LaunchpadStakingInvariantTest is Test {
         bytes memory initData = abi.encodeWithSelector(
             LaunchpadStaking.initialize.selector,
             address(loar),
-            address(0xBEEF),   // treasury
-            address(0xCAFE)    // LP
+            address(0xBEEF), // treasury
+            address(0xCAFE) // LP
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         staking = LaunchpadStaking(address(proxy));
@@ -171,6 +196,8 @@ contract LaunchpadStakingInvariantTest is Test {
             (uint256 poolStaked,,) = staking.universePools(handler.getUniverse(i));
             sum += poolStaked;
         }
-        assertEq(sum, staking.totalUniverseStaked(), "UNIVERSE AGG: pool sum != totalUniverseStaked");
+        assertEq(
+            sum, staking.totalUniverseStaked(), "UNIVERSE AGG: pool sum != totalUniverseStaked"
+        );
     }
 }

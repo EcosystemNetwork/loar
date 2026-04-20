@@ -13,7 +13,6 @@ import type { SupportedEvmChainId } from './chains';
 export interface EvmAddresses {
   universeManager: `0x${string}`;
   loarToken: `0x${string}`;
-  loarFaucet: `0x${string}`;
   paymentRouter: `0x${string}`;
   creditManager: `0x${string}`;
   rightsRegistry: `0x${string}`;
@@ -43,7 +42,6 @@ export const EVM_ADDRESSES: Partial<Record<SupportedEvmChainId, EvmAddresses>> =
   11155111: {
     universeManager: '0x5441273a432821d20C949768d5940960dEaC6C35',
     loarToken: '0xAEC35cAAE68de337711E3bc06b51aaAa5551b63F',
-    loarFaucet: ZERO_ADDR,
     paymentRouter: '0x0fF81B57D5B47AC5bF2A84EeA69cCf4Aa6eb0C7C',
     creditManager: '0x42d5F92F550D42B36a119949d26a34Ca1F6b2d1E',
     rightsRegistry: '0x82b4Fe50cE07a64CbF5f97E9d70F2cEb8af63EA3',
@@ -68,7 +66,6 @@ export const EVM_ADDRESSES: Partial<Record<SupportedEvmChainId, EvmAddresses>> =
   84532: {
     universeManager: '0xE981454B4149BEA3a9018fa2ab77482F388ba01f',
     loarToken: '0x1Ff9e293D6D4D564B99CFe57fe61f4DCdac4b5D5',
-    loarFaucet: '0x5Cc879CE26E38e4c9dAeecc0318f0EbdC22aa806',
     paymentRouter: '0x3a6C6Bc90F34839a4792c107d9597a92fBCCA984',
     creditManager: '0x6077Ce7CB99Bfe1eC3c67f8635a597a76e3FbB71',
     rightsRegistry: '0x3EF8d96cf4336E46cc7091A2325B19f53b65b109',

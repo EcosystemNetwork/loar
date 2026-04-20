@@ -9,7 +9,10 @@ import {Ownable} from "@openzeppelin/access/Ownable.sol";
 ///         Full supply minted to creator on deploy — creator distributes as they see fit
 ///         (treasury, members, liquidity, etc.).
 contract CollectiveERC20 is ERC20, ERC20Permit, Ownable {
-    enum CollectiveKind { FACTION, ORGANIZATION }
+    enum CollectiveKind {
+        FACTION,
+        ORGANIZATION
+    }
 
     uint256 public immutable universeId;
     CollectiveKind public immutable kind;
@@ -44,7 +47,10 @@ interface IUniverseManagerOwner {
 ///         minted entirely to the creator for self-managed distribution.
 ///         These tokens represent membership/ownership shares in a narrative collective.
 contract CollectiveTokenFactory {
-    enum CollectiveKind { FACTION, ORGANIZATION }
+    enum CollectiveKind {
+        FACTION,
+        ORGANIZATION
+    }
 
     struct Collective {
         address token;
@@ -118,11 +124,7 @@ contract CollectiveTokenFactory {
         token = address(t);
 
         collectives[collectiveId] = Collective({
-            token: token,
-            universeId: universeId,
-            kind: kind,
-            name: name,
-            creator: msg.sender
+            token: token, universeId: universeId, kind: kind, name: name, creator: msg.sender
         });
 
         universeCollectives[universeId].push(collectiveId);

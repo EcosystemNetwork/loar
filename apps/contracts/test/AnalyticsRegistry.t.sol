@@ -20,8 +20,7 @@ contract AnalyticsRegistryTest is Test {
         analytics = AnalyticsRegistry(
             address(
                 new ERC1967Proxy(
-                    address(impl),
-                    abi.encodeCall(AnalyticsRegistry.initialize, (platform))
+                    address(impl), abi.encodeCall(AnalyticsRegistry.initialize, (platform))
                 )
             )
         );

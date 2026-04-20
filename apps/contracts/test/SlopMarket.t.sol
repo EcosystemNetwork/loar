@@ -15,6 +15,7 @@ import {IRightsRegistry} from "../src/interfaces/IRightsRegistry.sol";
 contract MockERC721 is ERC721 {
     uint256 private _nextId;
     constructor() ERC721("MockNFT", "MNFT") {}
+
     function mint(address to) external returns (uint256 id) {
         id = _nextId++;
         _mint(to, id);
@@ -23,6 +24,7 @@ contract MockERC721 is ERC721 {
 
 contract MockERC1155 is ERC1155 {
     constructor() ERC1155("") {}
+
     function mint(address to, uint256 id, uint256 amount) external {
         _mint(to, id, amount, "");
     }
@@ -38,15 +40,32 @@ contract UnsupportedToken {
 /// @dev Contract that rejects ETH refunds
 contract RefundRejecter {
     SlopMarket public market;
-    constructor(SlopMarket _market) { market = _market; }
+
+    constructor(SlopMarket _market) {
+        market = _market;
+    }
+
     function buy(uint256 listingId, uint256 amount) external payable {
         market.buy{value: msg.value}(listingId, amount);
     }
-    receive() external payable { revert("no refunds"); }
-    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
+
+    receive() external payable {
+        revert("no refunds");
+    }
+
+    function onERC721Received(address, address, uint256, bytes calldata)
+        external
+        pure
+        returns (bytes4)
+    {
         return this.onERC721Received.selector;
     }
-    function onERC1155Received(address, address, uint256, uint256, bytes calldata) external pure returns (bytes4) {
+
+    function onERC1155Received(address, address, uint256, uint256, bytes calldata)
+        external
+        pure
+        returns (bytes4)
+    {
         return this.onERC1155Received.selector;
     }
 }
@@ -108,7 +127,10 @@ contract SlopMarketTest is Test {
         return market.list(address(nft721), tokenId, 1, price, CONTENT_HASH);
     }
 
-    function _list1155(address lister, uint256 tokenId, uint256 amount, uint256 price) internal returns (uint256) {
+    function _list1155(address lister, uint256 tokenId, uint256 amount, uint256 price)
+        internal
+        returns (uint256)
+    {
         vm.prank(lister);
         return market.list(address(nft1155), tokenId, amount, price, CONTENT_HASH);
     }
@@ -593,7 +615,9 @@ contract SlopMarketTest is Test {
         uint256 tokenId = _mintAndApprove721(seller);
 
         vm.expectEmit(true, true, true, true);
-        emit SlopMarket.Listed(0, seller, address(nft721), tokenId, SlopMarket.TokenStandard.ERC721, 1, 1 ether);
+        emit SlopMarket.Listed(
+            0, seller, address(nft721), tokenId, SlopMarket.TokenStandard.ERC721, 1, 1 ether
+        );
 
         vm.prank(seller);
         market.list(address(nft721), tokenId, 1, 1 ether, CONTENT_HASH);

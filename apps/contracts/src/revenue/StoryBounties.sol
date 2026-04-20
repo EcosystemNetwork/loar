@@ -4,7 +4,9 @@ pragma solidity =0.8.30;
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
@@ -23,7 +25,13 @@ import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 ///         - "Need a villain origin story for my universe" — 500 $LOAR
 ///         - "Create a 30-second trailer for Episode 3" — 2000 $LOAR
 ///         - "Design a faction logo" — 200 $LOAR
-contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+contract StoryBounties is
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable
+{
     using SafeERC20 for IERC20;
 
     enum BountyStatus {
@@ -36,15 +44,15 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     struct Bounty {
         uint256 id;
         address poster;
-        uint256 universeId;         // 0 = platform-wide bounty
-        uint256 reward;             // $LOAR amount
+        uint256 universeId; // 0 = platform-wide bounty
+        uint256 reward; // $LOAR amount
         string title;
-        string descriptionHash;     // IPFS hash of full description
-        string contentType;         // "video", "story", "character", "art", "music", etc.
-        uint256 deadline;           // unix timestamp
+        string descriptionHash; // IPFS hash of full description
+        string contentType; // "video", "story", "character", "art", "music", etc.
+        uint256 deadline; // unix timestamp
         BountyStatus status;
-        address claimedBy;          // winner
-        bytes32 submissionHash;     // content hash of winning submission
+        address claimedBy; // winner
+        bytes32 submissionHash; // content hash of winning submission
         uint256 createdAt;
     }
 
@@ -80,8 +88,16 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     // Active bounty IDs per universe (0 = platform-wide)
     mapping(uint256 => uint256[]) public universeBounties;
 
-    event BountyCreated(uint256 indexed bountyId, address indexed poster, uint256 universeId, uint256 reward, string contentType);
-    event BountyClaimed(uint256 indexed bountyId, address indexed winner, uint256 reward, uint256 platformFee);
+    event BountyCreated(
+        uint256 indexed bountyId,
+        address indexed poster,
+        uint256 universeId,
+        uint256 reward,
+        string contentType
+    );
+    event BountyClaimed(
+        uint256 indexed bountyId, address indexed winner, uint256 reward, uint256 platformFee
+    );
     event BountyCancelled(uint256 indexed bountyId, uint256 refund, uint256 fee);
     event BountyExpired(uint256 indexed bountyId);
 
@@ -94,13 +110,14 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     error ZeroAddress();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
-    function initialize(
-        address _loarToken,
-        address _treasury,
-        address _platform
-    ) external initializer {
+    function initialize(address _loarToken, address _treasury, address _platform)
+        external
+        initializer
+    {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -110,16 +127,21 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         loarToken = IERC20(_loarToken);
         treasury = _treasury;
         platform = _platform;
-        platformFeeBps = 500;       // 5%
-        cancellationFeeBps = 200;   // 2%
-        minBountyAmount = 10e18;    // 10 $LOAR minimum
+        platformFeeBps = 500; // 5%
+        cancellationFeeBps = 200; // 2%
+        minBountyAmount = 10e18; // 10 $LOAR minimum
         // PaymentRouter set post-init via setPaymentRouter() if available
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     // ── Create bounty ───────────────────────────────────────────
 
@@ -133,7 +155,9 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         uint256 deadline
     ) external nonReentrant whenNotPaused returns (uint256 bountyId) {
         if (reward < minBountyAmount) revert AmountTooLow();
-        if (deadline <= block.timestamp || deadline > block.timestamp + MAX_DEADLINE) revert InvalidDeadline();
+        if (deadline <= block.timestamp || deadline > block.timestamp + MAX_DEADLINE) {
+            revert InvalidDeadline();
+        }
 
         // Lock $LOAR in contract
         loarToken.safeTransferFrom(msg.sender, address(this), reward);
@@ -163,7 +187,11 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     // ── Award bounty ────────────────────────────────────────────
 
     /// @notice Poster awards the bounty to a winner
-    function awardBounty(uint256 bountyId, address winner, bytes32 submissionHash) external nonReentrant whenNotPaused {
+    function awardBounty(uint256 bountyId, address winner, bytes32 submissionHash)
+        external
+        nonReentrant
+        whenNotPaused
+    {
         if (winner == address(0)) revert ZeroAddress();
         Bounty storage b = bounties[bountyId];
         if (b.status != BountyStatus.OPEN) revert BountyNotOpen();
@@ -241,7 +269,9 @@ contract StoryBounties is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
 
     /// @notice Paginated bounty query — avoids gas limit on large arrays
     function getUniverseBountiesPaginated(uint256 universeId, uint256 offset, uint256 limit)
-        external view returns (uint256[] memory ids, uint256 total)
+        external
+        view
+        returns (uint256[] memory ids, uint256 total)
     {
         uint256[] storage all = universeBounties[universeId];
         total = all.length;

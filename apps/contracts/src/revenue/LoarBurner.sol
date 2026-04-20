@@ -4,7 +4,9 @@ pragma solidity =0.8.30;
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
@@ -31,7 +33,13 @@ import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 ///         - lpRatioBps% → LP address (deepens protocol-owned liquidity)
 ///         - remainder → DAO treasury (protocol revenue)
 ///         Default: 50% LP, 50% treasury.
-contract LoarBurner is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+contract LoarBurner is
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable
+{
     using SafeERC20 for IERC20;
 
     enum BurnAction {
@@ -43,10 +51,10 @@ contract LoarBurner is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reent
     }
 
     struct ActionConfig {
-        uint256 cost;           // $LOAR cost for this action
+        uint256 cost; // $LOAR cost for this action
         bool active;
-        uint256 totalBurned;    // lifetime $LOAR collected for this action (field name is historical; no supply destruction — see contract header)
-        uint256 totalCount;     // lifetime usage count
+        uint256 totalBurned; // lifetime $LOAR collected for this action (field name is historical; no supply destruction — see contract header)
+        uint256 totalCount; // lifetime usage count
     }
 
     IERC20 public loarToken;
@@ -97,7 +105,9 @@ contract LoarBurner is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reent
     error ZeroAddress();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(
         address _loarToken,
@@ -118,14 +128,23 @@ contract LoarBurner is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reent
         lpRatioBps = 5000; // 50% to LP, 50% to treasury
 
         // Default costs (in $LOAR with 18 decimals)
-        actions[BurnAction.PRIORITY_GENERATION] = ActionConfig({cost: 50e18, active: true, totalBurned: 0, totalCount: 0});
-        actions[BurnAction.PERMANENT_CANON]     = ActionConfig({cost: 500e18, active: true, totalBurned: 0, totalCount: 0});
-        actions[BurnAction.PREMIUM_PROFILE]     = ActionConfig({cost: 1000e18, active: true, totalBurned: 0, totalCount: 0});
-        actions[BurnAction.REMIX_BOOST]         = ActionConfig({cost: 100e18, active: true, totalBurned: 0, totalCount: 0});
+        actions[BurnAction.PRIORITY_GENERATION] =
+            ActionConfig({cost: 50e18, active: true, totalBurned: 0, totalCount: 0});
+        actions[BurnAction.PERMANENT_CANON] =
+            ActionConfig({cost: 500e18, active: true, totalBurned: 0, totalCount: 0});
+        actions[BurnAction.PREMIUM_PROFILE] =
+            ActionConfig({cost: 1000e18, active: true, totalBurned: 0, totalCount: 0});
+        actions[BurnAction.REMIX_BOOST] =
+            ActionConfig({cost: 100e18, active: true, totalBurned: 0, totalCount: 0});
     }
 
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
@@ -165,7 +184,10 @@ contract LoarBurner is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reent
 
     // ── Internal ────────────────────────────────────────────────
 
-    function _processPayment(address payer, uint256 cost) internal returns (uint256 toLp, uint256 toTreasury) {
+    function _processPayment(address payer, uint256 cost)
+        internal
+        returns (uint256 toLp, uint256 toTreasury)
+    {
         toLp = (cost * lpRatioBps) / 10_000;
         toTreasury = cost - toLp;
 

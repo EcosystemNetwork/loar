@@ -9,49 +9,26 @@ import {Test} from "forge-std/Test.sol";
 contract BalanceDeltaAssertions is Test {
     // @dev Asserts that `delta1` is equal to `delta2` for both amount0 and amount1
     function assertEq(BalanceDelta delta1, BalanceDelta delta2) internal pure {
-        assertEq(
-            BalanceDeltaLibrary.amount1(delta1),
-            BalanceDeltaLibrary.amount1(delta2)
-        );
-        assertEq(
-            BalanceDeltaLibrary.amount0(delta1),
-            BalanceDeltaLibrary.amount0(delta2)
-        );
+        assertEq(BalanceDeltaLibrary.amount1(delta1), BalanceDeltaLibrary.amount1(delta2));
+        assertEq(BalanceDeltaLibrary.amount0(delta1), BalanceDeltaLibrary.amount0(delta2));
     }
 
     // @dev Asserts that `delta1` is equal to `delta2` for both amount0 and amount1 with a custom error message
-    function assertEq(
-        BalanceDelta delta1,
-        BalanceDelta delta2,
-        string memory err
-    ) internal pure {
-        assertEq(
-            BalanceDeltaLibrary.amount1(delta1),
-            BalanceDeltaLibrary.amount1(delta2),
-            err
-        );
-        assertEq(
-            BalanceDeltaLibrary.amount0(delta1),
-            BalanceDeltaLibrary.amount0(delta2),
-            err
-        );
+    function assertEq(BalanceDelta delta1, BalanceDelta delta2, string memory err) internal pure {
+        assertEq(BalanceDeltaLibrary.amount1(delta1), BalanceDeltaLibrary.amount1(delta2), err);
+        assertEq(BalanceDeltaLibrary.amount0(delta1), BalanceDeltaLibrary.amount0(delta2), err);
     }
 
     // @dev Asserts that `delta1` is approximately equal to `delta2` for both amount0 and amount1
-    function assertApproxEqAbs(
-        BalanceDelta delta1,
-        BalanceDelta delta2,
-        uint256 absTolerance
-    ) internal pure {
+    function assertApproxEqAbs(BalanceDelta delta1, BalanceDelta delta2, uint256 absTolerance)
+        internal
+        pure
+    {
         assertApproxEqAbs(
-            BalanceDeltaLibrary.amount1(delta1),
-            BalanceDeltaLibrary.amount1(delta2),
-            absTolerance
+            BalanceDeltaLibrary.amount1(delta1), BalanceDeltaLibrary.amount1(delta2), absTolerance
         );
         assertApproxEqAbs(
-            BalanceDeltaLibrary.amount0(delta1),
-            BalanceDeltaLibrary.amount0(delta2),
-            absTolerance
+            BalanceDeltaLibrary.amount0(delta1), BalanceDeltaLibrary.amount0(delta2), absTolerance
         );
     }
 
@@ -77,137 +54,83 @@ contract BalanceDeltaAssertions is Test {
     }
 
     // @dev Asserts that `delta1` is not equal to `delta2` for both amount0 and amount1
-    function assertNotEq(
-        BalanceDelta delta1,
-        BalanceDelta delta2
-    ) internal pure {
-        bool amount0Different = BalanceDeltaLibrary.amount0(delta1) !=
-            BalanceDeltaLibrary.amount0(delta2);
-        bool amount1Different = BalanceDeltaLibrary.amount1(delta1) !=
-            BalanceDeltaLibrary.amount1(delta2);
+    function assertNotEq(BalanceDelta delta1, BalanceDelta delta2) internal pure {
+        bool amount0Different =
+            BalanceDeltaLibrary.amount0(delta1) != BalanceDeltaLibrary.amount0(delta2);
+        bool amount1Different =
+            BalanceDeltaLibrary.amount1(delta1) != BalanceDeltaLibrary.amount1(delta2);
         assertTrue(amount0Different || amount1Different);
     }
 
     // @dev Asserts that `delta1` is not equal to `delta2` for both amount0 and amount1 with a custom error message
-    function assertNotEq(
-        BalanceDelta delta1,
-        BalanceDelta delta2,
-        string memory err
-    ) internal pure {
-        bool amount0Different = BalanceDeltaLibrary.amount0(delta1) !=
-            BalanceDeltaLibrary.amount0(delta2);
-        bool amount1Different = BalanceDeltaLibrary.amount1(delta1) !=
-            BalanceDeltaLibrary.amount1(delta2);
+    function assertNotEq(BalanceDelta delta1, BalanceDelta delta2, string memory err)
+        internal
+        pure
+    {
+        bool amount0Different =
+            BalanceDeltaLibrary.amount0(delta1) != BalanceDeltaLibrary.amount0(delta2);
+        bool amount1Different =
+            BalanceDeltaLibrary.amount1(delta1) != BalanceDeltaLibrary.amount1(delta2);
         assertTrue(amount0Different || amount1Different, err);
     }
 
     // @dev Asserts that delta1 is greater than delta2 for both amount0 and amount1
     function assertGt(BalanceDelta delta1, BalanceDelta delta2) internal pure {
-        assertGt(
-            BalanceDeltaLibrary.amount1(delta1),
-            BalanceDeltaLibrary.amount1(delta2)
-        );
-        assertGt(
-            BalanceDeltaLibrary.amount0(delta1),
-            BalanceDeltaLibrary.amount0(delta2)
-        );
+        assertGt(BalanceDeltaLibrary.amount1(delta1), BalanceDeltaLibrary.amount1(delta2));
+        assertGt(BalanceDeltaLibrary.amount0(delta1), BalanceDeltaLibrary.amount0(delta2));
     }
 
     // @dev Asserts that `delta1` is greater than `delta2` for both amount0 and amount1 with a custom error message
-    function assertGt(
-        BalanceDelta delta1,
-        BalanceDelta delta2,
-        string memory err
-    ) internal pure {
-        assertGt(
-            BalanceDeltaLibrary.amount1(delta1),
-            BalanceDeltaLibrary.amount1(delta2),
-            err
-        );
-        assertGt(
-            BalanceDeltaLibrary.amount0(delta1),
-            BalanceDeltaLibrary.amount0(delta2),
-            err
-        );
+    function assertGt(BalanceDelta delta1, BalanceDelta delta2, string memory err) internal pure {
+        assertGt(BalanceDeltaLibrary.amount1(delta1), BalanceDeltaLibrary.amount1(delta2), err);
+        assertGt(BalanceDeltaLibrary.amount0(delta1), BalanceDeltaLibrary.amount0(delta2), err);
     }
 
     // @dev Asserts that delta1 is greater than delta2 for either amount0 or amount1
-    function assertEitherGt(
-        BalanceDelta delta1,
-        BalanceDelta delta2
-    ) internal pure {
-        bool amount1Gt = BalanceDeltaLibrary.amount1(delta1) >
-            BalanceDeltaLibrary.amount1(delta2);
-        bool amount0Gt = BalanceDeltaLibrary.amount0(delta1) >
-            BalanceDeltaLibrary.amount0(delta2);
+    function assertEitherGt(BalanceDelta delta1, BalanceDelta delta2) internal pure {
+        bool amount1Gt = BalanceDeltaLibrary.amount1(delta1) > BalanceDeltaLibrary.amount1(delta2);
+        bool amount0Gt = BalanceDeltaLibrary.amount0(delta1) > BalanceDeltaLibrary.amount0(delta2);
         assertTrue(amount1Gt || amount0Gt);
     }
 
     // @dev Asserts that delta1 is greater than delta2 for either amount0 or amount1 with a custom error message
-    function assertEitherGt(
-        BalanceDelta delta1,
-        BalanceDelta delta2,
-        string memory err
-    ) internal pure {
-        bool amount1Gt = BalanceDeltaLibrary.amount1(delta1) >
-            BalanceDeltaLibrary.amount1(delta2);
-        bool amount0Gt = BalanceDeltaLibrary.amount0(delta1) >
-            BalanceDeltaLibrary.amount0(delta2);
+    function assertEitherGt(BalanceDelta delta1, BalanceDelta delta2, string memory err)
+        internal
+        pure
+    {
+        bool amount1Gt =
+            BalanceDeltaLibrary.amount1(delta1) > BalanceDeltaLibrary.amount1(delta2);
+        bool amount0Gt = BalanceDeltaLibrary.amount0(delta1) > BalanceDeltaLibrary.amount0(delta2);
         assertTrue(amount1Gt || amount0Gt, err);
     }
 
     // @dev Asserts that delta1 is less than delta2 for both amount0 and amount1
     function assertLt(BalanceDelta delta1, BalanceDelta delta2) internal pure {
-        assertLt(
-            BalanceDeltaLibrary.amount1(delta1),
-            BalanceDeltaLibrary.amount1(delta2)
-        );
-        assertLt(
-            BalanceDeltaLibrary.amount0(delta1),
-            BalanceDeltaLibrary.amount0(delta2)
-        );
+        assertLt(BalanceDeltaLibrary.amount1(delta1), BalanceDeltaLibrary.amount1(delta2));
+        assertLt(BalanceDeltaLibrary.amount0(delta1), BalanceDeltaLibrary.amount0(delta2));
     }
 
     // @dev Asserts that delta1 is less than delta2 for both amount0 and amount1 with a custom error message
-    function assertLt(
-        BalanceDelta delta1,
-        BalanceDelta delta2,
-        string memory err
-    ) internal pure {
-        assertLt(
-            BalanceDeltaLibrary.amount1(delta1),
-            BalanceDeltaLibrary.amount1(delta2),
-            err
-        );
-        assertLt(
-            BalanceDeltaLibrary.amount0(delta1),
-            BalanceDeltaLibrary.amount0(delta2),
-            err
-        );
+    function assertLt(BalanceDelta delta1, BalanceDelta delta2, string memory err) internal pure {
+        assertLt(BalanceDeltaLibrary.amount1(delta1), BalanceDeltaLibrary.amount1(delta2), err);
+        assertLt(BalanceDeltaLibrary.amount0(delta1), BalanceDeltaLibrary.amount0(delta2), err);
     }
 
     // @dev Asserts that delta1 is less than delta2 for either amount0 or amount1
-    function assertEitherLt(
-        BalanceDelta delta1,
-        BalanceDelta delta2
-    ) internal pure {
-        bool amount1Lt = BalanceDeltaLibrary.amount1(delta1) <
-            BalanceDeltaLibrary.amount1(delta2);
-        bool amount0Lt = BalanceDeltaLibrary.amount0(delta1) <
-            BalanceDeltaLibrary.amount0(delta2);
+    function assertEitherLt(BalanceDelta delta1, BalanceDelta delta2) internal pure {
+        bool amount1Lt = BalanceDeltaLibrary.amount1(delta1) < BalanceDeltaLibrary.amount1(delta2);
+        bool amount0Lt = BalanceDeltaLibrary.amount0(delta1) < BalanceDeltaLibrary.amount0(delta2);
         assertTrue(amount1Lt || amount0Lt);
     }
 
     // @dev Asserts that delta1 is less than delta2 for either amount0 or amount1 with a custom error message
-    function assertEitherLt(
-        BalanceDelta delta1,
-        BalanceDelta delta2,
-        string memory err
-    ) internal pure {
-        bool amount1Lt = BalanceDeltaLibrary.amount1(delta1) <
-            BalanceDeltaLibrary.amount1(delta2);
-        bool amount0Lt = BalanceDeltaLibrary.amount0(delta1) <
-            BalanceDeltaLibrary.amount0(delta2);
+    function assertEitherLt(BalanceDelta delta1, BalanceDelta delta2, string memory err)
+        internal
+        pure
+    {
+        bool amount1Lt =
+            BalanceDeltaLibrary.amount1(delta1) < BalanceDeltaLibrary.amount1(delta2);
+        bool amount0Lt = BalanceDeltaLibrary.amount0(delta1) < BalanceDeltaLibrary.amount0(delta2);
         assertTrue(amount1Lt || amount0Lt, err);
     }
 }

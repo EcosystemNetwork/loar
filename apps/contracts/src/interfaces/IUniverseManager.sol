@@ -22,6 +22,7 @@ interface IUniverseManager {
         string description;
         address universeManager;
     }
+
     struct TokenConfig {
         address tokenAdmin;
         string name;
@@ -40,10 +41,10 @@ interface IUniverseManager {
     }
 
     struct AllocationConfig {
-        uint16 curveBps;      // % → bonding curve (min 5000 = 50%)
-        uint16 creatorBps;    // % → universe creator
-        uint16 treasuryBps;   // % → protocol treasury (min 200 = 2%)
-        uint16 communityBps;  // % → community rewards
+        uint16 curveBps; // % → bonding curve (min 5000 = 50%)
+        uint16 creatorBps; // % → universe creator
+        uint16 treasuryBps; // % → protocol treasury (min 200 = 2%)
+        uint16 communityBps; // % → community rewards
     }
 
     struct DeploymentConfig {
@@ -66,16 +67,9 @@ interface IUniverseManager {
         bytes lockerData;
     }
 
-    event UniverseCreated(
-        address universe,
-        address creator
-    );
+    event UniverseCreated(address universe, address creator);
     /// @notice Emitted when the mint fee ETH is stored as LP seed for the universe's token pool.
-    event UniverseLpSeed(
-        uint256 indexed universeId,
-        address indexed creator,
-        uint256 amount
-    );
+    event UniverseLpSeed(uint256 indexed universeId, address indexed creator, uint256 amount);
     event TokenDeployed();
     event BondingCurveCreated(
         uint256 indexed universeId,
@@ -85,20 +79,10 @@ interface IUniverseManager {
         uint256 curveSupply
     );
     event TokenGraduated(
-        uint256 indexed universeId,
-        address indexed token,
-        uint256 ethRaised,
-        uint256 lpTokens
+        uint256 indexed universeId, address indexed token, uint256 ethRaised, uint256 lpTokens
     );
-    event SetTeamFeeRecipient(
-        address oldTeamFeeRecipient,
-        address newTeamFeeRecipient
-    );
-    event ClaimTeamFees(
-        address indexed token,
-        address indexed recipient,
-        uint256 amount
-    );
+    event SetTeamFeeRecipient(address oldTeamFeeRecipient, address newTeamFeeRecipient);
+    event ClaimTeamFees(address indexed token, address indexed recipient, uint256 amount);
     event TokenCreated(
         address msgSender,
         address indexed tokenAddress,
@@ -116,10 +100,7 @@ interface IUniverseManager {
         address governor
     );
     event UniverseCreatedWithToken(
-        uint256 indexed universeId,
-        address universe,
-        address token,
-        address governor
+        uint256 indexed universeId, address universe, address token, address governor
     );
     event SetIdentityNft(address oldIdentityNft, address newIdentityNft);
     event SetLocker(address locker, address hook, bool enabled);
@@ -136,7 +117,6 @@ interface IUniverseManager {
     error CallerIsNotOwner();
     error TokenAlreadyDeployed();
 
-
     function createUniverse(
         string memory name,
         string memory imageURL,
@@ -144,12 +124,11 @@ interface IUniverseManager {
         NodeCreationOptions nodeCreationOptions,
         NodeVisibilityOptions nodeVisibilityOptions,
         address initialOwner
-    ) external payable returns (uint _id, address);
+    ) external payable returns (uint256 _id, address);
 
-    function deployUniverseToken(
-        DeploymentConfig memory deploymentConfig,
-        uint id
-    ) external returns (address tokenAddress);
+    function deployUniverseToken(DeploymentConfig memory deploymentConfig, uint256 id)
+        external
+        returns (address tokenAddress);
 
     function createUniverseWithToken(
         string memory name,
@@ -159,11 +138,7 @@ interface IUniverseManager {
         NodeVisibilityOptions nodeVisibilityOptions,
         address initialOwner,
         DeploymentConfig memory deploymentConfig
-    ) external payable returns (
-        uint256 universeId,
-        address universeAddress,
-        address tokenAddress
-    );
+    ) external payable returns (uint256 universeId, address universeAddress, address tokenAddress);
 
     function graduateFromBondingCurve(
         uint256 universeId,
@@ -176,12 +151,15 @@ interface IUniverseManager {
 
     function enabledLockers(address locker, address hook) external view returns (bool);
 
-    function getUniverseData(uint id) external view returns (
-        IUniverse universe,
-        IERC20 token,
-        IGovernor universeGovernor,
-        IHooks hook,
-        ILoarLpLocker locker,
-        address bondingCurve
-    );
+    function getUniverseData(uint256 id)
+        external
+        view
+        returns (
+            IUniverse universe,
+            IERC20 token,
+            IGovernor universeGovernor,
+            IHooks hook,
+            ILoarLpLocker locker,
+            address bondingCurve
+        );
 }

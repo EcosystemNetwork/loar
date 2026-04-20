@@ -17,9 +17,17 @@ contract MockVotesToken {
         totalSupply_ += amount;
     }
 
-    function totalSupply() external view returns (uint256) { return totalSupply_; }
-    function getPastVotes(address account, uint256) external view returns (uint256) { return balances[account]; }
-    function getPastTotalSupply(uint256) external view returns (uint256) { return totalSupply_; }
+    function totalSupply() external view returns (uint256) {
+        return totalSupply_;
+    }
+
+    function getPastVotes(address account, uint256) external view returns (uint256) {
+        return balances[account];
+    }
+
+    function getPastTotalSupply(uint256) external view returns (uint256) {
+        return totalSupply_;
+    }
 }
 
 /// @dev Mock UniverseManager that returns a known token for a universe ID
@@ -30,9 +38,18 @@ contract MockUniverseManager {
         universeTokens[universeId] = token;
     }
 
-    function getUniverseData(uint256 id) external view returns (
-        address universe, address token, address governor, address hook, address locker, address bondingCurve
-    ) {
+    function getUniverseData(uint256 id)
+        external
+        view
+        returns (
+            address universe,
+            address token,
+            address governor,
+            address hook,
+            address locker,
+            address bondingCurve
+        )
+    {
         return (address(0), universeTokens[id], address(0), address(0), address(0), address(0));
     }
 }
@@ -44,16 +61,16 @@ contract CanonMarketplaceTest is Test {
     MockVotesToken public votesToken;
     MockUniverseManager public universeManager;
 
-    address deployer  = makeAddr("deployer");
-    address platform  = makeAddr("platform");
-    address creator   = makeAddr("creator");
-    address voter1    = makeAddr("voter1");
-    address voter2    = makeAddr("voter2");
-    address attacker  = makeAddr("attacker");
+    address deployer = makeAddr("deployer");
+    address platform = makeAddr("platform");
+    address creator = makeAddr("creator");
+    address voter1 = makeAddr("voter1");
+    address voter2 = makeAddr("voter2");
+    address attacker = makeAddr("attacker");
 
-    uint16 constant PLATFORM_FEE = 500;    // 5%
-    uint16 constant LICENSE_FEE  = 300;    // 3%
-    uint256 constant MIN_FEE     = 0.001 ether;
+    uint16 constant PLATFORM_FEE = 500; // 5%
+    uint16 constant LICENSE_FEE = 300; // 3%
+    uint256 constant MIN_FEE = 0.001 ether;
     uint256 constant VOTE_DURATION = 7 days;
     uint256 constant UNIVERSE_ID = 1;
 
@@ -66,18 +83,25 @@ contract CanonMarketplaceTest is Test {
         universeManager = new MockUniverseManager();
 
         CanonMarketplace impl = new CanonMarketplace();
-        canon = CanonMarketplace(address(new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(CanonMarketplace.initialize, (
-                platform,
-                address(rights),
-                address(router),
-                PLATFORM_FEE,
-                LICENSE_FEE,
-                MIN_FEE,
-                VOTE_DURATION
-            ))
-        )));
+        canon = CanonMarketplace(
+            address(
+                new ERC1967Proxy(
+                    address(impl),
+                    abi.encodeCall(
+                        CanonMarketplace.initialize,
+                        (
+                            platform,
+                            address(rights),
+                            address(router),
+                            PLATFORM_FEE,
+                            LICENSE_FEE,
+                            MIN_FEE,
+                            VOTE_DURATION
+                        )
+                    )
+                )
+            )
+        );
 
         // Wire up UniverseManager for C5 protection
         canon.setUniverseManager(address(universeManager));
@@ -116,10 +140,18 @@ contract CanonMarketplaceTest is Test {
         vm.expectRevert(CanonMarketplace.ZeroAddress.selector);
         new ERC1967Proxy(
             address(impl),
-            abi.encodeCall(CanonMarketplace.initialize, (
-                address(0), address(rights), address(router),
-                PLATFORM_FEE, LICENSE_FEE, MIN_FEE, VOTE_DURATION
-            ))
+            abi.encodeCall(
+                CanonMarketplace.initialize,
+                (
+                    address(0),
+                    address(rights),
+                    address(router),
+                    PLATFORM_FEE,
+                    LICENSE_FEE,
+                    MIN_FEE,
+                    VOTE_DURATION
+                )
+            )
         );
     }
 
@@ -128,18 +160,31 @@ contract CanonMarketplaceTest is Test {
         vm.expectRevert(CanonMarketplace.FeeTooHigh.selector);
         new ERC1967Proxy(
             address(impl),
-            abi.encodeCall(CanonMarketplace.initialize, (
-                platform, address(rights), address(router),
-                5001, LICENSE_FEE, MIN_FEE, VOTE_DURATION
-            ))
+            abi.encodeCall(
+                CanonMarketplace.initialize,
+                (
+                    platform,
+                    address(rights),
+                    address(router),
+                    5001,
+                    LICENSE_FEE,
+                    MIN_FEE,
+                    VOTE_DURATION
+                )
+            )
         );
     }
 
     function test_cannotReinitialize() public {
         vm.expectRevert();
         canon.initialize(
-            platform, address(rights), address(router),
-            PLATFORM_FEE, LICENSE_FEE, MIN_FEE, VOTE_DURATION
+            platform,
+            address(rights),
+            address(router),
+            PLATFORM_FEE,
+            LICENSE_FEE,
+            MIN_FEE,
+            VOTE_DURATION
         );
     }
 

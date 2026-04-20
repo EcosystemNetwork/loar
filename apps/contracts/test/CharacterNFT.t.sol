@@ -15,13 +15,13 @@ contract CharacterNFTTest is Test {
     PaymentRouter public router;
     RightsRegistry public registry;
 
-    address deployer  = makeAddr("deployer");
-    address platform  = makeAddr("platform");
-    address treasury  = makeAddr("treasury");
-    address creator   = makeAddr("creator");
-    address creator2  = makeAddr("creator2");
-    address user2     = makeAddr("user2");
-    address buyer     = makeAddr("buyer");
+    address deployer = makeAddr("deployer");
+    address platform = makeAddr("platform");
+    address treasury = makeAddr("treasury");
+    address creator = makeAddr("creator");
+    address creator2 = makeAddr("creator2");
+    address user2 = makeAddr("user2");
+    address buyer = makeAddr("buyer");
 
     bytes32 visualHash = keccak256("character-visual");
 
@@ -30,31 +30,45 @@ contract CharacterNFTTest is Test {
 
         // Deploy PaymentRouter
         PaymentRouter routerImpl = new PaymentRouter();
-        router = PaymentRouter(address(new ERC1967Proxy(
-            address(routerImpl),
-            abi.encodeCall(PaymentRouter.initialize, (treasury, 1000, address(0), 0))
-        )));
+        router = PaymentRouter(
+            address(
+                new ERC1967Proxy(
+                    address(routerImpl),
+                    abi.encodeCall(PaymentRouter.initialize, (treasury, 1000, address(0), 0))
+                )
+            )
+        );
 
         // Deploy RightsRegistry
         RightsRegistry registryImpl = new RightsRegistry();
-        registry = RightsRegistry(address(new ERC1967Proxy(
-            address(registryImpl),
-            abi.encodeCall(RightsRegistry.initialize, (platform))
-        )));
+        registry = RightsRegistry(
+            address(
+                new ERC1967Proxy(
+                    address(registryImpl), abi.encodeCall(RightsRegistry.initialize, (platform))
+                )
+            )
+        );
 
         // Deploy CharacterNFT via Beacon
         CharacterNFT impl = new CharacterNFT();
         UpgradeableBeacon beacon = new UpgradeableBeacon(address(impl), deployer);
-        nft = CharacterNFT(address(new BeaconProxy(
-            address(beacon),
-            abi.encodeCall(CharacterNFT.initialize, (
-                1, // universeId
-                platform,
-                address(registry),
-                address(router),
-                300 // 3% appearance fee
-            ))
-        )));
+        nft = CharacterNFT(
+            address(
+                new BeaconProxy(
+                    address(beacon),
+                    abi.encodeCall(
+                        CharacterNFT.initialize,
+                        (
+                            1, // universeId
+                            platform,
+                            address(registry),
+                            address(router),
+                            300 // 3% appearance fee
+                        )
+                    )
+                )
+            )
+        );
 
         vm.stopPrank();
         vm.deal(platform, 100 ether);
@@ -92,7 +106,9 @@ contract CharacterNFTTest is Test {
         vm.expectRevert(CharacterNFT.FeeTooHigh.selector);
         new BeaconProxy(
             address(beacon),
-            abi.encodeCall(CharacterNFT.initialize, (1, platform, address(registry), address(router), 5001))
+            abi.encodeCall(
+                CharacterNFT.initialize, (1, platform, address(registry), address(router), 5001)
+            )
         );
     }
 
@@ -100,10 +116,17 @@ contract CharacterNFTTest is Test {
         CharacterNFT impl = new CharacterNFT();
         UpgradeableBeacon beacon = new UpgradeableBeacon(address(impl), address(this));
         // 5000 should succeed
-        CharacterNFT nft2 = CharacterNFT(address(new BeaconProxy(
-            address(beacon),
-            abi.encodeCall(CharacterNFT.initialize, (1, platform, address(registry), address(router), 5000))
-        )));
+        CharacterNFT nft2 = CharacterNFT(
+            address(
+                new BeaconProxy(
+                    address(beacon),
+                    abi.encodeCall(
+                        CharacterNFT.initialize,
+                        (1, platform, address(registry), address(router), 5000)
+                    )
+                )
+            )
+        );
         assertEq(nft2.appearanceFeeBps(), 5000);
     }
 
@@ -119,7 +142,14 @@ contract CharacterNFTTest is Test {
         assertEq(nft.ownerOf(1), creator); // tokenId 1
         assertEq(nft.tokenURI(1), "ipfs://alice");
 
-        (uint256 uid, string memory name, bytes32 vh, address cr, uint256 appearances, uint256 royalties) = nft.characters(1);
+        (
+            uint256 uid,
+            string memory name,
+            bytes32 vh,
+            address cr,
+            uint256 appearances,
+            uint256 royalties
+        ) = nft.characters(1);
         assertEq(uid, 1);
         assertEq(name, "Alice");
         assertEq(vh, visualHash);
@@ -149,7 +179,7 @@ contract CharacterNFTTest is Test {
     function test_createCharacter_multipleCharacters() public {
         vm.startPrank(creator);
         uint256 id1 = nft.createCharacter(1, "Alice", keccak256("a"), "ipfs://a", 0, 0);
-        uint256 id2 = nft.createCharacter(1, "Bob",   keccak256("b"), "ipfs://b", 0, 0);
+        uint256 id2 = nft.createCharacter(1, "Bob", keccak256("b"), "ipfs://b", 0, 0);
         uint256 id3 = nft.createCharacter(1, "Charlie", keccak256("c"), "ipfs://c", 0, 0);
         vm.stopPrank();
 
@@ -229,7 +259,8 @@ contract CharacterNFTTest is Test {
 
     function test_mintCharacter_paid() public {
         vm.prank(creator);
-        uint256 charId = nft.createCharacter(1, "Alice", keccak256("paid-char"), "ipfs://alice", 0.1 ether, 10);
+        uint256 charId =
+            nft.createCharacter(1, "Alice", keccak256("paid-char"), "ipfs://alice", 0.1 ether, 10);
 
         vm.prank(buyer);
         uint256 tokenId = nft.mintCharacter{value: 0.1 ether}(charId, "ipfs://edition1");
@@ -244,7 +275,8 @@ contract CharacterNFTTest is Test {
 
     function test_mintCharacter_routesPayment() public {
         vm.prank(creator);
-        uint256 charId = nft.createCharacter(1, "Alice", keccak256("paid-char"), "ipfs://alice", 1 ether, 10);
+        uint256 charId =
+            nft.createCharacter(1, "Alice", keccak256("paid-char"), "ipfs://alice", 1 ether, 10);
 
         uint256 treasuryBefore = treasury.balance;
         vm.prank(buyer);
@@ -257,7 +289,8 @@ contract CharacterNFTTest is Test {
 
     function test_mintCharacter_refundsExcess() public {
         vm.prank(creator);
-        uint256 charId = nft.createCharacter(1, "Alice", keccak256("paid-char"), "ipfs://alice", 0.1 ether, 10);
+        uint256 charId =
+            nft.createCharacter(1, "Alice", keccak256("paid-char"), "ipfs://alice", 0.1 ether, 10);
 
         uint256 buyerBefore = buyer.balance;
         vm.prank(buyer);
@@ -269,7 +302,8 @@ contract CharacterNFTTest is Test {
 
     function test_mintCharacter_freeCharacter() public {
         vm.prank(creator);
-        uint256 charId = nft.createCharacter(1, "Alice", keccak256("free-char"), "ipfs://alice", 0, 10);
+        uint256 charId =
+            nft.createCharacter(1, "Alice", keccak256("free-char"), "ipfs://alice", 0, 10);
 
         vm.prank(buyer);
         uint256 tokenId = nft.mintCharacter{value: 0}(charId, "ipfs://edition1");
@@ -280,7 +314,8 @@ contract CharacterNFTTest is Test {
 
     function test_mintCharacter_revert_inactive() public {
         vm.prank(creator);
-        uint256 charId = nft.createCharacter(1, "Alice", keccak256("paid-char"), "ipfs://alice", 0.1 ether, 10);
+        uint256 charId =
+            nft.createCharacter(1, "Alice", keccak256("paid-char"), "ipfs://alice", 0.1 ether, 10);
 
         vm.prank(creator);
         nft.deactivateCharacter(charId);
@@ -293,7 +328,8 @@ contract CharacterNFTTest is Test {
     function test_mintCharacter_revert_maxSupplyReached() public {
         vm.prank(creator);
         // maxSupply=2, creator already minted 1
-        uint256 charId = nft.createCharacter(1, "Alice", keccak256("paid-char"), "ipfs://alice", 0.1 ether, 2);
+        uint256 charId =
+            nft.createCharacter(1, "Alice", keccak256("paid-char"), "ipfs://alice", 0.1 ether, 2);
 
         vm.prank(buyer);
         nft.mintCharacter{value: 0.1 ether}(charId, "ipfs://edition1");
@@ -306,7 +342,8 @@ contract CharacterNFTTest is Test {
 
     function test_mintCharacter_revert_insufficientPayment() public {
         vm.prank(creator);
-        uint256 charId = nft.createCharacter(1, "Alice", keccak256("paid-char"), "ipfs://alice", 1 ether, 10);
+        uint256 charId =
+            nft.createCharacter(1, "Alice", keccak256("paid-char"), "ipfs://alice", 1 ether, 10);
 
         vm.prank(buyer);
         vm.expectRevert(CharacterNFT.InsufficientPayment.selector);
@@ -318,7 +355,8 @@ contract CharacterNFTTest is Test {
         vm.deal(buyer2, 10 ether);
 
         vm.prank(creator);
-        uint256 charId = nft.createCharacter(1, "Alice", keccak256("paid-char"), "ipfs://alice", 0.1 ether, 10);
+        uint256 charId =
+            nft.createCharacter(1, "Alice", keccak256("paid-char"), "ipfs://alice", 0.1 ether, 10);
 
         vm.prank(buyer);
         uint256 t1 = nft.mintCharacter{value: 0.1 ether}(charId, "ipfs://e1");
@@ -336,7 +374,8 @@ contract CharacterNFTTest is Test {
         // maxSupply=0 means 1-of-1 only per the contract logic (0 > 0 is false so the check passes)
         // Actually looking at the code: if (maxSup > 0 && characterMinted >= maxSup)
         // So maxSup=0 means unlimited!
-        uint256 charId = nft.createCharacter(1, "Alice", keccak256("free-char"), "ipfs://alice", 0, 0);
+        uint256 charId =
+            nft.createCharacter(1, "Alice", keccak256("free-char"), "ipfs://alice", 0, 0);
 
         // Should be able to mint even though maxSupply=0 (unlimited)
         vm.prank(buyer);
@@ -361,7 +400,8 @@ contract CharacterNFTTest is Test {
 
     function test_royaltyInfo_editionToken() public {
         vm.prank(creator);
-        uint256 charId = nft.createCharacter(1, "Alice", keccak256("paid-char"), "ipfs://alice", 0.1 ether, 10);
+        uint256 charId =
+            nft.createCharacter(1, "Alice", keccak256("paid-char"), "ipfs://alice", 0.1 ether, 10);
 
         vm.prank(buyer);
         uint256 tokenId = nft.mintCharacter{value: 0.1 ether}(charId, "ipfs://e1");

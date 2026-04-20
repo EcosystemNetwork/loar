@@ -46,7 +46,9 @@ contract DeployStakingScript is Script {
             address(
                 new ERC1967Proxy(
                     address(impl),
-                    abi.encodeCall(LaunchpadStaking.initialize, (loarToken, treasury, liquidityPool))
+                    abi.encodeCall(
+                        LaunchpadStaking.initialize, (loarToken, treasury, liquidityPool)
+                    )
                 )
             )
         );
@@ -55,10 +57,10 @@ contract DeployStakingScript is Script {
         // Configure default tiers (matching server-side TIER_THRESHOLDS)
         // Tier enum: 0=NONE, 1=BRONZE, 2=SILVER, 3=GOLD, 4=DIAMOND
         //                              tier  minStake       weight feeDisc curationBoost priorityQueue
-        staking.setTierConfig(LaunchpadStaking.Tier(1), 1_000e18,    100,   100,   100,   false); // BRONZE
-        staking.setTierConfig(LaunchpadStaking.Tier(2), 10_000e18,   200,   250,   150,   true);  // SILVER
-        staking.setTierConfig(LaunchpadStaking.Tier(3), 100_000e18,  400,   500,   200,   true);  // GOLD
-        staking.setTierConfig(LaunchpadStaking.Tier(4), 500_000e18,  800,   1000,  300,   true);  // DIAMOND
+        staking.setTierConfig(LaunchpadStaking.Tier(1), 1_000e18, 100, 100, 100, false); // BRONZE
+        staking.setTierConfig(LaunchpadStaking.Tier(2), 10_000e18, 200, 250, 150, true); // SILVER
+        staking.setTierConfig(LaunchpadStaking.Tier(3), 100_000e18, 400, 500, 200, true); // GOLD
+        staking.setTierConfig(LaunchpadStaking.Tier(4), 500_000e18, 800, 1000, 300, true); // DIAMOND
         console.log("Tier configs set");
 
         vm.stopBroadcast();

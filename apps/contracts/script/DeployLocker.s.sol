@@ -114,7 +114,8 @@ contract DeployLockerScript is Script {
         // Register locker with UniverseManager if requested
         if (registerLocker) {
             console.log("\nRegistering locker with UniverseManager for hook...");
-            UniverseManager(payable(universeManager)).setLocker(address(lpLocker), hookAddress, true);
+            UniverseManager(payable(universeManager))
+                .setLocker(address(lpLocker), hookAddress, true);
             console.log("Locker registered successfully");
         }
 

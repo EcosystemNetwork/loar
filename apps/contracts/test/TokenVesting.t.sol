@@ -36,9 +36,7 @@ contract TokenVestingTest is Test {
 
     function _createDefaultVesting() internal returns (uint256 vestingId) {
         vm.prank(owner);
-        vestingId = vesting.createVesting(
-            address(token), beneficiary, VEST_AMOUNT, CLIFF, DURATION
-        );
+        vestingId = vesting.createVesting(address(token), beneficiary, VEST_AMOUNT, CLIFF, DURATION);
     }
 
     // ── createVesting ──
@@ -141,12 +139,10 @@ contract TokenVestingTest is Test {
     function test_claimAll() public {
         // Create two vestings for same beneficiary
         vm.startPrank(owner);
-        uint256 id1 = vesting.createVesting(
-            address(token), beneficiary, VEST_AMOUNT, CLIFF, DURATION
-        );
-        uint256 id2 = vesting.createVesting(
-            address(token), beneficiary, VEST_AMOUNT, CLIFF, DURATION
-        );
+        uint256 id1 =
+            vesting.createVesting(address(token), beneficiary, VEST_AMOUNT, CLIFF, DURATION);
+        uint256 id2 =
+            vesting.createVesting(address(token), beneficiary, VEST_AMOUNT, CLIFF, DURATION);
         vm.stopPrank();
 
         // Warp past full vesting

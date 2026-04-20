@@ -4,7 +4,9 @@ pragma solidity =0.8.30;
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IPaymentRouter} from "./interfaces/IPaymentRouter.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
@@ -18,7 +20,14 @@ import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 ///
 ///         Replaces the scattered platform.call + creator.call patterns in each
 ///         revenue contract, giving a single place to adjust fees and routing.
-contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+contract PaymentRouter is
+    IPaymentRouter,
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable
+{
     using SafeERC20 for IERC20;
 
     address public treasury;
@@ -49,16 +58,10 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
     bool public loarTokenLocked;
 
     event PaymentRouted(
-        address indexed creator,
-        uint256 creatorAmount,
-        uint256 platformAmount,
-        uint16 feeBps
+        address indexed creator, uint256 creatorAmount, uint256 platformAmount, uint16 feeBps
     );
     event LoarPaymentRouted(
-        address indexed creator,
-        uint256 creatorAmount,
-        uint256 platformAmount,
-        uint16 feeBps
+        address indexed creator, uint256 creatorAmount, uint256 platformAmount, uint16 feeBps
     );
     event Claimed(address indexed creator, uint256 amount);
     event LoarClaimed(address indexed creator, uint256 amount);
@@ -73,7 +76,9 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
     error FeeTooHigh();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
     /// @param _treasury Receives the platform's fee cut immediately on each route()
     /// @param _defaultPlatformFeeBps Default fee in basis points (e.g. 1000 = 10%)
@@ -97,8 +102,13 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
         loarFeeDiscountBps = _loarFeeDiscountBps;
     }
 
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
@@ -187,7 +197,11 @@ contract PaymentRouter is IPaymentRouter, Initializable, UUPSUpgradeable, Ownabl
     /// @param creator Address that will be able to claim the creator portion
     /// @param feeBps Platform fee in basis points; USE_DEFAULT_FEE to use default (with discount applied)
     /// @param amount $LOAR amount to route
-    function routeLoar(address creator, uint16 feeBps, uint256 amount) external nonReentrant whenNotPaused {
+    function routeLoar(address creator, uint16 feeBps, uint256 amount)
+        external
+        nonReentrant
+        whenNotPaused
+    {
         if (amount == 0) return;
         if (creator == address(0)) revert ZeroAddress();
         if (address(loarToken) == address(0)) revert ZeroAddress();

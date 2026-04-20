@@ -22,10 +22,14 @@ contract UpgradeTest is Test {
 
         // Deploy V1 implementation + proxy
         PaymentRouter implV1 = new PaymentRouter();
-        PaymentRouter proxy = PaymentRouter(address(new ERC1967Proxy(
-            address(implV1),
-            abi.encodeCall(PaymentRouter.initialize, (treasury, 500, address(0), 0))
-        )));
+        PaymentRouter proxy = PaymentRouter(
+            address(
+                new ERC1967Proxy(
+                    address(implV1),
+                    abi.encodeCall(PaymentRouter.initialize, (treasury, 500, address(0), 0))
+                )
+            )
+        );
 
         // Verify V1 state
         assertEq(proxy.treasury(), treasury);
@@ -47,10 +51,14 @@ contract UpgradeTest is Test {
     function test_UUPS_non_owner_cannot_upgrade() public {
         vm.startPrank(deployer);
         PaymentRouter impl = new PaymentRouter();
-        PaymentRouter proxy = PaymentRouter(address(new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(PaymentRouter.initialize, (treasury, 500, address(0), 0))
-        )));
+        PaymentRouter proxy = PaymentRouter(
+            address(
+                new ERC1967Proxy(
+                    address(impl),
+                    abi.encodeCall(PaymentRouter.initialize, (treasury, 500, address(0), 0))
+                )
+            )
+        );
         PaymentRouter newImpl = new PaymentRouter();
         vm.stopPrank();
 
@@ -63,10 +71,14 @@ contract UpgradeTest is Test {
 
     function test_UUPS_cannot_reinitialize() public {
         vm.startPrank(deployer);
-        PaymentRouter proxy = PaymentRouter(address(new ERC1967Proxy(
-            address(new PaymentRouter()),
-            abi.encodeCall(PaymentRouter.initialize, (treasury, 500, address(0), 0))
-        )));
+        PaymentRouter proxy = PaymentRouter(
+            address(
+                new ERC1967Proxy(
+                    address(new PaymentRouter()),
+                    abi.encodeCall(PaymentRouter.initialize, (treasury, 500, address(0), 0))
+                )
+            )
+        );
 
         // Try to reinitialize — should revert
         vm.expectRevert();
@@ -84,19 +96,27 @@ contract UpgradeTest is Test {
         UpgradeableBeacon beacon = new UpgradeableBeacon(address(implV1), deployer);
 
         // Deploy 2 universe proxies through the beacon
-        CharacterNFT universe1 = CharacterNFT(address(new BeaconProxy(
-            address(beacon),
-            abi.encodeCall(CharacterNFT.initialize, (
-                1, deployer, address(0x1), address(0x2), 300
-            ))
-        )));
+        CharacterNFT universe1 = CharacterNFT(
+            address(
+                new BeaconProxy(
+                    address(beacon),
+                    abi.encodeCall(
+                        CharacterNFT.initialize, (1, deployer, address(0x1), address(0x2), 300)
+                    )
+                )
+            )
+        );
 
-        CharacterNFT universe2 = CharacterNFT(address(new BeaconProxy(
-            address(beacon),
-            abi.encodeCall(CharacterNFT.initialize, (
-                2, deployer, address(0x1), address(0x2), 300
-            ))
-        )));
+        CharacterNFT universe2 = CharacterNFT(
+            address(
+                new BeaconProxy(
+                    address(beacon),
+                    abi.encodeCall(
+                        CharacterNFT.initialize, (2, deployer, address(0x1), address(0x2), 300)
+                    )
+                )
+            )
+        );
 
         // Verify both proxies work
         assertEq(universe1.universeId(), 1);

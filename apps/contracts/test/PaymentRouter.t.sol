@@ -11,7 +11,9 @@ contract ReentrancyClaimer {
     PaymentRouter public router;
     uint256 public attempts;
 
-    constructor(PaymentRouter _router) { router = _router; }
+    constructor(PaymentRouter _router) {
+        router = _router;
+    }
 
     function attack() external {
         router.claim();
@@ -31,9 +33,9 @@ contract PaymentRouterTest is Test {
 
     address deployer = makeAddr("deployer");
     address treasury = makeAddr("treasury");
-    address creator  = makeAddr("creator");
+    address creator = makeAddr("creator");
     address creator2 = makeAddr("creator2");
-    address user     = makeAddr("user");
+    address user = makeAddr("user");
 
     function setUp() public {
         vm.startPrank(deployer);
@@ -41,10 +43,14 @@ contract PaymentRouterTest is Test {
         loar = new MockLoarToken();
 
         PaymentRouter impl = new PaymentRouter();
-        router = PaymentRouter(address(new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(PaymentRouter.initialize, (treasury, 1000, address(loar), 500))
-        )));
+        router = PaymentRouter(
+            address(
+                new ERC1967Proxy(
+                    address(impl),
+                    abi.encodeCall(PaymentRouter.initialize, (treasury, 1000, address(loar), 500))
+                )
+            )
+        );
         vm.stopPrank();
 
         vm.deal(user, 100 ether);
@@ -75,18 +81,21 @@ contract PaymentRouterTest is Test {
         PaymentRouter impl = new PaymentRouter();
         vm.expectRevert(PaymentRouter.FeeTooHigh.selector);
         new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(PaymentRouter.initialize, (treasury, 5001, address(0), 0))
+            address(impl), abi.encodeCall(PaymentRouter.initialize, (treasury, 5001, address(0), 0))
         );
     }
 
     function test_initialize_boundary_5000() public {
         PaymentRouter impl = new PaymentRouter();
         // 5000 should succeed (cap is inclusive)
-        PaymentRouter r = PaymentRouter(address(new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(PaymentRouter.initialize, (treasury, 5000, address(0), 0))
-        )));
+        PaymentRouter r = PaymentRouter(
+            address(
+                new ERC1967Proxy(
+                    address(impl),
+                    abi.encodeCall(PaymentRouter.initialize, (treasury, 5000, address(0), 0))
+                )
+            )
+        );
         assertEq(r.defaultPlatformFeeBps(), 5000);
     }
 
@@ -275,7 +284,7 @@ contract PaymentRouterTest is Test {
         vm.stopPrank();
 
         uint256 platformCut = (100e18 * 500) / 10_000; // 5e18
-        uint256 creatorCut = 100e18 - platformCut;      // 95e18
+        uint256 creatorCut = 100e18 - platformCut; // 95e18
 
         assertEq(router.claimableLoar(creator), creatorCut);
         assertEq(loar.balanceOf(treasury), platformCut);
@@ -319,10 +328,14 @@ contract PaymentRouterTest is Test {
         // Deploy router without LOAR token
         vm.startPrank(deployer);
         PaymentRouter impl = new PaymentRouter();
-        PaymentRouter noLoarRouter = PaymentRouter(address(new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(PaymentRouter.initialize, (treasury, 1000, address(0), 0))
-        )));
+        PaymentRouter noLoarRouter = PaymentRouter(
+            address(
+                new ERC1967Proxy(
+                    address(impl),
+                    abi.encodeCall(PaymentRouter.initialize, (treasury, 1000, address(0), 0))
+                )
+            )
+        );
         vm.stopPrank();
 
         vm.prank(user);

@@ -4,7 +4,9 @@ pragma solidity =0.8.30;
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
@@ -23,12 +25,18 @@ import {IERC721} from "@openzeppelin/token/ERC721/IERC721.sol";
 ///
 ///         Universe creators can set custom remix fees for their universe.
 ///         Platform sets a minimum and default.
-contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+contract RemixFees is
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable
+{
     using SafeERC20 for IERC20;
 
     struct RemixConfig {
-        uint256 fee;            // $LOAR cost to remix content from this universe
-        bool customFee;         // true if universe creator set a custom fee
+        uint256 fee; // $LOAR cost to remix content from this universe
+        bool customFee; // true if universe creator set a custom fee
     }
 
     IERC20 public loarToken;
@@ -43,9 +51,9 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
     uint256 public minRemixFee;
 
     /// @notice Split ratios (must sum to 10000)
-    uint16 public creatorShareBps;    // % to original content creator
-    uint16 public lpShareBps;         // % to LP
-    uint16 public treasuryShareBps;   // % to DAO treasury
+    uint16 public creatorShareBps; // % to original content creator
+    uint16 public lpShareBps; // % to LP
+    uint16 public treasuryShareBps; // % to DAO treasury
 
     /// @notice On-chain source of truth for universe ownership (ERC-721)
     address public universeManager;
@@ -84,7 +92,9 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
     uint256 public maxRemixFee;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(
         address _loarToken,
@@ -103,9 +113,9 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
         liquidityPool = _liquidityPool;
         platform = _platform;
 
-        defaultRemixFee = 25e18;    // 25 $LOAR default
-        minRemixFee = 5e18;         // 5 $LOAR minimum
-        maxRemixFee = 10_000e18;    // 10,000 $LOAR maximum
+        defaultRemixFee = 25e18; // 25 $LOAR default
+        minRemixFee = 5e18; // 5 $LOAR minimum
+        maxRemixFee = 10_000e18; // 10,000 $LOAR maximum
 
         // Default split: 70% creator, 20% LP, 10% treasury
         creatorShareBps = 7000;
@@ -115,8 +125,13 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     // ── Charge remix fee ────────────────────────────────────────
 
@@ -125,11 +140,11 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
     /// @param remixer The user creating the remix/branch
     /// @param originalCreator The creator of the source content
     /// @param universeId The universe the content belongs to
-    function chargeRemixFee(
-        address remixer,
-        address originalCreator,
-        uint256 universeId
-    ) external nonReentrant whenNotPaused {
+    function chargeRemixFee(address remixer, address originalCreator, uint256 universeId)
+        external
+        nonReentrant
+        whenNotPaused
+    {
         if (msg.sender != platform && msg.sender != owner()) revert NotAuthorized();
         if (remixer == address(0) || originalCreator == address(0)) revert ZeroAddress();
 
@@ -166,7 +181,9 @@ contract RemixFees is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentr
         totalRemixFees += fee;
         totalRemixes++;
 
-        emit RemixFeeCharged(remixer, originalCreator, universeId, fee, toCreator, toLp, toTreasuryAmount);
+        emit RemixFeeCharged(
+            remixer, originalCreator, universeId, fee, toCreator, toLp, toTreasuryAmount
+        );
     }
 
     // ── Universe config ─────────────────────────────────────────

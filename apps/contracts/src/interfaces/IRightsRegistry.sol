@@ -2,7 +2,14 @@
 pragma solidity =0.8.30;
 
 interface IRightsRegistry {
-    enum RightsType { UNSET, FUN, ORIGINAL, LICENSED, PUBLIC_DOMAIN, FROZEN }
+    enum RightsType {
+        UNSET,
+        FUN,
+        ORIGINAL,
+        LICENSED,
+        PUBLIC_DOMAIN,
+        FROZEN
+    }
 
     function rights(bytes32 contentHash) external view returns (RightsType);
     function setRights(bytes32 contentHash, RightsType rightsType) external;

@@ -35,10 +35,10 @@ contract PaymentRouterHandler is Test {
     address[] public actors;
 
     // Ghost variables for ETH accounting
-    uint256 public ghost_totalRouted;        // sum of msg.value across route/routeToTreasury
-    uint256 public ghost_totalClaimed;       // sum of ETH pulled via claim/claimPending
-    uint256 public ghost_totalRoutedLoar;    // sum of $LOAR amount across routeLoar
-    uint256 public ghost_totalClaimedLoar;   // sum of $LOAR pulled via claimLoar
+    uint256 public ghost_totalRouted; // sum of msg.value across route/routeToTreasury
+    uint256 public ghost_totalClaimed; // sum of ETH pulled via claim/claimPending
+    uint256 public ghost_totalRoutedLoar; // sum of $LOAR amount across routeLoar
+    uint256 public ghost_totalClaimedLoar; // sum of $LOAR pulled via claimLoar
 
     uint256 public routeCount;
     uint256 public claimCount;
@@ -135,8 +135,13 @@ contract PaymentRouterHandler is Test {
 
     // ── Helpers ───────────────────────────────────────────────────────────
 
-    function actorCount() external view returns (uint256) { return actors.length; }
-    function getActor(uint256 i) external view returns (address) { return actors[i % actors.length]; }
+    function actorCount() external view returns (uint256) {
+        return actors.length;
+    }
+
+    function getActor(uint256 i) external view returns (address) {
+        return actors[i % actors.length];
+    }
 }
 
 /// @notice BUILD-04 — invariants for PaymentRouter ETH + $LOAR routing.
@@ -157,9 +162,9 @@ contract PaymentRouterInvariantTest is Test {
         bytes memory initData = abi.encodeWithSelector(
             PaymentRouter.initialize.selector,
             address(treasury),
-            uint16(1000),       // 10% default fee
+            uint16(1000), // 10% default fee
             address(loar),
-            uint16(500)          // 5% LOAR discount
+            uint16(500) // 5% LOAR discount
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         router = PaymentRouter(payable(address(proxy)));

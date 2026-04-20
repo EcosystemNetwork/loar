@@ -4,7 +4,9 @@ pragma solidity =0.8.30;
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 
@@ -26,19 +28,25 @@ contract Escrow is
     ReentrancyGuardUpgradeable,
     PausableUpgradeable
 {
-    enum EscrowStatus { ACTIVE, COMPLETED, DISPUTED, RESOLVED, EXPIRED_CLAIMED }
+    enum EscrowStatus {
+        ACTIVE,
+        COMPLETED,
+        DISPUTED,
+        RESOLVED,
+        EXPIRED_CLAIMED
+    }
 
     struct EscrowData {
         uint256 id;
         address buyer;
         address seller;
-        uint256 amount;             // ETH held
-        bytes32 contentHash;        // content/NFT being traded
-        string metadataURI;         // IPFS URI for trade details
+        uint256 amount; // ETH held
+        bytes32 contentHash; // content/NFT being traded
+        string metadataURI; // IPFS URI for trade details
         EscrowStatus status;
         uint256 createdAt;
-        uint256 disputeDeadline;    // buyer must confirm or dispute before this
-        uint256 platformFeeBps;     // snapshot of fee at creation time
+        uint256 disputeDeadline; // buyer must confirm or dispute before this
+        uint256 platformFeeBps; // snapshot of fee at creation time
     }
 
     uint256 public nextEscrowId;
@@ -51,12 +59,18 @@ contract Escrow is
     IPaymentRouter public paymentRouter;
     address public platform;
     uint16 public defaultFeeBps;
-    uint256 public disputeWindow;   // seconds — default 7 days
+    uint256 public disputeWindow; // seconds — default 7 days
 
     uint16 public constant MAX_FEE_BPS = 1000; // ESCROW-04: capped at 10% (was 50%)
 
     // ── Events ──────────────────────────────────────────────────────────
-    event EscrowCreated(uint256 indexed id, address indexed buyer, address indexed seller, uint256 amount, bytes32 contentHash);
+    event EscrowCreated(
+        uint256 indexed id,
+        address indexed buyer,
+        address indexed seller,
+        uint256 amount,
+        bytes32 contentHash
+    );
     event DeliveryConfirmed(uint256 indexed id, address indexed buyer);
     event EscrowDisputed(uint256 indexed id, address indexed buyer, string reason);
     event DisputeResolved(uint256 indexed id, uint256 buyerAmount, uint256 sellerAmount);
@@ -78,7 +92,9 @@ contract Escrow is
     error AmountMismatch();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(
         address _platform,
@@ -103,11 +119,13 @@ contract Escrow is
     // ── Core Flow ───────────────────────────────────────────────────────
 
     /// @notice Create an escrow by depositing ETH. Seller must deliver within dispute window.
-    function createEscrow(
-        address seller,
-        bytes32 contentHash,
-        string calldata metadataURI
-    ) external payable nonReentrant whenNotPaused returns (uint256 escrowId) {
+    function createEscrow(address seller, bytes32 contentHash, string calldata metadataURI)
+        external
+        payable
+        nonReentrant
+        whenNotPaused
+        returns (uint256 escrowId)
+    {
         if (seller == address(0)) revert ZeroAddress();
         if (msg.value == 0) revert ZeroAmount();
 
@@ -155,11 +173,11 @@ contract Escrow is
     }
 
     /// @notice Admin/DAO resolves a dispute by splitting funds between buyer and seller.
-    function resolveDispute(
-        uint256 escrowId,
-        uint256 buyerAmount,
-        uint256 sellerAmount
-    ) external onlyOwner nonReentrant {
+    function resolveDispute(uint256 escrowId, uint256 buyerAmount, uint256 sellerAmount)
+        external
+        onlyOwner
+        nonReentrant
+    {
         EscrowData storage e = escrows[escrowId];
         if (e.status != EscrowStatus.DISPUTED) revert InvalidStatus();
 
@@ -203,7 +221,7 @@ contract Escrow is
 
         claimable[msg.sender] = 0;
 
-        (bool ok, ) = msg.sender.call{value: amount}("");
+        (bool ok,) = msg.sender.call{value: amount}("");
         if (!ok) revert TransferFailed();
 
         emit Claimed(msg.sender, amount);
@@ -239,8 +257,13 @@ contract Escrow is
         platform = _platform;
     }
 
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     // ── Internal ────────────────────────────────────────────────────────
 
@@ -254,8 +277,9 @@ contract Escrow is
             // M2 fix: route through PaymentRouter if available, otherwise fallback to claimable
             if (address(paymentRouter) != address(0)) {
                 try paymentRouter.routeToTreasury{value: fee}() {
-                    // Successfully routed through PaymentRouter
-                } catch {
+                // Successfully routed through PaymentRouter
+                }
+                catch {
                     // Fallback: accumulate in claimable mapping
                     claimable[platform] += fee;
                 }

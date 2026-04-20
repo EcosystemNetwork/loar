@@ -39,7 +39,9 @@ contract SubscriptionManagerTest is Test {
             address(
                 new ERC1967Proxy(
                     address(impl),
-                    abi.encodeCall(SubscriptionManager.initialize, (platform, address(router), FEE_BPS))
+                    abi.encodeCall(
+                        SubscriptionManager.initialize, (platform, address(router), FEE_BPS)
+                    )
                 )
             )
         );
@@ -55,11 +57,11 @@ contract SubscriptionManagerTest is Test {
             UNIVERSE_ID,
             SubscriptionManager.SubscriptionTier.BASIC,
             PRICE_PER_MONTH,
-            true,  // earlyAccess
+            true, // earlyAccess
             false, // votingBoost
-            true,  // premiumContent
+            true, // premiumContent
             false, // behindTheScenes
-            10     // creditBonus
+            10 // creditBonus
         );
     }
 
@@ -107,7 +109,9 @@ contract SubscriptionManagerTest is Test {
             address(
                 new ERC1967Proxy(
                     address(impl),
-                    abi.encodeCall(SubscriptionManager.initialize, (platform, address(router), 5000))
+                    abi.encodeCall(
+                        SubscriptionManager.initialize, (platform, address(router), 5000)
+                    )
                 )
             )
         );
@@ -149,7 +153,11 @@ contract SubscriptionManagerTest is Test {
             UNIVERSE_ID,
             SubscriptionManager.SubscriptionTier.PREMIUM,
             0.05 ether,
-            true, true, true, true, 50
+            true,
+            true,
+            true,
+            true,
+            50
         );
 
         (uint256 price,,,,,, bool active) =
@@ -169,7 +177,11 @@ contract SubscriptionManagerTest is Test {
             UNIVERSE_ID,
             SubscriptionManager.SubscriptionTier.VIP,
             1 ether,
-            true, true, true, true, 100
+            true,
+            true,
+            true,
+            true,
+            100
         );
     }
 
@@ -180,17 +192,18 @@ contract SubscriptionManagerTest is Test {
             UNIVERSE_ID,
             SubscriptionManager.SubscriptionTier.PREMIUM,
             0.05 ether,
-            true, true, true, true, 50
+            true,
+            true,
+            true,
+            true,
+            50
         );
     }
 
     function test_configureTier_zeroPriceTier() public {
         vm.prank(creator);
         sub.configureTier(
-            UNIVERSE_ID,
-            SubscriptionManager.SubscriptionTier.FREE,
-            0,
-            false, false, false, false, 0
+            UNIVERSE_ID, SubscriptionManager.SubscriptionTier.FREE, 0, false, false, false, false, 0
         );
 
         (uint256 price,,,,,, bool active) =
@@ -205,7 +218,11 @@ contract SubscriptionManagerTest is Test {
             UNIVERSE_ID,
             SubscriptionManager.SubscriptionTier.BASIC,
             0.02 ether,
-            false, true, false, true, 20
+            false,
+            true,
+            false,
+            true,
+            20
         );
 
         (uint256 price, bool ea, bool vb, bool pc, bool bts, uint16 cb, bool active) =
@@ -275,9 +292,7 @@ contract SubscriptionManagerTest is Test {
     function test_subscribe_revert_tierNotActive() public {
         vm.prank(alice);
         vm.expectRevert(SubscriptionManager.TierNotActive.selector);
-        sub.subscribe{value: 1 ether}(
-            UNIVERSE_ID, SubscriptionManager.SubscriptionTier.PREMIUM, 1
-        );
+        sub.subscribe{value: 1 ether}(UNIVERSE_ID, SubscriptionManager.SubscriptionTier.PREMIUM, 1);
     }
 
     function test_subscribe_revert_zeroMonths() public {
@@ -316,14 +331,16 @@ contract SubscriptionManagerTest is Test {
             999,
             SubscriptionManager.SubscriptionTier.BASIC,
             PRICE_PER_MONTH,
-            true, false, true, false, 10
+            true,
+            false,
+            true,
+            false,
+            10
         );
 
         vm.prank(alice);
         vm.expectRevert(SubscriptionManager.CreatorNotRegistered.selector);
-        sub.subscribe{value: PRICE_PER_MONTH}(
-            999, SubscriptionManager.SubscriptionTier.BASIC, 1
-        );
+        sub.subscribe{value: PRICE_PER_MONTH}(999, SubscriptionManager.SubscriptionTier.BASIC, 1);
     }
 
     function test_subscribe_overpaymentRefunded() public {
@@ -359,16 +376,11 @@ contract SubscriptionManagerTest is Test {
     function test_subscribe_zeroPriceTier() public {
         vm.prank(creator);
         sub.configureTier(
-            UNIVERSE_ID,
-            SubscriptionManager.SubscriptionTier.FREE,
-            0,
-            false, false, false, false, 0
+            UNIVERSE_ID, SubscriptionManager.SubscriptionTier.FREE, 0, false, false, false, false, 0
         );
 
         vm.prank(alice);
-        sub.subscribe{value: 0}(
-            UNIVERSE_ID, SubscriptionManager.SubscriptionTier.FREE, 1
-        );
+        sub.subscribe{value: 0}(UNIVERSE_ID, SubscriptionManager.SubscriptionTier.FREE, 1);
 
         (, uint256 expiresAt, bool active,) = sub.getSubscription(alice, UNIVERSE_ID);
         assertEq(expiresAt, block.timestamp + 30 days);
@@ -384,9 +396,7 @@ contract SubscriptionManagerTest is Test {
 
         // Subscribe for 1 month
         vm.prank(alice);
-        sub.subscribe{value: totalPrice}(
-            UNIVERSE_ID, SubscriptionManager.SubscriptionTier.BASIC, 1
-        );
+        sub.subscribe{value: totalPrice}(UNIVERSE_ID, SubscriptionManager.SubscriptionTier.BASIC, 1);
 
         (, uint256 firstExpiry,,) = sub.getSubscription(alice, UNIVERSE_ID);
 
@@ -450,7 +460,11 @@ contract SubscriptionManagerTest is Test {
             UNIVERSE_ID,
             SubscriptionManager.SubscriptionTier.PREMIUM,
             0.05 ether,
-            true, true, true, true, 50
+            true,
+            true,
+            true,
+            true,
+            50
         );
 
         // Subscribe to BASIC
@@ -589,18 +603,13 @@ contract SubscriptionManagerTest is Test {
     function test_subscribe_zeroPriceTier_noRouting() public {
         vm.prank(creator);
         sub.configureTier(
-            UNIVERSE_ID,
-            SubscriptionManager.SubscriptionTier.FREE,
-            0,
-            false, false, false, false, 0
+            UNIVERSE_ID, SubscriptionManager.SubscriptionTier.FREE, 0, false, false, false, false, 0
         );
 
         uint256 routerBalBefore = address(router).balance;
 
         vm.prank(alice);
-        sub.subscribe{value: 0}(
-            UNIVERSE_ID, SubscriptionManager.SubscriptionTier.FREE, 1
-        );
+        sub.subscribe{value: 0}(UNIVERSE_ID, SubscriptionManager.SubscriptionTier.FREE, 1);
 
         // Router should not have received anything
         assertEq(address(router).balance, routerBalBefore);
@@ -678,7 +687,9 @@ contract SubscriptionManagerTest is Test {
 
     function test_deactivateTier_emitsEvent() public {
         vm.expectEmit(true, false, false, true);
-        emit SubscriptionManager.TierDeactivated(UNIVERSE_ID, SubscriptionManager.SubscriptionTier.BASIC);
+        emit SubscriptionManager.TierDeactivated(
+            UNIVERSE_ID, SubscriptionManager.SubscriptionTier.BASIC
+        );
 
         vm.prank(creator);
         sub.deactivateTier(UNIVERSE_ID, SubscriptionManager.SubscriptionTier.BASIC);
@@ -726,7 +737,11 @@ contract SubscriptionManagerTest is Test {
             UNIVERSE_ID,
             SubscriptionManager.SubscriptionTier.BASIC,
             0.02 ether,
-            true, true, true, true, 20
+            true,
+            true,
+            true,
+            true,
+            20
         );
 
         (uint256 price,,,,,, bool active) =
@@ -794,7 +809,11 @@ contract SubscriptionManagerTest is Test {
             UNIVERSE_ID_2,
             SubscriptionManager.SubscriptionTier.BASIC,
             0.02 ether,
-            true, false, true, false, 5
+            true,
+            false,
+            true,
+            false,
+            5
         );
 
         // Alice subscribes to both
@@ -834,7 +853,11 @@ contract SubscriptionManagerTest is Test {
             UNIVERSE_ID,
             SubscriptionManager.SubscriptionTier.PREMIUM,
             0.05 ether,
-            true, true, true, true, 50
+            true,
+            true,
+            true,
+            true,
+            50
         );
 
         // Subscribe to BASIC
@@ -943,7 +966,11 @@ contract SubscriptionManagerTest is Test {
             UNIVERSE_ID,
             SubscriptionManager.SubscriptionTier.VIP,
             1 ether,
-            true, true, true, true, 100
+            true,
+            true,
+            true,
+            true,
+            100
         );
 
         (uint256 price,,,,,, bool active) =

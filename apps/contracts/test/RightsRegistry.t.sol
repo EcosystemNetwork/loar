@@ -19,10 +19,13 @@ contract RightsRegistryTest is Test {
     function setUp() public {
         vm.startPrank(deployer);
         RightsRegistry impl = new RightsRegistry();
-        registry = RightsRegistry(address(new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(RightsRegistry.initialize, (platform))
-        )));
+        registry = RightsRegistry(
+            address(
+                new ERC1967Proxy(
+                    address(impl), abi.encodeCall(RightsRegistry.initialize, (platform))
+                )
+            )
+        );
         vm.stopPrank();
     }
 
@@ -39,13 +42,13 @@ contract RightsRegistryTest is Test {
         // RIGHTS-01 hardening: plain operators may only set non-monetizable classifications.
         vm.prank(platform);
         registry.setRights(hash1, IRightsRegistry.RightsType.FUN);
-        assertEq(uint(registry.rights(hash1)), uint(IRightsRegistry.RightsType.FUN));
+        assertEq(uint256(registry.rights(hash1)), uint256(IRightsRegistry.RightsType.FUN));
     }
 
     function test_setRights_byOwner_monetizable() public {
         vm.prank(deployer);
         registry.setRights(hash1, IRightsRegistry.RightsType.LICENSED);
-        assertEq(uint(registry.rights(hash1)), uint(IRightsRegistry.RightsType.LICENSED));
+        assertEq(uint256(registry.rights(hash1)), uint256(IRightsRegistry.RightsType.LICENSED));
     }
 
     function test_setRights_byOperator_fun() public {
@@ -54,7 +57,7 @@ contract RightsRegistryTest is Test {
 
         vm.prank(operator);
         registry.setRights(hash1, IRightsRegistry.RightsType.FUN);
-        assertEq(uint(registry.rights(hash1)), uint(IRightsRegistry.RightsType.FUN));
+        assertEq(uint256(registry.rights(hash1)), uint256(IRightsRegistry.RightsType.FUN));
     }
 
     function test_setRights_operator_revert_monetizable() public {
@@ -90,7 +93,7 @@ contract RightsRegistryTest is Test {
     function test_emergencyFreeze() public {
         vm.prank(platform);
         registry.emergencyFreeze(hash1, "DMCA takedown");
-        assertEq(uint(registry.rights(hash1)), uint(IRightsRegistry.RightsType.FROZEN));
+        assertEq(uint256(registry.rights(hash1)), uint256(IRightsRegistry.RightsType.FROZEN));
     }
 
     function test_emergencyFreeze_revert_zeroHash() public {

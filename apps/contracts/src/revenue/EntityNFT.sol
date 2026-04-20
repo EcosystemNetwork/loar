@@ -2,11 +2,17 @@
 pragma solidity =0.8.30;
 
 import {ERC721Upgradeable} from "@openzeppelin-upgradeable/token/ERC721/ERC721Upgradeable.sol";
-import {ERC721EnumerableUpgradeable} from "@openzeppelin-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
-import {ERC721URIStorageUpgradeable} from "@openzeppelin-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
+import {
+    ERC721EnumerableUpgradeable
+} from "@openzeppelin-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
+import {
+    ERC721URIStorageUpgradeable
+} from "@openzeppelin-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
 import {ERC2981Upgradeable} from "@openzeppelin-upgradeable/token/common/ERC2981Upgradeable.sol";
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
@@ -15,8 +21,19 @@ import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 /// @notice ERC-721 for unique world-building entities: places, events, vehicles.
 ///         Each mint is a 1-of-1 token. Owners earn royalties on secondary sales.
 ///         Free to mint (mintPrice=0) or paid — payment routed through PaymentRouter.
-contract EntityNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URIStorageUpgradeable, ERC2981Upgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
-    enum EntityKind { PLACE, EVENT, VEHICLE }
+contract EntityNFT is
+    Initializable,
+    ERC721EnumerableUpgradeable,
+    ERC721URIStorageUpgradeable,
+    ERC2981Upgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable
+{
+    enum EntityKind {
+        PLACE,
+        EVENT,
+        VEHICLE
+    }
 
     struct Entity {
         uint256 universeId;
@@ -62,7 +79,9 @@ contract EntityNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URIStora
     uint16 public constant MAX_FEE_BPS = 5000;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(
         uint256 _universeId,
@@ -94,8 +113,15 @@ contract EntityNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URIStora
         royaltyBps = _royaltyBps;
     }
 
-    function pause() external { if (msg.sender != platform) revert NotPlatform(); _pause(); }
-    function unpause() external { if (msg.sender != platform) revert NotPlatform(); _unpause(); }
+    function pause() external {
+        if (msg.sender != platform) revert NotPlatform();
+        _pause();
+    }
+
+    function unpause() external {
+        if (msg.sender != platform) revert NotPlatform();
+        _unpause();
+    }
 
     /// @notice Mint a unique entity NFT (place, event, or vehicle)
     /// @param _universeId Universe this entity belongs to
@@ -150,7 +176,9 @@ contract EntityNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URIStora
 
     /// @notice Get entities in a universe filtered by kind (paginated)
     function getByUniverse(uint256 _universeId, EntityKind kind, uint256 startId, uint256 count)
-        external view returns (uint256[] memory ids)
+        external
+        view
+        returns (uint256[] memory ids)
     {
         uint256[] memory temp = new uint256[](count);
         uint256 found = 0;
@@ -160,7 +188,9 @@ contract EntityNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URIStora
             }
         }
         ids = new uint256[](found);
-        for (uint256 j = 0; j < found; j++) ids[j] = temp[j];
+        for (uint256 j = 0; j < found; j++) {
+            ids[j] = temp[j];
+        }
     }
 
     function setPlatformFee(uint16 newFeeBps) external {
@@ -172,25 +202,34 @@ contract EntityNFT is Initializable, ERC721EnumerableUpgradeable, ERC721URIStora
     // ---- ERC721 Overrides ----
 
     function tokenURI(uint256 tokenId)
-        public view override(ERC721Upgradeable, ERC721URIStorageUpgradeable) returns (string memory)
+        public
+        view
+        override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
+        returns (string memory)
     {
         return super.tokenURI(tokenId);
     }
 
     function supportsInterface(bytes4 interfaceId)
-        public view override(ERC721EnumerableUpgradeable, ERC721URIStorageUpgradeable, ERC2981Upgradeable) returns (bool)
+        public
+        view
+        override(ERC721EnumerableUpgradeable, ERC721URIStorageUpgradeable, ERC2981Upgradeable)
+        returns (bool)
     {
         return super.supportsInterface(interfaceId);
     }
 
     function _update(address to, uint256 tokenId, address auth)
-        internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable) returns (address)
+        internal
+        override(ERC721Upgradeable, ERC721EnumerableUpgradeable)
+        returns (address)
     {
         return super._update(to, tokenId, auth);
     }
 
     function _increaseBalance(address account, uint128 value)
-        internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable)
+        internal
+        override(ERC721Upgradeable, ERC721EnumerableUpgradeable)
     {
         super._increaseBalance(account, value);
     }

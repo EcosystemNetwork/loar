@@ -25,8 +25,8 @@ contract IdentityNFT is ERC721, Ownable {
 
     struct SignerInfo {
         uint256 universeId;
-        uint8 signerIndex;   // 1-based
-        uint8 totalSigners;  // total signers at mint time
+        uint8 signerIndex; // 1-based
+        uint8 totalSigners; // total signers at mint time
         address safeAddress; // address(0) for EOA creators
         address universeContract;
         string universeName;
@@ -129,16 +129,18 @@ contract IdentityNFT is ERC721, Ownable {
             try IUniverseMeta(info.universeContract).universeName() returns (string memory n) {
                 if (bytes(n).length > 0) liveName = n;
             } catch {}
-            try IUniverseMeta(info.universeContract).universeImageUrl() returns (string memory img) {
+            try IUniverseMeta(info.universeContract).universeImageUrl() returns (
+                string memory img
+            ) {
                 if (bytes(img).length > 0) liveImage = img;
             } catch {}
         }
 
-        string memory fraction = string(abi.encodePacked(
-            uint256(info.signerIndex).toString(),
-            "/",
-            uint256(info.totalSigners).toString()
-        ));
+        string memory fraction = string(
+            abi.encodePacked(
+                uint256(info.signerIndex).toString(), "/", uint256(info.totalSigners).toString()
+            )
+        );
 
         string memory name = info.totalSigners == 1
             ? string(abi.encodePacked("LOAR Creator - ", liveName))
@@ -146,34 +148,57 @@ contract IdentityNFT is ERC721, Ownable {
 
         string memory description = info.totalSigners == 1
             ? string(abi.encodePacked("Identity NFT for the creator of ", liveName))
-            : string(abi.encodePacked(
-                "Identity NFT for signer ", fraction, " of the multi-sig governing ", liveName
-            ));
+            : string(
+                abi.encodePacked(
+                    "Identity NFT for signer ", fraction, " of the multi-sig governing ", liveName
+                )
+            );
 
-        string memory json = string(abi.encodePacked(
-            '{"name":"', name,
-            '","description":"', description,
-            '","image":"', liveImage,
-            '","external_url":"https://loar.fun/universe/', info.universeContract.toHexString(),
-            '","attributes":[',
-                '{"trait_type":"Universe ID","value":"', info.universeId.toString(), '"}',
-                ',{"trait_type":"Signer Position","value":"', fraction, '"}',
-                ',{"trait_type":"Total Signers","value":"', uint256(info.totalSigners).toString(), '"}',
-                ',{"trait_type":"Universe Contract","value":"', info.universeContract.toHexString(), '"}',
+        string memory json = string(
+            abi.encodePacked(
+                '{"name":"',
+                name,
+                '","description":"',
+                description,
+                '","image":"',
+                liveImage,
+                '","external_url":"https://loar.fun/universe/',
+                info.universeContract.toHexString(),
+                '","attributes":[',
+                '{"trait_type":"Universe ID","value":"',
+                info.universeId.toString(),
+                '"}',
+                ',{"trait_type":"Signer Position","value":"',
+                fraction,
+                '"}',
+                ',{"trait_type":"Total Signers","value":"',
+                uint256(info.totalSigners).toString(),
+                '"}',
+                ',{"trait_type":"Universe Contract","value":"',
+                info.universeContract.toHexString(),
+                '"}',
                 info.safeAddress != address(0)
-                    ? string(abi.encodePacked(',{"trait_type":"Safe Address","value":"', info.safeAddress.toHexString(), '"}'))
-                    : '',
-            ']}'
-        ));
+                    ? string(
+                        abi.encodePacked(
+                            ',{"trait_type":"Safe Address","value":"',
+                            info.safeAddress.toHexString(),
+                            '"}'
+                        )
+                    )
+                    : "",
+                "]}"
+            )
+        );
 
-        return string(abi.encodePacked(
-            "data:application/json;base64,",
-            Base64.encode(bytes(json))
-        ));
+        return string(abi.encodePacked("data:application/json;base64,", Base64.encode(bytes(json))));
     }
 
     // IDENTITY-01: Soulbound — only mints allowed, no transfers
-    function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
+    function _update(address to, uint256 tokenId, address auth)
+        internal
+        override
+        returns (address)
+    {
         address from = super._update(to, tokenId, auth);
         require(from == address(0), "Soulbound: transfers disabled");
         return from;

@@ -68,7 +68,13 @@ contract ContentLicensingTest is Test {
                     address(impl),
                     abi.encodeCall(
                         ContentLicensing.initialize,
-                        (platform, address(splitRouter), address(paymentRouter), address(rightsRegistry), PLATFORM_FEE_BPS)
+                        (
+                            platform,
+                            address(splitRouter),
+                            address(paymentRouter),
+                            address(rightsRegistry),
+                            PLATFORM_FEE_BPS
+                        )
                     )
                 )
             )
@@ -106,7 +112,16 @@ contract ContentLicensingTest is Test {
         vm.expectRevert(ContentLicensing.ZeroAddress.selector);
         new ERC1967Proxy(
             address(impl),
-            abi.encodeCall(ContentLicensing.initialize, (address(0), address(splitRouter), address(paymentRouter), address(rightsRegistry), PLATFORM_FEE_BPS))
+            abi.encodeCall(
+                ContentLicensing.initialize,
+                (
+                    address(0),
+                    address(splitRouter),
+                    address(paymentRouter),
+                    address(rightsRegistry),
+                    PLATFORM_FEE_BPS
+                )
+            )
         );
     }
 
@@ -115,7 +130,16 @@ contract ContentLicensingTest is Test {
         vm.expectRevert(ContentLicensing.ZeroAddress.selector);
         new ERC1967Proxy(
             address(impl),
-            abi.encodeCall(ContentLicensing.initialize, (platform, address(0), address(paymentRouter), address(rightsRegistry), PLATFORM_FEE_BPS))
+            abi.encodeCall(
+                ContentLicensing.initialize,
+                (
+                    platform,
+                    address(0),
+                    address(paymentRouter),
+                    address(rightsRegistry),
+                    PLATFORM_FEE_BPS
+                )
+            )
         );
     }
 
@@ -124,7 +148,16 @@ contract ContentLicensingTest is Test {
         vm.expectRevert(ContentLicensing.ZeroAddress.selector);
         new ERC1967Proxy(
             address(impl),
-            abi.encodeCall(ContentLicensing.initialize, (platform, address(splitRouter), address(0), address(rightsRegistry), PLATFORM_FEE_BPS))
+            abi.encodeCall(
+                ContentLicensing.initialize,
+                (
+                    platform,
+                    address(splitRouter),
+                    address(0),
+                    address(rightsRegistry),
+                    PLATFORM_FEE_BPS
+                )
+            )
         );
     }
 
@@ -133,17 +166,39 @@ contract ContentLicensingTest is Test {
         vm.expectRevert(ContentLicensing.FeeTooHigh.selector);
         new ERC1967Proxy(
             address(impl),
-            abi.encodeCall(ContentLicensing.initialize, (platform, address(splitRouter), address(paymentRouter), address(rightsRegistry), 5001))
+            abi.encodeCall(
+                ContentLicensing.initialize,
+                (
+                    platform,
+                    address(splitRouter),
+                    address(paymentRouter),
+                    address(rightsRegistry),
+                    5001
+                )
+            )
         );
     }
 
     function test_initialize_maxFee_succeeds() public {
         ContentLicensing impl = new ContentLicensing();
         // 5000 bps (50%) is the maximum allowed
-        ContentLicensing l = ContentLicensing(address(new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(ContentLicensing.initialize, (platform, address(splitRouter), address(paymentRouter), address(rightsRegistry), 5000))
-        )));
+        ContentLicensing l = ContentLicensing(
+            address(
+                new ERC1967Proxy(
+                    address(impl),
+                    abi.encodeCall(
+                        ContentLicensing.initialize,
+                        (
+                            platform,
+                            address(splitRouter),
+                            address(paymentRouter),
+                            address(rightsRegistry),
+                            5000
+                        )
+                    )
+                )
+            )
+        );
         assertEq(l.platformFeeBps(), 5000);
     }
 
@@ -177,20 +232,38 @@ contract ContentLicensingTest is Test {
     function test_registerContent_revert_zeroHash() public {
         vm.prank(creator);
         vm.expectRevert(ContentLicensing.ZeroHash.selector);
-        licensing.registerContent(bytes32(0), 1, SPLIT_ENTITY_HASH, BUY_PRICE, RENT_PRICE_PER_DAY, LICENSE_FEE, LICENSE_ROYALTY_BPS);
+        licensing.registerContent(
+            bytes32(0),
+            1,
+            SPLIT_ENTITY_HASH,
+            BUY_PRICE,
+            RENT_PRICE_PER_DAY,
+            LICENSE_FEE,
+            LICENSE_ROYALTY_BPS
+        );
     }
 
     function test_registerContent_revert_alreadyRegistered() public {
         vm.prank(alice);
         vm.expectRevert(ContentLicensing.AlreadyRegistered.selector);
-        licensing.registerContent(CONTENT_HASH, 1, SPLIT_ENTITY_HASH, BUY_PRICE, RENT_PRICE_PER_DAY, LICENSE_FEE, LICENSE_ROYALTY_BPS);
+        licensing.registerContent(
+            CONTENT_HASH,
+            1,
+            SPLIT_ENTITY_HASH,
+            BUY_PRICE,
+            RENT_PRICE_PER_DAY,
+            LICENSE_FEE,
+            LICENSE_ROYALTY_BPS
+        );
     }
 
     function test_registerContent_revert_royaltyBpsTooHigh() public {
         bytes32 hash = keccak256("content:high-royalty");
         vm.prank(creator);
         vm.expectRevert(ContentLicensing.FeeTooHigh.selector);
-        licensing.registerContent(hash, 1, SPLIT_ENTITY_HASH, BUY_PRICE, RENT_PRICE_PER_DAY, LICENSE_FEE, 5001);
+        licensing.registerContent(
+            hash, 1, SPLIT_ENTITY_HASH, BUY_PRICE, RENT_PRICE_PER_DAY, LICENSE_FEE, 5001
+        );
     }
 
     function test_registerContent_noSplitEntityHash() public {
@@ -214,9 +287,15 @@ contract ContentLicensingTest is Test {
 
         // Check deal state
         (
-            uint256 id, bytes32 contentHash, bytes32 splitHash,
-            ContentLicensing.DealType dealType, ContentLicensing.DealStatus status,
-            address dealBuyer, uint256 pricePaid, uint256 startTime, uint256 endTime
+            uint256 id,
+            bytes32 contentHash,
+            bytes32 splitHash,
+            ContentLicensing.DealType dealType,
+            ContentLicensing.DealStatus status,
+            address dealBuyer,
+            uint256 pricePaid,
+            uint256 startTime,
+            uint256 endTime
         ) = licensing.deals(dealId);
 
         assertEq(id, 1);
@@ -286,7 +365,9 @@ contract ContentLicensingTest is Test {
         // Register content with buyPrice = 0
         bytes32 hash = keccak256("content:notsale");
         vm.prank(creator);
-        licensing.registerContent(hash, 1, bytes32(0), 0, RENT_PRICE_PER_DAY, LICENSE_FEE, LICENSE_ROYALTY_BPS);
+        licensing.registerContent(
+            hash, 1, bytes32(0), 0, RENT_PRICE_PER_DAY, LICENSE_FEE, LICENSE_ROYALTY_BPS
+        );
 
         vm.prank(buyer);
         vm.expectRevert(ContentLicensing.NotForSale.selector);
@@ -338,9 +419,15 @@ contract ContentLicensingTest is Test {
         assertEq(dealId, 1);
 
         (
-            uint256 id, bytes32 contentHash, bytes32 splitHash,
-            ContentLicensing.DealType dealType, ContentLicensing.DealStatus status,
-            address dealBuyer, uint256 pricePaid, uint256 startTime, uint256 endTime
+            uint256 id,
+            bytes32 contentHash,
+            bytes32 splitHash,
+            ContentLicensing.DealType dealType,
+            ContentLicensing.DealStatus status,
+            address dealBuyer,
+            uint256 pricePaid,
+            uint256 startTime,
+            uint256 endTime
         ) = licensing.deals(dealId);
 
         assertEq(id, 1);
@@ -402,7 +489,9 @@ contract ContentLicensingTest is Test {
     function test_rentContent_revert_notForRent() public {
         bytes32 hash = keccak256("content:norent");
         vm.prank(creator);
-        licensing.registerContent(hash, 1, bytes32(0), BUY_PRICE, 0, LICENSE_FEE, LICENSE_ROYALTY_BPS);
+        licensing.registerContent(
+            hash, 1, bytes32(0), BUY_PRICE, 0, LICENSE_FEE, LICENSE_ROYALTY_BPS
+        );
 
         vm.prank(buyer);
         vm.expectRevert(ContentLicensing.NotForRent.selector);
@@ -453,9 +542,15 @@ contract ContentLicensingTest is Test {
         assertEq(dealId, 1);
 
         (
-            uint256 id, bytes32 contentHash, bytes32 splitHash,
-            ContentLicensing.DealType dealType, ContentLicensing.DealStatus status,
-            address dealBuyer, uint256 pricePaid, uint256 startTime, uint256 endTime
+            uint256 id,
+            bytes32 contentHash,
+            bytes32 splitHash,
+            ContentLicensing.DealType dealType,
+            ContentLicensing.DealStatus status,
+            address dealBuyer,
+            uint256 pricePaid,
+            uint256 startTime,
+            uint256 endTime
         ) = licensing.deals(dealId);
 
         assertTrue(dealType == ContentLicensing.DealType.LICENSE);
@@ -644,7 +739,7 @@ contract ContentLicensingTest is Test {
 
         SplitRouter.Split[] memory splits = new SplitRouter.Split[](2);
         splits[0] = SplitRouter.Split(creator, 7000); // 70%
-        splits[1] = SplitRouter.Split(bob, 3000);     // 30%
+        splits[1] = SplitRouter.Split(bob, 3000); // 30%
         vm.prank(creator);
         splitRouter.setSplits(multiSplitHash, splits);
 
@@ -766,7 +861,7 @@ contract ContentLicensingTest is Test {
         assertFalse(licensing.checkAccess(CONTENT_HASH, buyer));
 
         // Verify deal status is now EXPIRED
-        (, , , , ContentLicensing.DealStatus status, , , ,) = licensing.deals(dealId);
+        (,,,, ContentLicensing.DealStatus status,,,,) = licensing.deals(dealId);
         assertTrue(status == ContentLicensing.DealStatus.EXPIRED);
     }
 
@@ -940,20 +1035,23 @@ contract ContentLicensingTest is Test {
         vm.stopPrank();
 
         // Get page 1 (offset=0, limit=2)
-        (uint256[] memory page1, uint256 total) = licensing.getContentDealsPaginated(CONTENT_HASH, 0, 2);
+        (uint256[] memory page1, uint256 total) =
+            licensing.getContentDealsPaginated(CONTENT_HASH, 0, 2);
         assertEq(total, 3);
         assertEq(page1.length, 2);
         assertEq(page1[0], 1);
         assertEq(page1[1], 2);
 
         // Get page 2 (offset=2, limit=2)
-        (uint256[] memory page2, uint256 total2) = licensing.getContentDealsPaginated(CONTENT_HASH, 2, 2);
+        (uint256[] memory page2, uint256 total2) =
+            licensing.getContentDealsPaginated(CONTENT_HASH, 2, 2);
         assertEq(total2, 3);
         assertEq(page2.length, 1);
         assertEq(page2[0], 3);
 
         // Offset past end
-        (uint256[] memory page3, uint256 total3) = licensing.getContentDealsPaginated(CONTENT_HASH, 10, 2);
+        (uint256[] memory page3, uint256 total3) =
+            licensing.getContentDealsPaginated(CONTENT_HASH, 10, 2);
         assertEq(total3, 3);
         assertEq(page3.length, 0);
     }
@@ -1008,7 +1106,7 @@ contract ContentLicensingTest is Test {
         vm.prank(buyer);
         uint256 dealId = licensing.rentContent{value: totalCost}(CONTENT_HASH, 1);
 
-        (, , , , , , , , uint256 endTime) = licensing.deals(dealId);
+        (,,,,,,,, uint256 endTime) = licensing.deals(dealId);
         assertEq(endTime, block.timestamp + 1 days);
     }
 
@@ -1073,9 +1171,10 @@ contract ContentLicensingTest is Test {
 
         vm.deal(buyer, totalCost + 1 ether);
         vm.prank(buyer);
-        uint256 dealId = licensing.rentContent{value: totalCost}(CONTENT_HASH, uint256(durationDays));
+        uint256 dealId =
+            licensing.rentContent{value: totalCost}(CONTENT_HASH, uint256(durationDays));
 
-        (, , , , , , uint256 pricePaid, , uint256 endTime) = licensing.deals(dealId);
+        (,,,,,, uint256 pricePaid,, uint256 endTime) = licensing.deals(dealId);
         assertEq(pricePaid, totalCost);
         assertEq(endTime, block.timestamp + (uint256(durationDays) * 1 days));
     }

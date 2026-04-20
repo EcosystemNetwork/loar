@@ -62,14 +62,14 @@ import {EpisodeNFT} from "../src/revenue/EpisodeNFT.sol";
  * Output: All contract addresses printed — copy into .env
  */
 contract DeployAllScript is Script {
-    uint16 constant PLATFORM_FEE_BPS = 500;   // 5%
-    uint16 constant CANON_FEE_BPS = 300;       // 3%
-    uint16 constant LOAR_DISCOUNT_BPS = 500;   // 5% discount for $LOAR payments
+    uint16 constant PLATFORM_FEE_BPS = 500; // 5%
+    uint16 constant CANON_FEE_BPS = 300; // 3%
+    uint16 constant LOAR_DISCOUNT_BPS = 500; // 5% discount for $LOAR payments
     uint256 constant CANON_MIN_FEE = 0.001 ether;
     uint256 constant CANON_VOTE_DURATION = 7 days;
-    uint256 constant BOUNTY_MIN = 10e18;       // 10 $LOAR minimum bounty
-    uint16 constant BOUNTY_FEE = 500;          // 5%
-    uint16 constant BOUNTY_CANCEL_FEE = 200;   // 2%
+    uint256 constant BOUNTY_MIN = 10e18; // 10 $LOAR minimum bounty
+    uint16 constant BOUNTY_FEE = 500; // 5%
+    uint16 constant BOUNTY_CANCEL_FEE = 200; // 2%
 
     function run() public {
         uint256 pk = vm.envUint("PRIVATE_KEY");
@@ -131,10 +131,7 @@ contract DeployAllScript is Script {
         console.log("[2] TimelockController:", address(timelock));
 
         UniverseTokenDeployerV3 utd = new UniverseTokenDeployerV3(
-            address(um),
-            address(gtFactory),
-            address(govFactory),
-            address(bcFactory)
+            address(um), address(gtFactory), address(govFactory), address(bcFactory)
         );
         utd.setTimelock(address(timelock));
         console.log("[2] UniverseTokenDeployerV3:", address(utd));
@@ -157,7 +154,10 @@ contract DeployAllScript is Script {
             address(
                 new ERC1967Proxy(
                     address(new PaymentRouter()),
-                    abi.encodeCall(PaymentRouter.initialize, (treasury, PLATFORM_FEE_BPS, address(loarToken), LOAR_DISCOUNT_BPS))
+                    abi.encodeCall(
+                        PaymentRouter.initialize,
+                        (treasury, PLATFORM_FEE_BPS, address(loarToken), LOAR_DISCOUNT_BPS)
+                    )
                 )
             )
         );
@@ -167,15 +167,15 @@ contract DeployAllScript is Script {
         RightsRegistry rightsRegistry = RightsRegistry(
             address(
                 new ERC1967Proxy(
-                    address(new RightsRegistry()),
-                    abi.encodeCall(RightsRegistry.initialize, (d))
+                    address(new RightsRegistry()), abi.encodeCall(RightsRegistry.initialize, (d))
                 )
             )
         );
         console.log("[3] RightsRegistry:", address(rightsRegistry));
 
         // NFT Beacons
-        UpgradeableBeacon epBeacon = new UpgradeableBeacon(address(new EpisodeEditionCollection()), d);
+        UpgradeableBeacon epBeacon =
+            new UpgradeableBeacon(address(new EpisodeEditionCollection()), d);
         UpgradeableBeacon chBeacon = new UpgradeableBeacon(address(new CharacterNFT()), d);
         UpgradeableBeacon enBeacon = new UpgradeableBeacon(address(new EntityNFT()), d);
         UpgradeableBeacon eeBeacon = new UpgradeableBeacon(address(new EntityEditionNFT()), d);
@@ -184,9 +184,19 @@ contract DeployAllScript is Script {
 
         // RevenueModuleFactory
         RevenueModuleFactory rmf = new RevenueModuleFactory(
-            d, address(rightsRegistry), address(paymentRouter),
-            PLATFORM_FEE_BPS, PLATFORM_FEE_BPS, 300, PLATFORM_FEE_BPS, PLATFORM_FEE_BPS,
-            address(epBeacon), address(chBeacon), address(enBeacon), address(eeBeacon), address(epNftBeacon)
+            d,
+            address(rightsRegistry),
+            address(paymentRouter),
+            PLATFORM_FEE_BPS,
+            PLATFORM_FEE_BPS,
+            300,
+            PLATFORM_FEE_BPS,
+            PLATFORM_FEE_BPS,
+            address(epBeacon),
+            address(chBeacon),
+            address(enBeacon),
+            address(eeBeacon),
+            address(epNftBeacon)
         );
         console.log("[3] RevenueModuleFactory:", address(rmf));
 
@@ -200,10 +210,18 @@ contract DeployAllScript is Script {
             address(
                 new ERC1967Proxy(
                     address(new CanonMarketplace()),
-                    abi.encodeCall(CanonMarketplace.initialize, (
-                        d, address(rightsRegistry), address(paymentRouter),
-                        PLATFORM_FEE_BPS, CANON_FEE_BPS, CANON_MIN_FEE, CANON_VOTE_DURATION
-                    ))
+                    abi.encodeCall(
+                        CanonMarketplace.initialize,
+                        (
+                            d,
+                            address(rightsRegistry),
+                            address(paymentRouter),
+                            PLATFORM_FEE_BPS,
+                            CANON_FEE_BPS,
+                            CANON_MIN_FEE,
+                            CANON_VOTE_DURATION
+                        )
+                    )
                 )
             )
         );
@@ -214,7 +232,10 @@ contract DeployAllScript is Script {
             address(
                 new ERC1967Proxy(
                     address(new CreditManager()),
-                    abi.encodeCall(CreditManager.initialize, (address(loarToken), d, treasury, address(paymentRouter)))
+                    abi.encodeCall(
+                        CreditManager.initialize,
+                        (address(loarToken), d, treasury, address(paymentRouter))
+                    )
                 )
             )
         );
@@ -225,7 +246,9 @@ contract DeployAllScript is Script {
             address(
                 new ERC1967Proxy(
                     address(new AdPlacement()),
-                    abi.encodeCall(AdPlacement.initialize, (d, address(paymentRouter), PLATFORM_FEE_BPS))
+                    abi.encodeCall(
+                        AdPlacement.initialize, (d, address(paymentRouter), PLATFORM_FEE_BPS)
+                    )
                 )
             )
         );
@@ -236,7 +259,10 @@ contract DeployAllScript is Script {
             address(
                 new ERC1967Proxy(
                     address(new SubscriptionManager()),
-                    abi.encodeCall(SubscriptionManager.initialize, (d, address(paymentRouter), PLATFORM_FEE_BPS))
+                    abi.encodeCall(
+                        SubscriptionManager.initialize,
+                        (d, address(paymentRouter), PLATFORM_FEE_BPS)
+                    )
                 )
             )
         );
@@ -247,7 +273,9 @@ contract DeployAllScript is Script {
             address(
                 new ERC1967Proxy(
                     address(new LicensingRegistry()),
-                    abi.encodeCall(LicensingRegistry.initialize, (d, address(paymentRouter), PLATFORM_FEE_BPS))
+                    abi.encodeCall(
+                        LicensingRegistry.initialize, (d, address(paymentRouter), PLATFORM_FEE_BPS)
+                    )
                 )
             )
         );
@@ -258,7 +286,10 @@ contract DeployAllScript is Script {
             address(
                 new ERC1967Proxy(
                     address(new CollabManager()),
-                    abi.encodeCall(CollabManager.initialize, (d, address(paymentRouter), address(um), PLATFORM_FEE_BPS))
+                    abi.encodeCall(
+                        CollabManager.initialize,
+                        (d, address(paymentRouter), address(um), PLATFORM_FEE_BPS)
+                    )
                 )
             )
         );
@@ -281,17 +312,19 @@ contract DeployAllScript is Script {
             address(
                 new ERC1967Proxy(
                     address(new LaunchpadStaking()),
-                    abi.encodeCall(LaunchpadStaking.initialize, (address(loarToken), treasury, treasury))
+                    abi.encodeCall(
+                        LaunchpadStaking.initialize, (address(loarToken), treasury, treasury)
+                    )
                 )
             )
         );
         console.log("[5] LaunchpadStaking:", address(staking));
 
         // Configure staking tiers
-        staking.setTierConfig(LaunchpadStaking.Tier(1), 1_000e18,    100, 100,  100, false); // BRONZE
-        staking.setTierConfig(LaunchpadStaking.Tier(2), 10_000e18,   200, 250,  150, true);  // SILVER
-        staking.setTierConfig(LaunchpadStaking.Tier(3), 100_000e18,  400, 500,  200, true);  // GOLD
-        staking.setTierConfig(LaunchpadStaking.Tier(4), 500_000e18,  800, 1000, 300, true);  // DIAMOND
+        staking.setTierConfig(LaunchpadStaking.Tier(1), 1_000e18, 100, 100, 100, false); // BRONZE
+        staking.setTierConfig(LaunchpadStaking.Tier(2), 10_000e18, 200, 250, 150, true); // SILVER
+        staking.setTierConfig(LaunchpadStaking.Tier(3), 100_000e18, 400, 500, 200, true); // GOLD
+        staking.setTierConfig(LaunchpadStaking.Tier(4), 500_000e18, 800, 1000, 300, true); // DIAMOND
         console.log("[5] Staking tiers configured");
 
         // StoryBounties (UUPS proxy)
@@ -310,7 +343,10 @@ contract DeployAllScript is Script {
             address(
                 new ERC1967Proxy(
                     address(new Escrow()),
-                    abi.encodeCall(Escrow.initialize, (treasury, address(paymentRouter), PLATFORM_FEE_BPS, 7 days))
+                    abi.encodeCall(
+                        Escrow.initialize,
+                        (treasury, address(paymentRouter), PLATFORM_FEE_BPS, 7 days)
+                    )
                 )
             )
         );

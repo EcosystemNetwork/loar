@@ -137,9 +137,26 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
     error OnlyOwner();
     error BondingCurveFactoryNotSet();
 
-    event TokenDeployed(uint256 indexed universeId, address indexed tokenAddress, address indexed hook, address locker);
-    event TokenAllocation(uint256 indexed universeId, uint256 lpAmount, uint256 creatorAmount, uint256 treasuryAmount, uint256 communityAmount);
-    event CreatorVestingCreated(uint256 indexed universeId, address indexed creator, address indexed token, uint256 vestingId, uint256 amount);
+    event TokenDeployed(
+        uint256 indexed universeId,
+        address indexed tokenAddress,
+        address indexed hook,
+        address locker
+    );
+    event TokenAllocation(
+        uint256 indexed universeId,
+        uint256 lpAmount,
+        uint256 creatorAmount,
+        uint256 treasuryAmount,
+        uint256 communityAmount
+    );
+    event CreatorVestingCreated(
+        uint256 indexed universeId,
+        address indexed creator,
+        address indexed token,
+        uint256 vestingId,
+        uint256 amount
+    );
     event VestingConfigUpdated(address vestingContract, uint64 cliff, uint64 duration);
 
     modifier onlyOwner() {
@@ -189,7 +206,10 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
 
     /// @notice Set vesting config for creator token allocation.
     ///         Set vestingContract to address(0) to disable vesting (direct transfer, V1 behavior).
-    function setVestingConfig(address _vestingContract, uint64 _cliff, uint64 _duration) external onlyOwner {
+    function setVestingConfig(address _vestingContract, uint64 _cliff, uint64 _duration)
+        external
+        onlyOwner
+    {
         if (_vestingContract != address(0)) {
             uint256 codeSize;
             assembly { codeSize := extcodesize(_vestingContract) }
@@ -207,7 +227,11 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
     function deployTokenAndGovernance(
         IUniverseManager.DeploymentConfig memory deploymentConfig,
         uint256 universeId
-    ) external nonReentrant returns (address tokenAddress, address governor, address bondingCurveAddress) {
+    )
+        external
+        nonReentrant
+        returns (address tokenAddress, address governor, address bondingCurveAddress)
+    {
         if (msg.sender != universeManager) revert OnlyUniverseManager();
         if (address(bondingCurveFactory) == address(0)) revert BondingCurveFactoryNotSet();
 
@@ -246,7 +270,9 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
         uint256 creatorAmount = (TOKEN_SUPPLY * creatorBps) / 10000;
         uint256 treasuryAmount = (TOKEN_SUPPLY * treasuryBps) / 10000;
         uint256 communityAmount = TOKEN_SUPPLY - lpAmount - creatorAmount - treasuryAmount;
-        if (lpAmount + creatorAmount + treasuryAmount + communityAmount != TOKEN_SUPPLY) revert AllocationSupplyMismatch();
+        if (lpAmount + creatorAmount + treasuryAmount + communityAmount != TOKEN_SUPPLY) {
+            revert AllocationSupplyMismatch();
+        }
 
         // Deploy bonding curve via factory
         bondingCurveAddress = bondingCurveFactory.deployBondingCurve(
@@ -263,18 +289,20 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
 
         // Creator allocation → vesting contract (if configured) or direct transfer
         address creator = deploymentConfig.tokenConfig.tokenAdmin;
-        require(creator != address(0) || creatorAmount == 0, "Creator address required when creatorBps > 0");
+        require(
+            creator != address(0) || creatorAmount == 0,
+            "Creator address required when creatorBps > 0"
+        );
         if (creator != address(0) && creatorAmount > 0) {
             if (vestingContract != address(0)) {
                 IERC20(tokenAddress).approve(vestingContract, creatorAmount);
-                uint256 vestingId = ITokenVesting(vestingContract).createVesting(
-                    tokenAddress,
-                    creator,
-                    uint128(creatorAmount),
-                    vestingCliff,
-                    vestingDuration
+                uint256 vestingId = ITokenVesting(vestingContract)
+                    .createVesting(
+                        tokenAddress, creator, uint128(creatorAmount), vestingCliff, vestingDuration
+                    );
+                emit CreatorVestingCreated(
+                    universeId, creator, tokenAddress, vestingId, creatorAmount
                 );
-                emit CreatorVestingCreated(universeId, creator, tokenAddress, vestingId, creatorAmount);
             } else {
                 IERC20(tokenAddress).safeTransfer(creator, creatorAmount);
             }
@@ -298,7 +326,12 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
         require(timelock != address(0), "Timelock not set");
         governor = governorFactory.deployGovernor(tokenAddress, timelock);
 
-        emit TokenDeployed(universeId, tokenAddress, deploymentConfig.poolConfig.hook, deploymentConfig.lockerConfig.locker);
+        emit TokenDeployed(
+            universeId,
+            tokenAddress,
+            deploymentConfig.poolConfig.hook,
+            deploymentConfig.lockerConfig.locker
+        );
         emit TokenAllocation(universeId, lpAmount, creatorAmount, treasuryAmount, communityAmount);
     }
 }

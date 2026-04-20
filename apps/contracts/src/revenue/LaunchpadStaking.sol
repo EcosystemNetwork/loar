@@ -4,7 +4,9 @@ pragma solidity =0.8.30;
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
@@ -28,15 +30,21 @@ import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 ///         - All staked $LOAR is locked (reduces circulating supply)
 ///         - Early unstake penalty: 5% to LP (not burned)
 ///         - Minimum lock period: 7 days
-contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+contract LaunchpadStaking is
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable
+{
     using SafeERC20 for IERC20;
 
     enum Tier {
-        NONE,       // 0 - not staked
-        BRONZE,     // 1
-        SILVER,     // 2
-        GOLD,       // 3
-        DIAMOND     // 4
+        NONE, // 0 - not staked
+        BRONZE, // 1
+        SILVER, // 2
+        GOLD, // 3
+        DIAMOND // 4
     }
 
     struct StakeInfo {
@@ -47,11 +55,11 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     }
 
     struct TierConfig {
-        uint256 minStake;       // minimum $LOAR to reach this tier
-        uint16 weight;          // allocation weight multiplier (100 = 1x)
-        uint16 feeDiscountBps;  // marketplace fee discount in bps
-        uint16 curationBoost;   // curation mining multiplier (100 = 1x)
-        bool priorityQueue;     // priority AI generation access
+        uint256 minStake; // minimum $LOAR to reach this tier
+        uint16 weight; // allocation weight multiplier (100 = 1x)
+        uint16 feeDiscountBps; // marketplace fee discount in bps
+        uint16 curationBoost; // curation mining multiplier (100 = 1x)
+        bool priorityQueue; // priority AI generation access
     }
 
     IERC20 public loarToken;
@@ -84,11 +92,11 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     struct UniverseStake {
         uint256 amount;
         uint256 stakedAt;
-        uint256 rewardDebt;     // for reward accounting
+        uint256 rewardDebt; // for reward accounting
     }
 
     struct UniversePool {
-        uint256 totalStaked;    // total $LOAR staked in this universe
+        uint256 totalStaked; // total $LOAR staked in this universe
         uint256 accRewardPerShare; // accumulated rewards per share (scaled by 1e18)
         uint256 totalDistributed;
     }
@@ -149,7 +157,9 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     event Unstaked(address indexed user, uint256 amount, uint256 penalty);
     event TierChanged(address indexed user, Tier oldTier, Tier newTier);
     event UniverseStaked(address indexed user, uint256 indexed universeId, uint256 amount);
-    event UniverseUnstaked(address indexed user, uint256 indexed universeId, uint256 amount, uint256 penalty);
+    event UniverseUnstaked(
+        address indexed user, uint256 indexed universeId, uint256 amount, uint256 penalty
+    );
     event UniverseRewardDistributed(uint256 indexed universeId, uint256 amount);
     event UniverseRewardClaimed(address indexed user, uint256 indexed universeId, uint256 amount);
 
@@ -160,13 +170,14 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     error NothingToClaim();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
-    function initialize(
-        address _loarToken,
-        address _treasury,
-        address _liquidityPool
-    ) external initializer {
+    function initialize(address _loarToken, address _treasury, address _liquidityPool)
+        external
+        initializer
+    {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -180,16 +191,45 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         earlyUnstakePenaltyBps = 500; // 5%
 
         // Default tier configs
-        tierConfigs[Tier.BRONZE]  = TierConfig({minStake: 1_000e18,   weight: 100,  feeDiscountBps: 100,  curationBoost: 100, priorityQueue: false});
-        tierConfigs[Tier.SILVER]  = TierConfig({minStake: 10_000e18,  weight: 300,  feeDiscountBps: 250,  curationBoost: 150, priorityQueue: true});
-        tierConfigs[Tier.GOLD]    = TierConfig({minStake: 100_000e18, weight: 1000, feeDiscountBps: 500,  curationBoost: 200, priorityQueue: true});
-        tierConfigs[Tier.DIAMOND] = TierConfig({minStake: 500_000e18, weight: 2500, feeDiscountBps: 1000, curationBoost: 300, priorityQueue: true});
+        tierConfigs[Tier.BRONZE] = TierConfig({
+            minStake: 1_000e18,
+            weight: 100,
+            feeDiscountBps: 100,
+            curationBoost: 100,
+            priorityQueue: false
+        });
+        tierConfigs[Tier.SILVER] = TierConfig({
+            minStake: 10_000e18,
+            weight: 300,
+            feeDiscountBps: 250,
+            curationBoost: 150,
+            priorityQueue: true
+        });
+        tierConfigs[Tier.GOLD] = TierConfig({
+            minStake: 100_000e18,
+            weight: 1000,
+            feeDiscountBps: 500,
+            curationBoost: 200,
+            priorityQueue: true
+        });
+        tierConfigs[Tier.DIAMOND] = TierConfig({
+            minStake: 500_000e18,
+            weight: 2500,
+            feeDiscountBps: 1000,
+            curationBoost: 300,
+            priorityQueue: true
+        });
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     // ── Stake ───────────────────────────────────────────────────
 
@@ -277,7 +317,11 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     // ── Universe Staking ──────────────────────────────────────
 
     /// @notice Stake $LOAR into a specific universe to earn revenue share
-    function stakeInUniverse(uint256 universeId, uint256 amount) external nonReentrant whenNotPaused {
+    function stakeInUniverse(uint256 universeId, uint256 amount)
+        external
+        nonReentrant
+        whenNotPaused
+    {
         if (amount == 0) revert ZeroAmount();
 
         loarToken.safeTransferFrom(msg.sender, address(this), amount);
@@ -300,7 +344,8 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
             us.stakedAt = block.timestamp;
         } else {
             // Weighted average: new stakedAt = (oldAmount * oldStakedAt + newAmount * now) / totalAmount
-            us.stakedAt = (us.amount * us.stakedAt + amount * block.timestamp) / (us.amount + amount);
+            us.stakedAt =
+                (us.amount * us.stakedAt + amount * block.timestamp) / (us.amount + amount);
         }
 
         us.amount += amount;
@@ -313,7 +358,11 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     }
 
     /// @notice Unstake $LOAR from a universe. Early unstake penalty goes to LP.
-    function unstakeFromUniverse(uint256 universeId, uint256 amount) external nonReentrant whenNotPaused {
+    function unstakeFromUniverse(uint256 universeId, uint256 amount)
+        external
+        nonReentrant
+        whenNotPaused
+    {
         UniverseStake storage us = universeStakes[msg.sender][universeId];
         if (us.amount == 0) revert NothingStaked();
         if (amount > us.amount) revert InsufficientStake();
@@ -358,8 +407,14 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     /// @dev Auth: owner OR `distributors[msg.sender]`. The legacy
     ///      `treasury` bypass is gone — re-add via `setDistributor(treasury, true)`
     ///      if the treasury wallet is supposed to push rewards directly.
-    function distributeUniverseReward(uint256 universeId, uint256 amount) external nonReentrant whenNotPaused {
-        if (msg.sender != owner() && !distributors[msg.sender]) revert NotDistributor();
+    function distributeUniverseReward(uint256 universeId, uint256 amount)
+        external
+        nonReentrant
+        whenNotPaused
+    {
+        if (msg.sender != owner() && !distributors[msg.sender]) {
+            revert NotDistributor();
+        }
 
         UniversePool storage pool = universePools[universeId];
         if (pool.totalStaked == 0) {
@@ -410,7 +465,11 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     // ── Views ───────────────────────────────────────────────────
 
     /// @notice Get pending universe staking rewards for a user
-    function pendingUniverseReward(address user, uint256 universeId) external view returns (uint256) {
+    function pendingUniverseReward(address user, uint256 universeId)
+        external
+        view
+        returns (uint256)
+    {
         UniversePool storage pool = universePools[universeId];
         UniverseStake storage us = universeStakes[user][universeId];
         if (us.amount == 0) return 0;
@@ -468,13 +527,27 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     // ── Admin ───────────────────────────────────────────────────
 
-    event TierConfigChanged(Tier indexed tier, uint256 minStake, uint16 weight, uint16 feeDiscountBps, uint16 curationBoost, bool priorityQueue);
+    event TierConfigChanged(
+        Tier indexed tier,
+        uint256 minStake,
+        uint16 weight,
+        uint16 feeDiscountBps,
+        uint16 curationBoost,
+        bool priorityQueue
+    );
     event MinLockPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
     event EarlyUnstakePenaltyChanged(uint16 oldPenaltyBps, uint16 newPenaltyBps);
     event TreasuryChanged(address indexed oldTreasury, address indexed newTreasury);
     event LiquidityPoolChanged(address indexed oldPool, address indexed newPool);
 
-    function setTierConfig(Tier tier, uint256 minStake, uint16 weight, uint16 feeDiscountBps, uint16 curationBoost, bool priorityQueue) external onlyOwner {
+    function setTierConfig(
+        Tier tier,
+        uint256 minStake,
+        uint16 weight,
+        uint16 feeDiscountBps,
+        uint16 curationBoost,
+        bool priorityQueue
+    ) external onlyOwner {
         require(tier != Tier.NONE, "Cannot configure NONE tier");
         require(feeDiscountBps <= 10_000, "Fee discount > 100%");
 
@@ -544,7 +617,10 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     /// @param newMaxRewardBps Max distribution size as fraction of pool (bps).
     /// @dev Pass `newMaxRewardBps == 0` to disable the per-distribution cap.
     ///      Must be <= 10_000 (100% of the pool); recommended 500 (5%).
-    function setDistributionGuard(uint256 newMinInterval, uint16 newMaxRewardBps) external onlyOwner {
+    function setDistributionGuard(uint256 newMinInterval, uint16 newMaxRewardBps)
+        external
+        onlyOwner
+    {
         require(newMaxRewardBps <= 10_000, "Max bps > 100%");
         require(newMinInterval <= 100_000, "Interval too large");
         minDistributionInterval = newMinInterval;
@@ -560,8 +636,8 @@ contract LaunchpadStaking is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     ///      values that owner has set since.
     function initializeDistributionGuardV2() external onlyOwner {
         if (minDistributionInterval == 0 && maxRewardBpsPerDistribution == 0) {
-            minDistributionInterval = 100;             // ~20min Eth, ~3min Base
-            maxRewardBpsPerDistribution = 500;         // 5% of pool per distribution
+            minDistributionInterval = 100; // ~20min Eth, ~3min Base
+            maxRewardBpsPerDistribution = 500; // 5% of pool per distribution
             emit DistributionGuardChanged(100, 500);
         }
     }

@@ -43,9 +43,7 @@ interface ILoarHook {
     ) external returns (PoolKey memory);
 
     // initialize a pool not via the factory
-    function poolCreationTimestamp(
-        PoolId poolId
-    ) external view returns (uint256);
+    function poolCreationTimestamp(PoolId poolId) external view returns (uint256);
 
     function supportsInterface(bytes4 interfaceId) external pure returns (bool);
 }

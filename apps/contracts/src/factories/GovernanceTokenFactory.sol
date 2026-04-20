@@ -29,8 +29,7 @@ contract GovernanceERC20 is ERC20, ERC20Permit, ERC20Votes {
         _mint(_mintTo, _supply);
     }
 
-    function _update(address from, address to, uint256 value)
-        internal override(ERC20, ERC20Votes) {
+    function _update(address from, address to, uint256 value) internal override(ERC20, ERC20Votes) {
         super._update(from, to, value);
         // GOV-02: Auto-delegate on first token receipt so voting power is active by default.
         // Without this, ERC20Votes requires explicit delegate(self) call, and empirical

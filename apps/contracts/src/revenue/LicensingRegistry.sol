@@ -4,7 +4,9 @@ pragma solidity =0.8.30;
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 import {IERC721} from "@openzeppelin/token/ERC721/IERC721.sol";
@@ -13,27 +15,45 @@ import {IERC721} from "@openzeppelin/token/ERC721/IERC721.sol";
 /// @notice Manages IP licensing for original universes. When a universe gains traction,
 ///         creators can register licensing deals with external platforms (Netflix, Amazon, etc).
 ///         Also handles merch licensing for original IP (shirts, posters, figurines, comics).
-contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
-    enum LicenseType { STREAMING, MERCH, GAMING, COMIC, AUDIO, OTHER }
-    enum LicenseStatus { PROPOSED, ACTIVE, EXPIRED, REVOKED }
+contract LicensingRegistry is
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable
+{
+    enum LicenseType {
+        STREAMING,
+        MERCH,
+        GAMING,
+        COMIC,
+        AUDIO,
+        OTHER
+    }
+    enum LicenseStatus {
+        PROPOSED,
+        ACTIVE,
+        EXPIRED,
+        REVOKED
+    }
 
     struct License {
         uint256 id;
         uint256 universeId;
         LicenseType licenseType;
         LicenseStatus status;
-        address licensor;          // universe creator
-        address licensee;          // external platform/partner
+        address licensor; // universe creator
+        address licensee; // external platform/partner
         uint256 upfrontFee;
         /// @dev LICENSE-02: royaltyBps is advisory — enforcement is off-chain via legal agreement.
         ///      On-chain enforcement would require an oracle for content revenue tracking.
         ///      This field records the agreed-upon royalty rate for reference and event emission,
         ///      but payRoyalty() does not auto-enforce minimum payment amounts against it.
-        uint16 royaltyBps;         // agreed royalty percentage (advisory, not auto-enforced)
+        uint16 royaltyBps; // agreed royalty percentage (advisory, not auto-enforced)
         uint256 totalRoyalties;
         uint256 startTime;
         uint256 endTime;
-        string terms;              // IPFS URI for full license terms
+        string terms; // IPFS URI for full license terms
     }
 
     struct MerchItem {
@@ -68,7 +88,13 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     IPaymentRouter public paymentRouter;
     uint16 public platformFeeBps;
 
-    event LicenseCreated(uint256 indexed licenseId, uint256 universeId, LicenseType licenseType, address licensee, uint256 upfrontFee);
+    event LicenseCreated(
+        uint256 indexed licenseId,
+        uint256 universeId,
+        LicenseType licenseType,
+        address licensee,
+        uint256 upfrontFee
+    );
     event LicenseActivated(uint256 indexed licenseId);
     event RoyaltyPaid(uint256 indexed licenseId, uint256 amount);
     event LicenseRevoked(uint256 indexed licenseId);
@@ -100,9 +126,14 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     error ZeroAddress();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
-    function initialize(address _platform, address _paymentRouter, uint16 _platformFeeBps) external initializer {
+    function initialize(address _platform, address _paymentRouter, uint16 _platformFeeBps)
+        external
+        initializer
+    {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -114,8 +145,13 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
         platformFeeBps = _platformFeeBps;
     }
 
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
@@ -302,7 +338,9 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
 
     /// @notice Paginated license query — avoids gas limit on large arrays
     function getUniverseLicensesPaginated(uint256 universeId, uint256 offset, uint256 limit)
-        external view returns (uint256[] memory ids, uint256 total)
+        external
+        view
+        returns (uint256[] memory ids, uint256 total)
     {
         uint256[] storage all = universeLicenses[universeId];
         total = all.length;
@@ -321,7 +359,9 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
 
     /// @notice Paginated merch query
     function getUniverseMerchPaginated(uint256 universeId, uint256 offset, uint256 limit)
-        external view returns (uint256[] memory ids, uint256 total)
+        external
+        view
+        returns (uint256[] memory ids, uint256 total)
     {
         uint256[] storage all = universeMerch[universeId];
         total = all.length;
@@ -335,7 +375,11 @@ contract LicensingRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     }
 
     /// @notice Count total licenses and merch for a universe
-    function getUniverseCounts(uint256 universeId) external view returns (uint256 licenseCount, uint256 merchCount) {
+    function getUniverseCounts(uint256 universeId)
+        external
+        view
+        returns (uint256 licenseCount, uint256 merchCount)
+    {
         return (universeLicenses[universeId].length, universeMerch[universeId].length);
     }
 

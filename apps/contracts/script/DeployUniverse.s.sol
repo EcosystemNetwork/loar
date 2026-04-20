@@ -147,7 +147,9 @@ contract DeployUniverseScript is Script {
         uint256 mintFee = universeManager.mintFee();
         console.log("1/2 Creating Universe...");
         console.log("   Mint fee:", mintFee);
-        (uint256 universeId, address universeAddress) = universeManager.createUniverse{value: mintFee}(
+        (uint256 universeId, address universeAddress) = universeManager.createUniverse{
+            value: mintFee
+        }(
             universeName,
             universeImage,
             universeDescription,
@@ -168,15 +170,14 @@ contract DeployUniverseScript is Script {
             symbol: tokenSymbol,
             imageURL: tokenImage,
             metadata: string(abi.encodePacked('{"description":"', universeDescription, '"}')),
-            context: string(abi.encodePacked('{"interface":"loar.fun","platform":"","messageId":""}'))
+            context: string(
+                abi.encodePacked('{"interface":"loar.fun","platform":"","messageId":""}')
+            )
         });
 
         // Prepare pool config with fee configuration
         bytes memory poolData = abi.encode(
-            ILoarHookStaticFee.PoolStaticConfigVars({
-                loarFee: loarFee,
-                pairedFee: pairedFee
-            })
+            ILoarHookStaticFee.PoolStaticConfigVars({loarFee: loarFee, pairedFee: pairedFee})
         );
 
         IUniverseManager.PoolConfig memory poolConfig = IUniverseManager.PoolConfig({
@@ -214,10 +215,7 @@ contract DeployUniverseScript is Script {
         });
 
         IUniverseManager.AllocationConfig memory allocationConfig = IUniverseManager.AllocationConfig({
-            curveBps: 0,
-            creatorBps: 0,
-            treasuryBps: 0,
-            communityBps: 0
+            curveBps: 0, creatorBps: 0, treasuryBps: 0, communityBps: 0
         });
 
         IUniverseManager.DeploymentConfig memory deployConfig = IUniverseManager.DeploymentConfig({

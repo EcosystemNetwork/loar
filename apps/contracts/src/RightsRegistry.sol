@@ -59,7 +59,9 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(address _platform) external initializer {
         __Ownable_init(msg.sender);
@@ -82,8 +84,7 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
         if (rights[contentHash] == RightsType.FROZEN) revert AlreadyFrozen();
 
         bool isMonetizableType = rightsType == RightsType.ORIGINAL
-            || rightsType == RightsType.LICENSED
-            || rightsType == RightsType.PUBLIC_DOMAIN;
+            || rightsType == RightsType.LICENSED || rightsType == RightsType.PUBLIC_DOMAIN;
         if (isMonetizableType && msg.sender != owner()) {
             revert MonetizableRequiresCreatorSig();
         }
@@ -182,21 +183,25 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
         if (rights[contentHash] == RightsType.FROZEN) revert AlreadyFrozen();
         if (block.timestamp > deadline) revert SignatureExpired();
 
-        bytes32 raw = keccak256(abi.encodePacked(
-            "LOAR-RIGHTS-V1",
-            address(this),
-            block.chainid,
-            contentHash,
-            uint8(rightsType),
-            creatorNonce[creator],
-            deadline
-        ));
+        bytes32 raw = keccak256(
+            abi.encodePacked(
+                "LOAR-RIGHTS-V1",
+                address(this),
+                block.chainid,
+                contentHash,
+                uint8(rightsType),
+                creatorNonce[creator],
+                deadline
+            )
+        );
         bytes32 digest = MessageHashUtils.toEthSignedMessageHash(raw);
         address recovered = ECDSA.recover(digest, signature);
         if (recovered != creator || recovered == address(0)) revert InvalidSignature();
 
         // Consume the nonce so this signature cannot be replayed.
-        unchecked { creatorNonce[creator]++; }
+        unchecked {
+            creatorNonce[creator]++;
+        }
 
         // Creator signature binds the content to this creator even on first classification.
         contentCreator[contentHash] = creator;

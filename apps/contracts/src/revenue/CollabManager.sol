@@ -4,7 +4,9 @@ pragma solidity =0.8.30;
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 import {IERC721} from "@openzeppelin/token/ERC721/IERC721.sol";
@@ -14,21 +16,33 @@ import {IUniverseManager} from "../interfaces/IUniverseManager.sol";
 /// @notice Manages cross-universe collaborations ("collisions").
 ///         Two universes can merge for special event episodes, joint NFTs,
 ///         and shared liquidity events.
-contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
-    enum CollabStatus { PROPOSED, ACCEPTED, ACTIVE, COMPLETED, CANCELLED }
+contract CollabManager is
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable
+{
+    enum CollabStatus {
+        PROPOSED,
+        ACCEPTED,
+        ACTIVE,
+        COMPLETED,
+        CANCELLED
+    }
 
     struct Collab {
         uint256 id;
         uint256 universeA;
         uint256 universeB;
-        address proposer;          // creator of universe A
-        address acceptor;          // creator of universe B
+        address proposer; // creator of universe A
+        address acceptor; // creator of universe B
         CollabStatus status;
-        uint256 revenueShareBps;   // universe A's share (rest goes to B)
+        uint256 revenueShareBps; // universe A's share (rest goes to B)
         uint256 totalRevenue;
         uint256 startTime;
         uint256 endTime;
-        string metadataURI;        // collab details
+        string metadataURI; // collab details
         uint256 episodeCount;
     }
 
@@ -43,7 +57,9 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     IUniverseManager public universeManager;
     uint16 public platformFeeBps;
 
-    event CollabProposed(uint256 indexed collabId, uint256 universeA, uint256 universeB, address proposer);
+    event CollabProposed(
+        uint256 indexed collabId, uint256 universeA, uint256 universeB, address proposer
+    );
     event CollabAccepted(uint256 indexed collabId, address acceptor);
     event CollabActivated(uint256 indexed collabId, uint256 startTime, uint256 endTime);
     event CollabEpisodeCreated(uint256 indexed collabId, uint256 episodeCount, uint256 revenue);
@@ -73,16 +89,26 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     error ZeroAddress();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
     error NotUniverseBAdmin();
 
-    function initialize(address _platform, address _paymentRouter, address _universeManager, uint16 _platformFeeBps) external initializer {
+    function initialize(
+        address _platform,
+        address _paymentRouter,
+        address _universeManager,
+        uint16 _platformFeeBps
+    ) external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-        if (_platform == address(0) || _paymentRouter == address(0) || _universeManager == address(0)) revert ZeroAddress();
+        if (
+            _platform == address(0) || _paymentRouter == address(0)
+                || _universeManager == address(0)
+        ) revert ZeroAddress();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
         paymentRouter = IPaymentRouter(_paymentRouter);
@@ -90,8 +116,13 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         platformFeeBps = _platformFeeBps;
     }
 
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
@@ -100,15 +131,18 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     function proposeCollab(
         uint256 universeA,
         uint256 universeB,
-        uint256 revenueShareBps,   // A's share in bps
-        uint256 duration,           // seconds
+        uint256 revenueShareBps, // A's share in bps
+        uint256 duration, // seconds
         string calldata metadataURI,
         address targetAcceptor
     ) external whenNotPaused returns (uint256 collabId) {
         require(revenueShareBps <= 10000, "Invalid share");
         if (targetAcceptor == address(0)) revert ZeroAddress();
         // COLLAB-01: Verify proposer owns universe A
-        require(IERC721(address(universeManager)).ownerOf(universeA) == msg.sender, "Not universe A owner");
+        require(
+            IERC721(address(universeManager)).ownerOf(universeA) == msg.sender,
+            "Not universe A owner"
+        );
 
         collabId = nextCollabId++;
 
@@ -138,7 +172,10 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         Collab storage c = collabs[collabId];
         if (c.status != CollabStatus.PROPOSED) revert InvalidStatus();
         // COLLAB-01: Verify acceptor owns universe B (on-chain check is authoritative)
-        require(IERC721(address(universeManager)).ownerOf(c.universeB) == msg.sender, "Not universe B owner");
+        require(
+            IERC721(address(universeManager)).ownerOf(c.universeB) == msg.sender,
+            "Not universe B owner"
+        );
 
         c.status = CollabStatus.ACCEPTED;
 
@@ -205,7 +242,9 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     /// @notice Cancel a proposed collab
     function cancelCollab(uint256 collabId) external {
         Collab storage c = collabs[collabId];
-        if (c.status != CollabStatus.PROPOSED && c.status != CollabStatus.ACCEPTED) revert InvalidStatus();
+        if (c.status != CollabStatus.PROPOSED && c.status != CollabStatus.ACCEPTED) {
+            revert InvalidStatus();
+        }
         if (msg.sender != c.proposer) revert NotProposer();
 
         c.status = CollabStatus.CANCELLED;
@@ -219,7 +258,9 @@ contract CollabManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
 
     /// @notice Paginated collab query
     function getUniverseCollabsPaginated(uint256 universeId, uint256 offset, uint256 limit)
-        external view returns (uint256[] memory ids, uint256 total)
+        external
+        view
+        returns (uint256[] memory ids, uint256 total)
     {
         uint256[] storage all = universeCollabs[universeId];
         total = all.length;

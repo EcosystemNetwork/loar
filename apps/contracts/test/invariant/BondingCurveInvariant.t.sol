@@ -36,11 +36,11 @@ contract BondingCurveHandler is Test {
     MockERC20 public token;
 
     // Ghost variables for invariant tracking
-    uint256 public ghost_totalEthIn;       // total ETH sent via buy()
-    uint256 public ghost_totalEthOut;      // total ETH returned via sell()
+    uint256 public ghost_totalEthIn; // total ETH sent via buy()
+    uint256 public ghost_totalEthOut; // total ETH returned via sell()
     uint256 public ghost_totalPendingRefunds; // sum of all pending refunds (approx)
-    uint256 public ghost_lastPrice;        // price snapshot after last operation
-    bool public ghost_priceMonotonicity;   // stays true unless price decreases after buy
+    uint256 public ghost_lastPrice; // price snapshot after last operation
+    bool public ghost_priceMonotonicity; // stays true unless price decreases after buy
 
     // Actors
     address[] public actors;
@@ -180,7 +180,7 @@ contract BondingCurveInvariantTest is Test {
         curve = new BondingCurve(
             address(token),
             address(manager),
-            1,                  // universeId
+            1, // universeId
             CURVE_SUPPLY,
             GRADUATION_ETH,
             MAX_BUY_BPS
@@ -201,8 +201,7 @@ contract BondingCurveInvariantTest is Test {
 
     function invariant_monotonicity() public view {
         assertTrue(
-            handler.ghost_priceMonotonicity(),
-            "MONOTONICITY VIOLATED: price decreased after a buy"
+            handler.ghost_priceMonotonicity(), "MONOTONICITY VIOLATED: price decreased after a buy"
         );
     }
 
@@ -238,8 +237,7 @@ contract BondingCurveInvariantTest is Test {
     function invariant_graduationThreshold() public view {
         if (curve.ethRaised() >= curve.GRADUATION_ETH()) {
             assertTrue(
-                curve.graduated(),
-                "GRADUATION VIOLATED: ethRaised >= target but not graduated"
+                curve.graduated(), "GRADUATION VIOLATED: ethRaised >= target but not graduated"
             );
         }
     }

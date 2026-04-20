@@ -70,8 +70,11 @@ contract RevenueModuleFactory is Ownable {
         address _entityEdBeacon,
         address _episodeNftBeacon
     ) Ownable(msg.sender) {
-        if (_platform == address(0) || _rightsRegistry == address(0) || _paymentRouter == address(0))
+        if (
+            _platform == address(0) || _rightsRegistry == address(0) || _paymentRouter == address(0)
+        ) {
             revert ZeroAddress();
+        }
         platform = _platform;
         rightsRegistry = _rightsRegistry;
         paymentRouter = _paymentRouter;
@@ -92,36 +95,98 @@ contract RevenueModuleFactory is Ownable {
     /// @notice Deploy all revenue modules for a universe as BeaconProxy instances.
     function deployModules(uint256 universeId)
         external
-        returns (address episodes, address characters, address entities, address entityEditions, address episodeNfts)
+        returns (
+            address episodes,
+            address characters,
+            address entities,
+            address entityEditions,
+            address episodeNfts
+        )
     {
-        if (episodeCollection[universeId] != address(0)) revert AlreadyDeployed();
+        if (episodeCollection[universeId] != address(0)) {
+            revert AlreadyDeployed();
+        }
 
-        episodes = address(new BeaconProxy(address(episodeBeacon),
-            abi.encodeCall(EpisodeEditionCollection.initialize, (
-                universeId, platform, rightsRegistry, paymentRouter,
-                episodePlatformFeeBps, episodeRoyaltyBps))));
+        episodes = address(
+            new BeaconProxy(
+                address(episodeBeacon),
+                abi.encodeCall(
+                    EpisodeEditionCollection.initialize,
+                    (
+                        universeId,
+                        platform,
+                        rightsRegistry,
+                        paymentRouter,
+                        episodePlatformFeeBps,
+                        episodeRoyaltyBps
+                    )
+                )
+            )
+        );
 
-        characters = address(new BeaconProxy(address(characterBeacon),
-            abi.encodeCall(CharacterNFT.initialize, (
-                universeId, platform, rightsRegistry, paymentRouter,
-                characterAppearanceFeeBps))));
+        characters = address(
+            new BeaconProxy(
+                address(characterBeacon),
+                abi.encodeCall(
+                    CharacterNFT.initialize,
+                    (universeId, platform, rightsRegistry, paymentRouter, characterAppearanceFeeBps)
+                )
+            )
+        );
 
         // NFT-02: empty strings fall back to the default name/symbol; per-universe
         //         customization can be wired through the factory signature in a future upgrade.
-        entities = address(new BeaconProxy(address(entityBeacon),
-            abi.encodeCall(EntityNFT.initialize, (
-                universeId, platform, paymentRouter, rightsRegistry,
-                entityPlatformFeeBps, entityRoyaltyBps, "", ""))));
+        entities = address(
+            new BeaconProxy(
+                address(entityBeacon),
+                abi.encodeCall(
+                    EntityNFT.initialize,
+                    (
+                        universeId,
+                        platform,
+                        paymentRouter,
+                        rightsRegistry,
+                        entityPlatformFeeBps,
+                        entityRoyaltyBps,
+                        "",
+                        ""
+                    )
+                )
+            )
+        );
 
-        entityEditions = address(new BeaconProxy(address(entityEdBeacon),
-            abi.encodeCall(EntityEditionNFT.initialize, (
-                universeId, platform, paymentRouter, rightsRegistry,
-                entityPlatformFeeBps, entityRoyaltyBps))));
+        entityEditions = address(
+            new BeaconProxy(
+                address(entityEdBeacon),
+                abi.encodeCall(
+                    EntityEditionNFT.initialize,
+                    (
+                        universeId,
+                        platform,
+                        paymentRouter,
+                        rightsRegistry,
+                        entityPlatformFeeBps,
+                        entityRoyaltyBps
+                    )
+                )
+            )
+        );
 
-        episodeNfts = address(new BeaconProxy(address(episodeNftBeacon),
-            abi.encodeCall(EpisodeNFT.initialize, (
-                platform, rightsRegistry, paymentRouter,
-                episodePlatformFeeBps, episodeRoyaltyBps))));
+        episodeNfts = address(
+            new BeaconProxy(
+                address(episodeNftBeacon),
+                abi.encodeCall(
+                    EpisodeNFT.initialize,
+                    (
+                        platform,
+                        rightsRegistry,
+                        paymentRouter,
+                        episodePlatformFeeBps,
+                        episodeRoyaltyBps
+                    )
+                )
+            )
+        );
 
         episodeCollection[universeId] = episodes;
         characterCollection[universeId] = characters;
@@ -129,7 +194,9 @@ contract RevenueModuleFactory is Ownable {
         entityEditionCollection[universeId] = entityEditions;
         episodeNftCollection[universeId] = episodeNfts;
 
-        emit ModulesDeployed(universeId, episodes, characters, entities, entityEditions, episodeNfts);
+        emit ModulesDeployed(
+            universeId, episodes, characters, entities, entityEditions, episodeNfts
+        );
     }
 
     // ── Admin ──

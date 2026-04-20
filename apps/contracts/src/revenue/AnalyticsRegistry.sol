@@ -10,7 +10,12 @@ import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgra
 /// @notice On-chain analytics for story engagement data. Records what stories
 ///         people like, trending characters, and engaging arcs. This data is
 ///         valuable for training story AIs and for studios.
-contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, PausableUpgradeable {
+contract AnalyticsRegistry is
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable,
+    PausableUpgradeable
+{
     struct UniverseMetrics {
         uint256 totalViews;
         uint256 totalMints;
@@ -30,7 +35,7 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     struct CharacterMetrics {
         uint256 appearances;
         uint256 votes;
-        uint256 popularity;        // composite score
+        uint256 popularity; // composite score
     }
 
     // universeId => metrics
@@ -45,9 +50,13 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
 
     address public platform;
 
-    event UniverseMetricsUpdated(uint256 indexed universeId, uint256 totalViews, uint256 totalMints, uint256 totalRevenue);
+    event UniverseMetricsUpdated(
+        uint256 indexed universeId, uint256 totalViews, uint256 totalMints, uint256 totalRevenue
+    );
     event EpisodeViewed(uint256 indexed universeId, uint256 indexed episodeId, uint256 totalViews);
-    event CharacterTrending(uint256 indexed universeId, uint256 indexed characterId, uint256 popularity);
+    event CharacterTrending(
+        uint256 indexed universeId, uint256 indexed characterId, uint256 popularity
+    );
     event DataExportRequested(address indexed requester, uint256 universeId, uint256 timestamp);
     event MintRecorded(uint256 indexed universeId, uint256 indexed episodeId, uint256 totalMints);
     event EngagementRecorded(uint256 indexed universeId, uint256 indexed episodeId, bool isLike);
@@ -67,7 +76,9 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(address _platform) external initializer {
         require(_platform != address(0), "Zero address");
@@ -79,8 +90,13 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     /// @notice Record a view on an episode
     function recordView(uint256 universeId, uint256 episodeId) external onlyPlatform whenNotPaused {
@@ -101,7 +117,11 @@ contract AnalyticsRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable
     }
 
     /// @notice Record engagement (like/share)
-    function recordEngagement(uint256 universeId, uint256 episodeId, bool isLike) external onlyPlatform whenNotPaused {
+    function recordEngagement(uint256 universeId, uint256 episodeId, bool isLike)
+        external
+        onlyPlatform
+        whenNotPaused
+    {
         if (isLike) {
             episodeMetrics[universeId][episodeId].likes++;
         } else {

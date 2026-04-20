@@ -10,7 +10,11 @@ import {Ownable} from "@openzeppelin/access/Ownable.sol";
 import {LPFeeLibrary} from "@uniswap/v4-core/src/libraries/LPFeeLibrary.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
-import {BeforeSwapDelta, toBeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
+import {
+    BeforeSwapDelta,
+    toBeforeSwapDelta,
+    BeforeSwapDeltaLibrary
+} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {BaseHook} from "@uniswap/v4-periphery/src/utils/BaseHook.sol";
@@ -55,19 +59,15 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         }
     }
 
-    constructor(
-        address _poolManager,
-        address _factory,
-        address _weth
-    ) BaseHook(IPoolManager(_poolManager)) Ownable(msg.sender) {
+    constructor(address _poolManager, address _factory, address _weth)
+        BaseHook(IPoolManager(_poolManager))
+        Ownable(msg.sender)
+    {
         factory = _factory;
         weth = _weth;
     }
 
-    function _setFee(
-        PoolKey calldata,
-        SwapParams calldata
-    ) internal virtual {
+    function _setFee(PoolKey calldata, SwapParams calldata) internal virtual {
         return;
     }
 
@@ -81,10 +81,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
     }
 
     // function for inheriting hooks to set process data in during initialization flow
-    function _initializePoolData(
-        PoolKey memory,
-        bytes memory
-    ) internal virtual {
+    function _initializePoolData(PoolKey memory, bytes memory) internal virtual {
         return;
     }
 
@@ -97,13 +94,8 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         bytes calldata poolData
     ) public onlyFactory returns (PoolKey memory) {
         // initialize the pool
-        PoolKey memory poolKey = _initializePool(
-            loar,
-            pairedToken,
-            tickIfToken0IsLoar,
-            tickSpacing,
-            poolData
-        );
+        PoolKey memory poolKey =
+            _initializePool(loar, pairedToken, tickIfToken0IsLoar, tickSpacing, poolData);
 
         // Store locker so _lpLockerFeeClaim can trigger fee collection on swaps
         if (_locker != address(0)) {
@@ -151,9 +143,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         loarIsToken0[_poolKey.toId()] = token0IsLoar;
 
         // initialize the pool
-        int24 startingTick = token0IsLoar
-            ? tickIfToken0IsLoar
-            : -tickIfToken0IsLoar;
+        int24 startingTick = token0IsLoar ? tickIfToken0IsLoar : -tickIfToken0IsLoar;
         uint160 initialPrice = startingTick.getSqrtPriceAtTick();
         poolManager.initialize(_poolKey, initialPrice);
 
@@ -171,12 +161,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         PoolKey calldata poolKey,
         SwapParams calldata swapParams,
         bytes calldata
-    )
-        internal
-        virtual
-        override
-        returns (bytes4, BeforeSwapDelta delta, uint24)
-    {
+    ) internal virtual override returns (bytes4, BeforeSwapDelta delta, uint24) {
         // set the fee for this swap
         _setFee(poolKey, swapParams);
 
@@ -200,8 +185,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
             // this also helps us match the ExactOutput swappingForLoar scenario
             uint24 pFee = poolProtocolFee[poolKey.toId()];
             // forge-lint: disable-next-line(unsafe-typecast)
-            uint128 scaledProtocolFee = (uint128(pFee) * 1e18) /
-                (1_000_000 + pFee);
+            uint128 scaledProtocolFee = (uint128(pFee) * 1e18) / (1_000_000 + pFee);
             // forge-lint: disable-next-line(unsafe-typecast)
             int128 fee = int128(
                 // forge-lint: disable-next-line(unsafe-typecast)
@@ -211,9 +195,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
             delta = toBeforeSwapDelta(fee, 0);
             poolManager.mint(
                 address(this),
-                token0IsLoar
-                    ? poolKey.currency1.toId()
-                    : poolKey.currency0.toId(),
+                token0IsLoar ? poolKey.currency1.toId() : poolKey.currency0.toId(),
                 // forge-lint: disable-next-line(unsafe-typecast)
                 uint256(int256(fee))
             );
@@ -228,8 +210,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
             // the ExactOutput !swappingForLoar scenario
             uint24 pFee = poolProtocolFee[poolKey.toId()];
             // forge-lint: disable-next-line(unsafe-typecast)
-            uint128 scaledProtocolFee = (uint128(pFee) * 1e18) /
-                (1_000_000 - pFee);
+            uint128 scaledProtocolFee = (uint128(pFee) * 1e18) / (1_000_000 - pFee);
             // forge-lint: disable-next-line(unsafe-typecast)
             int128 fee = int128(
                 // forge-lint: disable-next-line(unsafe-typecast)
@@ -239,9 +220,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
 
             poolManager.mint(
                 address(this),
-                token0IsLoar
-                    ? poolKey.currency1.toId()
-                    : poolKey.currency0.toId(),
+                token0IsLoar ? poolKey.currency1.toId() : poolKey.currency0.toId(),
                 // forge-lint: disable-next-line(unsafe-typecast)
                 uint256(int256(fee))
             );
@@ -272,14 +251,11 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
             int128 amountOut = token0IsLoar ? delta.amount1() : delta.amount0();
             // take fee from it
             unspecifiedDelta =
-                // forge-lint: disable-next-line(unsafe-typecast)
-                (amountOut * int24(pFee)) /
-                FEE_DENOMINATOR;
+            // forge-lint: disable-next-line(unsafe-typecast)
+             (amountOut * int24(pFee)) / FEE_DENOMINATOR;
             poolManager.mint(
                 address(this),
-                token0IsLoar
-                    ? poolKey.currency1.toId()
-                    : poolKey.currency0.toId(),
+                token0IsLoar ? poolKey.currency1.toId() : poolKey.currency0.toId(),
                 // forge-lint: disable-next-line(unsafe-typecast)
                 uint256(int256(unspecifiedDelta))
             );
@@ -295,14 +271,11 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
             int128 amountIn = token0IsLoar ? delta.amount1() : delta.amount0();
             // take fee from amount int
             unspecifiedDelta =
-                // forge-lint: disable-next-line(unsafe-typecast)
-                (amountIn * -int24(pFee)) /
-                FEE_DENOMINATOR;
+            // forge-lint: disable-next-line(unsafe-typecast)
+             (amountIn * -int24(pFee)) / FEE_DENOMINATOR;
             poolManager.mint(
                 address(this),
-                token0IsLoar
-                    ? poolKey.currency1.toId()
-                    : poolKey.currency0.toId(),
+                token0IsLoar ? poolKey.currency1.toId() : poolKey.currency0.toId(),
                 // forge-lint: disable-next-line(unsafe-typecast)
                 uint256(int256(unspecifiedDelta))
             );
@@ -311,17 +284,16 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         return (BaseHook.afterSwap.selector, unspecifiedDelta);
     }
 
-    function _beforeInitialize(
-        address,
-        PoolKey calldata,
-        uint160
-    ) internal virtual override returns (bytes4) {
+    function _beforeInitialize(address, PoolKey calldata, uint160)
+        internal
+        virtual
+        override
+        returns (bytes4)
+    {
         revert UnsupportedInitializePath();
     }
 
-    function supportsInterface(
-        bytes4 interfaceId
-    ) external pure returns (bool) {
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
         return interfaceId == type(ILoarHook).interfaceId;
     }
 
@@ -353,12 +325,9 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         ILoarLpLocker(locker[pid]).collectRewardsWithoutUnlock(token);
     }
 
-
     function _hookFeeClaim(PoolKey calldata poolKey) internal {
         // determine the fee token
-        Currency feeCurrency = loarIsToken0[poolKey.toId()]
-            ? poolKey.currency1
-            : poolKey.currency0;
+        Currency feeCurrency = loarIsToken0[poolKey.toId()] ? poolKey.currency1 : poolKey.currency0;
 
         // get the fees stored from the previous swap in the pool manager
         uint256 fee = poolManager.balanceOf(address(this), feeCurrency.toId());
@@ -376,28 +345,22 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         emit ClaimProtocolFees(Currency.unwrap(feeCurrency), fee);
     }
 
-    function getHookPermissions()
-        public
-        pure
-        override
-        returns (Hooks.Permissions memory)
-    {
-        return
-            Hooks.Permissions({
-                beforeInitialize: true,
-                afterInitialize: false,
-                beforeAddLiquidity: true,
-                afterAddLiquidity: false,
-                beforeRemoveLiquidity: false,
-                afterRemoveLiquidity: false,
-                beforeSwap: true,
-                afterSwap: true,
-                beforeDonate: false,
-                afterDonate: false,
-                beforeSwapReturnDelta: true,
-                afterSwapReturnDelta: true,
-                afterAddLiquidityReturnDelta: false,
-                afterRemoveLiquidityReturnDelta: false
-            });
+    function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
+        return Hooks.Permissions({
+            beforeInitialize: true,
+            afterInitialize: false,
+            beforeAddLiquidity: true,
+            afterAddLiquidity: false,
+            beforeRemoveLiquidity: false,
+            afterRemoveLiquidity: false,
+            beforeSwap: true,
+            afterSwap: true,
+            beforeDonate: false,
+            afterDonate: false,
+            beforeSwapReturnDelta: true,
+            afterSwapReturnDelta: true,
+            afterAddLiquidityReturnDelta: false,
+            afterRemoveLiquidityReturnDelta: false
+        });
     }
 }

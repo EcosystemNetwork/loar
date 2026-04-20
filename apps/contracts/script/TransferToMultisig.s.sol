@@ -88,7 +88,9 @@ contract TransferToMultisigScript is Script {
         require(timelockAddr != address(0), "TIMELOCK_ADDRESS must not be zero");
 
         console.log("=== Transfer Ownership to Timelock ===");
-        console.log("Mode:", dryRun ? "DRY RUN (no transactions)" : "LIVE (broadcasting transactions)");
+        console.log(
+            "Mode:", dryRun ? "DRY RUN (no transactions)" : "LIVE (broadcasting transactions)"
+        );
         console.log("Current owner:", deployer);
         console.log("Safe multisig:", safe);
         console.log("TimelockController:", timelockAddr);
@@ -102,9 +104,8 @@ contract TransferToMultisigScript is Script {
 
         bool safeIsProposer = timelock.hasRole(proposerRole, safe);
         bool safeIsExecutor = timelock.hasRole(executorRole, safe);
-        bool noAdmin = !timelock.hasRole(adminRole, deployer)
-                    && !timelock.hasRole(adminRole, safe)
-                    && !timelock.hasRole(adminRole, timelockAddr);
+        bool noAdmin = !timelock.hasRole(adminRole, deployer) && !timelock.hasRole(adminRole, safe)
+            && !timelock.hasRole(adminRole, timelockAddr);
 
         console.log("--- TimelockController Role Verification ---");
         console.log("  Safe has PROPOSER_ROLE:", safeIsProposer ? "YES" : "NO");

@@ -4,7 +4,9 @@ pragma solidity =0.8.30;
 import {ERC1155Upgradeable} from "@openzeppelin-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 import {ERC2981Upgradeable} from "@openzeppelin-upgradeable/token/common/ERC2981Upgradeable.sol";
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
@@ -16,13 +18,19 @@ import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 ///
 ///         Checks RightsRegistry before creating an edition — FUN and FROZEN content
 ///         cannot be monetized. Routes all payments through PaymentRouter.
-contract EpisodeEditionCollection is Initializable, ERC1155Upgradeable, ERC2981Upgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+contract EpisodeEditionCollection is
+    Initializable,
+    ERC1155Upgradeable,
+    ERC2981Upgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable
+{
     struct Edition {
         uint256 nodeId;
         bytes32 contentHash;
         address creator;
         uint256 mintPrice;
-        uint256 maxSupply;  // 0 = open edition
+        uint256 maxSupply; // 0 = open edition
         uint256 minted;
         bool active;
     }
@@ -73,7 +81,9 @@ contract EpisodeEditionCollection is Initializable, ERC1155Upgradeable, ERC2981U
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(
         uint256 _universeId,
@@ -96,8 +106,13 @@ contract EpisodeEditionCollection is Initializable, ERC1155Upgradeable, ERC2981U
         royaltyBps = _royaltyBps;
     }
 
-    function pause() external onlyPlatform { _pause(); }
-    function unpause() external onlyPlatform { _unpause(); }
+    function pause() external onlyPlatform {
+        _pause();
+    }
+
+    function unpause() external onlyPlatform {
+        _unpause();
+    }
 
     /// @notice Register a new episode edition for minting
     /// @dev contentHash must not be classified as FUN or FROZEN in RightsRegistry
@@ -108,7 +123,9 @@ contract EpisodeEditionCollection is Initializable, ERC1155Upgradeable, ERC2981U
         uint256 maxSupply,
         string calldata metadataURI
     ) external whenNotPaused returns (uint256 editionId) {
-        if (!rightsRegistry.isMonetizable(contentHash)) revert ContentNotMonetizable();
+        if (!rightsRegistry.isMonetizable(contentHash)) {
+            revert ContentNotMonetizable();
+        }
 
         editionId = nextEditionId++;
         editions[editionId] = Edition({

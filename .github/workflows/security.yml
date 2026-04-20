@@ -58,19 +58,23 @@ jobs:
         # via slither.config.json anyway.
         run: forge build --skip 'test/**'
 
+      - name: Install Slither
+        run: pip3 install slither-analyzer
+
       - name: Run Slither
         id: slither
-        uses: crytic/slither-action@v0.4.0
-        with:
-          target: apps/contracts
-          slither-config: apps/contracts/slither.config.json
-          fail-on: medium
-          sarif: results.sarif
-          # forge build above already compiled; skip the action's own build
-          # step so it doesn't try `npm install` and choke on pnpm's
-          # `workspace:*` protocol in the monorepo root package.json.
-          ignore-compile: true
-        continue-on-error: ${{ env.STRICT != 'true' }}
+        # crytic/slither-action@v0.4.0 runs `npm install` at the repo root
+        # inside its Docker image and chokes on pnpm's `workspace:*`
+        # protocol. Run slither directly against the foundry artifacts we
+        # already built so we skip all of that.
+        run: |
+          slither . \
+            --config-file slither.config.json \
+            --fail-medium \
+            --sarif results.sarif \
+            --foundry-ignore-compile || EXIT=$?
+          if [ "${STRICT}" = "true" ]; then exit ${EXIT:-0}; fi
+          exit 0
 
       - name: Upload Slither SARIF to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3

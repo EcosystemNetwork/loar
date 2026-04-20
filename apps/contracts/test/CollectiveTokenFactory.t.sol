@@ -96,11 +96,7 @@ contract CollectiveTokenFactoryTest is Test {
     function test_getUniverseCollectives() public {
         vm.startPrank(creator);
         (uint256 id1,) = factory.deployCollective(
-            UNIVERSE_ID,
-            CollectiveTokenFactory.CollectiveKind.FACTION,
-            "Guild A",
-            "GA",
-            "ipfs://a"
+            UNIVERSE_ID, CollectiveTokenFactory.CollectiveKind.FACTION, "Guild A", "GA", "ipfs://a"
         );
         (uint256 id2,) = factory.deployCollective(
             UNIVERSE_ID,

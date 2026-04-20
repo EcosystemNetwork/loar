@@ -37,11 +37,7 @@ interface IUniverseTokenDeployer {
     function deployTokenAndGovernance(
         IUniverseManager.DeploymentConfig memory deploymentConfig,
         uint256 universeId
-    ) external returns (
-        address tokenAddress,
-        address governor,
-        address bondingCurve
-    );
+    ) external returns (address tokenAddress, address governor, address bondingCurve);
 }
 
 /// @title UniverseManager
@@ -79,14 +75,14 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
     /// @notice Total ETH held across all universe LP seeds (must not be drained by claimEth).
     uint256 public totalLpSeedsHeld;
 
-    mapping(uint id => UniverseData) universeDatas;
+    mapping(uint256 id => UniverseData) universeDatas;
     mapping(address hook => bool enabled) public enabledHooks;
     mapping(address locker => mapping(address hook => bool enabled)) public enabledLockers;
     /// @notice Whitelist of tokens that can be claimed via claimTeamFee.
     mapping(address => bool) public claimableTokens;
     /// @notice Stored deployment config per universe for graduation (pool + locker config).
     mapping(uint256 => DeploymentConfig) public graduationConfigs;
-    uint latestId;
+    uint256 latestId;
     bool public deprecated;
 
     event SetTokenDeployer(address oldTokenDeployer, address newTokenDeployer);
@@ -98,7 +94,10 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
     /// @notice Emitted when multi-sig owner count exceeds 200 and signer minting is truncated (UNIVERSE-06).
     event SignersTruncated(uint256 indexed universeId, uint256 actualCount, uint16 mintedCount);
 
-    constructor(address _teamFeeRecipient, address _weth) ERC721("LOAR Universe", "UNIVERSE") Ownable(msg.sender) {
+    constructor(address _teamFeeRecipient, address _weth)
+        ERC721("LOAR Universe", "UNIVERSE")
+        Ownable(msg.sender)
+    {
         teamFeeRecipient = _teamFeeRecipient;
         require(_weth != address(0), "Zero WETH address");
         weth = _weth;
@@ -148,7 +147,10 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
     }
 
     /// @notice Claim ETH held in the contract, excluding LP seeds reserved for universes.
-    function claimEth(address recipient) external onlyOwner {
+    /// @dev nonReentrant (M11): recipient is arbitrary (owner-specified) and receives
+    ///      raw ETH via call, so re-entry via its fallback into other mutating paths
+    ///      (e.g. claimTeamFee, graduateFromBondingCurve) must be blocked.
+    function claimEth(address recipient) external onlyOwner nonReentrant {
         require(recipient != address(0), "Zero address");
         uint256 balance = address(this).balance;
         require(balance > totalLpSeedsHeld, "No ETH to claim");
@@ -159,10 +161,14 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
     }
 
     /// @notice Emergency pause (H3 fix)
-    function pause() external onlyOwner { _pause(); }
+    function pause() external onlyOwner {
+        _pause();
+    }
 
     /// @notice Unpause (H3 fix)
-    function unpause() external onlyOwner { _unpause(); }
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     receive() external payable {}
 
@@ -177,14 +183,18 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
         NodeVisibilityOptions nodeVisibilityOptions,
         address initialOwner
     ) public payable nonReentrant whenNotPaused returns (uint256 _id, address) {
-        return _createUniverse(name, imageURL, description, nodeCreationOptions, nodeVisibilityOptions, initialOwner);
+        return _createUniverse(
+            name, imageURL, description, nodeCreationOptions, nodeVisibilityOptions, initialOwner
+        );
     }
 
     /// @notice Deploy a governance token for an existing universe (created without one).
-    function deployUniverseToken(
-        DeploymentConfig memory deploymentConfig,
-        uint id
-    ) public nonReentrant whenNotPaused returns (address tokenAddress) {
+    function deployUniverseToken(DeploymentConfig memory deploymentConfig, uint256 id)
+        public
+        nonReentrant
+        whenNotPaused
+        returns (address tokenAddress)
+    {
         return _deployUniverseToken(deploymentConfig, id);
     }
 
@@ -199,20 +209,29 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
         NodeVisibilityOptions nodeVisibilityOptions,
         address initialOwner,
         DeploymentConfig memory deploymentConfig
-    ) external payable nonReentrant whenNotPaused returns (
-        uint256 universeId,
-        address universeAddress,
-        address tokenAddress
-    ) {
+    )
+        external
+        payable
+        nonReentrant
+        whenNotPaused
+        returns (uint256 universeId, address universeAddress, address tokenAddress)
+    {
+        // Explicit deprecation gate (M9). _createUniverse also checks this, but
+        // the transitive guard is fragile — a future refactor could bypass it.
+        require(!deprecated, "Manager is deprecated");
+
         (universeId, universeAddress) = _createUniverse(
-            name, imageURL, description,
-            nodeCreationOptions, nodeVisibilityOptions,
-            initialOwner
+            name, imageURL, description, nodeCreationOptions, nodeVisibilityOptions, initialOwner
         );
 
         tokenAddress = _deployUniverseToken(deploymentConfig, universeId);
 
-        emit UniverseCreatedWithToken(universeId, universeAddress, tokenAddress, address(universeDatas[universeId].universeGovernor));
+        emit UniverseCreatedWithToken(
+            universeId,
+            universeAddress,
+            tokenAddress,
+            address(universeDatas[universeId].universeGovernor)
+        );
     }
 
     // ── Internal implementations ────────────────────────────────────
@@ -271,7 +290,10 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
         emit UniverseCreated(address(universe), msg.sender);
         emit UniverseLpSeed(currentId, msg.sender, mintFee);
 
-        // Refund overpayment AFTER all state updates (CEI pattern)
+        // Refund overpayment AFTER all state updates (CEI pattern).
+        // Refund goes to msg.sender (tx signer who paid), NOT initialOwner:
+        // Alice can mint a universe whose admin is Bob, but Alice still gets
+        // her own overpayment back. This is the intended sponsorship flow (M12).
         if (overpayment > 0) {
             (bool refunded,) = msg.sender.call{value: overpayment}("");
             require(refunded, "Refund failed");
@@ -280,46 +302,64 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
         return (currentId, address(universe));
     }
 
-    function _deployUniverseToken(
-        DeploymentConfig memory deploymentConfig,
-        uint id
-    ) internal returns (address tokenAddress) {
+    function _deployUniverseToken(DeploymentConfig memory deploymentConfig, uint256 id)
+        internal
+        returns (address tokenAddress)
+    {
         IUniverse universe = universeDatas[id].universe;
         require(address(universe) != address(0), "Universe does not exist");
         if (ownerOf(id) != msg.sender) {
-          revert CallerIsNotOwner();
+            revert CallerIsNotOwner();
         }
         if (universe.getToken() != address(0)) {
-          revert TokenAlreadyDeployed();
+            revert TokenAlreadyDeployed();
         }
 
         if (!enabledHooks[deploymentConfig.poolConfig.hook]) {
             revert HookNotEnabled();
         }
 
-        if (!enabledLockers[deploymentConfig.lockerConfig.locker][deploymentConfig.poolConfig.hook]) {
+        if (!enabledLockers[deploymentConfig.lockerConfig.locker][deploymentConfig.poolConfig.hook])
+        {
             revert LockerNotEnabled();
         }
 
         // Paired token must be WETH for LP seeding at graduation
         require(deploymentConfig.poolConfig.pairedToken == weth, "Paired token must be WETH");
 
+        require(tokenDeployer != address(0), "Token deployer not set");
+
         (address _tokenAddress, address governor, address bondingCurve) =
-            IUniverseTokenDeployer(tokenDeployer).deployTokenAndGovernance(
-                deploymentConfig,
-                id
-            );
+            IUniverseTokenDeployer(tokenDeployer).deployTokenAndGovernance(deploymentConfig, id);
 
         require(_tokenAddress != address(0), "Token deployment returned zero address");
         require(governor != address(0), "Governor deployment returned zero address");
         require(bondingCurve != address(0), "BondingCurve deployment returned zero address");
+        // Defense-in-depth (C3): reject obviously bogus deployer returns that
+        // collide addresses. `tokenDeployer` is owner-set and trusted, but these
+        // cheap checks catch a byzantine deploy before `universe.setAdmin(governor)`.
+        require(bondingCurve != _tokenAddress, "BondingCurve == token");
+        require(bondingCurve != governor, "BondingCurve == governor");
+        require(governor != _tokenAddress, "Governor == token");
+        require(bondingCurve.code.length > 0, "BondingCurve has no code");
+        require(governor.code.length > 0, "Governor has no code");
+
+        // Re-check NFT ownership right before state mutations (M8). nonReentrant
+        // closes the obvious path; this is cheap defense-in-depth against any
+        // exotic transfer/hook re-entry between the earlier check and here.
+        if (ownerOf(id) != msg.sender) {
+            revert CallerIsNotOwner();
+        }
 
         tokenAddress = _tokenAddress;
 
         // Store deployment config for graduation (pool + locker config needed later)
         graduationConfigs[id] = deploymentConfig;
 
-        // Forward LP seed ETH to bonding curve as initial reserve
+        // Forward LP seed ETH to bonding curve as initial reserve.
+        // 0.8.x checked math reverts on underflow — the LP-seed invariant (H7):
+        // if totalLpSeedsHeld ever drifts below the per-universe seed, we refuse
+        // to continue rather than silently drain.
         uint256 lpSeed = universeLpSeed[id];
         universeLpSeed[id] = 0;
         totalLpSeedsHeld -= lpSeed;
@@ -338,11 +378,7 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
         universe.setToken(tokenAddress);
 
         emit BondingCurveCreated(
-            id,
-            tokenAddress,
-            bondingCurve,
-            4 ether,
-            (TOKEN_SUPPLY * 8000) / 10000
+            id, tokenAddress, bondingCurve, 4 ether, (TOKEN_SUPPLY * 8000) / 10000
         );
 
         emit TokenCreated(
@@ -365,6 +401,8 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
 
     /// @notice Called by a universe's BondingCurve contract when it graduates.
     ///         Initializes Uniswap v4 pool and permanently locks LP with raised ETH + unsold tokens.
+    /// @dev CEI (C2): sender auth + state-zeroing happen before external calls.
+    ///      H4: WETH pairing re-validated here in case the config was mutated.
     function graduateFromBondingCurve(
         uint256 universeId,
         uint256 ethAmount,
@@ -376,47 +414,57 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
         require(address(data.token) == _token, "Token mismatch");
         require(msg.value == ethAmount, "ETH amount mismatch");
 
-        // Pull unsold tokens from bonding curve (already approved)
+        DeploymentConfig memory config = graduationConfigs[universeId];
+        require(config.poolConfig.hook != address(0), "No graduation config");
+        // H4: re-validate WETH pairing. Deploy-time check at L305 only protects
+        // the config that was stored; re-checking guards against future
+        // factory-reentrancy or config-mutation paths.
+        require(config.poolConfig.pairedToken == weth, "Paired token must be WETH");
+        // Hook + locker must still be whitelisted — owner can revoke mid-flight.
+        require(enabledHooks[config.poolConfig.hook], "Hook no longer enabled");
+        require(
+            enabledLockers[config.lockerConfig.locker][config.poolConfig.hook],
+            "Locker no longer enabled"
+        );
+
+        // Effects first: zero the bonding-curve pointer so the caller cannot
+        // re-enter graduateFromBondingCurve for this universe, and record the
+        // locker/hook before any external call.
+        data.hook = IHooks(config.poolConfig.hook);
+        data.locker = ILoarLpLocker(config.lockerConfig.locker);
+        data.bondingCurve = address(0);
+
+        // Interactions.
         if (tokenAmount > 0) {
             IERC20(_token).transferFrom(msg.sender, address(this), tokenAmount);
         }
 
-        DeploymentConfig memory config = graduationConfigs[universeId];
-        require(config.poolConfig.hook != address(0), "No graduation config");
-
-        // Wrap ETH → WETH
         if (msg.value > 0) {
             IWETH(weth).deposit{value: msg.value}();
             IERC20(weth).approve(address(config.lockerConfig.locker), msg.value);
         }
 
-        // Initialize Uniswap v4 pool
-        PoolKey memory poolkey = ILoarHook(config.poolConfig.hook).initializePool(
-            _token,
-            config.poolConfig.pairedToken,
-            config.poolConfig.tickIfToken0IsLoar,
-            config.poolConfig.tickSpacing,
-            config.lockerConfig.locker,
-            config.poolConfig.poolData
-        );
+        PoolKey memory poolkey = ILoarHook(config.poolConfig.hook)
+            .initializePool(
+                _token,
+                config.poolConfig.pairedToken,
+                config.poolConfig.tickIfToken0IsLoar,
+                config.poolConfig.tickSpacing,
+                config.lockerConfig.locker,
+                config.poolConfig.poolData
+            );
 
-        // Lock LP permanently
+        // Refresh hook pointer with the canonical key returned by initializePool
+        // (covers hook deployments that remap to a salted address).
+        data.hook = poolkey.hooks;
+
         if (tokenAmount > 0) {
             IERC20(_token).approve(address(config.lockerConfig.locker), tokenAmount);
         }
-        ILoarLpLocker(config.lockerConfig.locker).placeLiquidity(
-            config.lockerConfig,
-            config.poolConfig,
-            poolkey,
-            tokenAmount,
-            _token,
-            msg.value
-        );
-
-        // Update universe data — graduated
-        data.hook = poolkey.hooks;
-        data.locker = ILoarLpLocker(config.lockerConfig.locker);
-        data.bondingCurve = address(0);
+        ILoarLpLocker(config.lockerConfig.locker)
+            .placeLiquidity(
+                config.lockerConfig, config.poolConfig, poolkey, tokenAmount, _token, msg.value
+            );
 
         emit TokenGraduated(universeId, _token, ethAmount, tokenAmount);
     }
@@ -445,22 +493,23 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
         if (owner.code.length > 0) {
             try IGnosisSafe(owner).getOwners() returns (address[] memory owners) {
                 if (owners.length > 0) {
-                    // Multi-sig detected — mint to each signer
-                    uint16 total = owners.length > 200 ? 200 : uint16(owners.length);
-                    if (owners.length > 200) {
-                        emit SignersTruncated(universeId, owners.length, total);
-                    }
+                    // Multi-sig detected — mint to each signer.
+                    // H6: Safes with >200 owners now revert rather than silently
+                    // dropping signers and leaving the INFT set inconsistent.
+                    require(owners.length <= 200, "Safe signer count exceeds 200");
+                    uint16 total = uint16(owners.length);
                     for (uint16 i = 0; i < total; i++) {
                         try inft.mint(
                             owners[i],
                             universeId,
-                            uint8(i + 1),        // 1-based index
+                            uint8(i + 1), // 1-based index
                             uint8(total),
-                            owner,        // safe address
+                            owner, // safe address
                             universeContract,
                             universeName,
                             universeImage
-                        ) {} catch {
+                        ) {}
+                            catch {
                             // Mint failed for this signer (maybe duplicate), continue
                         }
                     }
@@ -475,13 +524,14 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
         try inft.mint(
             owner,
             universeId,
-            1,            // signer 1
-            1,            // of 1
-            address(0),   // no safe
+            1, // signer 1
+            1, // of 1
+            address(0), // no safe
             universeContract,
             universeName,
             universeImage
-        ) {} catch {
+        ) {}
+            catch {
             // Non-blocking — INFT mint failure shouldn't break universe creation
         }
     }
@@ -498,7 +548,10 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
         claimableTokens[token] = allowed;
     }
 
-    function claimTeamFee(address token) external onlyOwner {
+    /// @dev whenNotPaused + nonReentrant (L15). During an emergency pause we
+    ///      freeze the full contract surface, including fee draws, so the
+    ///      oncall can triage without racing against revenue sweeps.
+    function claimTeamFee(address token) external onlyOwner whenNotPaused nonReentrant {
         if (teamFeeRecipient == address(0)) revert TeamFeeRecipientNotSet();
         require(claimableTokens[token], "Token not claimable");
 
@@ -563,16 +616,27 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
         emit SetLocker(locker, hook, enabled);
     }
 
-    function getUniverseData(uint id) public view returns (
-        IUniverse universe,
-        IERC20 token,
-        IGovernor universeGovernor,
-        IHooks hook,
-        ILoarLpLocker locker,
-        address bondingCurve
-    ) {
+    function getUniverseData(uint256 id)
+        public
+        view
+        returns (
+            IUniverse universe,
+            IERC20 token,
+            IGovernor universeGovernor,
+            IHooks hook,
+            ILoarLpLocker locker,
+            address bondingCurve
+        )
+    {
         UniverseData memory data = universeDatas[id];
-        return (data.universe, data.token, data.universeGovernor, data.hook, data.locker, data.bondingCurve);
+        return (
+            data.universe,
+            data.token,
+            data.universeGovernor,
+            data.hook,
+            data.locker,
+            data.bondingCurve
+        );
     }
 
     /// @notice Total universes created (also the next token ID)
@@ -585,13 +649,29 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
     /// @dev On transfer, sync the universe admin if governance hasn't been deployed yet.
     ///      Blocks transfer to address(0) (burn) when no governor, as that would
     ///      permanently brick universe admin with no recovery path.
-    function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
+    /// @dev C1: setAdmin is gas-bounded and wrapped so a griefing Universe impl
+    ///      cannot DoS the ERC-721 transfer. The NFT owner can reconcile later
+    ///      via `syncUniverseAdmin` if the in-line sync fails.
+    uint256 private constant ADMIN_SYNC_GAS = 200_000;
+
+    function _update(address to, uint256 tokenId, address auth)
+        internal
+        override
+        returns (address)
+    {
         address from = super._update(to, tokenId, auth);
 
         UniverseData storage data = universeDatas[tokenId];
         if (address(data.universe) != address(0) && address(data.universeGovernor) == address(0)) {
             require(to != address(0), "Cannot burn NFT without governor");
-            try data.universe.setAdmin(to) {} catch {
+            // Forward a fixed gas budget so an adversarial universe cannot
+            // consume the block gas limit and DoS the transfer. Solidity's
+            // native try/catch doesn't support a gas modifier, so drop to a
+            // low-level call and emit AdminSyncFailed on any failure path.
+            (bool ok,) = address(data.universe).call{gas: ADMIN_SYNC_GAS}(
+                abi.encodeWithSignature("setAdmin(address)", to)
+            );
+            if (!ok) {
                 emit AdminSyncFailed(tokenId, to);
             }
         }
@@ -599,13 +679,58 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
         return from;
     }
 
+    /// @notice Reconcile a universe's admin with the current NFT owner. Callable
+    ///         only by the NFT owner and only while no governor has been deployed.
+    ///         Retries the setAdmin that `_update` may have dropped due to a gas
+    ///         budget or transient revert.
+    function syncUniverseAdmin(uint256 tokenId) external nonReentrant whenNotPaused {
+        address _owner = ownerOf(tokenId); // reverts if token is burned / nonexistent
+        require(msg.sender == _owner, "Caller is not NFT owner");
+        UniverseData storage data = universeDatas[tokenId];
+        require(address(data.universe) != address(0), "Universe does not exist");
+        require(address(data.universeGovernor) == address(0), "Governor already set");
+        data.universe.setAdmin(_owner);
+    }
+
     /// @notice Fully on-chain tokenURI — delegates to external renderer (EIP-170 extraction).
+    /// @dev L13: if the external renderer ever reverts or self-destructs, fall
+    ///      back to a minimal inline JSON so marketplaces + indexers never see
+    ///      a permanently-broken tokenURI. Operators should redeploy the
+    ///      renderer to restore rich metadata.
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         _requireOwned(tokenId);
-        require(metadataRenderer != address(0), "Metadata renderer not set");
-        UniverseData storage data = universeDatas[tokenId];
-        return IUniverseMetadataRenderer(metadataRenderer).tokenURI(
-            tokenId, address(data.universe), address(data.token)
+        if (metadataRenderer != address(0)) {
+            UniverseData storage data = universeDatas[tokenId];
+            try IUniverseMetadataRenderer(metadataRenderer)
+                .tokenURI(tokenId, address(data.universe), address(data.token)) returns (
+                string memory uri
+            ) {
+                return uri;
+            } catch {
+                // fall through to the inline stub below
+            }
+        }
+        return string(
+            abi.encodePacked(
+                'data:application/json;utf8,{"name":"LOAR Universe #',
+                _toString(tokenId),
+                '","description":"Metadata renderer unavailable. Retry later."}'
+            )
         );
+    }
+
+    function _toString(uint256 value) private pure returns (string memory) {
+        if (value == 0) return "0";
+        uint256 temp = value;
+        uint256 digits;
+        while (temp != 0) digits++;
+        temp /= 10;
+        bytes memory buffer = new bytes(digits);
+        while (value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
+            value /= 10;
+        }
+        return string(buffer);
     }
 }

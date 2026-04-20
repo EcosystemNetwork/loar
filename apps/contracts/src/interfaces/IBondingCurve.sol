@@ -6,22 +6,13 @@ pragma solidity =0.8.30;
 interface IBondingCurve {
     // ── Events ─────────────────────────────────────────────────────────
     event TokensPurchased(
-        address indexed buyer,
-        uint256 ethAmount,
-        uint256 tokenAmount,
-        uint256 newPrice
+        address indexed buyer, uint256 ethAmount, uint256 tokenAmount, uint256 newPrice
     );
     event TokensSold(
-        address indexed seller,
-        uint256 tokenAmount,
-        uint256 ethReturned,
-        uint256 newPrice
+        address indexed seller, uint256 tokenAmount, uint256 ethReturned, uint256 newPrice
     );
     event Graduated(
-        uint256 indexed universeId,
-        address indexed token,
-        uint256 ethRaised,
-        uint256 lpTokens
+        uint256 indexed universeId, address indexed token, uint256 ethRaised, uint256 lpTokens
     );
     event TradingHalted(uint256 indexed universeId);
     event TradingResumed(uint256 indexed universeId);
@@ -92,15 +83,21 @@ interface IBondingCurve {
     /// @return raised ETH raised so far.
     /// @return target ETH needed for graduation.
     /// @return percentBps Progress in basis points (0-10000).
-    function getProgress() external view returns (uint256 raised, uint256 target, uint256 percentBps);
+    function getProgress()
+        external
+        view
+        returns (uint256 raised, uint256 target, uint256 percentBps);
 
     /// @notice Full state snapshot for frontends.
-    function curveState() external view returns (
-        uint256 _tokensSold,
-        uint256 _ethRaised,
-        bool _graduated,
-        uint256 _currentPrice,
-        uint256 _totalCurveSupply,
-        uint256 _graduationEth
-    );
+    function curveState()
+        external
+        view
+        returns (
+            uint256 _tokensSold,
+            uint256 _ethRaised,
+            bool _graduated,
+            uint256 _currentPrice,
+            uint256 _totalCurveSupply,
+            uint256 _graduationEth
+        );
 }

@@ -4,7 +4,7 @@ pragma solidity =0.8.30;
 import {IUniverseManager} from "./IUniverseManager.sol";
 
 interface IUniverseFactory {
-    function createUniverse(
-        IUniverseManager.UniverseConfig memory config
-    ) external returns (address);
+    function createUniverse(IUniverseManager.UniverseConfig memory config)
+        external
+        returns (address);
 }

@@ -34,17 +34,12 @@ contract UpgradeRevenueScript is Script {
         address deployer = vm.addr(pk);
 
         // Existing proxy addresses (Sepolia)
-        address paymentRouterProxy = vm.envOr(
-            "PAYMENT_ROUTER_PROXY",
-            address(0x920e9A9bac991554AEE2AB7c76c521e5FB3113b6)
-        );
-        address creditManagerProxy = vm.envOr(
-            "CREDIT_MANAGER_PROXY",
-            address(0x5110FCCaf50316D8F874F22428dC1a832F591639)
-        );
+        address paymentRouterProxy =
+            vm.envOr("PAYMENT_ROUTER_PROXY", address(0x920e9A9bac991554AEE2AB7c76c521e5FB3113b6));
+        address creditManagerProxy =
+            vm.envOr("CREDIT_MANAGER_PROXY", address(0x5110FCCaf50316D8F874F22428dC1a832F591639));
         address licensingRegistryProxy = vm.envOr(
-            "LICENSING_REGISTRY_PROXY",
-            address(0xbF0Fed6125b1e05aA3Dc52B72B5cd7703990627C)
+            "LICENSING_REGISTRY_PROXY", address(0xbF0Fed6125b1e05aA3Dc52B72B5cd7703990627C)
         );
         // RemixFees proxy address -- set via env if deployed, skip if not
         address remixFeesProxy = vm.envOr("REMIX_FEES_PROXY", address(0));

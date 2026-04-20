@@ -38,8 +38,15 @@ contract SplitRouter is ReentrancyGuard, Ownable {
     uint16 public constant MAX_RECIPIENTS = 10;
     uint16 public constant MAX_FEE_BPS = 5000;
 
-    event SplitsConfigured(bytes32 indexed entityHash, address indexed owner, uint256 recipientCount);
-    event SplitPayment(bytes32 indexed entityHash, uint256 totalAmount, uint256 recipientCount, uint16 platformFeeBps);
+    event SplitsConfigured(
+        bytes32 indexed entityHash, address indexed owner, uint256 recipientCount
+    );
+    event SplitPayment(
+        bytes32 indexed entityHash,
+        uint256 totalAmount,
+        uint256 recipientCount,
+        uint16 platformFeeBps
+    );
     event RegistrarUpdated(address indexed registrar, bool authorized);
     event PaymentRouterChangeRequested(address indexed pendingRouter, uint256 executeAfter);
     event PaymentRouterChanged(address indexed oldRouter, address indexed newRouter);
@@ -112,7 +119,11 @@ contract SplitRouter is ReentrancyGuard, Ownable {
     ///         then remainder distributed to co-creators.
     /// @param entityHash Entity whose splits to use
     /// @param platformFeeBps Platform fee in basis points
-    function routeWithSplits(bytes32 entityHash, uint16 platformFeeBps) external payable nonReentrant {
+    function routeWithSplits(bytes32 entityHash, uint16 platformFeeBps)
+        external
+        payable
+        nonReentrant
+    {
         if (platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         Split[] storage splits = _splits[entityHash];
         if (splits.length == 0) revert NoSplitsConfigured();
@@ -170,7 +181,9 @@ contract SplitRouter is ReentrancyGuard, Ownable {
     /// @notice Execute a pending PaymentRouter change after timelock delay (step 2)
     function executePaymentRouterChange() external onlyOwner {
         if (pendingPaymentRouter == address(0)) revert NoChangeRequested();
-        if (block.timestamp < paymentRouterChangeRequestedAt + ROUTER_CHANGE_DELAY) revert TimelockNotElapsed();
+        if (block.timestamp < paymentRouterChangeRequestedAt + ROUTER_CHANGE_DELAY) {
+            revert TimelockNotElapsed();
+        }
 
         address oldRouter = address(paymentRouter);
         paymentRouter = IPaymentRouter(pendingPaymentRouter);

@@ -31,12 +31,12 @@ import {IUniverse} from "../interfaces/IUniverse.sol";
 ///           TIMELINE   — 0.5   ETH, cap 10
 contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, ReentrancyGuard {
     enum Layer {
-        DOMAIN,      // 0 — most common, smallest territory
-        REALM,       // 1
-        PLANE,       // 2
-        DIMENSION,   // 3
-        REALITY,     // 4
-        TIMELINE     // 5 — rarest, root-level world frame
+        DOMAIN, // 0 — most common, smallest territory
+        REALM, // 1
+        PLANE, // 2
+        DIMENSION, // 3
+        REALITY, // 4
+        TIMELINE // 5 — rarest, root-level world frame
     }
 
     struct Deed {
@@ -45,12 +45,12 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
         string name;
         bytes32 contentHash;
         address creator;
-        uint256 parentTokenId;  // 0 = no parent
+        uint256 parentTokenId; // 0 = no parent
     }
 
     // Per-layer mint price and supply cap (index = Layer uint8)
     uint256[6] public layerMintPrices;
-    uint256[6] public layerMaxSupply;    // 0 = unlimited
+    uint256[6] public layerMaxSupply; // 0 = unlimited
     uint256[6] public layerMinted;
 
     uint256 public nextTokenId;
@@ -125,7 +125,9 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
         uint256 parentTokenId,
         string calldata metadataURI
     ) external payable nonReentrant returns (uint256 tokenId) {
-        if (!rightsRegistry.isMonetizable(contentHash)) revert ContentNotMonetizable();
+        if (!rightsRegistry.isMonetizable(contentHash)) {
+            revert ContentNotMonetizable();
+        }
 
         // DEED-01: Verify caller owns or administers this universe
         require(
@@ -184,7 +186,9 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
 
     /// @notice Get deeds in a universe at a given layer (paginated)
     function getDeedsByLayer(uint256 universeId, Layer layer, uint256 startId, uint256 count)
-        external view returns (uint256[] memory ids)
+        external
+        view
+        returns (uint256[] memory ids)
     {
         uint256[] memory temp = new uint256[](count);
         uint256 found = 0;
@@ -194,12 +198,16 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
             }
         }
         ids = new uint256[](found);
-        for (uint256 j = 0; j < found; j++) ids[j] = temp[j];
+        for (uint256 j = 0; j < found; j++) {
+            ids[j] = temp[j];
+        }
     }
 
     /// @notice Get direct children of a parent deed (paginated)
     function getChildren(uint256 parentTokenId, uint256 startId, uint256 count)
-        external view returns (uint256[] memory ids)
+        external
+        view
+        returns (uint256[] memory ids)
     {
         uint256[] memory temp = new uint256[](count);
         uint256 found = 0;
@@ -209,7 +217,9 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
             }
         }
         ids = new uint256[](found);
-        for (uint256 j = 0; j < found; j++) ids[j] = temp[j];
+        for (uint256 j = 0; j < found; j++) {
+            ids[j] = temp[j];
+        }
     }
 
     function setLayerPrice(Layer layer, uint256 newPrice) external {
@@ -221,25 +231,34 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
     // ---- ERC721 Overrides ----
 
     function tokenURI(uint256 tokenId)
-        public view override(ERC721, ERC721URIStorage) returns (string memory)
+        public
+        view
+        override(ERC721, ERC721URIStorage)
+        returns (string memory)
     {
         return super.tokenURI(tokenId);
     }
 
     function supportsInterface(bytes4 interfaceId)
-        public view override(ERC721Enumerable, ERC721URIStorage, ERC2981) returns (bool)
+        public
+        view
+        override(ERC721Enumerable, ERC721URIStorage, ERC2981)
+        returns (bool)
     {
         return super.supportsInterface(interfaceId);
     }
 
     function _update(address to, uint256 tokenId, address auth)
-        internal override(ERC721, ERC721Enumerable) returns (address)
+        internal
+        override(ERC721, ERC721Enumerable)
+        returns (address)
     {
         return super._update(to, tokenId, auth);
     }
 
     function _increaseBalance(address account, uint128 value)
-        internal override(ERC721, ERC721Enumerable)
+        internal
+        override(ERC721, ERC721Enumerable)
     {
         super._increaseBalance(account, value);
     }

@@ -153,7 +153,8 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
             IERC20(pairedToken).safeTransferFrom(msg.sender, address(this), pairedAmount);
         }
 
-        positionId = _mintLiquidity(poolConfig, lockerConfig, poolKey, poolSupply, token, pairedAmount);
+        positionId =
+            _mintLiquidity(poolConfig, lockerConfig, poolKey, poolSupply, token, pairedAmount);
 
         // store the reward info
         tokenRewardInfo.positionId = positionId;
@@ -253,10 +254,8 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
             uint256 amount1 = token0IsLoar ? pairedForPosition : tokenAmount;
 
             // determine tick bounds for this position
-            int24 tickLower_ =
-                token0IsLoar ? lockerConfig.tickLower[i] : -lockerConfig.tickLower[i];
-            int24 tickUpper_ =
-                token0IsLoar ? lockerConfig.tickUpper[i] : -lockerConfig.tickUpper[i];
+            int24 tickLower_ = token0IsLoar ? lockerConfig.tickLower[i] : -lockerConfig.tickLower[i];
+            int24 tickUpper_ = token0IsLoar ? lockerConfig.tickUpper[i] : -lockerConfig.tickUpper[i];
             int24 tickLower = token0IsLoar ? tickLower_ : tickUpper_;
             int24 tickUpper = token0IsLoar ? tickUpper_ : tickLower_;
             uint160 lowerSqrtPrice = TickMath.getSqrtPriceAtTick(tickLower);
@@ -288,7 +287,10 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
             IERC20(token).approve(address(permit2), poolSupply);
             permit2.approve(
                 // forge-lint: disable-next-line(unsafe-typecast)
-                token, address(positionManager), uint160(poolSupply), uint48(block.timestamp)
+                token,
+                address(positionManager),
+                uint160(poolSupply),
+                uint48(block.timestamp)
             );
         }
 
@@ -297,7 +299,10 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
             address pairedToken = poolConfig.pairedToken;
             IERC20(pairedToken).approve(address(permit2), pairedAmount);
             permit2.approve(
-                pairedToken, address(positionManager), uint160(pairedAmount), uint48(block.timestamp)
+                pairedToken,
+                address(positionManager),
+                uint160(pairedAmount),
+                uint48(block.timestamp)
             );
         }
 
@@ -524,7 +529,7 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
     // Withdraw ETH from the contract
     function withdrawEth(address recipient) public onlyOwner nonReentrant {
         require(recipient != address(0), "Invalid recipient");
-        (bool success, ) = payable(recipient).call{value: address(this).balance}("");
+        (bool success,) = payable(recipient).call{value: address(this).balance}("");
         require(success, "ETH transfer failed");
     }
 

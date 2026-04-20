@@ -4,7 +4,9 @@ pragma solidity =0.8.30;
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {ISplitRouter} from "../interfaces/ISplitRouter.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
@@ -14,32 +16,46 @@ import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 /// @notice Manages individual content piece licensing: buy (permanent), rent (time-bound),
 ///         or license (usage rights with royalties). Revenue is routed through SplitRouter
 ///         so universe creators and content generators both earn.
-contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
-    enum DealType { BUY, RENT, LICENSE }
-    enum DealStatus { ACTIVE, EXPIRED, REVOKED }
+contract ContentLicensing is
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable
+{
+    enum DealType {
+        BUY,
+        RENT,
+        LICENSE
+    }
+    enum DealStatus {
+        ACTIVE,
+        EXPIRED,
+        REVOKED
+    }
 
     struct ContentRegistration {
         bytes32 contentHash;
         address creator;
         uint256 universeId;
-        bytes32 splitEntityHash;    // entityHash in SplitRouter for revenue splits
-        uint256 buyPrice;           // 0 = not for sale
-        uint256 rentPricePerDay;    // 0 = not for rent
-        uint256 licenseFee;         // 0 = not licensable
-        uint16 licenseRoyaltyBps;   // ongoing royalty BPS for LICENSE deals
+        bytes32 splitEntityHash; // entityHash in SplitRouter for revenue splits
+        uint256 buyPrice; // 0 = not for sale
+        uint256 rentPricePerDay; // 0 = not for rent
+        uint256 licenseFee; // 0 = not licensable
+        uint16 licenseRoyaltyBps; // ongoing royalty BPS for LICENSE deals
         bool active;
     }
 
     struct Deal {
         uint256 id;
         bytes32 contentHash;
-        bytes32 splitEntityHash;    // stored so royalty routing works without reverse lookup
+        bytes32 splitEntityHash; // stored so royalty routing works without reverse lookup
         DealType dealType;
         DealStatus status;
         address buyer;
         uint256 pricePaid;
         uint256 startTime;
-        uint256 endTime;            // 0 for BUY (permanent)
+        uint256 endTime; // 0 for BUY (permanent)
     }
 
     ISplitRouter public splitRouter;
@@ -67,10 +83,16 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     // splitEntityHash => contentHash (reverse lookup for payment routing)
     mapping(bytes32 => bytes32) public splitToContent;
 
-    event ContentRegistered(bytes32 indexed contentHash, address creator, uint256 universeId, bytes32 splitEntityHash);
+    event ContentRegistered(
+        bytes32 indexed contentHash, address creator, uint256 universeId, bytes32 splitEntityHash
+    );
     event ContentBought(uint256 indexed dealId, bytes32 contentHash, address buyer, uint256 price);
-    event ContentRented(uint256 indexed dealId, bytes32 contentHash, address buyer, uint256 price, uint256 endTime);
-    event ContentLicensed(uint256 indexed dealId, bytes32 contentHash, address buyer, uint256 fee, uint256 endTime);
+    event ContentRented(
+        uint256 indexed dealId, bytes32 contentHash, address buyer, uint256 price, uint256 endTime
+    );
+    event ContentLicensed(
+        uint256 indexed dealId, bytes32 contentHash, address buyer, uint256 fee, uint256 endTime
+    );
     event RoyaltyPaid(uint256 indexed dealId, uint256 amount);
     event ContentDeactivated(bytes32 indexed contentHash);
     event PricingUpdated(bytes32 indexed contentHash);
@@ -106,7 +128,9 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     uint256 public constant MAX_RENT_PRICE_PER_DAY = 1000 ether;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(
         address _platform,
@@ -119,7 +143,10 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-        if (_platform == address(0) || _splitRouter == address(0) || _paymentRouter == address(0) || _rightsRegistry == address(0)) revert ZeroAddress();
+        if (
+            _platform == address(0) || _splitRouter == address(0) || _paymentRouter == address(0)
+                || _rightsRegistry == address(0)
+        ) revert ZeroAddress();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
         splitRouter = ISplitRouter(_splitRouter);
@@ -131,8 +158,13 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     // ── Registration ────────────────────────────────────────────────────
 
@@ -178,7 +210,13 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     // ── Deal Execution ──────────────────────────────────────────────────
 
     /// @notice Buy content permanently. Payment routed through SplitRouter.
-    function buyContent(bytes32 contentHash) external payable nonReentrant whenNotPaused returns (uint256 dealId) {
+    function buyContent(bytes32 contentHash)
+        external
+        payable
+        nonReentrant
+        whenNotPaused
+        returns (uint256 dealId)
+    {
         ContentRegistration storage reg = registrations[contentHash];
         if (!reg.active) revert ContentNotActive();
         if (reg.buyPrice == 0) revert NotForSale();
@@ -211,7 +249,13 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     }
 
     /// @notice Rent content for a duration. Payment through SplitRouter.
-    function rentContent(bytes32 contentHash, uint256 durationDays) external payable nonReentrant whenNotPaused returns (uint256 dealId) {
+    function rentContent(bytes32 contentHash, uint256 durationDays)
+        external
+        payable
+        nonReentrant
+        whenNotPaused
+        returns (uint256 dealId)
+    {
         ContentRegistration storage reg = registrations[contentHash];
         if (!reg.active) revert ContentNotActive();
         if (reg.rentPricePerDay == 0) revert NotForRent();
@@ -249,7 +293,13 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     }
 
     /// @notice License content for usage rights with potential ongoing royalties.
-    function licenseContent(bytes32 contentHash, uint256 durationDays) external payable nonReentrant whenNotPaused returns (uint256 dealId) {
+    function licenseContent(bytes32 contentHash, uint256 durationDays)
+        external
+        payable
+        nonReentrant
+        whenNotPaused
+        returns (uint256 dealId)
+    {
         ContentRegistration storage reg = registrations[contentHash];
         if (!reg.active) revert ContentNotActive();
         if (reg.licenseFee == 0) revert NotLicensable();
@@ -365,8 +415,8 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     function expireDeal(uint256 dealId) external {
         Deal storage deal = deals[dealId];
         if (deal.status != DealStatus.ACTIVE) revert DealNotActive();
-        if (deal.dealType == DealType.BUY) revert DealNotActive();   // BUYs never expire
-        if (deal.endTime == 0) revert DealNotActive();               // no expiry set
+        if (deal.dealType == DealType.BUY) revert DealNotActive(); // BUYs never expire
+        if (deal.endTime == 0) revert DealNotActive(); // no expiry set
         if (block.timestamp <= deal.endTime) revert DealNotActive(); // not yet past deadline
         deal.status = DealStatus.EXPIRED;
         emit DealExpired(dealId);
@@ -431,7 +481,9 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     /// @notice Paginated deal query for a content piece
     function getContentDealsPaginated(bytes32 contentHash, uint256 offset, uint256 limit)
-        external view returns (uint256[] memory ids, uint256 total)
+        external
+        view
+        returns (uint256[] memory ids, uint256 total)
     {
         uint256[] storage all = _contentDeals[contentHash];
         total = all.length;
@@ -444,7 +496,11 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         }
     }
 
-    function getRegistration(bytes32 contentHash) external view returns (ContentRegistration memory) {
+    function getRegistration(bytes32 contentHash)
+        external
+        view
+        returns (ContentRegistration memory)
+    {
         return registrations[contentHash];
     }
 
@@ -462,7 +518,9 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     /// @dev Only update _buyerLatestDeal if the existing entry is NOT an active permanent BUY.
     ///      Prevents RENT/LICENSE from overwriting a BUY, which would break hasAccessFast().
-    function _updateLatestDealIfSafe(bytes32 contentHash, address buyer, uint256 newDealId) internal {
+    function _updateLatestDealIfSafe(bytes32 contentHash, address buyer, uint256 newDealId)
+        internal
+    {
         uint256 existingDealId = _buyerLatestDeal[contentHash][buyer];
         if (existingDealId != 0) {
             Deal storage existing = deals[existingDealId];
@@ -488,7 +546,9 @@ contract ContentLicensing is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
         // Try SplitRouter first (handles multi-recipient splits)
         if (splitEntityHash != bytes32(0)) {
-            try splitRouter.getSplits(splitEntityHash) returns (ISplitRouter.Split[] memory splits) {
+            try splitRouter.getSplits(splitEntityHash) returns (
+                ISplitRouter.Split[] memory splits
+            ) {
                 if (splits.length > 0) {
                     splitRouter.routeWithSplits{value: amount}(splitEntityHash, platformFeeBps);
                     return;

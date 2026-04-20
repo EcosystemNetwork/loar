@@ -44,10 +44,14 @@ contract RemixFeesTest is Test {
 
         vm.startPrank(deployer);
         RemixFees impl = new RemixFees();
-        remix = RemixFees(address(new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(RemixFees.initialize, (address(loar), treasury, lp, platform))
-        )));
+        remix = RemixFees(
+            address(
+                new ERC1967Proxy(
+                    address(impl),
+                    abi.encodeCall(RemixFees.initialize, (address(loar), treasury, lp, platform))
+                )
+            )
+        );
 
         remix.setUniverseManager(address(universeManager));
 

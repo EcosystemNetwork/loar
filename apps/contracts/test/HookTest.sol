@@ -24,11 +24,7 @@ contract HookTest is Test, Deployers, IPoolManagerEvents, IHookEvents {
         IPoolManager(address(0x000000000004444c5dc75cB358380D2e3dE08A90));
 
     function deployFreshManager() internal override {
-        deployCodeTo(
-            "PoolManager",
-            abi.encode(address(this)),
-            address(POOL_MANAGER)
-        );
+        deployCodeTo("PoolManager", abi.encode(address(this)), address(POOL_MANAGER));
         manager = POOL_MANAGER;
     }
 
@@ -41,19 +37,8 @@ contract HookTest is Test, Deployers, IPoolManagerEvents, IHookEvents {
         int24 tickSpacing,
         uint160 sqrtPriceX96
     ) internal returns (PoolKey memory _key, PoolId id) {
-        (_key, id) = initPool(
-            _currency0,
-            _currency1,
-            hooks,
-            fee,
-            tickSpacing,
-            sqrtPriceX96
-        );
-        modifyLiquidityRouter.modifyLiquidity{value: msg.value}(
-            _key,
-            LIQUIDITY_PARAMS,
-            ZERO_BYTES
-        );
+        (_key, id) = initPool(_currency0, _currency1, hooks, fee, tickSpacing, sqrtPriceX96);
+        modifyLiquidityRouter.modifyLiquidity{value: msg.value}(_key, LIQUIDITY_PARAMS, ZERO_BYTES);
     }
 
     // @dev Calculate the current `feesAccrued` for a given position.
@@ -65,37 +50,18 @@ contract HookTest is Test, Deployers, IPoolManagerEvents, IHookEvents {
         int24 tickUpper,
         bytes32 salt
     ) internal view returns (int128, int128) {
-        bytes32 positionKey = Position.calculatePositionKey(
-            owner,
-            tickLower,
-            tickUpper,
-            salt
-        );
-        (
-            uint128 liquidity,
-            uint256 feeGrowthInside0LastX128,
-            uint256 feeGrowthInside1LastX128
-        ) = StateLibrary.getPositionInfo(manager, poolId, positionKey);
+        bytes32 positionKey = Position.calculatePositionKey(owner, tickLower, tickUpper, salt);
+        (uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128) =
+            StateLibrary.getPositionInfo(manager, poolId, positionKey);
 
-        (
-            uint256 feeGrowthInside0X128,
-            uint256 feeGrowthInside1X128
-        ) = StateLibrary.getFeeGrowthInside(
-                manager,
-                poolId,
-                tickLower,
-                tickUpper
-            );
+        (uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128) =
+            StateLibrary.getFeeGrowthInside(manager, poolId, tickLower, tickUpper);
 
         uint256 fees0 = FullMath.mulDiv(
-            feeGrowthInside0X128 - feeGrowthInside0LastX128,
-            liquidity,
-            FixedPoint128.Q128
+            feeGrowthInside0X128 - feeGrowthInside0LastX128, liquidity, FixedPoint128.Q128
         );
         uint256 fees1 = FullMath.mulDiv(
-            feeGrowthInside1X128 - feeGrowthInside1LastX128,
-            liquidity,
-            FixedPoint128.Q128
+            feeGrowthInside1X128 - feeGrowthInside1LastX128, liquidity, FixedPoint128.Q128
         );
 
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -111,14 +77,8 @@ contract HookTest is Test, Deployers, IPoolManagerEvents, IHookEvents {
         int24 tickUpper,
         bytes32 salt
     ) internal view returns (BalanceDelta feeDelta) {
-        (int128 fees0, int128 fees1) = calculateFees(
-            manager,
-            poolId,
-            owner,
-            tickLower,
-            tickUpper,
-            salt
-        );
+        (int128 fees0, int128 fees1) =
+            calculateFees(manager, poolId, owner, tickLower, tickUpper, salt);
         return toBalanceDelta(fees0, fees1);
     }
 
@@ -130,26 +90,14 @@ contract HookTest is Test, Deployers, IPoolManagerEvents, IHookEvents {
         int256 liquidity,
         bytes32 salt
     ) internal returns (BalanceDelta) {
-        ModifyLiquidityParams
-            memory modifyLiquidityParams = ModifyLiquidityParams({
-                tickLower: tickLower,
-                tickUpper: tickUpper,
-                liquidityDelta: liquidity,
-                salt: salt
-            });
-        return
-            modifyLiquidityRouter.modifyLiquidity(
-                poolKey,
-                modifyLiquidityParams,
-                ""
-            );
+        ModifyLiquidityParams memory modifyLiquidityParams = ModifyLiquidityParams({
+            tickLower: tickLower, tickUpper: tickUpper, liquidityDelta: liquidity, salt: salt
+        });
+        return modifyLiquidityRouter.modifyLiquidity(poolKey, modifyLiquidityParams, "");
     }
 
     // @dev Swaps all combinations of `zeroForOne` (true/false) and `amountSpecified` (+,-) in a given pool.
-    function swapAllCombinations(
-        PoolKey memory poolKey,
-        uint256 amount
-    ) internal {
+    function swapAllCombinations(PoolKey memory poolKey, uint256 amount) internal {
         for (uint256 i = 0; i < 4; i++) {
             swap(
                 poolKey,

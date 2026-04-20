@@ -3,11 +3,17 @@
 pragma solidity =0.8.30;
 
 import {Governor} from "@openzeppelin/governance/Governor.sol";
-import {GovernorCountingSimple} from "@openzeppelin/governance/extensions/GovernorCountingSimple.sol";
+import {
+    GovernorCountingSimple
+} from "@openzeppelin/governance/extensions/GovernorCountingSimple.sol";
 import {GovernorSettings} from "@openzeppelin/governance/extensions/GovernorSettings.sol";
 import {GovernorVotes} from "@openzeppelin/governance/extensions/GovernorVotes.sol";
-import {GovernorVotesQuorumFraction} from "@openzeppelin/governance/extensions/GovernorVotesQuorumFraction.sol";
-import {GovernorTimelockControl} from "@openzeppelin/governance/extensions/GovernorTimelockControl.sol";
+import {
+    GovernorVotesQuorumFraction
+} from "@openzeppelin/governance/extensions/GovernorVotesQuorumFraction.sol";
+import {
+    GovernorTimelockControl
+} from "@openzeppelin/governance/extensions/GovernorTimelockControl.sol";
 import {IVotes} from "@openzeppelin/governance/utils/IVotes.sol";
 import {TimelockController} from "@openzeppelin/governance/TimelockController.sol";
 
@@ -36,8 +42,14 @@ import {TimelockController} from "@openzeppelin/governance/TimelockController.so
 ///     before token distribution has a chance to diversify.
 ///   - Additional mitigations: (1) vesting for creator allocation via
 ///     UniverseTokenDeployerV3 (FACTORY-02 cleanup), (2) 24h timelock on all proposals.
-contract UniverseGovernor is Governor, GovernorSettings, GovernorCountingSimple, GovernorVotes, GovernorVotesQuorumFraction, GovernorTimelockControl {
-
+contract UniverseGovernor is
+    Governor,
+    GovernorSettings,
+    GovernorCountingSimple,
+    GovernorVotes,
+    GovernorVotesQuorumFraction,
+    GovernorTimelockControl
+{
     /// @notice Block at which this governor was deployed.
     uint256 public immutable deployedAtBlock;
 
@@ -50,7 +62,13 @@ contract UniverseGovernor is Governor, GovernorSettings, GovernorCountingSimple,
 
     constructor(IVotes _token, TimelockController _timelock, uint256 _earlyLifeBlocks)
         Governor("UniverseGovernor")
-        GovernorSettings(7200 /* ~1 day on Base L2 @ 2s blocks */, 50400 /* ~7 days */, 10_000_000e18 /* GOV-05: 10M tokens = 1% of 1B supply */)
+        GovernorSettings(
+            7200,
+            /* ~1 day on Base L2 @ 2s blocks */
+            50400,
+            /* ~7 days */
+            10_000_000e18 /* GOV-05: 10M tokens = 1% of 1B supply */
+        )
         GovernorVotes(_token)
         GovernorVotesQuorumFraction(10) // steady-state quorum = 10%
         GovernorTimelockControl(_timelock)

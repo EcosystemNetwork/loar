@@ -43,10 +43,7 @@ interface ILoarLpLockerMultiple is ILoarLpLocker {
         uint256 effectiveAt
     );
     event RewardAdminChangeRequested(
-        address indexed token,
-        uint256 indexed rewardIndex,
-        address newAdmin,
-        uint256 effectiveAt
+        address indexed token, uint256 indexed rewardIndex, address newAdmin, uint256 effectiveAt
     );
 
     function requestRewardAdminChange(address token, uint256 rewardIndex, address newAdmin) external;

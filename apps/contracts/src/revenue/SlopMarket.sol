@@ -26,19 +26,22 @@ import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
 ///         Sellers must approve this contract (setApprovalForAll or approve)
 ///         before listing. Tokens are transferred at point of sale, not on list.
 contract SlopMarket is ReentrancyGuard, Ownable {
-    enum TokenStandard { ERC721, ERC1155 }
+    enum TokenStandard {
+        ERC721,
+        ERC1155
+    }
 
     struct Listing {
         address seller;
         address tokenContract;
         uint256 tokenId;
         TokenStandard standard;
-        uint256 amount;        // always 1 for ERC721; remaining stock for ERC1155
-        uint256 pricePerUnit;  // ETH per 1 token unit
+        uint256 amount; // always 1 for ERC721; remaining stock for ERC1155
+        uint256 pricePerUnit; // ETH per 1 token unit
         bool active;
     }
 
-    bytes4 private constant ERC721_IFACE  = 0x80ac58cd;
+    bytes4 private constant ERC721_IFACE = 0x80ac58cd;
     bytes4 private constant ERC1155_IFACE = 0xd9b67a26;
 
     uint256 public nextListingId;
@@ -65,12 +68,7 @@ contract SlopMarket is ReentrancyGuard, Ownable {
         uint256 amount,
         uint256 pricePerUnit
     );
-    event Sale(
-        uint256 indexed listingId,
-        address indexed buyer,
-        uint256 amount,
-        uint256 totalPaid
-    );
+    event Sale(uint256 indexed listingId, address indexed buyer, uint256 amount, uint256 totalPaid);
     event Delisted(uint256 indexed listingId);
     event PlatformFeeUpdated(uint16 newFeeBps);
 
@@ -130,14 +128,18 @@ contract SlopMarket is ReentrancyGuard, Ownable {
             if (amount != 1) revert InvalidAmount();
             if (IERC721(tokenContract).ownerOf(tokenId) != msg.sender) revert NotTokenOwner();
             if (
-                !IERC721(tokenContract).isApprovedForAll(msg.sender, address(this)) &&
-                IERC721(tokenContract).getApproved(tokenId) != address(this)
+                !IERC721(tokenContract).isApprovedForAll(msg.sender, address(this))
+                    && IERC721(tokenContract).getApproved(tokenId) != address(this)
             ) revert NotApproved();
             // Prevent the same ERC721 token being listed twice
             if (activeERC721Listing[tokenContract][tokenId] != 0) revert AlreadyListed();
         } else {
-            if (IERC1155(tokenContract).balanceOf(msg.sender, tokenId) < amount) revert NotEnoughStock();
-            if (!IERC1155(tokenContract).isApprovedForAll(msg.sender, address(this))) revert NotApproved();
+            if (IERC1155(tokenContract).balanceOf(msg.sender, tokenId) < amount) {
+                revert NotEnoughStock();
+            }
+            if (!IERC1155(tokenContract).isApprovedForAll(msg.sender, address(this))) {
+                revert NotApproved();
+            }
         }
 
         listingId = nextListingId++;
@@ -192,7 +194,9 @@ contract SlopMarket is ReentrancyGuard, Ownable {
 
         // MARKET-01: Honor ERC2981 creator royalties
         (address royaltyReceiver, uint256 royaltyAmount) = (address(0), 0);
-        try IERC2981(l.tokenContract).royaltyInfo(l.tokenId, totalPrice) returns (address receiver, uint256 royaltyAmt) {
+        try IERC2981(l.tokenContract).royaltyInfo(l.tokenId, totalPrice) returns (
+            address receiver, uint256 royaltyAmt
+        ) {
             royaltyReceiver = receiver;
             royaltyAmount = royaltyAmt;
         } catch {}

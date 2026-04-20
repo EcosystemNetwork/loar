@@ -69,10 +69,5 @@ interface IPoolManagerEvents {
     /// @param sender The address that initiated the donate call
     /// @param amount0 The amount donated in currency0
     /// @param amount1 The amount donated in currency1
-    event Donate(
-        PoolId indexed id,
-        address indexed sender,
-        uint256 amount0,
-        uint256 amount1
-    );
+    event Donate(PoolId indexed id, address indexed sender, uint256 amount0, uint256 amount1);
 }

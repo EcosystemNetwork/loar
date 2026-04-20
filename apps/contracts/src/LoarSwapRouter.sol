@@ -116,7 +116,8 @@ contract LoarSwapRouter is IUnlockCallback, Ownable {
         // Pull ERC20 tokens from sender if the input currency is not native ETH
         Currency inputCurrency = zeroForOne ? key.currency0 : key.currency1;
         if (!inputCurrency.isAddressZero()) {
-            IERC20(Currency.unwrap(inputCurrency)).safeTransferFrom(msg.sender, address(this), amountIn);
+            IERC20(Currency.unwrap(inputCurrency))
+                .safeTransferFrom(msg.sender, address(this), amountIn);
         } else {
             if (msg.value < amountIn) revert InsufficientETH();
         }
@@ -179,7 +180,8 @@ contract LoarSwapRouter is IUnlockCallback, Ownable {
         Currency inputCurrency = zeroForOne ? key.currency0 : key.currency1;
         if (!inputCurrency.isAddressZero()) {
             // Transfer max input; excess will be refunded via the settle/take flow
-            IERC20(Currency.unwrap(inputCurrency)).safeTransferFrom(msg.sender, address(this), amountInMaximum);
+            IERC20(Currency.unwrap(inputCurrency))
+                .safeTransferFrom(msg.sender, address(this), amountInMaximum);
         } else {
             if (msg.value < amountInMaximum) revert InsufficientETH();
         }
@@ -300,5 +302,6 @@ contract LoarSwapRouter is IUnlockCallback, Ownable {
     // Uniswap v4 sqrt price limits (from TickMath)
     // MIN_SQRT_PRICE + 1 for zeroForOne swaps, MAX_SQRT_PRICE - 1 for oneForZero
     uint160 internal constant _MIN_SQRT_PRICE_LIMIT = 4295128740;
-    uint160 internal constant _MAX_SQRT_PRICE_LIMIT = 1461446703485210103287273052203988822378723970341;
+    uint160 internal constant _MAX_SQRT_PRICE_LIMIT =
+        1461446703485210103287273052203988822378723970341;
 }

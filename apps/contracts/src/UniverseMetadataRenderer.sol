@@ -14,11 +14,11 @@ contract UniverseMetadataRenderer is IUniverseMetadataRenderer {
     using Strings for uint256;
     using Strings for address;
 
-    function tokenURI(
-        uint256 tokenId,
-        address universeAddr,
-        address tokenAddr
-    ) external view returns (string memory) {
+    function tokenURI(uint256 tokenId, address universeAddr, address tokenAddr)
+        external
+        view
+        returns (string memory)
+    {
         IUniverse universe = IUniverse(universeAddr);
 
         string memory universeName = universe.universeName();
@@ -26,24 +26,37 @@ contract UniverseMetadataRenderer is IUniverseMetadataRenderer {
         string memory universeImage = universe.universeImageUrl();
         bool hasToken = tokenAddr != address(0);
 
-        string memory json = string(abi.encodePacked(
-            '{"name":"', universeName,
-            '","description":"', universeDesc,
-            '","image":"', universeImage,
-            '","external_url":"https://loar.fun/universe/', universeAddr.toHexString(),
-            '","attributes":[',
-                '{"trait_type":"Universe Contract","value":"', universeAddr.toHexString(), '"}',
-                ',{"trait_type":"Universe ID","value":"', tokenId.toString(), '"}',
-                ',{"trait_type":"Has Token","value":"', hasToken ? 'true' : 'false', '"}',
-                hasToken ? string(abi.encodePacked(
-                    ',{"trait_type":"Token","value":"', tokenAddr.toHexString(), '"}'
-                )) : '',
-            ']}'
-        ));
+        string memory json = string(
+            abi.encodePacked(
+                '{"name":"',
+                universeName,
+                '","description":"',
+                universeDesc,
+                '","image":"',
+                universeImage,
+                '","external_url":"https://loar.fun/universe/',
+                universeAddr.toHexString(),
+                '","attributes":[',
+                '{"trait_type":"Universe Contract","value":"',
+                universeAddr.toHexString(),
+                '"}',
+                ',{"trait_type":"Universe ID","value":"',
+                tokenId.toString(),
+                '"}',
+                ',{"trait_type":"Has Token","value":"',
+                hasToken ? "true" : "false",
+                '"}',
+                hasToken
+                    ? string(
+                        abi.encodePacked(
+                            ',{"trait_type":"Token","value":"', tokenAddr.toHexString(), '"}'
+                        )
+                    )
+                    : "",
+                "]}"
+            )
+        );
 
-        return string(abi.encodePacked(
-            "data:application/json;base64,",
-            Base64.encode(bytes(json))
-        ));
+        return string(abi.encodePacked("data:application/json;base64,", Base64.encode(bytes(json))));
     }
 }

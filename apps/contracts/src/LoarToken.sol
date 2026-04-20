@@ -47,11 +47,14 @@ contract LoarToken is ERC20, ERC20Permit, ERC20Burnable, Ownable, Pausable {
         if (!minters[msg.sender] && msg.sender != owner()) revert NotMinter();
     }
 
-    constructor(
-        address _treasury,
-        address _initialHolder
-    ) ERC20("LOAR", "LOAR") ERC20Permit("LOAR") Ownable(msg.sender) {
-        if (_treasury == address(0) || _initialHolder == address(0)) revert ZeroAddress();
+    constructor(address _treasury, address _initialHolder)
+        ERC20("LOAR", "LOAR")
+        ERC20Permit("LOAR")
+        Ownable(msg.sender)
+    {
+        if (_treasury == address(0) || _initialHolder == address(0)) {
+            revert ZeroAddress();
+        }
         treasury = _treasury;
 
         // Treasury and initial holder are fee-exempt by default

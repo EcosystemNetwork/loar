@@ -21,9 +21,10 @@ contract UniverseFactory is IUniverseFactory {
         manager = _manager;
     }
 
-    function createUniverse(
-        IUniverseManager.UniverseConfig memory config
-    ) external returns (address) {
+    function createUniverse(IUniverseManager.UniverseConfig memory config)
+        external
+        returns (address)
+    {
         if (msg.sender != manager) revert OnlyManager();
         Universe universe = new Universe(config);
         return address(universe);

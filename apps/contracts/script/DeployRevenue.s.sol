@@ -27,8 +27,8 @@ import {EpisodeNFT} from "../src/revenue/EpisodeNFT.sol";
  * Run: forge script script/DeployRevenue.s.sol --rpc-url sepolia --broadcast
  */
 contract DeployRevenueScript is Script {
-    uint16 constant FEE = 500;         // 5%
-    uint16 constant CANON_FEE = 300;   // 3%
+    uint16 constant FEE = 500; // 5%
+    uint16 constant CANON_FEE = 300; // 3%
     uint256 constant MIN_FEE = 0.001 ether;
     uint256 constant VOTE_DUR = 604800; // 7 days
 
@@ -42,80 +42,133 @@ contract DeployRevenueScript is Script {
         vm.startBroadcast(pk);
 
         // 1. PaymentRouter (UUPS) — initialize(treasury, feeBps, loarToken, loarFeeDiscount)
-        PaymentRouter pr = PaymentRouter(address(new ERC1967Proxy(
-            address(new PaymentRouter()),
-            abi.encodeCall(PaymentRouter.initialize, (treasury, FEE, loarToken, 500))
-        )));
+        PaymentRouter pr = PaymentRouter(
+            address(
+                new ERC1967Proxy(
+                    address(new PaymentRouter()),
+                    abi.encodeCall(PaymentRouter.initialize, (treasury, FEE, loarToken, 500))
+                )
+            )
+        );
         console.log("PaymentRouter:", address(pr));
 
         // 2. RightsRegistry (UUPS) — initialize(platform)
-        RightsRegistry rr = RightsRegistry(address(new ERC1967Proxy(
-            address(new RightsRegistry()),
-            abi.encodeCall(RightsRegistry.initialize, (d))
-        )));
+        RightsRegistry rr = RightsRegistry(
+            address(
+                new ERC1967Proxy(
+                    address(new RightsRegistry()), abi.encodeCall(RightsRegistry.initialize, (d))
+                )
+            )
+        );
         console.log("RightsRegistry:", address(rr));
 
         // 3. Deploy implementations + beacons + factory
         console.log("Deploying 5 NFT implementations + beacons...");
-        UpgradeableBeacon epBeacon = new UpgradeableBeacon(address(new EpisodeEditionCollection()), d);
+        UpgradeableBeacon epBeacon =
+            new UpgradeableBeacon(address(new EpisodeEditionCollection()), d);
         UpgradeableBeacon chBeacon = new UpgradeableBeacon(address(new CharacterNFT()), d);
         UpgradeableBeacon enBeacon = new UpgradeableBeacon(address(new EntityNFT()), d);
         UpgradeableBeacon eeBeacon = new UpgradeableBeacon(address(new EntityEditionNFT()), d);
         UpgradeableBeacon epNftBeacon = new UpgradeableBeacon(address(new EpisodeNFT()), d);
 
         RevenueModuleFactory rmf = new RevenueModuleFactory(
-            d, address(rr), address(pr), FEE, FEE, 300, FEE, FEE,
-            address(epBeacon), address(chBeacon), address(enBeacon), address(eeBeacon), address(epNftBeacon)
+            d,
+            address(rr),
+            address(pr),
+            FEE,
+            FEE,
+            300,
+            FEE,
+            FEE,
+            address(epBeacon),
+            address(chBeacon),
+            address(enBeacon),
+            address(eeBeacon),
+            address(epNftBeacon)
         );
         console.log("RevenueModuleFactory:", address(rmf));
 
         // 4. CanonMarketplace (UUPS) — initialize(platform, rightsRegistry, paymentRouter, feeBps, canonBps, minFee, voteDur)
-        CanonMarketplace cm = CanonMarketplace(address(new ERC1967Proxy(
-            address(new CanonMarketplace()),
-            abi.encodeCall(CanonMarketplace.initialize, (d, address(rr), address(pr), FEE, CANON_FEE, MIN_FEE, VOTE_DUR))
-        )));
+        CanonMarketplace cm = CanonMarketplace(
+            address(
+                new ERC1967Proxy(
+                    address(new CanonMarketplace()),
+                    abi.encodeCall(
+                        CanonMarketplace.initialize,
+                        (d, address(rr), address(pr), FEE, CANON_FEE, MIN_FEE, VOTE_DUR)
+                    )
+                )
+            )
+        );
         console.log("CanonMarketplace:", address(cm));
 
         // 5. CreditManager (UUPS) — initialize(loarToken, platform, treasury, paymentRouter)
-        CreditManager cr = CreditManager(address(new ERC1967Proxy(
-            address(new CreditManager()),
-            abi.encodeCall(CreditManager.initialize, (loarToken, d, treasury, address(pr)))
-        )));
+        CreditManager cr = CreditManager(
+            address(
+                new ERC1967Proxy(
+                    address(new CreditManager()),
+                    abi.encodeCall(CreditManager.initialize, (loarToken, d, treasury, address(pr)))
+                )
+            )
+        );
         console.log("CreditManager:", address(cr));
 
         // 6. AdPlacement (UUPS) — initialize(platform, paymentRouter, feeBps)
-        AdPlacement ap = AdPlacement(address(new ERC1967Proxy(
-            address(new AdPlacement()),
-            abi.encodeCall(AdPlacement.initialize, (d, address(pr), FEE))
-        )));
+        AdPlacement ap = AdPlacement(
+            address(
+                new ERC1967Proxy(
+                    address(new AdPlacement()),
+                    abi.encodeCall(AdPlacement.initialize, (d, address(pr), FEE))
+                )
+            )
+        );
         console.log("AdPlacement:", address(ap));
 
         // 7. SubscriptionManager (UUPS) — initialize(platform, paymentRouter, feeBps)
-        SubscriptionManager sm = SubscriptionManager(address(new ERC1967Proxy(
-            address(new SubscriptionManager()),
-            abi.encodeCall(SubscriptionManager.initialize, (d, address(pr), FEE))
-        )));
+        SubscriptionManager sm = SubscriptionManager(
+            address(
+                new ERC1967Proxy(
+                    address(new SubscriptionManager()),
+                    abi.encodeCall(SubscriptionManager.initialize, (d, address(pr), FEE))
+                )
+            )
+        );
         console.log("SubscriptionManager:", address(sm));
 
         // 8. LicensingRegistry (UUPS) — initialize(platform, paymentRouter, feeBps)
-        LicensingRegistry lr = LicensingRegistry(address(new ERC1967Proxy(
-            address(new LicensingRegistry()),
-            abi.encodeCall(LicensingRegistry.initialize, (d, address(pr), FEE))
-        )));
+        LicensingRegistry lr = LicensingRegistry(
+            address(
+                new ERC1967Proxy(
+                    address(new LicensingRegistry()),
+                    abi.encodeCall(LicensingRegistry.initialize, (d, address(pr), FEE))
+                )
+            )
+        );
         console.log("LicensingRegistry:", address(lr));
 
         // 9. CollabManager (UUPS) — initialize(platform, paymentRouter, feeBps)
-        CollabManager cl = CollabManager(address(new ERC1967Proxy(
-            address(new CollabManager()),
-            abi.encodeCall(CollabManager.initialize, (d, address(pr), vm.envOr("UNIVERSE_MANAGER", d), FEE))
-        )));
+        CollabManager cl = CollabManager(
+            address(
+                new ERC1967Proxy(
+                    address(new CollabManager()),
+                    abi.encodeCall(
+                        CollabManager.initialize,
+                        (d, address(pr), vm.envOr("UNIVERSE_MANAGER", d), FEE)
+                    )
+                )
+            )
+        );
         console.log("CollabManager:", address(cl));
 
         // 10. AnalyticsRegistry (UUPS) — initialize(platform)
-        AnalyticsRegistry ar = AnalyticsRegistry(address(new ERC1967Proxy(
-            address(new AnalyticsRegistry()),
-            abi.encodeCall(AnalyticsRegistry.initialize, (d))
-        )));
+        AnalyticsRegistry ar = AnalyticsRegistry(
+            address(
+                new ERC1967Proxy(
+                    address(new AnalyticsRegistry()),
+                    abi.encodeCall(AnalyticsRegistry.initialize, (d))
+                )
+            )
+        );
         console.log("AnalyticsRegistry:", address(ar));
 
         vm.stopBroadcast();

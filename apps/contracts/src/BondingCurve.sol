@@ -101,7 +101,7 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
 
     struct HaltRequest {
         bool pending;
-        bool halted;     // desired state (true = halt, false = resume)
+        bool halted; // desired state (true = halt, false = resume)
         uint64 executeAfter;
     }
     HaltRequest public pendingHalt;
@@ -257,7 +257,11 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
     // ── Sell ────────────────────────────────────────────────────────────
 
     /// @inheritdoc IBondingCurve
-    function sell(uint256 tokenAmount, uint256 minEthOut, uint256 deadline) external nonReentrant whenActive {
+    function sell(uint256 tokenAmount, uint256 minEthOut, uint256 deadline)
+        external
+        nonReentrant
+        whenActive
+    {
         require(block.timestamp <= deadline, "Transaction expired");
         if (tokenAmount == 0) revert ZeroAmount();
         if (tokenAmount > tokensSold) revert InsufficientTokens();
@@ -310,10 +314,7 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
 
         // Send ETH + unsold tokens to UniverseManager for LP creation
         IUniverseManagerGraduation(universeManager).graduateFromBondingCurve{value: ethForLp}(
-            universeId,
-            ethForLp,
-            unsoldTokens,
-            token
+            universeId, ethForLp, unsoldTokens, token
         );
 
         graduated = true;
@@ -362,22 +363,32 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
     }
 
     /// @inheritdoc IBondingCurve
-    function getProgress() external view returns (uint256 raised, uint256 target, uint256 percentBps) {
+    function getProgress()
+        external
+        view
+        returns (uint256 raised, uint256 target, uint256 percentBps)
+    {
         raised = ethRaised;
         target = GRADUATION_ETH;
         percentBps = ethRaised >= GRADUATION_ETH ? BPS : (ethRaised * BPS) / GRADUATION_ETH;
     }
 
     /// @inheritdoc IBondingCurve
-    function curveState() external view returns (
-        uint256 _tokensSold,
-        uint256 _ethRaised,
-        bool _graduated,
-        uint256 _currentPrice,
-        uint256 _totalCurveSupply,
-        uint256 _graduationEth
-    ) {
-        return (tokensSold, ethRaised, graduated, _getCurrentPrice(), TOTAL_CURVE_SUPPLY, GRADUATION_ETH);
+    function curveState()
+        external
+        view
+        returns (
+            uint256 _tokensSold,
+            uint256 _ethRaised,
+            bool _graduated,
+            uint256 _currentPrice,
+            uint256 _totalCurveSupply,
+            uint256 _graduationEth
+        )
+    {
+        return (
+            tokensSold, ethRaised, graduated, _getCurrentPrice(), TOTAL_CURVE_SUPPLY, GRADUATION_ETH
+        );
     }
 
     // ── Internal math ──────────────────────────────────────────────────
@@ -402,7 +413,11 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
     ///      ethAmount = slopeScaled * ((tokensSold + bought)² - tokensSold²) / (2 * PRECISION)
     ///      Solving for bought:
     ///      bought = sqrt(tokensSold² + 2 * ethAmount * PRECISION / slopeScaled) - tokensSold
-    function _getTokensForEth(uint256 ethAmount, uint256 currentSold) internal view returns (uint256) {
+    function _getTokensForEth(uint256 ethAmount, uint256 currentSold)
+        internal
+        view
+        returns (uint256)
+    {
         // inner = currentSold² + (2 * ethAmount * PRECISION) / slopeScaled
         uint256 currentSoldSq = currentSold * currentSold;
         uint256 addend = FixedPointMathLib.mulDiv(2 * ethAmount, PRECISION, slopeScaled);

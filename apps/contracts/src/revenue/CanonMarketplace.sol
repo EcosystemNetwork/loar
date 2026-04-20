@@ -4,7 +4,9 @@ pragma solidity =0.8.30;
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IVotes} from "@openzeppelin/governance/utils/IVotes.sol";
 import {IRightsRegistry} from "../interfaces/IRightsRegistry.sol";
@@ -14,9 +16,17 @@ import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 ///      Prevents sockpuppet token attacks (C5) by validating caller-supplied token
 ///      against the on-chain source of truth.
 interface IUniverseManagerLookup {
-    function getUniverseData(uint id) external view returns (
-        address universe, address token, address governor, address hook, address locker, address bondingCurve
-    );
+    function getUniverseData(uint256 id)
+        external
+        view
+        returns (
+            address universe,
+            address token,
+            address governor,
+            address hook,
+            address locker,
+            address bondingCurve
+        );
 }
 
 /// @title CanonMarketplace
@@ -24,40 +34,52 @@ interface IUniverseManagerLookup {
 ///         Covers all creator entity kinds: characters, plot arcs, locations, lore rules,
 ///         items, factions, species, vehicles, technology, and organizations.
 ///         Universe token holders vote submissions into canon. Accepted creators earn fees.
-contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+contract CanonMarketplace is
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable
+{
     enum SubmissionType {
-        CHARACTER,      // person
-        PLOT_ARC,       // event / narrative arc
-        LOCATION,       // place
-        LORE_RULE,      // lore
-        ITEM,           // thing
-        FACTION,        // faction
-        SPECIES,        // species
-        VEHICLE,        // vehicle
-        TECHNOLOGY,     // technology
-        ORGANIZATION    // organization
+        CHARACTER, // person
+        PLOT_ARC, // event / narrative arc
+        LOCATION, // place
+        LORE_RULE, // lore
+        ITEM, // thing
+        FACTION, // faction
+        SPECIES, // species
+        VEHICLE, // vehicle
+        TECHNOLOGY, // technology
+        ORGANIZATION // organization
     }
-    enum SubmissionStatus { PENDING, VOTING, ACCEPTED, REJECTED, EXPIRED }
+    enum SubmissionStatus {
+        PENDING,
+        VOTING,
+        ACCEPTED,
+        REJECTED,
+        EXPIRED
+    }
 
     struct Submission {
         uint256 id;
         uint256 universeId;
-        address universeToken;       // governance token for voting
+        address universeToken; // governance token for voting
         SubmissionType submissionType;
         SubmissionStatus status;
         address creator;
         bytes32 contentHash;
-        string metadataURI;          // IPFS URI for full content
-        uint256 submissionFee;       // fee paid by submitter
+        string metadataURI; // IPFS URI for full content
+        uint256 submissionFee; // fee paid by submitter
         uint256 votesFor;
         uint256 votesAgainst;
-        uint256 votingDeadline;      // uses block.timestamp (seconds) for calendar-predictable deadlines
+        uint256 votingDeadline; // uses block.timestamp (seconds) for calendar-predictable deadlines
         uint256 createdAt;
-        uint256 snapshotBlock;       // uses block.number for vote weight snapshot (flash loan protection)
-                                     // Design note (CANON-05): votingDeadline uses block.timestamp while
-                                     // snapshotBlock uses block.number. This is intentional — timestamps give
-                                     // human-readable deadlines, while block numbers provide deterministic
-                                     // snapshot points for IVotes.getPastVotes(). The two are independent axes.
+        uint256 snapshotBlock; // uses block.number for vote weight snapshot (flash loan protection)
+        // Design note (CANON-05): votingDeadline uses block.timestamp while
+        // snapshotBlock uses block.number. This is intentional — timestamps give
+        // human-readable deadlines, while block numbers provide deterministic
+        // snapshot points for IVotes.getPastVotes(). The two are independent axes.
     }
 
     struct CanonLicense {
@@ -90,10 +112,10 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     address public platform;
     IRightsRegistry public rightsRegistry;
     IPaymentRouter public paymentRouter;
-    uint16 public platformFeeBps;         // platform cut on submission fees
-    uint16 public canonLicenseFeeBps;     // platform cut on license fees
+    uint16 public platformFeeBps; // platform cut on submission fees
+    uint16 public canonLicenseFeeBps; // platform cut on license fees
     uint256 public minSubmissionFee;
-    uint256 public votingDuration;        // seconds
+    uint256 public votingDuration; // seconds
 
     /// @notice Minimum vote participation (basis points of total supply) for finalization
     uint16 public quorumBps;
@@ -102,12 +124,22 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     ///         universeToken is the actual governance token for the universeId (C5 fix).
     IUniverseManagerLookup public universeManager;
 
-    event SubmissionCreated(uint256 indexed id, uint256 universeId, SubmissionType subType, address creator, bytes32 contentHash);
+    event SubmissionCreated(
+        uint256 indexed id,
+        uint256 universeId,
+        SubmissionType subType,
+        address creator,
+        bytes32 contentHash
+    );
     event VoteCast(uint256 indexed submissionId, address voter, bool support, uint256 weight);
     event SubmissionAccepted(uint256 indexed submissionId, uint256 universeId);
     event SubmissionRejected(uint256 indexed submissionId);
-    event CanonLicensed(uint256 indexed licenseId, uint256 submissionId, address licensee, uint256 fee);
-    event CanonSubmissionAccepted(uint256 indexed universeId, uint256 indexed submissionId, bytes32 contentHash);
+    event CanonLicensed(
+        uint256 indexed licenseId, uint256 submissionId, address licensee, uint256 fee
+    );
+    event CanonSubmissionAccepted(
+        uint256 indexed universeId, uint256 indexed submissionId, bytes32 contentHash
+    );
     event RefundClaimed(address indexed creator, uint256 amount);
 
     error AlreadyVoted();
@@ -138,7 +170,9 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     error TokenMismatch();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(
         address _platform,
@@ -153,7 +187,9 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-        if (_platform == address(0) || _rightsRegistry == address(0) || _paymentRouter == address(0)) revert ZeroAddress();
+        if (
+            _platform == address(0) || _rightsRegistry == address(0) || _paymentRouter == address(0)
+        ) revert ZeroAddress();
         if (_platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         if (_canonLicenseFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         platform = _platform;
@@ -166,8 +202,13 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         quorumBps = 1000; // default 10% quorum
     }
 
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
@@ -195,7 +236,10 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
         if (registeredToken != universeToken) revert TokenMismatch();
 
         // Validate the token implements IVotes (will revert if not)
-        try IVotes(universeToken).getPastTotalSupply(block.number - 1) {} catch { revert InvalidToken(); }
+        try IVotes(universeToken).getPastTotalSupply(block.number - 1) {}
+            catch {
+            revert InvalidToken();
+        }
 
         submissionId = nextSubmissionId++;
 
@@ -330,7 +374,13 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
     }
 
     /// @notice License accepted canon content for use within the universe
-    function licenseCanon(uint256 submissionId) external payable nonReentrant whenNotPaused returns (uint256 licenseId) {
+    function licenseCanon(uint256 submissionId)
+        external
+        payable
+        nonReentrant
+        whenNotPaused
+        returns (uint256 licenseId)
+    {
         Submission storage sub = submissions[submissionId];
         if (sub.status != SubmissionStatus.ACCEPTED) revert InvalidStatus();
 
@@ -357,7 +407,9 @@ contract CanonMarketplace is Initializable, UUPSUpgradeable, OwnableUpgradeable,
 
     /// @notice Paginated canon submission query
     function getCanonSubmissionsPaginated(uint256 universeId, uint256 offset, uint256 limit)
-        external view returns (uint256[] memory ids, uint256 total)
+        external
+        view
+        returns (uint256[] memory ids, uint256 total)
     {
         uint256[] storage all = canonSubmissions[universeId];
         total = all.length;

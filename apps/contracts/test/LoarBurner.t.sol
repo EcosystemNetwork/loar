@@ -21,10 +21,14 @@ contract LoarBurnerTest is Test {
 
         vm.startPrank(deployer);
         LoarBurner impl = new LoarBurner();
-        burner = LoarBurner(address(new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(LoarBurner.initialize, (address(loar), treasury, lp, platform))
-        )));
+        burner = LoarBurner(
+            address(
+                new ERC1967Proxy(
+                    address(impl),
+                    abi.encodeCall(LoarBurner.initialize, (address(loar), treasury, lp, platform))
+                )
+            )
+        );
         vm.stopPrank();
 
         // Fund user and approve
@@ -65,8 +69,8 @@ contract LoarBurnerTest is Test {
 
     function test_execute() public {
         uint256 cost = 50e18; // PRIORITY_GENERATION
-        uint256 toLp = (cost * 5000) / 10_000;       // 50%
-        uint256 toTreasury = cost - toLp;             // 50%
+        uint256 toLp = (cost * 5000) / 10_000; // 50%
+        uint256 toTreasury = cost - toLp; // 50%
         uint256 userBalBefore = loar.balanceOf(user);
 
         vm.prank(user);
@@ -222,10 +226,16 @@ contract LoarBurnerTest is Test {
         // Deploy a new burner with LP = address(0)
         vm.startPrank(deployer);
         LoarBurner impl2 = new LoarBurner();
-        LoarBurner burner2 = LoarBurner(address(new ERC1967Proxy(
-            address(impl2),
-            abi.encodeCall(LoarBurner.initialize, (address(loar), treasury, address(0), platform))
-        )));
+        LoarBurner burner2 = LoarBurner(
+            address(
+                new ERC1967Proxy(
+                    address(impl2),
+                    abi.encodeCall(
+                        LoarBurner.initialize, (address(loar), treasury, address(0), platform)
+                    )
+                )
+            )
+        );
         vm.stopPrank();
 
         // Fund user and approve
@@ -347,7 +357,7 @@ contract LoarBurnerTest is Test {
         vm.prank(user);
         burner.execute(LoarBurner.BurnAction.PRIORITY_GENERATION);
 
-        (, , totalBurned, totalCount) = burner.actions(LoarBurner.BurnAction.PRIORITY_GENERATION);
+        (,, totalBurned, totalCount) = burner.actions(LoarBurner.BurnAction.PRIORITY_GENERATION);
         assertEq(totalBurned, 100e18);
         assertEq(totalCount, 2);
     }
@@ -494,7 +504,9 @@ contract LoarBurnerTest is Test {
         uint256 toTreasury = cost - toLp;
 
         vm.expectEmit(true, true, true, true);
-        emit LoarBurner.ActionExecuted(user, LoarBurner.BurnAction.PRIORITY_GENERATION, cost, toLp, toTreasury);
+        emit LoarBurner.ActionExecuted(
+            user, LoarBurner.BurnAction.PRIORITY_GENERATION, cost, toLp, toTreasury
+        );
 
         vm.prank(user);
         burner.execute(LoarBurner.BurnAction.PRIORITY_GENERATION);
@@ -625,7 +637,7 @@ contract LoarBurnerTest is Test {
 
         assertEq(burner.totalCollected(), 100e18);
 
-        (, , uint256 totalBurned, uint256 totalCount) =
+        (,, uint256 totalBurned, uint256 totalCount) =
             burner.actions(LoarBurner.BurnAction.PRIORITY_GENERATION);
         assertEq(totalBurned, 100e18);
         assertEq(totalCount, 2);

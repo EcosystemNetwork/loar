@@ -39,7 +39,10 @@ contract MockPaymentRouter is IPaymentRouter {
 
     function routeLoar(address, uint16, uint256) external {}
     function routeLoarToTreasury(uint256) external {}
-    function claimableLoar(address) external pure returns (uint256) { return 0; }
+
+    function claimableLoar(address) external pure returns (uint256) {
+        return 0;
+    }
     function claimLoar() external {}
 
     receive() external payable {}

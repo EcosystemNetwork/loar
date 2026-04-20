@@ -4,7 +4,9 @@ pragma solidity =0.8.30;
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
@@ -17,7 +19,13 @@ import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 ///
 ///         Credits are the internal unit for all generation actions.
 ///         1 credit = 1 unit of generation capacity (costs vary by action type).
-contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+contract CreditManager is
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable
+{
     using SafeERC20 for IERC20;
 
     // ── Structs ──────────────────────────────────────────────────
@@ -26,9 +34,9 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         uint256 id;
         string name;
         uint256 credits;
-        uint256 priceWei;         // ETH price (35% margin baked in)
-        uint256 priceLoar;        // $LOAR price (25% margin baked in)
-        uint256 bonusCredits;     // extra credits as purchase incentive
+        uint256 priceWei; // ETH price (35% margin baked in)
+        uint256 priceLoar; // $LOAR price (25% margin baked in)
+        uint256 bonusCredits; // extra credits as purchase incentive
         bool active;
     }
 
@@ -70,15 +78,23 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     mapping(address => uint256) public grantedPerUser;
 
     // ── Margin constants (informational, actual margins baked into package prices) ──
-    uint16 public constant FIAT_MARGIN_BPS = 3500;   // 35%
-    uint16 public constant LOAR_MARGIN_BPS = 2500;    // 25%
+    uint16 public constant FIAT_MARGIN_BPS = 3500; // 35%
+    uint16 public constant LOAR_MARGIN_BPS = 2500; // 25%
 
     // ── Events ───────────────────────────────────────────────────
 
-    event PackageCreated(uint256 indexed packageId, string name, uint256 credits, uint256 priceWei, uint256 priceLoar);
-    event CreditsPurchasedWithEth(address indexed user, uint256 packageId, uint256 credits, uint256 bonus, uint256 paid);
-    event CreditsPurchasedWithLoar(address indexed user, uint256 packageId, uint256 credits, uint256 bonus, uint256 loarPaid);
-    event CreditsSpent(address indexed user, uint256 amount, string generationType, uint256 universeId);
+    event PackageCreated(
+        uint256 indexed packageId, string name, uint256 credits, uint256 priceWei, uint256 priceLoar
+    );
+    event CreditsPurchasedWithEth(
+        address indexed user, uint256 packageId, uint256 credits, uint256 bonus, uint256 paid
+    );
+    event CreditsPurchasedWithLoar(
+        address indexed user, uint256 packageId, uint256 credits, uint256 bonus, uint256 loarPaid
+    );
+    event CreditsSpent(
+        address indexed user, uint256 amount, string generationType, uint256 universeId
+    );
     event CreditsGranted(address indexed user, uint256 amount, string reason);
     event GenerationCostUpdated(string genType, uint256 newCost);
     event PlatformUpdated(address indexed oldPlatform, address indexed newPlatform);
@@ -108,16 +124,24 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     // ── Constructor ──────────────────────────────────────────────
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
-    function initialize(address _loarToken, address _platform, address _treasury, address _paymentRouter) external initializer {
+    function initialize(
+        address _loarToken,
+        address _platform,
+        address _treasury,
+        address _paymentRouter
+    ) external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
         // loarToken can be address(0) initially — set later via updateLoarToken()
-        if (_platform == address(0) || _treasury == address(0))
+        if (_platform == address(0) || _treasury == address(0)) {
             revert ZeroAddress();
+        }
 
         loarToken = IERC20(_loarToken);
         platform = _platform;
@@ -143,8 +167,13 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     // ── Package Management ───────────────────────────────────────
 
@@ -179,7 +208,12 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     /// @notice Buy credits with ETH. 35% platform margin.
     ///         If a holderDiscount is configured for a token and buyer holds that token,
     ///         they receive bonus credits proportional to the discount.
-    function purchaseWithEth(uint256 packageId, address discountToken) external payable nonReentrant whenNotPaused {
+    function purchaseWithEth(uint256 packageId, address discountToken)
+        external
+        payable
+        nonReentrant
+        whenNotPaused
+    {
         CreditPackage storage pkg = packages[packageId];
         if (!pkg.active) revert PackageNotActive();
         if (msg.value < pkg.priceWei) revert InsufficientPayment();
@@ -210,7 +244,9 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
             if (!sent) revert TransferFailed();
         }
 
-        emit CreditsPurchasedWithEth(msg.sender, packageId, pkg.credits, pkg.bonusCredits + bonusFromDiscount, pkg.priceWei);
+        emit CreditsPurchasedWithEth(
+            msg.sender, packageId, pkg.credits, pkg.bonusCredits + bonusFromDiscount, pkg.priceWei
+        );
     }
 
     /// @notice Buy credits with ETH (no holder discount).
@@ -232,7 +268,9 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
             if (!sent) revert TransferFailed();
         }
 
-        emit CreditsPurchasedWithEth(msg.sender, packageId, pkg.credits, pkg.bonusCredits, pkg.priceWei);
+        emit CreditsPurchasedWithEth(
+            msg.sender, packageId, pkg.credits, pkg.bonusCredits, pkg.priceWei
+        );
     }
 
     // ── Purchase with $LOAR (25% margin) ─────────────────────────
@@ -247,7 +285,9 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
 
         // Check balance and allowance
         if (loarToken.balanceOf(msg.sender) < loarAmount) revert InsufficientLoarBalance();
-        if (loarToken.allowance(msg.sender, address(this)) < loarAmount) revert InsufficientLoarAllowance();
+        if (loarToken.allowance(msg.sender, address(this)) < loarAmount) {
+            revert InsufficientLoarAllowance();
+        }
 
         // CREDIT-05: Require PaymentRouter — no fallback path that bypasses accounting
         require(address(paymentRouter) != address(0), "PaymentRouter not set");
@@ -263,7 +303,9 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         userCredits[msg.sender].totalPurchased += pkg.credits;
         userCredits[msg.sender].totalBonusReceived += pkg.bonusCredits + loarBonus;
 
-        emit CreditsPurchasedWithLoar(msg.sender, packageId, pkg.credits, pkg.bonusCredits + loarBonus, loarAmount);
+        emit CreditsPurchasedWithLoar(
+            msg.sender, packageId, pkg.credits, pkg.bonusCredits + loarBonus, loarAmount
+        );
     }
 
     // ── Spend Credits ────────────────────────────────────────────
@@ -275,7 +317,9 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         string calldata generationType,
         uint256 universeId
     ) external onlyPlatform whenNotPaused {
-        if (userCredits[user].balance < amount) revert InsufficientCredits();
+        if (userCredits[user].balance < amount) {
+            revert InsufficientCredits();
+        }
 
         userCredits[user].balance -= amount;
         userCredits[user].totalSpent += amount;
@@ -286,11 +330,11 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
     // ── Grant Credits (quests, affiliates, promotions) ───────────
 
     /// @notice Grant free credits (rate-limited)
-    function grantCredits(
-        address user,
-        uint256 amount,
-        string calldata reason
-    ) external onlyPlatform whenNotPaused {
+    function grantCredits(address user, uint256 amount, string calldata reason)
+        external
+        onlyPlatform
+        whenNotPaused
+    {
         // Daily rate limit reset
         uint256 today = block.timestamp / 1 days;
         if (today != currentGrantDay) {
@@ -357,12 +401,16 @@ contract CreditManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, Re
         return generationCosts[keccak256(abi.encodePacked(genType))];
     }
 
-    function getUserStats(address user) external view returns (
-        uint256 balance,
-        uint256 totalPurchased,
-        uint256 totalSpent,
-        uint256 totalBonusReceived
-    ) {
+    function getUserStats(address user)
+        external
+        view
+        returns (
+            uint256 balance,
+            uint256 totalPurchased,
+            uint256 totalSpent,
+            uint256 totalBonusReceived
+        )
+    {
         UserCredits storage uc = userCredits[user];
         return (uc.balance, uc.totalPurchased, uc.totalSpent, uc.totalBonusReceived);
     }

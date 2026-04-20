@@ -67,16 +67,14 @@ contract BondingCurveTest is Test {
         // Deploy V1 curve (1B supply)
         tokenV1 = new MockToken("TokenV1", "TV1", TOKEN_SUPPLY_V1, address(this));
         curveV1 = new BondingCurve(
-            address(tokenV1), address(manager), 1,
-            CURVE_SUPPLY_V1, GRADUATION_ETH, MAX_BUY_BPS
+            address(tokenV1), address(manager), 1, CURVE_SUPPLY_V1, GRADUATION_ETH, MAX_BUY_BPS
         );
         tokenV1.transfer(address(curveV1), CURVE_SUPPLY_V1);
 
         // Deploy V3 curve (1B supply, same as V1 after C7 fix)
         tokenV3 = new MockToken("TokenV3", "TV3", TOKEN_SUPPLY_V3, address(this));
         curveV3 = new BondingCurve(
-            address(tokenV3), address(manager), 2,
-            CURVE_SUPPLY_V3, GRADUATION_ETH, MAX_BUY_BPS
+            address(tokenV3), address(manager), 2, CURVE_SUPPLY_V3, GRADUATION_ETH, MAX_BUY_BPS
         );
         tokenV3.transfer(address(curveV3), CURVE_SUPPLY_V3);
 
@@ -103,10 +101,7 @@ contract BondingCurveTest is Test {
         // supply = 1e38 (way beyond any real use), graduation = 1 wei
         // slopeScaled = mulDiv(2, 1e44, 1e76) = 2e44/1e76 = 0
         vm.expectRevert(IBondingCurve.SlopeIsZero.selector);
-        new BondingCurve(
-            address(tokenV1), address(manager), 99,
-            1e38, 1, 200
-        );
+        new BondingCurve(address(tokenV1), address(manager), 99, 1e38, 1, 200);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -285,11 +280,7 @@ contract BondingCurveTest is Test {
         try curveV1.buy{value: ethAmount}(0, block.timestamp + 1 hours) {} catch {}
 
         if (!curveV1.graduated()) {
-            assertGe(
-                address(curveV1).balance,
-                curveV1.ethRaised(),
-                "balance < ethRaised"
-            );
+            assertGe(address(curveV1).balance, curveV1.ethRaised(), "balance < ethRaised");
         }
     }
 
@@ -322,7 +313,10 @@ contract BondingCurveTest is Test {
 
         vm.deal(alice, eth1);
         vm.prank(alice);
-        try curveV1.buy{value: eth1}(0, block.timestamp + 1 hours) {} catch { return; }
+        try curveV1.buy{value: eth1}(0, block.timestamp + 1 hours) {}
+            catch {
+            return;
+        }
 
         uint256 tokens1 = tokenV1.balanceOf(alice);
         if (tokens1 == 0) return;
@@ -331,18 +325,17 @@ contract BondingCurveTest is Test {
 
         vm.deal(bob, eth2);
         vm.prank(bob);
-        try curveV1.buy{value: eth2}(0, block.timestamp + 1 hours) {} catch { return; }
+        try curveV1.buy{value: eth2}(0, block.timestamp + 1 hours) {}
+            catch {
+            return;
+        }
 
         uint256 tokens2 = tokenV1.balanceOf(bob);
         if (tokens2 == 0) return;
 
         // Price should increase: tokens per ETH should decrease (or stay same)
         // Equivalently: tokens1/eth1 >= tokens2/eth2 → tokens1*eth2 >= tokens2*eth1
-        assertGe(
-            tokens1 * eth2,
-            tokens2 * eth1,
-            "Price should increase or stay flat"
-        );
+        assertGe(tokens1 * eth2, tokens2 * eth1, "Price should increase or stay flat");
     }
 
     /// @dev Invariant: getTokensForEth and getCostForTokens are inverses (within rounding)
@@ -370,28 +363,20 @@ contract BondingCurveTest is Test {
         uint256 cost = _getCostExternally(curveV1, CURVE_SUPPLY_V1);
 
         // Should be within 0.01% of GRADUATION_ETH
-        uint256 diff = cost > GRADUATION_ETH
-            ? cost - GRADUATION_ETH
-            : GRADUATION_ETH - cost;
+        uint256 diff = cost > GRADUATION_ETH ? cost - GRADUATION_ETH : GRADUATION_ETH - cost;
 
         assertLe(
-            diff * 10000,
-            GRADUATION_ETH,
-            "Full curve cost deviates > 0.01% from GRADUATION_ETH"
+            diff * 10000, GRADUATION_ETH, "Full curve cost deviates > 0.01% from GRADUATION_ETH"
         );
     }
 
     function test_fullCurve_costs_graduationEth_V3() public view {
         uint256 cost = _getCostExternally(curveV3, CURVE_SUPPLY_V3);
 
-        uint256 diff = cost > GRADUATION_ETH
-            ? cost - GRADUATION_ETH
-            : GRADUATION_ETH - cost;
+        uint256 diff = cost > GRADUATION_ETH ? cost - GRADUATION_ETH : GRADUATION_ETH - cost;
 
         assertLe(
-            diff * 10000,
-            GRADUATION_ETH,
-            "Full curve cost deviates > 0.01% from GRADUATION_ETH"
+            diff * 10000, GRADUATION_ETH, "Full curve cost deviates > 0.01% from GRADUATION_ETH"
         );
     }
 
@@ -416,26 +401,20 @@ contract BondingCurveTest is Test {
     }
 
     /// @dev Fuzz: various supply/graduation combos produce valid slopeScaled
-    function testFuzz_constructor_various_params(
-        uint256 supply,
-        uint256 gradEth
-    ) public {
-        supply = bound(supply, 1e20, 1e29);   // 100 tokens to 100B tokens
+    function testFuzz_constructor_various_params(uint256 supply, uint256 gradEth) public {
+        supply = bound(supply, 1e20, 1e29); // 100 tokens to 100B tokens
         gradEth = bound(gradEth, 0.1 ether, 100 ether);
 
         MockToken t = new MockToken("T", "T", supply, address(this));
 
-        try new BondingCurve(
-            address(t), address(manager), 99,
-            supply, gradEth, 10000
-        ) returns (BondingCurve c) {
+        try new BondingCurve(address(t), address(manager), 99, supply, gradEth, 10000) returns (
+            BondingCurve c
+        ) {
             assertGt(c.slopeScaled(), 0, "slopeScaled must be > 0");
 
             // Verify full curve cost ~ gradEth (within 1% for reasonable params)
             uint256 cost = _getCostExternally(c, supply);
-            uint256 diff = cost > gradEth
-                ? cost - gradEth
-                : gradEth - cost;
+            uint256 diff = cost > gradEth ? cost - gradEth : gradEth - cost;
             assertLe(diff * 100, gradEth + 1, "Full curve cost off by > 1%");
         } catch {
             // SlopeIsZero is acceptable for extreme params
@@ -446,8 +425,12 @@ contract BondingCurveTest is Test {
     function test_antiWhale_maxBuy() public {
         MockToken whaleToken = new MockToken("WT", "WT", TOKEN_SUPPLY_V1, address(this));
         BondingCurve whaleCurve = new BondingCurve(
-            address(whaleToken), address(manager), 99,
-            CURVE_SUPPLY_V1, GRADUATION_ETH, REAL_MAX_BUY_BPS
+            address(whaleToken),
+            address(manager),
+            99,
+            CURVE_SUPPLY_V1,
+            GRADUATION_ETH,
+            REAL_MAX_BUY_BPS
         );
         whaleToken.transfer(address(whaleCurve), CURVE_SUPPLY_V1);
 

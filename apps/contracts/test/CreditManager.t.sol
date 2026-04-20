@@ -65,10 +65,14 @@ contract CreditManagerTest is Test {
 
         // Deploy PaymentRouter
         PaymentRouter routerImpl = new PaymentRouter();
-        router = PaymentRouter(address(new ERC1967Proxy(
-            address(routerImpl),
-            abi.encodeCall(PaymentRouter.initialize, (treasury, 1000, address(0), 0))
-        )));
+        router = PaymentRouter(
+            address(
+                new ERC1967Proxy(
+                    address(routerImpl),
+                    abi.encodeCall(PaymentRouter.initialize, (treasury, 1000, address(0), 0))
+                )
+            )
+        );
 
         // Deploy real LoarToken — treasury gets 70%, deployer (initialHolder) gets 30%
         loarToken = new LoarToken(treasury, deployer);
@@ -78,12 +82,17 @@ contract CreditManagerTest is Test {
 
         // Deploy CreditManager
         CreditManager creditsImpl = new CreditManager();
-        credits = CreditManager(address(new ERC1967Proxy(
-            address(creditsImpl),
-            abi.encodeCall(CreditManager.initialize, (
-                address(loarToken), platform, treasury, address(router)
-            ))
-        )));
+        credits = CreditManager(
+            address(
+                new ERC1967Proxy(
+                    address(creditsImpl),
+                    abi.encodeCall(
+                        CreditManager.initialize,
+                        (address(loarToken), platform, treasury, address(router))
+                    )
+                )
+            )
+        );
 
         vm.stopPrank();
 
@@ -121,7 +130,10 @@ contract CreditManagerTest is Test {
         vm.expectRevert(CreditManager.ZeroAddress.selector);
         new ERC1967Proxy(
             address(impl),
-            abi.encodeCall(CreditManager.initialize, (address(loarToken), address(0), treasury, address(router)))
+            abi.encodeCall(
+                CreditManager.initialize,
+                (address(loarToken), address(0), treasury, address(router))
+            )
         );
     }
 
@@ -130,26 +142,42 @@ contract CreditManagerTest is Test {
         vm.expectRevert(CreditManager.ZeroAddress.selector);
         new ERC1967Proxy(
             address(impl),
-            abi.encodeCall(CreditManager.initialize, (address(loarToken), platform, address(0), address(router)))
+            abi.encodeCall(
+                CreditManager.initialize,
+                (address(loarToken), platform, address(0), address(router))
+            )
         );
     }
 
     function test_initialize_allowsZeroLoarToken() public {
         // loarToken can be address(0) initially — set later via updateLoarToken()
         CreditManager impl = new CreditManager();
-        CreditManager c = CreditManager(address(new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(CreditManager.initialize, (address(0), platform, treasury, address(router)))
-        )));
+        CreditManager c = CreditManager(
+            address(
+                new ERC1967Proxy(
+                    address(impl),
+                    abi.encodeCall(
+                        CreditManager.initialize, (address(0), platform, treasury, address(router))
+                    )
+                )
+            )
+        );
         assertEq(address(c.loarToken()), address(0));
     }
 
     function test_initialize_allowsZeroPaymentRouter() public {
         CreditManager impl = new CreditManager();
-        CreditManager c = CreditManager(address(new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(CreditManager.initialize, (address(loarToken), platform, treasury, address(0)))
-        )));
+        CreditManager c = CreditManager(
+            address(
+                new ERC1967Proxy(
+                    address(impl),
+                    abi.encodeCall(
+                        CreditManager.initialize,
+                        (address(loarToken), platform, treasury, address(0))
+                    )
+                )
+            )
+        );
         assertEq(address(c.paymentRouter()), address(0));
     }
 
@@ -185,8 +213,15 @@ contract CreditManagerTest is Test {
         uint256 id = credits.createPackage("Starter", 100, 0.01 ether, 50e18, 10);
         assertEq(id, 0);
 
-        (uint256 pkgId, string memory name, uint256 creditAmount, uint256 priceWei,
-         uint256 priceLoar, uint256 bonusCredits, bool active) = credits.packages(0);
+        (
+            uint256 pkgId,
+            string memory name,
+            uint256 creditAmount,
+            uint256 priceWei,
+            uint256 priceLoar,
+            uint256 bonusCredits,
+            bool active
+        ) = credits.packages(0);
         assertEq(pkgId, 0);
         assertEq(name, "Starter");
         assertEq(creditAmount, 100);
@@ -364,7 +399,8 @@ contract CreditManagerTest is Test {
         vm.prank(user);
         credits.purchaseWithEth{value: 0.01 ether}(0);
 
-        (uint256 balance, uint256 purchased, uint256 spent, uint256 bonus) = credits.getUserStats(user);
+        (uint256 balance, uint256 purchased, uint256 spent, uint256 bonus) =
+            credits.getUserStats(user);
         assertEq(balance, 110);
         assertEq(purchased, 100);
         assertEq(spent, 0);
@@ -501,7 +537,8 @@ contract CreditManagerTest is Test {
 
         // bonusFromDiscount = 200 * 1000 / 10000 = 20
         // totalCredits = 200 + 20 + 20 = 240
-        (uint256 balance, uint256 purchased, uint256 spent, uint256 bonus) = credits.getUserStats(user);
+        (uint256 balance, uint256 purchased, uint256 spent, uint256 bonus) =
+            credits.getUserStats(user);
         assertEq(balance, 240);
         assertEq(purchased, 200);
         assertEq(spent, 0);
@@ -579,7 +616,8 @@ contract CreditManagerTest is Test {
         credits.purchaseWithLoar(0);
         vm.stopPrank();
 
-        (uint256 balance, uint256 purchased, uint256 spent, uint256 bonus) = credits.getUserStats(user);
+        (uint256 balance, uint256 purchased, uint256 spent, uint256 bonus) =
+            credits.getUserStats(user);
         assertEq(balance, 115);
         assertEq(purchased, 100);
         assertEq(spent, 0);
@@ -693,7 +731,8 @@ contract CreditManagerTest is Test {
         assertEq(credits.getBalance(user), 335);
 
         // Verify cumulative stats
-        (uint256 balance, uint256 purchased, uint256 spent, uint256 bonus) = credits.getUserStats(user);
+        (uint256 balance, uint256 purchased, uint256 spent, uint256 bonus) =
+            credits.getUserStats(user);
         assertEq(balance, 335);
         assertEq(purchased, 300); // 50 + 200 + 50
         assertEq(spent, 0);
@@ -979,7 +1018,9 @@ contract CreditManagerTest is Test {
         CreditManagerV2 newImpl = new CreditManagerV2();
 
         vm.prank(stranger);
-        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, stranger));
+        vm.expectRevert(
+            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, stranger)
+        );
         credits.upgradeToAndCall(address(newImpl), "");
     }
 
@@ -987,7 +1028,9 @@ contract CreditManagerTest is Test {
         CreditManagerV2 newImpl = new CreditManagerV2();
 
         vm.prank(platform);
-        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, platform));
+        vm.expectRevert(
+            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, platform)
+        );
         credits.upgradeToAndCall(address(newImpl), "");
     }
 
@@ -1056,9 +1099,10 @@ contract CreditManagerTest is Test {
         vm.prank(platform);
         credits.spendCredits(user, 30, "image", 1);
 
-        (uint256 balance, uint256 purchased, uint256 spent, uint256 bonus) = credits.getUserStats(user);
-        assertEq(balance, 105);     // 110 + 25 - 30
-        assertEq(purchased, 125);   // 100 + 25
+        (uint256 balance, uint256 purchased, uint256 spent, uint256 bonus) =
+            credits.getUserStats(user);
+        assertEq(balance, 105); // 110 + 25 - 30
+        assertEq(purchased, 125); // 100 + 25
         assertEq(spent, 30);
         assertEq(bonus, 10);
     }
@@ -1085,12 +1129,17 @@ contract CreditManagerTest is Test {
         // In this case, LOAR goes directly to treasury
         vm.startPrank(deployer);
         CreditManager impl = new CreditManager();
-        CreditManager noRouterCredits = CreditManager(address(new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(CreditManager.initialize, (
-                address(loarToken), platform, treasury, address(0)
-            ))
-        )));
+        CreditManager noRouterCredits = CreditManager(
+            address(
+                new ERC1967Proxy(
+                    address(impl),
+                    abi.encodeCall(
+                        CreditManager.initialize,
+                        (address(loarToken), platform, treasury, address(0))
+                    )
+                )
+            )
+        );
         // Make it fee-exempt too
         loarToken.setFeeExempt(address(noRouterCredits), true);
         vm.stopPrank();

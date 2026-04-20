@@ -77,12 +77,9 @@ contract DeployHookScript is Script {
 
         // Calculate the required hook address flags
         uint160 flags = uint160(
-            Hooks.BEFORE_INITIALIZE_FLAG |
-            Hooks.BEFORE_ADD_LIQUIDITY_FLAG |
-            Hooks.BEFORE_SWAP_FLAG |
-            Hooks.AFTER_SWAP_FLAG |
-            Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG |
-            Hooks.AFTER_SWAP_RETURNS_DELTA_FLAG
+            Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_SWAP_FLAG
+                | Hooks.AFTER_SWAP_FLAG | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
+                | Hooks.AFTER_SWAP_RETURNS_DELTA_FLAG
         );
 
         console.log("Deploying LoarHookStaticFee...");
@@ -102,11 +99,7 @@ contract DeployHookScript is Script {
         console.log("Expected hook address:", hookAddress);
 
         // Deploy hook with the mined salt
-        hook = new LoarHookStaticFee{salt: salt}(
-            poolManager,
-            universeManager,
-            weth
-        );
+        hook = new LoarHookStaticFee{salt: salt}(poolManager, universeManager, weth);
 
         require(address(hook) == hookAddress, "Hook address mismatch");
         console.log("LoarHookStaticFee deployed at:", address(hook));

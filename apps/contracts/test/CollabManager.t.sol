@@ -66,8 +66,20 @@ contract CollabManagerTest is Test {
             uint256 episodeCount
         )
     {
-        (id, universeA, universeB, prop, acc, status, revenueShareBps,
-         totalRevenue, startTime, endTime, metadataURI, episodeCount) = cm.collabs(collabId);
+        (
+            id,
+            universeA,
+            universeB,
+            prop,
+            acc,
+            status,
+            revenueShareBps,
+            totalRevenue,
+            startTime,
+            endTime,
+            metadataURI,
+            episodeCount
+        ) = cm.collabs(collabId);
     }
 
     function _proposeCollab() internal returns (uint256 collabId) {
@@ -110,8 +122,8 @@ contract CollabManagerTest is Test {
             address prop,
             address acc,
             CollabManager.CollabStatus status,
-            uint256 revShareBps,
-            ,,,, uint256 episodeCount
+            uint256 revShareBps,,,,,
+            uint256 episodeCount
         ) = _getCollab(collabId);
 
         assertEq(id, collabId);
@@ -149,8 +161,8 @@ contract CollabManagerTest is Test {
     function test_activateCollab() public {
         uint256 collabId = _proposeAcceptAndActivate();
 
-        (,,,,, CollabManager.CollabStatus status,,,
-         uint256 startTime, uint256 endTime,,) = _getCollab(collabId);
+        (,,,,, CollabManager.CollabStatus status,,, uint256 startTime, uint256 endTime,,) =
+            _getCollab(collabId);
 
         assertEq(uint8(status), uint8(CollabManager.CollabStatus.ACTIVE));
         assertEq(startTime, block.timestamp);

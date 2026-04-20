@@ -59,7 +59,9 @@ contract DeployBaseScript is Script {
         console.log("Next steps:");
         console.log("  1. Copy addresses above into .env");
         console.log("  2. Set SAFE_ADDRESS in .env (your Gnosis Safe)");
-        console.log("  3. Run: forge script script/DeployGovernance.s.sol --rpc-url base --broadcast --verify");
+        console.log(
+            "  3. Run: forge script script/DeployGovernance.s.sol --rpc-url base --broadcast --verify"
+        );
         console.log("  4. Update VITE_ frontend addresses");
         console.log("  5. Set VITE_CHAIN_ENV=mainnet");
         console.log("========================================");

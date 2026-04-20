@@ -82,16 +82,9 @@ contract TokenVesting is Ownable {
         uint64 vestingDuration
     );
 
-    event TokensClaimed(
-        uint256 indexed vestingId,
-        address indexed beneficiary,
-        uint128 amount
-    );
+    event TokensClaimed(uint256 indexed vestingId, address indexed beneficiary, uint128 amount);
 
-    event VestingRevoked(
-        uint256 indexed vestingId,
-        uint128 unvestedAmountReturned
-    );
+    event VestingRevoked(uint256 indexed vestingId, uint128 unvestedAmountReturned);
 
     // ──────────────────────────────────────────────────────────────────────
     // Constructor
@@ -120,7 +113,9 @@ contract TokenVesting is Ownable {
         uint64 cliffDuration,
         uint64 vestingDuration
     ) external onlyOwner returns (uint256 vestingId) {
-        return _createVesting(token, beneficiary, totalAmount, cliffDuration, vestingDuration, false);
+        return _createVesting(
+            token, beneficiary, totalAmount, cliffDuration, vestingDuration, false
+        );
     }
 
     /// @notice VESTING-01: Create a non-revocable vesting schedule. Admin cannot claw back

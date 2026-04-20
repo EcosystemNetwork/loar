@@ -17,15 +17,19 @@ contract GovernorFactory {
     }
 
     /// @notice Deploy a governor with a custom early-life period (GOV-04).
-    function deployGovernor(address token, address timelock, uint256 earlyLifeBlocks) external returns (address) {
+    function deployGovernor(address token, address timelock, uint256 earlyLifeBlocks)
+        external
+        returns (address)
+    {
         return _deploy(token, timelock, earlyLifeBlocks);
     }
 
-    function _deploy(address token, address timelock, uint256 earlyLifeBlocks) internal returns (address) {
+    function _deploy(address token, address timelock, uint256 earlyLifeBlocks)
+        internal
+        returns (address)
+    {
         UniverseGovernor governor = new UniverseGovernor(
-            IVotes(token),
-            TimelockController(payable(timelock)),
-            earlyLifeBlocks
+            IVotes(token), TimelockController(payable(timelock)), earlyLifeBlocks
         );
         emit GovernorCreated(address(governor), token);
         return address(governor);

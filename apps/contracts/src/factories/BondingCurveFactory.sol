@@ -32,21 +32,11 @@ contract BondingCurveFactory {
         uint16 maxBuyBps
     ) external returns (address) {
         BondingCurve curve = new BondingCurve(
-            token,
-            universeManager,
-            universeId,
-            totalCurveSupply,
-            graduationEth,
-            maxBuyBps
+            token, universeManager, universeId, totalCurveSupply, graduationEth, maxBuyBps
         );
 
         emit BondingCurveCreated(
-            address(curve),
-            token,
-            universeManager,
-            universeId,
-            totalCurveSupply,
-            graduationEth
+            address(curve), token, universeManager, universeId, totalCurveSupply, graduationEth
         );
 
         return address(curve);

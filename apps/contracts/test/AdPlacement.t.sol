@@ -88,8 +88,7 @@ contract AdPlacementTest is Test {
         AdPlacement impl = new AdPlacement();
         vm.expectRevert(AdPlacement.ZeroAddress.selector);
         new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(AdPlacement.initialize, (platform, address(0), FEE_BPS))
+            address(impl), abi.encodeCall(AdPlacement.initialize, (platform, address(0), FEE_BPS))
         );
     }
 
@@ -97,17 +96,20 @@ contract AdPlacementTest is Test {
         AdPlacement impl = new AdPlacement();
         vm.expectRevert(AdPlacement.FeeTooHigh.selector);
         new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(AdPlacement.initialize, (platform, address(router), 5001))
+            address(impl), abi.encodeCall(AdPlacement.initialize, (platform, address(router), 5001))
         );
     }
 
     function test_initialize_maxFee() public {
         AdPlacement impl = new AdPlacement();
-        AdPlacement ad2 = AdPlacement(address(new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(AdPlacement.initialize, (platform, address(router), 5000))
-        )));
+        AdPlacement ad2 = AdPlacement(
+            address(
+                new ERC1967Proxy(
+                    address(impl),
+                    abi.encodeCall(AdPlacement.initialize, (platform, address(router), 5000))
+                )
+            )
+        );
         assertEq(ad2.platformFeeBps(), 5000);
     }
 
@@ -148,11 +150,7 @@ contract AdPlacementTest is Test {
     function test_createAdSlot() public {
         vm.prank(creator);
         uint256 slotId = ad.createAdSlot(
-            UNIVERSE_ID,
-            AdPlacement.PlacementType.BILLBOARD,
-            MIN_BID,
-            10,
-            "billboard-meta"
+            UNIVERSE_ID, AdPlacement.PlacementType.BILLBOARD, MIN_BID, 10, "billboard-meta"
         );
 
         (
@@ -161,8 +159,7 @@ contract AdPlacementTest is Test {
             AdPlacement.PlacementType placementType,
             uint256 minBid,
             uint256 currentBid,
-            address currentBidder,
-            , // metadata
+            address currentBidder,, // metadata
             uint256 episodesRemaining,
             bool active
         ) = ad.adSlots(slotId);
@@ -180,11 +177,7 @@ contract AdPlacementTest is Test {
     function test_createAdSlot_platformCanCreate() public {
         vm.prank(platform);
         uint256 slotId = ad.createAdSlot(
-            UNIVERSE_ID,
-            AdPlacement.PlacementType.PRODUCT,
-            MIN_BID,
-            5,
-            "product-meta"
+            UNIVERSE_ID, AdPlacement.PlacementType.PRODUCT, MIN_BID, 5, "product-meta"
         );
         (,, AdPlacement.PlacementType pt,,,,,,) = ad.adSlots(slotId);
         assertEq(uint8(pt), uint8(AdPlacement.PlacementType.PRODUCT));
@@ -193,10 +186,14 @@ contract AdPlacementTest is Test {
     function test_createAdSlot_allPlacementTypes() public {
         vm.startPrank(creator);
 
-        uint256 s0 = ad.createAdSlot(UNIVERSE_ID, AdPlacement.PlacementType.BILLBOARD, MIN_BID, 1, "");
+        uint256 s0 =
+            ad.createAdSlot(UNIVERSE_ID, AdPlacement.PlacementType.BILLBOARD, MIN_BID, 1, "");
         uint256 s1 = ad.createAdSlot(UNIVERSE_ID, AdPlacement.PlacementType.PRODUCT, MIN_BID, 1, "");
-        uint256 s2 = ad.createAdSlot(UNIVERSE_ID, AdPlacement.PlacementType.SPONSORED_CHARACTER, MIN_BID, 1, "");
-        uint256 s3 = ad.createAdSlot(UNIVERSE_ID, AdPlacement.PlacementType.AUDIO_MENTION, MIN_BID, 1, "");
+        uint256 s2 = ad.createAdSlot(
+            UNIVERSE_ID, AdPlacement.PlacementType.SPONSORED_CHARACTER, MIN_BID, 1, ""
+        );
+        uint256 s3 =
+            ad.createAdSlot(UNIVERSE_ID, AdPlacement.PlacementType.AUDIO_MENTION, MIN_BID, 1, "");
 
         vm.stopPrank();
 
@@ -232,8 +229,10 @@ contract AdPlacementTest is Test {
 
     function test_createAdSlot_incrementsNextSlotId() public {
         vm.startPrank(creator);
-        uint256 s0 = ad.createAdSlot(UNIVERSE_ID, AdPlacement.PlacementType.BILLBOARD, MIN_BID, 1, "");
-        uint256 s1 = ad.createAdSlot(UNIVERSE_ID, AdPlacement.PlacementType.BILLBOARD, MIN_BID, 1, "");
+        uint256 s0 =
+            ad.createAdSlot(UNIVERSE_ID, AdPlacement.PlacementType.BILLBOARD, MIN_BID, 1, "");
+        uint256 s1 =
+            ad.createAdSlot(UNIVERSE_ID, AdPlacement.PlacementType.BILLBOARD, MIN_BID, 1, "");
         vm.stopPrank();
 
         assertEq(s0, 0);
@@ -268,7 +267,7 @@ contract AdPlacementTest is Test {
         vm.prank(bidder1);
         ad.bid{value: 0.2 ether}(slotId);
 
-        (,,, , uint256 currentBid, address currentBidder,,,) = ad.adSlots(slotId);
+        (,,,, uint256 currentBid, address currentBidder,,,) = ad.adSlots(slotId);
         assertEq(currentBid, 0.2 ether);
         assertEq(currentBidder, bidder1);
     }
@@ -279,7 +278,7 @@ contract AdPlacementTest is Test {
         vm.prank(bidder1);
         ad.bid{value: MIN_BID}(slotId);
 
-        (,,,,uint256 currentBid, address currentBidder,,,) = ad.adSlots(slotId);
+        (,,,, uint256 currentBid, address currentBidder,,,) = ad.adSlots(slotId);
         assertEq(currentBid, MIN_BID);
         assertEq(currentBidder, bidder1);
     }
@@ -343,7 +342,7 @@ contract AdPlacementTest is Test {
         assertEq(ad.pendingWithdrawals(bidder1), 0.2 ether);
 
         // Slot state updated
-        (,,,,uint256 currentBid, address currentBidder,,,) = ad.adSlots(slotId);
+        (,,,, uint256 currentBid, address currentBidder,,,) = ad.adSlots(slotId);
         assertEq(currentBid, 0.3 ether);
         assertEq(currentBidder, bidder2);
     }
@@ -382,7 +381,7 @@ contract AdPlacementTest is Test {
         ad.bid{value: 0.3 ether}(slotId);
 
         assertEq(ad.pendingWithdrawals(bidder1), 0.2 ether);
-        (,,,,uint256 currentBid, address currentBidder,,,) = ad.adSlots(slotId);
+        (,,,, uint256 currentBid, address currentBidder,,,) = ad.adSlots(slotId);
         assertEq(currentBid, 0.3 ether);
         assertEq(currentBidder, bidder1);
     }
@@ -452,8 +451,7 @@ contract AdPlacementTest is Test {
             uint256 adSlotId,
             address sponsor,
             uint256 totalPaid,
-            uint256 impressions,
-            ,  // startedAt
+            uint256 impressions,, // startedAt
             bool active
         ) = ad.sponsorships(sponsorshipId);
 
@@ -492,7 +490,7 @@ contract AdPlacementTest is Test {
         ad.acceptBid(slotId);
 
         // Slot bid state should be cleared
-        (,,,,uint256 currentBid, address currentBidder,,,) = ad.adSlots(slotId);
+        (,,,, uint256 currentBid, address currentBidder,,,) = ad.adSlots(slotId);
         assertEq(currentBid, 0);
         assertEq(currentBidder, address(0));
     }
@@ -542,7 +540,7 @@ contract AdPlacementTest is Test {
         vm.prank(bidder2);
         ad.bid{value: 0.2 ether}(slotId);
 
-        (,,,,uint256 currentBid, address currentBidder,,,) = ad.adSlots(slotId);
+        (,,,, uint256 currentBid, address currentBidder,,,) = ad.adSlots(slotId);
         assertEq(currentBid, 0.2 ether);
         assertEq(currentBidder, bidder2);
     }
@@ -599,7 +597,7 @@ contract AdPlacementTest is Test {
         assertEq(impressions, 1);
 
         // Check episodes remaining decreased
-        (,,,,,,,uint256 episodesRemaining,) = ad.adSlots(slotId);
+        (,,,,,,, uint256 episodesRemaining,) = ad.adSlots(slotId);
         assertEq(episodesRemaining, 9);
     }
 
@@ -620,9 +618,8 @@ contract AdPlacementTest is Test {
     function test_recordImpression_deactivatesAtZeroEpisodes() public {
         // Create slot with only 2 episodes
         vm.prank(creator);
-        uint256 slotId = ad.createAdSlot(
-            UNIVERSE_ID, AdPlacement.PlacementType.BILLBOARD, MIN_BID, 2, ""
-        );
+        uint256 slotId =
+            ad.createAdSlot(UNIVERSE_ID, AdPlacement.PlacementType.BILLBOARD, MIN_BID, 2, "");
 
         vm.prank(bidder1);
         ad.bid{value: 0.5 ether}(slotId);
@@ -643,15 +640,14 @@ contract AdPlacementTest is Test {
         assertEq(impressions, 2);
         assertFalse(active2);
 
-        (,,,,,,,uint256 remaining,) = ad.adSlots(slotId);
+        (,,,,,,, uint256 remaining,) = ad.adSlots(slotId);
         assertEq(remaining, 0);
     }
 
     function test_recordImpression_multipleImpressions() public {
         vm.prank(creator);
-        uint256 slotId = ad.createAdSlot(
-            UNIVERSE_ID, AdPlacement.PlacementType.BILLBOARD, MIN_BID, 100, ""
-        );
+        uint256 slotId =
+            ad.createAdSlot(UNIVERSE_ID, AdPlacement.PlacementType.BILLBOARD, MIN_BID, 100, "");
 
         vm.prank(bidder1);
         ad.bid{value: 0.5 ether}(slotId);
@@ -667,7 +663,7 @@ contract AdPlacementTest is Test {
         (,,,, uint256 impressions,,) = ad.sponsorships(sponsorshipId);
         assertEq(impressions, 5);
 
-        (,,,,,,,uint256 remaining,) = ad.adSlots(slotId);
+        (,,,,,,, uint256 remaining,) = ad.adSlots(slotId);
         assertEq(remaining, 95);
     }
 
@@ -873,7 +869,7 @@ contract AdPlacementTest is Test {
         (,,,,,, bool active) = ad.sponsorships(sponsorshipId);
         assertFalse(active);
 
-        (,,,,,,,uint256 remaining,) = ad.adSlots(slotId);
+        (,,,,,,, uint256 remaining,) = ad.adSlots(slotId);
         assertEq(remaining, 0);
     }
 }

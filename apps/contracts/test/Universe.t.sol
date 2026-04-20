@@ -17,27 +17,26 @@ contract UniverseTest is Test {
         NodeCreationOptions creationOption = NodeCreationOptions.PUBLIC;
         NodeVisibilityOptions visibilityOption = NodeVisibilityOptions.PUBLIC;
 
-        IUniverseManager.UniverseConfig memory config = IUniverseManager
-            .UniverseConfig({
-                nodeCreationOption: creationOption,
-                nodeVisibilityOption: visibilityOption,
-                universeAdmin: msg.sender,
-                name: "Universe Name",
-                imageURL: "Universeimage.com",
-                description: "test universe",
-                universeManager: msg.sender
-            });
+        IUniverseManager.UniverseConfig memory config = IUniverseManager.UniverseConfig({
+            nodeCreationOption: creationOption,
+            nodeVisibilityOption: visibilityOption,
+            universeAdmin: msg.sender,
+            name: "Universe Name",
+            imageURL: "Universeimage.com",
+            description: "test universe",
+            universeManager: msg.sender
+        });
         universe = new Universe(config);
     }
 
     function test_createNode() public {
-        uint id = createNode();
+        uint256 id = createNode();
         (
-            uint nid,
+            uint256 nid,
             bytes32 contentHash,
             bytes32 plotHash,
-            uint prev,
-            uint[] memory next,
+            uint256 prev,
+            uint256[] memory next,
             bool canon,
             address creator
         ) = universe.getNode(id);
@@ -49,8 +48,8 @@ contract UniverseTest is Test {
     }
 
     function test_createBranch() public {
-        uint rootId = createNode();
-        uint branchId = universe.createNode(
+        uint256 rootId = createNode();
+        uint256 branchId = universe.createNode(
             keccak256("branch-link"),
             keccak256("branch plot"),
             rootId,
@@ -58,11 +57,11 @@ contract UniverseTest is Test {
             "branch plot"
         );
 
-        (,,,, uint[] memory rootNext,,) = universe.getNode(rootId);
+        (,,,, uint256[] memory rootNext,,) = universe.getNode(rootId);
         assertEq(rootNext.length, 1);
         assertEq(rootNext[0], branchId);
 
-        (,,, uint prev,,bool canon,) = universe.getNode(branchId);
+        (,,, uint256 prev,, bool canon,) = universe.getNode(branchId);
         assertEq(prev, rootId);
         assertFalse(canon); // non-root should not be canon
     }
@@ -70,39 +69,26 @@ contract UniverseTest is Test {
     function test_eventEmission() public {
         vm.expectEmit(true, true, true, true);
         emit IUniverse.NodeCreated(
-            1,
-            0,
-            address(this),
-            TEST_CONTENT_HASH,
-            TEST_PLOT_HASH,
-            "testlink.org",
-            "test plot"
+            1, 0, address(this), TEST_CONTENT_HASH, TEST_PLOT_HASH, "testlink.org", "test plot"
         );
         createNode();
     }
 
     function test_getMedia() public {
-        uint id = createNode();
+        uint256 id = createNode();
         bytes32 contentHash = universe.getMedia(id);
         assertEq(contentHash, TEST_CONTENT_HASH);
     }
 
     function test_getFullGraph() public {
         createNode();
-        universe.createNode(
-            keccak256("link2"),
-            keccak256("plot2"),
-            1,
-            "link2.org",
-            "plot2"
-        );
+        universe.createNode(keccak256("link2"), keccak256("plot2"), 1, "link2.org", "plot2");
 
         (
-            uint[] memory ids,
+            uint256[] memory ids,
             bytes32[] memory contentHashes,
             bytes32[] memory plotHashes,
-            uint[] memory previousIds,
-            ,
+            uint256[] memory previousIds,,
             bool[] memory canonFlags
         ) = universe.getFullGraph();
 
@@ -113,11 +99,11 @@ contract UniverseTest is Test {
     }
 
     function test_getTimeline() public {
-        uint root = createNode();
-        uint child1 = universe.createNode(keccak256("c1"), keccak256("p1"), root, "c1", "p1");
-        uint child2 = universe.createNode(keccak256("c2"), keccak256("p2"), child1, "c2", "p2");
+        uint256 root = createNode();
+        uint256 child1 = universe.createNode(keccak256("c1"), keccak256("p1"), root, "c1", "p1");
+        uint256 child2 = universe.createNode(keccak256("c2"), keccak256("p2"), child1, "c2", "p2");
 
-        uint[] memory timeline = universe.getTimeline(child2);
+        uint256[] memory timeline = universe.getTimeline(child2);
         assertEq(timeline.length, 3);
         assertEq(timeline[0], child2);
         assertEq(timeline[1], child1);
@@ -125,7 +111,7 @@ contract UniverseTest is Test {
     }
 
     function test_setMedia() public {
-        uint id = createNode();
+        uint256 id = createNode();
         bytes32 newHash = keccak256("new-link");
         vm.prank(msg.sender); // admin is msg.sender from setUp
         universe.setMedia(id, newHash, "new-link.org");
@@ -133,21 +119,21 @@ contract UniverseTest is Test {
     }
 
     function test_setCanon() public {
-        uint root = createNode();
-        uint child = universe.createNode(keccak256("c"), keccak256("p"), root, "c", "p");
+        uint256 root = createNode();
+        uint256 child = universe.createNode(keccak256("c"), keccak256("p"), root, "c", "p");
         vm.prank(msg.sender); // admin is msg.sender from setUp
         universe.setCanon(child);
 
-        (,,,,,bool rootCanon,) = universe.getNode(root);
+        (,,,,, bool rootCanon,) = universe.getNode(root);
         assertTrue(rootCanon); // root stays canon — setCanon only marks the target node
-        (,,,,,bool childCanon,) = universe.getNode(child);
+        (,,,,, bool childCanon,) = universe.getNode(child);
         assertTrue(childCanon);
     }
 
     // --- Security tests ---
 
     function test_nodeIdToHex_validId() public {
-        uint id = createNode();
+        uint256 id = createNode();
         bytes32 result = universe.nodeIdToHex(id);
         assertTrue(result != bytes32(0));
     }
@@ -200,7 +186,7 @@ contract UniverseTest is Test {
 
         // Whitelisted user can create
         vm.prank(address(0xBEEF));
-        uint id = wlUniverse.createNode(keccak256("l"), keccak256("p"), 0, "l", "p");
+        uint256 id = wlUniverse.createNode(keccak256("l"), keccak256("p"), 0, "l", "p");
         assertEq(id, 1);
     }
 
@@ -233,22 +219,17 @@ contract UniverseTest is Test {
     }
 
     function testFuzz_createNode(bytes32 contentHash, bytes32 plotHash) public {
-        uint id = universe.createNode(contentHash, plotHash, 0, "fuzz-link", "fuzz-plot");
+        uint256 id = universe.createNode(contentHash, plotHash, 0, "fuzz-link", "fuzz-plot");
         assertEq(id, 1);
-        (uint nid, bytes32 ch, bytes32 ph,,,,) = universe.getNode(id);
+        (uint256 nid, bytes32 ch, bytes32 ph,,,,) = universe.getNode(id);
         assertEq(nid, id);
         assertEq(ch, contentHash);
         assertEq(ph, plotHash);
     }
 
-    function createNode() internal returns (uint) {
-        uint id = universe.createNode(
-            TEST_CONTENT_HASH,
-            TEST_PLOT_HASH,
-            0,
-            "testlink.org",
-            "test plot"
-        );
+    function createNode() internal returns (uint256) {
+        uint256 id =
+            universe.createNode(TEST_CONTENT_HASH, TEST_PLOT_HASH, 0, "testlink.org", "test plot");
         return id;
     }
 }

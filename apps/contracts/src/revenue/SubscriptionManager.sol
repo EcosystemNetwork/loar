@@ -4,7 +4,9 @@ pragma solidity =0.8.30;
 import {Initializable} from "@openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgradeable.sol";
 import {IPaymentRouter} from "../interfaces/IPaymentRouter.sol";
 import {IERC721} from "@openzeppelin/token/ERC721/IERC721.sol";
@@ -12,16 +14,27 @@ import {IERC721} from "@openzeppelin/token/ERC721/IERC721.sol";
 /// @title SubscriptionManager
 /// @notice Manages subscriptions to universes. Subscribers get early episodes,
 ///         voting rights, premium content, and behind-the-scenes access.
-contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
-    enum SubscriptionTier { FREE, BASIC, PREMIUM, VIP }
+contract SubscriptionManager is
+    Initializable,
+    UUPSUpgradeable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable
+{
+    enum SubscriptionTier {
+        FREE,
+        BASIC,
+        PREMIUM,
+        VIP
+    }
 
     struct TierConfig {
-        uint256 pricePerMonth;     // in wei
+        uint256 pricePerMonth; // in wei
         bool earlyAccess;
         bool votingBoost;
         bool premiumContent;
         bool behindTheScenes;
-        uint16 creditBonus;        // bonus credits per month
+        uint16 creditBonus; // bonus credits per month
         bool active;
     }
 
@@ -51,7 +64,9 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
 
     event TierConfigured(uint256 indexed universeId, SubscriptionTier tier, uint256 pricePerMonth);
     event TierDeactivated(uint256 indexed universeId, SubscriptionTier tier);
-    event Subscribed(address indexed user, uint256 indexed universeId, SubscriptionTier tier, uint256 expiresAt);
+    event Subscribed(
+        address indexed user, uint256 indexed universeId, SubscriptionTier tier, uint256 expiresAt
+    );
     event SubscriptionRenewed(address indexed user, uint256 indexed universeId, uint256 newExpiry);
     event SubscriptionCancelled(address indexed user, uint256 indexed universeId);
 
@@ -84,9 +99,14 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     error RefundFailed();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    constructor() {
+        _disableInitializers();
+    }
 
-    function initialize(address _platform, address _paymentRouter, uint16 _platformFeeBps) external initializer {
+    function initialize(address _platform, address _paymentRouter, uint16 _platformFeeBps)
+        external
+        initializer
+    {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -98,8 +118,13 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         platformFeeBps = _platformFeeBps;
     }
 
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
@@ -119,7 +144,9 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
 
     /// @notice Deactivate a subscription tier
     function deactivateTier(uint256 universeId, SubscriptionTier tier) external {
-        if (msg.sender != _currentCreator(universeId) && msg.sender != platform) revert NotAuthorized();
+        if (msg.sender != _currentCreator(universeId) && msg.sender != platform) {
+            revert NotAuthorized();
+        }
         tierConfigs[universeId][tier].active = false;
         emit TierDeactivated(universeId, tier);
     }
@@ -136,7 +163,9 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         uint16 creditBonus
     ) external {
         // Must be universe creator or platform
-        if (msg.sender != _currentCreator(universeId) && msg.sender != platform) revert NotAuthorized();
+        if (msg.sender != _currentCreator(universeId) && msg.sender != platform) {
+            revert NotAuthorized();
+        }
         // SUB-02: Price cap to prevent abusive pricing
         require(pricePerMonth <= 100 ether, "Price too high");
 
@@ -174,7 +203,12 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     }
 
     /// @notice Subscribe to a universe tier
-    function subscribe(uint256 universeId, SubscriptionTier tier, uint256 months) external payable nonReentrant whenNotPaused {
+    function subscribe(uint256 universeId, SubscriptionTier tier, uint256 months)
+        external
+        payable
+        nonReentrant
+        whenNotPaused
+    {
         if (months == 0 || months > 120) revert MonthsTooHigh(); // max 10 years
         TierConfig storage config = tierConfigs[universeId][tier];
         if (!config.active) revert TierNotActive();
@@ -211,8 +245,8 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
                 TierConfig storage oldCfg = tierConfigs[universeId][sub.tier];
                 uint256 remainingSecs = sub.expiresAt - block.timestamp;
                 if (config.pricePerMonth > 0) {
-                    startTime = block.timestamp
-                        + (remainingSecs * oldCfg.pricePerMonth) / config.pricePerMonth;
+                    startTime = block.timestamp + (remainingSecs * oldCfg.pricePerMonth)
+                        / config.pricePerMonth;
                 }
                 // If new tier is free-priced (shouldn't happen given downgrade
                 // guard), the upgrade simply begins at block.timestamp.
@@ -270,25 +304,23 @@ contract SubscriptionManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     }
 
     /// @notice Check if user has active subscription at or above a tier
-    function hasAccess(address user, uint256 universeId, SubscriptionTier minTier) external view returns (bool) {
+    function hasAccess(address user, uint256 universeId, SubscriptionTier minTier)
+        external
+        view
+        returns (bool)
+    {
         Subscription storage sub = subscriptions[user][universeId];
         return sub.expiresAt > block.timestamp && uint8(sub.tier) >= uint8(minTier);
     }
 
     /// @notice Get subscription details
-    function getSubscription(address user, uint256 universeId) external view returns (
-        SubscriptionTier tier,
-        uint256 expiresAt,
-        bool active,
-        bool autoRenew
-    ) {
+    function getSubscription(address user, uint256 universeId)
+        external
+        view
+        returns (SubscriptionTier tier, uint256 expiresAt, bool active, bool autoRenew)
+    {
         Subscription storage sub = subscriptions[user][universeId];
-        return (
-            sub.tier,
-            sub.expiresAt,
-            sub.expiresAt > block.timestamp,
-            sub.autoRenew
-        );
+        return (sub.tier, sub.expiresAt, sub.expiresAt > block.timestamp, sub.autoRenew);
     }
 
     /// @dev Reserved storage gap for future upgrades (M4)
