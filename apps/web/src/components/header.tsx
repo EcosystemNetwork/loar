@@ -102,23 +102,23 @@ export default function Header() {
           </Link>
 
           <nav className="hidden lg:flex items-center">
-            {primaryLinks.map(({ to, label }) => {
-              const isActive = matchRoute({ to, fuzzy: true });
-              return (
-                <Link
-                  key={to}
-                  to={to}
-                  className={`relative px-3 py-1.5 text-[13px] font-medium tracking-wide transition-colors ${
-                    isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {label}
-                  {isActive && (
-                    <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-primary rounded-full" />
-                  )}
-                </Link>
-              );
-            })}
+            {primaryLinks.map(({ to, label }) => (
+              <Link
+                key={to}
+                to={to as any}
+                className="relative px-3 py-1.5 text-[13px] font-medium tracking-wide transition-colors text-muted-foreground hover:text-foreground [&.active]:text-foreground"
+                activeProps={{ className: 'active group' }}
+              >
+                {({ isActive }: { isActive: boolean }) => (
+                  <>
+                    {label}
+                    {isActive && (
+                      <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-primary rounded-full" />
+                    )}
+                  </>
+                )}
+              </Link>
+            ))}
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -147,12 +147,10 @@ export default function Header() {
                       {visibleLinks.map((link) => (
                         <DropdownMenuItem key={link.to} asChild>
                           <Link
-                            to={link.to}
-                            className={`w-full cursor-pointer flex items-center justify-between text-[13px] ${
-                              matchRoute({ to: link.to, fuzzy: true })
-                                ? 'text-primary font-medium'
-                                : ''
-                            }`}
+                            to={link.to as any}
+                            activeProps={{ className: 'text-primary font-medium' }}
+                            inactiveProps={{ className: 'text-foreground' }}
+                            className="w-full cursor-pointer flex items-center justify-between text-[13px]"
                           >
                             {link.label}
                             {'beta' in link && link.beta && (
@@ -196,30 +194,27 @@ export default function Header() {
 
       {/* ── Mobile Navigation ── */}
       {mobileOpen && (
-        <nav
-          id="mobile-nav"
-          aria-label="Mobile navigation"
-          className="lg:hidden border-t border-border/40 bg-background/95 backdrop-blur-lg max-h-[70vh] overflow-y-auto"
-        >
-          <div className="mx-auto max-w-[1440px] px-4 py-3">
+        <div className="lg:hidden fixed inset-x-0 top-14 bottom-0 z-40 bg-background/95 backdrop-blur-xl border-t border-border/40 overflow-y-auto">
+          <nav
+            id="mobile-nav"
+            aria-label="Mobile navigation"
+            className="mx-auto max-w-[1440px] px-4 py-3"
+          >
             <div className="grid grid-cols-3 gap-1 mb-3">
-              {primaryLinks.map(({ to, label }) => {
-                const isActive = matchRoute({ to, fuzzy: true });
-                return (
-                  <Link
-                    key={to}
-                    to={to}
-                    onClick={() => setMobileOpen(false)}
-                    className={`px-2 py-2.5 rounded-lg text-[13px] font-medium text-center transition-colors ${
-                      isActive
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-                    }`}
-                  >
-                    {label}
-                  </Link>
-                );
-              })}
+              {primaryLinks.map(({ to, label }) => (
+                <Link
+                  key={to}
+                  to={to as any}
+                  onClick={() => setMobileOpen(false)}
+                  activeProps={{ className: 'bg-primary/10 text-primary' }}
+                  inactiveProps={{
+                    className: 'text-muted-foreground hover:text-foreground hover:bg-muted/40',
+                  }}
+                  className="px-2 py-2.5 rounded-lg text-[13px] font-medium text-center transition-colors"
+                >
+                  {label}
+                </Link>
+              ))}
             </div>
             {moreGroups.map((group) => {
               const visibleLinks = group.links.filter((l) => !HIDDEN_ROUTES.has(l.to));
@@ -230,28 +225,26 @@ export default function Header() {
                     {group.label}
                   </p>
                   <div className="grid grid-cols-2 gap-0.5">
-                    {visibleLinks.map((link) => {
-                      const isActive = matchRoute({ to: link.to, fuzzy: true });
-                      return (
-                        <Link
-                          key={link.to}
-                          to={link.to}
-                          onClick={() => setMobileOpen(false)}
-                          className={`px-3 py-2 rounded-lg text-[13px] font-medium transition-colors flex items-center gap-2 ${
-                            isActive
-                              ? 'bg-primary/10 text-primary'
-                              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-                          }`}
-                        >
-                          {link.label}
-                          {'beta' in link && link.beta && (
-                            <span className="text-[9px] font-semibold bg-primary/10 text-primary/70 px-1.5 py-0.5 rounded leading-none">
-                              BETA
-                            </span>
-                          )}
-                        </Link>
-                      );
-                    })}
+                    {visibleLinks.map((link) => (
+                      <Link
+                        key={link.to}
+                        to={link.to as any}
+                        onClick={() => setMobileOpen(false)}
+                        activeProps={{ className: 'bg-primary/10 text-primary' }}
+                        inactiveProps={{
+                          className:
+                            'text-muted-foreground hover:text-foreground hover:bg-muted/40',
+                        }}
+                        className="px-3 py-2 rounded-lg text-[13px] font-medium transition-colors flex items-center gap-2"
+                      >
+                        {link.label}
+                        {'beta' in link && link.beta && (
+                          <span className="text-[9px] font-semibold bg-primary/10 text-primary/70 px-1.5 py-0.5 rounded leading-none">
+                            BETA
+                          </span>
+                        )}
+                      </Link>
+                    ))}
                   </div>
                 </div>
               );
@@ -260,8 +253,8 @@ export default function Header() {
               <Web3ModeToggle />
               <ModeToggle />
             </div>
-          </div>
-        </nav>
+          </nav>
+        </div>
       )}
     </header>
   );
