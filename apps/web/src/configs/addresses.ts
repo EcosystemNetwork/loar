@@ -58,7 +58,7 @@ export const EVM_ADDRESSES: Partial<Record<SupportedEvmChainId, EvmAddresses>> =
     feeLocker: '0x965f5C192E38b86Fa4a79A561E695C48B1DC3582',
     swapRouter: '0x7E156f3Ddd56539aB941DeEfEd1342ae5C9C09a5',
     tokenVesting: '0x5d74D9e42a52D04DEC9F895F2c9D2e14b1DdCD64',
-    loarFaucet: ZERO_ADDR,
+    loarFaucet: '0x0000000000000000000000000000000000000000',
     episodeEditionBeacon: '0x14742D6BB8eeE513D0D70a235d8B4d801F19F9ed',
     characterBeacon: '0x0BEcc54417e9AaC9289C748eb72ECBb55292756f',
     entityBeacon: '0xF951065C7d4d28805188F60a3F8bd398B7776EC8',

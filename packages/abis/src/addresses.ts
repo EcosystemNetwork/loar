@@ -218,3 +218,4 @@ export const UniverseTokenDeployer = {
 } as const;
 
 export type UniverseTokenDeployerChainId = keyof typeof UniverseTokenDeployer;
+

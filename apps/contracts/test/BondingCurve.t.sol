@@ -314,7 +314,7 @@ contract BondingCurveTest is Test {
         vm.deal(alice, eth1);
         vm.prank(alice);
         try curveV1.buy{value: eth1}(0, block.timestamp + 1 hours) {}
-            catch {
+        catch {
             return;
         }
 
@@ -326,7 +326,7 @@ contract BondingCurveTest is Test {
         vm.deal(bob, eth2);
         vm.prank(bob);
         try curveV1.buy{value: eth2}(0, block.timestamp + 1 hours) {}
-            catch {
+        catch {
             return;
         }
 

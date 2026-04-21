@@ -237,7 +237,7 @@ contract CanonMarketplace is
 
         // Validate the token implements IVotes (will revert if not)
         try IVotes(universeToken).getPastTotalSupply(block.number - 1) {}
-            catch {
+        catch {
             revert InvalidToken();
         }
 
