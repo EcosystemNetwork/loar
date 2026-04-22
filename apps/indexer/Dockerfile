@@ -1,5 +1,5 @@
 # ── Stage 1: Builder ──────────────────────────────────────────────────────
-FROM node:20.18.1-alpine AS builder
+FROM node:20-alpine AS builder
 
 RUN apk add --no-cache curl
 ENV COREPACK_INTEGRITY_KEYS=""
@@ -41,7 +41,7 @@ COPY deployments/ ./deployments/
 RUN pnpm prune --prod
 
 # ── Stage 2: Production ──────────────────────────────────────────────────
-FROM node:20.18.1-alpine
+FROM node:20-alpine
 
 RUN apk add --no-cache curl
 ENV COREPACK_INTEGRITY_KEYS=""
