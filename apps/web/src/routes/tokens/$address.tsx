@@ -1041,6 +1041,12 @@ function SwapInterface({
       )}
 
       {/* Tx status */}
+      {(status === 'approving' || status === 'approval-pending') && (
+        <div className="p-2 bg-blue-500/10 rounded-lg text-xs text-blue-600 dark:text-blue-400 flex items-center gap-2">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          {status === 'approving' ? `Approve $${tokenSymbol} in wallet…` : 'Waiting for approval…'}
+        </div>
+      )}
       {status === 'pending' && txHash && (
         <div className="p-2 bg-blue-500/10 rounded-lg text-xs text-blue-600 dark:text-blue-400 flex items-center gap-2">
           <Loader2 className="h-3 w-3 animate-spin" />
@@ -1059,9 +1065,16 @@ function SwapInterface({
           mode === 'buy' ? 'bg-green-600 hover:bg-green-500' : 'bg-red-600 hover:bg-red-500'
         }`}
         onClick={handleSwap}
-        disabled={!amount || Number(amount) <= 0 || status === 'confirming' || status === 'pending'}
+        disabled={
+          !amount ||
+          Number(amount) <= 0 ||
+          status === 'confirming' ||
+          status === 'pending' ||
+          status === 'approving' ||
+          status === 'approval-pending'
+        }
       >
-        {status === 'confirming' ? (
+        {status === 'confirming' || status === 'approving' || status === 'approval-pending' ? (
           <Loader2 className="h-5 w-5 mr-2 animate-spin" />
         ) : (
           <ArrowUpDown className="h-5 w-5 mr-2" />

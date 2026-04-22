@@ -532,6 +532,21 @@ function SwapPage() {
             )}
 
             {/* ── Tx Status Feedback ────────────────────────────────── */}
+            {(status === 'approving' || status === 'approval-pending') && (
+              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-xs text-blue-600 dark:text-blue-400 flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="font-semibold">
+                    {status === 'approving'
+                      ? `Approve $${selectedToken?.symbol ?? ''} to sell`
+                      : 'Approval pending…'}
+                  </p>
+                  <p className="text-[10px] opacity-80">
+                    One-time approval lets the router pull your tokens for this sell.
+                  </p>
+                </div>
+              </div>
+            )}
             {status === 'pending' && txHash && (
               <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-xs text-blue-600 dark:text-blue-400 flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
@@ -591,10 +606,25 @@ function SwapPage() {
                 }`}
                 onClick={handleSwap}
                 disabled={
-                  !amount || Number(amount) <= 0 || status === 'confirming' || status === 'pending'
+                  !amount ||
+                  Number(amount) <= 0 ||
+                  status === 'confirming' ||
+                  status === 'pending' ||
+                  status === 'approving' ||
+                  status === 'approval-pending'
                 }
               >
-                {status === 'confirming' ? (
+                {status === 'approving' ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    Approve in wallet…
+                  </>
+                ) : status === 'approval-pending' ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    Waiting for approval…
+                  </>
+                ) : status === 'confirming' ? (
                   <>
                     <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                     Confirm in wallet...

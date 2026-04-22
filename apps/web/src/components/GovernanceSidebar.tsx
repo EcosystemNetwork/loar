@@ -52,9 +52,10 @@ const MAX_PROPOSAL_DESCRIPTION = 500;
 /**
  * Block lookback ranges for fetching proposals.
  * Many RPC providers cap eth_getLogs to ~10k blocks, so we try progressively
- * smaller windows on failure rather than one giant 500k-block query.
+ * smaller windows on failure rather than one giant 500k-block query. Public
+ * fallbacks (Cloudflare, Ankr) can cap as low as 500 blocks.
  */
-const PROPOSAL_LOOKBACK_RANGES = [100_000n, 50_000n, 10_000n, 2_000n] as const;
+const PROPOSAL_LOOKBACK_RANGES = [100_000n, 50_000n, 10_000n, 2_000n, 500n] as const;
 
 interface GovernanceSidebarProps {
   isOpen: boolean;
@@ -160,6 +161,10 @@ export function GovernanceSidebar({
   // Check if governance is properly configured (undefined = not deployed yet)
   const isGovernanceConfigured = !!governanceAddress && !!tokenAddress && !!timelineAddress;
 
+  // All on-chain reads below gate on isOpen — the sidebar is always mounted by
+  // the parent route, so without this guard we'd hammer the RPC on every
+  // universe page load even when governance UI is hidden.
+
   // Check token balance
   const { data: tokenBalance } = useReadContract({
     abi: governanceErc20Abi,
@@ -167,7 +172,7 @@ export function GovernanceSidebar({
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address && !!isGovernanceConfigured,
+      enabled: isOpen && !!address && !!isGovernanceConfigured,
     },
   });
 
@@ -178,7 +183,7 @@ export function GovernanceSidebar({
     functionName: 'getVotes',
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address && !!isGovernanceConfigured,
+      enabled: isOpen && !!address && !!isGovernanceConfigured,
     },
   });
 
@@ -189,7 +194,7 @@ export function GovernanceSidebar({
     functionName: 'delegates',
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address && !!isGovernanceConfigured,
+      enabled: isOpen && !!address && !!isGovernanceConfigured,
     },
   });
 
@@ -199,7 +204,7 @@ export function GovernanceSidebar({
     address: governanceAddress,
     functionName: 'votingDelay',
     query: {
-      enabled: !!isGovernanceConfigured,
+      enabled: isOpen && !!isGovernanceConfigured,
     },
   });
 
@@ -208,7 +213,7 @@ export function GovernanceSidebar({
     address: governanceAddress,
     functionName: 'votingPeriod',
     query: {
-      enabled: !!isGovernanceConfigured,
+      enabled: isOpen && !!isGovernanceConfigured,
     },
   });
 
@@ -217,7 +222,7 @@ export function GovernanceSidebar({
     address: governanceAddress,
     functionName: 'proposalThreshold',
     query: {
-      enabled: !!isGovernanceConfigured,
+      enabled: isOpen && !!isGovernanceConfigured,
     },
   });
 
@@ -282,8 +287,9 @@ export function GovernanceSidebar({
   // Get current block number for progress tracking
   const [currentBlock, setCurrentBlock] = useState<bigint>(0n);
 
-  // Update current block number
+  // Update current block number — only while the sidebar is open
   useEffect(() => {
+    if (!isOpen) return;
     const updateBlockNumber = async () => {
       if (publicClient) {
         try {
@@ -297,7 +303,7 @@ export function GovernanceSidebar({
     updateBlockNumber();
     const interval = setInterval(updateBlockNumber, 30000);
     return () => clearInterval(interval);
-  }, [publicClient]);
+  }, [publicClient, isOpen]);
 
   // Fetch proposals from ProposalCreated events
   const fetchProposalsFromEvents = useCallback(async () => {
@@ -419,12 +425,13 @@ export function GovernanceSidebar({
     }
   }, [publicClient, governanceAddress]);
 
-  // Fetch proposals when governance is configured
+  // Fetch proposals when the sidebar opens (not on every mount — we stay
+  // mounted even when hidden, and eth_getLogs is expensive)
   useEffect(() => {
-    if (isGovernanceConfigured) {
+    if (isOpen && isGovernanceConfigured) {
       fetchProposalsFromEvents();
     }
-  }, [isGovernanceConfigured, fetchProposalsFromEvents]);
+  }, [isOpen, isGovernanceConfigured, fetchProposalsFromEvents]);
 
   // Handle proposal creation
   const handleCreateProposal = useCallback(async () => {

@@ -47,6 +47,7 @@ import { Route as UniverseIdRouteImport } from './routes/universe/$id'
 import { Route as TreasuryUniverseIdRouteImport } from './routes/treasury/$universeId'
 import { Route as TokensSwapRouteImport } from './routes/tokens/swap'
 import { Route as TokensPortfolioRouteImport } from './routes/tokens/portfolio'
+import { Route as TokensLaunchRouteImport } from './routes/tokens/launch'
 import { Route as TokensAddressRouteImport } from './routes/tokens/$address'
 import { Route as ShopUniverseIdRouteImport } from './routes/shop/$universeId'
 import { Route as SellNewRouteImport } from './routes/sell/new'
@@ -272,6 +273,11 @@ const TokensSwapRoute = TokensSwapRouteImport.update({
 const TokensPortfolioRoute = TokensPortfolioRouteImport.update({
   id: '/tokens/portfolio',
   path: '/tokens/portfolio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TokensLaunchRoute = TokensLaunchRouteImport.update({
+  id: '/tokens/launch',
+  path: '/tokens/launch',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TokensAddressRoute = TokensAddressRouteImport.update({
@@ -510,6 +516,7 @@ export interface FileRoutesByFullPath {
   '/sell/new': typeof SellNewRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
+  '/tokens/launch': typeof TokensLaunchRoute
   '/tokens/portfolio': typeof TokensPortfolioRoute
   '/tokens/swap': typeof TokensSwapRoute
   '/treasury/$universeId': typeof TreasuryUniverseIdRoute
@@ -586,6 +593,7 @@ export interface FileRoutesByTo {
   '/sell/new': typeof SellNewRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
+  '/tokens/launch': typeof TokensLaunchRoute
   '/tokens/portfolio': typeof TokensPortfolioRoute
   '/tokens/swap': typeof TokensSwapRoute
   '/treasury/$universeId': typeof TreasuryUniverseIdRoute
@@ -663,6 +671,7 @@ export interface FileRoutesById {
   '/sell/new': typeof SellNewRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
+  '/tokens/launch': typeof TokensLaunchRoute
   '/tokens/portfolio': typeof TokensPortfolioRoute
   '/tokens/swap': typeof TokensSwapRoute
   '/treasury/$universeId': typeof TreasuryUniverseIdRoute
@@ -741,6 +750,7 @@ export interface FileRouteTypes {
     | '/sell/new'
     | '/shop/$universeId'
     | '/tokens/$address'
+    | '/tokens/launch'
     | '/tokens/portfolio'
     | '/tokens/swap'
     | '/treasury/$universeId'
@@ -817,6 +827,7 @@ export interface FileRouteTypes {
     | '/sell/new'
     | '/shop/$universeId'
     | '/tokens/$address'
+    | '/tokens/launch'
     | '/tokens/portfolio'
     | '/tokens/swap'
     | '/treasury/$universeId'
@@ -893,6 +904,7 @@ export interface FileRouteTypes {
     | '/sell/new'
     | '/shop/$universeId'
     | '/tokens/$address'
+    | '/tokens/launch'
     | '/tokens/portfolio'
     | '/tokens/swap'
     | '/treasury/$universeId'
@@ -969,6 +981,7 @@ export interface RootRouteChildren {
   SellNewRoute: typeof SellNewRoute
   ShopUniverseIdRoute: typeof ShopUniverseIdRoute
   TokensAddressRoute: typeof TokensAddressRoute
+  TokensLaunchRoute: typeof TokensLaunchRoute
   TokensPortfolioRoute: typeof TokensPortfolioRoute
   TokensSwapRoute: typeof TokensSwapRoute
   TreasuryUniverseIdRoute: typeof TreasuryUniverseIdRoute
@@ -1252,6 +1265,13 @@ declare module '@tanstack/react-router' {
       path: '/tokens/portfolio'
       fullPath: '/tokens/portfolio'
       preLoaderRoute: typeof TokensPortfolioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tokens/launch': {
+      id: '/tokens/launch'
+      path: '/tokens/launch'
+      fullPath: '/tokens/launch'
+      preLoaderRoute: typeof TokensLaunchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/tokens/$address': {
@@ -1595,6 +1615,7 @@ const rootRouteChildren: RootRouteChildren = {
   SellNewRoute: SellNewRoute,
   ShopUniverseIdRoute: ShopUniverseIdRoute,
   TokensAddressRoute: TokensAddressRoute,
+  TokensLaunchRoute: TokensLaunchRoute,
   TokensPortfolioRoute: TokensPortfolioRoute,
   TokensSwapRoute: TokensSwapRoute,
   TreasuryUniverseIdRoute: TreasuryUniverseIdRoute,

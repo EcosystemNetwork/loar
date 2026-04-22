@@ -153,7 +153,7 @@ function TokenLaunchpad() {
                 Portfolio
               </Button>
             </Link>
-            <Link to="/cinematicUniverseCreate">
+            <Link to="/tokens/launch">
               <Button size="lg" className="font-bold gap-2">
                 <Plus className="h-5 w-5" />
                 Launch Token
@@ -314,7 +314,7 @@ function TokenLaunchpad() {
                         : 'Be the first to launch a universe token!'}
                     </p>
                     {!search && (
-                      <Link to="/cinematicUniverseCreate">
+                      <Link to="/tokens/launch">
                         <Button>
                           <Rocket className="h-4 w-4 mr-2" />
                           Launch First Token

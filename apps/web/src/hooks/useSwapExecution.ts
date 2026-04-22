@@ -5,12 +5,36 @@
  * Falls back to Uniswap deep link when router is not available.
  */
 import { useState, useCallback } from 'react';
-import { useChainId } from 'wagmi';
+import { useChainId, usePublicClient } from 'wagmi';
 import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { useWalletAccount } from '@/hooks/useWalletAccount';
-import { parseEther, encodeFunctionData, type Address } from 'viem';
+import { parseEther, type Address, maxUint256 } from 'viem';
 import { getSwapUrl } from '@/hooks/useTokenSwap';
 import { openExternal } from '@/utils/open-external';
+
+// Minimal ERC20 subset for allowance + approve (used for native sell)
+const ERC20_ABI = [
+  {
+    name: 'allowance',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' },
+    ],
+    outputs: [{ type: 'uint256' }],
+  },
+  {
+    name: 'approve',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ type: 'bool' }],
+  },
+] as const;
 
 // LoarSwapRouter ABI (minimal — just the swap functions we need)
 const SWAP_ROUTER_ABI = [
@@ -67,12 +91,20 @@ export interface SwapConfig {
 
 const NATIVE_ETH: Address = '0x0000000000000000000000000000000000000000';
 
+export type SwapStatus =
+  | 'idle'
+  | 'approving'
+  | 'approval-pending'
+  | 'confirming'
+  | 'pending'
+  | 'success'
+  | 'error';
+
 export function useSwapExecution() {
   const chainId = useChainId();
   const { address } = useWalletAccount();
-  const [status, setStatus] = useState<'idle' | 'confirming' | 'pending' | 'success' | 'error'>(
-    'idle'
-  );
+  const publicClient = usePublicClient();
+  const [status, setStatus] = useState<SwapStatus>('idle');
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -164,19 +196,80 @@ export function useSwapExecution() {
           setStatus('pending');
           return { fallback: false, txHash: hash };
         } else {
-          // Sell tokens for ETH — requires token approval first
-          // For now, redirect to Uniswap for sell orders (approval flow is complex)
-          const swapUrl = getSwapUrl(config.tokenAddress, chainId);
-          const sellUrl = swapUrl
-            .replace(
-              'inputCurrency=ETH&outputCurrency=',
-              `inputCurrency=${config.tokenAddress}&outputCurrency=`
-            )
-            .replace(`outputCurrency=${config.tokenAddress}`, 'outputCurrency=ETH');
-          openExternal(
-            `${sellUrl}${config.amount ? `&exactAmount=${config.amount}&exactField=input` : ''}`
-          );
-          return { fallback: true };
+          // Sell tokens for ETH — native flow: ensure ERC20 allowance, then swap.
+          if (!publicClient) {
+            setError('RPC client unavailable');
+            setStatus('error');
+            return { fallback: false, error: 'RPC client unavailable' };
+          }
+
+          const amountIn = parseEther(config.amount);
+          const tokenAddr = config.tokenAddress as Address;
+
+          // Determine direction: selling the token means input = token, output = ETH.
+          // zeroForOne = input currency is currency0.
+          const tokenIsCurrency0 =
+            config.poolKey.currency0.toLowerCase() === tokenAddr.toLowerCase();
+          const tokenIsCurrency1 =
+            config.poolKey.currency1.toLowerCase() === tokenAddr.toLowerCase();
+          if (!tokenIsCurrency0 && !tokenIsCurrency1) {
+            setError('Pool does not include this token');
+            setStatus('error');
+            return { fallback: false, error: 'Token not in pool' };
+          }
+          const zeroForOne = tokenIsCurrency0;
+
+          if (config.expectedOutWei === undefined) {
+            setError('Missing expected output — cannot enforce slippage');
+            setStatus('error');
+            return { fallback: false, error: 'Missing slippage bound' };
+          }
+          const bps = BigInt(slippageBps);
+          const amountOutMinimum = (config.expectedOutWei * (10_000n - bps)) / 10_000n;
+
+          // 1) Allowance check. If < amountIn, approve max first.
+          const allowance = (await publicClient.readContract({
+            address: tokenAddr,
+            abi: ERC20_ABI,
+            functionName: 'allowance',
+            args: [address, routerAddress],
+          })) as bigint;
+
+          if (allowance < amountIn) {
+            setStatus('approving');
+            const approveHash = await writeContractAsync({
+              address: tokenAddr,
+              abi: ERC20_ABI,
+              functionName: 'approve',
+              args: [routerAddress, maxUint256],
+              chainId,
+            });
+            setStatus('approval-pending');
+            await publicClient.waitForTransactionReceipt({
+              hash: approveHash as `0x${string}`,
+            });
+          }
+
+          // 2) Swap.
+          setStatus('confirming');
+          const hash = await writeContractAsync({
+            address: routerAddress,
+            abi: SWAP_ROUTER_ABI,
+            functionName: 'swapExactInput',
+            args: [
+              config.poolKey,
+              zeroForOne,
+              amountIn,
+              amountOutMinimum,
+              deadline,
+              '0x', // hookData
+            ],
+            chainId,
+          });
+
+          setTxHash(hash);
+          setStatus('pending');
+          return { fallback: false, txHash: hash };
         }
       } catch (err: any) {
         // Distinguish user rejection from real errors
