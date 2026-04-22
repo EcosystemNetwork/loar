@@ -8,6 +8,7 @@
  * Credits are the internal unit consumed by all generation actions.
  * Users buy credit packages, then spend credits on generations.
  */
+import type { Transaction } from 'firebase-admin/firestore';
 import { adminProcedure, protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
@@ -306,6 +307,59 @@ const GENERATION_COSTS: Record<string, number> = {
   // Legacy mappings
   video: 13,
 };
+
+// ── Grant helpers ─────────────────────────────────────────────────────
+
+export type GrantSource = 'admin' | 'quest' | 'affiliate' | 'promo' | 'signup';
+
+/**
+ * Add credits to a user inside an existing Firestore transaction.
+ * The caller is responsible for ensuring the transaction's read phase
+ * has already happened before any writes (Firestore requires all reads
+ * before writes).
+ */
+export async function grantCreditsInTxn(
+  tx: Transaction,
+  uid: string,
+  credits: number,
+  source: GrantSource,
+  reason: string
+): Promise<void> {
+  const userRef = creditsCol().doc(uid);
+  const userDoc = await tx.get(userRef);
+  const now = new Date();
+
+  if (userDoc.exists) {
+    const data = userDoc.data()!;
+    tx.update(userRef, {
+      balance: (data.balance || 0) + credits,
+      totalBonusReceived: (data.totalBonusReceived || 0) + credits,
+      updatedAt: now,
+    });
+  } else {
+    tx.set(userRef, {
+      uid,
+      balance: credits,
+      totalPurchased: 0,
+      totalSpent: 0,
+      totalBonusReceived: credits,
+      totalLoarPurchases: 0,
+      totalFiatPurchases: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  const txRef = creditTxCol().doc();
+  tx.set(txRef, {
+    uid,
+    type: 'grant',
+    source,
+    credits,
+    reason,
+    createdAt: now,
+  });
+}
 
 // ── Router ────────────────────────────────────────────────────────────
 
@@ -741,43 +795,9 @@ export const creditsRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      await db.runTransaction(async (transaction) => {
-        const userRef = creditsCol().doc(input.targetUid);
-        const userDoc = await transaction.get(userRef);
-        const now = new Date();
-
-        if (userDoc.exists) {
-          const data = userDoc.data()!;
-          transaction.update(userRef, {
-            balance: (data.balance || 0) + input.credits,
-            totalBonusReceived: (data.totalBonusReceived || 0) + input.credits,
-            updatedAt: now,
-          });
-        } else {
-          transaction.set(userRef, {
-            uid: input.targetUid,
-            balance: input.credits,
-            totalPurchased: 0,
-            totalSpent: 0,
-            totalBonusReceived: input.credits,
-            totalLoarPurchases: 0,
-            totalFiatPurchases: 0,
-            createdAt: now,
-            updatedAt: now,
-          });
-        }
-
-        const txRef = creditTxCol().doc();
-        transaction.set(txRef, {
-          uid: input.targetUid,
-          type: 'grant',
-          source: input.source,
-          credits: input.credits,
-          reason: input.reason,
-          createdAt: now,
-        });
-      });
-
+      await db.runTransaction((tx) =>
+        grantCreditsInTxn(tx, input.targetUid, input.credits, input.source, input.reason)
+      );
       return { ok: true };
     }),
 

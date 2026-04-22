@@ -37,7 +37,7 @@ import { imageRouter } from './generation/image.routes';
 import { marketplaceRouter } from './marketplace/marketplace.routes';
 import { nftRouter } from './nft/nft.routes';
 import { listingsRouter } from './listings/listings.routes';
-import { creditsRouter } from './credits/credits.routes';
+import { creditsRouter, grantCreditsInTxn } from './credits/credits.routes';
 import { subscriptionsRouter } from './subscriptions/subscriptions.routes';
 import { analyticsRouter } from './analytics/analytics.routes';
 import { storageRouter } from './storage/storage.routes';
@@ -103,6 +103,12 @@ import { indexerRouter } from './indexer/indexer.routes';
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
 const getUsersCol = () => (firebaseAvailable ? db.collection('users') : null);
 
+/**
+ * One-time signup bonus granted on first wallet login.
+ * 500 credits ≈ $5 of generation value at the retail Starter rate.
+ */
+const SIGNUP_CREDIT_GRANT = Number(process.env.SIGNUP_CREDIT_GRANT ?? 500);
+
 // ── Root router ─────────────────────────────────────────────────────────
 export const appRouter = router({
   // ── System ──────────────────────────────────────────────────────────
@@ -139,26 +145,43 @@ export const appRouter = router({
         userAgent: '',
       });
 
-      const userRef = usersCol.doc(addressLower);
-      const userDoc = await userRef.get();
-      if (userDoc.exists) {
-        await userRef.update({
-          lastLoginAt: now,
-          loginCount: (userDoc.data()?.loginCount || 0) + 1,
-          chainId: input.chainId,
-        });
-      } else {
-        await userRef.set({
+      // Atomically create the user doc + grant signup credits on first login.
+      // A transaction is needed so two concurrent first-login requests can't
+      // both pass the `!exists` check and double-grant.
+      const isNewUser = await db.runTransaction(async (tx) => {
+        const userRef = usersCol.doc(addressLower);
+        const userDoc = await tx.get(userRef);
+
+        if (userDoc.exists) {
+          tx.update(userRef, {
+            lastLoginAt: now,
+            loginCount: (userDoc.data()?.loginCount || 0) + 1,
+            chainId: input.chainId,
+          });
+          return false;
+        }
+
+        await grantCreditsInTxn(
+          tx,
+          addressLower,
+          SIGNUP_CREDIT_GRANT,
+          'signup',
+          'Welcome bonus — free credits to get started'
+        );
+
+        tx.set(userRef, {
           address: addressLower,
           firstLoginAt: now,
           lastLoginAt: now,
           loginCount: 1,
           chainId: input.chainId,
           connector: input.connector || 'unknown',
+          signupCreditsGranted: SIGNUP_CREDIT_GRANT,
         });
-      }
+        return true;
+      });
 
-      return { ok: true };
+      return { ok: true, newUser: isNewUser, creditsGranted: isNewUser ? SIGNUP_CREDIT_GRANT : 0 };
     }),
 
   // ── Indexer reads (replaces Ponder GraphQL) ─────────────────────────
