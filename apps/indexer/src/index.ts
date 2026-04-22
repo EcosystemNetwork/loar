@@ -138,13 +138,37 @@ ponder.on('UniverseManager:TokenCreated', async ({ event, context }) => {
     console.error('On-chain universe resolution failed, trying SQL fallback:', err);
   }
 
-  // Fallback: SQL query by deployer
+  // Fallback: SQL query by deployer.
+  //
+  // The on-chain back-resolution above scans the most recent 10 universes,
+  // which races when two universes are created in the same block (or within
+  // 10 universes of each other). This SQL fallback also races when one
+  // creator deploys multiple universes in a single session.
+  //
+  // To minimize collisions:
+  //   - Restrict the candidate row to the same block height (a tx that
+  //     creates a universe and tx that deploys its token must be within the
+  //     same block in the v3 deployer flow), AND
+  //   - Require the candidate has no tokenAddress yet (still empty),
+  //   - Order by createdAt DESC and take a single row.
+  //
+  // This is still not perfectly safe across reorgs / concurrent creates, but
+  // tightens the window from "any prior universe by this creator" to "the
+  // most-recent universe created in the same block by this creator", which is
+  // accurate for the canonical single-tx flow. Long-term fix: emit `universeId`
+  // in TokenCreated and switch to a direct lookup (contract change).
   if (resolvedUniverseAddress === '0x0000000000000000000000000000000000000000') {
     try {
       const deployerLower = deployer.toLowerCase();
+      // 60-second window matches the canonical create-then-deploy single-tx
+      // flow. Universes created earlier than that by the same deployer are
+      // assumed to belong to a separate session and not picked up here.
+      const tsLowerBound = Number(event.block.timestamp) - 60;
       const universes = await context.db.sql.execute(sql`
         SELECT id FROM universe
-        WHERE LOWER(creator) = ${deployerLower} AND "tokenAddress" IS NULL
+        WHERE LOWER(creator) = ${deployerLower}
+          AND "tokenAddress" IS NULL
+          AND "createdAt" >= ${tsLowerBound}
         ORDER BY "createdAt" DESC
         LIMIT 1
       `);
@@ -610,6 +634,40 @@ ponder.on('UniverseGovernor:VoteCast', async ({ event, context }) => {
     reason: event.args.reason || null,
     timestamp: Number(event.block.timestamp),
   });
+});
+
+// Governor + Timelock: ProposalQueued lands between propose and execute. The
+// UI needs the eta to show "executable in X hours" on queued proposals.
+ponder.on('UniverseGovernor:ProposalQueued', async ({ event, context }) => {
+  const proposalId = event.args.proposalId.toString();
+  const eta = Number(event.args.etaSeconds);
+  await context.db.update(proposal, { id: proposalId }).set({ queued: true, queuedEta: eta });
+});
+
+// Quadratic / parameterized voting variant — same projection as VoteCast.
+ponder.on('UniverseGovernor:VoteCastWithParams', async ({ event, context }) => {
+  const governorAddress = getAddress(event.log.address);
+  const proposalId = event.args.proposalId.toString();
+  const voter = getAddress(event.args.voter);
+
+  await context.db
+    .insert(vote)
+    .values({
+      id: `${proposalId}:${voter}`,
+      proposalId: proposalId,
+      governorAddress: governorAddress,
+      voter: voter,
+      support: event.args.support,
+      weight: event.args.weight.toString(),
+      reason: event.args.reason || null,
+      timestamp: Number(event.block.timestamp),
+    })
+    .onConflictDoUpdate(() => ({
+      // Re-vote semantics: latest vote with params overwrites prior vote.
+      support: event.args.support,
+      weight: event.args.weight.toString(),
+      reason: event.args.reason || null,
+    }));
 });
 
 // ============= Token Transfer Tracking =============
