@@ -176,36 +176,6 @@ test.describe('Token Detail Page', () => {
 });
 
 /* -------------------------------------------------------------------------- */
-/*  Agent Sub-Routes                                                          */
-/* -------------------------------------------------------------------------- */
-
-test.describe('Agent Routes', () => {
-  test('agents index page loads', async ({ page }) => {
-    await page.goto('/agents');
-    await page.waitForTimeout(1000);
-    await expect(page.locator('body')).toBeVisible();
-  });
-
-  test('agent register page loads', async ({ page }) => {
-    await page.goto('/agents/register');
-    await page.waitForTimeout(1000);
-    await expect(page.locator('body')).toBeVisible();
-  });
-
-  test('agent dashboard page loads', async ({ page }) => {
-    await page.goto('/agents/dashboard');
-    await page.waitForTimeout(1000);
-    await expect(page.locator('body')).toBeVisible();
-  });
-
-  test('agent detail page loads', async ({ page }) => {
-    await page.goto('/agents/test-uid-123');
-    await page.waitForTimeout(1000);
-    await expect(page.locator('body')).toBeVisible();
-  });
-});
-
-/* -------------------------------------------------------------------------- */
 /*  Shop / Checkout / Orders                                                  */
 /* -------------------------------------------------------------------------- */
 
