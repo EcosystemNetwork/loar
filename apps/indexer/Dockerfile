@@ -34,8 +34,11 @@ COPY apps/indexer/abis ./apps/indexer/abis
 COPY packages/abis/ ./packages/abis/
 COPY deployments/ ./deployments/
 
-# Prune dev dependencies
-RUN pnpm prune --prod --no-optional
+# Prune dev dependencies. Keep optional deps — rolldown (and other build
+# tools) ship their platform-specific native bindings as optionalDependencies,
+# so --no-optional strips @rolldown/binding-linux-x64-musl and the indexer
+# crashes at startup with MODULE_NOT_FOUND.
+RUN pnpm prune --prod
 
 # ── Stage 2: Production ──────────────────────────────────────────────────
 FROM node:20.18.1-alpine
