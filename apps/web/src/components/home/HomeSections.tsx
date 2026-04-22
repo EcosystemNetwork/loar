@@ -157,11 +157,11 @@ export function SectionHeader({
  * Universe Card — tall portrait (Webtoons feel)
  * ────────────────────────────────────────── */
 export function UniverseCard({ universe }: { universe: EnrichedUniverse }) {
-  const navigate = useNavigate({ from: '//' });
+  const navigate = useNavigate();
 
   return (
     <div
-      onClick={() => navigate({ to: `/universe/${universe.id}` })}
+      onClick={() => navigate({ to: '/universe/$id', params: { id: universe.id } })}
       className="group flex-shrink-0 w-[180px] md:w-[200px] cursor-pointer"
     >
       {/* Tall poster image — prefer dedicated portrait crop */}
@@ -237,11 +237,11 @@ export function UniverseCard({ universe }: { universe: EnrichedUniverse }) {
  * Wide landscape card for featured row
  * ────────────────────────────────────────── */
 export function WideCard({ universe }: { universe: EnrichedUniverse }) {
-  const navigate = useNavigate({ from: '//' });
+  const navigate = useNavigate();
 
   return (
     <div
-      onClick={() => navigate({ to: `/universe/${universe.id}` })}
+      onClick={() => navigate({ to: '/universe/$id', params: { id: universe.id } })}
       className="group flex-shrink-0 w-[320px] md:w-[400px] cursor-pointer"
     >
       <div className="relative aspect-video rounded-xl overflow-hidden bg-muted ring-1 ring-white/5 group-hover:ring-primary/60 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl group-hover:shadow-primary/20">
@@ -329,7 +329,7 @@ export function HeroSkeleton() {
  * ────────────────────────────────────────── */
 export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const navigate = useNavigate({ from: '//' });
+  const navigate = useNavigate();
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   const featured = useMemo(() => {
@@ -447,7 +447,7 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
             <Button
               size="lg"
               className="px-6 bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
-              onClick={() => navigate({ to: `/universe/${current.id}` })}
+              onClick={() => navigate({ to: '/universe/$id', params: { id: current.id } })}
             >
               <Play className="h-4 w-4 mr-2 fill-current" />
               Explore
@@ -456,7 +456,7 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
               size="lg"
               variant="ghost"
               className="px-6 text-white/80 hover:text-white hover:bg-white/10 font-medium"
-              onClick={() => navigate({ to: `/universe/${current.id}` })}
+              onClick={() => navigate({ to: '/universe/$id', params: { id: current.id } })}
             >
               <BookOpen className="h-4 w-4 mr-2" />
               Details
@@ -996,7 +996,7 @@ export function ContentCard({ item }: { item: any }) {
  * CTA Banner
  * ────────────────────────────────────────── */
 export function CreateBanner() {
-  const navigate = useNavigate({ from: '//' });
+  const navigate = useNavigate();
 
   return (
     <section className="px-4 md:px-12 py-12">
@@ -1038,7 +1038,7 @@ export function SearchOverlay({
   universes: EnrichedUniverse[];
 }) {
   const [query, setQuery] = useState('');
-  const navigate = useNavigate({ from: '//' });
+  const navigate = useNavigate();
 
   const filtered = useMemo(() => {
     if (!query) return [];
@@ -1107,7 +1107,7 @@ export function SearchOverlay({
                     <button
                       key={u.id}
                       onClick={() => {
-                        navigate({ to: `/universe/${u.id}` });
+                        navigate({ to: '/universe/$id', params: { id: u.id } });
                         onClose();
                       }}
                       className="w-full p-3 rounded-xl hover:bg-white/5 transition-colors text-left flex items-center gap-3"
@@ -1164,7 +1164,7 @@ export function SearchOverlay({
                     <button
                       key={u.id}
                       onClick={() => {
-                        navigate({ to: `/universe/${u.id}` });
+                        navigate({ to: '/universe/$id', params: { id: u.id } });
                         onClose();
                       }}
                       className="w-full p-2.5 rounded-lg hover:bg-white/5 transition-colors text-left flex items-center gap-3"

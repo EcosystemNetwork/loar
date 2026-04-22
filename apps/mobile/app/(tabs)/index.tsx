@@ -79,7 +79,9 @@ export default function PortfolioHomeScreen() {
             <SectionHeader
               title="Universes"
               count={universes.length}
-              onSeeAll={() => router.push('/universe/' + universes[0].id)}
+              onSeeAll={() =>
+                router.push({ pathname: '/universe/[id]', params: { id: universes[0].id } })
+              }
             />
             <ScrollView
               horizontal

@@ -187,7 +187,7 @@ function HomeComponent() {
     }
 
     // Enrich base with Ponder data where available
-    const enriched = base.map((u: Partial<EnrichedUniverse>) => {
+    const enriched = base.map((u) => {
       const ponder = ponderMap.get(u.id.toLowerCase());
       let tokenData = tokenMap.get(u.id.toLowerCase());
       // Fallback: if Ponder doesn't have the token but Firestore has a non-zero tokenAddress,
