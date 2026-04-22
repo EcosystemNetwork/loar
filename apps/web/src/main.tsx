@@ -28,6 +28,11 @@ window.addEventListener('vite:preloadError', (e) => {
   window.location.reload();
 });
 
+// Retry IPFS image/video loads against public gateways when the configured
+// Pinata gateway 403s unpinned CIDs.
+import { installGlobalIpfsFallback } from './utils/install-ipfs-fallback';
+installGlobalIpfsFallback();
+
 import { RouterProvider, createRouter } from '@tanstack/react-router';
 import ReactDOM from 'react-dom/client';
 import Loader from './components/loader';
