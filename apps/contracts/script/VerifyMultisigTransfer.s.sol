@@ -79,7 +79,6 @@ contract VerifyMultisigTransferScript is Script {
         _checkOwnableUpgradeable("COLLAB_MANAGER_ADDRESS");
         _checkOwnableUpgradeable("ANALYTICS_REGISTRY_ADDRESS");
         _checkOwnableUpgradeable("LAUNCHPAD_STAKING_ADDRESS");
-        _checkOwnableUpgradeable("STORY_BOUNTIES_ADDRESS");
         _checkOwnableUpgradeable("ESCROW_ADDRESS");
         _checkOwnableUpgradeable("LOAR_BURNER_ADDRESS");
         _checkOwnableUpgradeable("REMIX_FEES_ADDRESS");

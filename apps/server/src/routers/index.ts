@@ -71,7 +71,6 @@ import { feedRouter } from './feed/feed.routes';
 import { playerRouter } from './player/player.routes';
 import { loraRouter } from './generation/lora.routes';
 import { privateSectionRouter } from './privateSection/privateSection.routes';
-import { bountiesRouter } from './bounties/bounties.routes';
 import { splitsRouter } from './splits/splits.routes';
 import { universeGenConfigRouter } from './universeGenConfig/universeGenConfig.routes';
 import { contentLicensingRouter } from './contentLicensing/contentLicensing.routes';
@@ -247,9 +246,6 @@ export const appRouter = router({
 
   // ── Portfolio BFF (mobile vault aggregation) ────────────────────────
   portfolio: portfolioRouter,
-
-  // ── $LOAR Token Economy ─────────────────────────────────────────────
-  bounties: bountiesRouter,
 
   // ── Pricing ────────────────────────────────────────────────────────
   pricing: pricingRouter,

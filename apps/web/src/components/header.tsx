@@ -61,10 +61,7 @@ const moreGroups = [
   },
   {
     label: 'Earn',
-    links: [
-      { to: '/bounties', label: 'Bounties' },
-      { to: '/sell', label: 'Sell' },
-    ],
+    links: [{ to: '/sell', label: 'Sell' }],
   },
   {
     label: 'More',

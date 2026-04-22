@@ -26,7 +26,6 @@ import {
   PanelLeftOpen,
   PanelLeftClose,
   X,
-  Target,
   Vault,
   BookPlus,
   Pin,
@@ -556,20 +555,6 @@ export function UniverseSidebar({
                   </Link>
                 </div>
               )}
-
-              {/* Bounties button */}
-              <div>
-                <Link to="/bounties" search={{ universeId: universeIdOrAddress }}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 hover:from-orange-100 hover:to-amber-100 dark:hover:from-orange-950/50 dark:hover:to-amber-950/50 border-orange-200 dark:border-orange-800 transition-all duration-300 group/btn h-10"
-                  >
-                    <Target className="h-4 w-4 mr-2 group-hover/btn:scale-110 transition-transform duration-300 text-orange-600 dark:text-orange-400" />
-                    Bounties
-                  </Button>
-                </Link>
-              </div>
 
               <Button
                 onClick={handleRefreshTimeline}

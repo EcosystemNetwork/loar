@@ -50,7 +50,6 @@ import {UpgradeableBeacon} from "@openzeppelin/proxy/beacon/UpgradeableBeacon.so
  *     COLLAB_MANAGER_ADDRESS           - CollabManager
  *     ANALYTICS_REGISTRY_ADDRESS       - AnalyticsRegistry
  *     LAUNCHPAD_STAKING_ADDRESS        - LaunchpadStaking
- *     STORY_BOUNTIES_ADDRESS           - StoryBounties
  *     ESCROW_ADDRESS                   - Escrow
  *     LOAR_BURNER_ADDRESS              - LoarBurner
  *     REMIX_FEES_ADDRESS               - RemixFees
@@ -142,7 +141,6 @@ contract TransferToMultisigScript is Script {
         _transferOwnableUpgradeable("COLLAB_MANAGER_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("ANALYTICS_REGISTRY_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("LAUNCHPAD_STAKING_ADDRESS", timelockAddr);
-        _transferOwnableUpgradeable("STORY_BOUNTIES_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("ESCROW_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("LOAR_BURNER_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("REMIX_FEES_ADDRESS", timelockAddr);
