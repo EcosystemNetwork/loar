@@ -141,12 +141,47 @@ export async function createUserWallet(userId: string, chainId = 84532): Promise
 
 /**
  * Get or create a wallet for a user.
- * Idempotent — returns existing wallet if one exists.
+ *
+ * Idempotent across concurrent calls — two parallel register/verify requests
+ * for the same userId will share a single Circle wallet. We can't use a
+ * Firestore transaction (Circle is an external API call), so instead:
+ *  - In-memory mutex dedupes in-process concurrent calls.
+ *  - Post-create we re-check the Firestore doc; if another replica/process
+ *    already wrote one, we keep the existing record and log the orphan so ops
+ *    can garbage-collect it in Circle's dashboard.
  */
+const _inflight = new Map<string, Promise<CircleWallet>>();
+
 export async function getOrCreateWallet(userId: string, chainId = 84532): Promise<CircleWallet> {
   const existing = await getUserWallet(userId);
   if (existing) return existing;
-  return createUserWallet(userId, chainId);
+
+  const pending = _inflight.get(userId);
+  if (pending) return pending;
+
+  const promise = (async (): Promise<CircleWallet> => {
+    const wallet = await createUserWallet(userId, chainId);
+    // Post-create: another process may have won the race. Firestore write-wins
+    // semantics mean our doc would have overwritten theirs — re-read to detect
+    // the race and log it. (Single-replica deploys never hit this path.)
+    const col = getUserWalletsCol();
+    if (col) {
+      const reread = await col.doc(userId).get();
+      const stored = reread.exists ? (reread.data() as CircleWallet) : null;
+      if (stored && stored.walletId !== wallet.walletId) {
+        console.warn(
+          `[circle] concurrent wallet creation for ${userId} — keeping ${stored.walletId}, orphan: ${wallet.walletId}`
+        );
+        return stored;
+      }
+    }
+    return wallet;
+  })().finally(() => {
+    _inflight.delete(userId);
+  });
+
+  _inflight.set(userId, promise);
+  return promise;
 }
 
 // ── Transaction execution ───────────────────────────────────────────────────

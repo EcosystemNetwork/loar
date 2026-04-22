@@ -245,12 +245,12 @@ export async function verifyEmailOTP(
 }
 
 /**
- * Social login (Google/Apple) — post the provider-issued idToken.
+ * Google social login — post the provider-issued idToken.
  * Email is extracted server-side from the verified token; don't trust
  * any email the client could send.
  */
 export async function socialLogin(
-  provider: 'google' | 'apple',
+  provider: 'google',
   idToken: string
 ): Promise<{ address: string; email: string; walletId: string; expiresAt: number }> {
   const res = await fetch(`${SERVER_URL}/auth/circle/social`, {
@@ -316,7 +316,7 @@ export function useWalletAuth() {
   }, []);
 
   /** Sign in with social provider (Circle flow). */
-  const signInWithSocial = useCallback(async (provider: 'google' | 'apple', idToken: string) => {
+  const signInWithSocial = useCallback(async (provider: 'google', idToken: string) => {
     setIsAuthenticating(true);
     setError(null);
     try {

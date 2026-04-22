@@ -3,22 +3,17 @@
  *
  * POST /auth/circle/register    — Register with email, get OTP sent
  * POST /auth/circle/verify-otp  — Verify OTP, create Circle wallet, issue JWT
- * POST /auth/circle/social      — Social login (Google/Apple token → wallet + JWT)
+ * POST /auth/circle/social      — Google social login (idToken → wallet + JWT)
  * GET  /auth/circle/me          — Current session info
  *
  * Each user gets a Circle-managed EOA wallet. The server holds the signing keys
  * via Circle's KMS — users only need email/social credentials.
  */
 import { Hono } from 'hono';
-import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
-import { issueSessionToken, verifySessionToken } from '../lib/siwe';
+import { setCookie } from 'hono/cookie';
+import { issueSessionToken } from '../lib/siwe';
 import { getOrCreateWallet, isCircleConfigured, type CircleWallet } from '../lib/circle-wallets';
-import {
-  verifyGoogleIdToken,
-  verifyAppleIdToken,
-  isGoogleOAuthConfigured,
-  isAppleOAuthConfigured,
-} from '../lib/oauth-verify';
+import { verifyGoogleIdToken, isGoogleOAuthConfigured } from '../lib/oauth-verify';
 import { recordAuthEvent } from '../lib/metrics';
 import { db, firebaseAvailable } from '../lib/firebase';
 import crypto from 'node:crypto';
@@ -34,15 +29,46 @@ const COOKIE_MAX_AGE = 24 * 60 * 60;
 
 const OTP_TTL = 5 * 60 * 1000; // 5 minutes
 const OTP_LENGTH = 6;
+const OTP_ISSUE_WINDOW_MS = 15 * 60 * 1000; // 15-min rolling issuance cap
+const OTP_ISSUE_MAX = 3; // max OTP emails per 15 min per email
 
-// In-memory OTP store (local dev fallback)
-const memOtps = new Map<string, { code: string; expiresAt: number; attempts: number }>();
+// HMAC key for OTP hashing — reuses SIWE_JWT_SECRET so we don't introduce a
+// new secret to rotate. Falls back to a random per-process key in dev so
+// tests still work without real config.
+const OTP_HMAC_KEY = process.env.SIWE_JWT_SECRET ?? crypto.randomBytes(32).toString('hex');
 
-// Clean up expired OTPs
+function hashOTP(code: string, email: string): string {
+  return crypto.createHmac('sha256', OTP_HMAC_KEY).update(`${email}:${code}`).digest('hex');
+}
+
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  return crypto.timingSafeEqual(ab, bb);
+}
+
+// In-memory OTP store (local dev fallback). `code` here is already the hash.
+interface OTPRecord {
+  hash: string;
+  expiresAt: number;
+  attempts: number;
+  issuedAt: number;
+}
+const memOtps = new Map<string, OTPRecord>();
+// Separate rolling-window issuance log per email (timestamps of each issue).
+const memIssueLog = new Map<string, number[]>();
+
+// Clean up expired OTPs + old issuance log entries.
 setInterval(() => {
   const now = Date.now();
   for (const [key, val] of memOtps) {
     if (now > val.expiresAt) memOtps.delete(key);
+  }
+  for (const [key, times] of memIssueLog) {
+    const fresh = times.filter((t) => now - t < OTP_ISSUE_WINDOW_MS);
+    if (fresh.length) memIssueLog.set(key, fresh);
+    else memIssueLog.delete(key);
   }
 }, 60_000);
 
@@ -52,27 +78,70 @@ function generateOTP(): string {
     .join('');
 }
 
+/**
+ * Returns true when the email may receive another OTP in this window.
+ * Does NOT record the new issuance — call `recordIssuance` after a successful
+ * send to avoid penalising the caller for rate-limit checks that return false.
+ */
+async function canIssueOTP(email: string): Promise<boolean> {
+  const windowStart = new Date(Date.now() - OTP_ISSUE_WINDOW_MS);
+
+  if (firebaseAvailable) {
+    const snap = await db
+      .collection('authOTPIssuances')
+      .where('email', '==', email)
+      .where('issuedAt', '>=', windowStart)
+      .limit(OTP_ISSUE_MAX)
+      .get();
+    return snap.size < OTP_ISSUE_MAX;
+  }
+
+  const times = (memIssueLog.get(email) ?? []).filter((t) => Date.now() - t < OTP_ISSUE_WINDOW_MS);
+  memIssueLog.set(email, times);
+  return times.length < OTP_ISSUE_MAX;
+}
+
+async function recordIssuance(email: string): Promise<void> {
+  if (firebaseAvailable) {
+    await db.collection('authOTPIssuances').add({
+      email,
+      issuedAt: new Date(),
+    });
+    return;
+  }
+  const times = memIssueLog.get(email) ?? [];
+  times.push(Date.now());
+  memIssueLog.set(email, times);
+}
+
 async function storeOTP(email: string, code: string): Promise<void> {
   const normalizedEmail = email.toLowerCase().trim();
   const expiresAt = Date.now() + OTP_TTL;
+  const hash = hashOTP(code, normalizedEmail);
 
   if (firebaseAvailable) {
     await db
       .collection('authOTPs')
       .doc(normalizedEmail)
       .set({
-        code,
+        hash,
         expiresAt: new Date(expiresAt),
         attempts: 0,
         createdAt: new Date(),
       });
   } else {
-    memOtps.set(normalizedEmail, { code, expiresAt, attempts: 0 });
+    memOtps.set(normalizedEmail, {
+      hash,
+      expiresAt,
+      attempts: 0,
+      issuedAt: Date.now(),
+    });
   }
 }
 
 async function verifyOTP(email: string, code: string): Promise<boolean> {
   const normalizedEmail = email.toLowerCase().trim();
+  const candidate = hashOTP(code, normalizedEmail);
 
   if (firebaseAvailable) {
     const ref = db.collection('authOTPs').doc(normalizedEmail);
@@ -88,28 +157,31 @@ async function verifyOTP(email: string, code: string): Promise<boolean> {
       await ref.delete();
       return false;
     }
-    if (data.code !== code) {
+    // Legacy plaintext migration: if an old doc still has `code`, compare
+    // against it once so active OTPs survive the deploy. Safe to remove after
+    // 5 min (OTP TTL) post-deploy.
+    const stored: string | undefined = data.hash ?? data.code;
+    if (!stored || !constantTimeEqual(stored, data.hash ? candidate : code)) {
       await ref.update({ attempts: data.attempts + 1 });
       return false;
     }
 
-    // OTP is valid — delete it (one-time use)
     await ref.delete();
     return true;
-  } else {
-    const entry = memOtps.get(normalizedEmail);
-    if (!entry) return false;
-    if (entry.attempts >= 5 || Date.now() > entry.expiresAt) {
-      memOtps.delete(normalizedEmail);
-      return false;
-    }
-    if (entry.code !== code) {
-      entry.attempts++;
-      return false;
-    }
-    memOtps.delete(normalizedEmail);
-    return true;
   }
+
+  const entry = memOtps.get(normalizedEmail);
+  if (!entry) return false;
+  if (entry.attempts >= 5 || Date.now() > entry.expiresAt) {
+    memOtps.delete(normalizedEmail);
+    return false;
+  }
+  if (!constantTimeEqual(entry.hash, candidate)) {
+    entry.attempts++;
+    return false;
+  }
+  memOtps.delete(normalizedEmail);
+  return true;
 }
 
 // ── User accounts ───────────────────────────────────────────────────────────
@@ -118,31 +190,59 @@ interface UserAccount {
   email: string;
   walletAddress: string;
   walletId: string;
-  provider: 'email' | 'google' | 'apple';
+  provider: 'email' | 'google';
   createdAt: Date;
 }
 
+/**
+ * Two concurrent logins for the same email must end up on the same wallet.
+ * `getOrCreateWallet` handles Circle-wallet-side dedup; here we dedup the
+ * UserAccount write by using `create()` as a compare-and-set — it rejects
+ * with ALREADY_EXISTS (gRPC code 6) on race, in which case we read the
+ * winner's doc and return that.
+ */
 async function getOrCreateUserAccount(
   email: string,
-  provider: 'email' | 'google' | 'apple' = 'email'
+  provider: 'email' | 'google' = 'email'
 ): Promise<{ account: UserAccount; wallet: CircleWallet }> {
   const normalizedEmail = email.toLowerCase().trim();
-  // Use email hash as userId for Circle wallet mapping
   const userId = `email:${normalizedEmail}`;
 
-  // Check if user exists
   if (firebaseAvailable) {
-    const userDoc = await db.collection('userAccounts').doc(normalizedEmail).get();
-    if (userDoc.exists) {
-      const account = userDoc.data() as UserAccount;
+    const ref = db.collection('userAccounts').doc(normalizedEmail);
+    const existing = await ref.get();
+    if (existing.exists) {
+      const account = existing.data() as UserAccount;
       const wallet = await getOrCreateWallet(userId);
       return { account, wallet };
     }
+
+    const wallet = await getOrCreateWallet(userId);
+    const account: UserAccount = {
+      email: normalizedEmail,
+      walletAddress: wallet.address,
+      walletId: wallet.walletId,
+      provider,
+      createdAt: new Date(),
+    };
+
+    try {
+      await ref.create(account);
+      return { account, wallet };
+    } catch (err: unknown) {
+      const code = (err as { code?: number })?.code;
+      if (code === 6) {
+        const winner = await ref.get();
+        if (winner.exists) {
+          return { account: winner.data() as UserAccount, wallet };
+        }
+      }
+      throw err;
+    }
   }
 
-  // Create new Circle wallet for user
+  // Dev/test fallback — no Firestore, no cross-request race.
   const wallet = await getOrCreateWallet(userId);
-
   const account: UserAccount = {
     email: normalizedEmail,
     walletAddress: wallet.address,
@@ -150,11 +250,6 @@ async function getOrCreateUserAccount(
     provider,
     createdAt: new Date(),
   };
-
-  if (firebaseAvailable) {
-    await db.collection('userAccounts').doc(normalizedEmail).set(account);
-  }
-
   return { account, wallet };
 }
 
@@ -190,8 +285,17 @@ circleAuthRoutes.post('/register', async (c) => {
   }
 
   try {
+    // Per-email issuance cap — prevents email bombing + verifier brute-force
+    // via repeated re-issues. Return 200 with the same success shape so the
+    // response doesn't double as an account-existence oracle.
+    if (!(await canIssueOTP(email))) {
+      recordAuthEvent('circle_register', 'failure');
+      return c.json({ ok: true, email, throttled: true });
+    }
+
     const otp = generateOTP();
     await storeOTP(email, otp);
+    await recordIssuance(email);
 
     // In production, send via email service (SendGrid, SES, etc.)
     // For now, log it in dev and return a success indicator
@@ -275,7 +379,7 @@ circleAuthRoutes.post('/verify-otp', async (c) => {
 /**
  * POST /auth/circle/social
  *
- * Social login — the client performs OAuth with Google/Apple and posts the
+ * Social login — the client performs Google OAuth and posts the
  * resulting ID token here. We verify it server-side against the provider's
  * JWKS before issuing a wallet/session, so a caller cannot simply POST
  * { email: "victim@example.com" } to take over an account.
@@ -286,32 +390,26 @@ circleAuthRoutes.post('/social', async (c) => {
   }
 
   const body = await c.req.json<{
-    provider: 'google' | 'apple';
+    provider: 'google';
     idToken?: string;
   }>();
 
   const provider = body.provider;
   const idToken = body.idToken?.trim();
 
-  if (!provider || (provider !== 'google' && provider !== 'apple')) {
-    return c.json({ error: 'provider must be "google" or "apple"' }, 400);
+  if (provider !== 'google') {
+    return c.json({ error: 'provider must be "google"' }, 400);
   }
   if (!idToken) {
     return c.json({ error: 'idToken is required' }, 400);
   }
-  if (provider === 'google' && !isGoogleOAuthConfigured()) {
+  if (!isGoogleOAuthConfigured()) {
     return c.json({ error: 'Google OAuth not configured on this server' }, 503);
-  }
-  if (provider === 'apple' && !isAppleOAuthConfigured()) {
-    return c.json({ error: 'Apple OAuth not configured on this server' }, 503);
   }
 
   let verified;
   try {
-    verified =
-      provider === 'google'
-        ? await verifyGoogleIdToken(idToken)
-        : await verifyAppleIdToken(idToken);
+    verified = await verifyGoogleIdToken(idToken);
   } catch (err) {
     recordAuthEvent('circle_social', 'failure');
     const message = err instanceof Error ? err.message : 'idToken verification failed';

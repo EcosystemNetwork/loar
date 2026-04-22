@@ -12,7 +12,6 @@ import { useState, useEffect, useRef } from 'react';
 import { z } from 'zod';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID as string | undefined;
-const APPLE_CLIENT_ID = import.meta.env.VITE_APPLE_OAUTH_CLIENT_ID as string | undefined;
 
 // Loaded once per page — both scripts are idempotent (no-op on repeat).
 function loadScript(src: string, id: string): Promise<void> {
@@ -140,37 +139,6 @@ function LoginPage() {
     };
   }, [signInWithSocial]);
 
-  // ── Apple Sign-In (popup flow) ───────────────────────────────────────────
-  const handleAppleSignIn = async () => {
-    if (!APPLE_CLIENT_ID) return;
-    try {
-      await loadScript(
-        'https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js',
-        'apple-id-auth'
-      );
-      const AppleID = (window as any).AppleID;
-      if (!AppleID?.auth) throw new Error('Apple ID SDK not available');
-
-      AppleID.auth.init({
-        clientId: APPLE_CLIENT_ID,
-        scope: 'name email',
-        redirectURI: window.location.origin + '/login',
-        usePopup: true,
-      });
-
-      const result = await AppleID.auth.signIn();
-      const idToken = result?.authorization?.id_token;
-      if (!idToken) throw new Error('No id_token from Apple');
-
-      setError(null);
-      await signInWithSocial('apple', idToken);
-    } catch (err: any) {
-      // Apple's popup throws { error: 'popup_closed_by_user' } on cancel — swallow that
-      if (err?.error === 'popup_closed_by_user') return;
-      setError(err instanceof Error ? err.message : 'Apple sign-in failed');
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-10">
@@ -294,28 +262,15 @@ function LoginPage() {
             </div>
           )}
 
-          {/* Social sign-in — only when the provider is configured */}
-          {(GOOGLE_CLIENT_ID || APPLE_CLIENT_ID) && step === 'email' && (
+          {/* Social sign-in — only when Google is configured */}
+          {GOOGLE_CLIENT_ID && step === 'email' && (
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-xs text-muted-foreground/60">
                 <div className="flex-1 border-t border-border/50" />
                 <span className="uppercase tracking-widest text-[10px]">or</span>
                 <div className="flex-1 border-t border-border/50" />
               </div>
-              {GOOGLE_CLIENT_ID && <div ref={googleBtnRef} className="flex justify-center" />}
-              {APPLE_CLIENT_ID && (
-                <button
-                  type="button"
-                  onClick={handleAppleSignIn}
-                  disabled={isAuthenticating}
-                  className="w-full py-3 flex items-center justify-center gap-2 bg-black hover:bg-zinc-900 disabled:opacity-50 text-white rounded-lg border border-white/10 transition-colors"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M11.182.008C11.148-.03 9.923.023 8.857 1.18c-1.066 1.156-.902 2.482-.878 2.516.024.034 1.52.087 2.475-1.258.955-1.345.762-2.391.728-2.43Zm3.314 11.733c-.048-.096-2.325-1.234-2.113-3.422.212-2.189 1.675-2.789 1.698-2.854.023-.065-.597-.79-1.254-1.157a3.692 3.692 0 0 0-1.563-.434c-.108-.003-.483-.095-1.254.116-.508.139-1.653.589-1.968.607-.316.018-1.256-.522-2.267-.665-.647-.125-1.333.131-1.824.328-.49.196-1.422.754-2.074 2.237-.652 1.482-.311 3.83.203 5.117.514 1.287 1.258 2.655 2.245 2.659.983.023 1.334-.618 2.523-.612 1.189.005 1.502.622 2.517.606 1.014-.017 1.673-1.237 2.186-2.241.374-.691.678-1.432.96-2.213ZM9.5 3.01c.279-.275.5-.667.5-.675-.074.131-.326.493-.5.675Z" />
-                  </svg>
-                  <span className="text-sm font-medium">Continue with Apple</span>
-                </button>
-              )}
+              <div ref={googleBtnRef} className="flex justify-center" />
             </div>
           )}
 

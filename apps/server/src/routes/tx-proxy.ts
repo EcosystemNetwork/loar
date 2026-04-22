@@ -13,11 +13,11 @@
 import { Hono } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { verifySessionToken } from '../lib/siwe';
-import { getUserWallet, executeTransaction } from '../lib/circle-wallets';
+import { executeTransaction } from '../lib/circle-wallets';
+import { isContractAllowed } from '../lib/contract-allowlist';
+import { consumeRateLimit } from '../middleware/rate-limit';
 import { db, firebaseAvailable } from '../lib/firebase';
 import { encodeFunctionData, type Abi } from 'viem';
-// Note: SPONSORED_ACTIONS is not exported from paymaster.ts on the server.
-// For analytics, we just track the function name — sponsorship enforcement is separate.
 
 export const txProxyRoutes = new Hono();
 
@@ -80,6 +80,27 @@ txProxyRoutes.post('/write', async (c) => {
 
   const walletAddress = payload.sub;
 
+  // Per-user cap — the global /tx rate limit is keyed on IP, but a compromised
+  // session can reach us from anywhere. Cap each authenticated identity at
+  // 20/min and 200/day independently so one hot wallet can't drain Circle's
+  // quota or your gas budget.
+  const perMinute = await consumeRateLimit(
+    `txproxy:min:${walletAddress.toLowerCase()}`,
+    60_000,
+    20
+  );
+  if (perMinute.blocked) {
+    return c.json({ error: 'Too many transactions — try again in a minute' }, 429);
+  }
+  const perDay = await consumeRateLimit(
+    `txproxy:day:${walletAddress.toLowerCase()}`,
+    24 * 60 * 60_000,
+    200
+  );
+  if (perDay.blocked) {
+    return c.json({ error: 'Daily transaction limit reached' }, 429);
+  }
+
   // Parse request
   const body = await c.req.json<{
     address: string;
@@ -100,6 +121,20 @@ txProxyRoutes.post('/write', async (c) => {
     return c.json({ error: 'Provide either {abi,functionName} or {data}' }, 400);
   }
 
+  // Allowlist enforcement — the server is a signing oracle, so callers can
+  // only ask us to sign calls to contracts we know about. Anything else would
+  // let a compromised session drain funds (e.g. approve to attacker-spender).
+  const chainId = body.chainId ?? 84532;
+  const allowed = await isContractAllowed(chainId, body.address);
+  if (!allowed) {
+    return c.json(
+      {
+        error: `Contract ${body.address} on chain ${chainId} is not in the allowlist`,
+      },
+      403
+    );
+  }
+
   // Resolve Circle wallet
   const wallet = await resolveWallet(walletAddress);
   if (!wallet) {
@@ -115,10 +150,13 @@ txProxyRoutes.post('/write', async (c) => {
     // Build calldata — either encode the ABI call or pass raw bytes through.
     let calldata: `0x${string}`;
     if (hasRawCall) {
-      if (!/^0x[0-9a-fA-F]*$/.test(body.data!)) {
-        return c.json({ error: 'data must be a 0x-prefixed hex string' }, 400);
+      const raw = body.data!;
+      // Calldata must be even-length hex; Circle's SDK rejects odd-length
+      // upstream but only after a 60s poll, so fail fast here.
+      if (!/^0x[0-9a-fA-F]*$/.test(raw) || raw.length % 2 !== 0) {
+        return c.json({ error: 'data must be 0x-prefixed even-length hex' }, 400);
       }
-      calldata = body.data!;
+      calldata = raw;
     } else {
       calldata = encodeFunctionData({
         abi: body.abi!,
@@ -132,7 +170,7 @@ txProxyRoutes.post('/write', async (c) => {
       walletId: wallet.walletId,
       contractAddress: body.address,
       calldata,
-      chainId: body.chainId ?? 84532, // Default to Base Sepolia
+      chainId,
       value: body.value,
     });
 
