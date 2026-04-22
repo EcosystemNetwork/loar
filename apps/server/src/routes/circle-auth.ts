@@ -14,6 +14,7 @@ import { setCookie } from 'hono/cookie';
 import { issueSessionToken } from '../lib/siwe';
 import { getOrCreateWallet, isCircleConfigured, type CircleWallet } from '../lib/circle-wallets';
 import { verifyGoogleIdToken, isGoogleOAuthConfigured } from '../lib/oauth-verify';
+import { sendOtpEmail, isEmailConfigured } from '../lib/email';
 import { recordAuthEvent } from '../lib/metrics';
 import { db, firebaseAvailable } from '../lib/firebase';
 import crypto from 'node:crypto';
@@ -299,16 +300,29 @@ circleAuthRoutes.post('/register', async (c) => {
     await storeOTP(email, otp);
     await recordIssuance(email);
 
-    // In production, send via email service (SendGrid, SES, etc.)
-    // For now, log it in dev and return a success indicator
+    // Dev/test: log the OTP and echo it in the response so we can drive the
+    // flow without an email provider during local work + vitest.
     if (IS_DEV_OR_TEST) {
       console.log(`[AUTH] OTP for ${email}: ${otp}`);
-      // In dev, also return the OTP for testing convenience
       return c.json({ ok: true, email, _devOtp: otp });
     }
 
-    // TODO: Integrate email sending service
-    // await sendOtpEmail(email, otp);
+    // Production: deliver via Resend. Fail hard rather than silently accept —
+    // if email is broken, the user will never see a code and assumes the
+    // product is broken. Surfacing the error lets us react immediately.
+    if (!isEmailConfigured()) {
+      recordAuthEvent('circle_register', 'failure');
+      console.error('[AUTH] RESEND_API_KEY not set; cannot deliver OTP');
+      return c.json({ error: 'Email delivery not configured' }, 503);
+    }
+
+    try {
+      await sendOtpEmail(email, otp);
+    } catch (err) {
+      recordAuthEvent('circle_register', 'failure');
+      console.error('[AUTH] email send failed:', err);
+      return c.json({ error: 'Failed to send verification code' }, 502);
+    }
 
     recordAuthEvent('circle_register', 'success');
     return c.json({ ok: true, email });
