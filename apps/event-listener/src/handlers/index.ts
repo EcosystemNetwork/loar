@@ -17,7 +17,6 @@ import { governorHandlers } from './governor.js';
 import { governanceTokenHandlers } from './governance-token.js';
 import { poolManagerHandlers } from './pool-manager.js';
 import { canonMarketplaceHandlers } from './canon-marketplace.js';
-import { adPlacementHandlers } from './ad-placement.js';
 import { licensingHandlers } from './licensing.js';
 import { collabHandlers } from './collab.js';
 import type { Handler, ContractKind } from './types.js';
@@ -30,7 +29,6 @@ export const allHandlers: Handler[] = [
   ...governanceTokenHandlers,
   ...poolManagerHandlers,
   ...canonMarketplaceHandlers,
-  ...adPlacementHandlers,
   ...licensingHandlers,
   ...collabHandlers,
 ];
@@ -52,7 +50,6 @@ const topicsByKind: Record<ContractKind, string[]> = {
   BondingCurve: [],
   PoolManager: [],
   CanonMarketplace: [],
-  AdPlacement: [],
   LicensingRegistry: [],
   CollabManager: [],
 };

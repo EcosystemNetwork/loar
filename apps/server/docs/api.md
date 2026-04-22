@@ -22,7 +22,6 @@ Auth is SIWE JWT via `Authorization: Bearer <token>` header.
 | **Credits**       | `credits`          | mixed             | Credit packages, balance, spend/purchase                          |
 | **Subscriptions** | `subscriptions`    | mixed             | Per-universe subscription tiers                                   |
 | **Analytics**     | `analytics`        | mixed             | Views, engagement, trending                                       |
-| **Ads**           | `ads`              | mixed             | Ad slots, sponsorships, bidding                                   |
 | **Licensing**     | `licensing`        | mixed             | IP licenses, merch, royalties                                     |
 | **Storage**       | `storage`          | mixed             | Unified decentralized storage (Pinata/IPFS, Lighthouse, Firebase) |
 |                   | `firebaseStorage`  | mixed             | Direct Firebase Storage operations                                |

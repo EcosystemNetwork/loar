@@ -30,7 +30,6 @@ All upgradeable contracts use OpenZeppelin Upgradeable v5.0.2 with `Initializabl
 | RightsRegistry      | `0x3A14A746990498d5a4eCe867db10a197f91856Bc` |
 | CanonMarketplace    | `0xDc5998C5e334345Ac3Aa9a9c6e141f471e929c81` |
 | CreditManager       | `0x5110FCCaf50316D8F874F22428dC1a832F591639` |
-| AdPlacement         | `0x972bD30323B0Fb5f2466E39593cCdE1e8ae3F8C1` |
 | SubscriptionManager | `0x53542bA1e3445804D9a225C967E2677F017D1d47` |
 | LicensingRegistry   | `0xbF0Fed6125b1e05aA3Dc52B72B5cd7703990627C` |
 | CollabManager       | `0xE981454B4149BEa3a9018fa2ab77482F388ba01f` |
@@ -88,7 +87,6 @@ function createNode(
 | RightsRegistry      | UUPS    | Tracks content rights, ownership, and operator permissions |
 | CanonMarketplace    | UUPS    | Submit/vote/finalize/license canonical content             |
 | CreditManager       | UUPS    | AI generation credits with tier-based pricing              |
-| AdPlacement         | UUPS    | Ad slot creation, bidding, and impression tracking         |
 | SubscriptionManager | UUPS    | Creator subscription tier management                       |
 | LicensingRegistry   | UUPS    | 6 IP license types with royalty distribution               |
 | CollabManager       | UUPS    | Multi-creator collaboration proposals & revenue splits     |

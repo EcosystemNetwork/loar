@@ -23,7 +23,6 @@ export type ContractKind =
   | 'BondingCurve'
   | 'PoolManager'
   | 'CanonMarketplace'
-  | 'AdPlacement'
   | 'LicensingRegistry'
   | 'CollabManager';
 

@@ -54,7 +54,6 @@ export const chainConfig = {
           : '0xE8E23e97Fa135823143d6b9Cba9c699040D51F70'
     ),
     CanonMarketplace: lc(deployment.contracts.CanonMarketplace),
-    AdPlacement: lc(deployment.contracts.AdPlacement),
     LicensingRegistry: lc(deployment.contracts.LicensingRegistry),
     CollabManager: lc(deployment.contracts.CollabManager),
   } satisfies Partial<Record<ContractKind, Hex | undefined>>,

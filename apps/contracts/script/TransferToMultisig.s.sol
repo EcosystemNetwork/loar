@@ -45,7 +45,6 @@ import {UpgradeableBeacon} from "@openzeppelin/proxy/beacon/UpgradeableBeacon.so
  *     RIGHTS_REGISTRY_ADDRESS          - RightsRegistry
  *     CANON_MARKETPLACE_ADDRESS        - CanonMarketplace
  *     CREDIT_MANAGER_ADDRESS           - CreditManager
- *     AD_PLACEMENT_ADDRESS             - AdPlacement
  *     SUBSCRIPTION_MANAGER_ADDRESS     - SubscriptionManager
  *     LICENSING_REGISTRY_ADDRESS       - LicensingRegistry
  *     COLLAB_MANAGER_ADDRESS           - CollabManager
@@ -138,7 +137,6 @@ contract TransferToMultisigScript is Script {
         _transferOwnableUpgradeable("RIGHTS_REGISTRY_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("CANON_MARKETPLACE_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("CREDIT_MANAGER_ADDRESS", timelockAddr);
-        _transferOwnableUpgradeable("AD_PLACEMENT_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("SUBSCRIPTION_MANAGER_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("LICENSING_REGISTRY_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("COLLAB_MANAGER_ADDRESS", timelockAddr);

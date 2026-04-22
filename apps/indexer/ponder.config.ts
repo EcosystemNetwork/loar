@@ -19,7 +19,6 @@ import {
   creditManagerAbi,
   subscriptionManagerAbi,
   canonMarketplaceAbi,
-  adPlacementAbi,
   licensingRegistryAbi,
   collabManagerAbi,
   // analyticsRegistryAbi — no events to index currently
@@ -82,9 +81,6 @@ const subscriptionManagerAddress = deployment.contracts.SubscriptionManager
   : undefined;
 const canonMarketplaceAddress = deployment.contracts.CanonMarketplace
   ? getAddress(deployment.contracts.CanonMarketplace)
-  : undefined;
-const adPlacementAddress = deployment.contracts.AdPlacement
-  ? getAddress(deployment.contracts.AdPlacement)
   : undefined;
 const licensingRegistryAddress = deployment.contracts.LicensingRegistry
   ? getAddress(deployment.contracts.LicensingRegistry)
@@ -210,12 +206,6 @@ export default createConfig({
       abi: canonMarketplaceAbi,
       address: canonMarketplaceAddress ?? ZERO_ADDRESS,
       startBlock: canonMarketplaceAddress ? startBlock : UNDEPLOYED_BLOCK,
-    },
-    AdPlacement: {
-      chain: chainName,
-      abi: adPlacementAbi,
-      address: adPlacementAddress ?? ZERO_ADDRESS,
-      startBlock: adPlacementAddress ? startBlock : UNDEPLOYED_BLOCK,
     },
     LicensingRegistry: {
       chain: chainName,

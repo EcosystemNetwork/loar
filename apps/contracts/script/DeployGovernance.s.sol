@@ -39,7 +39,6 @@ import {UpgradeableBeacon} from "@openzeppelin/proxy/beacon/UpgradeableBeacon.so
  *     SUBSCRIPTION_MANAGER_PROXY
  *     LICENSING_REGISTRY_PROXY
  *     COLLAB_MANAGER_PROXY
- *     AD_PLACEMENT_PROXY
  *     ANALYTICS_REGISTRY_PROXY
  *     RIGHTS_REGISTRY_PROXY
  *     ESCROW_PROXY
@@ -184,7 +183,6 @@ contract DeployGovernanceScript is Script {
         _transferUUPS("SUBSCRIPTION_MANAGER_PROXY", timelockAddr);
         _transferUUPS("LICENSING_REGISTRY_PROXY", timelockAddr);
         _transferUUPS("COLLAB_MANAGER_PROXY", timelockAddr);
-        _transferUUPS("AD_PLACEMENT_PROXY", timelockAddr);
         _transferUUPS("ANALYTICS_REGISTRY_PROXY", timelockAddr);
         _transferUUPS("RIGHTS_REGISTRY_PROXY", timelockAddr);
         _transferUUPS("ESCROW_PROXY", timelockAddr);

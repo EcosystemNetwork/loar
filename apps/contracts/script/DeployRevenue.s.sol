@@ -8,7 +8,6 @@ import {RightsRegistry} from "../src/RightsRegistry.sol";
 import {RevenueModuleFactory} from "../src/RevenueModuleFactory.sol";
 import {CanonMarketplace} from "../src/revenue/CanonMarketplace.sol";
 import {CreditManager} from "../src/revenue/CreditManager.sol";
-import {AdPlacement} from "../src/revenue/AdPlacement.sol";
 import {SubscriptionManager} from "../src/revenue/SubscriptionManager.sol";
 import {LicensingRegistry} from "../src/revenue/LicensingRegistry.sol";
 import {CollabManager} from "../src/revenue/CollabManager.sol";
@@ -113,18 +112,7 @@ contract DeployRevenueScript is Script {
         );
         console.log("CreditManager:", address(cr));
 
-        // 6. AdPlacement (UUPS) — initialize(platform, paymentRouter, feeBps)
-        AdPlacement ap = AdPlacement(
-            address(
-                new ERC1967Proxy(
-                    address(new AdPlacement()),
-                    abi.encodeCall(AdPlacement.initialize, (d, address(pr), FEE))
-                )
-            )
-        );
-        console.log("AdPlacement:", address(ap));
-
-        // 7. SubscriptionManager (UUPS) — initialize(platform, paymentRouter, feeBps)
+        // 6. SubscriptionManager (UUPS) — initialize(platform, paymentRouter, feeBps)
         SubscriptionManager sm = SubscriptionManager(
             address(
                 new ERC1967Proxy(
@@ -135,7 +123,7 @@ contract DeployRevenueScript is Script {
         );
         console.log("SubscriptionManager:", address(sm));
 
-        // 8. LicensingRegistry (UUPS) — initialize(platform, paymentRouter, feeBps)
+        // 7. LicensingRegistry (UUPS) — initialize(platform, paymentRouter, feeBps)
         LicensingRegistry lr = LicensingRegistry(
             address(
                 new ERC1967Proxy(
@@ -146,7 +134,7 @@ contract DeployRevenueScript is Script {
         );
         console.log("LicensingRegistry:", address(lr));
 
-        // 9. CollabManager (UUPS) — initialize(platform, paymentRouter, feeBps)
+        // 8. CollabManager (UUPS) — initialize(platform, paymentRouter, feeBps)
         CollabManager cl = CollabManager(
             address(
                 new ERC1967Proxy(
@@ -160,7 +148,7 @@ contract DeployRevenueScript is Script {
         );
         console.log("CollabManager:", address(cl));
 
-        // 10. AnalyticsRegistry (UUPS) — initialize(platform)
+        // 9. AnalyticsRegistry (UUPS) — initialize(platform)
         AnalyticsRegistry ar = AnalyticsRegistry(
             address(
                 new ERC1967Proxy(

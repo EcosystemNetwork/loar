@@ -69,7 +69,6 @@ const moreGroups = [
   {
     label: 'More',
     links: [
-      { to: '/adplacements', label: 'Ads', beta: true },
       { to: '/sandbox', label: 'Sandbox', beta: true },
       { to: '/subscriptions', label: 'Subscriptions' },
       { to: '/faucet', label: 'Faucet' },

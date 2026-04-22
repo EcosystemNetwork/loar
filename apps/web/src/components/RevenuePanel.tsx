@@ -38,7 +38,6 @@ import {
   useSubmitCanon,
   useCreditBalance,
   useUniverseSubStats,
-  useAdSlots,
   useUniverseMetrics,
 } from '@/hooks/useRevenue';
 import { useVocab } from '@/hooks/use-vocab';
@@ -79,9 +78,6 @@ export function RevenuePanel({ universeId, universeName }: RevenuePanelProps) {
             <TabsTrigger value="subs" className="text-xs">
               Subs
             </TabsTrigger>
-            <TabsTrigger value="ads" className="text-xs">
-              Ads
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4 mt-4">
@@ -98,10 +94,6 @@ export function RevenuePanel({ universeId, universeName }: RevenuePanelProps) {
 
           <TabsContent value="subs" className="space-y-4 mt-4">
             <SubsTab universeId={universeId} />
-          </TabsContent>
-
-          <TabsContent value="ads" className="space-y-4 mt-4">
-            <AdsTabPanel universeId={universeId} />
           </TabsContent>
         </Tabs>
       </SheetContent>
@@ -298,40 +290,6 @@ function SubsTab({ universeId }: { universeId: string }) {
             <span className="font-mono">{count as number}</span>
           </div>
         ))}
-    </div>
-  );
-}
-
-function AdsTabPanel({ universeId }: { universeId: string }) {
-  const { data: slots } = useAdSlots(universeId);
-
-  return (
-    <div className="space-y-4">
-      <h3 className="font-semibold">Ad Placements</h3>
-      {(slots as any[])?.length ? (
-        <div className="space-y-2">
-          {(slots as any[]).map((slot: any) => (
-            <Card key={slot.id}>
-              <CardContent className="pt-3 pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-sm capitalize">
-                      {slot.placementType?.toLowerCase()}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{slot.episodes} episodes</p>
-                  </div>
-                  <div className="text-right text-xs">
-                    <p>Min: {formatWei(slot.minBid)} ETH</p>
-                    <p>Current: {formatWei(slot.currentBid || '0')} ETH</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">No ad slots created</p>
-      )}
     </div>
   );
 }

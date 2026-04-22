@@ -25,7 +25,6 @@ import {SplitRouter} from "../src/SplitRouter.sol";
 import {RevenueModuleFactory} from "../src/RevenueModuleFactory.sol";
 import {CanonMarketplace} from "../src/revenue/CanonMarketplace.sol";
 import {CreditManager} from "../src/revenue/CreditManager.sol";
-import {AdPlacement} from "../src/revenue/AdPlacement.sol";
 import {SubscriptionManager} from "../src/revenue/SubscriptionManager.sol";
 import {LicensingRegistry} from "../src/revenue/LicensingRegistry.sol";
 import {CollabManager} from "../src/revenue/CollabManager.sol";
@@ -241,19 +240,6 @@ contract DeployAllScript is Script {
         );
         console.log("[4] CreditManager:", address(creditManager));
 
-        // AdPlacement
-        AdPlacement adPlacement = AdPlacement(
-            address(
-                new ERC1967Proxy(
-                    address(new AdPlacement()),
-                    abi.encodeCall(
-                        AdPlacement.initialize, (d, address(paymentRouter), PLATFORM_FEE_BPS)
-                    )
-                )
-            )
-        );
-        console.log("[4] AdPlacement:", address(adPlacement));
-
         // SubscriptionManager
         SubscriptionManager subManager = SubscriptionManager(
             address(
@@ -378,7 +364,6 @@ contract DeployAllScript is Script {
         _logEnv("REVENUE_MODULE_FACTORY", address(rmf));
         _logEnv("CANON_MARKETPLACE_ADDRESS", address(canon));
         _logEnv("CREDIT_MANAGER_ADDRESS", address(creditManager));
-        _logEnv("AD_PLACEMENT_ADDRESS", address(adPlacement));
         _logEnv("SUBSCRIPTION_MANAGER_ADDRESS", address(subManager));
         _logEnv("LICENSING_REGISTRY_ADDRESS", address(licensingRegistry));
         _logEnv("COLLAB_MANAGER_ADDRESS", address(collabManager));

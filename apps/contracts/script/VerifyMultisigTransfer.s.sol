@@ -74,7 +74,6 @@ contract VerifyMultisigTransferScript is Script {
         _checkOwnableUpgradeable("RIGHTS_REGISTRY_ADDRESS");
         _checkOwnableUpgradeable("CANON_MARKETPLACE_ADDRESS");
         _checkOwnableUpgradeable("CREDIT_MANAGER_ADDRESS");
-        _checkOwnableUpgradeable("AD_PLACEMENT_ADDRESS");
         _checkOwnableUpgradeable("SUBSCRIPTION_MANAGER_ADDRESS");
         _checkOwnableUpgradeable("LICENSING_REGISTRY_ADDRESS");
         _checkOwnableUpgradeable("COLLAB_MANAGER_ADDRESS");

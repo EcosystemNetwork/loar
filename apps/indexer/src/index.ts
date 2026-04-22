@@ -32,8 +32,6 @@ import {
   vote,
   canonSubmission,
   canonVote,
-  adSlot,
-  sponsorship,
   license,
   collab,
 } from 'ponder:schema';
@@ -777,53 +775,6 @@ ponder.on('CanonMarketplace:SubmissionRejected', async ({ event, context }) => {
   await context.db
     .update(canonSubmission, { id: event.args.submissionId.toString() })
     .set({ status: 3, finalizedAt: Number(event.block.timestamp) });
-});
-
-// ── AdPlacement ───────────────────────────────────────────────────────
-// AdSlotCreated doesn't carry episodesRemaining, and SponsorshipActivated
-// doesn't carry totalPaid — read them from the adSlots()/sponsorships()
-// struct getters so the schema's notNull contract holds.
-
-ponder.on('AdPlacement:AdSlotCreated', async ({ event, context }) => {
-  const slotId = event.args.slotId;
-
-  const slot = (await context.client.readContract({
-    abi: context.contracts.AdPlacement.abi,
-    address: context.contracts.AdPlacement.address as `0x${string}`,
-    functionName: 'adSlots',
-    args: [slotId],
-  })) as readonly [bigint, bigint, number, bigint, bigint, `0x${string}`, string, bigint, boolean];
-
-  await context.db.insert(adSlot).values({
-    id: slotId.toString(),
-    universeId: Number(event.args.universeId),
-    placementType: Number(event.args.placementType),
-    minBid: event.args.minBid.toString(),
-    episodesRemaining: Number(slot[7]),
-    active: true,
-    createdAt: Number(event.block.timestamp),
-  });
-});
-
-ponder.on('AdPlacement:SponsorshipActivated', async ({ event, context }) => {
-  const sponsorshipId = event.args.sponsorshipId;
-
-  const spon = (await context.client.readContract({
-    abi: context.contracts.AdPlacement.abi,
-    address: context.contracts.AdPlacement.address as `0x${string}`,
-    functionName: 'sponsorships',
-    args: [sponsorshipId],
-  })) as readonly [bigint, bigint, `0x${string}`, bigint, bigint, bigint, boolean];
-
-  await context.db.insert(sponsorship).values({
-    id: sponsorshipId.toString(),
-    adSlotId: Number(event.args.slotId),
-    sponsor: getAddress(event.args.sponsor),
-    totalPaid: spon[3].toString(),
-    impressions: 0,
-    active: true,
-    startedAt: Number(event.block.timestamp),
-  });
 });
 
 // ── LicensingRegistry ─────────────────────────────────────────────────

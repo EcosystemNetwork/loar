@@ -48,8 +48,6 @@ const PER_EVENT_COLLECTIONS = [
   COLLECTIONS.votes,
   COLLECTIONS.canonSubmissions,
   COLLECTIONS.canonVotes,
-  COLLECTIONS.adSlots,
-  COLLECTIONS.sponsorships,
   COLLECTIONS.licenses,
   COLLECTIONS.collabs,
 ];

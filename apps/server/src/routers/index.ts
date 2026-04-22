@@ -13,7 +13,6 @@
  *   credits        — Credit packages, balances, spend/purchase
  *   subscriptions  — Universe subscription tiers
  *   analytics      — Views, engagement, trending, wallet tracking
- *   ads            — Ad slots, sponsorships, bidding
  *   licensing      — IP licensing, merch, royalties
  *   storage        — Unified storage, Firebase Storage, Filecoin Synapse
  *   profiles       — User profiles, discovery
@@ -41,8 +40,6 @@ import { listingsRouter } from './listings/listings.routes';
 import { creditsRouter } from './credits/credits.routes';
 import { subscriptionsRouter } from './subscriptions/subscriptions.routes';
 import { analyticsRouter } from './analytics/analytics.routes';
-import { adsRouter } from './ads/ads.routes';
-import { adSeedsRouter } from './ads/adSeeds.routes';
 import { storageRouter } from './storage/storage.routes';
 import { firebaseStorageRouter } from './storage/firebase.routes';
 import { synapseRouter } from './storage/synapse.routes';
@@ -210,8 +207,6 @@ export const appRouter = router({
   // ── Monetization ────────────────────────────────────────────────────
   credits: creditsRouter,
   subscriptions: subscriptionsRouter,
-  ads: adsRouter,
-  adSeeds: adSeedsRouter,
 
   // ── Analytics ───────────────────────────────────────────────────────
   analytics: analyticsRouter,
