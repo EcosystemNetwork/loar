@@ -1,34 +1,29 @@
 /**
- * Wallet Provider Wrapper
+ * Wallet Provider — Minimal auth context wrapper
  *
- * Uses thirdweb for wallet connection + wagmi for contract hooks.
- * ThirdwebProvider handles wallet UI and connection state.
- * Wagmi hooks (useAccount, useSignMessage, etc.) work via thirdweb's built-in wagmi support.
+ * Previously wrapped ThirdwebProvider + WagmiProvider.
+ * Now provides a lightweight context for Circle DCW auth state.
+ * wagmi stays for read-only contract calls (useReadContract, useChainId).
  */
-
-import { ThirdwebProvider } from 'thirdweb/react';
 import { WagmiProvider } from 'wagmi';
-import type { QueryClient } from '@tanstack/react-query';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { config } from '../../config';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { config } from '@/../config';
+import type { ReactNode } from 'react';
 
-interface WalletProviderProps {
-  children: React.ReactNode;
-  queryClient: QueryClient;
-}
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Don't refetch on window focus — prevents auth/contract data thrashing
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
-/**
- * Top-level wallet context provider.
- *
- * Nesting order (outermost → innermost):
- *   ThirdwebProvider → WagmiProvider → QueryClientProvider
- */
-export function WalletWrapper({ children, queryClient }: WalletProviderProps) {
+export function WalletProvider({ children }: { children: ReactNode }) {
   return (
-    <ThirdwebProvider>
-      <WagmiProvider config={config}>
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-      </WagmiProvider>
-    </ThirdwebProvider>
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    </WagmiProvider>
   );
 }

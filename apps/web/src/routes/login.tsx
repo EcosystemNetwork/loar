@@ -1,15 +1,14 @@
 /**
- * Login Route
+ * Login Route — Email / Social Sign-In via Circle DCW
  *
- * Wallet sign-in via thirdweb + SIWE.
- * After wallet connect + SIWE verification, redirects to ?redirect param or /dashboard.
+ * Users can sign in with email (OTP verification) or social providers.
+ * After verification, a Circle wallet is auto-created and a JWT session is set.
  */
 
 import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router';
-import { WalletConnectButton } from '@/components/wallet-connect-button';
-import { useWalletAuth } from '@/lib/wallet-auth';
+import { useWalletAuth, requestEmailOTP } from '@/lib/wallet-auth';
 import { CHAIN_NAMES, SUPPORTED_CHAIN_IDS } from '@/configs/chains';
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { z } from 'zod';
 
 const loginSearchSchema = z.object({
@@ -22,9 +21,15 @@ export const Route = createFileRoute('/login')({
 });
 
 function LoginPage() {
-  const { isAuthenticated } = useWalletAuth();
+  const { isAuthenticated, signInWithEmail, isAuthenticating, error: authError } = useWalletAuth();
   const navigate = useNavigate();
   const { redirect } = useSearch({ from: '/login' });
+
+  const [step, setStep] = useState<'email' | 'otp'>('email');
+  const [email, setEmail] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
 
   // Redirect once authenticated — only allow internal paths (prevent open redirect)
   useEffect(() => {
@@ -37,6 +42,37 @@ function LoginPage() {
     }
   }, [isAuthenticated, navigate, redirect]);
 
+  const handleSendOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsSending(true);
+
+    try {
+      const result = await requestEmailOTP(email);
+      setStep('otp');
+
+      // In dev mode, auto-fill the OTP for testing
+      if (result._devOtp) {
+        setOtpCode(result._devOtp);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send code');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    try {
+      await signInWithEmail(email, otpCode);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Verification failed');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-10">
@@ -48,17 +84,119 @@ function LoginPage() {
           </p>
         </div>
 
-        {/* Sign In */}
+        {/* Sign In Form */}
         <div className="space-y-6">
           <div className="text-center space-y-1.5">
             <h1 className="text-2xl font-display italic">Sign in</h1>
-            <p className="text-sm text-muted-foreground">Connect your wallet to get started</p>
+            <p className="text-sm text-muted-foreground">
+              {step === 'email' ? 'Enter your email to get started' : `We sent a code to ${email}`}
+            </p>
           </div>
 
-          <div className="flex justify-center">
-            <WalletConnectButton size="lg" />
-          </div>
+          {step === 'email' ? (
+            <form onSubmit={handleSendOTP} className="space-y-4">
+              <div>
+                <input
+                  id="login-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                  autoFocus
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isSending || !email}
+                className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg shadow-lg shadow-indigo-500/25 transition-all duration-200"
+              >
+                {isSending ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                        strokeDasharray="32"
+                        strokeDashoffset="8"
+                      />
+                    </svg>
+                    Sending…
+                  </span>
+                ) : (
+                  'Continue with Email'
+                )}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleVerifyOTP} className="space-y-4">
+              <div>
+                <input
+                  id="login-otp"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Enter 6-digit code"
+                  required
+                  autoFocus
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white text-center text-2xl tracking-[0.3em] font-mono placeholder:text-white/30 placeholder:text-base placeholder:tracking-normal focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isAuthenticating || otpCode.length < 6}
+                className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg shadow-lg shadow-indigo-500/25 transition-all duration-200"
+              >
+                {isAuthenticating ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                        strokeDasharray="32"
+                        strokeDashoffset="8"
+                      />
+                    </svg>
+                    Verifying…
+                  </span>
+                ) : (
+                  'Verify & Sign In'
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('email');
+                  setOtpCode('');
+                  setError(null);
+                }}
+                className="w-full py-2 text-sm text-white/50 hover:text-white/70 transition-colors"
+              >
+                ← Use a different email
+              </button>
+            </form>
+          )}
 
+          {/* Error display */}
+          {(error || authError) && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <p className="text-sm text-red-400">{error || authError}</p>
+            </div>
+          )}
+
+          {/* Divider */}
           <div className="flex items-center gap-3 text-xs text-muted-foreground/60">
             <div className="flex-1 border-t border-border/50" />
             <span className="uppercase tracking-widest text-[10px]">
@@ -69,7 +207,7 @@ function LoginPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-[11px] text-muted-foreground/40">Secured by thirdweb</p>
+        <p className="text-center text-[11px] text-muted-foreground/40">Secured by Circle</p>
       </div>
     </div>
   );

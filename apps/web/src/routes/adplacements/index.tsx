@@ -27,7 +27,6 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useAdSlots, useMySponsorships } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
-import { useIsAutoConnecting } from 'thirdweb/react';
 import { formatEther } from 'viem';
 
 export const Route = createFileRoute('/adplacements/')({
@@ -284,7 +283,7 @@ function CampaignsTab({
   isLoading: boolean;
   isConnected: boolean;
 }) {
-  const isAutoConnecting = useIsAutoConnecting();
+  const isAutoConnecting = false; // thirdweb removed — Circle DCW always instant
 
   if (isAutoConnecting) {
     return (

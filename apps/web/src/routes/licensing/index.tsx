@@ -30,7 +30,6 @@ import {
   useActivateLicense,
 } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
-import { useIsAutoConnecting } from 'thirdweb/react';
 import { formatEther } from 'viem';
 import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { useChainId } from 'wagmi';
@@ -169,7 +168,7 @@ function LicensesTab({
   isLoading: boolean;
   isConnected: boolean;
 }) {
-  const isAutoConnecting = useIsAutoConnecting();
+  const isAutoConnecting = false; // thirdweb removed — Circle DCW always instant
   const revokeLicense = useRevokeLicense();
   const activateLicense = useActivateLicense();
   const { writeContractAsync, isPending: isTxPending } = useWriteContract();
@@ -351,7 +350,7 @@ function MerchTab({
   isLoading: boolean;
   isConnected: boolean;
 }) {
-  const isAutoConnecting = useIsAutoConnecting();
+  const isAutoConnecting = false; // thirdweb removed — Circle DCW always instant
 
   if (isAutoConnecting) {
     return (

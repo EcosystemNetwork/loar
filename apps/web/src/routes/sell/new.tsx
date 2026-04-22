@@ -30,7 +30,6 @@ import {
 } from '@/components/ui/select';
 import { useCreateListing } from '@/hooks/useListings';
 import { useWalletAuth } from '@/lib/wallet-auth';
-import { useIsAutoConnecting } from 'thirdweb/react';
 import { toast } from 'sonner';
 import { useVocab } from '@/hooks/use-vocab';
 
@@ -121,7 +120,7 @@ const STEP_LABELS: Record<Step, string> = {
 function CreateListingPage() {
   const navigate = useNavigate();
   const { isConnected, isAuthenticated, isAuthenticating } = useWalletAuth();
-  const isAutoConnecting = useIsAutoConnecting();
+  const isAutoConnecting = false; // thirdweb removed — Circle DCW always instant
   const v = useVocab();
   const create = useCreateListing();
   const [step, setStep] = useState<Step>('type');

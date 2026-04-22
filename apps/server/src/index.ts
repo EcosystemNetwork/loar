@@ -104,6 +104,14 @@ app.route('/api/stripe', stripeWebhookRoutes);
 app.use('/auth/*', rateLimiter({ windowMs: 60_000, max: 20 }));
 app.route('/auth', authRoutes);
 
+// Circle Developer Controlled Wallet auth routes (email/social login)
+const { circleAuthRoutes } = await import('./routes/circle-auth');
+app.route('/auth/circle', circleAuthRoutes);
+
+// Circle transaction proxy — server-side contract execution via Circle KMS
+const { txProxyRoutes } = await import('./routes/tx-proxy');
+app.route('/api/tx', txProxyRoutes);
+
 // Add image serving routes
 app.route('/images', imageRouter);
 
