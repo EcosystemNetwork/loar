@@ -69,6 +69,40 @@ This PRD operationalizes it. Each content item has a `classification` and a `con
 
 **Classification × status gate:** `original` and `licensed` content in `flagged` state cannot enter any new commercial transaction. Existing subscription access continues (no surprise disruption) but is re-evaluated on next renewal.
 
+### Universe-Level Visibility
+
+Individual content docs carry `contentStatus` (above). Universes themselves carry two independent visibility flags on the `cinematicUniverses` doc:
+
+| Flag        | Controller                     | Trigger                                | Effect                                                                                                                           |
+| ----------- | ------------------------------ | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `isHidden`  | Admin (`admin.moderation.*`)   | Moderation action, legal takedown, ban | Universe + every content doc linked by `universeId` disappears from all public endpoints. Irreversible only via admin.           |
+| `isPrivate` | Owner (`universes.setPrivate`) | Owner toggles from Access Settings     | Same public-removal effect. The owner still sees their own universe + content. No moderation signal implied; reversible anytime. |
+
+Both flags are **orthogonal** — either one being true removes the universe from public surfaces. Neither flag touches on-chain data (contracts, NFTs, hashes are immutable).
+
+**Enforcement chokepoint:** Every public listing/read endpoint calls
+
+```ts
+getExcludedUniverseIds({ viewerAddress });
+```
+
+once per request. It returns a `Set<string>` of every universe id where `isHidden || isPrivate`, minus universes where `viewerAddress === creator` (so owners always see their own content). Callers then filter by `universeId`:
+
+| Router        | Endpoints that apply the filter                                                         |
+| ------------- | --------------------------------------------------------------------------------------- |
+| `universes.*` | `get`, `getAll`, `discover`, `getByCreator`                                             |
+| `gallery.*`   | `browse`, `trending`, `featured`, `lineage`, `creatorPortfolio`                         |
+| `entities.*`  | `get`, `list`, `listByKind`, `listByCreator`, `children`, `search`, `universeRelations` |
+
+Scoped queries into a hidden/private universe short-circuit with empty results; unscoped queries post-filter items whose `universeId` is in the excluded set.
+
+**Audit log:** Both `setUniverseHidden` and `setUniversePrivate` write a `contentAuditLog` entry with actions `universe_hidden` / `universe_unhidden` / `universe_made_private` / `universe_made_public` capturing the actor and previous state. See [Audit Log Integrity](#audit-log-integrity).
+
+**Authorization:**
+
+- `setHidden` — `adminProcedure` (wallet in `ADMIN_ADDRESSES`).
+- `setPrivate` — `protectedProcedure` + `isUniverseAdmin()` check (creator, or a signer of the Safe when multi-sig).
+
 ---
 
 ## Data Model

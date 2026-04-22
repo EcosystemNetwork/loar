@@ -56,18 +56,33 @@ AI-generated wiki entries for events within a universe.
 
 Cinematic universe metadata (off-chain supplement to on-chain data).
 
-| Field               | Type      | Description                 |
-| ------------------- | --------- | --------------------------- |
-| `address`           | string    | Universe contract address   |
-| `creator`           | string    | Creator wallet address (0x) |
-| `tokenAddress`      | string    | Governance token address    |
-| `governanceAddress` | string    | Governor contract address   |
-| `imageUrl`          | string    | Universe cover image URL    |
-| `description`       | string    | Universe description        |
-| `createdAt`         | timestamp | Creation time               |
-| `updatedAt`         | timestamp | Last update time            |
+| Field                    | Type      | Description                                                                                                                                                                                                                 |
+| ------------------------ | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `address`                | string    | Universe contract address                                                                                                                                                                                                   |
+| `creator`                | string    | Creator wallet address (0x), or Safe address when multi-sig                                                                                                                                                                 |
+| `tokenAddress`           | string    | Governance token address                                                                                                                                                                                                    |
+| `governanceAddress`      | string    | Governor contract address                                                                                                                                                                                                   |
+| `image_url`              | string    | Universe cover image URL                                                                                                                                                                                                    |
+| `portrait_image_url`     | string?   | Optional portrait variant for tall cards                                                                                                                                                                                    |
+| `description`            | string    | Universe description                                                                                                                                                                                                        |
+| `onChainUniverseId`      | string?   | UniverseManager integer id (null until confirmed)                                                                                                                                                                           |
+| `mintTxHash`             | string?   | Tx hash of the original universe-mint tx                                                                                                                                                                                    |
+| `chainId`                | number?   | Chain the universe was deployed on (11155111 Sepolia, 84532 Base Sepolia, 8453 Base)                                                                                                                                        |
+| `unstoppableDomain`      | string?   | Optional UD name linked to the universe                                                                                                                                                                                     |
+| `hasPrivateSection`      | boolean   | Whether Creator's Room is enabled (default true)                                                                                                                                                                            |
+| `accessModel`            | string    | `open` / `subscription` / `token_gate` / `both` — gates Creator's Room + paid tiers                                                                                                                                         |
+| `universeType`           | string    | `fun` (no monetization) / `monetized` (revenue-bearing)                                                                                                                                                                     |
+| `isMultiSig`             | boolean   | True when `creator` is a Gnosis Safe                                                                                                                                                                                        |
+| `multiSigAddress`        | string?   | Safe address when `isMultiSig`                                                                                                                                                                                              |
+| `isHidden`               | boolean   | **Admin-set** soft-delete. Removes universe + content from public surfaces. See PRD-10                                                                                                                                      |
+| `isPrivate`              | boolean   | **Owner-set** visibility toggle. Same public-removal effect as `isHidden`, but the owner retains full access to their own universe + content. See [moderation PRD §Universe-Level Visibility](prd-moderation-rights-ops.md) |
+| `canonStylePackEntityId` | string?   | Pointer to the canon style_pack entity, if declared                                                                                                                                                                         |
+| `created_at`             | timestamp | Creation time                                                                                                                                                                                                               |
+| `updated_at`             | timestamp | Last update time                                                                                                                                                                                                            |
 
-**Document ID:** Typically the universe contract address
+**Document ID:** Lowercase universe contract address.
+
+**Visibility enforcement:** Every public listing/read endpoint (`universes.*`, `gallery.*`, `entities.*`) calls `getExcludedUniverseIds({ viewerAddress })` once and filters results whose `universeId` is in the excluded set. A universe is excluded if `isHidden === true` OR (`isPrivate === true` AND viewer ≠ creator). `isHidden` is orthogonal to `isPrivate` — either one is enough to hide a universe. Both toggles write a `contentAuditLog` entry.
 
 ---
 

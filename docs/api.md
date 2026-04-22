@@ -64,11 +64,14 @@ Procedures marked **[protected]** require either method.
 
 ---
 
-### cinematicUniverses
+### universes
 
-#### cinematicUniverses.createcu
+> Router renamed from `cinematicUniverses` → `universes`. The Firestore
+> collection name is still `cinematicUniverses` for data continuity.
 
-- **Type:** mutation
+#### universes.create
+
+- **Type:** mutation (protected)
 - **Input:**
   ```ts
   {
@@ -80,27 +83,53 @@ Procedures marked **[protected]** require either method.
     description: string;
     signature: string; // Wallet signature
     message: string; // Signed message
+    nonce: string; // Server-issued nonce (prevents replay)
   }
   ```
 - **Returns:** Created universe document
 
-#### cinematicUniverses.get
+#### universes.get
 
 - **Type:** query
 - **Input:** `{ id: string }`
-- **Returns:** Universe document or null
+- **Returns:** Universe document or throws `Universe not found` when the
+  doc has `isHidden` or `isPrivate` set and the caller is not the creator.
 
-#### cinematicUniverses.getAll
+#### universes.getAll
 
 - **Type:** query
 - **Input:** none
-- **Returns:** Array of all universe documents
+- **Returns:** Array of universe documents. Excludes `isHidden` docs
+  entirely; excludes `isPrivate` docs unless the authenticated caller is
+  the creator.
 
-#### cinematicUniverses.getByCreator
+#### universes.getByCreator
 
 - **Type:** query
 - **Input:** `{ creator: string }` (0x address)
-- **Returns:** Array of universes by creator
+- **Returns:** Array of universes by creator. When the authenticated
+  caller matches `creator`, private universes are included.
+
+#### universes.setPrivate
+
+- **Type:** mutation (protected, creator- or multi-sig-signer-only)
+- **Input:** `{ universeId: string, isPrivate: boolean }`
+- **Returns:** `{ id: string, isPrivate: boolean }`
+- **Behavior:** Flips the owner-controlled `isPrivate` flag. When true,
+  the universe + every content item linked by `universeId` (gallery,
+  entities, lineage, featured, landing-page cards, search) is removed
+  from every public endpoint. The owner retains full visibility of their
+  own universe. Writes a `contentAuditLog` entry. See
+  [moderation PRD §Universe-Level Visibility](prd-moderation-rights-ops.md).
+
+#### universes.setHidden (admin-only)
+
+- **Type:** mutation (`adminProcedure`)
+- **Input:** `{ universeId: string, isHidden: boolean }`
+- **Returns:** `{ id: string, isHidden: boolean }`
+- **Behavior:** Admin moderation toggle. Same public-removal effect as
+  `setPrivate` but intended for takedowns / abuse enforcement. Writes a
+  `contentAuditLog` entry.
 
 ---
 

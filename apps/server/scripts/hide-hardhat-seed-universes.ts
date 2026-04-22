@@ -31,7 +31,11 @@ const JUNK_IMAGE_PREFIX = 'https://ipfs.io/ipfs/QmUNLL';
 async function main() {
   const isDryRun = process.env.DRY_RUN === '1';
 
-  const { db } = await import('../src/lib/firebase.js');
+  const firebase = await import('../src/lib/firebase.js');
+  if ('initFirebase' in firebase && typeof firebase.initFirebase === 'function') {
+    firebase.initFirebase();
+  }
+  const { db } = firebase;
   const { setUniverseHidden } = await import('../src/routers/universes/universes.handlers.js');
 
   if (!db) throw new Error('Firestore not configured — check FIREBASE_* env vars.');
