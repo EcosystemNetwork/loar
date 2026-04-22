@@ -179,9 +179,15 @@ export async function runUniverseLayer(cfg: SmokeConfig, token: string): Promise
         funUniverseId = result?.id ?? result?.data?.id;
         if (!funUniverseId) throw new Error('no id returned from fun universe create');
 
-        const u = await tRPCQuery<{ data?: Record<string, unknown> }>(cfg, 'universes.get', {
-          id: funUniverseId,
-        });
+        // Fun universes default to isPrivate=true — the get handler gates
+        // private universes to the owner, so we must pass the smoke-wallet
+        // JWT to see our own newly-created private universe.
+        const u = await tRPCQuery<{ data?: Record<string, unknown> }>(
+          cfg,
+          'universes.get',
+          { id: funUniverseId },
+          token
+        );
         const data = u?.data ?? {};
         if ((data as { universeType?: string }).universeType !== 'fun') {
           throw new Error(`expected universeType=fun, got ${JSON.stringify(data).slice(0, 80)}`);

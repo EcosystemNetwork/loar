@@ -57,7 +57,9 @@
       "drizzle-orm@<0.45.2": ">=0.45.2",
       "kysely@<0.28.12": ">=0.28.12",
       "tar@<7.5.10": ">=7.5.10",
-      "vite@<6.4.2": "~6.4.2"
+      "vite@<6.4.2": "~6.4.2",
+      "ponder>vite": "5.4.21",
+      "ponder>vite-node": "1.0.2"
     },
     "auditConfig": {
       "ignoreGhsas": [
