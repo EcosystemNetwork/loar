@@ -50,7 +50,7 @@ const createContentSchema = z.object({
   description: z.string().max(2000).default(''),
   mediaUrl: z.string().url(),
   thumbnailUrl: z.string().url().optional(),
-  mediaType: z.enum(['video', 'image', 'ai-video', 'ai-image']),
+  mediaType: z.enum(['video', 'image', 'ai-video', 'ai-image', 'audio', '3d']),
   format: z.enum(['short', 'long']).optional(),
   classification: contentClassification,
   tags: z.array(z.string().max(30)).max(15).default([]),
@@ -131,7 +131,13 @@ export const contentRouter = router({
     }
 
     // PRD 10: publish lineage event.
-    const outputKind: AssetOutputKind = input.mediaType.includes('image') ? 'image' : 'video';
+    const outputKind: AssetOutputKind = input.mediaType.includes('image')
+      ? 'image'
+      : input.mediaType === 'audio'
+        ? 'audio'
+        : input.mediaType === '3d'
+          ? '3d'
+          : 'video';
     recordAssetEventAsync({
       assetId: ref.id,
       parentAssetId: input.sourceGenerationId ?? null,
@@ -384,7 +390,7 @@ export const contentRouter = router({
     .input(
       z.object({
         classification: contentClassification.optional(),
-        mediaType: z.enum(['video', 'image', 'ai-video', 'ai-image']).optional(),
+        mediaType: z.enum(['video', 'image', 'ai-video', 'ai-image', 'audio', '3d']).optional(),
         format: z.enum(['short', 'long']).optional(),
         search: z.string().optional(),
         limit: z.number().min(1).max(50).default(20),

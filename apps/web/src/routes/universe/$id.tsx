@@ -109,6 +109,8 @@ import { useVideoGeneration, type StatusMessage } from '@/hooks/useVideoGenerati
 import { useCharacterGeneration } from '@/hooks/useCharacterGeneration';
 import { useContractSave } from '@/hooks/useContractSave';
 import { useUniverseBlockchain } from '@/hooks/useUniverseBlockchain';
+import { useSwapNodes } from '@/hooks/useTimeline';
+import { toast } from 'sonner';
 import { TokenGateGuard } from '@/components/governance/TokenGateGuard';
 import { PrivateSection } from '@/components/private/PrivateSection';
 import { SceneControlsPanel } from '@/components/flow/SceneControlsPanel';
@@ -347,6 +349,10 @@ function UniverseTimelineEditorInner() {
   // Multi-select state
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Node-swap state — bulk toolbar uses selection, context menu uses a marker
+  const [swapMarkNodeId, setSwapMarkNodeId] = useState<string | null>(null);
+  const [isSwapping, setIsSwapping] = useState(false);
   const [showSelectionPlayer, setShowSelectionPlayer] = useState(false);
   const [showAudioToolbar, setShowAudioToolbar] = useState(false);
   const [showEpisodeBuilder, setShowEpisodeBuilder] = useState(false);
@@ -408,6 +414,7 @@ function UniverseTimelineEditorInner() {
 
   // Contract hooks - we'll use the write contract directly for universe-specific contracts
   const { writeContractAsync } = useWriteContract();
+  const { writeAsync: swapNodesOnChain } = useSwapNodes();
 
   // For blockchain universes (addresses starting with 0x), fetch from indexer
   const isBlockchainUniverse = id?.startsWith('0x');
@@ -932,6 +939,124 @@ function UniverseTimelineEditorInner() {
     setSelectedNodeIds(new Set());
     setShowDeleteConfirm(false);
   }, [selectedNodeIds, id, getArchivedNodeIds, saveArchivedNodeIds, setNodes, setEdges]);
+
+  // Swap the on-chain content of two ReactFlow nodes. The DAG (parents/positions)
+  // stays put; contentHash + plotHash are exchanged on-chain, and we mirror the
+  // swap in local state so videos/titles move between the two positions.
+  const swapTwoNodes = useCallback(
+    async (flowIdA: string, flowIdB: string) => {
+      if (flowIdA === flowIdB) return;
+      const nodeA = nodesRef.current.find((n) => n.id === flowIdA);
+      const nodeB = nodesRef.current.find((n) => n.id === flowIdB);
+      if (!nodeA || !nodeB) {
+        toast.error('Could not find both nodes to swap');
+        return;
+      }
+      const idA = nodeA.data.blockchainNodeId;
+      const idB = nodeB.data.blockchainNodeId;
+      if (idA === undefined || idB === undefined) {
+        toast.error('Both nodes must be saved on-chain before you can swap them');
+        return;
+      }
+      if (idA === idB) return;
+
+      setIsSwapping(true);
+      try {
+        await swapNodesOnChain(idA, idB);
+        setNodes((nds: any) =>
+          nds.map((n: any) => {
+            if (n.id === nodeA.id) {
+              return {
+                ...n,
+                data: {
+                  ...nodeB.data,
+                  eventId: nodeA.data.eventId,
+                  blockchainNodeId: nodeA.data.blockchainNodeId,
+                },
+              };
+            }
+            if (n.id === nodeB.id) {
+              return {
+                ...n,
+                data: {
+                  ...nodeA.data,
+                  eventId: nodeB.data.eventId,
+                  blockchainNodeId: nodeB.data.blockchainNodeId,
+                },
+              };
+            }
+            return n;
+          })
+        );
+        toast.success('Nodes swapped on-chain');
+        setSelectedNodeIds(new Set());
+        setSwapMarkNodeId(null);
+      } catch (err: any) {
+        console.error('Swap failed:', err);
+        toast.error(err?.shortMessage || err?.message || 'Swap failed');
+      } finally {
+        setIsSwapping(false);
+      }
+    },
+    [swapNodesOnChain, setNodes]
+  );
+
+  // Derive whether the two currently-selected nodes can be swapped on-chain.
+  const canSwapSelected = useMemo(() => {
+    if (selectedNodeIds.size !== 2) return false;
+    const [a, b] = [...selectedNodeIds];
+    const nodeA = nodes.find((n) => n.id === a);
+    const nodeB = nodes.find((n) => n.id === b);
+    return (
+      !!nodeA &&
+      !!nodeB &&
+      nodeA.data.blockchainNodeId !== undefined &&
+      nodeB.data.blockchainNodeId !== undefined &&
+      nodeA.data.blockchainNodeId !== nodeB.data.blockchainNodeId
+    );
+  }, [selectedNodeIds, nodes]);
+
+  const handleSwapSelected = useCallback(() => {
+    if (selectedNodeIds.size !== 2) return;
+    const [a, b] = [...selectedNodeIds];
+    void swapTwoNodes(a, b);
+  }, [selectedNodeIds, swapTwoNodes]);
+
+  const handleMarkForSwap = useCallback((nodeId: string) => {
+    setSwapMarkNodeId(nodeId);
+    toast('Marked for swap — right-click another on-chain node to swap');
+  }, []);
+
+  const handleSwapWithMarked = useCallback(
+    (nodeId: string) => {
+      if (!swapMarkNodeId) return;
+      void swapTwoNodes(swapMarkNodeId, nodeId);
+    },
+    [swapMarkNodeId, swapTwoNodes]
+  );
+
+  const handleClearSwapMark = useCallback(() => {
+    setSwapMarkNodeId(null);
+  }, []);
+
+  // Label shown in the context menu for "Swap with {label}"
+  const swapMarkLabel = useMemo(() => {
+    if (!swapMarkNodeId) return null;
+    const marked = nodes.find((n) => n.id === swapMarkNodeId);
+    if (!marked) return null;
+    const bcId = marked.data.blockchainNodeId;
+    const display = marked.data.displayName || marked.data.label;
+    if (display) return `"${display}"`;
+    if (bcId !== undefined) return `Node #${bcId}`;
+    return 'marked node';
+  }, [swapMarkNodeId, nodes]);
+
+  // Drop the swap mark if the marked node disappears (e.g. deleted)
+  useEffect(() => {
+    if (swapMarkNodeId && !nodes.some((n) => n.id === swapMarkNodeId)) {
+      setSwapMarkNodeId(null);
+    }
+  }, [swapMarkNodeId, nodes]);
 
   // Clear selection
   const handleClearSelection = useCallback(() => {
@@ -3281,9 +3406,12 @@ function UniverseTimelineEditorInner() {
                         selectedNodeIds.has(n.id) && n.data?.videoUrl && n.data.nodeType === 'scene'
                     )}
                     selectedClipsCount={selectedClips.length}
+                    canSwapSelected={canSwapSelected}
+                    isSwapping={isSwapping}
                     onPlaySelected={handlePlaySelected}
                     onDuplicateSelected={handleDuplicateSelected}
                     onDeleteSelected={handleDeleteSelected}
+                    onSwapSelected={handleSwapSelected}
                     onClearSelection={handleClearSelection}
                     onSelectAll={handleSelectAll}
                     onInvertSelection={handleInvertSelection}
@@ -3322,6 +3450,9 @@ function UniverseTimelineEditorInner() {
               }
               arcs={nodeArcs.arcs}
               universeId={id}
+              swapMarkNodeId={swapMarkNodeId}
+              swapMarkLabel={swapMarkLabel}
+              isSwapping={isSwapping}
               onClose={() => setContextMenu((c) => ({ ...c, visible: false }))}
               onEdit={handleEditScene}
               onDuplicate={handleDuplicateSingle}
@@ -3334,6 +3465,9 @@ function UniverseTimelineEditorInner() {
                 setSelectedNodeIds(new Set([nodeId]));
                 setShowSelectionPlayer(true);
               }}
+              onMarkForSwap={handleMarkForSwap}
+              onSwapWithMarked={handleSwapWithMarked}
+              onClearSwapMark={handleClearSwapMark}
             />
           </div>
         </div>

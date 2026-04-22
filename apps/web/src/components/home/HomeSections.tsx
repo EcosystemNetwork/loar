@@ -731,11 +731,14 @@ export function Top10Strip({ universes }: { universes: EnrichedUniverse[] }) {
   if (sorted.length === 0) return null;
 
   return (
-    <section className="py-6">
+    <section className="pt-20 pb-6">
       <SectionHeader icon={Flame} title="Top 10 Universes" subtitle="Most active this week" />
       <ScrollRow>
         {sorted.map((u) => (
-          <div key={u.id} className="flex-shrink-0 relative flex items-end pl-[60px] md:pl-[75px]">
+          <div
+            key={u.id}
+            className="flex-shrink-0 relative flex items-end pt-4 pl-[60px] md:pl-[75px]"
+          >
             {/* Large rank number — absolutely positioned so digit width doesn't shift the card */}
             <span
               className="absolute left-0 bottom-0 text-[100px] md:text-[120px] font-black leading-[0.85] select-none pointer-events-none whitespace-nowrap"

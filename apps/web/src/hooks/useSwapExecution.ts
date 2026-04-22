@@ -60,7 +60,12 @@ export interface SwapConfig {
   mode: 'buy' | 'sell';
   amount: string; // ETH for buy, tokens for sell
   slippageBps?: number; // default 100 = 1%
+  // Expected output in wei (tokens for buy, ETH for sell). Required for on-chain
+  // slippage protection — without it, amountOutMinimum defaults to 0 (unsafe).
+  expectedOutWei?: bigint;
 }
+
+const NATIVE_ETH: Address = '0x0000000000000000000000000000000000000000';
 
 export function useSwapExecution() {
   const chainId = useChainId();
@@ -114,7 +119,30 @@ export function useSwapExecution() {
         if (config.mode === 'buy') {
           // Buy tokens with ETH
           const amountIn = parseEther(config.amount);
-          const amountOutMinimum = 0n; // Slippage handled by price limit in practice
+
+          // zeroForOne: true if input currency sorts lower (i.e. is currency0).
+          // For native-ETH pools, Currency.wrap(address(0)) sorts lowest so ETH is
+          // always currency0 — but we check explicitly to support any ordering.
+          const inputIsCurrency0 =
+            config.poolKey.currency0.toLowerCase() === NATIVE_ETH.toLowerCase();
+          const inputIsCurrency1 =
+            config.poolKey.currency1.toLowerCase() === NATIVE_ETH.toLowerCase();
+          if (!inputIsCurrency0 && !inputIsCurrency1) {
+            setError('Pool does not include native ETH — use wrapped ETH router');
+            setStatus('error');
+            return { fallback: false, error: 'Pool missing native ETH' };
+          }
+          const zeroForOne = inputIsCurrency0;
+
+          // Enforce slippage on-chain. Without expectedOutWei we cannot compute a
+          // safe min-out, so we refuse to swap rather than accept 0.
+          if (config.expectedOutWei === undefined) {
+            setError('Missing expected output — cannot enforce slippage');
+            setStatus('error');
+            return { fallback: false, error: 'Missing slippage bound' };
+          }
+          const bps = BigInt(slippageBps);
+          const amountOutMinimum = (config.expectedOutWei * (10_000n - bps)) / 10_000n;
 
           const hash = await writeContractAsync({
             address: routerAddress,
@@ -122,7 +150,7 @@ export function useSwapExecution() {
             functionName: 'swapExactInput',
             args: [
               config.poolKey,
-              true, // zeroForOne depends on token ordering
+              zeroForOne,
               amountIn,
               amountOutMinimum,
               deadline,

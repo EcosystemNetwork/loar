@@ -8,7 +8,7 @@ import { GalleryGrid } from '@/components/gallery/GalleryGrid';
 import { GalleryFilters } from '@/components/gallery/GalleryFilters';
 import { useGalleryBrowse, useGalleryTrending } from '@/hooks/useGallery';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sparkles, TrendingUp } from 'lucide-react';
+import { Sparkles, TrendingUp, Music, Box } from 'lucide-react';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 export const Route = createFileRoute('/gallery')({
@@ -51,8 +51,14 @@ function GalleryPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {trending.slice(0, 4).map((item: any) => {
                 const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
-                const thumbnail =
-                  item.thumbnailUrl || item.imageUrl || item.mediaUrl || '/placeholder.jpg';
+                const isAudio = item.mediaType === 'audio';
+                const is3D = item.mediaType === '3d' || item.mediaType === 'ai-3d';
+                // For 3D/audio the mediaUrl is a .glb/.mp3 — never fall back to it
+                // as an <img> source. Use the rendered thumbnail only.
+                const visualThumbnail =
+                  isAudio || is3D
+                    ? item.thumbnailUrl || item.imageUrl || null
+                    : item.thumbnailUrl || item.imageUrl || item.mediaUrl || '/placeholder.jpg';
                 return (
                   <div
                     key={item.id}
@@ -76,15 +82,23 @@ function GalleryPage() {
                           e.currentTarget.currentTime = 0;
                         }}
                       />
-                    ) : (
+                    ) : visualThumbnail ? (
                       <img
-                        src={resolveIpfsUrl(thumbnail) || thumbnail}
+                        src={resolveIpfsUrl(visualThumbnail) || visualThumbnail}
                         alt={item.title || 'Trending'}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
                           (e.currentTarget as HTMLImageElement).src = '/placeholder.jpg';
                         }}
                       />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-500/20 to-rose-500/20">
+                        {is3D ? (
+                          <Box className="h-8 w-8 text-foreground/60" />
+                        ) : (
+                          <Music className="h-8 w-8 text-foreground/60" />
+                        )}
+                      </div>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                     <div className="absolute bottom-2 left-2 text-white text-xs font-medium">

@@ -10,9 +10,9 @@ import { useState, useMemo, memo } from 'react';
 import {
   useTokenListData,
   type EnrichedToken,
+  type TokenStage,
   formatEth,
   timeAgo,
-  priceFromTick,
 } from '@/hooks/useTokens';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -50,11 +50,13 @@ export const Route = createFileRoute('/tokens/')({
 });
 
 type SortMode = 'trending' | 'newest' | 'holders' | 'volume' | 'name';
+type StageFilter = 'all' | TokenStage;
 
 function TokenLaunchpad() {
   const chainId = useChainId();
   const [search, setSearch] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('trending');
+  const [stageFilter, setStageFilter] = useState<StageFilter>('all');
   const {
     data: tokens,
     isLoading,
@@ -67,6 +69,10 @@ function TokenLaunchpad() {
   const filteredTokens = useMemo(() => {
     if (!tokens.length) return [];
     let result = [...tokens];
+
+    if (stageFilter !== 'all') {
+      result = result.filter((t) => t.stage === stageFilter);
+    }
 
     if (search) {
       const q = search.toLowerCase();
@@ -97,7 +103,15 @@ function TokenLaunchpad() {
     }
 
     return result;
-  }, [tokens, search, sortMode]);
+  }, [tokens, search, sortMode, stageFilter]);
+
+  const stageCounts = useMemo(() => {
+    const counts = { all: tokens.length, bonding: 0, graduating: 0, graduated: 0, halted: 0 };
+    for (const t of tokens) {
+      counts[t.stage]++;
+    }
+    return counts;
+  }, [tokens]);
 
   // Enrich swaps with token info for the activity feed
   const enrichedSwaps = useMemo(() => {
@@ -195,7 +209,7 @@ function TokenLaunchpad() {
                 <Flame className="h-5 w-5 text-amber-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold">100B</p>
+                <p className="text-2xl font-bold">1B</p>
                 <p className="text-xs text-muted-foreground">Supply / Token</p>
               </div>
             </CardContent>
@@ -216,6 +230,32 @@ function TokenLaunchpad() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Main Token Grid */}
           <div className="lg:col-span-3">
+            {/* Stage filter tabs */}
+            <div className="flex gap-1.5 flex-wrap mb-3">
+              {(
+                [
+                  { stage: 'all' as StageFilter, label: 'All' },
+                  { stage: 'bonding' as StageFilter, label: 'Bonding' },
+                  { stage: 'graduating' as StageFilter, label: 'Graduating' },
+                  { stage: 'graduated' as StageFilter, label: 'Graduated' },
+                  { stage: 'halted' as StageFilter, label: 'Halted' },
+                ] as const
+              ).map(({ stage, label }) => (
+                <Button
+                  key={stage}
+                  variant={stageFilter === stage ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setStageFilter(stage)}
+                  className="text-xs h-8 px-3"
+                >
+                  {label}
+                  <span className="ml-1.5 text-[10px] opacity-60 tabular-nums">
+                    {stageCounts[stage]}
+                  </span>
+                </Button>
+              ))}
+            </div>
+
             {/* Search & Sort */}
             <div className="flex flex-col sm:flex-row gap-3 mb-4">
               <div className="relative flex-1">
@@ -412,6 +452,70 @@ const Sparkline = memo(function Sparkline({
   );
 });
 
+// ─── Stage Badge ──────────────────────────────────────────────────────
+
+function StageBadge({ stage }: { stage: TokenStage }) {
+  const config = {
+    bonding: {
+      label: 'Bonding',
+      className: 'bg-primary/80 text-white',
+    },
+    graduating: {
+      label: 'Graduating',
+      className: 'bg-amber-500/80 text-white',
+    },
+    graduated: {
+      label: 'Graduated',
+      className: 'bg-green-500/80 text-white',
+    },
+    halted: {
+      label: 'Halted',
+      className: 'bg-red-500/80 text-white',
+    },
+  }[stage];
+  return (
+    <Badge className={`text-[10px] px-1.5 py-0 border-0 backdrop-blur-sm ${config.className}`}>
+      {config.label}
+    </Badge>
+  );
+}
+
+// ─── Graduation Progress ──────────────────────────────────────────────
+
+function GraduationProgress({ token }: { token: EnrichedToken }) {
+  const curve = token.bondingCurve;
+  if (!curve) return null;
+  const raised = Number(BigInt(curve.ethRaised)) / 1e18;
+  const target = Number(BigInt(curve.graduationEth)) / 1e18;
+  const pct = target > 0 ? Math.min((raised / target) * 100, 100) : 0;
+  const isGraduating = token.stage === 'graduating';
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-[10px]">
+        <span className="text-muted-foreground flex items-center gap-1">
+          <Zap className="h-2.5 w-2.5" />
+          {token.stage === 'halted' ? 'Halted' : 'Graduation'}
+        </span>
+        <span className="font-mono tabular-nums font-medium">
+          {raised.toFixed(3)} / {target.toFixed(1)} ETH
+        </span>
+      </div>
+      <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${
+            token.stage === 'halted'
+              ? 'bg-red-500'
+              : isGraduating
+                ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                : 'bg-gradient-to-r from-primary to-purple-500'
+          }`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ─── Token Maturity Progress ──────────────────────────────────────────
 
 function MaturityProgress({ token }: { token: EnrichedToken }) {
@@ -479,6 +583,11 @@ const TokenCard = memo(function TokenCard({
               </div>
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+            {/* Stage badge - top left */}
+            <div className="absolute top-2 left-2">
+              <StageBadge stage={token.stage} />
+            </div>
 
             {/* Price change badge - top right */}
             {token.priceChange24h !== null && (
@@ -565,8 +674,12 @@ const TokenCard = memo(function TokenCard({
               </div>
             )}
 
-            {/* Maturity Progress */}
-            <MaturityProgress token={token} />
+            {/* Graduation progress (bonding/graduating/halted) or maturity milestones (graduated) */}
+            {token.stage === 'graduated' ? (
+              <MaturityProgress token={token} />
+            ) : (
+              <GraduationProgress token={token} />
+            )}
 
             {/* Badges + Share */}
             <div className="flex items-center justify-between pt-0.5">

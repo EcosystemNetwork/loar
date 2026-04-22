@@ -18,6 +18,8 @@ import {
   Hash,
   Plus,
   Play,
+  ArrowLeftRight,
+  X,
 } from 'lucide-react';
 import type { Node } from 'reactflow';
 import type { TimelineNodeData } from './TimelineNodes';
@@ -28,6 +30,9 @@ interface NodeContextMenuProps {
   node: Node<TimelineNodeData> | null;
   arcs: ArcDefinition[];
   universeId: string;
+  swapMarkNodeId: string | null;
+  swapMarkLabel: string | null;
+  isSwapping: boolean;
   onClose: () => void;
   onEdit: (eventId: string) => void;
   onDuplicate: (nodeId: string) => void;
@@ -37,6 +42,9 @@ interface NodeContextMenuProps {
   onAssignToArc: (arcId: string, nodeIds: string[]) => void;
   onCreateArc: (name: string) => void;
   onPlay: (nodeId: string) => void;
+  onMarkForSwap: (nodeId: string) => void;
+  onSwapWithMarked: (nodeId: string) => void;
+  onClearSwapMark: () => void;
 }
 
 interface MenuItemProps {
@@ -84,6 +92,9 @@ export function NodeContextMenu({
   node,
   arcs,
   universeId,
+  swapMarkNodeId,
+  swapMarkLabel,
+  isSwapping,
   onClose,
   onEdit,
   onDuplicate,
@@ -93,6 +104,9 @@ export function NodeContextMenu({
   onAssignToArc,
   onCreateArc,
   onPlay,
+  onMarkForSwap,
+  onSwapWithMarked,
+  onClearSwapMark,
 }: NodeContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -122,10 +136,13 @@ export function NodeContextMenu({
   const eventId = node.data.eventId || '';
   const isBlockchain = node.id.startsWith('blockchain-node-');
   const hasVideo = !!node.data.videoUrl;
+  const canSwap = node.data.blockchainNodeId !== undefined;
+  const isMarked = swapMarkNodeId === node.id;
+  const hasOtherMark = !!swapMarkNodeId && !isMarked;
 
   // Clamp position to viewport
   const menuWidth = 220;
-  const menuHeight = 340;
+  const menuHeight = 380;
   const x = Math.min(state.x, window.innerWidth - menuWidth - 8);
   const y = Math.min(state.y, window.innerHeight - menuHeight - 8);
 
@@ -190,6 +207,41 @@ export function NodeContextMenu({
           }}
         />
       </div>
+
+      {/* Swap positions — only for on-chain nodes */}
+      {canSwap && (
+        <div className="border-t border-zinc-800 py-1">
+          {hasOtherMark ? (
+            <MenuItem
+              icon={<ArrowLeftRight className="h-3.5 w-3.5" />}
+              label={isSwapping ? 'Swapping…' : `Swap with ${swapMarkLabel ?? 'marked node'}`}
+              disabled={isSwapping}
+              onClick={() => {
+                onSwapWithMarked(node.id);
+                onClose();
+              }}
+            />
+          ) : isMarked ? (
+            <MenuItem
+              icon={<X className="h-3.5 w-3.5" />}
+              label="Clear Swap Mark"
+              onClick={() => {
+                onClearSwapMark();
+                onClose();
+              }}
+            />
+          ) : (
+            <MenuItem
+              icon={<ArrowLeftRight className="h-3.5 w-3.5" />}
+              label="Mark for Swap"
+              onClick={() => {
+                onMarkForSwap(node.id);
+                onClose();
+              }}
+            />
+          )}
+        </div>
+      )}
 
       <div className="border-t border-zinc-800 py-1">
         <MenuItem

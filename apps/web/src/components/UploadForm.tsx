@@ -67,9 +67,9 @@ export function UploadForm({
   const [description, setDescription] = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
   const [thumbnailUrl, setThumbnailUrl] = useState('');
-  const [mediaType, setMediaType] = useState<'video' | 'image' | 'ai-video' | 'ai-image'>(
-    'ai-video'
-  );
+  const [mediaType, setMediaType] = useState<
+    'video' | 'image' | 'ai-video' | 'ai-image' | 'audio' | '3d'
+  >('ai-video');
   const [format, setFormat] = useState<'short' | 'long'>('short');
 
   const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
@@ -131,13 +131,17 @@ export function UploadForm({
       if (entityId && uploadedManifest) {
         const selectedEntity = (universeEntities as any[]).find((e: any) => e.id === entityId);
         const mimeType = uploadedManifest.mimeType;
+        const filename = uploadedManifest.originalFilename.toLowerCase();
+        const THREE_D_EXT = /\.(glb|gltf|obj|stl|fbx|blend|ma|mb|c4d|dae|abc|3ds|lwo|ztl|zpr)$/;
         const category = mimeType.startsWith('video/')
           ? 'video'
           : mimeType.startsWith('image/')
             ? 'image'
             : mimeType.startsWith('audio/')
               ? 'sound'
-              : 'other';
+              : mimeType.startsWith('model/') || THREE_D_EXT.test(filename)
+                ? '3d'
+                : 'other';
         await trpcClient.media.attach.mutate({
           contentHash: uploadedManifest.contentHash,
           originalFilename: uploadedManifest.originalFilename,
@@ -256,10 +260,34 @@ export function UploadForm({
       return;
     }
 
+    // Auto-detect mediaType from MIME + extension. Many 3D formats are sent
+    // as application/octet-stream, so we fall back to the extension.
+    const extLower = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const THREE_D_EXT = new Set([
+      'glb',
+      'gltf',
+      'obj',
+      'stl',
+      'fbx',
+      'blend',
+      'ma',
+      'mb',
+      'c4d',
+      'dae',
+      'abc',
+      '3ds',
+      'lwo',
+      'ztl',
+      'zpr',
+    ]);
     if (file.type.startsWith('video/')) {
       setMediaType('video');
     } else if (file.type.startsWith('image/')) {
       setMediaType('image');
+    } else if (file.type.startsWith('audio/')) {
+      setMediaType('audio');
+    } else if (file.type.startsWith('model/') || THREE_D_EXT.has(extLower)) {
+      setMediaType('3d');
     }
 
     const formData = new FormData();
@@ -694,6 +722,8 @@ export function UploadForm({
                   <SelectItem value="video">Video</SelectItem>
                   <SelectItem value="ai-image">AI Generated Image</SelectItem>
                   <SelectItem value="image">Image</SelectItem>
+                  <SelectItem value="audio">Audio</SelectItem>
+                  <SelectItem value="3d">3D Model</SelectItem>
                 </SelectContent>
               </Select>
             </div>

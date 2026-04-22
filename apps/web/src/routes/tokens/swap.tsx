@@ -159,6 +159,12 @@ function SwapPage() {
         }
       : null;
 
+    // Expected output in wei: tokens (18 decimals) for buy, ETH (18 decimals) for sell.
+    const expectedOutWei =
+      estimatedOutput !== null && estimatedOutput > 0
+        ? BigInt(Math.floor(estimatedOutput * 1e18))
+        : undefined;
+
     const result = await executeSwap({
       tokenAddress: selectedToken.id,
       tokenSymbol: selectedToken.symbol,
@@ -166,6 +172,7 @@ function SwapPage() {
       mode,
       amount,
       slippageBps: Math.round(slippage * 100),
+      expectedOutWei,
     });
 
     // Record trade for PnL tracking if native swap succeeded

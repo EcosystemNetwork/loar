@@ -9,6 +9,7 @@ import {
   useSwapHistory,
   usePoolData,
   useUniverseForToken,
+  useBondingCurveForToken,
   priceFromSqrtX96,
   priceFromTick,
   formatTokenAmount,
@@ -78,6 +79,7 @@ function TokenDetailPage() {
   const { data: pool } = usePoolData(token?.poolId);
   const { data: universe } = useUniverseForToken(token?.universeAddress);
   const { data: swaps, isLoading: swapsLoading } = useSwapHistory(token?.poolId, 200);
+  const { data: bondingCurve } = useBondingCurveForToken(token?.id);
 
   // Watchlist state
   const { data: isWatching } = useQuery({
@@ -181,10 +183,6 @@ function TokenDetailPage() {
     }
     if (token && totalSwaps < 5 && holderStats.total < 3) {
       warnings.push('Very early token — low liquidity and few holders');
-    }
-    // Only warn about vesting if creator still holds a large share
-    if (holderStats.topHolderPct > 10 && holderStats.total < 20) {
-      warnings.push('Creator allocation is not vested — tokens were distributed immediately');
     }
     return warnings;
   }, [holderStats, token, totalSwaps]);
@@ -387,7 +385,7 @@ function TokenDetailPage() {
           <Card>
             <CardContent className="p-3 text-center">
               <p className="text-xs text-muted-foreground">Supply</p>
-              <p className="text-lg font-bold">100B</p>
+              <p className="text-lg font-bold">1B</p>
               <p className="text-[10px] text-muted-foreground">fixed</p>
             </CardContent>
           </Card>
@@ -494,6 +492,99 @@ function TokenDetailPage() {
 
           {/* Right: Swap + Info + Holders */}
           <div className="space-y-6">
+            {/* Graduation Progress */}
+            {bondingCurve && (
+              <Card
+                className={
+                  bondingCurve.tradingStatus === 'halted'
+                    ? 'border-red-500/40'
+                    : bondingCurve.graduated
+                      ? 'border-green-500/40'
+                      : 'border-amber-500/30'
+                }
+              >
+                <CardContent className="p-4 space-y-3">
+                  {(() => {
+                    const raised = Number(BigInt(bondingCurve.ethRaised)) / 1e18;
+                    const target = Number(BigInt(bondingCurve.graduationEth)) / 1e18;
+                    const pct = target > 0 ? Math.min((raised / target) * 100, 100) : 0;
+                    const isHalted = bondingCurve.tradingStatus === 'halted';
+                    const isGraduated = bondingCurve.graduated;
+                    const isGraduating = !isGraduated && !isHalted && pct >= 75;
+
+                    return (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-primary" />
+                          <h3 className="font-semibold text-sm">
+                            {isHalted
+                              ? 'Trading Halted'
+                              : isGraduated
+                                ? 'Graduated to Uniswap'
+                                : isGraduating
+                                  ? 'Graduating Soon'
+                                  : 'Bonding Curve'}
+                          </h3>
+                          <Badge
+                            variant={isHalted ? 'destructive' : isGraduated ? 'default' : 'outline'}
+                            className="text-[10px] ml-auto"
+                          >
+                            {pct.toFixed(1)}%
+                          </Badge>
+                        </div>
+
+                        <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              isHalted
+                                ? 'bg-red-500'
+                                : isGraduated
+                                  ? 'bg-gradient-to-r from-green-500 to-emerald-500'
+                                  : isGraduating
+                                    ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                                    : 'bg-gradient-to-r from-primary to-purple-500'
+                            }`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Raised</span>
+                          <span className="font-mono tabular-nums">
+                            {raised.toFixed(4)} / {target.toFixed(2)} ETH
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Trades</span>
+                          <span className="font-mono tabular-nums">{bondingCurve.tradeCount}</span>
+                        </div>
+
+                        {isHalted && (
+                          <p className="text-[11px] text-red-600 dark:text-red-400 leading-relaxed">
+                            Trading on this bonding curve is currently halted by governance. It will
+                            resume after the 48-hour timelock unless otherwise directed.
+                          </p>
+                        )}
+                        {isGraduating && (
+                          <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
+                            Approaching graduation. Once ETH raised hits the target, unsold tokens
+                            and raised ETH seed a permanent Uniswap v4 pool.
+                          </p>
+                        )}
+                        {isGraduated && (
+                          <p className="text-[11px] text-muted-foreground leading-relaxed">
+                            This token graduated and now trades on Uniswap v4 with permanently
+                            locked liquidity.
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Swap Card */}
             <Card className="border-primary/30">
               <CardContent className="p-4">
@@ -506,6 +597,7 @@ function TokenDetailPage() {
                   tokenSymbol={token.symbol}
                   swapUrl={swapUrl}
                   currentPrice={currentPrice}
+                  poolData={pool}
                 />
               </CardContent>
             </Card>
@@ -518,14 +610,18 @@ function TokenDetailPage() {
               />
             )}
 
-            {/* LP Yield & Fee Management */}
-            <LPYieldManager
-              tokenAddress={token.id as `0x${string}`}
-              universeName={universe?.name || token.name}
-              onChainUniverseId={
-                universe?.universeId != null ? Number(universe.universeId) : undefined
-              }
-            />
+            {/* LP Yield & Fee Management — creator only */}
+            {userAddress &&
+              token.tokenAdmin &&
+              token.tokenAdmin.toLowerCase() === userAddress.toLowerCase() && (
+                <LPYieldManager
+                  tokenAddress={token.id as `0x${string}`}
+                  universeName={universe?.name || token.name}
+                  onChainUniverseId={
+                    universe?.universeId != null ? Number(universe.universeId) : undefined
+                  }
+                />
+              )}
 
             {/* Token Maturity */}
             <Card>
@@ -643,11 +739,8 @@ function TokenDetailPage() {
                   <Badge variant="secondary" className="text-[10px] gap-1">
                     <Users className="h-2.5 w-2.5" /> Governance Token
                   </Badge>
-                  <Badge
-                    variant="secondary"
-                    className="text-[10px] gap-1 text-amber-600 border-amber-300"
-                  >
-                    <AlertTriangle className="h-2.5 w-2.5" /> No Vesting
+                  <Badge variant="secondary" className="text-[10px] gap-1">
+                    <Clock className="h-2.5 w-2.5" /> Creator Vested
                   </Badge>
                 </div>
 
@@ -761,11 +854,19 @@ function SwapInterface({
   tokenSymbol,
   swapUrl,
   currentPrice,
+  poolData,
 }: {
   tokenAddress: string;
   tokenSymbol: string;
   swapUrl: string;
   currentPrice: number | null;
+  poolData?: {
+    currency0: string;
+    currency1: string;
+    fee: number;
+    tickSpacing: number;
+    hooks: string;
+  } | null;
 }) {
   const [mode, setMode] = useState<'buy' | 'sell'>('buy');
   const [amount, setAmount] = useState('');
@@ -784,12 +885,29 @@ function SwapInterface({
   }, [amount, currentPrice, mode]);
 
   const handleSwap = async () => {
+    const poolKey = poolData
+      ? {
+          currency0: poolData.currency0 as `0x${string}`,
+          currency1: poolData.currency1 as `0x${string}`,
+          fee: poolData.fee,
+          tickSpacing: poolData.tickSpacing,
+          hooks: poolData.hooks as `0x${string}`,
+        }
+      : null;
+
+    const expectedOutWei =
+      estimatedOutput !== null && estimatedOutput > 0
+        ? BigInt(Math.floor(estimatedOutput * 1e18))
+        : undefined;
+
     const result = await executeSwap({
       tokenAddress,
       tokenSymbol,
-      poolKey: null, // Will fallback to Uniswap link until router is deployed
+      poolKey,
       mode,
       amount,
+      slippageBps: 100, // 1% default for inline widget
+      expectedOutWei,
     });
 
     if (result && !result.fallback && result.txHash) {

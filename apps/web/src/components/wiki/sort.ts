@@ -3,10 +3,19 @@ import type { WikiEntity, WikiSort } from './types';
 export function sortEntities(entities: WikiEntity[], sort: WikiSort): WikiEntity[] {
   const copy = [...entities];
   const ts = (e: WikiEntity) => {
-    const v = e.createdAt;
+    const v = e.createdAt as unknown;
     if (!v) return 0;
-    const d = typeof v === 'string' ? new Date(v) : v;
-    return d.getTime();
+    // Firestore Timestamps cross tRPC as {_seconds, _nanoseconds} — no superjson transformer.
+    if (typeof v === 'object' && v !== null && '_seconds' in v) {
+      const secs = (v as { _seconds?: number })._seconds;
+      return typeof secs === 'number' ? secs * 1000 : 0;
+    }
+    if (v instanceof Date) return v.getTime();
+    if (typeof v === 'string' || typeof v === 'number') {
+      const t = new Date(v).getTime();
+      return Number.isNaN(t) ? 0 : t;
+    }
+    return 0;
   };
   switch (sort) {
     case 'newest':

@@ -24,6 +24,7 @@ import {
   CheckCheck,
   Film,
   ScrollText,
+  ArrowLeftRight,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -43,9 +44,12 @@ interface BulkOperationsToolbarProps {
   arcs: ArcDefinition[];
   hasVideoInSelection: boolean;
   selectedClipsCount: number;
+  canSwapSelected: boolean;
+  isSwapping: boolean;
   onPlaySelected: () => void;
   onDuplicateSelected: () => void;
   onDeleteSelected: () => void;
+  onSwapSelected: () => void;
   onClearSelection: () => void;
   onSelectAll: () => void;
   onInvertSelection: () => void;
@@ -63,9 +67,12 @@ export function BulkOperationsToolbar({
   arcs,
   hasVideoInSelection,
   selectedClipsCount,
+  canSwapSelected,
+  isSwapping,
   onPlaySelected,
   onDuplicateSelected,
   onDeleteSelected,
+  onSwapSelected,
   onClearSelection,
   onSelectAll,
   onInvertSelection,
@@ -168,6 +175,24 @@ export function BulkOperationsToolbar({
         <Copy className="h-4 w-4" />
         Duplicate
       </Button>
+
+      {selectedNodeIds.size === 2 && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1.5 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
+          onClick={onSwapSelected}
+          disabled={!canSwapSelected || isSwapping}
+          title={
+            canSwapSelected
+              ? 'Swap positions of the two selected nodes on-chain'
+              : 'Both nodes must be saved on-chain to swap'
+          }
+        >
+          <ArrowLeftRight className="h-4 w-4" />
+          {isSwapping ? 'Swapping…' : 'Swap'}
+        </Button>
+      )}
 
       <Button
         variant="ghost"

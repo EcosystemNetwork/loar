@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useGalleryLineage } from '@/hooks/useGallery';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { ModelViewer } from '@/components/ModelViewer';
 
 interface MediaLightboxProps {
   content: {
@@ -34,10 +35,16 @@ interface MediaLightboxProps {
 export function MediaLightbox({ content, onClose, onNavigate }: MediaLightboxProps) {
   const [loaded, setLoaded] = useState(false);
   const isVideo = content?.mediaType === 'video' || content?.mediaType === 'ai-video';
+  const isAudio = content?.mediaType === 'audio';
+  const is3D = content?.mediaType === '3d' || content?.mediaType === 'ai-3d';
   // Prefer the full-quality source; fall back to thumbnail so images always display
   const videoSrc = content?.mediaUrl;
+  const audioSrc = content?.mediaUrl;
+  const modelSrc = content?.mediaUrl
+    ? resolveIpfsUrl(content.mediaUrl) || content.mediaUrl
+    : undefined;
   const imageSrc = content?.mediaUrl || content?.imageUrl || content?.thumbnailUrl;
-  const mediaSrc = isVideo ? videoSrc : imageSrc;
+  const mediaSrc = isVideo ? videoSrc : isAudio ? audioSrc : is3D ? modelSrc : imageSrc;
 
   // Lineage — only fetched when a node is open and likely has a family tree
   // (parent ref or source image set). Avoids a flood of requests for the
@@ -104,6 +111,19 @@ export function MediaLightbox({ content, onClose, onNavigate }: MediaLightboxPro
               playsInline
               preload="auto"
             />
+          ) : is3D && modelSrc ? (
+            <ModelViewer
+              src={modelSrc}
+              poster={
+                resolveIpfsUrl(content.thumbnailUrl || '') || content.thumbnailUrl || undefined
+              }
+              alt={content.title || '3D model'}
+              className="w-[85vw] h-[75vh] max-w-[85vw] max-h-[75vh]"
+            />
+          ) : isAudio ? (
+            <div className="flex items-center justify-center w-[60vw] max-w-[85vw] min-h-[40vh] p-8 bg-gradient-to-br from-emerald-500/20 to-cyan-500/20">
+              <audio key={mediaSrc} src={mediaSrc} controls autoPlay className="w-full" />
+            </div>
           ) : (
             <>
               {!loaded && (

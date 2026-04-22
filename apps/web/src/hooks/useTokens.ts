@@ -249,6 +249,62 @@ export function usePoolData(poolId: string | undefined) {
   });
 }
 
+// ─── Bonding curve data ────────────────────────────────────────────────
+
+export interface BondingCurveData {
+  id: string;
+  tokenAddress: string;
+  universeId: number;
+  graduationEth: string;
+  curveSupply: string;
+  graduated: boolean;
+  graduatedAt: number | null;
+  createdAt: number;
+  tradingStatus: 'active' | 'halted' | 'graduated';
+  tokensSold: string;
+  ethRaised: string;
+  lastPrice: string;
+  tradeCount: number;
+}
+
+export function useBondingCurveForToken(tokenAddress: string | undefined) {
+  return useQuery({
+    queryKey: ['bonding-curve-for-token', tokenAddress],
+    queryFn: async () => {
+      const data = await ponderGql<{
+        bondingCurves: { items: BondingCurveData[] };
+      }>(
+        `query ($tokenAddress: String!) {
+          bondingCurves(where: { tokenAddress: $tokenAddress }, limit: 1) {
+            items {
+              id tokenAddress universeId graduationEth curveSupply
+              graduated graduatedAt createdAt tradingStatus
+              tokensSold ethRaised lastPrice tradeCount
+            }
+          }
+        }`,
+        { tokenAddress: tokenAddress!.toLowerCase() }
+      );
+      return data.bondingCurves?.items?.[0] ?? null;
+    },
+    enabled: !!tokenAddress,
+    ...ponderQueryDefaults,
+    refetchInterval: jitteredInterval(POLL_INTERVALS.MODERATE),
+  });
+}
+
+export type TokenStage = 'bonding' | 'graduating' | 'graduated' | 'halted';
+
+export function stageFromBondingCurve(curve: BondingCurveData | null | undefined): TokenStage {
+  if (!curve) return 'graduated'; // pools without bonding curve are post-graduation
+  if (curve.tradingStatus === 'halted') return 'halted';
+  if (curve.graduated || curve.tradingStatus === 'graduated') return 'graduated';
+  const raised = Number(BigInt(curve.ethRaised)) / 1e18;
+  const target = Number(BigInt(curve.graduationEth)) / 1e18;
+  if (target > 0 && raised / target >= 0.75) return 'graduating';
+  return 'bonding';
+}
+
 // ─── Universe data for token cards ─────────────────────────────────────
 
 export function useUniverseForToken(universeAddress: string | undefined) {
@@ -353,6 +409,9 @@ export interface EnrichedToken extends Token {
   holderCount: number;
   sparkline: number[];
   marketCap: number | null;
+  bondingCurve: BondingCurveData | null;
+  stage: TokenStage;
+  graduationPct: number; // 0..100, 100 once graduated
 }
 
 const TOTAL_SUPPLY = 1_000_000_000; // 1B tokens per universe
@@ -401,6 +460,27 @@ export function useTokenListData() {
     refetchInterval: jitteredInterval(POLL_INTERVALS.MODERATE),
   });
 
+  // Fetch all bonding curves to determine token stage
+  const curvesQuery = useQuery({
+    queryKey: ['all-bonding-curves'],
+    queryFn: async () => {
+      const data = await ponderGql<{
+        bondingCurves: { items: BondingCurveData[] };
+      }>(`query {
+        bondingCurves(limit: 500) {
+          items {
+            id tokenAddress universeId graduationEth curveSupply
+            graduated graduatedAt createdAt tradingStatus
+            tokensSold ethRaised lastPrice tradeCount
+          }
+        }
+      }`);
+      return data.bondingCurves?.items ?? [];
+    },
+    ...ponderQueryDefaults,
+    refetchInterval: jitteredInterval(POLL_INTERVALS.MODERATE),
+  });
+
   // Fetch all holder records to count per token
   const holdersQuery = useQuery({
     queryKey: ['all-holder-counts'],
@@ -444,10 +524,17 @@ export function useTokenListData() {
       holderCounts.set(key, (holderCounts.get(key) ?? 0) + 1);
     }
 
+    // Index bonding curves by token address (lowercased)
+    const curvesByToken = new Map<string, BondingCurveData>();
+    for (const curve of curvesQuery.data ?? []) {
+      curvesByToken.set(curve.tokenAddress.toLowerCase(), curve);
+    }
+
     return tokensQuery.data.map((token) => {
       const pool = poolMap.get(token.poolId);
       const tokenSwaps = swapsByPool.get(token.poolId) ?? [];
       const recentSwaps = tokenSwaps.filter((s) => s.timestamp >= oneDayAgo);
+      const bondingCurve = curvesByToken.get(token.id.toLowerCase()) ?? null;
 
       // Current price from pool
       let price: number | null = null;
@@ -478,6 +565,20 @@ export function useTokenListData() {
       // Market cap = price * total supply
       const marketCap = price != null ? price * TOTAL_SUPPLY : null;
 
+      const stage = stageFromBondingCurve(bondingCurve);
+      let graduationPct = 0;
+      if (bondingCurve) {
+        if (bondingCurve.graduated) {
+          graduationPct = 100;
+        } else {
+          const raised = Number(BigInt(bondingCurve.ethRaised)) / 1e18;
+          const target = Number(BigInt(bondingCurve.graduationEth)) / 1e18;
+          graduationPct = target > 0 ? Math.min((raised / target) * 100, 100) : 0;
+        }
+      } else {
+        graduationPct = 100; // no curve = already on Uniswap
+      }
+
       return {
         ...token,
         price,
@@ -488,9 +589,12 @@ export function useTokenListData() {
         holderCount: holderCounts.get(token.id.toLowerCase()) ?? 0,
         sparkline,
         marketCap,
+        bondingCurve,
+        stage,
+        graduationPct,
       };
     });
-  }, [tokensQuery.data, poolsQuery.data, swapsQuery.data, holdersQuery.data]);
+  }, [tokensQuery.data, poolsQuery.data, swapsQuery.data, holdersQuery.data, curvesQuery.data]);
 
   // Total market cap across all tokens
   const totalMarketCap = useMemo(() => {

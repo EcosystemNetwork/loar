@@ -128,11 +128,15 @@ export const galleryRouter = router({
         allowedByMedia = [input.mediaType];
       }
 
+      // All 3D in the gallery is AI-generated today — content.routes.ts only
+      // accepts image/video uploads, and every `publishToGallery({mediaType:'3d'})`
+      // call site is a Meshy-backed generator (threed.routes, character-pipeline).
+      // So '3d' lives in the `generated` bucket, not `uploaded`.
       let allowedByOrigin: string[];
       if (input.origin === 'generated') {
-        allowedByOrigin = ['ai-video', 'ai-image'];
+        allowedByOrigin = ['ai-video', 'ai-image', '3d'];
       } else if (input.origin === 'uploaded') {
-        allowedByOrigin = ['video', 'image', 'audio', '3d'];
+        allowedByOrigin = ['video', 'image', 'audio'];
       } else {
         allowedByOrigin = allTypes;
       }
