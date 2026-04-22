@@ -45,7 +45,8 @@ export const IdentityNFT = {
     '11155111': '0x45A5E2816696fE9AF96e2F669cafD376a84E8db7',
 };
 export const LaunchpadStaking = {
-    '84532': '0xc934b9785c139d98aecE97D75a945E3f6132B49a',
+    '84532': '0x94556da562b0Fa73914baf9d45Fc048a4e401249',
+    '11155111': '0x8696aaC70BAcD9b5ecFe0126322FD1fE46CD62Fa',
 };
 export const LicensingRegistry = {
     '84532': '0x8e6c09198267B07E3FC8C66F0343759111D63016',

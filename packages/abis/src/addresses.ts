@@ -79,7 +79,8 @@ export const IdentityNFT = {
 export type IdentityNFTChainId = keyof typeof IdentityNFT;
 
 export const LaunchpadStaking = {
-  '84532': '0xc934b9785c139d98aecE97D75a945E3f6132B49a',
+  '84532': '0x94556da562b0Fa73914baf9d45Fc048a4e401249',
+  '11155111': '0x8696aaC70BAcD9b5ecFe0126322FD1fE46CD62Fa',
 } as const;
 
 export type LaunchpadStakingChainId = keyof typeof LaunchpadStaking;
