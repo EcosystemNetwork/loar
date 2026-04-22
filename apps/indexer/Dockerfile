@@ -1,7 +1,12 @@
 # ── Stage 1: Builder ──────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+# Debian slim (glibc), not alpine (musl). Vite 8+ pulls in rolldown, whose
+# platform-specific native bindings ship as optionalDependencies. On alpine
+# the musl binding (@rolldown/binding-linux-x64-musl) failed to resolve at
+# runtime even with optional deps preserved — swapping to glibc sidesteps
+# the entire class of musl-binding issues common in the Node ecosystem.
+FROM node:20-slim AS builder
 
-RUN apk add --no-cache curl
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
 ENV COREPACK_INTEGRITY_KEYS=""
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
@@ -41,9 +46,9 @@ COPY deployments/ ./deployments/
 RUN pnpm prune --prod
 
 # ── Stage 2: Production ──────────────────────────────────────────────────
-FROM node:20-alpine
+FROM node:20-slim
 
-RUN apk add --no-cache curl
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
 ENV COREPACK_INTEGRITY_KEYS=""
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
@@ -56,7 +61,7 @@ COPY --from=builder /app/apps/indexer ./apps/indexer
 COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/deployments ./deployments
 
-RUN addgroup -g 1001 -S appgroup && adduser -S appuser -u 1001 -G appgroup
+RUN groupadd --gid 1001 appgroup && useradd --uid 1001 --gid appgroup --system --create-home appuser
 RUN chown -R appuser:appgroup /app/apps/indexer
 USER appuser
 
