@@ -147,28 +147,10 @@ export async function runLaunchpadLayer(cfg: SmokeConfig, jwt: string): Promise<
     );
   }
 
-  // 5. Server /staking.tiers — confirms server can derive tiers from chain
-  results.push(
-    await check('server staking.tiers returns 5 entries', async () => {
-      const url = `${cfg.serverUrl}/api/trpc/staking.tiers`;
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(cfg.timeout),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json: any = await res.json();
-      const data = json?.result?.data ?? json?.data;
-      if (!Array.isArray(data)) {
-        throw new Error(`expected array, got ${typeof data}`);
-      }
-      if (data.length !== 5) {
-        throw new Error(`expected 5 tiers, got ${data.length}`);
-      }
-      const names = data.map((t: any) => t.name).join(',');
-      return `tiers=[${names}]`;
-    })
-  );
+  // NOTE: staking router was removed in commit 595c5ccb ("remove workflow
+  // feature set and integrate OAuth verification helper"). Tier configs are
+  // read directly from LaunchpadStaking on-chain above; there is no server
+  // staking.tiers endpoint. If the router is reinstated, re-add a check here.
 
   // 6. Indexer schema — confirm new launchpad tables are present.
   //    Probes the GraphQL schema introspection rather than running a query
