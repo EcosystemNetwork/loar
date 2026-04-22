@@ -12,15 +12,16 @@
  */
 import {
   initiateDeveloperControlledWalletsClient,
-  type DeveloperControlledWalletsClient,
+  type CircleDeveloperControlledWalletsClient,
 } from '@circle-fin/developer-controlled-wallets';
+import { formatEther } from 'viem';
 import { db, firebaseAvailable } from './firebase';
 
 // ── Client singleton ────────────────────────────────────────────────────────
 
-let _client: DeveloperControlledWalletsClient | null = null;
+let _client: CircleDeveloperControlledWalletsClient | null = null;
 
-function getClient(): DeveloperControlledWalletsClient {
+function getClient(): CircleDeveloperControlledWalletsClient {
   if (_client) return _client;
 
   const apiKey = process.env.CIRCLE_API_KEY;
@@ -153,8 +154,10 @@ export async function getOrCreateWallet(userId: string, chainId = 84532): Promis
 export interface TxRequest {
   walletId: string;
   contractAddress: string;
-  calldata: string;
+  /** 0x-prefixed ABI-encoded calldata. */
+  calldata: `0x${string}`;
   chainId: number;
+  /** Native-token value as a wei string (e.g. "1000000000000000000" = 1 ETH). */
   value?: string;
 }
 
@@ -170,7 +173,10 @@ export interface TxResult {
  */
 export async function executeTransaction(req: TxRequest): Promise<TxResult> {
   const client = getClient();
-  const blockchain = circleBlockchain(req.chainId);
+  // Blockchain isn't passed on contract-execution calls — Circle derives it
+  // from the walletId — but we still validate the chain is recognised so a
+  // caller can't silently route across networks.
+  circleBlockchain(req.chainId);
 
   // Get the wallet address from Circle
   const walletResp = await client.getWallet({ id: req.walletId });
@@ -179,10 +185,22 @@ export async function executeTransaction(req: TxRequest): Promise<TxResult> {
     throw new Error(`Wallet ${req.walletId} not found`);
   }
 
+  // Circle takes `amount` as a decimal native-token string (e.g. "0.01"),
+  // not wei. Convert from the wagmi-shape bigint-as-wei we accept.
+  let amount: string | undefined;
+  if (req.value && req.value !== '0') {
+    try {
+      amount = formatEther(BigInt(req.value));
+    } catch {
+      throw new Error(`Invalid value: ${req.value} is not a valid wei string`);
+    }
+  }
+
   const txResp = await client.createContractExecutionTransaction({
     walletId: req.walletId,
     callData: req.calldata,
     contractAddress: req.contractAddress,
+    ...(amount ? { amount } : {}),
     fee: { type: 'level', config: { feeLevel: 'MEDIUM' } },
   });
 

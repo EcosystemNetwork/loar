@@ -245,18 +245,19 @@ export async function verifyEmailOTP(
 }
 
 /**
- * Social login (Google/Apple) — send the verified email from OAuth.
+ * Social login (Google/Apple) — post the provider-issued idToken.
+ * Email is extracted server-side from the verified token; don't trust
+ * any email the client could send.
  */
 export async function socialLogin(
-  email: string,
   provider: 'google' | 'apple',
-  idToken?: string
+  idToken: string
 ): Promise<{ address: string; email: string; walletId: string; expiresAt: number }> {
   const res = await fetch(`${SERVER_URL}/auth/circle/social`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, provider, idToken }),
+    body: JSON.stringify({ provider, idToken }),
   });
 
   if (!res.ok) {
@@ -315,21 +316,18 @@ export function useWalletAuth() {
   }, []);
 
   /** Sign in with social provider (Circle flow). */
-  const signInWithSocial = useCallback(
-    async (email: string, provider: 'google' | 'apple', idToken?: string) => {
-      setIsAuthenticating(true);
-      setError(null);
-      try {
-        await socialLogin(email, provider, idToken);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Sign-in failed');
-        throw err;
-      } finally {
-        setIsAuthenticating(false);
-      }
-    },
-    []
-  );
+  const signInWithSocial = useCallback(async (provider: 'google' | 'apple', idToken: string) => {
+    setIsAuthenticating(true);
+    setError(null);
+    try {
+      await socialLogin(provider, idToken);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sign-in failed');
+      throw err;
+    } finally {
+      setIsAuthenticating(false);
+    }
+  }, []);
 
   /** Sign out — clear session and revoke server-side. */
   const signOut = useCallback(() => {

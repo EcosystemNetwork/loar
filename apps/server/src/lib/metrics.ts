@@ -122,7 +122,7 @@ export function recordCreditsTx(
 }
 
 export function recordAuthEvent(
-  kind: 'nonce' | 'verify' | 'refresh',
+  kind: 'nonce' | 'verify' | 'refresh' | 'circle_register' | 'circle_verify' | 'circle_social',
   status: 'success' | 'failure'
 ): void {
   authEventsTotal.labels(kind, status).inc();

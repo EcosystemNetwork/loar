@@ -13,6 +13,12 @@ import { Hono } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { issueSessionToken, verifySessionToken } from '../lib/siwe';
 import { getOrCreateWallet, isCircleConfigured, type CircleWallet } from '../lib/circle-wallets';
+import {
+  verifyGoogleIdToken,
+  verifyAppleIdToken,
+  isGoogleOAuthConfigured,
+  isAppleOAuthConfigured,
+} from '../lib/oauth-verify';
 import { recordAuthEvent } from '../lib/metrics';
 import { db, firebaseAvailable } from '../lib/firebase';
 import crypto from 'node:crypto';
@@ -269,11 +275,10 @@ circleAuthRoutes.post('/verify-otp', async (c) => {
 /**
  * POST /auth/circle/social
  *
- * Social login — accepts a verified token from Google/Apple OAuth.
- * The frontend handles the OAuth flow and sends the verified email here.
- *
- * In a full implementation, this would verify the OAuth token server-side.
- * For now, we accept the verified email directly (TODO: add token verification).
+ * Social login — the client performs OAuth with Google/Apple and posts the
+ * resulting ID token here. We verify it server-side against the provider's
+ * JWKS before issuing a wallet/session, so a caller cannot simply POST
+ * { email: "victim@example.com" } to take over an account.
  */
 circleAuthRoutes.post('/social', async (c) => {
   if (!isCircleConfigured()) {
@@ -281,21 +286,45 @@ circleAuthRoutes.post('/social', async (c) => {
   }
 
   const body = await c.req.json<{
-    email: string;
     provider: 'google' | 'apple';
     idToken?: string;
   }>();
 
-  const email = body.email?.toLowerCase().trim();
   const provider = body.provider;
+  const idToken = body.idToken?.trim();
 
-  if (!email || !provider) {
-    return c.json({ error: 'Email and provider are required' }, 400);
+  if (!provider || (provider !== 'google' && provider !== 'apple')) {
+    return c.json({ error: 'provider must be "google" or "apple"' }, 400);
+  }
+  if (!idToken) {
+    return c.json({ error: 'idToken is required' }, 400);
+  }
+  if (provider === 'google' && !isGoogleOAuthConfigured()) {
+    return c.json({ error: 'Google OAuth not configured on this server' }, 503);
+  }
+  if (provider === 'apple' && !isAppleOAuthConfigured()) {
+    return c.json({ error: 'Apple OAuth not configured on this server' }, 503);
   }
 
-  // TODO: Verify OAuth idToken with Google/Apple
-  // For now, trust the email from the frontend OAuth flow
-  // In production, this MUST verify the idToken server-side
+  let verified;
+  try {
+    verified =
+      provider === 'google'
+        ? await verifyGoogleIdToken(idToken)
+        : await verifyAppleIdToken(idToken);
+  } catch (err) {
+    recordAuthEvent('circle_social', 'failure');
+    const message = err instanceof Error ? err.message : 'idToken verification failed';
+    console.warn('[AUTH] social idToken rejected:', message);
+    return c.json({ error: 'Invalid idToken' }, 401);
+  }
+
+  if (!verified.emailVerified) {
+    recordAuthEvent('circle_social', 'failure');
+    return c.json({ error: 'Email is not verified by provider' }, 401);
+  }
+
+  const email = verified.email;
 
   try {
     const { account, wallet } = await getOrCreateUserAccount(email, provider);

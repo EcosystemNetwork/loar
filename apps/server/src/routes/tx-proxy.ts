@@ -61,14 +61,10 @@ async function resolveWallet(
  *
  * Execute a contract call via Circle wallet.
  *
- * Body: {
- *   address: string;      // contract address
- *   abi: Abi;              // contract ABI
- *   functionName: string;  // function to call
- *   args?: any[];          // function arguments
- *   value?: string;        // ETH value in wei
- *   chainId?: number;      // target chain
- * }
+ * Body: either
+ *   { address, abi, functionName, args?, value?, chainId? }   // ABI-encoded call
+ * or
+ *   { address, data: "0x…", value?, chainId? }                // pre-encoded calldata
  */
 txProxyRoutes.post('/write', async (c) => {
   // Auth check
@@ -87,15 +83,21 @@ txProxyRoutes.post('/write', async (c) => {
   // Parse request
   const body = await c.req.json<{
     address: string;
-    abi: Abi;
-    functionName: string;
+    abi?: Abi;
+    functionName?: string;
     args?: any[];
+    data?: `0x${string}`;
     value?: string;
     chainId?: number;
   }>();
 
-  if (!body.address || !body.abi || !body.functionName) {
-    return c.json({ error: 'Missing address, abi, or functionName' }, 400);
+  if (!body.address) {
+    return c.json({ error: 'Missing address' }, 400);
+  }
+  const hasAbiCall = !!(body.abi && body.functionName);
+  const hasRawCall = !!body.data;
+  if (!hasAbiCall && !hasRawCall) {
+    return c.json({ error: 'Provide either {abi,functionName} or {data}' }, 400);
   }
 
   // Resolve Circle wallet
@@ -110,12 +112,20 @@ txProxyRoutes.post('/write', async (c) => {
   }
 
   try {
-    // Encode calldata
-    const calldata = encodeFunctionData({
-      abi: body.abi,
-      functionName: body.functionName,
-      args: body.args ?? [],
-    });
+    // Build calldata — either encode the ABI call or pass raw bytes through.
+    let calldata: `0x${string}`;
+    if (hasRawCall) {
+      if (!/^0x[0-9a-fA-F]*$/.test(body.data!)) {
+        return c.json({ error: 'data must be a 0x-prefixed hex string' }, 400);
+      }
+      calldata = body.data!;
+    } else {
+      calldata = encodeFunctionData({
+        abi: body.abi!,
+        functionName: body.functionName!,
+        args: body.args ?? [],
+      });
+    }
 
     // Execute via Circle
     const result = await executeTransaction({
@@ -130,7 +140,7 @@ txProxyRoutes.post('/write', async (c) => {
     void import('../lib/analytics').then(({ captureServerEvent }) =>
       captureServerEvent('tx:circle_write', {
         distinctId: walletAddress,
-        functionName: body.functionName,
+        functionName: body.functionName ?? 'raw',
         txHash: result.txHash,
       })
     );

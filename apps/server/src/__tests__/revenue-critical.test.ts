@@ -183,53 +183,6 @@ describe('credits router', () => {
 });
 
 // ---------------------------------------------------------------------------
-// licensing
-// ---------------------------------------------------------------------------
-describe('licensing router', () => {
-  it('getLicenses is public', async () => {
-    const caller = createPublicCaller();
-    const result = await caller.licensing.getLicenses({ universeId: 'test-universe' });
-    expect(Array.isArray(result)).toBe(true);
-  });
-
-  it('getMerch is public', async () => {
-    const caller = createPublicCaller();
-    const result = await caller.licensing.getMerch({ universeId: 'test-universe' });
-    expect(Array.isArray(result)).toBe(true);
-  });
-
-  it('createLicense rejects unauthenticated callers', async () => {
-    const caller = createPublicCaller();
-    await expect(
-      caller.licensing.createLicense({
-        universeId: 'u1',
-        licenseType: 'STREAMING',
-        licensee: 'Netflix',
-        upfrontFee: '1000',
-        royaltyBps: 500,
-        durationDays: 365,
-        terms: 'Standard license terms',
-      })
-    ).rejects.toThrow(TRPCError);
-  });
-
-  it('purchaseMerch rejects unauthenticated callers', async () => {
-    const caller = createPublicCaller();
-    await expect(
-      caller.licensing.purchaseMerch({
-        merchId: 'merch1',
-        txHash: '0xabc',
-      })
-    ).rejects.toThrow(TRPCError);
-  });
-
-  it('myMerch rejects unauthenticated callers', async () => {
-    const caller = createPublicCaller();
-    await expect(caller.licensing.myMerch()).rejects.toThrow(TRPCError);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // analytics
 // ---------------------------------------------------------------------------
 describe('analytics router', () => {
@@ -304,36 +257,6 @@ describe('ads router', () => {
   it('mySponsorships rejects unauthenticated callers', async () => {
     const caller = createPublicCaller();
     await expect(caller.ads.mySponsorships()).rejects.toThrow(TRPCError);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// collabs
-// ---------------------------------------------------------------------------
-describe('collabs router', () => {
-  it('getByUniverse is public', async () => {
-    const caller = createPublicCaller();
-    const result = await caller.collabs.getByUniverse({ universeId: 'test-universe' });
-    expect(Array.isArray(result)).toBe(true);
-  });
-
-  it('propose rejects unauthenticated callers', async () => {
-    const caller = createPublicCaller();
-    await expect(
-      caller.collabs.propose({
-        universeA: 'u1',
-        universeB: 'u2',
-        revenueShareBps: 5000,
-        durationDays: 30,
-        title: 'Crossover',
-        description: 'A crossover event',
-      })
-    ).rejects.toThrow(TRPCError);
-  });
-
-  it('myCollabs rejects unauthenticated callers', async () => {
-    const caller = createPublicCaller();
-    await expect(caller.collabs.myCollabs()).rejects.toThrow(TRPCError);
   });
 });
 

@@ -125,10 +125,9 @@ export function useSendTransaction() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             address: params.to,
-            // For raw sends, we pass the calldata directly
-            abi: [],
-            functionName: '__raw__',
-            args: [],
+            // Raw send: forward pre-encoded calldata as `data` (empty if the
+            // tx is a plain value transfer with no call).
+            data: params.data ?? '0x',
             value: params.value?.toString(),
             chainId,
           }),
