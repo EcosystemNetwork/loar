@@ -161,7 +161,7 @@ export function UniverseCard({ universe }: { universe: EnrichedUniverse }) {
 
   return (
     <div
-      onClick={() => navigate({ to: '/universe/$id', params: { id: universe.id } })}
+      onClick={() => navigate({ to: '/universe/$id/watch', params: { id: universe.id } })}
       className="group flex-shrink-0 w-[180px] md:w-[200px] cursor-pointer"
     >
       {/* Tall poster image — prefer dedicated portrait crop */}
@@ -241,7 +241,7 @@ export function WideCard({ universe }: { universe: EnrichedUniverse }) {
 
   return (
     <div
-      onClick={() => navigate({ to: '/universe/$id', params: { id: universe.id } })}
+      onClick={() => navigate({ to: '/universe/$id/watch', params: { id: universe.id } })}
       className="group flex-shrink-0 w-[320px] md:w-[400px] cursor-pointer"
     >
       <div className="relative aspect-video rounded-xl overflow-hidden bg-muted ring-1 ring-white/5 group-hover:ring-primary/60 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl group-hover:shadow-primary/20">
@@ -447,7 +447,7 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
             <Button
               size="lg"
               className="px-6 bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
-              onClick={() => navigate({ to: '/universe/$id', params: { id: current.id } })}
+              onClick={() => navigate({ to: '/universe/$id/watch', params: { id: current.id } })}
             >
               <Play className="h-4 w-4 mr-2 fill-current" />
               Explore
@@ -456,7 +456,7 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
               size="lg"
               variant="ghost"
               className="px-6 text-white/80 hover:text-white hover:bg-white/10 font-medium"
-              onClick={() => navigate({ to: '/universe/$id', params: { id: current.id } })}
+              onClick={() => navigate({ to: '/universe/$id/watch', params: { id: current.id } })}
             >
               <BookOpen className="h-4 w-4 mr-2" />
               Details
@@ -571,7 +571,7 @@ export function ActivityTicker() {
         {marqueeItems.map((a, i) => (
           <Link
             key={`${a.id}-${i}`}
-            to="/universe/$id"
+            to="/universe/$id/watch"
             params={{ id: a.universeId }}
             className="flex items-center gap-2 text-sm flex-shrink-0 hover:text-primary transition-colors"
           >
@@ -1110,7 +1110,7 @@ export function SearchOverlay({
                     <button
                       key={u.id}
                       onClick={() => {
-                        navigate({ to: '/universe/$id', params: { id: u.id } });
+                        navigate({ to: '/universe/$id/watch', params: { id: u.id } });
                         onClose();
                       }}
                       className="w-full p-3 rounded-xl hover:bg-white/5 transition-colors text-left flex items-center gap-3"
@@ -1167,7 +1167,7 @@ export function SearchOverlay({
                     <button
                       key={u.id}
                       onClick={() => {
-                        navigate({ to: '/universe/$id', params: { id: u.id } });
+                        navigate({ to: '/universe/$id/watch', params: { id: u.id } });
                         onClose();
                       }}
                       className="w-full p-2.5 rounded-lg hover:bg-white/5 transition-colors text-left flex items-center gap-3"

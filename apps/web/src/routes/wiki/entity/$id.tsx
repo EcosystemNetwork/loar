@@ -922,7 +922,7 @@ function EntityPage() {
                 <div className="flex justify-between items-center gap-2">
                   <span className="text-muted-foreground">Universe</span>
                   <Link
-                    to="/universe/$id"
+                    to="/universe/$id/watch"
                     params={{ id: entity.universeAddress }}
                     className="text-primary text-xs font-mono hover:underline truncate max-w-[120px]"
                   >

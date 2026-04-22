@@ -314,7 +314,7 @@ function TokenDetailPage() {
 
             {/* Universe */}
             {universe && (
-              <Link to="/universe/$id" params={{ id: token.universeAddress }}>
+              <Link to="/universe/$id/watch" params={{ id: token.universeAddress }}>
                 <Button variant="outline" size="sm" className="gap-1.5">
                   View Universe
                   <ExternalLink className="h-3 w-3" />
@@ -821,7 +821,7 @@ function TokenDetailPage() {
               <Card>
                 <CardContent className="p-4">
                   <h3 className="font-semibold text-sm mb-3">Universe</h3>
-                  <Link to="/universe/$id" params={{ id: token.universeAddress }}>
+                  <Link to="/universe/$id/watch" params={{ id: token.universeAddress }}>
                     <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
                       {universe.imageURL && (
                         <img

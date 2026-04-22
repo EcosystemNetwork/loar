@@ -35,6 +35,7 @@ const HIDDEN_ROUTES = new Set<string>([]);
 const primaryLinks = [
   { to: '/discover', label: 'Discover' },
   { to: '/create', label: 'Create' },
+  { to: '/studio', label: 'Studio' },
   { to: '/editor', label: 'Editor' },
   { to: '/tokens', label: 'Launchpad' },
   { to: '/gallery', label: 'Gallery' },

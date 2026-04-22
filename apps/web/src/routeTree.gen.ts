@@ -14,6 +14,7 @@ import { Route as UploadRouteImport } from './routes/upload'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
 import { Route as StudioControlledRouteImport } from './routes/studio-controlled'
+import { Route as StudioRouteImport } from './routes/studio'
 import { Route as StatusRouteImport } from './routes/status'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SandboxRouteImport } from './routes/sandbox'
@@ -75,6 +76,7 @@ import { Route as AdminMcpUsageRouteImport } from './routes/admin/mcp-usage'
 import { Route as AdminCostRouteImport } from './routes/admin/cost'
 import { Route as WikiEntityIdRouteImport } from './routes/wiki/entity/$id'
 import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
+import { Route as UniverseIdWatchRouteImport } from './routes/universe/$id/watch'
 import { Route as UniverseIdStyleRouteImport } from './routes/universe/$id/style'
 import { Route as UniverseIdLineageRouteImport } from './routes/universe/$id/lineage'
 import { Route as UniverseIdGenConfigRouteImport } from './routes/universe/$id/gen-config'
@@ -108,6 +110,11 @@ const SubscriptionsRoute = SubscriptionsRouteImport.update({
 const StudioControlledRoute = StudioControlledRouteImport.update({
   id: '/studio-controlled',
   path: '/studio-controlled',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioRoute = StudioRouteImport.update({
+  id: '/studio',
+  path: '/studio',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StatusRoute = StatusRouteImport.update({
@@ -415,6 +422,11 @@ const WikiCharacterIdRoute = WikiCharacterIdRouteImport.update({
   path: '/wiki/character/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UniverseIdWatchRoute = UniverseIdWatchRouteImport.update({
+  id: '/watch',
+  path: '/watch',
+  getParentRoute: () => UniverseIdRoute,
+} as any)
 const UniverseIdStyleRoute = UniverseIdStyleRouteImport.update({
   id: '/style',
   path: '/style',
@@ -451,9 +463,9 @@ const TokensCreatorAddressRoute = TokensCreatorAddressRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const StudioEditAssetIdRoute = StudioEditAssetIdRouteImport.update({
-  id: '/studio/edit/$assetId',
-  path: '/studio/edit/$assetId',
-  getParentRoute: () => rootRouteImport,
+  id: '/edit/$assetId',
+  path: '/edit/$assetId',
+  getParentRoute: () => StudioRoute,
 } as any)
 const EventUniverseEventRoute = EventUniverseEventRouteImport.update({
   id: '/event/$universe/$event',
@@ -486,6 +498,7 @@ export interface FileRoutesByFullPath {
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
   '/status': typeof StatusRoute
+  '/studio': typeof StudioRouteWithChildren
   '/studio-controlled': typeof StudioControlledRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/terms': typeof TermsRoute
@@ -535,6 +548,7 @@ export interface FileRoutesByFullPath {
   '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
   '/universe/$id/lineage': typeof UniverseIdLineageRoute
   '/universe/$id/style': typeof UniverseIdStyleRoute
+  '/universe/$id/watch': typeof UniverseIdWatchRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
 }
@@ -563,6 +577,7 @@ export interface FileRoutesByTo {
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
   '/status': typeof StatusRoute
+  '/studio': typeof StudioRouteWithChildren
   '/studio-controlled': typeof StudioControlledRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/terms': typeof TermsRoute
@@ -612,6 +627,7 @@ export interface FileRoutesByTo {
   '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
   '/universe/$id/lineage': typeof UniverseIdLineageRoute
   '/universe/$id/style': typeof UniverseIdStyleRoute
+  '/universe/$id/watch': typeof UniverseIdWatchRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
 }
@@ -641,6 +657,7 @@ export interface FileRoutesById {
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
   '/status': typeof StatusRoute
+  '/studio': typeof StudioRouteWithChildren
   '/studio-controlled': typeof StudioControlledRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/terms': typeof TermsRoute
@@ -690,6 +707,7 @@ export interface FileRoutesById {
   '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
   '/universe/$id/lineage': typeof UniverseIdLineageRoute
   '/universe/$id/style': typeof UniverseIdStyleRoute
+  '/universe/$id/watch': typeof UniverseIdWatchRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
 }
@@ -720,6 +738,7 @@ export interface FileRouteTypes {
     | '/sandbox'
     | '/search'
     | '/status'
+    | '/studio'
     | '/studio-controlled'
     | '/subscriptions'
     | '/terms'
@@ -769,6 +788,7 @@ export interface FileRouteTypes {
     | '/universe/$id/gen-config'
     | '/universe/$id/lineage'
     | '/universe/$id/style'
+    | '/universe/$id/watch'
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -797,6 +817,7 @@ export interface FileRouteTypes {
     | '/sandbox'
     | '/search'
     | '/status'
+    | '/studio'
     | '/studio-controlled'
     | '/subscriptions'
     | '/terms'
@@ -846,6 +867,7 @@ export interface FileRouteTypes {
     | '/universe/$id/gen-config'
     | '/universe/$id/lineage'
     | '/universe/$id/style'
+    | '/universe/$id/watch'
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
   id:
@@ -874,6 +896,7 @@ export interface FileRouteTypes {
     | '/sandbox'
     | '/search'
     | '/status'
+    | '/studio'
     | '/studio-controlled'
     | '/subscriptions'
     | '/terms'
@@ -923,6 +946,7 @@ export interface FileRouteTypes {
     | '/universe/$id/gen-config'
     | '/universe/$id/lineage'
     | '/universe/$id/style'
+    | '/universe/$id/watch'
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
   fileRoutesById: FileRoutesById
@@ -952,6 +976,7 @@ export interface RootRouteChildren {
   SandboxRoute: typeof SandboxRoute
   SearchRoute: typeof SearchRoute
   StatusRoute: typeof StatusRoute
+  StudioRoute: typeof StudioRouteWithChildren
   StudioControlledRoute: typeof StudioControlledRoute
   SubscriptionsRoute: typeof SubscriptionsRoute
   TermsRoute: typeof TermsRoute
@@ -992,7 +1017,6 @@ export interface RootRouteChildren {
   TokensIndexRoute: typeof TokensIndexRoute
   WikiIndexRoute: typeof WikiIndexRoute
   EventUniverseEventRoute: typeof EventUniverseEventRoute
-  StudioEditAssetIdRoute: typeof StudioEditAssetIdRoute
   TokensCreatorAddressRoute: typeof TokensCreatorAddressRoute
   UniverseAddressPollsRoute: typeof UniverseAddressPollsRoute
   WikiCharacterIdRoute: typeof WikiCharacterIdRoute
@@ -1034,6 +1058,13 @@ declare module '@tanstack/react-router' {
       path: '/studio-controlled'
       fullPath: '/studio-controlled'
       preLoaderRoute: typeof StudioControlledRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio': {
+      id: '/studio'
+      path: '/studio'
+      fullPath: '/studio'
+      preLoaderRoute: typeof StudioRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/status': {
@@ -1463,6 +1494,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WikiCharacterIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/universe/$id/watch': {
+      id: '/universe/$id/watch'
+      path: '/watch'
+      fullPath: '/universe/$id/watch'
+      preLoaderRoute: typeof UniverseIdWatchRouteImport
+      parentRoute: typeof UniverseIdRoute
+    }
     '/universe/$id/style': {
       id: '/universe/$id/style'
       path: '/style'
@@ -1514,10 +1552,10 @@ declare module '@tanstack/react-router' {
     }
     '/studio/edit/$assetId': {
       id: '/studio/edit/$assetId'
-      path: '/studio/edit/$assetId'
+      path: '/edit/$assetId'
       fullPath: '/studio/edit/$assetId'
       preLoaderRoute: typeof StudioEditAssetIdRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof StudioRoute
     }
     '/event/$universe/$event': {
       id: '/event/$universe/$event'
@@ -1541,12 +1579,24 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
   DashboardRouteChildren,
 )
 
+interface StudioRouteChildren {
+  StudioEditAssetIdRoute: typeof StudioEditAssetIdRoute
+}
+
+const StudioRouteChildren: StudioRouteChildren = {
+  StudioEditAssetIdRoute: StudioEditAssetIdRoute,
+}
+
+const StudioRouteWithChildren =
+  StudioRoute._addFileChildren(StudioRouteChildren)
+
 interface UniverseIdRouteChildren {
   UniverseIdDeployTokenRoute: typeof UniverseIdDeployTokenRoute
   UniverseIdGalleryRoute: typeof UniverseIdGalleryRoute
   UniverseIdGenConfigRoute: typeof UniverseIdGenConfigRoute
   UniverseIdLineageRoute: typeof UniverseIdLineageRoute
   UniverseIdStyleRoute: typeof UniverseIdStyleRoute
+  UniverseIdWatchRoute: typeof UniverseIdWatchRoute
 }
 
 const UniverseIdRouteChildren: UniverseIdRouteChildren = {
@@ -1555,6 +1605,7 @@ const UniverseIdRouteChildren: UniverseIdRouteChildren = {
   UniverseIdGenConfigRoute: UniverseIdGenConfigRoute,
   UniverseIdLineageRoute: UniverseIdLineageRoute,
   UniverseIdStyleRoute: UniverseIdStyleRoute,
+  UniverseIdWatchRoute: UniverseIdWatchRoute,
 }
 
 const UniverseIdRouteWithChildren = UniverseIdRoute._addFileChildren(
@@ -1586,6 +1637,7 @@ const rootRouteChildren: RootRouteChildren = {
   SandboxRoute: SandboxRoute,
   SearchRoute: SearchRoute,
   StatusRoute: StatusRoute,
+  StudioRoute: StudioRouteWithChildren,
   StudioControlledRoute: StudioControlledRoute,
   SubscriptionsRoute: SubscriptionsRoute,
   TermsRoute: TermsRoute,
@@ -1626,7 +1678,6 @@ const rootRouteChildren: RootRouteChildren = {
   TokensIndexRoute: TokensIndexRoute,
   WikiIndexRoute: WikiIndexRoute,
   EventUniverseEventRoute: EventUniverseEventRoute,
-  StudioEditAssetIdRoute: StudioEditAssetIdRoute,
   TokensCreatorAddressRoute: TokensCreatorAddressRoute,
   UniverseAddressPollsRoute: UniverseAddressPollsRoute,
   WikiCharacterIdRoute: WikiCharacterIdRoute,

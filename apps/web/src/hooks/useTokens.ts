@@ -305,6 +305,334 @@ export function stageFromBondingCurve(curve: BondingCurveData | null | undefined
   return 'bonding';
 }
 
+// ─── User portfolio, derived from the indexer (not client-recorded) ────
+
+export interface UserBondingTrade {
+  id: string;
+  bondingCurve: string;
+  tokenAddress: string;
+  trader: string;
+  isBuy: boolean;
+  ethAmount: string;
+  tokenAmount: string;
+  price: string;
+  timestamp: number;
+}
+
+/**
+ * Fetch all bonding-curve trades for a user, joined against the curve table to
+ * resolve each curve → tokenAddress. Returns [] if the indexer doesn't expose
+ * bondingCurves (older schema on some chains).
+ */
+export function useUserBondingCurveTrades(userAddress: string | undefined) {
+  return useQuery({
+    queryKey: ['user-bonding-curve-trades', userAddress?.toLowerCase()],
+    queryFn: async (): Promise<UserBondingTrade[]> => {
+      const trader = userAddress!.toLowerCase();
+      try {
+        const [tradesRes, curvesRes] = await Promise.all([
+          ponderGql<{
+            bondingCurveTrades: {
+              items: {
+                id: string;
+                bondingCurve: string;
+                trader: string;
+                isBuy: boolean;
+                ethAmount: string;
+                tokenAmount: string;
+                price: string;
+                timestamp: number;
+              }[];
+            };
+          }>(
+            `query ($trader: String!) {
+              bondingCurveTrades(
+                where: { trader: $trader }
+                orderBy: "timestamp"
+                orderDirection: "desc"
+                limit: 500
+              ) {
+                items { id bondingCurve trader isBuy ethAmount tokenAmount price timestamp }
+              }
+            }`,
+            { trader }
+          ),
+          ponderGql<{
+            bondingCurves: { items: { id: string; tokenAddress: string }[] };
+          }>(`query { bondingCurves(limit: 500) { items { id tokenAddress } } }`),
+        ]);
+
+        const curveToToken = new Map<string, string>();
+        for (const c of curvesRes.bondingCurves.items) {
+          curveToToken.set(c.id.toLowerCase(), c.tokenAddress);
+        }
+        return tradesRes.bondingCurveTrades.items.map((t) => ({
+          ...t,
+          tokenAddress: curveToToken.get(t.bondingCurve.toLowerCase()) ?? '',
+        }));
+      } catch {
+        // Older indexer schemas (e.g. Sepolia) don't expose bondingCurves —
+        // portfolio falls back to swap-only view, no fatal error.
+        return [];
+      }
+    },
+    enabled: !!userAddress,
+    ...ponderQueryDefaults,
+    refetchInterval: jitteredInterval(POLL_INTERVALS.MODERATE),
+  });
+}
+
+export interface UserHolding {
+  tokenAddress: string;
+  balance: string;
+}
+
+export function useUserTokenHoldings(userAddress: string | undefined) {
+  return useQuery({
+    queryKey: ['user-token-holdings', userAddress?.toLowerCase()],
+    queryFn: async (): Promise<UserHolding[]> => {
+      const holder = userAddress!.toLowerCase();
+      const data = await ponderGql<{
+        tokenHolders: {
+          items: { tokenAddress: string; balance: string }[];
+        };
+      }>(
+        `query ($holder: String!) {
+          tokenHolders(where: { holderAddress: $holder }, limit: 500) {
+            items { tokenAddress balance }
+          }
+        }`,
+        { holder }
+      );
+      return data.tokenHolders.items;
+    },
+    enabled: !!userAddress,
+    ...ponderQueryDefaults,
+    refetchInterval: jitteredInterval(POLL_INTERVALS.MODERATE),
+  });
+}
+
+export interface PortfolioPosition {
+  tokenAddress: string;
+  tokenSymbol: string;
+  tokenName: string;
+  imageURL: string;
+  currentPrice: number | null;
+  netTokens: number; // from on-chain balance — authoritative
+  totalBoughtEth: number;
+  totalBoughtTokens: number;
+  totalSoldEth: number;
+  totalSoldTokens: number;
+  avgBuyPrice: number; // ETH per token
+  realizedPnL: number;
+  unrealizedPnL: number;
+  totalPnL: number;
+  currentValue: number;
+  tradeCount: number;
+  firstTrade: number | null;
+  lastTrade: number | null;
+}
+
+export interface PortfolioSummary {
+  positions: PortfolioPosition[];
+  totalValue: number;
+  totalRealizedPnL: number;
+  totalUnrealizedPnL: number;
+  totalPnL: number;
+  totalTrades: number;
+}
+
+/**
+ * Indexer-derived portfolio. Joins the user's bonding-curve trades + their
+ * Uniswap v4 swaps + their current holder balances against the token list.
+ * This replaces the old client-recorded `tokenSocial.getPortfolio` which missed
+ * any swap not recorded through the in-app UI.
+ */
+export function useIndexerPortfolio(userAddress: string | undefined): {
+  data: PortfolioSummary;
+  isLoading: boolean;
+} {
+  const tokens = useTokenListData();
+  const trades = useUserBondingCurveTrades(userAddress);
+  const holdings = useUserTokenHoldings(userAddress);
+  const swaps = useMySwapHistory(userAddress, 500);
+
+  const data = useMemo<PortfolioSummary>(() => {
+    if (!userAddress)
+      return {
+        positions: [],
+        totalValue: 0,
+        totalRealizedPnL: 0,
+        totalUnrealizedPnL: 0,
+        totalPnL: 0,
+        totalTrades: 0,
+      };
+
+    // Index tokens by address (lowercased) and poolId.
+    const byAddr = new Map<string, EnrichedToken>();
+    const byPool = new Map<string, EnrichedToken>();
+    for (const t of tokens.data) {
+      byAddr.set(t.id.toLowerCase(), t);
+      byPool.set(t.poolId.toLowerCase(), t);
+    }
+
+    interface Agg {
+      totalBoughtEth: number;
+      totalBoughtTokens: number;
+      totalSoldEth: number;
+      totalSoldTokens: number;
+      tradeCount: number;
+      firstTrade: number | null;
+      lastTrade: number | null;
+    }
+    const agg = new Map<string, Agg>();
+    const bumpTrade = (addr: string, ts: number) => {
+      const a = agg.get(addr)!;
+      a.tradeCount++;
+      a.firstTrade = a.firstTrade == null ? ts : Math.min(a.firstTrade, ts);
+      a.lastTrade = a.lastTrade == null ? ts : Math.max(a.lastTrade, ts);
+    };
+    const ensure = (addr: string) => {
+      if (!agg.has(addr)) {
+        agg.set(addr, {
+          totalBoughtEth: 0,
+          totalBoughtTokens: 0,
+          totalSoldEth: 0,
+          totalSoldTokens: 0,
+          tradeCount: 0,
+          firstTrade: null,
+          lastTrade: null,
+        });
+      }
+    };
+
+    // 1) Bonding-curve trades have exact ETH+token amounts already.
+    for (const t of trades.data ?? []) {
+      const addr = t.tokenAddress.toLowerCase();
+      if (!addr) continue;
+      ensure(addr);
+      const ethF = Number(BigInt(t.ethAmount)) / 1e18;
+      const tokF = Number(BigInt(t.tokenAmount)) / 1e18;
+      const a = agg.get(addr)!;
+      if (t.isBuy) {
+        a.totalBoughtEth += ethF;
+        a.totalBoughtTokens += tokF;
+      } else {
+        a.totalSoldEth += ethF;
+        a.totalSoldTokens += tokF;
+      }
+      bumpTrade(addr, t.timestamp);
+    }
+
+    // 2) Uniswap v4 swaps — use signed amounts (amount0 = ETH for native-ETH
+    //    pools). Positive amount0 = pool received ETH = user BUYS token.
+    for (const s of swaps.data ?? []) {
+      const token = byPool.get(s.poolId.toLowerCase());
+      if (!token) continue;
+      const addr = token.id.toLowerCase();
+      ensure(addr);
+      const a0 = BigInt(s.amount0);
+      const a1 = BigInt(s.amount1);
+      // For native-ETH pools, amount0 is ETH delta to the pool; amount1 is token delta.
+      // Assumes currency0 = ETH. Non-ETH pools fall through but the amounts are
+      // still meaningful as absolute ETH-equivalent via current pool price.
+      const ethAbs = Number(a0 < 0n ? -a0 : a0) / 1e18;
+      const tokAbs = Number(a1 < 0n ? -a1 : a1) / 1e18;
+      const a = agg.get(addr)!;
+      if (a0 > 0n) {
+        a.totalBoughtEth += ethAbs;
+        a.totalBoughtTokens += tokAbs;
+      } else if (a0 < 0n) {
+        a.totalSoldEth += ethAbs;
+        a.totalSoldTokens += tokAbs;
+      }
+      bumpTrade(addr, s.timestamp);
+    }
+
+    // 3) Holdings — authoritative current balance per token.
+    const balances = new Map<string, number>();
+    for (const h of holdings.data ?? []) {
+      const addr = h.tokenAddress.toLowerCase();
+      const bal = Number(BigInt(h.balance)) / 1e18;
+      balances.set(addr, bal);
+    }
+
+    // Build positions. Include any token the user has either traded or holds.
+    const tokenAddrs = new Set<string>([...agg.keys(), ...balances.keys()]);
+    const positions: PortfolioPosition[] = [];
+    let totalValue = 0;
+    let totalRealizedPnL = 0;
+    let totalUnrealizedPnL = 0;
+    let totalTrades = 0;
+
+    for (const addr of tokenAddrs) {
+      const t = byAddr.get(addr);
+      if (!t) continue; // skip tokens we don't have metadata for
+      const a = agg.get(addr) ?? {
+        totalBoughtEth: 0,
+        totalBoughtTokens: 0,
+        totalSoldEth: 0,
+        totalSoldTokens: 0,
+        tradeCount: 0,
+        firstTrade: null,
+        lastTrade: null,
+      };
+      const netTokens = balances.get(addr) ?? 0;
+      const avgBuyPrice = a.totalBoughtTokens > 0 ? a.totalBoughtEth / a.totalBoughtTokens : 0;
+      const realizedPnL = a.totalSoldEth - a.totalSoldTokens * avgBuyPrice;
+      const currentPrice = t.price;
+      const currentValue = currentPrice != null ? netTokens * currentPrice : 0;
+      const unrealizedPnL =
+        currentPrice != null && netTokens > 0
+          ? netTokens * currentPrice - netTokens * avgBuyPrice
+          : 0;
+      const totalPnL = realizedPnL + unrealizedPnL;
+
+      totalValue += currentValue;
+      totalRealizedPnL += realizedPnL;
+      totalUnrealizedPnL += unrealizedPnL;
+      totalTrades += a.tradeCount;
+
+      positions.push({
+        tokenAddress: t.id,
+        tokenSymbol: t.symbol,
+        tokenName: t.name,
+        imageURL: t.imageURL,
+        currentPrice,
+        netTokens,
+        totalBoughtEth: a.totalBoughtEth,
+        totalBoughtTokens: a.totalBoughtTokens,
+        totalSoldEth: a.totalSoldEth,
+        totalSoldTokens: a.totalSoldTokens,
+        avgBuyPrice,
+        realizedPnL,
+        unrealizedPnL,
+        totalPnL,
+        currentValue,
+        tradeCount: a.tradeCount,
+        firstTrade: a.firstTrade,
+        lastTrade: a.lastTrade,
+      });
+    }
+
+    positions.sort((a, b) => b.currentValue - a.currentValue);
+
+    return {
+      positions,
+      totalValue,
+      totalRealizedPnL,
+      totalUnrealizedPnL,
+      totalPnL: totalRealizedPnL + totalUnrealizedPnL,
+      totalTrades,
+    };
+  }, [userAddress, tokens.data, trades.data, holdings.data, swaps.data]);
+
+  return {
+    data,
+    isLoading: tokens.isLoading || trades.isLoading || holdings.isLoading || swaps.isLoading,
+  };
+}
+
 // ─── Universe data for token cards ─────────────────────────────────────
 
 export function useUniverseForToken(universeAddress: string | undefined) {

@@ -421,7 +421,7 @@ function UniverseCard({ universe }: { universe: any }) {
   const universeType = (universe.universeType || 'monetized') as 'fun' | 'monetized';
 
   return (
-    <Link to="/universe/$id" params={{ id: universe.id }}>
+    <Link to="/universe/$id/watch" params={{ id: universe.id }}>
       <Card className="overflow-hidden group cursor-pointer hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
         <CardContent className="p-0">
           <div className="relative aspect-[4/5] bg-muted">

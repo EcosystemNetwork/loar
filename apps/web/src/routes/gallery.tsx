@@ -1,157 +1,24 @@
 /**
- * Global Gallery Page — Browse all public content across universes.
- * Filterable by media type, sortable by trending/newest/price.
+ * Legacy /gallery route — now redirects into the Wiki's Gallery tab.
+ * Kept so existing links (discover, search, edit.inpaint, external) don't 404.
  */
-import { createFileRoute } from '@tanstack/react-router';
-import { useState } from 'react';
-import { GalleryGrid } from '@/components/gallery/GalleryGrid';
-import { GalleryFilters } from '@/components/gallery/GalleryFilters';
-import { useGalleryBrowse, useGalleryTrending } from '@/hooks/useGallery';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sparkles, TrendingUp, Music, Box } from 'lucide-react';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { createFileRoute, redirect } from '@tanstack/react-router';
+import { z } from 'zod';
 
-export const Route = createFileRoute('/gallery')({
-  component: GalleryPage,
+const gallerySearchSchema = z.object({
+  universe: z.string().optional(),
+  contentId: z.string().optional(),
 });
 
-function GalleryPage() {
-  const [mediaType, setMediaType] = useState('all');
-  const [sortBy, setSortBy] = useState('newest');
-  const [originFilter, setOriginFilter] = useState('all');
-
-  const { data: browseData, isLoading } = useGalleryBrowse({
-    mediaType: mediaType as any,
-    origin: originFilter as any,
-    sortBy: sortBy as any,
-    limit: 40,
-  });
-
-  const { data: trending } = useGalleryTrending(undefined, 8);
-
-  return (
-    <div className="container mx-auto px-4 py-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Sparkles className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold">Gallery</h1>
-        <span className="text-muted-foreground text-sm">Discover content across all universes</span>
-      </div>
-
-      {/* Trending Section */}
-      {trending && trending.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <TrendingUp className="h-4 w-4 text-orange-500" />
-              Trending
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {trending.slice(0, 4).map((item: any) => {
-                const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
-                const isAudio = item.mediaType === 'audio';
-                const is3D = item.mediaType === '3d' || item.mediaType === 'ai-3d';
-                // For 3D/audio the mediaUrl is a .glb/.mp3 — never fall back to it
-                // as an <img> source. Use the rendered thumbnail only.
-                const visualThumbnail =
-                  isAudio || is3D
-                    ? item.thumbnailUrl || item.imageUrl || null
-                    : item.thumbnailUrl || item.imageUrl || item.mediaUrl || '/placeholder.jpg';
-                return (
-                  <div
-                    key={item.id}
-                    className="relative aspect-video rounded-lg overflow-hidden group cursor-pointer"
-                  >
-                    {isVideo && item.mediaUrl ? (
-                      <video
-                        src={`${resolveIpfsUrl(item.mediaUrl)}#t=0.5`}
-                        className="w-full h-full object-cover"
-                        muted
-                        loop
-                        playsInline
-                        preload="metadata"
-                        poster={resolveIpfsUrl(item.thumbnailUrl || item.imageUrl) || undefined}
-                        onMouseEnter={(e) => {
-                          const p = e.currentTarget.play();
-                          if (p) p.catch(() => {});
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.pause();
-                          e.currentTarget.currentTime = 0;
-                        }}
-                      />
-                    ) : visualThumbnail ? (
-                      <img
-                        src={resolveIpfsUrl(visualThumbnail) || visualThumbnail}
-                        alt={item.title || 'Trending'}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).src = '/placeholder.jpg';
-                        }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-500/20 to-rose-500/20">
-                        {is3D ? (
-                          <Box className="h-8 w-8 text-foreground/60" />
-                        ) : (
-                          <Music className="h-8 w-8 text-foreground/60" />
-                        )}
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                    <div className="absolute bottom-2 left-2 text-white text-xs font-medium">
-                      {item.title || 'Untitled'}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Filters */}
-      <GalleryFilters
-        mediaType={mediaType}
-        onMediaTypeChange={setMediaType}
-        sortBy={sortBy}
-        onSortByChange={setSortBy}
-        originFilter={originFilter}
-        onOriginFilterChange={setOriginFilter}
-      />
-
-      {/* Grid */}
-      <GalleryGrid
-        items={browseData?.items || []}
-        isLoading={isLoading}
-        emptyMessage={emptyMessageFor(mediaType, originFilter)}
-      />
-    </div>
-  );
-}
-
-/**
- * MediaType-aware empty state copy. The generic "No content yet" is misleading
- * when a filter is active — users think the gallery is empty when actually
- * that media kind just hasn't been generated yet.
- */
-function emptyMessageFor(mediaType: string, origin: string): string {
-  if (origin === 'uploaded') return 'No uploaded content matches this filter yet.';
-  if (origin === 'generated' && mediaType === 'all') {
-    return 'No AI-generated content yet. Try the studio.';
-  }
-  switch (mediaType) {
-    case '3d':
-      return 'No 3D models yet — generate one from the studio.';
-    case 'audio':
-      return 'No audio yet — try voice synthesis or music generation.';
-    case 'video':
-      return 'No videos yet — try image-to-video in the studio.';
-    case 'image':
-      return 'No images yet — try text-to-image in the studio.';
-    default:
-      return 'No content yet. Be the first to create something!';
-  }
-}
+export const Route = createFileRoute('/gallery')({
+  validateSearch: gallerySearchSchema,
+  beforeLoad: ({ search }) => {
+    throw redirect({
+      to: '/wiki',
+      search: {
+        tab: 'gallery',
+        ...(search.universe ? { universe: search.universe } : {}),
+      },
+    });
+  },
+});

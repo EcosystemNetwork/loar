@@ -22,18 +22,7 @@ import {
   type Token as PonderToken,
 } from '@/utils/ponder-api';
 import type { FirestoreUniverse } from '@/types/firestore';
-import {
-  Plus,
-  Settings,
-  BarChart3,
-  Eye,
-  Film,
-  Loader2,
-  Wand2,
-  Coins,
-  Users,
-  Layers,
-} from 'lucide-react';
+import { Plus, Settings, BarChart3, Eye, Film, Loader2, Wand2, Coins, Layers } from 'lucide-react';
 
 export const Route = createFileRoute('/studio')({
   beforeLoad: ({ context }) => {
@@ -196,7 +185,6 @@ function Stat({
 
 function StudioCard({ universe: u }: { universe: StudioUniverse }) {
   const cover = u.image_url || u.imageURL;
-  const portrait = u.portrait_image_url;
   const title = u.name || `Universe ${u.id.slice(0, 8)}`;
   const hasToken =
     u.tokenAddress && u.tokenAddress !== '0x0000000000000000000000000000000000000000';

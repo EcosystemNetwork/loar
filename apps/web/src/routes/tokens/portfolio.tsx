@@ -3,9 +3,7 @@
  * positions, and realized gains/losses across universe tokens.
  */
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { useQuery } from '@tanstack/react-query';
-import { trpcClient } from '@/utils/trpc';
-import { useTokenListData, useMySwapHistory, formatEth, timeAgo } from '@/hooks/useTokens';
+import { useIndexerPortfolio, useMySwapHistory, formatEth, timeAgo } from '@/hooks/useTokens';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,7 +22,6 @@ import {
 } from 'lucide-react';
 import { getExplorerTxUrl } from '@/configs/chains';
 import { useChainId } from 'wagmi';
-import { useMemo } from 'react';
 
 export const Route = createFileRoute('/tokens/portfolio')({
   component: PortfolioPage,
@@ -33,40 +30,14 @@ export const Route = createFileRoute('/tokens/portfolio')({
 function PortfolioPage() {
   const { address } = useAccount();
   const chainId = useChainId();
-  const { data: allTokens } = useTokenListData();
   const { data: mySwaps, isLoading: swapsLoading } = useMySwapHistory(address, 50);
+  const { data: portfolio, isLoading } = useIndexerPortfolio(address);
 
-  const { data: portfolio, isLoading } = useQuery({
-    queryKey: ['token-portfolio'],
-    queryFn: () => trpcClient.tokenSocial.getPortfolio.query(),
-    enabled: !!address,
-    staleTime: 30_000,
-  });
-
-  // Enrich positions with current prices
-  const enrichedPositions = useMemo(() => {
-    if (!portfolio?.positions || !allTokens.length) return [];
-    return portfolio.positions.map((pos) => {
-      const token = allTokens.find((t) => t.id.toLowerCase() === pos.tokenAddress.toLowerCase());
-      const currentPrice = token?.price ?? null;
-      const unrealizedPnl =
-        currentPrice != null && pos.netTokens > 0
-          ? pos.netTokens * currentPrice - pos.netTokens * pos.avgBuyPrice
-          : 0;
-      const currentValue = currentPrice != null ? pos.netTokens * currentPrice : 0;
-      return {
-        ...pos,
-        token,
-        currentPrice,
-        unrealizedPnl,
-        currentValue,
-        totalPnl: pos.realizedPnl + unrealizedPnl,
-      };
-    });
-  }, [portfolio, allTokens]);
-
-  const totalUnrealizedPnl = enrichedPositions.reduce((sum, p) => sum + p.unrealizedPnl, 0);
-  const totalValue = enrichedPositions.reduce((sum, p) => sum + p.currentValue, 0);
+  const positions = portfolio.positions;
+  const totalValue = portfolio.totalValue;
+  const totalUnrealizedPnl = portfolio.totalUnrealizedPnL;
+  const totalRealizedPnl = portfolio.totalRealizedPnL;
+  const totalTrades = portfolio.totalTrades;
 
   if (!address) {
     return (
@@ -123,12 +94,10 @@ function PortfolioPage() {
               <p className="text-xs text-muted-foreground">Realized PnL</p>
               <p
                 className={`text-2xl font-bold tabular-nums ${
-                  (portfolio?.totalRealizedPnl ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'
+                  totalRealizedPnl >= 0 ? 'text-green-500' : 'text-red-500'
                 }`}
               >
-                {portfolio
-                  ? `${(portfolio.totalRealizedPnl >= 0 ? '+' : '') + portfolio.totalRealizedPnl.toFixed(4)}`
-                  : '--'}
+                {`${totalRealizedPnl >= 0 ? '+' : ''}${totalRealizedPnl.toFixed(4)}`}
               </p>
               <p className="text-[10px] text-muted-foreground">ETH</p>
             </CardContent>
@@ -149,7 +118,7 @@ function PortfolioPage() {
           <Card>
             <CardContent className="p-4 text-center">
               <p className="text-xs text-muted-foreground">Total Trades</p>
-              <p className="text-2xl font-bold">{portfolio?.totalTrades ?? 0}</p>
+              <p className="text-2xl font-bold">{totalTrades}</p>
             </CardContent>
           </Card>
         </div>
@@ -164,7 +133,7 @@ function PortfolioPage() {
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        ) : enrichedPositions.length === 0 ? (
+        ) : positions.length === 0 ? (
           <Card>
             <CardContent className="text-center py-12">
               <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -189,7 +158,7 @@ function PortfolioPage() {
               <span className="text-right">PnL</span>
             </div>
 
-            {enrichedPositions.map((pos) => (
+            {positions.map((pos) => (
               <Link
                 key={pos.tokenAddress}
                 to="/tokens/$address"
@@ -200,16 +169,18 @@ function PortfolioPage() {
                     {/* Desktop: table row */}
                     <div className="hidden md:grid grid-cols-7 gap-2 items-center text-xs">
                       <div className="col-span-2 flex items-center gap-2">
-                        {pos.token?.imageURL && (
+                        {pos.imageURL && (
                           <img
-                            src={pos.token.imageURL}
+                            src={pos.imageURL}
                             alt={pos.tokenSymbol}
                             className="w-8 h-8 rounded-lg object-cover"
                           />
                         )}
                         <div>
                           <p className="font-semibold">${pos.tokenSymbol}</p>
-                          <p className="text-[10px] text-muted-foreground">{pos.trades} trades</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {pos.tradeCount} trades
+                          </p>
                         </div>
                       </div>
 
@@ -246,11 +217,11 @@ function PortfolioPage() {
                       <div className="text-right">
                         <span
                           className={`font-mono tabular-nums font-semibold ${
-                            pos.totalPnl >= 0 ? 'text-green-500' : 'text-red-500'
+                            pos.totalPnL >= 0 ? 'text-green-500' : 'text-red-500'
                           }`}
                         >
-                          {pos.totalPnl >= 0 ? '+' : ''}
-                          {pos.totalPnl.toFixed(4)}
+                          {pos.totalPnL >= 0 ? '+' : ''}
+                          {pos.totalPnL.toFixed(4)}
                         </span>
                       </div>
                     </div>
@@ -259,25 +230,27 @@ function PortfolioPage() {
                     <div className="md:hidden space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          {pos.token?.imageURL && (
+                          {pos.imageURL && (
                             <img
-                              src={pos.token.imageURL}
+                              src={pos.imageURL}
                               alt={pos.tokenSymbol}
                               className="w-8 h-8 rounded-lg object-cover"
                             />
                           )}
                           <div>
                             <p className="font-semibold text-sm">${pos.tokenSymbol}</p>
-                            <p className="text-[10px] text-muted-foreground">{pos.trades} trades</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {pos.tradeCount} trades
+                            </p>
                           </div>
                         </div>
                         <span
                           className={`font-mono tabular-nums font-semibold text-sm ${
-                            pos.totalPnl >= 0 ? 'text-green-500' : 'text-red-500'
+                            pos.totalPnL >= 0 ? 'text-green-500' : 'text-red-500'
                           }`}
                         >
-                          {pos.totalPnl >= 0 ? '+' : ''}
-                          {pos.totalPnl.toFixed(4)} ETH
+                          {pos.totalPnL >= 0 ? '+' : ''}
+                          {pos.totalPnL.toFixed(4)} ETH
                         </span>
                       </div>
                       <div className="grid grid-cols-3 gap-2 text-center text-[10px]">

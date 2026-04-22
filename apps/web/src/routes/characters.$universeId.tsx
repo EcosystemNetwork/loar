@@ -57,7 +57,7 @@ function CharactersGalleryPage() {
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b px-4 py-3 flex items-center gap-3">
-        <Link to="/universe/$id" params={{ id: universeId }}>
+        <Link to="/universe/$id/watch" params={{ id: universeId }}>
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <ArrowLeft className="w-4 h-4" />
           </Button>

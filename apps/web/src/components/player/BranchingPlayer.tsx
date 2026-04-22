@@ -189,7 +189,7 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
     <div className="relative w-full h-screen bg-black flex items-center justify-center">
       {/* Back button */}
       <Link
-        to="/universe/$id"
+        to="/universe/$id/watch"
         params={{ id: universeId }}
         className="absolute top-4 left-4 z-30 p-2 bg-black/50 rounded-full text-white/70 hover:text-white transition-colors"
       >

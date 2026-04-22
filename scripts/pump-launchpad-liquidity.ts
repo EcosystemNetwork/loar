@@ -77,8 +77,11 @@ const PONDER_URL =
     : process.env.VITE_PONDER_URL) ??
   'http://localhost:42069';
 const N_TRADES = Number(process.env.N_TRADES ?? '20');
-const MIN_ETH = Number(process.env.MIN_ETH ?? '0.0005');
-const MAX_ETH = Number(process.env.MAX_ETH ?? '0.003');
+// Per-buy cap in the curve (MAX_BUY_AMOUNT) limits how much you can buy in a
+// single tx. Defaults are conservative for the $EGG-style 4-ETH-graduation
+// curves (16M token cap ≈ 0.0012 ETH at slope start). Override with env.
+const MIN_ETH = Number(process.env.MIN_ETH ?? '0.0003');
+const MAX_ETH = Number(process.env.MAX_ETH ?? '0.0012');
 const JITTER_MS_MAX = Number(process.env.JITTER_MS_MAX ?? '4000');
 const CONFIRM_SEND = process.env.CONFIRM_SEND === '1';
 
@@ -309,16 +312,25 @@ function planTrades(curves: ActiveCurve[]): PlannedTrade[] {
 async function executeTrade(trade: PlannedTrade): Promise<void> {
   const deadline = BigInt(Math.floor(Date.now() / 1000) + 20 * 60); // 20 min
   try {
-    const hash = await walletClient.writeContract({
-      address: trade.curve.curveAddress,
-      abi: BONDING_CURVE_READ_ABI,
-      functionName: 'buy',
-      args: [0n, deadline],
-      value: trade.ethValue,
-    });
+    const hash =
+      trade.curve.buyAbi === 'v2'
+        ? await walletClient.writeContract({
+            address: trade.curve.curveAddress,
+            abi: BONDING_CURVE_ABI_V2,
+            functionName: 'buy',
+            args: [0n, deadline],
+            value: trade.ethValue,
+          })
+        : await walletClient.writeContract({
+            address: trade.curve.curveAddress,
+            abi: BONDING_CURVE_ABI_V1,
+            functionName: 'buy',
+            args: [0n],
+            value: trade.ethValue,
+          });
     console.log(
       `  [${String(trade.idx + 1).padStart(3)}] BUY $${trade.curve.tokenSymbol.padEnd(6)} ` +
-        `${trade.ethFloat.toFixed(6)} ETH  tx=${truncate(hash)}`
+        `${trade.ethFloat.toFixed(6)} ETH  [${trade.curve.buyAbi}] tx=${truncate(hash)}`
     );
   } catch (err: any) {
     const msg = err?.shortMessage ?? err?.message ?? String(err);

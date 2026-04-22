@@ -73,6 +73,9 @@ import { resolveIpfsUrl } from '@/utils/ipfs-url';
 // New wiki components
 import { EntityCard } from '@/components/wiki/EntityCard';
 import { GalleryGrid } from '@/components/gallery/GalleryGrid';
+import { GalleryFilters } from '@/components/gallery/GalleryFilters';
+import { useGalleryTrending } from '@/hooks/useGallery';
+import { TrendingUp } from 'lucide-react';
 import { SortMenu } from '@/components/wiki/SortMenu';
 import { sortEntities } from '@/components/wiki/sort';
 import { RandomEntityButton } from '@/components/wiki/RandomEntityButton';
@@ -216,20 +219,29 @@ function EntityTab({ kind, universeAddress }: { kind: EntityKind; universeAddres
   );
 }
 
+type GalleryMediaType = 'all' | 'video' | 'image' | 'audio' | '3d';
+type GalleryOrigin = 'all' | 'generated' | 'uploaded';
+type GallerySort = 'newest' | 'trending' | 'price_asc' | 'price_desc';
+
 function GalleryTab({ universeAddress }: { universeAddress?: string }) {
   const [search, setSearch] = useState('');
-  const [mediaFilter, setMediaFilter] = useState<'all' | 'video' | 'image'>('all');
+  const [mediaType, setMediaType] = useState<GalleryMediaType>('all');
+  const [sortBy, setSortBy] = useState<GallerySort>('newest');
+  const [originFilter, setOriginFilter] = useState<GalleryOrigin>('all');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['wiki', 'gallery', universeAddress, mediaFilter],
+    queryKey: ['wiki', 'gallery', universeAddress, mediaType, sortBy, originFilter],
     queryFn: () =>
       trpcClient.gallery.browse.query({
         universeId: universeAddress,
-        mediaType: mediaFilter,
-        sortBy: 'newest',
-        limit: 50,
+        mediaType,
+        origin: originFilter,
+        sortBy,
+        limit: 40,
       }),
   });
+
+  const { data: trending } = useGalleryTrending(universeAddress, 8);
 
   const items = data?.items ?? [];
   const filtered = search.trim()
@@ -241,33 +253,91 @@ function GalleryTab({ universeAddress }: { universeAddress?: string }) {
     : items;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search gallery..."
-            className="pl-9"
-          />
-        </div>
-        <Select value={mediaFilter} onValueChange={(v) => setMediaFilter(v as any)}>
-          <SelectTrigger className="h-9 text-xs w-32">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all" className="text-xs">
-              All Media
-            </SelectItem>
-            <SelectItem value="video" className="text-xs">
-              Videos
-            </SelectItem>
-            <SelectItem value="image" className="text-xs">
-              Images
-            </SelectItem>
-          </SelectContent>
-        </Select>
+    <div className="space-y-6">
+      {/* Trending row — hidden while searching to keep the page calm */}
+      {trending && trending.length > 0 && !search.trim() && (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <TrendingUp className="h-4 w-4 text-orange-500" />
+              Trending
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {trending.slice(0, 4).map((item: any) => {
+                const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
+                const isAudio = item.mediaType === 'audio';
+                const is3D = item.mediaType === '3d' || item.mediaType === 'ai-3d';
+                // 3D/audio mediaUrl is a .glb/.mp3 — never use as an <img> source.
+                const visualThumbnail =
+                  isAudio || is3D
+                    ? item.thumbnailUrl || item.imageUrl || null
+                    : item.thumbnailUrl || item.imageUrl || item.mediaUrl || '/placeholder.jpg';
+                return (
+                  <div
+                    key={item.id}
+                    className="relative aspect-video rounded-lg overflow-hidden group cursor-pointer"
+                  >
+                    {isVideo && item.mediaUrl ? (
+                      <video
+                        src={`${resolveIpfsUrl(item.mediaUrl)}#t=0.5`}
+                        className="w-full h-full object-cover"
+                        muted
+                        loop
+                        playsInline
+                        preload="metadata"
+                        poster={resolveIpfsUrl(item.thumbnailUrl || item.imageUrl) || undefined}
+                        onMouseEnter={(e) => {
+                          const p = e.currentTarget.play();
+                          if (p) p.catch(() => {});
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.pause();
+                          e.currentTarget.currentTime = 0;
+                        }}
+                      />
+                    ) : visualThumbnail ? (
+                      <img
+                        src={resolveIpfsUrl(visualThumbnail) || visualThumbnail}
+                        alt={item.title || 'Trending'}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = '/placeholder.jpg';
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-500/20 to-rose-500/20">
+                        {is3D ? (
+                          <Box className="h-8 w-8 text-foreground/60" />
+                        ) : (
+                          <Music className="h-8 w-8 text-foreground/60" />
+                        )}
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <div className="absolute bottom-2 left-2 text-white text-xs font-medium truncate max-w-[90%]">
+                      {item.title || 'Untitled'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Shared filter bar: search + media pills + sort + origin */}
+      <GalleryFilters
+        mediaType={mediaType}
+        onMediaTypeChange={(v) => setMediaType(v as GalleryMediaType)}
+        sortBy={sortBy}
+        onSortByChange={(v) => setSortBy(v as GallerySort)}
+        searchQuery={search}
+        onSearchChange={setSearch}
+        originFilter={originFilter}
+        onOriginFilterChange={(v) => setOriginFilter(v as GalleryOrigin)}
+      />
+
+      <div className="flex justify-end">
         <Link to="/sandbox">
           <Button size="sm" variant="outline">
             <Plus className="h-4 w-4 mr-1" />
@@ -279,10 +349,34 @@ function GalleryTab({ universeAddress }: { universeAddress?: string }) {
       <GalleryGrid
         items={filtered}
         isLoading={isLoading}
-        emptyMessage="No gallery content yet. Generate in the Sandbox, then it appears here."
+        emptyMessage={galleryEmptyMessage(mediaType, originFilter)}
       />
     </div>
   );
+}
+
+/**
+ * MediaType-aware empty state. Generic "no content" is misleading when a
+ * filter is on — users think the gallery is empty when really the filtered
+ * kind just hasn't been generated yet.
+ */
+function galleryEmptyMessage(mediaType: GalleryMediaType, origin: GalleryOrigin): string {
+  if (origin === 'uploaded') return 'No uploaded content matches this filter yet.';
+  if (origin === 'generated' && mediaType === 'all') {
+    return 'No AI-generated content yet. Try the studio.';
+  }
+  switch (mediaType) {
+    case '3d':
+      return 'No 3D models yet — generate one from the studio.';
+    case 'audio':
+      return 'No audio yet — try voice synthesis or music generation.';
+    case 'video':
+      return 'No videos yet — try image-to-video in the studio.';
+    case 'image':
+      return 'No images yet — try text-to-image in the studio.';
+    default:
+      return 'No content yet. Be the first to create something!';
+  }
 }
 
 function CollectionTab() {
@@ -656,10 +750,32 @@ function GlobalSearchResults({
 }
 
 function WikiPage() {
-  const { universe: universeAddress } = useSearch({ from: '/wiki/' });
+  const { universe: universeAddress, tab: urlTab } = useSearch({ from: '/wiki/' });
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<WikiTab>('person');
+  const [activeTab, setActiveTab] = useState<WikiTab>((urlTab as WikiTab) ?? 'person');
   const [globalSearch, setGlobalSearch] = useState('');
+
+  // Keep component state in sync with the URL when the user navigates back/forward
+  // or when another surface (e.g. the /gallery redirect) changes ?tab=.
+  // Missing ?tab= means the default tab ('person').
+  const expectedTab = ((urlTab as WikiTab) ?? 'person') as WikiTab;
+  if (expectedTab !== activeTab) {
+    setActiveTab(expectedTab);
+  }
+
+  // Build a /wiki search object. 'person' is the default, so it's omitted from
+  // the URL to keep the no-tab case clean.
+  const buildSearch = (tab: WikiTab, universe: string | undefined) => {
+    const s: { universe?: string; tab?: string } = {};
+    if (universe) s.universe = universe;
+    if (tab !== 'person') s.tab = tab;
+    return s;
+  };
+
+  const selectTab = (tab: WikiTab) => {
+    setActiveTab(tab);
+    navigate({ to: '/wiki', search: buildSearch(tab, universeAddress) });
+  };
 
   const { data: universeResult } = useQuery({
     queryKey: ['universe', universeAddress],
@@ -736,7 +852,7 @@ function WikiPage() {
               variant="ghost"
               size="sm"
               className="h-6 px-2 text-xs ml-auto text-muted-foreground hover:text-foreground"
-              onClick={() => navigate({ to: '/wiki', search: {} })}
+              onClick={() => navigate({ to: '/wiki', search: buildSearch(activeTab, undefined) })}
             >
               <X className="h-3 w-3 mr-1" />
               Clear filter
@@ -745,7 +861,7 @@ function WikiPage() {
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           <button
-            onClick={() => navigate({ to: '/wiki', search: {} })}
+            onClick={() => navigate({ to: '/wiki', search: buildSearch(activeTab, undefined) })}
             className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
               !universeAddress
                 ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary/20'
@@ -758,7 +874,7 @@ function WikiPage() {
           {publicUniverses.map((u: any) => (
             <button
               key={u.id}
-              onClick={() => navigate({ to: '/wiki', search: { universe: u.id } })}
+              onClick={() => navigate({ to: '/wiki', search: buildSearch(activeTab, u.id) })}
               className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
                 universeAddress === u.id
                   ? 'border-violet-500 bg-violet-500/10 text-violet-400 ring-1 ring-violet-500/20'
@@ -823,7 +939,7 @@ function WikiPage() {
                 key={tab.id}
                 tab={tab}
                 isActive={tab.id === activeTab}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => selectTab(tab.id)}
               />
             ))}
           </div>
@@ -895,6 +1011,7 @@ function TabButton({
 
 const wikiSearchSchema = z.object({
   universe: z.string().optional(),
+  tab: z.string().optional(),
 });
 
 export const Route = createFileRoute('/wiki/')({
