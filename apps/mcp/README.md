@@ -80,7 +80,7 @@ Add to `~/.claude/claude_desktop_config.json`:
 }
 ```
 
-## Available Tools (25)
+## Available Tools (22)
 
 ### Entities
 
@@ -108,17 +108,10 @@ Add to `~/.claude/claude_desktop_config.json`:
 
 - `loar_propose_collab` — Propose cross-universe collab
 
-### AI Agents
-
-- `loar_list_ai_agents` — List AI agents for a universe
-- `loar_run_pipeline` — Execute an AI agent pipeline
-- `loar_get_pipeline_run` — Check pipeline execution status
-
 ### Profiles & Discovery
 
 - `loar_get_profile` — Get user profile
 - `loar_discover_profiles` — Search creator profiles
-- `loar_discover_talent_agents` — Browse talent agents
 
 ### Media Generation (Extended)
 
