@@ -620,31 +620,37 @@ ponder.on('GovernanceToken:Transfer', async ({ event, context }) => {
   const to = getAddress(event.args.to);
   const amount = event.args.amount;
 
-  // Record transfer
-  await context.db.insert(tokenTransfer).values({
-    id: event.id,
-    tokenAddress,
-    from,
-    to,
-    value: amount.toString(),
-    timestamp: Number(event.block.timestamp),
-    blockNumber: Number(event.block.number),
-  });
+  // Record transfer first — `event.id` is `${txHash}:${logIndex}` which
+  // makes the row idempotent against re-org re-ingest. If the row already
+  // exists we MUST skip the holder mutations below — otherwise the same
+  // event double-credits `to` and double-debits `from` on every reprocess.
+  let isReplay = false;
+  try {
+    await context.db.insert(tokenTransfer).values({
+      id: event.id,
+      tokenAddress,
+      from,
+      to,
+      value: amount.toString(),
+      timestamp: Number(event.block.timestamp),
+      blockNumber: Number(event.block.number),
+    });
+  } catch (err) {
+    // Drizzle/Ponder throws on duplicate primary key. Treat as already
+    // processed — do not re-apply balance deltas.
+    isReplay = true;
+  }
+
+  if (isReplay) return;
 
   // Update holder balances (skip mint/burn from/to zero address for balance tracking)
   if (from !== '0x0000000000000000000000000000000000000000') {
     const fromHolder = await context.db.find(tokenHolder, { id: `${tokenAddress}:${from}` });
     if (fromHolder) {
       const newBalance = BigInt(fromHolder.balance) - amount;
-      if (newBalance > 0n) {
-        await context.db
-          .update(tokenHolder, { id: `${tokenAddress}:${from}` })
-          .set({ balance: newBalance.toString() });
-      } else {
-        await context.db
-          .update(tokenHolder, { id: `${tokenAddress}:${from}` })
-          .set({ balance: '0' });
-      }
+      await context.db
+        .update(tokenHolder, { id: `${tokenAddress}:${from}` })
+        .set({ balance: newBalance > 0n ? newBalance.toString() : '0' });
     }
   }
 
@@ -680,6 +686,8 @@ ponder.on('PoolManager:Initialize', async ({ event, context }) => {
 });
 
 ponder.on('PoolManager:Swap', async ({ event, context }) => {
+  const existing = await context.db.find(swap, { id: event.id });
+  if (existing) return;
   await context.db.insert(swap).values({
     id: event.id,
     poolId: event.args.id,
@@ -911,7 +919,7 @@ ponder.on('CreditManager:CreditsGranted', async ({ event, context }) => {
   });
 });
 
-ponder.on('CreditManager:CreditsPurchased', async ({ event, context }) => {
+ponder.on('CreditManager:CreditsPurchasedWithEth', async ({ event, context }) => {
   await context.db.insert(creditEvent).values({
     id: event.id,
     kind: 'purchased',
@@ -925,7 +933,7 @@ ponder.on('CreditManager:CreditsPurchased', async ({ event, context }) => {
   });
 });
 
-ponder.on('CreditManager:CreditsLoarPurchased', async ({ event, context }) => {
+ponder.on('CreditManager:CreditsPurchasedWithLoar', async ({ event, context }) => {
   await context.db.insert(creditEvent).values({
     id: event.id,
     kind: 'loar_purchased',
