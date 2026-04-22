@@ -10,25 +10,17 @@
  * Requires STRIPE_SECRET_KEY env var. If not set, card payments are disabled.
  */
 import { z } from 'zod';
+import Stripe from 'stripe';
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 
-let stripe: any = null;
+let stripe: Stripe | null = null;
 
 export function getStripe() {
   if (stripe) return stripe;
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return null;
-
-  try {
-    // Dynamic import to avoid crash if stripe package not installed
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Stripe = require('stripe');
-    stripe = new Stripe(key, { apiVersion: '2024-12-18.acacia' });
-    return stripe;
-  } catch {
-    console.warn('[Stripe] stripe package not installed');
-    return null;
-  }
+  stripe = new Stripe(key, { apiVersion: '2024-12-18.acacia' as Stripe.LatestApiVersion });
+  return stripe;
 }
 
 export const stripeRouter = router({
