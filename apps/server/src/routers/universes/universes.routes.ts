@@ -12,6 +12,7 @@ import {
   getAllUniverses,
   getUniversesByCreator,
   setUniverseHidden,
+  setUniversePrivate,
   deleteUniverse,
 } from './universes.handlers';
 import { isUniverseAdmin, getSafeInfo } from '../../lib/safe-admin';
@@ -113,14 +114,22 @@ export const universesRouter = router({
     return result;
   }),
 
-  /** Get a specific universe by ID. */
-  get: publicProcedure.input(getUniverseSchema).query(async ({ input }) => {
-    return await getUniverse(input.id);
+  /** Get a specific universe by ID. Private universes are hidden from non-owners. */
+  get: publicProcedure.input(getUniverseSchema).query(async ({ input, ctx }) => {
+    const result = await getUniverse(input.id);
+    const data = (result as any)?.data ?? {};
+    const viewer = ctx.user?.address?.toLowerCase();
+    const creator = (data.creator as string | undefined)?.toLowerCase();
+    const isOwner = !!viewer && !!creator && viewer === creator;
+    if (!isOwner && (data.isHidden || data.isPrivate)) {
+      throw new Error('Universe not found');
+    }
+    return result;
   }),
 
-  /** Get all universes. */
-  getAll: publicProcedure.query(async () => {
-    return await getAllUniverses();
+  /** Get all universes. Private universes appear only for the viewing owner. */
+  getAll: publicProcedure.query(async ({ ctx }) => {
+    return await getAllUniverses({ viewerAddress: ctx.user?.address });
   }),
 
   /** Discover universes with search, sorting, and pagination. */
@@ -135,7 +144,7 @@ export const universesRouter = router({
         cursor: z.string().optional(),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const col = db.collection('cinematicUniverses');
 
       // Firestore query — order by created_at (only reliable server-side sort)
@@ -162,7 +171,10 @@ export const universesRouter = router({
 
       let items = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[];
 
-      items = items.filter((u: any) => !u.isHidden);
+      const viewer = ctx.user?.address?.toLowerCase();
+      items = items.filter(
+        (u: any) => !u.isHidden && (!u.isPrivate || (viewer && u.creator?.toLowerCase() === viewer))
+      );
 
       // Client-side filter — universeType is stored on a per-doc basis and may be missing
       // on legacy records, in which case it defaults to 'monetized' (pre-label behavior).
@@ -197,9 +209,11 @@ export const universesRouter = router({
       };
     }),
 
-  /** Get universes by creator address. */
-  getByCreator: publicProcedure.input(getByCreatorSchema).query(async ({ input }) => {
-    return await getUniversesByCreator(input.creator);
+  /** Get universes by creator address. Owner sees their private universes; others do not. */
+  getByCreator: publicProcedure.input(getByCreatorSchema).query(async ({ input, ctx }) => {
+    return await getUniversesByCreator(input.creator, {
+      viewerAddress: ctx.user?.address,
+    });
   }),
 
   /** Update token and governance addresses after token deployment (Step 2). */
@@ -405,6 +419,32 @@ export const universesRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       return await setUniverseHidden(input.universeId, input.isHidden, {
+        uid: ctx.user?.uid,
+        address: ctx.user?.address,
+      });
+    }),
+
+  /**
+   * Owner-controlled: toggle the universe's `isPrivate` flag. Hides the
+   * universe + all of its linked content (gallery, entities, featured, etc.)
+   * from every public surface. The owner still sees their own content.
+   *
+   * Allowed callers: the universe creator, or a signer of the multi-sig Safe
+   * if the universe is multi-sig owned. Enforced via `isUniverseAdmin`.
+   */
+  setPrivate: protectedProcedure
+    .input(
+      z.object({
+        universeId: z.string().min(1),
+        isPrivate: z.boolean(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const universeId = input.universeId.toLowerCase();
+      if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
+        throw new Error('Only the universe creator can change privacy');
+      }
+      return await setUniversePrivate(universeId, input.isPrivate, {
         uid: ctx.user?.uid,
         address: ctx.user?.address,
       });

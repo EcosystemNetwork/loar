@@ -25,7 +25,6 @@ import {
   Users,
   Coins,
   Crown,
-  Megaphone,
   ShoppingBag,
   BarChart3,
   Layers,

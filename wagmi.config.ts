@@ -24,13 +24,11 @@ import EntityNFT from './apps/contracts/out/EntityNFT.sol/EntityNFT.json';
 import EntityEditionNFT from './apps/contracts/out/EntityEditionNFT.sol/EntityEditionNFT.json';
 import CreditManager from './apps/contracts/out/CreditManager.sol/CreditManager.json';
 import LoarBurner from './apps/contracts/out/LoarBurner.sol/LoarBurner.json';
-import StoryBounties from './apps/contracts/out/StoryBounties.sol/StoryBounties.json';
 import LaunchpadStaking from './apps/contracts/out/LaunchpadStaking.sol/LaunchpadStaking.json';
 import RemixFees from './apps/contracts/out/RemixFees.sol/RemixFees.json';
 import SlopMarket from './apps/contracts/out/SlopMarket.sol/SlopMarket.json';
 import SubscriptionManager from './apps/contracts/out/SubscriptionManager.sol/SubscriptionManager.json';
 import LicensingRegistry from './apps/contracts/out/LicensingRegistry.sol/LicensingRegistry.json';
-import AdPlacement from './apps/contracts/out/AdPlacement.sol/AdPlacement.json';
 import CollabManager from './apps/contracts/out/CollabManager.sol/CollabManager.json';
 import CanonMarketplace from './apps/contracts/out/CanonMarketplace.sol/CanonMarketplace.json';
 import ContentLicensing from './apps/contracts/out/ContentLicensing.sol/ContentLicensing.json';
@@ -86,13 +84,11 @@ export default defineConfig({
     { name: 'EntityEditionNFT', abi: EntityEditionNFT.abi as Abi },
     { name: 'CreditManager', abi: CreditManager.abi as Abi },
     { name: 'LoarBurner', abi: LoarBurner.abi as Abi },
-    { name: 'StoryBounties', abi: StoryBounties.abi as Abi },
     { name: 'LaunchpadStaking', abi: LaunchpadStaking.abi as Abi },
     { name: 'RemixFees', abi: RemixFees.abi as Abi },
     { name: 'SlopMarket', abi: SlopMarket.abi as Abi },
     { name: 'SubscriptionManager', abi: SubscriptionManager.abi as Abi },
     { name: 'LicensingRegistry', abi: LicensingRegistry.abi as Abi },
-    { name: 'AdPlacement', abi: AdPlacement.abi as Abi },
     { name: 'CollabManager', abi: CollabManager.abi as Abi },
     { name: 'CanonMarketplace', abi: CanonMarketplace.abi as Abi },
     { name: 'ContentLicensing', abi: ContentLicensing.abi as Abi },

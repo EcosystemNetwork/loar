@@ -9,6 +9,7 @@ import { db } from '../../lib/firebase';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { isUniverseAdmin } from '../../lib/safe-admin';
+import { getExcludedUniverseIds } from '../universes/universes.handlers';
 
 const contentCol = () => {
   if (!db)
@@ -95,7 +96,15 @@ export const galleryRouter = router({
         cursor: z.string().optional(),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
+      const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
+
+      // Scoped browse into a single universe that's private/hidden (and the
+      // viewer isn't the owner) returns nothing — never leak universe content.
+      if (input.universeId && excluded.has(input.universeId.toLowerCase())) {
+        return { items: [], nextCursor: null };
+      }
+
       let query: FirebaseFirestore.Query = contentCol().where('visibility', '==', 'public');
 
       if (input.universeId) {
@@ -161,7 +170,13 @@ export const galleryRouter = router({
       const snapshot = await query.limit(input.limit).get();
 
       const items = snapshot.docs
-        .filter((d) => isVisible(d.data().contentStatus))
+        .filter((d) => {
+          const data = d.data();
+          if (!isVisible(data.contentStatus)) return false;
+          const uniId = (data.universeId as string | undefined)?.toLowerCase();
+          if (uniId && excluded.has(uniId)) return false;
+          return true;
+        })
         .map(serializeGalleryItem);
 
       // Enrich with licensing data if available
@@ -209,7 +224,13 @@ export const galleryRouter = router({
         limit: z.number().int().min(1).max(20).default(10),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
+      const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
+
+      if (input.universeId && excluded.has(input.universeId.toLowerCase())) {
+        return [];
+      }
+
       let query: FirebaseFirestore.Query = contentCol().where('visibility', '==', 'public');
 
       if (input.universeId) {
@@ -219,7 +240,13 @@ export const galleryRouter = router({
       const snapshot = await query.orderBy('views', 'desc').limit(input.limit).get();
 
       return snapshot.docs
-        .filter((d) => isVisible(d.data().contentStatus))
+        .filter((d) => {
+          const data = d.data();
+          if (!isVisible(data.contentStatus)) return false;
+          const uniId = (data.universeId as string | undefined)?.toLowerCase();
+          if (uniId && excluded.has(uniId)) return false;
+          return true;
+        })
         .map(serializeGalleryItem);
     }),
 
@@ -240,12 +267,26 @@ export const galleryRouter = router({
         derivativeLimit: z.number().int().min(1).max(20).default(12),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const rootDoc = await contentCol().doc(input.contentId).get();
       if (!rootDoc.exists) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Content not found' });
       }
       const root = rootDoc.data()!;
+
+      const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
+      const rootUniverseId = (root.universeId as string | undefined)?.toLowerCase();
+      // Don't resolve lineage rooted in a private/hidden universe for non-owners.
+      if (rootUniverseId && excluded.has(rootUniverseId)) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Content not found' });
+      }
+
+      const isContentVisible = (data: FirebaseFirestore.DocumentData): boolean => {
+        if (!isVisible(data.contentStatus)) return false;
+        const uniId = (data.universeId as string | undefined)?.toLowerCase();
+        if (uniId && excluded.has(uniId)) return false;
+        return true;
+      };
 
       let parent: ReturnType<typeof serializeGalleryItem> | null = null;
       const parentGenId: string | undefined = root.parentGenerationId;
@@ -255,7 +296,7 @@ export const galleryRouter = router({
           .limit(1)
           .get();
         const parentDoc = parentSnap.docs[0];
-        if (parentDoc && isVisible(parentDoc.data().contentStatus)) {
+        if (parentDoc && isContentVisible(parentDoc.data())) {
           parent = serializeGalleryItem(parentDoc);
         }
       }
@@ -271,7 +312,7 @@ export const galleryRouter = router({
           .limit(input.derivativeLimit)
           .get();
         derivatives = derivSnap.docs
-          .filter((d) => isVisible(d.data().contentStatus))
+          .filter((d) => isContentVisible(d.data()))
           .map(serializeGalleryItem);
       }
 
@@ -279,30 +320,35 @@ export const galleryRouter = router({
     }),
 
   /** Get admin-curated featured content for a universe */
-  featured: publicProcedure.input(z.object({ universeId: z.string() })).query(async ({ input }) => {
-    const now = new Date();
-    const snapshot = await featuredCol()
-      .where('universeId', '==', input.universeId)
-      .orderBy('position', 'asc')
-      .get();
+  featured: publicProcedure
+    .input(z.object({ universeId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
+      if (excluded.has(input.universeId.toLowerCase())) return [];
 
-    // Filter out expired features
-    const active = snapshot.docs
-      .map((d) => ({ id: d.id, ...d.data() }))
-      .filter((f: any) => !f.expiresAt || f.expiresAt.toDate() > now);
+      const now = new Date();
+      const snapshot = await featuredCol()
+        .where('universeId', '==', input.universeId)
+        .orderBy('position', 'asc')
+        .get();
 
-    // Fetch the actual content docs in one batched getAll() to avoid the
-    // N+1 Firestore reads the per-id Promise.all was doing.
-    const contentIds = active.map((f: any) => f.contentId);
-    if (contentIds.length === 0) return [];
+      // Filter out expired features
+      const active = snapshot.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((f: any) => !f.expiresAt || f.expiresAt.toDate() > now);
 
-    const refs = contentIds.map((id: string) => contentCol().doc(id));
-    const contentDocs = await db!.getAll(...refs);
+      // Fetch the actual content docs in one batched getAll() to avoid the
+      // N+1 Firestore reads the per-id Promise.all was doing.
+      const contentIds = active.map((f: any) => f.contentId);
+      if (contentIds.length === 0) return [];
 
-    return contentDocs
-      .filter((d) => d.exists && isVisible(d.data()?.contentStatus))
-      .map(serializeGalleryItem);
-  }),
+      const refs = contentIds.map((id: string) => contentCol().doc(id));
+      const contentDocs = await db!.getAll(...refs);
+
+      return contentDocs
+        .filter((d) => d.exists && isVisible(d.data()?.contentStatus))
+        .map(serializeGalleryItem);
+    }),
 
   /** Set featured content for a universe (admin only) */
   setFeatured: protectedProcedure
@@ -353,7 +399,9 @@ export const galleryRouter = router({
         limit: z.number().int().min(1).max(50).default(20),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
+      const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
+
       // Fetch profile
       const profileDoc = await profilesCol().doc(input.creatorUid).get();
       const profile = profileDoc.exists ? { id: profileDoc.id, ...profileDoc.data() } : null;
@@ -367,7 +415,13 @@ export const galleryRouter = router({
         .get();
 
       const content = contentSnapshot.docs
-        .filter((d) => isVisible(d.data().contentStatus))
+        .filter((d) => {
+          const data = d.data();
+          if (!isVisible(data.contentStatus)) return false;
+          const uniId = (data.universeId as string | undefined)?.toLowerCase();
+          if (uniId && excluded.has(uniId)) return false;
+          return true;
+        })
         .map(serializeGalleryItem);
 
       // Aggregate stats — across the visible set only, so hidden content

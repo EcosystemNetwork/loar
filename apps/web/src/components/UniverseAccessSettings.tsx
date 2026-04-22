@@ -18,7 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { trpcClient } from '@/utils/trpc';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Shield, Crown, Coins, Lock, Unlock, Loader2, Save } from 'lucide-react';
+import { Shield, Crown, Coins, Lock, Unlock, Loader2, Save, EyeOff } from 'lucide-react';
 import { useVocab } from '@/hooks/use-vocab';
 
 interface UniverseAccessSettingsProps {
@@ -72,6 +72,8 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
   const queryClient = useQueryClient();
   const v = useVocab();
   const [accessModel, setAccessModel] = useState<AccessModel>('open');
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [initialIsPrivate, setInitialIsPrivate] = useState(false);
   const [tokenThreshold, setTokenThreshold] = useState('1');
   const [tiers, setTiers] = useState<TierConfig[]>([
     { ...DEFAULT_TIERS.BASIC },
@@ -86,12 +88,27 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
     queryFn: () => trpcClient.universes.getAccessModel.query({ universeId }),
   });
 
+  // Load the universe doc so we can read the owner-controlled `isPrivate` flag.
+  // Uses the owner-authenticated `universes.get` path (auth token is attached
+  // by the tRPC client), so this fetch succeeds even when the universe is
+  // already private.
+  const { data: universeDoc } = useQuery({
+    queryKey: ['universe-privacy', universeId],
+    queryFn: () => trpcClient.universes.get.query({ id: universeId }),
+  });
+
   // Sync state when data loads
   useEffect(() => {
     if (currentAccessModel?.accessModel) {
       setAccessModel(currentAccessModel.accessModel as AccessModel);
     }
   }, [currentAccessModel]);
+
+  useEffect(() => {
+    const value = Boolean((universeDoc?.data as { isPrivate?: boolean } | undefined)?.isPrivate);
+    setIsPrivate(value);
+    setInitialIsPrivate(value);
+  }, [universeDoc]);
 
   const { data: existingTiers, isLoading: isLoadingTiers } = useQuery({
     queryKey: ['subscription-tiers', universeId],
@@ -124,6 +141,12 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Persist the privacy toggle first — it's independent from access model
+      // and we want it to take effect even if a downstream tier save fails.
+      if (isPrivate !== initialIsPrivate) {
+        await trpcClient.universes.setPrivate.mutate({ universeId, isPrivate });
+      }
+
       // Save the access model choice
       await trpcClient.universes.updateAccessModel.mutate({
         universeId,
@@ -167,6 +190,8 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
 
       queryClient.invalidateQueries({ queryKey: ['subscription-tiers', universeId] });
       queryClient.invalidateQueries({ queryKey: ['access-model', universeId] });
+      queryClient.invalidateQueries({ queryKey: ['universe-privacy', universeId] });
+      queryClient.invalidateQueries({ queryKey: ['universes', 'all'] });
       toast.success('Access settings saved');
       onClose();
     } catch (err: any) {
@@ -215,6 +240,49 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
           </div>
         ) : (
           <>
+            {/* Privacy toggle — owner-controlled visibility. Independent from
+                the access model below: a public-open universe can still be
+                flipped private to pull it + all its content off every public
+                surface (gallery, landing page, search, wiki, lineage). */}
+            <Card className="mb-6 border-zinc-800 bg-zinc-800/50">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <EyeOff
+                        className={`w-4 h-4 ${isPrivate ? 'text-amber-400' : 'text-zinc-500'}`}
+                      />
+                      <span className="text-sm font-semibold text-white">Private universe</span>
+                      {isPrivate && (
+                        <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40">
+                          On
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      Hide this universe and all of its content (gallery, wiki, search, landing
+                      page) from the public. You will still see everything. On-chain data is
+                      immutable and not affected.
+                    </p>
+                  </div>
+                  <button
+                    role="switch"
+                    aria-checked={isPrivate}
+                    onClick={() => setIsPrivate((v) => !v)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-zinc-900 ${
+                      isPrivate ? 'bg-amber-500' : 'bg-zinc-700'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        isPrivate ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Access Model Selector */}
             <div className="grid grid-cols-2 gap-2 mb-6">
               {accessOptions.map((opt) => {

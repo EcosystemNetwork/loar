@@ -59,6 +59,7 @@ export async function createUniverse(input: CreateUniverseInput) {
       multiSigAddress: null,
       accessModel: 'open', // open | subscription | token_gate | both
       universeType: 'monetized', // 'fun' (no monetization) | 'monetized' (revenue-bearing)
+      isPrivate: false, // owner-controlled: hides universe + its content from all public surfaces
       created_at: new Date(),
       updated_at: new Date(),
     };
@@ -120,7 +121,16 @@ export async function getUniverse(id: string) {
   }
 }
 
-export async function getAllUniverses(options?: { includeHidden?: boolean }) {
+export async function getAllUniverses(options?: {
+  /** Include admin-hidden docs (admin dashboards only). */
+  includeHidden?: boolean;
+  /**
+   * If provided, universes where `creator === viewerAddress` are kept even when
+   * `isPrivate` is true — owners always see their own stuff. `includeHidden`
+   * still controls admin-hidden docs independently.
+   */
+  viewerAddress?: string;
+}) {
   try {
     const snapshot = await collection().orderBy('created_at').limit(500).get();
     let data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[];
@@ -128,6 +138,9 @@ export async function getAllUniverses(options?: { includeHidden?: boolean }) {
     if (!options?.includeHidden) {
       data = data.filter((u) => !u.isHidden);
     }
+
+    const viewer = options?.viewerAddress?.toLowerCase();
+    data = data.filter((u) => !u.isPrivate || (viewer && u.creator?.toLowerCase() === viewer));
 
     return {
       success: true,
@@ -139,6 +152,40 @@ export async function getAllUniverses(options?: { includeHidden?: boolean }) {
     console.error('Error fetching all universes:', error);
     throw new Error('Failed to fetch universes', { cause: error });
   }
+}
+
+/**
+ * Returns the set of universe IDs (lowercase addresses) whose content must
+ * NOT surface on public listing endpoints — union of admin-hidden and
+ * owner-private universes. Callers can pass a `viewerAddress` to exempt
+ * universes the viewer owns, so creators always see their own content.
+ *
+ * This is the single chokepoint every public content endpoint calls before
+ * returning a list. It's an O(N) scan of the universe collection, which is
+ * bounded (few hundred docs today). If it grows: denormalize or add an index.
+ */
+export async function getExcludedUniverseIds(options?: {
+  viewerAddress?: string;
+}): Promise<Set<string>> {
+  const snapshot = await collection().select('creator', 'isHidden', 'isPrivate').get();
+  const viewer = options?.viewerAddress?.toLowerCase();
+  const excluded = new Set<string>();
+  for (const doc of snapshot.docs) {
+    const data = doc.data();
+    const hidden = Boolean(data.isHidden);
+    const isPrivate = Boolean(data.isPrivate);
+    if (!hidden && !isPrivate) continue;
+    if (
+      isPrivate &&
+      !hidden &&
+      viewer &&
+      (data.creator as string | undefined)?.toLowerCase() === viewer
+    ) {
+      continue; // owner sees their own private universe content
+    }
+    excluded.add(doc.id);
+  }
+  return excluded;
 }
 
 /**
@@ -175,6 +222,43 @@ export async function setUniverseHidden(
   await batch.commit();
 
   return { id, isHidden };
+}
+
+/**
+ * Owner-controlled: toggle a universe's `isPrivate` flag. When true, the
+ * universe and every piece of content linked to it (gallery items, entities,
+ * etc.) disappear from all public listing endpoints — but the owner still
+ * sees their own stuff. Writes a `contentAuditLog` entry mirroring
+ * `setUniverseHidden` so every visibility change is recoverable.
+ *
+ * Caller authorization (creator-or-multisig-owner) is enforced in the route.
+ */
+export async function setUniversePrivate(
+  universeId: string,
+  isPrivate: boolean,
+  actor?: { uid?: string; address?: string }
+) {
+  const id = universeId.toLowerCase();
+  const doc = await collection().doc(id).get();
+  if (!doc.exists) throw new Error('Universe not found');
+
+  const previousPrivate = Boolean(doc.data()?.isPrivate);
+  const now = new Date();
+
+  const batch = db.batch();
+  batch.update(collection().doc(id), { isPrivate, updated_at: now });
+  batch.set(db.collection('contentAuditLog').doc(), {
+    action: isPrivate ? 'universe_made_private' : 'universe_made_public',
+    universeId: id,
+    previousPrivate,
+    newPrivate: isPrivate,
+    actorUid: actor?.uid ?? null,
+    actorAddress: actor?.address ?? null,
+    createdAt: now.toISOString(),
+  });
+  await batch.commit();
+
+  return { id, isPrivate };
 }
 
 /**
@@ -217,7 +301,11 @@ export async function deleteUniverse(
 
 export async function getUniversesByCreator(
   creator: string,
-  options?: { includeHidden?: boolean }
+  options?: {
+    includeHidden?: boolean;
+    /** When the viewer is the creator themselves, private universes are kept. */
+    viewerAddress?: string;
+  }
 ) {
   try {
     const snapshot = await collection().where('creator', '==', creator).get();
@@ -231,6 +319,11 @@ export async function getUniversesByCreator(
 
     if (!options?.includeHidden) {
       data = data.filter((u) => !u.isHidden);
+    }
+
+    const viewerIsCreator = options?.viewerAddress?.toLowerCase() === creator.toLowerCase();
+    if (!viewerIsCreator) {
+      data = data.filter((u) => !u.isPrivate);
     }
 
     return {

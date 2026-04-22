@@ -1,9 +1,9 @@
 /**
- * Credits Router — $LOAR-powered generation credit system
+ * Credits Router — generation credit system
  *
- * Dual-margin pricing:
- *   Credit card / ETH / other crypto → 35% margin
- *   $LOAR token payments → 25% margin + 10% bonus credits
+ * Pricing: credit card / ETH / other crypto → 35% margin. The $LOAR token
+ * discount path is disabled for the alpha launch (purchaseWithLoar returns
+ * a disabled error; package pricing reports fiat-equivalent LOAR fields).
  *
  * Credits are the internal unit consumed by all generation actions.
  * Users buy credit packages, then spend credits on generations.
@@ -77,12 +77,7 @@ function getChainName(chainId?: number) {
   return 'Sepolia';
 }
 
-const LOAR_TOKEN_ADDRESS = (process.env.LOAR_TOKEN_ADDRESS ?? '') as `0x${string}`;
 const TREASURY_ADDRESS = (process.env.TREASURY_ADDRESS ?? '') as `0x${string}`;
-
-// ERC20 Transfer event topic
-const TRANSFER_TOPIC =
-  '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' as const;
 
 /**
  * Verify an ETH or native-crypto payment by checking that the tx:
@@ -173,92 +168,6 @@ async function verifyEthPayment(
   }
 }
 
-async function verifyLoarPayment(
-  txHash: string,
-  expectedLoarWei: bigint,
-  chainId?: number,
-  expectedSender?: string
-): Promise<void> {
-  if (!LOAR_TOKEN_ADDRESS || LOAR_TOKEN_ADDRESS === '0x') {
-    throw new Error('LOAR_TOKEN_ADDRESS is not configured on the server');
-  }
-  if (!TREASURY_ADDRESS || TREASURY_ADDRESS === '0x') {
-    throw new Error('TREASURY_ADDRESS is not configured on the server');
-  }
-
-  // Note: dedup is enforced atomically inside the Firestore transaction
-  // (purchaseWithLoar). No pre-check here to avoid TOCTOU race.
-
-  const client = getChainClient(chainId);
-  const chainName = getChainName(chainId);
-
-  let receipt: Awaited<ReturnType<typeof client.getTransactionReceipt>>;
-  try {
-    receipt = await client.getTransactionReceipt({ hash: txHash as Hash });
-  } catch {
-    throw new Error(
-      `Transaction not found on ${chainName}. Confirm it has been broadcast and wait for it to be included in a block.`
-    );
-  }
-
-  if (receipt.status !== 'success') {
-    throw new Error('Transaction was reverted on-chain. No credits will be issued.');
-  }
-
-  // Find a Transfer(from, to, amount) log from the $LOAR contract to the treasury
-  const transferLog = receipt.logs.find(
-    (log) =>
-      log.address.toLowerCase() === LOAR_TOKEN_ADDRESS.toLowerCase() &&
-      log.topics[0] === TRANSFER_TOPIC &&
-      log.topics[2] &&
-      `0x${log.topics[2].slice(26)}`.toLowerCase() === TREASURY_ADDRESS.toLowerCase()
-  );
-
-  if (!transferLog) {
-    throw new Error(
-      'Transaction does not contain a $LOAR Transfer to the platform treasury. Ensure you sent $LOAR to the correct address.'
-    );
-  }
-
-  // C4 fix: Verify the transfer was sent by the authenticated user
-  if (!expectedSender) {
-    throw new Error('Sender verification is required for payment claims.');
-  }
-  if (transferLog.topics[1]) {
-    const sender = `0x${transferLog.topics[1].slice(26)}`.toLowerCase();
-    if (sender !== expectedSender.toLowerCase()) {
-      throw new Error(
-        'Token transfer sender does not match your wallet address. You can only claim credits for your own payments.'
-      );
-    }
-  }
-
-  // Amplifies PAY-01: reject $LOAR payments older than MAX_TX_AGE_SECONDS.
-  try {
-    const block = await getCachedOrFetch(`block-${receipt.blockNumber.toString()}`, () =>
-      client.getBlock({ blockNumber: receipt.blockNumber })
-    );
-    const ageSeconds = Math.floor(Date.now() / 1000) - Number(block.timestamp);
-    if (ageSeconds > MAX_TX_AGE_SECONDS) {
-      throw new Error(
-        `Transaction is too old (${ageSeconds}s). Payments must be claimed within ${MAX_TX_AGE_SECONDS / 3600}h of confirmation.`
-      );
-    }
-  } catch (err: any) {
-    if (err?.message?.startsWith('Transaction is too old')) throw err;
-  }
-
-  // Decode the transfer amount from the log data
-  const transferredWei = BigInt(transferLog.data);
-  // Allow up to 1% underpayment to tolerate minor price drift
-  const minRequired = (expectedLoarWei * 99n) / 100n;
-  if (transferredWei < minRequired) {
-    throw new Error(
-      `Insufficient $LOAR transferred. Expected ~${expectedLoarWei.toString()} wei, got ${transferredWei.toString()} wei.`
-    );
-  }
-}
-
 const creditsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('userCredits');
@@ -326,16 +235,17 @@ function buildPackage(
   bonusCredits: number,
   popular: boolean,
   fiatMargin = FIAT_MARGIN,
-  loarMargin = LOAR_MARGIN,
-  loarBonusFraction = 0.1,
+  _loarMargin = LOAR_MARGIN,
+  _loarBonusFraction = 0.1,
   baseCreditCostUsd = BASE_CREDIT_COST_USD,
   ethPriceUsd = 3000
 ): CreditPackage {
   const baseCostUsd = credits * baseCreditCostUsd;
   const fiatPriceUsd = Math.round(baseCostUsd * fiatMargin * 100) / 100;
-  const loarPriceUsd = Math.round(baseCostUsd * loarMargin * 100) / 100;
+  // Alpha launch: no LOAR discount — LOAR fields mirror fiat pricing with no bonus
+  const loarPriceUsd = fiatPriceUsd;
   const loarTokenAmount = Math.ceil(loarPriceUsd / LOAR_TO_USD);
-  const loarBonusCredits = Math.floor(credits * loarBonusFraction);
+  const loarBonusCredits = 0;
 
   // Compute expected ETH wei from the fiat price and ETH/USD rate
   const ethPriceWei =
@@ -551,101 +461,21 @@ export const creditsRouter = router({
       };
     }),
 
-  // ── Purchase with $LOAR (25% margin + 10% bonus) ───────────────
+  // ── Purchase with $LOAR — DISABLED for alpha launch ────────────
 
   purchaseWithLoar: protectedProcedure
     .input(
       z.object({
         packageId: z.string(),
         txHash: z.string(),
-        loarAmount: z.string(), // $LOAR tokens transferred (wei units)
-        /** Chain ID for on-chain payment verification */
+        loarAmount: z.string(),
         chainId: z.number().optional(),
       })
     )
-    .mutation(async ({ input, ctx }) => {
-      const livePackages = await buildPackagesFromConfig();
-      const pkg = livePackages.find((p) => p.id === input.packageId);
-      if (!pkg || !pkg.active) throw new Error('Package not found or inactive');
-
-      // Verify the on-chain transfer before issuing any credits
-      const expectedWei = parseUnits(pkg.loarTokenAmount.toString(), 18);
-      await verifyLoarPayment(input.txHash, expectedWei, input.chainId, ctx.user.address);
-
-      // $LOAR buyers get: base credits + package bonus + 10% LOAR bonus
-      const totalCredits = pkg.credits + pkg.bonusCredits + pkg.loarBonusCredits;
-      const totalBonus = pkg.bonusCredits + pkg.loarBonusCredits;
-
-      // Atomic: dedup + balance update + tx record
-      // Include chainId in dedup key for defense-in-depth
-      const txDocId = `loar-${input.txHash}-${input.chainId || 0}`;
-      await db.runTransaction(async (tx) => {
-        const dedupRef = creditTxCol().doc(txDocId);
-        const dedupDoc = await tx.get(dedupRef);
-        if (dedupDoc.exists) {
-          throw new Error('This transaction has already been used to purchase credits');
-        }
-
-        const userRef = creditsCol().doc(ctx.user.uid);
-        const userDoc = await tx.get(userRef);
-        const prev = userDoc.data() ?? {};
-
-        tx.set(
-          userRef,
-          {
-            uid: ctx.user.uid,
-            balance: (prev.balance || 0) + totalCredits,
-            totalPurchased: (prev.totalPurchased || 0) + pkg.credits,
-            totalBonusReceived: (prev.totalBonusReceived || 0) + totalBonus,
-            totalLoarPurchases: (prev.totalLoarPurchases || 0) + 1,
-            totalSpent: prev.totalSpent || 0,
-            totalFiatPurchases: prev.totalFiatPurchases || 0,
-            updatedAt: new Date(),
-            ...(!userDoc.exists && { createdAt: new Date() }),
-          },
-          { merge: true }
-        );
-
-        tx.set(dedupRef, {
-          id: txDocId,
-          uid: ctx.user.uid,
-          type: 'purchase',
-          paymentMethod: 'loar',
-          packageId: input.packageId,
-          packageName: pkg.name,
-          credits: pkg.credits,
-          bonusCredits: totalBonus,
-          totalCredits,
-          pricePaidUsd: pkg.loarPriceUsd,
-          loarTokensPaid: input.loarAmount,
-          marginPercent: 25,
-          txHash: input.txHash,
-          createdAt: new Date(),
-        });
-      });
-
-      void import('../../lib/analytics').then(({ captureServerEvent }) =>
-        captureServerEvent('credits:purchase_completed', {
-          distinctId: ctx.user.uid,
-          paymentMethod: 'loar',
-          packageId: input.packageId,
-          credits: totalCredits,
-          pricePaidUsd: pkg.loarPriceUsd,
-        })
+    .mutation(async () => {
+      throw new Error(
+        'Buying credits with $LOAR is not available during the alpha launch. Please use card or ETH.'
       );
-
-      return {
-        ok: true,
-        creditsAdded: totalCredits,
-        baseCredits: pkg.credits,
-        bonusCredits: pkg.bonusCredits,
-        loarBonusCredits: pkg.loarBonusCredits,
-        pricePaid: pkg.loarPriceUsd,
-        loarTokensPaid: input.loarAmount,
-        paymentMethod: 'loar' as const,
-        margin: '25%',
-        savings: `You saved $${(pkg.fiatPriceUsd - pkg.loarPriceUsd).toFixed(2)} and got ${pkg.loarBonusCredits} extra credits!`,
-      };
     }),
 
   // ── Purchase with LOAR Balance (reward credits → package credits) ──

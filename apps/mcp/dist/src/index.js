@@ -420,7 +420,11 @@ async function main() {
     const client = new LoarClient({ serverUrl: LOAR_SERVER_URL, apiKey: LOAR_API_KEY });
     const LOAR_MCP_HOST = process.env.LOAR_MCP_HOST || '127.0.0.1';
     if (LOAR_MCP_TRANSPORT === 'sse') {
-        await startSse(client, { host: LOAR_MCP_HOST, port: LOAR_MCP_PORT, upstreamUrl: LOAR_SERVER_URL });
+        await startSse(client, {
+            host: LOAR_MCP_HOST,
+            port: LOAR_MCP_PORT,
+            upstreamUrl: LOAR_SERVER_URL,
+        });
     }
     else {
         await startStdio(client, LOAR_SERVER_URL);

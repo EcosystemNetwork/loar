@@ -221,23 +221,9 @@ function HomeComponent() {
       };
     });
 
-    // Add any Ponder-only universes not in Firestore (skip duplicates by name)
-    if (ponderUniverses) {
-      const baseIds = new Set(base.map((u: Partial<EnrichedUniverse>) => u.id!.toLowerCase()));
-      const baseNames = new Set(
-        base.map((u: Partial<EnrichedUniverse>) => (u.name || '').toLowerCase())
-      );
-      ponderUniverses.forEach((pu) => {
-        if (baseIds.has(pu.id.toLowerCase())) return;
-        if (baseNames.has((pu.name || '').toLowerCase())) return;
-        const tokenData = tokenMap.get(pu.id.toLowerCase());
-        const poolId = tokenData?.poolId;
-        const swapVolume = poolId ? volumeMap.get(poolId) || 0 : 0;
-        const holderCount = tokenData ? holderCountMap.get(tokenData.id.toLowerCase()) || 0 : 0;
-        enriched.push({ ...pu, tokenData, swapVolume, holderCount });
-      });
-    }
-
+    // Firestore is the authoritative set — Ponder only enriches universes that
+    // already have a Firestore doc. Orphan on-chain universes (no Firestore
+    // doc) are skipped so a private-universe flag can't be bypassed via Ponder.
     return enriched;
   }, [firestoreUniverses, ponderUniverses, tokensData, swapsData, holdersData]);
 

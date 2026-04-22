@@ -27,8 +27,8 @@ const STREAMS: Stream[] = [
     id: 'credits',
     icon: 'bolt',
     label: 'AI Credits',
-    desc: 'Buy credits with card, ETH, or $LOAR. 25% margin discount with token.',
-    potential: 'Up to 35% margin',
+    desc: 'Buy credits with card or ETH to power every generation.',
+    potential: '35% margin',
     status: 'live',
     ctaLabel: 'Buy Credits',
     ctaAction: 'credits',
@@ -188,28 +188,6 @@ export function MonetizationOverview() {
             </div>
           );
         })}
-
-        {/* Summary card */}
-        <div className="bg-gradient-to-br from-amber-950/60 to-zinc-900 border border-amber-800/40 rounded-xl p-4 flex flex-col justify-between">
-          <div>
-            <LoarIcon name="money-bag" size={24} className="text-amber-400" />
-            <div className="text-sm font-bold text-white mt-2">$LOAR Advantage</div>
-            <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
-              Hold $LOAR to get 25% margin on credits vs 35% for card/ETH — plus 10% bonus credits
-              on every purchase.
-            </p>
-          </div>
-          <div className="mt-3 space-y-1 text-xs">
-            <div className="flex justify-between text-zinc-400">
-              <span>Card / ETH margin</span>
-              <span className="text-red-400">35%</span>
-            </div>
-            <div className="flex justify-between text-zinc-400">
-              <span>$LOAR margin</span>
-              <span className="text-green-400">25% + 10% bonus</span>
-            </div>
-          </div>
-        </div>
       </div>
 
       {showCreditStore && (

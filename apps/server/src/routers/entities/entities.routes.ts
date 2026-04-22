@@ -51,6 +51,7 @@ import {
 import { geminiService } from '../../services/gemini';
 import { triggerCoverImageGenerationAsync } from '../../services/entity-cover-image';
 import { db } from '../../lib/firebase';
+import { getExcludedUniverseIds } from '../universes/universes.handlers';
 
 const entityKindSchema = z.enum(ENTITY_KINDS);
 
@@ -123,9 +124,15 @@ export const entitiesRouter = router({
         universeAddress: ethereumAddress.optional(),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const entity = await getEntity(input.entityId);
       if (!entity) throw new Error('Entity not found');
+      if (entity.universeAddress) {
+        const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
+        if (excluded.has(entity.universeAddress.toLowerCase())) {
+          throw new Error('Entity not found');
+        }
+      }
       return entity;
     }),
 
@@ -137,7 +144,11 @@ export const entitiesRouter = router({
         kind: entityKindSchema.optional(),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
+      const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
+      if (excluded.has(input.universeAddress.toLowerCase())) {
+        return { entities: [], total: 0 };
+      }
       const entities = await getEntitiesByUniverse(input.universeAddress, input.kind);
       return { entities, total: entities.length };
     }),
@@ -153,8 +164,15 @@ export const entitiesRouter = router({
         limit: z.number().int().positive().max(200).default(100),
       })
     )
-    .query(async ({ input }) => {
-      const entities = await getEntitiesByKind(input.kind, input.limit);
+    .query(async ({ input, ctx }) => {
+      const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
+      // Fetch extra to compensate for post-filter losses so the caller still gets
+      // close to its requested limit of publicly-visible entities.
+      const fetchLimit = excluded.size > 0 ? Math.min(input.limit * 2, 200) : input.limit;
+      const raw = await getEntitiesByKind(input.kind, fetchLimit);
+      const entities = raw
+        .filter((e) => !e.universeAddress || !excluded.has(e.universeAddress.toLowerCase()))
+        .slice(0, input.limit);
       return { entities, total: entities.length };
     }),
 
@@ -167,8 +185,18 @@ export const entitiesRouter = router({
         limit: z.number().int().positive().max(200).default(100),
       })
     )
-    .query(async ({ input }) => {
-      const entities = await getEntitiesByCreator(input.creator, input.kind, input.limit);
+    .query(async ({ input, ctx }) => {
+      // When the viewer is the creator themselves, their own private-universe
+      // entities stay visible. Otherwise filter them out.
+      const viewerIsCreator = ctx.user?.address?.toLowerCase() === input.creator.toLowerCase();
+      const excluded = viewerIsCreator
+        ? new Set<string>()
+        : await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
+      const fetchLimit = excluded.size > 0 ? Math.min(input.limit * 2, 200) : input.limit;
+      const raw = await getEntitiesByCreator(input.creator, input.kind, fetchLimit);
+      const entities = raw
+        .filter((e) => !e.universeAddress || !excluded.has(e.universeAddress.toLowerCase()))
+        .slice(0, input.limit);
       return { entities, total: entities.length };
     }),
 
@@ -182,8 +210,12 @@ export const entitiesRouter = router({
         limit: z.number().int().positive().max(200).default(100),
       })
     )
-    .query(async ({ input }) => {
-      const children = await getChildEntities(input.parentId, input.limit);
+    .query(async ({ input, ctx }) => {
+      const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
+      const raw = await getChildEntities(input.parentId, input.limit);
+      const children = raw.filter(
+        (e) => !e.universeAddress || !excluded.has(e.universeAddress.toLowerCase())
+      );
       return { children, total: children.length };
     }),
 
@@ -344,8 +376,18 @@ export const entitiesRouter = router({
         limit: z.number().int().positive().max(100).default(50),
       })
     )
-    .query(async ({ input }) => {
-      const entities = await searchEntities(input);
+    .query(async ({ input, ctx }) => {
+      const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
+
+      // Scoped search into a private/hidden universe — never surface results.
+      if (input.universeAddress && excluded.has(input.universeAddress.toLowerCase())) {
+        return { entities: [], total: 0 };
+      }
+
+      const raw = await searchEntities(input);
+      const entities = raw.filter(
+        (e) => !e.universeAddress || !excluded.has(e.universeAddress.toLowerCase())
+      );
       return { entities, total: entities.length };
     }),
 
@@ -391,7 +433,11 @@ export const entitiesRouter = router({
   /** Get all relationships within a universe. */
   universeRelations: publicProcedure
     .input(z.object({ universeAddress: ethereumAddress }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
+      const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
+      if (excluded.has(input.universeAddress.toLowerCase())) {
+        return { relations: [] };
+      }
       const relations = await getUniverseRelations(input.universeAddress);
       return { relations };
     }),
