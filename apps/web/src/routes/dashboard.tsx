@@ -20,7 +20,6 @@ import {
   Globe,
   Coins,
   BarChart3,
-  Crown,
   ArrowUpRight,
   ArrowDownRight,
   ShoppingBag,
@@ -78,13 +77,6 @@ function RouteComponent() {
     staleTime: 60_000,
   });
 
-  const { data: stakingProfile } = useQuery({
-    queryKey: ['staking-profile'],
-    queryFn: () => trpcClient.staking.getProfile.query(),
-    enabled: isAuthenticated,
-    staleTime: 60_000,
-  });
-
   const { data: myUniverses } = useQuery({
     queryKey: ['my-universes', address],
     queryFn: () => trpcClient.universes.getByCreator.query({ creator: address! }),
@@ -129,8 +121,6 @@ function RouteComponent() {
   const totalSpent = creditData?.totalSpent ?? 0;
   const revenue30d = (revenueData as any)?.totalEarned30d ?? 0;
   const revenueTxCount = (revenueData as any)?.transactionCount30d ?? 0;
-  const stakingTier = (stakingProfile as any)?.tier ?? 'NONE';
-  const stakedAmount = (stakingProfile as any)?.stakedAmount ?? 0;
   const universesOwned = (portfolioData as any)?.universesOwned ?? myUniverseList.length;
   const activeSubscriptions = (portfolioData as any)?.activeSubscriptions ?? 0;
   const totalCollectibles = (portfolioData as any)?.totalCollectibles ?? 0;
@@ -250,13 +240,6 @@ function RouteComponent() {
                     : undefined
                 }
                 accent="purple"
-              />
-              <StatCard
-                icon={<Crown className="h-4 w-4 text-orange-500" />}
-                label="Staking"
-                value={stakingTier !== 'NONE' ? stakingTier : '--'}
-                sub={stakedAmount > 0 ? `${stakedAmount.toLocaleString()} $LOAR` : 'Not staked'}
-                accent="orange"
               />
               <StatCard
                 icon={<ShoppingBag className="h-4 w-4 text-pink-500" />}

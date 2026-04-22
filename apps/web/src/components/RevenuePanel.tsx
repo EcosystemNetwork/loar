@@ -23,10 +23,8 @@ import {
   DollarSign,
   Film,
   Users,
-  Gavel,
   Coins,
   Crown,
-  Handshake,
   Megaphone,
   ShoppingBag,
   BarChart3,
@@ -40,10 +38,7 @@ import {
   useSubmitCanon,
   useCreditBalance,
   useUniverseSubStats,
-  useUniverseCollabs,
   useAdSlots,
-  useUniverseLicenses,
-  useUniverseMerch,
   useUniverseMetrics,
 } from '@/hooks/useRevenue';
 import { useVocab } from '@/hooks/use-vocab';
@@ -118,8 +113,6 @@ function OverviewTab({ universeId }: { universeId: string }) {
   const { data: metrics } = useUniverseMetrics(universeId);
   const { data: episodes } = useEpisodeNFTs(universeId);
   const { data: subStats } = useUniverseSubStats(universeId);
-  const { data: collabs } = useUniverseCollabs(universeId);
-  const { data: licenses } = useUniverseLicenses(universeId);
 
   return (
     <div className="space-y-4">
@@ -139,18 +132,6 @@ function OverviewTab({ universeId }: { universeId: string }) {
           icon={<Crown className="w-4 h-4" />}
           label="Subscribers"
           value={(subStats as any)?.totalSubscribers ?? 0}
-        />
-        <MetricCard
-          icon={<Handshake className="w-4 h-4" />}
-          label="Collabs"
-          value={(collabs as any[])?.length ?? 0}
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <MetricCard
-          icon={<Gavel className="w-4 h-4" />}
-          label="Licenses"
-          value={(licenses as any[])?.length ?? 0}
         />
         <MetricCard
           icon={<Coins className="w-4 h-4" />}

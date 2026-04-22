@@ -9,7 +9,6 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { useWalletAuth } from '@/lib/wallet-auth';
-import { useActiveAccount } from 'thirdweb/react';
 import { useChainId } from 'wagmi';
 import { getEvmAddresses, isZeroAddress } from '@/configs/addresses';
 import { Button } from '@/components/ui/button';
@@ -76,7 +75,6 @@ const ERC20_TRANSFER_ABI = [
 function PricingPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useWalletAuth();
-  const thirdwebAccount = useActiveAccount();
   const walletChainId = useChainId();
   const queryClient = useQueryClient();
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
@@ -105,12 +103,10 @@ function PricingPage() {
       const loarTokens = billing === 'annual' ? tier.annualLoarTokens : tier.monthlyLoarTokens;
       const totalLoarForPeriod = billing === 'annual' ? loarTokens * 12 : loarTokens;
 
-      if (!thirdwebAccount) throw new Error('Wallet not connected');
+      if (!isAuthenticated) throw new Error('Not signed in');
 
       // Dynamically import viem for encoding
       const { encodeFunctionData, parseUnits: pu } = await import('viem');
-      const { sendTransaction } = await import('thirdweb');
-      const { prepareTransaction } = await import('thirdweb');
 
       const chainId = walletChainId || Number(import.meta.env.VITE_CHAIN_ID ?? 84532);
       const loarAddress = getEvmAddresses(chainId)?.loarToken;
@@ -129,19 +125,27 @@ function PricingPage() {
         args: [treasuryAddress, pu(totalLoarForPeriod.toString(), 18)],
       });
 
-      // Send the ERC20 transfer via thirdweb
-      const { thirdwebClient } = await import('@/lib/thirdweb');
-      const { defineChain } = await import('thirdweb');
-
-      const tx = prepareTransaction({
-        client: thirdwebClient,
-        chain: defineChain(chainId),
-        to: loarAddress,
-        data,
+      // Send the ERC20 transfer via server-proxied Circle wallet
+      const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+      const txRes = await fetch(`${SERVER_URL}/api/tx/write`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address: loarAddress,
+          abi: ERC20_TRANSFER_ABI,
+          functionName: 'transfer',
+          args: [treasuryAddress, pu(totalLoarForPeriod.toString(), 18).toString()],
+          chainId,
+        }),
       });
 
-      const result = await sendTransaction({ transaction: tx, account: thirdwebAccount });
-      const txHash = result.transactionHash;
+      if (!txRes.ok) {
+        const errData = await txRes.json().catch(() => ({ error: 'Transaction failed' }));
+        throw new Error(errData.error || 'Transaction failed');
+      }
+
+      const { txHash } = await txRes.json();
 
       // Verify on server + create subscription
       return trpcClient.platformSubscriptions.subscribeWithLoar.mutate({

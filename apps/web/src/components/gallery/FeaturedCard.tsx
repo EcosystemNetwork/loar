@@ -32,7 +32,13 @@ export function FeaturedCard({ item }: FeaturedCardProps) {
           poster={item.thumbnailUrl || undefined}
           onLoadedData={() => onLoaded()}
           onError={() => onLoaded()}
-          onMouseEnter={(e) => e.currentTarget.play()}
+          onMouseEnter={(e) => {
+            const playPromise = e.currentTarget.play();
+            if (playPromise)
+              playPromise.catch(() => {
+                /* AbortError — hover cancelled */
+              });
+          }}
           onMouseLeave={(e) => {
             e.currentTarget.pause();
             e.currentTarget.currentTime = 0;

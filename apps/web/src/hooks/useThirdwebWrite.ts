@@ -1,35 +1,27 @@
 /**
- * useThirdwebWrite — Drop-in replacements for wagmi's useWriteContract and
- * useSendTransaction that route through thirdweb's native transaction pipeline.
+ * useWriteContract / useSendTransaction — Server-proxied via Circle DCW
  *
- * Problem: wagmi has zero connectors configured because thirdweb manages wallet
- * connections. Wagmi's useWriteContract/useSendTransaction require an active
- * connector, so they throw "Connector not connected".
+ * All contract writes are proxied through POST /api/tx/write on the server.
+ * The server signs and broadcasts via Circle's KMS — no client-side keys needed.
  *
- * Solution: Use thirdweb's native `prepareTransaction` + `sendTransaction`
- * which properly signs via the thirdweb account (in-app or external wallet)
- * and sends via `eth_sendRawTransaction`. The previous viem adapter approach
- * tried `eth_sendTransaction` against public RPCs which don't support it.
- *
- * Both hooks expose the same API shape as their wagmi counterparts so consumers
- * can switch imports without changing call sites.
+ * These hooks expose the same API shape as their wagmi counterparts
+ * so consumers can keep the same call sites.
  */
 import { useState, useCallback } from 'react';
 import { useChainId } from 'wagmi';
-import { useActiveAccount } from 'thirdweb/react';
-import { defineChain, prepareTransaction, sendTransaction, estimateGas } from 'thirdweb';
-import { thirdwebClient } from '@/lib/thirdweb';
 import { encodeFunctionData, type Abi } from 'viem';
+
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 
 // ─── useWriteContract replacement ────────────────────────────────────────────
 
 /**
  * Drop-in replacement for wagmi's `useWriteContract`.
  *
+ * Routes contract calls through the LOAR server → Circle KMS.
  * Provides both `writeContract` (fire-and-forget) and `writeContractAsync` (returns hash).
  */
 export function useWriteContract() {
-  const thirdwebAccount = useActiveAccount();
   const chainId = useChainId();
   const [data, setData] = useState<`0x${string}` | undefined>();
   const [isPending, setIsPending] = useState(false);
@@ -44,35 +36,31 @@ export function useWriteContract() {
       value?: bigint;
       chainId?: number;
     }): Promise<`0x${string}`> => {
-      if (!thirdwebAccount) throw new Error('Wallet not connected');
       setIsPending(true);
       setError(null);
       setData(undefined);
       try {
-        const calldata = encodeFunctionData({
-          abi: params.abi as Abi,
-          functionName: params.functionName,
-          args: (params.args as any[]) ?? [],
+        const res = await fetch(`${SERVER_URL}/api/tx/write`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            address: params.address,
+            abi: params.abi,
+            functionName: params.functionName,
+            args: params.args ? Array.from(params.args) : [],
+            value: params.value?.toString(),
+            chainId: params.chainId ?? chainId,
+          }),
         });
 
-        const tx = prepareTransaction({
-          client: thirdwebClient,
-          chain: defineChain(params.chainId ?? chainId),
-          to: params.address as `0x${string}`,
-          data: calldata,
-          value: params.value,
-        });
-
-        // Pre-flight gas estimation — catches reverts before broadcasting
-        try {
-          await estimateGas({ transaction: tx, account: thirdwebAccount });
-        } catch (gasErr) {
-          const reason = gasErr instanceof Error ? gasErr.message : String(gasErr);
-          throw new Error(`Transaction would fail: ${reason}`);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ error: 'Transaction failed' }));
+          throw new Error(errData.error || `Transaction failed (${res.status})`);
         }
 
-        const result = await sendTransaction({ transaction: tx, account: thirdwebAccount });
-        const txHash = result.transactionHash;
+        const result = await res.json();
+        const txHash = result.txHash as `0x${string}`;
         setData(txHash);
         return txHash;
       } catch (e) {
@@ -83,7 +71,7 @@ export function useWriteContract() {
         setIsPending(false);
       }
     },
-    [thirdwebAccount, chainId]
+    [chainId]
   );
 
   /** Fire-and-forget variant — sets `data`/`error` state but doesn't throw. */
@@ -117,10 +105,9 @@ export function useWriteContract() {
 /**
  * Drop-in replacement for wagmi's `useSendTransaction`.
  *
- * Provides `sendTransactionAsync` (returns hash).
+ * Routes raw transactions through the LOAR server → Circle KMS.
  */
 export function useSendTransaction() {
-  const thirdwebAccount = useActiveAccount();
   const chainId = useChainId();
   const [data, setData] = useState<`0x${string}` | undefined>();
   const [isPending, setIsPending] = useState(false);
@@ -128,29 +115,31 @@ export function useSendTransaction() {
 
   const sendTransactionAsync = useCallback(
     async (params: { to: string; value?: bigint; data?: string }): Promise<`0x${string}`> => {
-      if (!thirdwebAccount) throw new Error('Wallet not connected');
       setIsPending(true);
       setError(null);
       setData(undefined);
       try {
-        const tx = prepareTransaction({
-          client: thirdwebClient,
-          chain: defineChain(chainId),
-          to: params.to as `0x${string}`,
-          value: params.value,
-          data: params.data as `0x${string}` | undefined,
+        const res = await fetch(`${SERVER_URL}/api/tx/write`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            address: params.to,
+            // Raw send: forward pre-encoded calldata as `data` (empty if the
+            // tx is a plain value transfer with no call).
+            data: params.data ?? '0x',
+            value: params.value?.toString(),
+            chainId,
+          }),
         });
 
-        // Pre-flight gas estimation — catches reverts before broadcasting
-        try {
-          await estimateGas({ transaction: tx, account: thirdwebAccount });
-        } catch (gasErr) {
-          const reason = gasErr instanceof Error ? gasErr.message : String(gasErr);
-          throw new Error(`Transaction would fail: ${reason}`);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ error: 'Transaction failed' }));
+          throw new Error(errData.error || `Transaction failed (${res.status})`);
         }
 
-        const result = await sendTransaction({ transaction: tx, account: thirdwebAccount });
-        const txHash = result.transactionHash;
+        const result = await res.json();
+        const txHash = result.txHash as `0x${string}`;
         setData(txHash);
         return txHash;
       } catch (e) {
@@ -161,7 +150,7 @@ export function useSendTransaction() {
         setIsPending(false);
       }
     },
-    [thirdwebAccount, chainId]
+    [chainId]
   );
 
   const reset = useCallback(() => {

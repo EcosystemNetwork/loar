@@ -1,18 +1,22 @@
 /**
- * Wallet-based authentication using SIWE (Sign-In With Ethereum).
+ * Wallet-based authentication — Circle Developer Controlled Wallets + SIWE fallback.
+ *
+ * Circle DCW flow:
+ *   email/social login → server creates Circle wallet → JWT session cookie
+ *
+ * Legacy SIWE flow (kept for backward compat with external wallets):
+ *   connect wallet → fetch nonce → sign SIWE message → server sets cookie
  *
  * Session tokens are stored in httpOnly cookies (set by the server).
  * The client only stores the wallet address and session expiry for UI purposes.
- * This prevents XSS attacks from stealing session tokens.
- *
- * Flow: connect wallet → fetch nonce → sign SIWE message → server sets cookie
  */
 import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
-import { useAccount, useDisconnect } from 'wagmi';
-import { useActiveAccount } from 'thirdweb/react';
 
 const ADDRESS_KEY = 'siwe-address';
 const EXPIRY_KEY = 'siwe-expiry';
+const EMAIL_KEY = 'circle-email';
+const WALLET_ID_KEY = 'circle-wallet-id';
+const AUTH_PROVIDER_KEY = 'auth-provider'; // 'circle' | 'siwe'
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 
@@ -64,21 +68,39 @@ export function getSiweToken(): string | null {
   return hasSession() ? '__httpOnly__' : null;
 }
 
-function setSession(address: string, expiresAt: number) {
+function setSession(address: string, expiresAt: number, email?: string, walletId?: string) {
   localStorage.setItem(ADDRESS_KEY, address);
   localStorage.setItem(EXPIRY_KEY, String(expiresAt));
+  if (email) localStorage.setItem(EMAIL_KEY, email);
+  if (walletId) localStorage.setItem(WALLET_ID_KEY, walletId);
   emitChange();
   // Stitch pre-login anonymous analytics to this wallet. Fire-and-forget.
   void import('./analytics').then(({ identifyUser, track }) => {
     void identifyUser(address);
-    void track('auth:login_succeeded', { wallet: address.toLowerCase() });
+    void track('auth:login_succeeded', {
+      wallet: address.toLowerCase(),
+      provider: getAuthProvider(),
+    });
   });
 }
 
-/** Clear the SIWE session from local state and optionally revoke server-side. */
+/** Get the current auth provider type. */
+export function getAuthProvider(): 'circle' | 'siwe' | null {
+  return localStorage.getItem(AUTH_PROVIDER_KEY) as 'circle' | 'siwe' | null;
+}
+
+/** Get the authenticated user's email (Circle auth only). */
+export function getAuthEmail(): string | null {
+  return localStorage.getItem(EMAIL_KEY);
+}
+
+/** Clear the SIWE/Circle session from local state and optionally revoke server-side. */
 export function clearSiweSession(revoke = false) {
   localStorage.removeItem(ADDRESS_KEY);
   localStorage.removeItem(EXPIRY_KEY);
+  localStorage.removeItem(EMAIL_KEY);
+  localStorage.removeItem(WALLET_ID_KEY);
+  localStorage.removeItem(AUTH_PROVIDER_KEY);
   emitChange();
 
   // Un-link the user in analytics so subsequent events are anonymous again.
@@ -127,183 +149,143 @@ export async function refreshSession(): Promise<RefreshResult> {
   }
 }
 
-// Session validation — lazy getter avoids TDZ errors from Rollup reordering
-// module-level code. No live `export let` binding to get trapped in the dead zone.
+// ── Session validation (startup) ────────────────────────────────
+
 let _sessionValidated = false;
-let _sessionValidationDone: Promise<void> | null = null;
+const _validationPromise = validateSessionOnStartup();
 
-export function getSessionValidationDone(): Promise<void> {
-  if (_sessionValidationDone) return _sessionValidationDone;
-  if (typeof window === 'undefined' || !localStorage.getItem(ADDRESS_KEY)) {
+async function validateSessionOnStartup() {
+  if (!hasSession()) {
     _sessionValidated = true;
-    _sessionValidationDone = Promise.resolve();
-    return _sessionValidationDone;
+    return;
   }
-  _sessionValidationDone = fetch(`${SERVER_URL}/auth/me`, { credentials: 'include' })
-    .then((res) => res.json())
-    .then((data) => {
+
+  try {
+    const res = await fetch(`${SERVER_URL}/auth/me`, {
+      credentials: 'include',
+    });
+    if (res.ok) {
+      const data = await res.json();
       if (!data.authenticated) {
-        localStorage.removeItem(ADDRESS_KEY);
-        localStorage.removeItem(EXPIRY_KEY);
-        emitChange();
-      }
-    })
-    .catch(() => {
-      // AUTH-04: Fail open on transient network errors (server cold start, latency, DNS).
-      // Only the explicit `authenticated: false` branch above should clear the session.
-      // Clearing here caused sign-in spam on the live app whenever /auth/me was unreachable.
-    })
-    .finally(() => {
-      _sessionValidated = true;
-    });
-  return _sessionValidationDone;
-}
-
-/** Whether the initial session validation has completed. */
-export function isSessionValidated(): boolean {
-  return _sessionValidated;
-}
-
-// ── Deferred initialisation (called from main.tsx) ─────────────
-// Moved out of module scope to avoid top-level side effects that
-// trigger TDZ errors when Rollup reorders import initialisers.
-let _initDone = false;
-
-export function initWalletAuth() {
-  if (_initDone) return;
-  _initDone = true;
-
-  // Proactive session refresh — refresh 1 hour before expiry.
-  // JWT has 24h TTL, so refresh at the 23h mark.
-  if (typeof window !== 'undefined') {
-    setInterval(
-      async () => {
-        const expiry = localStorage.getItem(EXPIRY_KEY);
-        if (!expiry) return;
-
-        const expiresIn = Number(expiry) - Date.now();
-        if (expiresIn > 0 && expiresIn < 60 * 60 * 1000) {
-          await refreshSession();
-        }
-      },
-      5 * 60 * 1000
-    );
-  }
-
-  // Refresh token when user returns to a backgrounded tab.
-  if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', async () => {
-      if (document.visibilityState !== 'visible') return;
-      const expiry = localStorage.getItem(EXPIRY_KEY);
-      if (!expiry) return;
-
-      const expiresIn = Number(expiry) - Date.now();
-      if (expiresIn <= 0) {
         clearSiweSession();
-      } else if (expiresIn < 60 * 60 * 1000) {
-        const result = await refreshSession();
-        // Only clear on an explicit server rejection — network errors are transient.
-        if (result === 'expired') clearSiweSession();
       }
-    });
+    }
+  } catch {
+    // Network failure — keep the session (don't log out on transient errors)
   }
+  _sessionValidated = true;
 }
 
-// ── SIWE message construction ───────────────────────────────────
-
-function buildSiweMessage(params: { address: string; nonce: string; chainId: number }) {
-  const domain = window.location.host;
-  const uri = window.location.origin;
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + 2 * 60 * 1000); // 2 minutes (matches server nonce TTL)
-
-  return [
-    `${domain} wants you to sign in with your Ethereum account:`,
-    params.address,
-    '',
-    'Sign in to LOAR',
-    '',
-    `URI: ${uri}`,
-    `Version: 1`,
-    `Chain ID: ${params.chainId}`,
-    `Nonce: ${params.nonce}`,
-    `Issued At: ${now.toISOString()}`,
-    `Expiration Time: ${expiresAt.toISOString()}`,
-  ].join('\n');
+function getSessionValidationDone(): Promise<void> {
+  return _validationPromise;
 }
 
-// ── SIWE handshake ──────────────────────────────────────────────
+// ── Session refresh timer ───────────────────────────────────────
 
-// Track nonce fetch failures to implement backoff
-let _nonceFailCount = 0;
-let _nonceBackoffUntil = 0;
+const REFRESH_INTERVAL = 15 * 60 * 1000; // 15 minutes
+let _refreshTimer: ReturnType<typeof setInterval> | null = null;
 
-async function fetchNonce(): Promise<string> {
-  // Respect backoff window from previous 429s
-  const now = Date.now();
-  if (now < _nonceBackoffUntil) {
-    throw new Error('Rate limited — please wait before signing in');
-  }
-
-  const res = await fetch(`${SERVER_URL}/auth/nonce`, { credentials: 'include' });
-  if (res.status === 429) {
-    _nonceFailCount++;
-    // Exponential backoff: 5s, 10s, 20s, 40s, capped at 60s
-    const delay = Math.min(5000 * Math.pow(2, _nonceFailCount - 1), 60_000);
-    _nonceBackoffUntil = Date.now() + delay;
-    throw new Error('Rate limited — please wait before signing in');
-  }
-  if (!res.ok) throw new Error('Failed to fetch nonce');
-
-  _nonceFailCount = 0; // Reset on success
-  const data = await res.json();
-  return data.nonce;
+function startRefreshTimer() {
+  if (_refreshTimer) return;
+  _refreshTimer = setInterval(async () => {
+    if (!hasSession()) return;
+    const result = await refreshSession();
+    if (result === 'expired') {
+      clearSiweSession();
+    }
+  }, REFRESH_INTERVAL);
 }
 
-async function verifySignature(
-  message: string,
-  signature: string
-): Promise<{ address: string; expiresAt: number }> {
-  const res = await fetch(`${SERVER_URL}/auth/verify`, {
+startRefreshTimer();
+
+// ── Circle Auth API ─────────────────────────────────────────────
+
+/**
+ * Request an OTP code for email login.
+ */
+export async function requestEmailOTP(email: string): Promise<{ ok: boolean; _devOtp?: string }> {
+  const res = await fetch(`${SERVER_URL}/auth/circle/register`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include', // receive and store httpOnly cookie
-    body: JSON.stringify({ message, signature }),
+    body: JSON.stringify({ email }),
   });
+
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Verification failed' }));
-    throw new Error(err.error || 'Verification failed');
+    const data = await res.json().catch(() => ({ error: 'Request failed' }));
+    throw new Error(data.error || 'Failed to send verification code');
   }
+
   return res.json();
 }
 
-// ── React hook ──────────────────────────────────────────────────
+/**
+ * Verify an OTP code and establish a session.
+ */
+export async function verifyEmailOTP(
+  email: string,
+  code: string
+): Promise<{ address: string; email: string; walletId: string; expiresAt: number }> {
+  const res = await fetch(`${SERVER_URL}/auth/circle/verify-otp`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, code }),
+  });
 
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ error: 'Verification failed' }));
+    throw new Error(data.error || 'Invalid verification code');
+  }
+
+  const result = await res.json();
+  localStorage.setItem(AUTH_PROVIDER_KEY, 'circle');
+  setSession(result.address, result.expiresAt, result.email, result.walletId);
+  return result;
+}
+
+/**
+ * Google social login — post the provider-issued idToken.
+ * Email is extracted server-side from the verified token; don't trust
+ * any email the client could send.
+ */
+export async function socialLogin(
+  provider: 'google',
+  idToken: string
+): Promise<{ address: string; email: string; walletId: string; expiresAt: number }> {
+  const res = await fetch(`${SERVER_URL}/auth/circle/social`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider, idToken }),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ error: 'Social login failed' }));
+    throw new Error(data.error || 'Social login failed');
+  }
+
+  const result = await res.json();
+  localStorage.setItem(AUTH_PROVIDER_KEY, 'circle');
+  setSession(result.address, result.expiresAt, result.email, result.walletId);
+  return result;
+}
+
+// ── React Hook ──────────────────────────────────────────────────
+
+/**
+ * Primary authentication hook.
+ *
+ * Supports both Circle (email/social) and legacy SIWE (wallet signature) flows.
+ * The returned shape is backward-compatible — all downstream consumers
+ * (protected routes, tRPC auth, etc.) work unchanged.
+ */
 export function useWalletAuth() {
-  const { address: wagmiAddress, isConnected: wagmiConnected, chain } = useAccount();
-  const thirdwebAccount = useActiveAccount();
-  // Thirdweb manages wallet connections; wagmi may not have synced yet.
-  // Use thirdweb as fallback source of truth for address and connection state.
-  const address = (wagmiAddress ?? thirdwebAccount?.address) as `0x${string}` | undefined;
-  const isConnected = wagmiConnected || !!thirdwebAccount;
   const [validated, setValidated] = useState(_sessionValidated);
-  const { disconnect } = useDisconnect();
   const storedAddress = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Track whether user rejected SIWE to prevent auto-sign-in loop
-  const rejectedRef = useRef(false);
-  // Track the last address we auto-signed for to avoid duplicate attempts
-  const autoSignedForRef = useRef<string | null>(null);
-  // Track failed sign-in attempts to prevent infinite retry loop
-  const signInFailCountRef = useRef(0);
-  const MAX_AUTO_SIGN_IN_ATTEMPTS = 2;
-  // Debounce transient wagmi↔thirdweb disconnect flickers so they don't
-  // falsely clear the session on a 50-200ms sync glitch.
-  const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const DISCONNECT_DEBOUNCE_MS = 500;
 
   // Wait for session validation before trusting localStorage
   useEffect(() => {
@@ -312,169 +294,63 @@ export function useWalletAuth() {
     }
   }, [validated]);
 
-  // Only trust isAuthenticated after session validation completes
-  const isAuthenticated = validated && Boolean(isConnected && address && storedAddress);
+  // Circle auth: address comes from localStorage (set during login)
+  // There's no wallet "connection" in the thirdweb sense — the wallet
+  // is server-managed. isConnected is true whenever we have a session.
+  const address = storedAddress as `0x${string}` | undefined;
+  const isConnected = validated && !!storedAddress;
+  const isAuthenticated = validated && !!storedAddress;
 
-  /** Perform the SIWE sign-in handshake. */
-  const signIn = useCallback(async () => {
-    if (!address || !thirdwebAccount) return;
-
+  /** Sign in with email OTP (Circle flow). */
+  const signInWithEmail = useCallback(async (email: string, code: string) => {
     setIsAuthenticating(true);
     setError(null);
-    rejectedRef.current = false;
-
     try {
-      const nonce = await fetchNonce();
-      const message = buildSiweMessage({
-        address,
-        nonce,
-        // AUTH-01 fix: Never default to mainnet (chainId 1) — require wallet to report chain.
-        // Falling back to 1 creates a cross-environment phishing vector where a signature
-        // valid on mainnet can be replayed on testnet or vice versa.
-        chainId: chain?.id ?? 8453,
-      });
-      // Use thirdweb's account.signMessage — wagmi has no connectors
-      // configured so wagmi's useSignMessage cannot sign.
-      const signature = await thirdwebAccount.signMessage({ message });
-      const result = await verifySignature(message, signature);
-      setSession(result.address, result.expiresAt);
-      signInFailCountRef.current = 0;
-      autoSignedForRef.current = address.toLowerCase();
+      await verifyEmailOTP(email, code);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Sign-in failed';
-      // Track user rejections to prevent auto-sign-in loop
-      if (msg.includes('User rejected') || msg.includes('user rejected')) {
-        rejectedRef.current = true;
-      } else {
-        signInFailCountRef.current++;
-        setError(msg);
-      }
-      // Mark this address as attempted so auto-sign-in doesn't retry in a loop
-      autoSignedForRef.current = address.toLowerCase();
+      setError(err instanceof Error ? err.message : 'Sign-in failed');
+      throw err;
     } finally {
       setIsAuthenticating(false);
     }
-  }, [address, chain?.id, thirdwebAccount]);
+  }, []);
 
-  /** Disconnect wallet, revoke JWT server-side, and clear SIWE session. */
+  /** Sign in with social provider (Circle flow). */
+  const signInWithSocial = useCallback(async (provider: 'google', idToken: string) => {
+    setIsAuthenticating(true);
+    setError(null);
+    try {
+      await socialLogin(provider, idToken);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sign-in failed');
+      throw err;
+    } finally {
+      setIsAuthenticating(false);
+    }
+  }, []);
+
+  /** Sign out — clear session and revoke server-side. */
   const signOut = useCallback(() => {
-    clearSiweSession(true); // revoke = true
-    rejectedRef.current = false;
-    autoSignedForRef.current = null;
-    signInFailCountRef.current = 0;
-    disconnect();
-  }, [disconnect]);
+    clearSiweSession(true);
+  }, []);
 
-  // Auto-clear session if wallet disconnects or address changes.
-  // Transient disconnects (wagmi↔thirdweb desync) are debounced so a 50-200ms
-  // flicker during infinite-scroll or wallet modal interaction doesn't log the
-  // user out. Explicit address changes clear immediately (intentional switch).
-  useEffect(() => {
-    // Address swapped while connected — intentional switch, clear immediately.
-    if (
-      isConnected &&
-      address &&
-      storedAddress &&
-      storedAddress.toLowerCase() !== address.toLowerCase()
-    ) {
-      if (disconnectTimerRef.current) {
-        clearTimeout(disconnectTimerRef.current);
-        disconnectTimerRef.current = null;
-      }
-      clearSiweSession();
-      rejectedRef.current = false;
-      autoSignedForRef.current = null;
-      signInFailCountRef.current = 0;
-      return;
-    }
-
-    // Connected cleanly — cancel any pending disconnect clear.
-    if (isConnected && address) {
-      if (disconnectTimerRef.current) {
-        clearTimeout(disconnectTimerRef.current);
-        disconnectTimerRef.current = null;
-      }
-      return;
-    }
-
-    // Disconnected with no stored session — just reset rejection state.
-    if (!storedAddress) {
-      rejectedRef.current = false;
-      return;
-    }
-
-    // Disconnected while a session exists — debounce the clear so a quick
-    // reconnect cancels it.
-    if (!disconnectTimerRef.current) {
-      disconnectTimerRef.current = setTimeout(() => {
-        disconnectTimerRef.current = null;
-        clearSiweSession();
-        rejectedRef.current = false;
-        autoSignedForRef.current = null;
-        signInFailCountRef.current = 0;
-      }, DISCONNECT_DEBOUNCE_MS);
-    }
-  }, [isConnected, address, storedAddress]);
-
-  // Track whether the user explicitly connected their wallet in THIS session
-  // (as opposed to thirdweb auto-reconnecting from browser storage on page load).
-  // Only auto-trigger SIWE for explicit connects to prevent sign-in spam.
-  const userInitiatedConnectRef = useRef(false);
-  const prevConnectedRef = useRef(isConnected);
-  useEffect(() => {
-    // Detect explicit wallet connect: was disconnected, now connected.
-    // On page load, isConnected starts false then becomes true from auto-reconnect,
-    // but validated is false during that window. We only set userInitiatedConnect
-    // when the transition happens AFTER session validation is done (i.e., the user
-    // clicked connect, not thirdweb restoring from storage).
-    if (!prevConnectedRef.current && isConnected && validated) {
-      userInitiatedConnectRef.current = true;
-    }
-    prevConnectedRef.current = isConnected;
-  }, [isConnected, validated]);
-
-  // Auto-trigger SIWE sign-in ONLY when the user explicitly connected their wallet
-  // in this session — never on thirdweb auto-reconnect from storage.
-  const autoSignInPendingRef = useRef(false);
-  useEffect(() => {
-    if (
-      userInitiatedConnectRef.current &&
-      isConnected &&
-      address &&
-      thirdwebAccount &&
-      !storedAddress &&
-      !isAuthenticating &&
-      !rejectedRef.current &&
-      !autoSignInPendingRef.current &&
-      signInFailCountRef.current < MAX_AUTO_SIGN_IN_ATTEMPTS &&
-      autoSignedForRef.current !== address.toLowerCase()
-    ) {
-      autoSignInPendingRef.current = true;
-      signIn().finally(() => {
-        autoSignInPendingRef.current = false;
-      });
-    }
-  }, [isConnected, address, thirdwebAccount, storedAddress, isAuthenticating, signIn]);
-
-  // Surface when auto-sign-in has been exhausted — wallet is connected but
-  // session was never established, and we've stopped retrying.
-  const needsManualSignIn =
-    validated &&
-    isConnected &&
-    !!address &&
-    !storedAddress &&
-    !isAuthenticating &&
-    autoSignedForRef.current === address.toLowerCase() &&
-    signInFailCountRef.current >= MAX_AUTO_SIGN_IN_ATTEMPTS;
+  /** Legacy SIWE sign-in (no-op placeholder — kept for API compat). */
+  const signIn = useCallback(async () => {
+    // SIWE wallet-based sign-in is deprecated.
+    // Use signInWithEmail or signInWithSocial instead.
+    console.warn('[auth] Legacy SIWE signIn called — use signInWithEmail or signInWithSocial');
+  }, []);
 
   return {
     address,
     isConnected,
     isAuthenticated,
     isAuthenticating,
-    needsManualSignIn,
+    needsManualSignIn: false,
     error,
     signIn,
+    signInWithEmail,
+    signInWithSocial,
     signOut,
   };
 }

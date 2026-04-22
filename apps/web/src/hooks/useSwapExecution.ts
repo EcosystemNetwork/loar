@@ -5,9 +5,9 @@
  * Falls back to Uniswap deep link when router is not available.
  */
 import { useState, useCallback } from 'react';
-import { useAccount, useChainId } from 'wagmi';
+import { useChainId } from 'wagmi';
 import { useWriteContract } from '@/hooks/useThirdwebWrite';
-import { useActiveAccount } from 'thirdweb/react';
+import { useWalletAccount } from '@/hooks/useWalletAccount';
 import { parseEther, encodeFunctionData, type Address } from 'viem';
 import { getSwapUrl } from '@/hooks/useTokenSwap';
 import { openExternal } from '@/utils/open-external';
@@ -64,9 +64,7 @@ export interface SwapConfig {
 
 export function useSwapExecution() {
   const chainId = useChainId();
-  const { address: wagmiAddress } = useAccount();
-  const thirdwebAccount = useActiveAccount();
-  const address = (wagmiAddress ?? thirdwebAccount?.address) as `0x${string}` | undefined;
+  const { address } = useWalletAccount();
   const [status, setStatus] = useState<'idle' | 'confirming' | 'pending' | 'success' | 'error'>(
     'idle'
   );

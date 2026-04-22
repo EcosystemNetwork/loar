@@ -9,6 +9,55 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
+import type {
+  VideoModel,
+  ImageSize,
+  AspectRatio,
+  ReferenceMode,
+  GenKind,
+  Generation,
+  SandboxMode,
+  StylePresetId,
+  EditOp,
+  RestyleModelId,
+  InterpolateMultiplier,
+  VideoResolution,
+  CameraIntensity,
+  OutpaintAspect,
+  DraftData,
+} from '@/types/sandbox.types';
+import {
+  STYLE_PRESETS,
+  RESTYLE_MODELS,
+  INTERPOLATE_MULTIPLIERS,
+  VIDEO_DURATIONS,
+  VIDEO_RESOLUTIONS,
+  CAMERA_PRESET_OPTIONS,
+  QUICK_RELIGHT_PRESETS,
+  OUTPAINT_ASPECTS,
+  VIDEO_MODELS,
+  VALID_VIDEO_MODELS,
+  SEEDANCE_MODELS,
+  IMAGE_SIZES,
+  MODEL_REGISTRY_MAP,
+  MAX_CONCURRENT_GENS,
+  QUEUE_MAX_PERSISTED,
+  QUEUE_STORAGE_KEY,
+  SANDBOX_TABS,
+  VARIATION_OPTIONS,
+  EDIT_OP_LABELS,
+  MAX_RETRIES_PER_GEN,
+} from '@/components/sandbox/constants';
+import {
+  applyStylePreset,
+  randomSeed,
+  isSubmitShortcut,
+  makeId,
+  aspectToImageSize,
+  aspectFromSize,
+} from '@/components/sandbox/utils';
+import { GenerationCard } from '@/components/sandbox/GenerationCard';
+import { DraftCard, inferDraftKind } from '@/components/sandbox/DraftCard';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { WalletConnectButton } from '@/components/wallet-connect-button';
 import { Button } from '@/components/ui/button';
@@ -59,293 +108,6 @@ import { resolveIpfsUrl } from '@/utils/ipfs-url';
 export const Route = createFileRoute('/sandbox')({
   component: SandboxPage,
 });
-
-type VideoModel = 'fal-kling' | 'fal-wan25' | 'fal-veo3' | 'seedance' | 'seedance-fast';
-type ImageSize = 'landscape_16_9' | 'portrait_16_9' | 'square_hd';
-type AspectRatio = '16:9' | '9:16' | '1:1';
-
-type ReferenceMode = 'animate' | 'style';
-
-type GenKind = 'image' | 'video' | 'audio' | '3d-model';
-
-type Generation = {
-  id: string;
-  kind: GenKind;
-  prompt: string;
-  status: 'generating' | 'done' | 'failed';
-  imageUrl?: string;
-  videoUrl?: string;
-  audioUrl?: string;
-  modelUrl?: string;
-  thumbnailUrl?: string;
-  sourceImageUrl?: string;
-  referenceMode?: ReferenceMode;
-  negativePrompt?: string;
-  seed?: number;
-  stylePresetId?: string;
-  imageModel?: string;
-  videoModel?: VideoModel;
-  imageSize: ImageSize;
-  aspectRatio: AspectRatio;
-  // Video-only settings preserved across retries
-  videoDurationSec?: number;
-  videoResolution?: VideoResolution;
-  cameraPreset?: string;
-  cameraIntensity?: CameraIntensity;
-  videoAudio?: boolean;
-  // For async ops (3D) — server-side generation ID we poll on
-  pollGenerationId?: string;
-  // Sub-flavor for audio cards (drives the badge)
-  audioFlavor?: 'tts' | 'sfx' | 'music';
-  error?: string;
-  draftId?: string;
-  draftSaveError?: string;
-  retryCount?: number;
-  createdAt: number;
-};
-
-type SandboxMode = 'image' | 'video' | 'voice' | 'audio' | '3d' | 'talking';
-
-const SANDBOX_TABS: { id: SandboxMode; label: string; hint: string }[] = [
-  { id: 'image', label: 'Image', hint: 'text→image, image→image, edits' },
-  { id: 'video', label: 'Video', hint: 'text→video, image→video, v2v, extend' },
-  { id: 'voice', label: 'Voice', hint: 'TTS + sound effects' },
-  { id: 'audio', label: 'Audio', hint: 'music + ambient (text→music)' },
-  { id: '3d', label: '3D', hint: 'text→3D and image→3D' },
-  { id: 'talking', label: 'Talking', hint: 'image + dialogue → lip-synced clip' },
-];
-
-const VARIATION_OPTIONS = [1, 2, 4, 10] as const;
-const MAX_CONCURRENT_GENS = 12;
-const MAX_RETRIES_PER_GEN = 2;
-const QUEUE_STORAGE_KEY = 'loar:sandbox:queue:v1';
-const QUEUE_MAX_PERSISTED = 50;
-
-// Style presets — clicking a chip appends its `suffix` into the prompt.
-// They're additive (not exclusive) so users can stack vibes if they want.
-const STYLE_PRESETS = [
-  {
-    id: 'cinematic',
-    label: 'Cinematic',
-    suffix: 'cinematic lighting, 35mm film, shallow depth of field, color graded',
-  },
-  {
-    id: 'photoreal',
-    label: 'Photoreal',
-    suffix: 'hyperrealistic, sharp focus, natural lighting, DSLR photo, 8k',
-  },
-  {
-    id: 'anime',
-    label: 'Anime',
-    suffix: 'anime style, vibrant colors, cel-shaded, expressive eyes, Studio Ghibli inspired',
-  },
-  {
-    id: 'manga',
-    label: 'Manga',
-    suffix: 'black and white manga panel, ink lines, screentone shading, dynamic composition',
-  },
-  {
-    id: 'comic',
-    label: 'Comic',
-    suffix: 'western comic book art, bold ink outlines, halftone dots, dramatic shading',
-  },
-  {
-    id: 'pixar',
-    label: '3D Render',
-    suffix:
-      'pixar-style 3D render, soft global illumination, subsurface scattering, expressive character',
-  },
-  {
-    id: 'watercolor',
-    label: 'Watercolor',
-    suffix: 'soft watercolor painting, paper texture, bleeding edges, pastel palette',
-  },
-  {
-    id: 'oil',
-    label: 'Oil Painting',
-    suffix: 'classical oil painting, visible brushstrokes, rich impasto, chiaroscuro lighting',
-  },
-  {
-    id: 'pixel',
-    label: 'Pixel Art',
-    suffix: '16-bit pixel art, limited palette, crisp pixels, retro game sprite',
-  },
-  {
-    id: 'cyberpunk',
-    label: 'Cyberpunk',
-    suffix: 'cyberpunk neon, rain-slick streets, holographic signs, cinematic rim lighting',
-  },
-  {
-    id: 'noir',
-    label: 'Film Noir',
-    suffix: 'black and white film noir, harsh shadows, venetian blind lighting, 1940s mood',
-  },
-  {
-    id: 'fantasy',
-    label: 'High Fantasy',
-    suffix: 'epic fantasy concept art, painterly style, golden hour, mythic scale',
-  },
-  {
-    id: 'studio',
-    label: 'Studio Portrait',
-    suffix: 'studio portrait photography, softbox lighting, plain backdrop, sharp eyes',
-  },
-  {
-    id: 'lowpoly',
-    label: 'Low Poly',
-    suffix: 'low poly 3D, flat shading, geometric facets, minimal palette',
-  },
-  {
-    id: 'isometric',
-    label: 'Isometric',
-    suffix: 'isometric illustration, clean vector shapes, soft shadows, game asset',
-  },
-  {
-    id: 'vaporwave',
-    label: 'Vaporwave',
-    suffix: 'vaporwave aesthetic, pastel pink and cyan, retro grid, 1990s VHS feel',
-  },
-] as const;
-type StylePresetId = (typeof STYLE_PRESETS)[number]['id'];
-
-function applyStylePreset(prompt: string, presetId: string | null): string {
-  if (!presetId) return prompt;
-  const preset = STYLE_PRESETS.find((p) => p.id === presetId);
-  if (!preset) return prompt;
-  // Don't double-apply if the user already pasted in the suffix.
-  if (prompt.toLowerCase().includes(preset.suffix.toLowerCase().slice(0, 20))) return prompt;
-  const trimmed = prompt.trim();
-  if (!trimmed) return preset.suffix;
-  const sep = /[.!?]$/.test(trimmed) ? ' ' : '. ';
-  return `${trimmed}${sep}${preset.suffix}`;
-}
-
-function randomSeed(): number {
-  return Math.floor(Math.random() * 2_147_483_647);
-}
-
-// ⌘/Ctrl+Enter inside a textarea triggers the primary action of the form.
-function isSubmitShortcut(e: React.KeyboardEvent): boolean {
-  return e.key === 'Enter' && (e.metaKey || e.ctrlKey);
-}
-
-// Phase 2 — quick edit operations exposed inline on done image cards.
-// Each runs against an existing image URL and returns a new image URL,
-// which we treat as a fresh Generation card for consistent UX.
-type EditOp =
-  | 'upscale'
-  | 'remove-bg'
-  | 'relight'
-  | 'outpaint'
-  | 'restyle'
-  | 'extend'
-  | 'interpolate';
-
-const EDIT_OP_LABELS: Record<EditOp, string> = {
-  upscale: '4× Upscale',
-  'remove-bg': 'Remove BG',
-  relight: 'Relight',
-  outpaint: 'Outpaint',
-  restyle: 'Restyle',
-  extend: 'Extend',
-  interpolate: 'Smooth Motion',
-};
-
-const RESTYLE_MODELS = [
-  { id: 'restyle-wan-v2v', label: 'WAN v2v' },
-  { id: 'restyle-kling-v2v', label: 'Kling v2v (premium)' },
-] as const;
-type RestyleModelId = (typeof RESTYLE_MODELS)[number]['id'];
-
-const INTERPOLATE_MULTIPLIERS = [2, 4, 8] as const;
-type InterpolateMultiplier = (typeof INTERPOLATE_MULTIPLIERS)[number];
-
-// Phase 4 — video generation controls. Mirrors generation.routes.ts
-// generateInputSchema + scene-controls/types.ts CAMERA_PRESETS.
-const VIDEO_DURATIONS = [3, 5, 8, 10] as const;
-const VIDEO_RESOLUTIONS = ['720p', '1080p'] as const;
-type VideoResolution = (typeof VIDEO_RESOLUTIONS)[number];
-
-const CAMERA_PRESET_OPTIONS = [
-  { id: '', label: 'No motion preset' },
-  { id: 'locked', label: 'Locked' },
-  { id: 'handheld_subtle', label: 'Handheld' },
-  { id: 'dolly_in_slow', label: 'Dolly In (slow)' },
-  { id: 'dolly_in_fast', label: 'Dolly In (fast)' },
-  { id: 'dolly_out_slow', label: 'Dolly Out (slow)' },
-  { id: 'dolly_out_fast', label: 'Dolly Out (fast)' },
-  { id: 'pan_left', label: 'Pan Left' },
-  { id: 'pan_right', label: 'Pan Right' },
-  { id: 'tilt_up', label: 'Tilt Up' },
-  { id: 'tilt_down', label: 'Tilt Down' },
-  { id: 'orbit_left_slow', label: 'Orbit Left' },
-  { id: 'orbit_right_slow', label: 'Orbit Right' },
-  { id: 'orbit_right_fast', label: 'Orbit Right (fast)' },
-  { id: 'crane_up', label: 'Crane Up' },
-  { id: 'crane_down', label: 'Crane Down' },
-  { id: 'whip_pan_right', label: 'Whip Pan' },
-  { id: 'crash_zoom', label: 'Crash Zoom' },
-  { id: 'walk_up', label: 'Walk Up (POV)' },
-] as const;
-
-type CameraIntensity = 'subtle' | 'standard' | 'pronounced';
-
-const QUICK_RELIGHT_PRESETS = [
-  { id: 'golden-hour', label: 'Golden Hour' },
-  { id: 'neon-night', label: 'Neon Night' },
-  { id: 'moonlit-alley', label: 'Moonlit Alley' },
-  { id: 'stage-interview', label: 'Studio' },
-  { id: 'warm-tavern', label: 'Warm Tavern' },
-  { id: 'cold-wasteland', label: 'Cold Wasteland' },
-  { id: 'cinematic-noir', label: 'Noir' },
-  { id: 'volumetric-cathedral', label: 'God Rays' },
-] as const;
-
-const OUTPAINT_ASPECTS = ['1:1', '4:5', '16:9', '9:16', '21:9'] as const;
-type OutpaintAspect = (typeof OUTPAINT_ASPECTS)[number];
-
-function aspectToImageSize(aspect: OutpaintAspect): ImageSize {
-  if (aspect === '9:16') return 'portrait_16_9';
-  if (aspect === '1:1') return 'square_hd';
-  return 'landscape_16_9';
-}
-
-const VIDEO_MODELS: { value: VideoModel; label: string; badge?: string }[] = [
-  { value: 'seedance', label: 'Seedance 2.0', badge: 'Free' },
-  { value: 'seedance-fast', label: 'Seedance 2.0 Fast', badge: 'Free' },
-  { value: 'fal-kling', label: 'Kling 2.5' },
-  { value: 'fal-wan25', label: 'Wan 2.5' },
-  { value: 'fal-veo3', label: 'Veo 3' },
-];
-const VALID_VIDEO_MODELS = new Set<VideoModel>(VIDEO_MODELS.map((m) => m.value));
-const SEEDANCE_MODELS = new Set<VideoModel>(['seedance', 'seedance-fast']);
-
-const IMAGE_SIZES = [
-  { value: 'landscape_16_9', label: '16:9 Landscape' },
-  { value: 'portrait_16_9', label: '9:16 Portrait' },
-  { value: 'square_hd', label: '1:1 Square' },
-] as const;
-
-const MODEL_REGISTRY_MAP: Record<VideoModel, { t2v: string; i2v: string }> = {
-  seedance: { t2v: 'seedance2-t2v', i2v: 'seedance2-i2v' },
-  'seedance-fast': { t2v: 'seedance2-fast-t2v', i2v: 'seedance2-fast-i2v' },
-  'fal-kling': { t2v: 'kling-t2v', i2v: 'kling-i2v' },
-  'fal-wan25': { t2v: 'wan25-t2v', i2v: 'wan25-i2v' },
-  'fal-veo3': { t2v: 'veo31-t2v', i2v: 'veo31-i2v' },
-};
-
-function aspectFromSize(size: ImageSize): AspectRatio {
-  if (size === 'portrait_16_9') return '9:16';
-  if (size === 'square_hd') return '1:1';
-  return '16:9';
-}
-
-function makeId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `gen-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
 
 function SandboxPage() {
   const { isAuthenticated, isAuthenticating } = useWalletAuth();
@@ -410,15 +172,22 @@ function SandboxPage() {
   }, [voicesList, voiceId]);
 
   // Parallel generation queue — finished entries persist via localStorage so
-  // a refresh doesn't lose what you generated. In-flight entries are dropped
-  // on reload (server still completes the job and saves the draft).
+  // a refresh doesn't lose what you generated. In-flight entries that are
+  // interrupted are mapped to 'failed' so users can press Retry without losing settings.
   const [generations, setGenerations] = useState<Generation[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
       const raw = window.localStorage.getItem(QUEUE_STORAGE_KEY);
       if (!raw) return [];
       const parsed: Generation[] = JSON.parse(raw);
-      return parsed.filter((g) => g && g.status !== 'generating').slice(0, QUEUE_MAX_PERSISTED);
+      return parsed
+        .filter(Boolean)
+        .map((g) =>
+          g.status === 'generating'
+            ? { ...g, status: 'failed' as const, error: 'Interrupted by navigation' }
+            : g
+        )
+        .slice(0, QUEUE_MAX_PERSISTED);
     } catch {
       return [];
     }
@@ -428,11 +197,17 @@ function SandboxPage() {
     if (typeof window === 'undefined') return;
     try {
       const persistable = generations
-        .filter((g) => g.status !== 'generating')
+        .map((g) => {
+          // Fix F: Omit massive data URLs to prevent QuotaExceededError
+          if (g.sourceImageUrl?.startsWith('data:')) {
+            return { ...g, sourceImageUrl: undefined };
+          }
+          return g;
+        })
         .slice(0, QUEUE_MAX_PERSISTED);
       window.localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(persistable));
-    } catch {
-      // localStorage may be full or disabled — non-fatal
+    } catch (e) {
+      console.warn('[sandbox] localStorage save failed', e);
     }
   }, [generations]);
 
@@ -456,6 +231,13 @@ function SandboxPage() {
   }, []);
 
   const inFlightCountRef = React.useRef(0);
+  const isMounted = React.useRef(true);
+  React.useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
   const checkConcurrency = useCallback((requested: number): number => {
     const slack = MAX_CONCURRENT_GENS - inFlightCountRef.current;
     if (slack <= 0) {
@@ -787,7 +569,9 @@ function SandboxPage() {
         const pollIntervalMs = 5_000;
         // eslint-disable-next-line no-constant-condition
         while (true) {
+          if (!isMounted.current) return;
           await new Promise((r) => setTimeout(r, pollIntervalMs));
+          if (!isMounted.current) return;
           const t: any = await trpcClient.threed.getTask.query({ generationId: pollId });
           if (!t) throw new Error('3D task disappeared');
           const status = t.status as string | undefined;
@@ -2387,917 +2171,5 @@ function SandboxPage() {
         )}
       </div>
     </div>
-  );
-}
-
-// ── Generation Card ─────────────────────────────────────────────────
-
-interface GenerationCardProps {
-  gen: Generation;
-  onDismiss: () => void;
-  onRetry: () => void;
-  onAnimate: () => void;
-  onUseAsStyleRef: () => void;
-  onEditOp: (
-    op: EditOp,
-    opts?: {
-      relightPresetIds?: string[];
-      relightFreeText?: string;
-      outpaintAspect?: OutpaintAspect;
-      outpaintPrompt?: string;
-      restylePrompt?: string;
-      restyleStrength?: number;
-      restyleModelId?: RestyleModelId;
-      extendPrompt?: string;
-      extendDurationSec?: number;
-      interpolateMultiplier?: InterpolateMultiplier;
-    }
-  ) => void;
-  onRetryDraftSave: () => void;
-  onVoiceModified: (newAudioUrl: string, newGenerationId: string, presetLabel: string) => void;
-}
-
-type EditPanel = null | 'menu' | 'relight' | 'outpaint' | 'restyle' | 'extend';
-
-function GenerationCard({
-  gen,
-  onDismiss,
-  onRetry,
-  onAnimate,
-  onUseAsStyleRef,
-  onEditOp,
-  onRetryDraftSave,
-  onVoiceModified,
-}: GenerationCardProps) {
-  const retriesLeft = MAX_RETRIES_PER_GEN - (gen.retryCount ?? 0);
-  const [editPanel, setEditPanel] = useState<EditPanel>(null);
-  const [voiceModifyOpen, setVoiceModifyOpen] = useState(false);
-  const [relightPresets, setRelightPresets] = useState<string[]>([]);
-  const [relightFree, setRelightFree] = useState('');
-  const [outpaintAspect, setOutpaintAspect] = useState<OutpaintAspect>('16:9');
-  const [outpaintPrompt, setOutpaintPrompt] = useState('');
-  const [restylePrompt, setRestylePrompt] = useState('');
-  const [restyleStrength, setRestyleStrength] = useState(0.65);
-  const [restyleModelId, setRestyleModelId] = useState<RestyleModelId>('restyle-wan-v2v');
-  const [extendPrompt, setExtendPrompt] = useState('');
-  const [extendDuration, setExtendDuration] = useState(5);
-
-  const toggleRelightPreset = (id: string) => {
-    setRelightPresets((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  };
-  return (
-    <Card className="overflow-hidden">
-      <div className="aspect-video bg-muted relative">
-        {gen.status === 'generating' && (
-          <>
-            {gen.sourceImageUrl && (
-              <img
-                src={gen.sourceImageUrl}
-                alt=""
-                className="w-full h-full object-cover opacity-30"
-              />
-            )}
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <span className="text-xs text-muted-foreground">Generating {gen.kind}…</span>
-            </div>
-          </>
-        )}
-        {gen.status === 'failed' && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-3 text-center">
-            <AlertCircle className="h-6 w-6 text-destructive" />
-            <span className="text-xs text-destructive">Failed</span>
-            {gen.error && (
-              <span className="text-[10px] text-muted-foreground line-clamp-2">{gen.error}</span>
-            )}
-          </div>
-        )}
-        {gen.status === 'done' && gen.kind === 'audio' && gen.audioUrl && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary/20 to-primary/5 px-3">
-            <Sparkles className="h-6 w-6 text-primary" />
-            <audio src={gen.audioUrl} controls className="w-full" />
-          </div>
-        )}
-        {gen.status === 'done' && gen.kind === '3d-model' && (
-          <>
-            {gen.videoUrl ? (
-              // Turntable preview if Meshy returned one
-              <video
-                src={resolveIpfsUrl(gen.videoUrl)}
-                className="w-full h-full object-cover"
-                autoPlay
-                muted
-                loop
-                playsInline
-              />
-            ) : gen.thumbnailUrl ? (
-              <img
-                src={resolveIpfsUrl(gen.thumbnailUrl)}
-                alt=""
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-                <Frame className="h-8 w-8 text-muted-foreground" />
-                <span className="text-[10px] text-muted-foreground">3D model ready</span>
-              </div>
-            )}
-          </>
-        )}
-        {gen.status === 'done' &&
-          gen.kind !== 'audio' &&
-          gen.kind !== '3d-model' &&
-          gen.videoUrl && (
-            <video
-              src={resolveIpfsUrl(gen.videoUrl)}
-              className="w-full h-full object-cover"
-              controls
-              muted
-              loop
-              playsInline
-            />
-          )}
-        {gen.status === 'done' &&
-          gen.kind !== 'audio' &&
-          gen.kind !== '3d-model' &&
-          !gen.videoUrl &&
-          gen.imageUrl && (
-            <img src={resolveIpfsUrl(gen.imageUrl)} alt="" className="w-full h-full object-cover" />
-          )}
-
-        <Button
-          size="icon"
-          variant="secondary"
-          className="absolute top-1.5 right-1.5 h-6 w-6 opacity-80 hover:opacity-100"
-          onClick={onDismiss}
-          title="Dismiss from queue"
-        >
-          <X className="h-3 w-3" />
-        </Button>
-
-        <Badge variant="secondary" className="absolute top-1.5 left-1.5 text-[10px]">
-          {gen.kind === 'video' ? (
-            <Video className="h-2.5 w-2.5 mr-1" />
-          ) : gen.kind === 'audio' ? (
-            <Sparkles className="h-2.5 w-2.5 mr-1" />
-          ) : gen.kind === '3d-model' ? (
-            <Frame className="h-2.5 w-2.5 mr-1" />
-          ) : (
-            <ImageIcon className="h-2.5 w-2.5 mr-1" />
-          )}
-          {gen.kind === '3d-model' ? '3D' : gen.audioFlavor || gen.kind}
-        </Badge>
-      </div>
-
-      <CardContent className="p-2 space-y-1.5">
-        <p className="text-xs text-muted-foreground line-clamp-2">{gen.prompt}</p>
-        <div className="flex items-center gap-1 flex-wrap">
-          {gen.status === 'done' && gen.draftId && (
-            <Badge variant="outline" className="text-[10px]">
-              Saved
-            </Badge>
-          )}
-          {gen.status === 'done' && !gen.draftId && gen.draftSaveError && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 px-2 text-[10px] text-destructive"
-              onClick={onRetryDraftSave}
-              title={gen.draftSaveError}
-            >
-              <RefreshCw className="h-3 w-3 mr-1" />
-              Save draft
-            </Button>
-          )}
-          {gen.status === 'done' && gen.kind === 'image' && (
-            <>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 px-2 text-[10px]"
-                onClick={onAnimate}
-              >
-                <Video className="h-3 w-3 mr-1" />
-                Animate
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 px-2 text-[10px]"
-                onClick={onUseAsStyleRef}
-                title="Use as style + composition reference for new images"
-              >
-                <ImageIcon className="h-3 w-3 mr-1" />
-                Style ref
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 px-2 text-[10px]"
-                onClick={() => setEditPanel((p) => (p === 'menu' ? null : 'menu'))}
-                title="Image edit operations"
-              >
-                <Wand2 className="h-3 w-3 mr-1" />
-                Edit
-              </Button>
-            </>
-          )}
-          {gen.status === 'done' && gen.kind === 'video' && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 px-2 text-[10px]"
-              onClick={() => setEditPanel((p) => (p === 'menu' ? null : 'menu'))}
-              title="Video edit operations: restyle, extend, interpolate"
-            >
-              <Wand2 className="h-3 w-3 mr-1" />
-              Edit
-            </Button>
-          )}
-          {gen.status === 'done' && gen.kind === 'audio' && gen.audioUrl && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 px-2 text-[10px]"
-              onClick={() => setVoiceModifyOpen(true)}
-              title="Swap voice or apply an effect preset"
-            >
-              <Mic className="h-3 w-3 mr-1" />
-              Modify voice
-            </Button>
-          )}
-          {gen.status === 'failed' && retriesLeft > 0 && (
-            <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={onRetry}>
-              <RefreshCw className="h-3 w-3 mr-1" />
-              Retry ({retriesLeft} left)
-            </Button>
-          )}
-          {gen.status === 'failed' && retriesLeft <= 0 && (
-            <span className="text-[10px] text-muted-foreground">Retry limit reached</span>
-          )}
-        </div>
-
-        {/* Edit menu — one-click ops + expandable panels */}
-        {gen.status === 'done' && gen.kind === 'image' && editPanel === 'menu' && (
-          <div className="mt-1.5 pt-1.5 border-t flex flex-wrap gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 px-2 text-[10px]"
-              onClick={() => {
-                setEditPanel(null);
-                onEditOp('upscale');
-              }}
-              title="4× super-resolution upscale"
-            >
-              <Maximize2 className="h-3 w-3 mr-1" />
-              4× Upscale
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 px-2 text-[10px]"
-              onClick={() => {
-                setEditPanel(null);
-                onEditOp('remove-bg');
-              }}
-              title="Remove background — outputs transparent PNG"
-            >
-              <Eraser className="h-3 w-3 mr-1" />
-              Remove BG
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 px-2 text-[10px]"
-              onClick={() => setEditPanel('relight')}
-            >
-              <Sun className="h-3 w-3 mr-1" />
-              Relight…
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 px-2 text-[10px]"
-              onClick={() => setEditPanel('outpaint')}
-              title="Extend the canvas to a new aspect ratio"
-            >
-              <Frame className="h-3 w-3 mr-1" />
-              Outpaint…
-            </Button>
-          </div>
-        )}
-
-        {gen.status === 'done' && editPanel === 'relight' && (
-          <div className="mt-1.5 pt-1.5 border-t space-y-1.5">
-            <p className="text-[10px] font-semibold text-muted-foreground">
-              Pick lighting (multi-select OK)
-            </p>
-            <div className="flex flex-wrap gap-1">
-              {QUICK_RELIGHT_PRESETS.map((p) => {
-                const active = relightPresets.includes(p.id);
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => toggleRelightPreset(p.id)}
-                    className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
-                      active
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                );
-              })}
-            </div>
-            <Input
-              value={relightFree}
-              onChange={(e) => setRelightFree(e.target.value)}
-              placeholder="Or describe the look in your own words"
-              className="h-7 text-[11px]"
-            />
-            <div className="flex gap-1">
-              <Button
-                size="sm"
-                className="h-6 px-2 text-[10px] flex-1"
-                disabled={relightPresets.length === 0 && !relightFree.trim()}
-                onClick={() => {
-                  onEditOp('relight', {
-                    relightPresetIds: relightPresets,
-                    relightFreeText: relightFree.trim() || undefined,
-                  });
-                  setEditPanel(null);
-                  setRelightPresets([]);
-                  setRelightFree('');
-                }}
-              >
-                Relight
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 px-2 text-[10px]"
-                onClick={() => setEditPanel(null)}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {gen.status === 'done' && editPanel === 'outpaint' && (
-          <div className="mt-1.5 pt-1.5 border-t space-y-1.5">
-            <p className="text-[10px] font-semibold text-muted-foreground">Target aspect</p>
-            <div className="flex flex-wrap gap-1">
-              {OUTPAINT_ASPECTS.map((a) => (
-                <button
-                  key={a}
-                  type="button"
-                  onClick={() => setOutpaintAspect(a)}
-                  className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
-                    outpaintAspect === a
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
-                  }`}
-                >
-                  {a}
-                </button>
-              ))}
-            </div>
-            <Input
-              value={outpaintPrompt}
-              onChange={(e) => setOutpaintPrompt(e.target.value)}
-              placeholder="Optional: hint at what to add in the new canvas"
-              className="h-7 text-[11px]"
-            />
-            <div className="flex gap-1">
-              <Button
-                size="sm"
-                className="h-6 px-2 text-[10px] flex-1"
-                onClick={() => {
-                  onEditOp('outpaint', {
-                    outpaintAspect,
-                    outpaintPrompt: outpaintPrompt.trim() || undefined,
-                  });
-                  setEditPanel(null);
-                  setOutpaintPrompt('');
-                }}
-              >
-                Outpaint
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 px-2 text-[10px]"
-                onClick={() => setEditPanel(null)}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Video edit menu */}
-        {gen.status === 'done' && gen.kind === 'video' && editPanel === 'menu' && (
-          <div className="mt-1.5 pt-1.5 border-t flex flex-wrap gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 px-2 text-[10px]"
-              onClick={() => setEditPanel('restyle')}
-              title="Video-to-video restyle: keep motion, swap look"
-            >
-              <Wand2 className="h-3 w-3 mr-1" />
-              Restyle…
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 px-2 text-[10px]"
-              onClick={() => setEditPanel('extend')}
-              title="Continue the clip from its last frame"
-            >
-              <ArrowRight className="h-3 w-3 mr-1" />
-              Extend…
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 px-2 text-[10px]"
-              onClick={() => {
-                setEditPanel(null);
-                onEditOp('interpolate', { interpolateMultiplier: 2 });
-              }}
-              title="Frame interpolation — smoother motion (2× by default)"
-            >
-              <Sparkles className="h-3 w-3 mr-1" />
-              Smooth
-            </Button>
-          </div>
-        )}
-
-        {gen.status === 'done' && gen.kind === 'video' && editPanel === 'restyle' && (
-          <div className="mt-1.5 pt-1.5 border-t space-y-1.5">
-            <p className="text-[10px] font-semibold text-muted-foreground">Restyle (v2v)</p>
-            <Textarea
-              value={restylePrompt}
-              onChange={(e) => setRestylePrompt(e.target.value)}
-              placeholder="Describe the new look — e.g. 'cyberpunk neon, rain-slick streets'"
-              rows={2}
-              className="resize-none text-[11px]"
-            />
-            <div className="flex items-center gap-2">
-              <label className="text-[10px] text-muted-foreground whitespace-nowrap">
-                Strength {restyleStrength.toFixed(2)}
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={restyleStrength}
-                onChange={(e) => setRestyleStrength(Number(e.target.value))}
-                className="flex-1 accent-primary"
-                title="Higher = more aggressive style swap"
-              />
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {RESTYLE_MODELS.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => setRestyleModelId(m.id)}
-                  className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
-                    restyleModelId === m.id
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-1">
-              <Button
-                size="sm"
-                className="h-6 px-2 text-[10px] flex-1"
-                disabled={!restylePrompt.trim()}
-                onClick={() => {
-                  onEditOp('restyle', {
-                    restylePrompt: restylePrompt.trim(),
-                    restyleStrength,
-                    restyleModelId,
-                  });
-                  setEditPanel(null);
-                  setRestylePrompt('');
-                }}
-              >
-                Restyle
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 px-2 text-[10px]"
-                onClick={() => setEditPanel(null)}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {gen.status === 'done' && gen.kind === 'video' && editPanel === 'extend' && (
-          <div className="mt-1.5 pt-1.5 border-t space-y-1.5">
-            <p className="text-[10px] font-semibold text-muted-foreground">
-              Extend clip — describe what happens next
-            </p>
-            <Textarea
-              value={extendPrompt}
-              onChange={(e) => setExtendPrompt(e.target.value)}
-              placeholder="What follows the current shot — e.g. 'camera dollies forward, character draws sword'"
-              rows={2}
-              className="resize-none text-[11px]"
-            />
-            <div className="flex items-center gap-2">
-              <label className="text-[10px] text-muted-foreground whitespace-nowrap">
-                Duration {extendDuration}s
-              </label>
-              <input
-                type="range"
-                min="2"
-                max="10"
-                step="1"
-                value={extendDuration}
-                onChange={(e) => setExtendDuration(Number(e.target.value))}
-                className="flex-1 accent-primary"
-              />
-            </div>
-            <div className="flex gap-1">
-              <Button
-                size="sm"
-                className="h-6 px-2 text-[10px] flex-1"
-                disabled={!extendPrompt.trim()}
-                onClick={() => {
-                  onEditOp('extend', {
-                    extendPrompt: extendPrompt.trim(),
-                    extendDurationSec: extendDuration,
-                  });
-                  setEditPanel(null);
-                  setExtendPrompt('');
-                }}
-              >
-                Extend
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 px-2 text-[10px]"
-                onClick={() => setEditPanel(null)}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        )}
-      </CardContent>
-
-      <Dialog open={voiceModifyOpen} onOpenChange={setVoiceModifyOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Modify voice</DialogTitle>
-          </DialogHeader>
-          <VoiceModifyPanel
-            audioUrl={gen.audioUrl ?? null}
-            parentGenerationId={gen.id}
-            onComplete={(newUrl, newId, label) => {
-              onVoiceModified(newUrl, newId, label);
-              setVoiceModifyOpen(false);
-            }}
-          />
-        </DialogContent>
-      </Dialog>
-    </Card>
-  );
-}
-
-// ── Draft Card ─────────────────────────────────────────────────
-
-interface DraftData {
-  id: string;
-  title: string;
-  prompt: string;
-  imageUrl: string | null;
-  videoUrl: string | null;
-  audioUrl?: string | null;
-  modelUrl?: string | null;
-  thumbnailUrl?: string | null;
-  kind?: string | null;
-  model: string | null;
-  tags: string[];
-  status: string;
-  createdAt: string | null;
-}
-
-interface DraftCardProps {
-  draft: DraftData;
-  onDelete: () => void;
-  onReuse: () => void;
-}
-
-function inferDraftKind(draft: DraftData): GenKind {
-  if (draft.kind === '3d' || draft.kind === '3d-model' || draft.modelUrl) return '3d-model';
-  if (draft.kind === 'audio' || draft.audioUrl) return 'audio';
-  if (draft.kind === 'video' || draft.videoUrl) return 'video';
-  return 'image';
-}
-
-function DraftCard({ draft, onDelete, onReuse }: DraftCardProps) {
-  const queryClient = useQueryClient();
-  const draftKind = inferDraftKind(draft);
-  const isPromoted = draft.status === 'promoted';
-
-  const [editing, setEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState(draft.title);
-
-  const [showPromote, setShowPromote] = useState(false);
-  const [selectedTarget, setSelectedTarget] = useState('__gallery__');
-  // Defaults match the safer auto-publish defaults the server uses (fan +
-  // unlisted) so users explicitly opt into a rights claim before promoting.
-  const [classification, setClassification] = useState<'fan' | 'original' | 'licensed'>('fan');
-  const [visibility, setVisibility] = useState<'public' | 'private' | 'unlisted'>('public');
-
-  const { data: universesResult } = useQuery({
-    queryKey: ['all-universes'],
-    queryFn: () => trpcClient.universes.getAll.query(),
-    enabled: showPromote,
-  });
-  const universes = (universesResult as any)?.data ?? universesResult ?? [];
-
-  const updateMutation = useMutation({
-    mutationFn: (input: { id: string; title?: string; tags?: string[] }) =>
-      trpcClient.sandbox.updateDraft.mutate(input),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] });
-      setEditing(false);
-      toast.success('Draft updated');
-    },
-    onError: (err: any) => toast.error(err.message || 'Failed to update'),
-  });
-
-  const promoteMutation = useMutation({
-    mutationFn: () =>
-      trpcClient.sandbox.promoteToUniverse.mutate({
-        draftId: draft.id,
-        ...(selectedTarget !== '__gallery__' ? { universeId: selectedTarget } : {}),
-        classification,
-        visibility,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] });
-      setShowPromote(false);
-      toast.success(
-        selectedTarget === '__gallery__' ? 'Published to your gallery!' : 'Promoted to universe!'
-      );
-    },
-    onError: (err: any) => toast.error(err.message || 'Failed to promote'),
-  });
-
-  return (
-    <Card className="overflow-hidden group relative">
-      {/* Thumbnail */}
-      <div className="aspect-video bg-muted relative">
-        {draftKind === 'audio' ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary/20 to-primary/5 px-3">
-            <Sparkles className="h-6 w-6 text-primary" />
-            {draft.audioUrl ? (
-              <audio src={draft.audioUrl} controls className="w-full" />
-            ) : (
-              <span className="text-[10px] text-muted-foreground">Audio draft</span>
-            )}
-          </div>
-        ) : draftKind === '3d-model' ? (
-          draft.thumbnailUrl || draft.imageUrl ? (
-            <img
-              src={resolveIpfsUrl((draft.thumbnailUrl || draft.imageUrl)!)}
-              alt={draft.title}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-              <Frame className="h-6 w-6 text-muted-foreground/40" />
-              <span className="text-[10px] text-muted-foreground">3D model</span>
-            </div>
-          )
-        ) : draft.videoUrl ? (
-          <video
-            src={resolveIpfsUrl(draft.videoUrl)}
-            className="w-full h-full object-cover"
-            muted
-            playsInline
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLVideoElement).play().catch(() => {});
-            }}
-            onMouseLeave={(e) => {
-              const v = e.currentTarget as HTMLVideoElement;
-              v.pause();
-              v.currentTime = 0;
-            }}
-          />
-        ) : draft.imageUrl ? (
-          <img
-            src={resolveIpfsUrl(draft.imageUrl)}
-            alt={draft.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Wand2 className="h-6 w-6 text-muted-foreground/30" />
-          </div>
-        )}
-
-        <div className="absolute top-2 left-2 flex gap-1">
-          {isPromoted && (
-            <Badge className="bg-green-500/90 text-white border-0 text-[10px]">Promoted</Badge>
-          )}
-          <Badge variant="secondary" className="text-[9px] capitalize">
-            {draftKind === '3d-model' ? '3D' : draftKind}
-          </Badge>
-        </div>
-
-        {!showPromote && (
-          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-            {!isPromoted && (
-              <Button size="sm" variant="default" onClick={() => setShowPromote(true)}>
-                <Rocket className="h-3.5 w-3.5 mr-1" />
-                Promote
-              </Button>
-            )}
-            <Button size="sm" variant="secondary" onClick={onReuse}>
-              Reuse
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        )}
-      </div>
-
-      <CardContent className="p-3">
-        {editing ? (
-          <div className="flex items-center gap-1">
-            <Input
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              className="h-7 text-sm px-2"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  updateMutation.mutate({ id: draft.id, title: editTitle });
-                }
-                if (e.key === 'Escape') {
-                  setEditing(false);
-                  setEditTitle(draft.title);
-                }
-              }}
-            />
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              onClick={() => updateMutation.mutate({ id: draft.id, title: editTitle })}
-              disabled={updateMutation.isPending}
-            >
-              {updateMutation.isPending ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <Check className="h-3 w-3" />
-              )}
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              onClick={() => {
-                setEditing(false);
-                setEditTitle(draft.title);
-              }}
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-        ) : (
-          <p className="text-sm font-medium truncate">{draft.title}</p>
-        )}
-        <p className="text-xs text-muted-foreground truncate mt-0.5">{draft.prompt}</p>
-        <div className="flex items-center gap-1.5 mt-1.5">
-          {draft.videoUrl && (
-            <Badge variant="secondary" className="text-xs">
-              <Video className="h-2.5 w-2.5 mr-1" />
-              Video
-            </Badge>
-          )}
-          {draft.model && (
-            <Badge variant="outline" className="text-[10px]">
-              {draft.model.replace('fal-', '')}
-            </Badge>
-          )}
-        </div>
-
-        {showPromote && !isPromoted && (
-          <div className="mt-3 pt-3 border-t space-y-2">
-            <p className="text-xs font-semibold flex items-center gap-1.5">
-              <Globe className="h-3 w-3" />
-              Promote to Universe
-            </p>
-
-            <Select value={selectedTarget} onValueChange={setSelectedTarget}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="Select destination" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__gallery__" className="text-xs font-medium">
-                  My Gallery (no universe)
-                </SelectItem>
-                {Array.isArray(universes) &&
-                  universes.map((u: any) => (
-                    <SelectItem key={u.id} value={u.id} className="text-xs">
-                      {u.name || u.id.slice(0, 12)}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-
-            <div className="flex gap-1">
-              {(['original', 'fan', 'licensed'] as const).map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setClassification(c)}
-                  className={`flex-1 text-[10px] py-1 rounded-md border transition-colors ${
-                    classification === c
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
-                  }`}
-                >
-                  {c.charAt(0).toUpperCase() + c.slice(1)}
-                </button>
-              ))}
-            </div>
-
-            <Select value={visibility} onValueChange={(v) => setVisibility(v as typeof visibility)}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="public" className="text-xs">
-                  Public
-                </SelectItem>
-                <SelectItem value="unlisted" className="text-xs">
-                  Unlisted
-                </SelectItem>
-                <SelectItem value="private" className="text-xs">
-                  Private
-                </SelectItem>
-              </SelectContent>
-            </Select>
-
-            <div className="flex gap-1.5">
-              <Button
-                size="sm"
-                className="flex-1 h-8 text-xs"
-                disabled={promoteMutation.isPending}
-                onClick={() => promoteMutation.mutate()}
-              >
-                {promoteMutation.isPending ? (
-                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                ) : (
-                  <Rocket className="h-3 w-3 mr-1" />
-                )}
-                {selectedTarget === '__gallery__' ? 'Publish' : 'Promote'}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 text-xs"
-                onClick={() => setShowPromote(false)}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
   );
 }

@@ -1,5 +1,5 @@
-import { useReadContract, useChainId, useAccount } from 'wagmi';
-import { useActiveAccount } from 'thirdweb/react';
+import { useReadContract, useChainId } from 'wagmi';
+import { useWalletAccount } from '@/hooks/useWalletAccount';
 import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { universeManagerAbi } from '@loar/abis/generated';
 import { UniverseManager, LoarHookStaticFee, LoarLpLockerMultiple } from '@loar/abis/addresses';
@@ -24,9 +24,7 @@ const WETH: Partial<Record<number, `0x${string}`>> = {
  */
 export function useUniverseManager() {
   const chainId = useChainId();
-  const { isConnected: wagmiConnected } = useAccount();
-  const thirdwebAccount = useActiveAccount();
-  const isConnected = wagmiConnected || !!thirdwebAccount;
+  const { isConnected } = useWalletAccount();
   const { writeContractAsync, data: hash, isPending, error } = useWriteContract();
 
   const contractAddress = UniverseManager[String(chainId) as keyof typeof UniverseManager];

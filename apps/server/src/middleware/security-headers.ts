@@ -50,10 +50,10 @@ export async function securityHeaders(c: Context, next: Next) {
     [
       "default-src 'self'",
       `script-src 'self' 'nonce-${nonce}'`,
-      "style-src 'self' 'nonce-" + nonce + "'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       `connect-src ${TRUSTED_CONNECT}`,
       `img-src ${TRUSTED_IMG}`,
-      "font-src 'self'",
+      "font-src 'self' https://fonts.gstatic.com",
       "media-src 'self' blob: https://*.pinata.cloud https://gateway.pinata.cloud https://*.mypinata.cloud https://*.lighthouse.storage https://*.volces.com https://*.fal.ai https://*.fal.media",
       "object-src 'none'",
       "base-uri 'self'",

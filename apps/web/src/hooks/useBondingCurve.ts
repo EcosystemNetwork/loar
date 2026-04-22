@@ -8,7 +8,7 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { useReadContract, useChainId, usePublicClient } from 'wagmi';
 import { useWriteContract } from '@/hooks/useThirdwebWrite';
-import { useActiveAccount } from 'thirdweb/react';
+import { useWalletAccount } from '@/hooks/useWalletAccount';
 import { parseEther, formatEther, type Address } from 'viem';
 import { useVisibilityAwareInterval, POLL_INTERVALS } from './useSmartPolling';
 
@@ -223,7 +223,7 @@ type BuyOpts = { slippageBps?: number; minTokensOut?: bigint };
 type SellOpts = { slippageBps?: number; minEthOut?: bigint };
 
 export function useBondingCurveActions(bondingCurveAddress: Address | undefined) {
-  const thirdwebAccount = useActiveAccount();
+  const { isConnected } = useWalletAccount();
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
   const [status, setStatus] = useState<'idle' | 'confirming' | 'pending' | 'success' | 'error'>(
@@ -265,7 +265,7 @@ export function useBondingCurveActions(bondingCurveAddress: Address | undefined)
 
   const buy = useCallback(
     async (ethAmount: string, opts: BuyOpts | number = {}) => {
-      if (!bondingCurveAddress || !thirdwebAccount) {
+      if (!bondingCurveAddress || !isConnected) {
         setError('Wallet not connected');
         setStatus('error');
         return;
@@ -338,12 +338,12 @@ export function useBondingCurveActions(bondingCurveAddress: Address | undefined)
         setStatus('error');
       }
     },
-    [bondingCurveAddress, thirdwebAccount, writeContractAsync, publicClient, awaitReceipt]
+    [bondingCurveAddress, isConnected, writeContractAsync, publicClient, awaitReceipt]
   );
 
   const sell = useCallback(
     async (tokenAmount: bigint, opts: SellOpts | bigint = {}) => {
-      if (!bondingCurveAddress || !thirdwebAccount) {
+      if (!bondingCurveAddress || !isConnected) {
         setError('Wallet not connected');
         setStatus('error');
         return;
@@ -411,7 +411,7 @@ export function useBondingCurveActions(bondingCurveAddress: Address | undefined)
         setStatus('error');
       }
     },
-    [bondingCurveAddress, thirdwebAccount, writeContractAsync, publicClient, awaitReceipt]
+    [bondingCurveAddress, isConnected, writeContractAsync, publicClient, awaitReceipt]
   );
 
   const reset = useCallback(() => {

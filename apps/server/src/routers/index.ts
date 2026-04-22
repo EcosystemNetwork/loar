@@ -43,7 +43,6 @@ import { subscriptionsRouter } from './subscriptions/subscriptions.routes';
 import { analyticsRouter } from './analytics/analytics.routes';
 import { adsRouter } from './ads/ads.routes';
 import { adSeedsRouter } from './ads/adSeeds.routes';
-import { licensingRouter } from './licensing/licensing.routes';
 import { storageRouter } from './storage/storage.routes';
 import { firebaseStorageRouter } from './storage/firebase.routes';
 import { synapseRouter } from './storage/synapse.routes';
@@ -53,7 +52,6 @@ import { offChainNodesRouter } from './offChainNodes/offChainNodes.routes';
 import { nodeMediaRouter } from './nodeMedia/nodeMedia.routes';
 import { questsRouter } from './quests/quests.routes';
 import { sandboxRouter } from './sandbox/sandbox.routes';
-import { collabsRouter } from './collabs/collabs.routes';
 import { universeTeamRouter } from './universeTeam/universeTeam.routes';
 import { universeTreasuryRouter } from './universeTreasury/universeTreasury.routes';
 import { adminRouter } from './admin/admin.routes';
@@ -81,7 +79,6 @@ import { aiAgentsRouter } from './aiAgents/aiAgents.routes';
 import { aiPipelinesRouter } from './aiPipelines/aiPipelines.routes';
 import { apiKeysRouter } from './apiKeys/apiKeys.routes';
 import { bountiesRouter } from './bounties/bounties.routes';
-import { stakingRouter } from './staking/staking.routes';
 import { splitsRouter } from './splits/splits.routes';
 import { universeGenConfigRouter } from './universeGenConfig/universeGenConfig.routes';
 import { contentLicensingRouter } from './contentLicensing/contentLicensing.routes';
@@ -105,7 +102,6 @@ import { revenueDashboardRouter } from './revenueDashboard/revenueDashboard.rout
 import { episodesRouter } from './episodes/episodes.routes';
 import { shotTemplatesRouter } from './shotTemplates/shotTemplates.routes';
 import { lineageRouter } from './lineage/lineage.routes';
-import { workflowsRouter } from './workflows/workflows.index';
 import { mcpRouter } from './mcp/mcp.routes';
 import { jobsRouter } from './jobs/jobs.routes';
 import { vlmRouter } from './vlm/vlm.index';
@@ -178,7 +174,6 @@ export const appRouter = router({
 
   // ── Universes domain ────────────────────────────────────────────────
   universes: universesRouter,
-  collabs: collabsRouter,
   universeTeam: universeTeamRouter,
   universeTreasury: universeTreasuryRouter,
 
@@ -221,7 +216,6 @@ export const appRouter = router({
   subscriptions: subscriptionsRouter,
   ads: adsRouter,
   adSeeds: adSeedsRouter,
-  licensing: licensingRouter,
 
   // ── Analytics ───────────────────────────────────────────────────────
   analytics: analyticsRouter,
@@ -265,16 +259,12 @@ export const appRouter = router({
 
   // ── $LOAR Token Economy ─────────────────────────────────────────────
   bounties: bountiesRouter,
-  staking: stakingRouter,
 
   // ── Agent Systems ──────────────────────────────────────────────────
   talentAgents: talentAgentsRouter,
   aiAgents: aiAgentsRouter,
   aiPipelines: aiPipelinesRouter,
   apiKeys: apiKeysRouter,
-
-  // ── Node Workflow Builder (PRD 9: visual DAG editor for generation pipelines) ─
-  workflows: workflowsRouter,
 
   // ── Pricing ────────────────────────────────────────────────────────
   pricing: pricingRouter,

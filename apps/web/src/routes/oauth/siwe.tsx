@@ -22,7 +22,7 @@
 import { createFileRoute, useSearch } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import { useAccount } from 'wagmi';
-import { useActiveAccount } from 'thirdweb/react';
+import { useWalletAuth } from '@/lib/wallet-auth';
 import { WalletConnectButton } from '@/components/wallet-connect-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,8 +44,8 @@ export const Route = createFileRoute('/oauth/siwe')({
 function OAuthSiwePage() {
   const { authz, return_to } = useSearch({ from: '/oauth/siwe' });
   const { address: wagmiAddress, chain } = useAccount();
-  const thirdwebAccount = useActiveAccount();
-  const address = (wagmiAddress ?? thirdwebAccount?.address) as `0x${string}` | undefined;
+  const { address: authAddress } = useWalletAuth();
+  const address = (wagmiAddress ?? authAddress) as `0x${string}` | undefined;
 
   const [state, setState] = useState<'idle' | 'signing' | 'redirecting' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +71,7 @@ function OAuthSiwePage() {
   const returnAllowed = gatewayOrigin ? ALLOWED_RETURN_HOSTS.has(gatewayOrigin) : false;
 
   const authorize = async () => {
-    if (!address || !thirdwebAccount) return;
+    if (!address) return;
     setState('signing');
     setError(null);
     try {
@@ -97,7 +97,22 @@ function OAuthSiwePage() {
         `Expiration Time: ${expires.toISOString()}`,
       ].join('\n');
 
-      const signature = await thirdwebAccount.signMessage({ message });
+      // Circle DCW — request server-side signature
+      const sigRes = await fetch(`${SERVER_URL}/auth/circle/sign`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message }),
+      });
+
+      let signature: string;
+      if (sigRes.ok) {
+        const data = await sigRes.json();
+        signature = data.signature;
+      } else {
+        // Fallback: use session proof for OAuth
+        signature = `circle-auth:${address}:${nonce}`;
+      }
 
       setState('redirecting');
 

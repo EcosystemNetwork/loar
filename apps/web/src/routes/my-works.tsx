@@ -300,7 +300,10 @@ function ContentCard({
             className="w-full h-full object-cover"
             muted
             loop
-            onMouseEnter={(e) => e.currentTarget.play()}
+            onMouseEnter={(e) => {
+              const p = e.currentTarget.play();
+              if (p) p.catch(() => {});
+            }}
             onMouseLeave={(e) => {
               e.currentTarget.pause();
               e.currentTarget.currentTime = 0;

@@ -8,7 +8,6 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useChainId, useSwitchChain } from 'wagmi';
-import { useActiveAccount } from 'thirdweb/react';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { useUniverseManager, useDefaultDeploymentConfig } from '@/hooks/useUniverseManager';
 import { useWalletAccount } from '@/hooks/useWalletAccount';
@@ -77,7 +76,6 @@ function DeployTokenPage() {
   const { isAuthenticated } = useWalletAuth();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
-  const thirdwebAccount = useActiveAccount();
 
   const { deployUniverseToken, hash, isPending, error } = useUniverseManager();
   const defaultConfig = useDefaultDeploymentConfig();

@@ -62,11 +62,8 @@ const moreGroups = [
   {
     label: 'Earn',
     links: [
-      { to: '/staking', label: 'Staking' },
       { to: '/bounties', label: 'Bounties' },
       { to: '/sell', label: 'Sell' },
-      { to: '/licensing', label: 'Licensing' },
-      { to: '/collabs', label: 'Collabs' },
     ],
   },
   {
@@ -75,7 +72,6 @@ const moreGroups = [
       { to: '/agents', label: 'Agents', beta: true },
       { to: '/adplacements', label: 'Ads', beta: true },
       { to: '/sandbox', label: 'Sandbox', beta: true },
-      { to: '/workflows', label: 'Workflows', beta: true },
       { to: '/subscriptions', label: 'Subscriptions' },
       { to: '/faucet', label: 'Faucet' },
       { to: '/pricing', label: 'Pricing' },

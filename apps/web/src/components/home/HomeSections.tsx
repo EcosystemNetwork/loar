@@ -168,7 +168,9 @@ export function UniverseCard({ universe }: { universe: EnrichedUniverse }) {
       <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-xl group-hover:shadow-primary/20">
         {universe.portraitImageURL || universe.imageURL || universe.tokenData?.imageURL ? (
           <img
-            src={universe.portraitImageURL || universe.imageURL || universe.tokenData?.imageURL}
+            src={resolveIpfsUrl(
+              universe.portraitImageURL || universe.imageURL || universe.tokenData?.imageURL
+            )}
             alt=""
             loading="lazy"
             className="w-full h-full object-cover"
@@ -245,7 +247,7 @@ export function WideCard({ universe }: { universe: EnrichedUniverse }) {
       <div className="relative aspect-video rounded-xl overflow-hidden bg-muted ring-1 ring-white/5 group-hover:ring-primary/60 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl group-hover:shadow-primary/20">
         {universe.imageURL || universe.tokenData?.imageURL ? (
           <img
-            src={universe.imageURL || universe.tokenData?.imageURL}
+            src={resolveIpfsUrl(universe.imageURL || universe.tokenData?.imageURL)}
             alt=""
             loading="lazy"
             className="w-full h-full object-cover"
@@ -390,7 +392,7 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
         >
           {u.imageURL || u.tokenData?.imageURL ? (
             <img
-              src={u.imageURL || u.tokenData?.imageURL}
+              src={resolveIpfsUrl(u.imageURL || u.tokenData?.imageURL)}
               alt=""
               className="w-full h-full object-cover scale-105"
               style={{
@@ -658,7 +660,7 @@ export function RecentEpisodes({ universes }: { universes: EnrichedUniverse[] })
               {ep.videoLink ? (
                 <>
                   <video
-                    src={ep.videoLink}
+                    src={resolveIpfsUrl(ep.videoLink)}
                     className="w-full h-full object-cover"
                     muted
                     preload="metadata"
@@ -685,7 +687,7 @@ export function RecentEpisodes({ universes }: { universes: EnrichedUniverse[] })
             <div className="flex gap-2 items-start px-0.5">
               {ep.universeImage ? (
                 <img
-                  src={ep.universeImage}
+                  src={resolveIpfsUrl(ep.universeImage)}
                   alt=""
                   loading="lazy"
                   className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5"
@@ -1113,7 +1115,9 @@ export function SearchOverlay({
                       <div className="w-10 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-600 to-purple-600">
                         {(u.portraitImageURL || u.imageURL || u.tokenData?.imageURL) && (
                           <img
-                            src={u.portraitImageURL || u.imageURL || u.tokenData?.imageURL}
+                            src={resolveIpfsUrl(
+                              u.portraitImageURL || u.imageURL || u.tokenData?.imageURL
+                            )}
                             alt=""
                             className="w-full h-full object-cover"
                           />
@@ -1168,7 +1172,7 @@ export function SearchOverlay({
                       <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-600 to-purple-600">
                         {(u.imageURL || u.tokenData?.imageURL) && (
                           <img
-                            src={u.imageURL || u.tokenData?.imageURL}
+                            src={resolveIpfsUrl(u.imageURL || u.tokenData?.imageURL)}
                             alt=""
                             className="w-full h-full object-cover"
                           />

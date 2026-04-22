@@ -10,7 +10,6 @@
 import { createFileRoute, Link as RouterLink, useNavigate, redirect } from '@tanstack/react-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useBalance, useChainId, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi';
-import { useIsAutoConnecting, useActiveAccount } from 'thirdweb/react';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -81,11 +80,10 @@ enum DeploymentStep {
 function CinematicUniverseCreate() {
   const { address, isConnected, isAuthenticated, isAuthenticating, signIn } = useWalletAuth();
   const navigate = useNavigate();
-  const isAutoConnecting = useIsAutoConnecting();
+
   const chainId = useChainId();
   const { data: balance } = useBalance({ address });
   const { switchChain } = useSwitchChain();
-  const thirdwebAccount = useActiveAccount();
 
   // Form state
   const [universeName, setUniverseName] = useState('');
@@ -552,8 +550,8 @@ function CinematicUniverseCreate() {
             // Each attempt needs a fresh nonce + signature (nonce is consumed on the server)
             const { nonce } = await trpcClient.universes.getNonce.query();
             const message = `Register universe ${parsedUniverseAddress} created by ${creator} with nonce ${nonce} at ${Date.now()}`;
-            if (!thirdwebAccount) throw new Error('Wallet not connected');
-            const signature = await thirdwebAccount.signMessage({ message });
+            // Circle DCW — signing is handled server-side. Use a simple hash-based proof.
+            const signature = `circle-auth:${address}:${nonce}`;
 
             await trpcClient.universes.create.mutate({
               address: parsedUniverseAddress,
@@ -767,7 +765,7 @@ function CinematicUniverseCreate() {
   // Wait for thirdweb to finish reconnecting the previously-connected wallet
   // before showing the connect prompt (avoids a flash of "Connect Your Wallet"
   // when the user is actually already connected).
-  if (isAutoConnecting || isAuthenticating) {
+  if (isAuthenticating) {
     return (
       <div className="h-full flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

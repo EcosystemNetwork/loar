@@ -4,7 +4,7 @@
  * Bootstraps the React app with:
  * - TanStack Router (file-based routing with code-gen route tree)
  * - TanStack React Query (via QueryClientProvider)
- * - Wagmi wallet provider (WalletWrapper)
+ * - Wagmi wallet provider (WalletProvider)
  *
  * The router's Wrap component nests all global providers so that
  * route loaders have access to tRPC and the query client.
@@ -36,11 +36,9 @@ import { routeTree } from './routeTree.gen';
 import { queryClient, trpc } from './utils/trpc';
 
 import { trackPageView } from './lib/ga';
-import { WalletWrapper } from './lib/wallet-provider';
+import { WalletProvider } from './lib/wallet-provider';
 import { Web3ModeProvider } from './lib/web3-mode';
-import { hasSession, initWalletAuth } from './lib/wallet-auth';
-
-initWalletAuth();
+import { hasSession } from './lib/wallet-auth';
 
 const router = createRouter({
   routeTree,
@@ -49,9 +47,9 @@ const router = createRouter({
   context: { trpc, queryClient, hasSession },
   Wrap: function WrapComponent({ children }: { children: React.ReactNode }) {
     return (
-      <WalletWrapper queryClient={queryClient}>
+      <WalletProvider queryClient={queryClient}>
         <Web3ModeProvider>{children}</Web3ModeProvider>
-      </WalletWrapper>
+      </WalletProvider>
     );
   },
 });

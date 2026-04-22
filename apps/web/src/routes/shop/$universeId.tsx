@@ -20,14 +20,6 @@ import {
   User,
   Plus,
   Gavel,
-  Scale,
-  Handshake,
-  FileText,
-  Banknote,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  Zap,
 } from 'lucide-react';
 import { LoarIcon } from '@/components/loar-icons';
 import { Button } from '@/components/ui/button';
@@ -35,22 +27,9 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUniverseStorefront } from '@/hooks/useListings';
-import {
-  useSubscriptionTiers,
-  useAdSlots,
-  useCanonSubmissions,
-  useUniverseLicenses,
-  useUniverseCollabs,
-  useUniverseMerch,
-  usePurchaseMerch,
-} from '@/hooks/useRevenue';
+import { useSubscriptionTiers, useAdSlots, useCanonSubmissions } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { formatEther } from 'viem';
-import { useWriteContract } from '@/hooks/useThirdwebWrite';
-import { useChainId } from 'wagmi';
-import { getEvmAddresses } from '@/configs/addresses';
-import { licensingRegistryAbi } from '@loar/abis/generated';
-import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { useVocab } from '@/hooks/use-vocab';
@@ -69,9 +48,6 @@ function UniverseShopPage() {
   const { data: subTiers } = useSubscriptionTiers(universeId);
   const { data: adSlots, isLoading: adsLoading } = useAdSlots(universeId);
   const { data: votingSubmissions } = useCanonSubmissions(universeId, 'VOTING');
-  const { data: licenses, isLoading: licensesLoading } = useUniverseLicenses(universeId);
-  const { data: collabs, isLoading: collabsLoading } = useUniverseCollabs(universeId);
-  const { data: merch, isLoading: merchLoading } = useUniverseMerch(universeId);
   const { data: universe } = useQuery({
     queryKey: ['universe', universeId],
     queryFn: () => trpcClient.universes.get.query({ id: universeId }),
@@ -145,18 +121,6 @@ function UniverseShopPage() {
                   {adSlots.length} ad slots
                 </Badge>
               )}
-              {licenses && licenses.length > 0 && (
-                <Badge variant="outline" className="gap-1">
-                  <Scale className="w-3 h-3" />
-                  {licenses.length} licenses
-                </Badge>
-              )}
-              {collabs && collabs.length > 0 && (
-                <Badge variant="outline" className="gap-1">
-                  <Handshake className="w-3 h-3" />
-                  {collabs.length} collabs
-                </Badge>
-              )}
               {votingSubmissions && votingSubmissions.length > 0 && (
                 <Badge variant="outline" className="gap-1">
                   <Gavel className="w-3 h-3" />
@@ -189,14 +153,6 @@ function UniverseShopPage() {
               <TabsTrigger value="ads" className="flex-1 gap-1">
                 <Megaphone className="w-3 h-3" />
                 Ads
-              </TabsTrigger>
-              <TabsTrigger value="licensing" className="flex-1 gap-1">
-                <Scale className="w-3 h-3" />
-                Licenses
-              </TabsTrigger>
-              <TabsTrigger value="collabs" className="flex-1 gap-1">
-                <Handshake className="w-3 h-3" />
-                Collabs
               </TabsTrigger>
             </TabsList>
 
@@ -276,87 +232,6 @@ function UniverseShopPage() {
                   <Link to="/adplacements/new">
                     <Button variant="outline" size="sm" className="mt-3">
                       Create a Slot
-                    </Button>
-                  </Link>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="licensing">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-sm">IP Licenses</h3>
-                <Link to="/licensing/new" search={{ universeId }}>
-                  <Button size="sm" variant="outline" className="gap-1 h-7 text-xs">
-                    <Plus className="w-3 h-3" />
-                    New License
-                  </Button>
-                </Link>
-              </div>
-              {licensesLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : licenses?.length ? (
-                <div className="space-y-3">
-                  {licenses.map((license: any) => (
-                    <LicenseCard key={license.id} license={license} />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Scale className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                  <p className="text-sm">No active licenses</p>
-                  <Link to="/licensing/new" search={{ universeId }}>
-                    <Button variant="outline" size="sm" className="mt-3">
-                      Create a License
-                    </Button>
-                  </Link>
-                </div>
-              )}
-
-              {/* Merch section within licensing tab */}
-              {merch && merch.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-1.5">
-                    <ShoppingBag className="w-4 h-4" />
-                    Merchandise
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    {merch.map((item: any) => (
-                      <MerchCard key={item.id} item={item} />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="collabs">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-sm">Collaborations</h3>
-                <Link to="/collabs/new">
-                  <Button size="sm" variant="outline" className="gap-1 h-7 text-xs">
-                    <Plus className="w-3 h-3" />
-                    Propose
-                  </Button>
-                </Link>
-              </div>
-              {collabsLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : collabs?.length ? (
-                <div className="space-y-3">
-                  {collabs.map((collab: any) => (
-                    <ShopCollabCard key={collab.id} collab={collab} />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Handshake className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                  <p className="text-sm">No collaborations yet</p>
-                  <Link to="/collabs/new">
-                    <Button variant="outline" size="sm" className="mt-3">
-                      Propose a Collab
                     </Button>
                   </Link>
                 </div>
@@ -484,197 +359,6 @@ function ShopListingCard({ listing }: { listing: any }) {
           <p className="text-xs text-primary font-semibold mt-0.5">
             {listing.price === '0' ? 'Free' : `${listing.price} ${listing.currency}`}
           </p>
-        </CardContent>
-      </Card>
-    </Link>
-  );
-}
-
-const LICENSE_TYPE_LABELS: Record<string, string> = {
-  STREAMING: 'Streaming',
-  MERCH: 'Merchandise',
-  GAMING: 'Gaming',
-  COMIC: 'Comic / Print',
-  AUDIO: 'Audio',
-  OTHER: 'Other',
-};
-
-const LICENSE_STATUS_COLORS: Record<string, string> = {
-  PROPOSED: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-  ACTIVE: 'bg-green-500/10 text-green-400 border-green-500/20',
-  REVOKED: 'bg-red-500/10 text-red-400 border-red-500/20',
-};
-
-function LicenseCard({ license }: { license: any }) {
-  const statusColor = LICENSE_STATUS_COLORS[license.status] ?? '';
-  const feeEth = license.upfrontFee
-    ? parseFloat(formatEther(BigInt(license.upfrontFee))).toFixed(4)
-    : '—';
-
-  return (
-    <Card className="hover:border-primary/50 transition-colors">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-              <FileText className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-sm font-medium">
-                {LICENSE_TYPE_LABELS[license.licenseType] ?? license.licenseType}
-              </p>
-              <p className="text-xs text-muted-foreground">{license.licensee}</p>
-            </div>
-          </div>
-          <Badge variant="outline" className={`text-xs ${statusColor}`}>
-            {license.status}
-          </Badge>
-        </div>
-
-        {license.terms && (
-          <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{license.terms}</p>
-        )}
-
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">
-            Fee: <span className="text-foreground font-medium">{feeEth} ETH</span>
-          </span>
-          <span className="text-muted-foreground">
-            Royalty:{' '}
-            <span className="text-foreground font-medium">
-              {(license.royaltyBps / 100).toFixed(1)}%
-            </span>
-          </span>
-          <span className="text-muted-foreground">{license.durationDays}d</span>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function MerchCard({ item }: { item: any }) {
-  const priceEth = item.price ? parseFloat(formatEther(BigInt(item.price))).toFixed(4) : '0';
-  const purchaseMerch = usePurchaseMerch();
-  const { writeContractAsync, isPending: isTxPending } = useWriteContract();
-  const { isConnected } = useWalletAuth();
-  const chainId = useChainId();
-  const addresses = getEvmAddresses(chainId);
-
-  async function handleBuy() {
-    try {
-      let txHash: string | undefined;
-
-      // Submit on-chain purchase if the contract is deployed
-      if (addresses?.licensingRegistry && item.onChainMerchId != null) {
-        toast.info('Confirm the purchase in your wallet...');
-        txHash = await writeContractAsync({
-          address: addresses.licensingRegistry,
-          abi: licensingRegistryAbi,
-          functionName: 'purchaseMerch',
-          args: [BigInt(item.onChainMerchId)],
-          value: BigInt(item.price),
-        });
-        toast.info('Transaction submitted, recording purchase...');
-      }
-
-      await purchaseMerch.mutateAsync({
-        merchId: item.id,
-        quantity: 1,
-        txHash: txHash ?? '0x0000000000000000000000000000000000000000000000000000000000000000',
-      });
-      toast.success('Purchase complete!');
-    } catch (e: any) {
-      toast.error(e?.message ?? 'Failed to purchase');
-    }
-  }
-
-  const isBusy = purchaseMerch.isPending || isTxPending;
-
-  return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-3">
-        {item.imageUrl && (
-          <div className="aspect-square rounded-lg bg-muted overflow-hidden mb-2">
-            <img
-              src={resolveIpfsUrl(item.imageUrl)}
-              alt={item.name}
-              className="w-full h-full object-cover"
-            />
-          </div>
-        )}
-        <p className="text-xs font-medium truncate">{item.name}</p>
-        <div className="flex items-center justify-between mt-1">
-          <span className="text-xs text-primary font-semibold">{priceEth} ETH</span>
-          <Badge variant="secondary" className="text-xs">
-            {item.category}
-          </Badge>
-        </div>
-        {isConnected && (
-          <Button
-            size="sm"
-            className="w-full mt-2 h-7 text-xs"
-            onClick={handleBuy}
-            disabled={isBusy}
-          >
-            {isBusy ? (
-              <Loader2 className="w-3 h-3 animate-spin mr-1" />
-            ) : (
-              <ShoppingBag className="w-3 h-3 mr-1" />
-            )}
-            {isTxPending ? 'Confirming...' : `Buy for ${priceEth} ETH`}
-          </Button>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-const COLLAB_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  PROPOSED: { label: 'Proposed', color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
-  ACCEPTED: { label: 'Accepted', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
-  ACTIVE: { label: 'Active', color: 'bg-green-500/10 text-green-400 border-green-500/20' },
-  COMPLETED: { label: 'Completed', color: 'bg-muted text-muted-foreground border-border' },
-  CANCELLED: { label: 'Cancelled', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
-};
-
-function ShopCollabCard({ collab }: { collab: any }) {
-  const statusConfig = COLLAB_STATUS_CONFIG[collab.status] ?? COLLAB_STATUS_CONFIG.PROPOSED;
-
-  return (
-    <Link to="/collabs" search={{}}>
-      <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                <Handshake className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">{collab.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {collab.universeA?.slice(0, 8)}… x {collab.universeB?.slice(0, 8)}…
-                </p>
-              </div>
-            </div>
-            <Badge variant="outline" className={`text-xs ${statusConfig.color}`}>
-              {statusConfig.label}
-            </Badge>
-          </div>
-
-          {collab.description && (
-            <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{collab.description}</p>
-          )}
-
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">
-              Split:{' '}
-              <span className="text-foreground font-medium">
-                {(collab.revenueShareBps / 100).toFixed(1)}%
-              </span>
-            </span>
-            <span className="text-muted-foreground">{collab.episodeCount ?? 0} episodes</span>
-            <span className="text-muted-foreground">{collab.durationDays}d</span>
-          </div>
         </CardContent>
       </Card>
     </Link>

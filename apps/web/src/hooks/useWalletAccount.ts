@@ -1,23 +1,60 @@
 /**
- * useWalletAccount — drop-in replacement for wagmi's useAccount()
- * that also checks thirdweb's active account as a fallback.
+ * useWalletAccount — Wallet account hook backed by Circle auth session.
  *
- * Thirdweb manages wallet connections via its ConnectButton, but wagmi
- * may not have synced the connection state yet. This hook merges both
- * sources so components always see the connected wallet.
+ * Previously merged wagmi + thirdweb account state.
+ * Now reads from localStorage (set during Circle login) and
+ * falls back to wagmi for read-only chain info.
  *
  * Usage: replace `import { useAccount } from 'wagmi'` with
  *        `import { useWalletAccount } from '@/hooks/useWalletAccount'`
  */
 import { useAccount } from 'wagmi';
-import { useActiveAccount } from 'thirdweb/react';
+import { getSiweAddress, hasSession } from '@/lib/wallet-auth';
+import { useSyncExternalStore } from 'react';
+
+// Re-subscribe to auth state changes
+let listeners: Array<() => void> = [];
+function subscribe(listener: () => void) {
+  listeners.push(listener);
+  return () => {
+    listeners = listeners.filter((l) => l !== listener);
+  };
+}
+
+// Listen for localStorage changes (cross-tab + same-tab via emitChange)
+if (typeof window !== 'undefined') {
+  const originalSetItem = localStorage.setItem;
+  localStorage.setItem = function (key: string, value: string) {
+    originalSetItem.call(this, key, value);
+    if (key === 'siwe-address') {
+      for (const l of listeners) l();
+    }
+  };
+  const originalRemoveItem = localStorage.removeItem;
+  localStorage.removeItem = function (key: string) {
+    originalRemoveItem.call(this, key);
+    if (key === 'siwe-address') {
+      for (const l of listeners) l();
+    }
+  };
+}
+
+function getSnapshot(): string | null {
+  return getSiweAddress();
+}
+
+function getServerSnapshot(): string | null {
+  return null;
+}
 
 export function useWalletAccount() {
   const wagmi = useAccount();
-  const thirdwebAccount = useActiveAccount();
+  const storedAddress = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  const address = (wagmi.address ?? thirdwebAccount?.address) as `0x${string}` | undefined;
-  const isConnected = wagmi.isConnected || !!thirdwebAccount;
+  // Circle auth: address from session storage
+  // wagmi: used for chain info only (read-only contract calls)
+  const address = (storedAddress ?? wagmi.address) as `0x${string}` | undefined;
+  const isConnected = !!storedAddress || wagmi.isConnected;
 
   return {
     ...wagmi,

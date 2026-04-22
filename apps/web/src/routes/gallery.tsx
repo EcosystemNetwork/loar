@@ -67,7 +67,10 @@ function GalleryPage() {
                         playsInline
                         preload="metadata"
                         poster={resolveIpfsUrl(item.thumbnailUrl || item.imageUrl) || undefined}
-                        onMouseEnter={(e) => e.currentTarget.play()}
+                        onMouseEnter={(e) => {
+                          const p = e.currentTarget.play();
+                          if (p) p.catch(() => {});
+                        }}
                         onMouseLeave={(e) => {
                           e.currentTarget.pause();
                           e.currentTarget.currentTime = 0;

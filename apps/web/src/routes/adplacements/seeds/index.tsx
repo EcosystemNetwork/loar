@@ -41,7 +41,6 @@ import {
   useAdSeedStats,
 } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
-import { useIsAutoConnecting } from 'thirdweb/react';
 
 export const Route = createFileRoute('/adplacements/seeds/')({
   component: SeedDanceHub,
@@ -290,7 +289,7 @@ function HowItWorksCard() {
 
 function MySeedsTab() {
   const { isConnected } = useWalletAuth();
-  const isAutoConnecting = useIsAutoConnecting();
+  const isAutoConnecting = false; // thirdweb removed — Circle DCW always instant
   const { data: seeds, isLoading } = useMyAdSeeds();
 
   if (isAutoConnecting) {
@@ -420,7 +419,7 @@ function MySeedCard({ seed }: { seed: any }) {
 
 function MyGigsTab() {
   const { isConnected } = useWalletAuth();
-  const isAutoConnecting = useIsAutoConnecting();
+  const isAutoConnecting = false; // thirdweb removed — Circle DCW always instant
   const { data: placements, isLoading } = useMyAdSeedPlacements();
 
   if (isAutoConnecting) {
