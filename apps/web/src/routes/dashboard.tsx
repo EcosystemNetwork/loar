@@ -38,6 +38,7 @@ import { useQuery } from '@tanstack/react-query';
 import { QuestsPanel } from '@/components/QuestsPanel';
 import { DailyCheckin } from '@/components/DailyCheckin';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
+import { FaucetBanner } from '@/components/FaucetBanner';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
 import { useCreditBalance, useMyNFTs, useUniversesMetricsBatch } from '@/hooks/useRevenue';
 import { useTokenListData, type EnrichedToken } from '@/hooks/useTokens';
@@ -174,6 +175,9 @@ function RouteComponent() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex gap-6">
         {/* ── Main Content ─────────────────────────────────────────── */}
         <div className="flex-1 min-w-0 space-y-8">
+          {/* ── Faucet prompt for empty wallets ─────────────────────── */}
+          <FaucetBanner address={address} />
+
           {/* ── New User Onboarding ───────────────────────────────── */}
           {isNewUser && (
             <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-purple-500/5">
