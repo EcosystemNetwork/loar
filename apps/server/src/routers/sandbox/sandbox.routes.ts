@@ -95,19 +95,22 @@ export const sandboxRouter = router({
       let contentId: string | null = null;
       if (hasMedia) {
         const mediaUrl = primaryMediaUrl;
-        // Transaction prevents duplicate gallery rows when batch generations
-        // resolve concurrently with the same mediaUrl.
-        const result = await db!.runTransaction(async (tx) => {
-          const existingSnap = await tx.get(
-            contentCol()
-              .where('mediaUrl', '==', mediaUrl)
-              .where('creatorUid', '==', ctx.user.uid)
-              .limit(1)
-          );
 
-          if (!existingSnap.empty) {
-            const existingDoc = existingSnap.docs[0];
-            tx.update(existingDoc.ref, {
+        // Use a deterministic document ID based on the user and media URL to prevent
+        // phantom reads where concurrent transactions both find 0 results and create dupes.
+        const crypto = await import('crypto');
+        const hashId = crypto
+          .createHash('sha256')
+          .update(`${ctx.user.uid}:${mediaUrl}`)
+          .digest('hex')
+          .substring(0, 20);
+        const contentRef = contentCol().doc(`ai-${hashId}`);
+
+        const result = await db!.runTransaction(async (tx) => {
+          const existingDoc = await tx.get(contentRef);
+
+          if (existingDoc.exists) {
+            tx.update(contentRef, {
               title: input.title,
               tags: input.tags || [],
               description: input.prompt || '',
@@ -116,8 +119,7 @@ export const sandboxRouter = router({
             return { contentId: existingDoc.id, created: false };
           }
 
-          const newRef = contentCol().doc();
-          tx.set(newRef, {
+          tx.set(contentRef, {
             title: input.title,
             description: input.prompt || '',
             mediaUrl,
@@ -142,7 +144,7 @@ export const sandboxRouter = router({
             promotedFromDraft: draftRef.id,
             generationModel: input.model || null,
           });
-          return { contentId: newRef.id, created: true };
+          return { contentId: contentRef.id, created: true };
         });
         contentId = result.contentId;
 
@@ -191,6 +193,33 @@ export const sandboxRouter = router({
       if (input.tags !== undefined) updates.tags = input.tags;
 
       await ref.update(updates);
+
+      // Fix C: Sync properties to the mirror content doc so the gallery reflects edits
+      const draftData = snap.data();
+      if (draftData?.galleryContentId) {
+        const contentUpdates: Record<string, any> = { updatedAt: new Date() };
+        if (input.title !== undefined) contentUpdates.title = input.title;
+        if (input.prompt !== undefined) contentUpdates.description = input.prompt;
+
+        const isVideoOnly =
+          draftData.kind === 'video' || (input.videoUrl !== undefined ? true : draftData.videoUrl);
+        if (input.videoUrl !== undefined) {
+          contentUpdates.mediaUrl = input.videoUrl;
+        } else if (input.imageUrl !== undefined && !isVideoOnly) {
+          contentUpdates.mediaUrl = input.imageUrl; // update main mediaUrl if strictly image
+        }
+        if (input.imageUrl !== undefined) {
+          contentUpdates.thumbnailUrl = input.imageUrl;
+        }
+        if (input.tags !== undefined) contentUpdates.tags = input.tags;
+
+        try {
+          await contentCol().doc(draftData.galleryContentId).update(contentUpdates);
+        } catch (e) {
+          console.warn('[sandbox] gallery item sync update failed:', e);
+        }
+      }
+
       return { ok: true };
     }),
 
@@ -289,6 +318,19 @@ export const sandboxRouter = router({
       const draft = snap.data()!;
       if (!ownsDraft(draft, ctx.user))
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your draft' });
+
+      // Fix A: IDOR Patch. Validate universe access.
+      if (input.universeId) {
+        const { isUniverseAdmin } = await import('../../lib/safe-admin');
+        const isAdmin = await isUniverseAdmin(input.universeId, ctx.user.uid);
+        if (!isAdmin) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You must be a universe admin to promote content directly to this universe.',
+          });
+        }
+      }
+
       const now = new Date();
       const mediaUrl = draft.videoUrl || draft.imageUrl || '';
       const mediaType = draft.videoUrl ? 'ai-video' : draft.imageUrl ? 'ai-image' : 'image';

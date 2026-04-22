@@ -130,7 +130,13 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
                 onVideoSlotDone();
               }}
               onError={() => onVideoSlotDone()}
-              onMouseEnter={(e) => e.currentTarget.play()}
+              onMouseEnter={(e) => {
+                const playPromise = e.currentTarget.play();
+                if (playPromise)
+                  playPromise.catch(() => {
+                    /* AbortError — hover cancelled before play resolved */
+                  });
+              }}
               onMouseLeave={(e) => {
                 e.currentTarget.pause();
                 e.currentTarget.currentTime = 0;
