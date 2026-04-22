@@ -22,9 +22,9 @@ export class PinataProvider implements StorageProvider {
   private lastFailureTime = 0;
 
   constructor() {
-    this.jwt = process.env.PINATA_JWT || '';
-    this.gatewayUrl = process.env.PINATA_GATEWAY_URL || DEFAULT_GATEWAY;
-    this.gatewayToken = process.env.PINATA_GATEWAY_TOKEN || '';
+    this.jwt = (process.env.PINATA_JWT || '').trim();
+    this.gatewayUrl = (process.env.PINATA_GATEWAY_URL || DEFAULT_GATEWAY).trim();
+    this.gatewayToken = (process.env.PINATA_GATEWAY_TOKEN || '').trim();
   }
 
   isAvailable(): boolean {

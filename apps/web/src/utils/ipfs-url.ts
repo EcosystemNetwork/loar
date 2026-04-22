@@ -1,9 +1,8 @@
 const PUBLIC_GATEWAY = 'https://gateway.pinata.cloud';
-const CONFIGURED_GATEWAY = (import.meta.env.VITE_PINATA_GATEWAY_URL || PUBLIC_GATEWAY).replace(
-  /\/$/,
-  ''
-);
-const GATEWAY_TOKEN = import.meta.env.VITE_PINATA_GATEWAY_TOKEN || '';
+const CONFIGURED_GATEWAY = (import.meta.env.VITE_PINATA_GATEWAY_URL || PUBLIC_GATEWAY)
+  .trim()
+  .replace(/\/$/, '');
+const GATEWAY_TOKEN = (import.meta.env.VITE_PINATA_GATEWAY_TOKEN || '').trim();
 
 let CONFIGURED_HOST = '';
 try {
@@ -25,11 +24,19 @@ if (IS_DEDICATED_GATEWAY && !GATEWAY_TOKEN && typeof console !== 'undefined') {
 }
 
 function appendToken(url: string): string {
-  if (!GATEWAY_TOKEN) return url;
   try {
     const parsed = new URL(url);
     if (!parsed.host.endsWith('.mypinata.cloud') && parsed.host !== ACTIVE_HOST) return url;
-    if (parsed.searchParams.has('pinataGatewayToken')) return url;
+    const existing = parsed.searchParams.get('pinataGatewayToken');
+    if (existing !== null) {
+      const cleaned = existing.trim();
+      if (cleaned !== existing) {
+        parsed.searchParams.set('pinataGatewayToken', cleaned);
+        return parsed.toString();
+      }
+      return url;
+    }
+    if (!GATEWAY_TOKEN) return url;
     parsed.searchParams.set('pinataGatewayToken', GATEWAY_TOKEN);
     return parsed.toString();
   } catch {
