@@ -62,6 +62,18 @@ stripeWebhookRoutes.post('/webhook', async (c) => {
         return c.json({ received: true, error: 'Unknown package' });
       }
 
+      // Defense-in-depth: never grant credits if the actual paid amount is less
+      // than the package price. createPaymentIntent derives amount server-side,
+      // but if a legacy or tampered intent arrives we refuse to issue credits.
+      const expectedCents = Math.round(pkg.fiatPriceUsd * 100);
+      if (typeof intent.amount !== 'number' || intent.amount < expectedCents) {
+        console.error(
+          `[Stripe Webhook] Amount mismatch for ${intent.id}: paid=${intent.amount} expected>=${expectedCents} package=${packageId}`
+        );
+        // 400 — do not retry; this is a permanent mismatch
+        return c.json({ error: 'amount mismatch' }, 400);
+      }
+
       const totalCredits = pkg.credits + pkg.bonusCredits;
 
       // Atomic: dedup + balance update + tx record in one Firestore transaction

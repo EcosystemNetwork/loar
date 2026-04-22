@@ -22,7 +22,7 @@ import { sepolia, baseSepolia } from 'viem/chains';
 import { getStorageManager } from '../../services/storage';
 import { throwApiError } from '../../lib/errors';
 import { recordRevenueEvent } from '../../services/revenue-recorder';
-import { assertContentOperable } from '../../lib/content-status';
+import { assertContentOperable, assertCanonReadyForMonetization } from '../../lib/content-status';
 
 // ── Chain clients for on-chain TX verification ──────────────────────
 const sepoliaClient = createPublicClient({
@@ -85,6 +85,9 @@ export const nftRouter = router({
       try {
         // Block minting of moderated content
         await assertContentOperable(input.contentId);
+        // For monetized universes, require at least one canon episode before
+        // any content from the universe can be minted.
+        await assertCanonReadyForMonetization(input.contentId);
 
         // 1. Load the content from gallery
         const contentRef = contentCol().doc(input.contentId);

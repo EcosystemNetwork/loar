@@ -12,6 +12,7 @@
 import { z } from 'zod';
 import Stripe from 'stripe';
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
+import { DEFAULT_PACKAGES } from './credits.routes';
 
 let stripe: Stripe | null = null;
 
@@ -19,7 +20,7 @@ export function getStripe() {
   if (stripe) return stripe;
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return null;
-  stripe = new Stripe(key, { apiVersion: '2024-12-18.acacia' as Stripe.LatestApiVersion });
+  stripe = new Stripe(key);
   return stripe;
 }
 
@@ -29,13 +30,12 @@ export const stripeRouter = router({
     return { available: !!process.env.STRIPE_SECRET_KEY };
   }),
 
-  /** Create a PaymentIntent for a credit package purchase */
+  /** Create a PaymentIntent for a credit package purchase. Amount is derived
+   * server-side from the package id — never trusted from the client. */
   createPaymentIntent: protectedProcedure
     .input(
       z.object({
         packageId: z.string(),
-        /** Price in USD cents (server verifies against package) */
-        amountCents: z.number().int().min(50),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -44,13 +44,23 @@ export const stripeRouter = router({
         throw new Error('Card payments are not yet available. Please use ETH or $LOAR.');
       }
 
+      const pkg = DEFAULT_PACKAGES.find((p) => p.id === input.packageId);
+      if (!pkg) {
+        throw new Error(`Unknown credit package: ${input.packageId}`);
+      }
+      const amountCents = Math.round(pkg.fiatPriceUsd * 100);
+      if (amountCents < 50) {
+        throw new Error('Package price is below Stripe minimum.');
+      }
+
       const intent = await stripeClient.paymentIntents.create({
-        amount: input.amountCents,
+        amount: amountCents,
         currency: 'usd',
         metadata: {
           packageId: input.packageId,
           userId: ctx.user.uid,
-          userAddress: ctx.user.address,
+          userAddress: ctx.user.address ?? '',
+          expectedAmountCents: String(amountCents),
         },
         automatic_payment_methods: { enabled: true },
       });

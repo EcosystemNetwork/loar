@@ -64,6 +64,7 @@ import { openExternal } from '@/utils/open-external';
 import { TokenSwapWidget } from '@/components/TokenSwapWidget';
 import { SubscribeDialog } from '@/components/SubscribeDialog';
 import { UniverseAccessSettings } from '@/components/UniverseAccessSettings';
+import { UniversePublishPanel } from '@/components/UniversePublishPanel';
 import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -117,6 +118,7 @@ export function UniverseSidebar({
   const [pinned, setPinned] = useState(false);
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [showAccessSettings, setShowAccessSettings] = useState(false);
+  const [showPublishPanel, setShowPublishPanel] = useState(false);
   const [showEditMetadata, setShowEditMetadata] = useState(false);
   const [editName, setEditName] = useState('');
   const [editImageUrl, setEditImageUrl] = useState('');
@@ -459,6 +461,15 @@ export function UniverseSidebar({
                     <Settings className="h-4 w-4 mr-2 group-hover/btn:rotate-90 transition-transform duration-500" />
                     Access Settings
                   </Button>
+                  <Button
+                    onClick={() => setShowPublishPanel(true)}
+                    variant="outline"
+                    className="w-full border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-300 group/btn h-9"
+                    size="sm"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2 text-amber-500 group-hover/btn:scale-110 transition-transform duration-300" />
+                    Publish & Canon
+                  </Button>
                 </>
               )}
 
@@ -612,6 +623,13 @@ export function UniverseSidebar({
         <UniverseAccessSettings
           universeId={finalUniverse?.address || ''}
           onClose={() => setShowAccessSettings(false)}
+        />
+      )}
+
+      {showPublishPanel && (
+        <UniversePublishPanel
+          universeId={finalUniverse?.address || ''}
+          onClose={() => setShowPublishPanel(false)}
         />
       )}
 

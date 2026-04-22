@@ -1,11 +1,21 @@
 /**
  * Layer 2 — auth
- * Checks: full SIWE round-trip (nonce → sign → verify → JWT) using the
- * primary smoke-test wallet.
- * Identifies: SIWE_JWT_SECRET misconfiguration, Firebase nonce storage failure,
- *             signature verification bugs.
+ * Checks two auth paths:
+ *   (a) Legacy SIWE round-trip (nonce → sign → verify → JWT) — exercises
+ *       server-side SIWE primitives still used by any external-wallet flow
+ *       and returns a smoke-wallet-owned JWT for downstream chain layers.
+ *   (b) Circle DCW flow (register → verify-otp) — the primary live login
+ *       path post-2026-04-22 migration. Uses `_devOtp` echo so the smoke
+ *       harness can complete the round-trip without an email provider.
+ *       In production (NODE_ENV=production) `_devOtp` is not returned, so
+ *       the smoke only verifies /register is reachable and not 503.
  *
- * Returns the session JWT so downstream layers can make authenticated calls.
+ * Identifies: SIWE_JWT_SECRET misconfig, nonce storage failure, signature
+ *             bugs, CIRCLE_* env missing, OTP delivery broken, Circle
+ *             wallet-set access broken.
+ *
+ * Returns the SIWE session JWT so downstream layers that need a funded
+ * smoke-wallet identity can make authenticated calls.
  */
 import { privateKeyToAccount } from 'viem/accounts';
 import type { SmokeConfig } from '../config.ts';
@@ -91,6 +101,60 @@ export async function runAuthLayer(cfg: SmokeConfig): Promise<AuthResult> {
       return `sub=${payload.sub.slice(0, 10)}… exp=${new Date((payload.exp ?? 0) * 1000).toISOString().slice(0, 10)}`;
     })
   );
+
+  // ── Circle DCW flow — primary live login path ──────────────────────────────
+  // Uses a fresh email per run so the per-email issuance cap (3/15min) never
+  // throttles successive smoke runs.
+  const smokeEmail = `smoke-${Date.now()}@loar-smoke.test`;
+  let devOtp: string | undefined;
+
+  checks.push(
+    await check('POST /auth/circle/register → OTP issued', async () => {
+      const { status, body } = await rawPost(cfg, '/auth/circle/register', {
+        email: smokeEmail,
+      });
+      const b = body as Record<string, unknown>;
+      if (status === 503) {
+        throw new Error(`Circle not configured: ${(b?.error as string) ?? 'unknown'}`);
+      }
+      if (status !== 200) {
+        throw new Error(`HTTP ${status}: ${(b?.error as string) ?? JSON.stringify(b)}`);
+      }
+      if (b?.throttled) {
+        throw new Error(
+          'unexpected throttle on fresh email — rate-limit state leaking between runs'
+        );
+      }
+      devOtp = b?._devOtp as string | undefined;
+      return devOtp ? 'dev OTP received' : 'OTP sent via email (prod mode)';
+    })
+  );
+
+  if (devOtp) {
+    checks.push(
+      await check('POST /auth/circle/verify-otp → Circle wallet + JWT cookie', async () => {
+        const { status, body, setCookie } = await rawPost(cfg, '/auth/circle/verify-otp', {
+          email: smokeEmail,
+          code: devOtp,
+        });
+        const b = body as Record<string, unknown>;
+        if (status !== 200) {
+          throw new Error(`HTTP ${status}: ${(b?.error as string) ?? JSON.stringify(b)}`);
+        }
+        const addr = b?.address as string | undefined;
+        const walletId = b?.walletId as string | undefined;
+        if (!addr || !walletId) {
+          throw new Error('missing address/walletId in response body');
+        }
+        const cookieMatch = setCookie?.match(/siwe-session=([^;]+)/);
+        const circleToken = cookieMatch?.[1] ?? '';
+        if (!circleToken || circleToken.split('.').length !== 3) {
+          throw new Error(`bad cookie JWT: ${String(circleToken).slice(0, 40)}`);
+        }
+        return `addr=${addr.slice(0, 10)}… walletId=${walletId.slice(0, 8)}…`;
+      })
+    );
+  }
 
   return { token, address, checks };
 }

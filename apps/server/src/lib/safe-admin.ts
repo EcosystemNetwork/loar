@@ -23,7 +23,7 @@ const baseSepoliaClient = createPublicClient({
   transport: http(process.env.RPC_URL_BASE_SEPOLIA ?? ''),
 });
 
-function getChainClient(chainId?: number) {
+export function getChainClient(chainId?: number) {
   if (chainId === baseSepolia.id) return baseSepoliaClient;
   return sepoliaClient;
 }
@@ -138,4 +138,26 @@ export async function getUniverseAdminAddress(universeId: string): Promise<strin
   const doc = await universesCol().doc(universeId.toLowerCase()).get();
   if (!doc.exists) return null;
   return (doc.data()?.creator as string | undefined)?.toLowerCase() ?? null;
+}
+
+/**
+ * Broader than `isUniverseAdmin` — returns true if the caller is the universe
+ * admin (creator or Safe signer) OR an active member of the universe team.
+ * This is the chokepoint for "can this viewer see draft (non-canon) episodes
+ * and other team-only content?".
+ *
+ * Returns false when `callerAddress` is undefined (anonymous public viewer).
+ */
+export async function isUniverseCollaborator(
+  universeId: string,
+  callerAddress: string | undefined,
+  chainId?: number
+): Promise<boolean> {
+  if (!callerAddress) return false;
+  if (await isUniverseAdmin(universeId, callerAddress, chainId)) return true;
+
+  const docId = `${universeId.toLowerCase()}-${callerAddress.toLowerCase()}`;
+  const teamDoc = await db.collection('universeTeamMembers').doc(docId).get();
+  if (!teamDoc.exists) return false;
+  return teamDoc.data()?.status === 'active';
 }

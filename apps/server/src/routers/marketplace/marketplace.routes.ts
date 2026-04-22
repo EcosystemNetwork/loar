@@ -9,7 +9,7 @@ import { TRPCError } from '@trpc/server';
 import { getPlatformConfig, bpsToFraction } from '../../services/platformConfig';
 import { randomUUID } from 'crypto';
 import { getStorageManager } from '../../services/storage';
-import { assertContentOperable } from '../../lib/content-status';
+import { assertContentOperable, assertCanonReadyForMonetization } from '../../lib/content-status';
 
 const submissionsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -308,6 +308,7 @@ export const marketplaceRouter = router({
       // Block licensing of moderated content
       if (sub.contentId) {
         await assertContentOperable(sub.contentId);
+        await assertCanonReadyForMonetization(sub.contentId);
       }
 
       const config = await getPlatformConfig();

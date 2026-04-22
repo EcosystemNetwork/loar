@@ -10,8 +10,8 @@ import {
   usePoolData,
   useUniverseForToken,
   useBondingCurveForToken,
-  priceFromSqrtX96,
-  priceFromTick,
+  ethPricePerToken,
+  ethPriceFromTick,
   formatTokenAmount,
   formatEth,
   timeAgo,
@@ -120,26 +120,38 @@ function TokenDetailPage() {
     }
   };
 
-  // Calculate current price from pool data
-  const currentPrice = useMemo(() => {
-    if (pool?.sqrtPriceX96) return priceFromSqrtX96(pool.sqrtPriceX96);
-    if (pool?.tick != null) return priceFromTick(pool.tick);
-    return null;
-  }, [pool]);
+  // Which side of the pool holds our token — controls quote inversion and
+  // which swap amount represents ETH. Defaults to currency0 until the pool
+  // has been indexed so downstream memos stay stable.
+  const tokenIsCurrency0 = useMemo(() => {
+    if (!pool || !token) return true;
+    return pool.currency0.toLowerCase() === token.id.toLowerCase();
+  }, [pool, token]);
 
-  // Chart data from swaps
+  // ETH-per-token quote; null for untraded pools so we render "--"
+  // instead of a bogus 1.0.
+  const currentPrice = useMemo(() => {
+    if (!pool || !token) return null;
+    return ethPricePerToken(pool, token.id);
+  }, [pool, token]);
+
+  // Chart data from swaps — quote each tick as ETH/token and pull the ETH
+  // leg (amount1 when the token is currency0, else amount0).
   const chartData = useMemo(() => {
     if (!swaps?.length) return [];
     return swaps
       .slice()
       .reverse()
-      .map((s) => ({
-        timestamp: s.timestamp,
-        price: priceFromTick(s.tick),
-        isBuy: BigInt(s.amount0) > 0n,
-        ethAmount: Math.abs(Number(BigInt(s.amount1))) / 1e18,
-      }));
-  }, [swaps]);
+      .map((s) => {
+        const ethAmountSigned = tokenIsCurrency0 ? BigInt(s.amount1) : BigInt(s.amount0);
+        return {
+          timestamp: s.timestamp,
+          price: ethPriceFromTick(s.tick, tokenIsCurrency0),
+          isBuy: ethAmountSigned > 0n,
+          ethAmount: Math.abs(Number(ethAmountSigned)) / 1e18,
+        };
+      });
+  }, [swaps, tokenIsCurrency0]);
 
   // 24h price change
   const priceChange = useMemo(() => {
@@ -449,7 +461,14 @@ function TokenDetailPage() {
                       <span className="text-right">Time</span>
                     </div>
                     {swaps.slice(0, 50).map((swap) => {
-                      const isBuy = BigInt(swap.amount0) > 0n;
+                      // ETH side sign drives BUY/SELL — ETH flowing INTO the
+                      // pool (positive) means the user is buying our token.
+                      const ethAmountSigned = tokenIsCurrency0
+                        ? BigInt(swap.amount1)
+                        : BigInt(swap.amount0);
+                      const isBuy = ethAmountSigned > 0n;
+                      const ethAmountAbs =
+                        ethAmountSigned < 0n ? -ethAmountSigned : ethAmountSigned;
                       return (
                         <div
                           key={swap.id}
@@ -462,10 +481,10 @@ function TokenDetailPage() {
                             {isBuy ? 'BUY' : 'SELL'}
                           </Badge>
                           <span className="font-mono text-[10px] truncate">
-                            {formatEth(isBuy ? swap.amount1 : swap.amount0)}
+                            {formatEth(ethAmountAbs.toString())}
                           </span>
                           <span className="font-mono text-[10px]">
-                            {priceFromTick(swap.tick).toExponential(2)}
+                            {ethPriceFromTick(swap.tick, tokenIsCurrency0).toExponential(2)}
                           </span>
                           <AddressDisplay
                             address={swap.sender}

@@ -140,7 +140,6 @@ function WatchPage() {
   const description = universe.description || ponderUniverse?.description || '';
   const cover =
     universe.image_url || universe.imageURL || ponderUniverse?.imageURL || token?.imageURL;
-  const portraitCover = universe.portrait_image_url || cover;
   const episodeCount = ponderUniverse?.nodeCount ?? episodes.length;
   const firstEpisode = episodes[episodes.length - 1]; // oldest for "Start from episode 1"
   const latestEpisode = episodes[0];

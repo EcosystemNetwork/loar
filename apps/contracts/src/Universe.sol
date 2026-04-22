@@ -421,6 +421,19 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
         emit CanonChanged(id, previousCanon, msg.sender);
     }
 
+    /// @notice Promote an off-chain episode to canon. Shifts the canon tip to
+    ///         `tipNodeId` and emits `EpisodeCanonized` so the off-chain indexer
+    ///         can mark the episode canon in its Firestore mirror.
+    /// @dev    Single-linear canon only (v1): promoting episode B dethrones the
+    ///         prior tip, matching the existing `setCanon` invariant. Ancestor
+    ///         nodes remain immutable.
+    /// @param  tipNodeId    The node id that becomes the canon tip.
+    /// @param  episodeHash  keccak256 of the off-chain episode id (UUID bytes).
+    function setCanonForEpisode(uint256 tipNodeId, bytes32 episodeHash) external onlyAdmin {
+        setCanon(tipNodeId);
+        emit EpisodeCanonized(episodeHash, tipNodeId, msg.sender);
+    }
+
     function getCanonChain() public view returns (uint256[] memory) {
         if (currentCanonId == 0) {
             revert CanonNotSet();

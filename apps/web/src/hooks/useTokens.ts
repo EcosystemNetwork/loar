@@ -740,6 +740,53 @@ export function priceFromTick(tick: number): number {
   return Math.pow(1.0001, tick);
 }
 
+// sqrtPriceX96 at tick 0 — fresh pools that have never been traded sit at this
+// exact value, which would otherwise render as a bogus "1.0 ETH" quote.
+const SQRT_PRICE_X96_AT_TICK_0 = '79228162514264337593543950336';
+
+/**
+ * ETH-per-token quote for a Uniswap v4 pool paired against WETH.
+ *
+ * Uniswap pools are keyed by address order, so whether our token sits on
+ * `currency0` or `currency1` depends on address comparison vs WETH. The raw
+ * `sqrtPriceX96`/`tick` math yields `currency1/currency0`; inverting when the
+ * token is `currency1` gets us back to "ETH per token" either way.
+ * Returns null for untraded pools (tick 0 / initial sqrtPrice) so the UI can
+ * show "--" instead of a misleading 1:1 quote.
+ */
+export function ethPricePerToken(
+  pool:
+    | {
+        currency0: string;
+        currency1: string;
+        sqrtPriceX96: string | null;
+        tick: number | null;
+      }
+    | null
+    | undefined,
+  tokenAddress: string
+): number | null {
+  if (!pool) return null;
+  if (pool.sqrtPriceX96 === SQRT_PRICE_X96_AT_TICK_0) return null;
+  if (pool.sqrtPriceX96 == null && (pool.tick == null || pool.tick === 0)) return null;
+
+  const raw = pool.sqrtPriceX96
+    ? priceFromSqrtX96(pool.sqrtPriceX96)
+    : pool.tick != null
+      ? priceFromTick(pool.tick)
+      : null;
+  if (raw == null || !Number.isFinite(raw) || raw === 0) return null;
+
+  const tokenIsCurrency0 = pool.currency0.toLowerCase() === tokenAddress.toLowerCase();
+  return tokenIsCurrency0 ? raw : 1 / raw;
+}
+
+/** ETH-per-token from a swap's tick, given which side of the pool the token sits on. */
+export function ethPriceFromTick(tick: number, tokenIsCurrency0: boolean): number {
+  const raw = priceFromTick(tick);
+  return tokenIsCurrency0 ? raw : raw === 0 ? 0 : 1 / raw;
+}
+
 /**
  * Format token amount from raw bigint string (18 decimals)
  */
@@ -795,6 +842,10 @@ export interface EnrichedToken extends Token {
   // Null while the pool has no swaps yet or the token hasn't graduated.
   latestSqrtPriceX96: string | null;
   latestLiquidity: string | null;
+  // Whether our token is currency0 in its pool. Consumers (activity feed,
+  // impact math) need this to pick the right side when reading swap amounts
+  // or inverting quotes.
+  tokenIsCurrency0: boolean;
 }
 
 const TOTAL_SUPPLY = 1_000_000_000; // 1B tokens per universe
@@ -919,31 +970,44 @@ export function useTokenListData() {
       const recentSwaps = tokenSwaps.filter((s) => s.timestamp >= oneDayAgo);
       const bondingCurve = curvesByToken.get(token.id.toLowerCase()) ?? null;
 
-      // Current price from pool
-      let price: number | null = null;
-      if (pool?.sqrtPriceX96) price = priceFromSqrtX96(pool.sqrtPriceX96);
-      else if (pool?.tick != null) price = priceFromTick(pool.tick);
+      // Which side of the pool holds our token — determines quote inversion
+      // and which swap amount represents ETH. Fall back to currency0 when the
+      // pool hasn't been indexed yet so downstream code stays consistent.
+      const tokenIsCurrency0 = pool
+        ? pool.currency0.toLowerCase() === token.id.toLowerCase()
+        : true;
 
-      // 24h price change
+      // Current ETH-per-token quote. `ethPricePerToken` returns null for
+      // untraded pools so the card shows "--" instead of a bogus 1.0.
+      const price = pool ? ethPricePerToken(pool, token.id) : null;
+
+      // 24h price change — compare now to the oldest swap in the window,
+      // using the same side-of-pool convention as `price`.
       let priceChange24h: number | null = null;
-      if (recentSwaps.length >= 2 && price) {
-        const oldestPrice = priceFromTick(recentSwaps[recentSwaps.length - 1].tick);
+      if (recentSwaps.length >= 2 && price != null) {
+        const oldestPrice = ethPriceFromTick(
+          recentSwaps[recentSwaps.length - 1].tick,
+          tokenIsCurrency0
+        );
         if (oldestPrice > 0) {
           priceChange24h = ((price - oldestPrice) / oldestPrice) * 100;
         }
       }
 
-      // 24h volume (sum of absolute ETH moved)
+      // 24h volume: sum absolute ETH moved. ETH sits on the side opposite
+      // our token — amount1 when the token is currency0, else amount0.
       let volume24h = 0;
       for (const s of recentSwaps) {
-        volume24h += Math.abs(Number(BigInt(s.amount1))) / 1e18;
+        const ethAmount = tokenIsCurrency0 ? s.amount1 : s.amount0;
+        volume24h += Math.abs(Number(BigInt(ethAmount))) / 1e18;
       }
 
-      // Sparkline: last 20 swap prices, oldest→newest
+      // Sparkline: last 20 swap prices, oldest→newest, inverted to match the
+      // ETH-per-token quote the card displays.
       const sparkline = tokenSwaps
         .slice(0, 20)
         .reverse()
-        .map((s) => priceFromTick(s.tick));
+        .map((s) => ethPriceFromTick(s.tick, tokenIsCurrency0));
 
       // Market cap = price * total supply
       const marketCap = price != null ? price * TOTAL_SUPPLY : null;
@@ -982,6 +1046,7 @@ export function useTokenListData() {
         graduationPct,
         latestSqrtPriceX96,
         latestLiquidity,
+        tokenIsCurrency0,
       };
     });
   }, [tokensQuery.data, poolsQuery.data, swapsQuery.data, holdersQuery.data, curvesQuery.data]);

@@ -11,6 +11,9 @@ const PRIVATE_IP_RANGES = [
   /^::1$/,
   /^fc00/,
   /^fe80/,
+  // IPv4-mapped IPv6 — `::ffff:127.0.0.1` and friends. dns.resolve6 can
+  // return these for hostnames that have an A record but no AAAA record.
+  /^::ffff:(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|0\.)/i,
 ];
 
 const BLOCKED_HOSTNAMES = ['localhost', 'metadata.google.internal'];
@@ -50,14 +53,10 @@ export async function validateUploadUrl(url: string): Promise<URL> {
       }
     }
   } catch (err) {
-    if (
-      err instanceof Error &&
-      (err.message.includes('private') || err.message.includes('resolve'))
-    ) {
-      throw err;
-    }
-    // DNS resolution failure for non-private reasons — let it pass
-    // (the actual fetch will fail with a more descriptive error)
+    // Fail closed on any error from the resolution path — letting unknown
+    // failures fall through created an SSRF window when the resolver
+    // intermittently rejected lookups.
+    throw err instanceof Error ? err : new Error('Could not validate URL for safe fetching');
   }
 
   return parsed;

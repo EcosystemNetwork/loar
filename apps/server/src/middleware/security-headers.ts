@@ -29,9 +29,15 @@ const TRUSTED_IMG = [
   'data:',
   'blob:',
   'https://*.pinata.cloud',
+  'https://*.mypinata.cloud',
   'https://gateway.pinata.cloud',
   'https://*.lighthouse.storage',
   'https://firebasestorage.googleapis.com',
+  'https://w3s.link',
+  'https://*.w3s.link',
+  'https://ipfs.io',
+  'https://dweb.link',
+  'https://*.dweb.link',
 ].join(' ');
 
 export async function securityHeaders(c: Context, next: Next) {
@@ -54,7 +60,7 @@ export async function securityHeaders(c: Context, next: Next) {
       `connect-src ${TRUSTED_CONNECT}`,
       `img-src ${TRUSTED_IMG}`,
       "font-src 'self' https://fonts.gstatic.com",
-      "media-src 'self' blob: https://*.pinata.cloud https://gateway.pinata.cloud https://*.mypinata.cloud https://*.lighthouse.storage https://*.volces.com https://*.fal.ai https://*.fal.media",
+      "media-src 'self' blob: https://*.pinata.cloud https://gateway.pinata.cloud https://*.mypinata.cloud https://*.lighthouse.storage https://*.volces.com https://*.fal.ai https://*.fal.media https://w3s.link https://*.w3s.link https://ipfs.io https://dweb.link https://*.dweb.link",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",

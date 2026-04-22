@@ -942,6 +942,13 @@ export const generationRouter = router({
       // ── Deduct credits (transactional) ─────────────────────────────
       const userCreditsRef = db.collection('userCredits').doc(ctx.user.uid);
       if (creditsCharged > 0) {
+        // Enforce kill switch + rolling spend cap *before* the transaction so a
+        // capped user fails fast and never debits even on a race. The legacy
+        // `deductCredits` helper did this; the inline transaction must too.
+        const { assertGenerationAllowed } = await import('../../lib/generation-guards');
+        const { invalidateSpendCache } = await import('../../services/spend-cap');
+        await assertGenerationAllowed(ctx.user.uid, creditsCharged);
+
         try {
           await db.runTransaction(async (tx) => {
             const userCreditsDoc = await tx.get(userCreditsRef);
@@ -958,7 +965,22 @@ export const generationRouter = router({
               totalSpent: (userCreditsDoc.data()?.totalSpent || 0) + creditsCharged,
               updatedAt: new Date(),
             });
+
+            // Mirror what `deductCredits` does — write the spend row that
+            // spend-cap.ts sums for monthly/daily ceilings. Without this row
+            // the entire `generate` path is invisible to the spend cap.
+            const txRef = db.collection('creditTransactions').doc();
+            tx.set(txRef, {
+              uid: ctx.user.uid,
+              type: 'spend',
+              generationType: input.mode,
+              credits: -creditsCharged,
+              source: 'generation',
+              jobId: generationId,
+              createdAt: new Date(),
+            });
           });
+          invalidateSpendCache(ctx.user.uid);
         } catch (creditErr) {
           await generationsCol()
             .doc(generationId)

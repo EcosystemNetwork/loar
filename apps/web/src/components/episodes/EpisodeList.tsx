@@ -33,6 +33,7 @@ interface Episode {
   exportUrl?: string | null;
   createdAt: string;
   updatedAt: string;
+  isCanon?: boolean;
 }
 
 interface EpisodeListProps {
@@ -147,6 +148,15 @@ export function EpisodeList({ universeId, onClose }: EpisodeListProps) {
                       <Badge variant="outline" className="text-[10px]">
                         ~{Math.round(((ep.clipCount ?? ep.clips?.length ?? 0) * 8) / 60)} min
                       </Badge>
+                      {ep.isCanon ? (
+                        <Badge className="text-[10px] bg-emerald-500/20 text-emerald-600 border-emerald-500/40">
+                          Canon
+                        </Badge>
+                      ) : (
+                        <Badge className="text-[10px] bg-amber-500/20 text-amber-600 border-amber-500/40">
+                          Draft
+                        </Badge>
+                      )}
                       {isExported && (
                         <Badge variant="outline" className="text-[10px] gap-1 text-green-600">
                           <Check className="w-3 h-3" /> Exported

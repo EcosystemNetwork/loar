@@ -177,7 +177,9 @@ function SandboxPage() {
       window.localStorage.setItem(AUTO_SEND_KEY, autoSendTarget);
       window.localStorage.setItem(AUTO_SEND_CLASSIFICATION_KEY, autoSendClassification);
       window.localStorage.setItem(AUTO_SEND_VISIBILITY_KEY, autoSendVisibility);
-    } catch {}
+    } catch {
+      // localStorage may be unavailable (SSR, private mode) — settings won't persist this turn.
+    }
   }, [autoSendTarget, autoSendClassification, autoSendVisibility]);
 
   // Refs so autoSaveDraft reads the latest values without re-building every

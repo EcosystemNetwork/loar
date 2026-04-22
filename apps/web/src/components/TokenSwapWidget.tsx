@@ -10,7 +10,7 @@
  */
 import { useState, useMemo } from 'react';
 import { useTokenPool, getSwapUrl } from '@/hooks/useTokenSwap';
-import { usePoolData, priceFromSqrtX96, priceFromTick, formatTokenAmount } from '@/hooks/useTokens';
+import { usePoolData, ethPricePerToken, formatTokenAmount } from '@/hooks/useTokens';
 import {
   useCurveState,
   useCurveProgress,
@@ -73,16 +73,16 @@ export function TokenSwapWidget({
 
   const mode = modeProp ?? (compact ? 'compact' : 'card');
 
-  // Calculate current price — bonding curve or LP pool
+  // Calculate current ETH-per-token price — bonding curve or LP pool. The
+  // pool helper handles currency0/currency1 ordering so we always quote in
+  // ETH per token and return null for untraded pools.
   const currentPrice = isInBondingPhase
     ? curveState && curveState.currentPrice > 0n
       ? Number(formatEther(curveState.currentPrice))
       : null
-    : poolData?.sqrtPriceX96
-      ? priceFromSqrtX96(poolData.sqrtPriceX96)
-      : poolData?.tick != null
-        ? priceFromTick(poolData.tick)
-        : null;
+    : poolData && pool
+      ? ethPricePerToken(poolData, pool.tokenAddress)
+      : null;
 
   const estimatedTokens = useMemo(() => {
     if (isInBondingPhase) {

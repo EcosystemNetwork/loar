@@ -508,6 +508,16 @@ export const platformSubscriptionsRouter = router({
 
 // ── Webhook helpers (called from stripe-webhook.ts) ──────────────────
 
+// Stripe API 2025-04-30+ moved current_period_start/end onto subscription items.
+// Older webhooks may still carry them on the subscription itself, so probe both.
+function getSubscriptionPeriod(sub: any): { start?: number; end?: number } {
+  const item = Array.isArray(sub?.items?.data) ? sub.items.data[0] : undefined;
+  return {
+    start: item?.current_period_start ?? sub?.current_period_start ?? undefined,
+    end: item?.current_period_end ?? sub?.current_period_end ?? undefined,
+  };
+}
+
 /**
  * Handle a successful subscription checkout — create the subscription record
  * and issue the first month's credits.
@@ -523,6 +533,7 @@ export async function handleCheckoutCompleted(session: any) {
   const subscription = await getStripe()?.subscriptions.retrieve(session.subscription);
   if (!subscription) return;
 
+  const period = getSubscriptionPeriod(subscription);
   const now = new Date();
   await subscriptionsCol()
     .doc(userId.toLowerCase())
@@ -532,8 +543,8 @@ export async function handleCheckoutCompleted(session: any) {
       stripeSubscriptionId: subscription.id,
       stripeCustomerId: subscription.customer,
       status: subscription.status,
-      currentPeriodStart: new Date(subscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      currentPeriodStart: period.start ? new Date(period.start * 1000) : now,
+      currentPeriodEnd: period.end ? new Date(period.end * 1000) : now,
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
       creditsRefreshedAt: now,
       createdAt: now,
@@ -573,13 +584,15 @@ export async function handleInvoicePaid(invoice: any) {
   // Update subscription period
   const subscription = await getStripe()?.subscriptions.retrieve(subscriptionId);
   if (subscription) {
+    const period = getSubscriptionPeriod(subscription);
+    const now = new Date();
     await subDoc.ref.update({
       status: subscription.status,
-      currentPeriodStart: new Date(subscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      currentPeriodStart: period.start ? new Date(period.start * 1000) : now,
+      currentPeriodEnd: period.end ? new Date(period.end * 1000) : now,
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
-      creditsRefreshedAt: new Date(),
-      updatedAt: new Date(),
+      creditsRefreshedAt: now,
+      updatedAt: now,
     });
   }
 }

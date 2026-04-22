@@ -1,7 +1,10 @@
 /**
  * Universe (dynamic) handlers — events emitted from per-universe contract
  * instances spawned by the UniverseManager factory.
- * Events: NodeCreated, NodeCanonized, MediaUpdated, TokenUpdated, AdminUpdated.
+ * Events: NodeCreated, CanonChanged, EpisodeCanonized, MediaUpdated, TokenUpdated, AdminUpdated.
+ *
+ * Note: legacy `NodeCanonized` event is deprecated and never emitted in
+ * current Universe contracts — listening for it would be silent data loss.
  */
 import { parseAbiItem, getAddress } from 'viem';
 import { db } from '../firestore.js';
@@ -18,8 +21,11 @@ import type { Handler } from './types.js';
 const nodeCreatedEvent = parseAbiItem(
   'event NodeCreated(uint256 indexed id, uint256 indexed previous, address indexed creator, bytes32 contentHash, bytes32 plotHash, string link, string plot)'
 );
-const nodeCanonizedEvent = parseAbiItem(
-  'event NodeCanonized(uint256 indexed id, address indexed canonizer)'
+const canonChangedEvent = parseAbiItem(
+  'event CanonChanged(uint256 indexed newCanonId, uint256 indexed previousCanonId, address canonizer)'
+);
+const episodeCanonizedEvent = parseAbiItem(
+  'event EpisodeCanonized(bytes32 indexed episodeHash, uint256 indexed tipNodeId, address canonizer)'
 );
 const mediaUpdatedEvent = parseAbiItem(
   'event MediaUpdated(uint256 indexed nodeId, bytes32 contentHash, string link)'
@@ -70,13 +76,13 @@ const nodeCreated: Handler<typeof nodeCreatedEvent> = {
   },
 };
 
-const nodeCanonized: Handler<typeof nodeCanonizedEvent> = {
+const canonChanged: Handler<typeof canonChangedEvent> = {
   kind: 'Universe',
-  event: 'NodeCanonized',
-  abi: nodeCanonizedEvent,
+  event: 'CanonChanged',
+  abi: canonChangedEvent,
   async run(ctx) {
     const universeAddress = ctx.address;
-    const nodeId = Number(ctx.args.id);
+    const nodeId = Number(ctx.args.newCanonId);
     const id = `${universeAddress}:${nodeId}:${ctx.eventId}`;
     const doc: NodeCanonization = {
       id,
@@ -87,6 +93,31 @@ const nodeCanonized: Handler<typeof nodeCanonizedEvent> = {
       _event: ctx.envelope,
     };
     ctx.batcher.set(db.collection(COLLECTIONS.nodeCanonizations).doc(id), doc);
+  },
+};
+
+const episodeCanonized: Handler<typeof episodeCanonizedEvent> = {
+  kind: 'Universe',
+  event: 'EpisodeCanonized',
+  abi: episodeCanonizedEvent,
+  async run(ctx) {
+    const universeAddress = ctx.address;
+    const tipNodeId = Number(ctx.args.tipNodeId);
+    const episodeHash = ctx.args.episodeHash as Hex;
+    // Mirror onto the episodes collection (server uses the same hash) so the
+    // off-chain mirror reflects on-chain canon authoritatively.
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.episodeCanonizations).doc(`${universeAddress}:${episodeHash}`),
+      {
+        id: `${universeAddress}:${episodeHash}`,
+        universeAddress,
+        episodeHash,
+        tipNodeId,
+        canonizer: getAddress(ctx.args.canonizer).toLowerCase() as Hex,
+        timestamp: ctx.block.timestamp,
+        _event: ctx.envelope,
+      }
+    );
   },
 };
 
@@ -136,7 +167,8 @@ const adminUpdated: Handler<typeof adminUpdatedEvent> = {
 
 export const universeHandlers: Handler[] = [
   nodeCreated as unknown as Handler,
-  nodeCanonized as unknown as Handler,
+  canonChanged as unknown as Handler,
+  episodeCanonized as unknown as Handler,
   mediaUpdated as unknown as Handler,
   tokenUpdated as unknown as Handler,
   adminUpdated as unknown as Handler,

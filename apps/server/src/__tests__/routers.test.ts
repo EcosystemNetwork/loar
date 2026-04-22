@@ -35,7 +35,9 @@ describe('Top-level procedures', () => {
       chainId: 84532,
       connector: 'injected',
     });
-    expect(result).toEqual({ ok: true });
+    expect(result.ok).toBe(true);
+    expect(result).toHaveProperty('newUser');
+    expect(result).toHaveProperty('creditsGranted');
   });
 });
 

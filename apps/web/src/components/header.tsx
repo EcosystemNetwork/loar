@@ -24,6 +24,9 @@ import {
 } from './ui/dropdown-menu';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useWalletAuth } from '@/lib/wallet-auth';
+import { trpcClient } from '@/utils/trpc';
 
 /**
  * Routes hidden from navigation (empty = all routes visible).
@@ -32,22 +35,20 @@ import { useState } from 'react';
 const HIDDEN_ROUTES = new Set<string>([]);
 
 /** Core navigation — the 5 most important user flows */
-const primaryLinks = [
+const primaryLinksBase = [
   { to: '/discover', label: 'Discover' },
   { to: '/create', label: 'Create' },
-  { to: '/studio', label: 'Studio' },
   { to: '/editor', label: 'Editor' },
   { to: '/tokens', label: 'Launchpad' },
-  { to: '/gallery', label: 'Gallery' },
+  { to: '/wiki', label: 'Wiki' },
   { to: '/dashboard', label: 'Dashboard' },
-].filter((l) => !HIDDEN_ROUTES.has(l.to));
+] as const;
 
 /** Grouped secondary links — organized by function with section headers */
 const moreGroups = [
   {
     label: 'Explore',
     links: [
-      { to: '/wiki', label: 'Wiki' },
       { to: '/market', label: 'Marketplace' },
       { to: '/activity', label: 'Activity' },
     ],
@@ -81,6 +82,32 @@ const moreLinks = moreGroups.flatMap((g) => g.links.filter((l) => !HIDDEN_ROUTES
 export default function Header() {
   const matchRoute = useMatchRoute();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { address, isAuthenticated } = useWalletAuth();
+
+  // Surface the Studio link only for users who actually have universes to manage.
+  const { data: hasUniverses } = useQuery({
+    queryKey: ['header', 'has-universes', address],
+    queryFn: () =>
+      trpcClient.universes.getByCreator
+        .query({ creator: address! })
+        .then((r: any) => ((r?.data ?? r) as unknown[])?.length > 0),
+    enabled: !!address && isAuthenticated,
+    staleTime: 60_000,
+  });
+
+  const primaryLinks = (
+    hasUniverses
+      ? ([
+          { to: '/discover', label: 'Discover' },
+          { to: '/create', label: 'Create' },
+          { to: '/studio', label: 'Studio' },
+          { to: '/editor', label: 'Editor' },
+          { to: '/tokens', label: 'Launchpad' },
+          { to: '/gallery', label: 'Gallery' },
+          { to: '/dashboard', label: 'Dashboard' },
+        ] as const)
+      : primaryLinksBase
+  ).filter((l) => !HIDDEN_ROUTES.has(l.to));
 
   const moreIsActive = moreLinks.some(({ to }) => matchRoute({ to, fuzzy: true }));
 

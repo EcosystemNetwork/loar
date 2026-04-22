@@ -100,6 +100,7 @@ import { useChainId } from 'wagmi';
 import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import { UniverseSidebar } from '@/components/UniverseSidebar';
+import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
 import { FlowCreationPanel } from '@/components/FlowCreationPanel';
 import { GovernanceSidebar } from '@/components/GovernanceSidebar';
 import { GenerationsPanel } from '@/components/GenerationsPanel';
@@ -4068,12 +4069,44 @@ function UniverseTimelineEditorInner() {
   );
 }
 
-function UniverseTimelineEditor() {
+function EditorAdminGate() {
+  const { id } = useParams({ from: '/universe/$id' });
+  const navigate = useNavigate();
+  const admin = useIsUniverseAdmin(id as `0x${string}`);
+
+  useEffect(() => {
+    if (admin.isLoading) return;
+    if (!admin.isAdmin) {
+      navigate({
+        to: '/universe/$id/watch',
+        params: { id },
+        replace: true,
+      });
+    }
+  }, [admin.isLoading, admin.isAdmin, id, navigate]);
+
+  if (admin.isLoading || !admin.isAdmin) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin mx-auto" />
+          <p className="text-sm text-muted-foreground">
+            {admin.isLoading ? 'Checking editor access…' : 'Redirecting…'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <ReactFlowProvider>
       <UniverseTimelineEditorInner />
     </ReactFlowProvider>
   );
+}
+
+function UniverseTimelineEditor() {
+  return <EditorAdminGate />;
 }
 
 export const Route = createFileRoute('/universe/$id')({

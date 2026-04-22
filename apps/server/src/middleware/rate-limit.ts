@@ -222,16 +222,26 @@ export function aiRateLimiter(opts: { windowMs: number; max: number }) {
       );
     }
 
-    // Per-wallet rate limit (10 req/min per wallet across all AI endpoints)
+    // Per-wallet rate limit (10 req/min per wallet across all AI endpoints).
+    // Browser clients authenticate via the `siwe-session` httpOnly cookie and
+    // never send Authorization, so we must check both. Without the cookie
+    // fallback, every browser-authed user only hits the per-IP bucket and the
+    // 200/day per-wallet ceiling is unreachable.
     const authHeader = c.req.header('authorization');
-    if (authHeader) {
+    const { getCookie } = await import('hono/cookie');
+    const cookieToken = getCookie(c, 'siwe-session');
+    const tokenSource = authHeader
+      ? authHeader.replace('Bearer ', '')
+      : cookieToken
+        ? cookieToken
+        : null;
+    if (tokenSource) {
       // Extract wallet address from JWT via cryptographic verification.
       // Using verifySessionToken ensures attackers cannot forge wallet addresses
       // to bypass per-wallet rate limits.
       try {
         const { verifySessionToken } = await import('../lib/siwe');
-        const token = authHeader.replace('Bearer ', '');
-        const payload = await verifySessionToken(token);
+        const payload = await verifySessionToken(tokenSource);
         const wallet = (payload?.sub || '').toLowerCase();
         if (wallet) {
           const walletKey = `ai-wallet:${wallet}`;

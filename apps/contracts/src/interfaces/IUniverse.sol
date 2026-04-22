@@ -14,6 +14,12 @@ interface IUniverse {
     event CanonChanged(
         uint256 indexed newCanonId, uint256 indexed previousCanonId, address canonizer
     );
+    /// @notice Emitted when an off-chain episode is promoted to canon. `episodeHash` is
+    ///         keccak256 of the episode's off-chain id (UUID); `tipNodeId` is the canon
+    ///         tip after promotion (same semantics as CanonChanged.newCanonId).
+    event EpisodeCanonized(
+        bytes32 indexed episodeHash, uint256 indexed tipNodeId, address canonizer
+    );
     event NodeCreated(
         uint256 indexed id,
         uint256 indexed previous,

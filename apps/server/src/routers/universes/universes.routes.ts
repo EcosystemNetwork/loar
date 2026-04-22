@@ -41,6 +41,8 @@ const createUniverseSchema = z.object({
   chainId: z.number().int().positive().optional(),
   /** Optional Unstoppable Domains name for this universe (e.g. "myuniverse.crypto"). */
   unstoppableDomain: z.string().max(100).nullish(),
+  /** 'fun' starts private (owner must Launch Publicly); 'monetized' is public from mint. */
+  universeType: z.enum(['fun', 'monetized']).default('monetized'),
 });
 
 const getUniverseSchema = z.object({
@@ -100,6 +102,7 @@ export const universesRouter = router({
       mintTxHash: input.mintTxHash,
       unstoppableDomain: input.unstoppableDomain ?? null,
       chainId: input.chainId,
+      universeType: input.universeType,
     });
 
     void import('../../lib/analytics').then(({ captureServerEvent }) =>
@@ -444,6 +447,16 @@ export const universesRouter = router({
       if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
         throw new Error('Only the universe creator can change privacy');
       }
+
+      // Monetized (launchpad) universes are always public. Letting an admin
+      // flip one private post-launch would unlist a trading token.
+      const doc = await db.collection('cinematicUniverses').doc(universeId).get();
+      const universeType =
+        (doc.data()?.universeType as 'fun' | 'monetized' | undefined) ?? 'monetized';
+      if (universeType === 'monetized' && input.isPrivate) {
+        throw new Error('Launchpad universes are always public');
+      }
+
       return await setUniversePrivate(universeId, input.isPrivate, {
         uid: ctx.user?.uid,
         address: ctx.user?.address,

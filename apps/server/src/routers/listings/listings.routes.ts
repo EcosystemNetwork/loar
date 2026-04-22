@@ -11,7 +11,7 @@ import { createPublicClient, http, parseEther, type Hash } from 'viem';
 import { sepolia, baseSepolia } from 'viem/chains';
 import { throwApiError } from '../../lib/errors';
 import { recordRevenueEvent } from '../../services/revenue-recorder';
-import { assertContentOperable } from '../../lib/content-status';
+import { assertContentOperable, assertCanonReadyForMonetization } from '../../lib/content-status';
 
 const sepoliaClient = createPublicClient({
   chain: sepolia,
@@ -138,6 +138,7 @@ export const listingsRouter = router({
       // Block listing of moderated content
       if (input.assetRef) {
         await assertContentOperable(input.assetRef);
+        await assertCanonReadyForMonetization(input.assetRef);
       }
 
       const now = new Date();

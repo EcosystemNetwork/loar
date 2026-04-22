@@ -26,6 +26,25 @@ import { getStorageManager } from '../../services/storage';
 import { routeModel, getModelById } from '../../services/video-models';
 import { dispatchGeneration, saveGenerationRecord } from '../generation/generation.routes';
 import { publishToGallery } from '../../lib/gallery-publish';
+import { isUniverseCollaborator, isUniverseAdmin, getChainClient } from '../../lib/safe-admin';
+import { decodeEventLog, getAddress, keccak256, toBytes } from 'viem';
+
+/**
+ * Minimal ABI for the EpisodeCanonized event so we can decode receipts
+ * without depending on the full wagmi-generated universeAbi (which may be
+ * stale until forge + wagmi generate is re-run).
+ */
+const EPISODE_CANONIZED_EVENT_ABI = [
+  {
+    type: 'event',
+    name: 'EpisodeCanonized',
+    inputs: [
+      { name: 'episodeHash', type: 'bytes32', indexed: true },
+      { name: 'tipNodeId', type: 'uint256', indexed: true },
+      { name: 'canonizer', type: 'address', indexed: false },
+    ],
+  },
+] as const;
 
 // ── Collections ─────────────────────────────────────────────────────────
 
@@ -857,6 +876,14 @@ export const episodesRouter = router({
         createdAt: now,
         updatedAt: now,
         exportUrl: null,
+        // Episodes start as drafts. `publishAsCanon` is the one-way gesture
+        // that flips `isCanon` to true. `canonTipNodeId` records the on-chain
+        // anchor (for monetized universes) so a future multi-branch canon
+        // model can migrate without an on-chain rewrite.
+        isCanon: false,
+        canonTipNodeId: null,
+        canonizedAt: null,
+        canonTxHash: null,
       });
 
       return { id: episodeId };
@@ -893,16 +920,41 @@ export const episodesRouter = router({
       return { ok: true };
     }),
 
-  /** Get a single episode */
+  /**
+   * Get a single episode.
+   *
+   * Drafts (isCanon === false) are only visible to the creator, the universe
+   * admin (creator or Safe signer), or an active team member. Public viewers
+   * only ever see canon episodes.
+   */
   get: publicProcedure
     .input(z.object({ episodeId: z.string().min(1) }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const doc = await episodesCol().doc(input.episodeId).get();
       if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND' });
-      return doc.data();
+      const data = doc.data()!;
+
+      if (data.isCanon) return data;
+
+      const callerUid = ctx.user?.uid?.toLowerCase();
+      if (callerUid && data.creatorId?.toLowerCase?.() === callerUid) return data;
+
+      if (
+        data.universeId &&
+        (await isUniverseCollaborator(data.universeId as string, ctx.user?.address ?? callerUid))
+      ) {
+        return data;
+      }
+
+      throw new TRPCError({ code: 'NOT_FOUND' });
     }),
 
-  /** List episodes for a universe */
+  /**
+   * List episodes for a universe.
+   *
+   * Drafts are only returned to the creator, the universe admin, or an active
+   * team member. Public viewers receive canon-only listings.
+   */
   list: publicProcedure
     .input(
       z.object({
@@ -910,14 +962,205 @@ export const episodesRouter = router({
         limit: z.number().min(1).max(50).default(20),
       })
     )
-    .query(async ({ input }) => {
-      const snap = await episodesCol()
-        .where('universeId', '==', input.universeId)
-        .orderBy('createdAt', 'desc')
-        .limit(input.limit)
-        .get();
+    .query(async ({ input, ctx }) => {
+      const canSeeDrafts = await isUniverseCollaborator(
+        input.universeId,
+        ctx.user?.address ?? ctx.user?.uid
+      );
 
+      let query = episodesCol().where('universeId', '==', input.universeId);
+      if (!canSeeDrafts) {
+        query = query.where('isCanon', '==', true);
+      }
+
+      const snap = await query.orderBy('createdAt', 'desc').limit(input.limit).get();
       return snap.docs.map((d) => d.data());
+    }),
+
+  /**
+   * Promote an episode to canon. **One-way** — cannot be reversed.
+   *
+   * For `fun` universes, canon is a Firestore flag only (off-chain).
+   * For `monetized` universes, canon is an on-chain concept. The client must
+   * first sign `Universe.setCanonForEpisode(tipNodeId, episodeHash)` and pass
+   * the resulting txHash + tipNodeId here; we verify the `EpisodeCanonized`
+   * event in the receipt matches and then mirror `isCanon: true` to Firestore.
+   * The on-chain event remains the source of truth.
+   */
+  publishAsCanon: protectedProcedure
+    .input(
+      z.object({
+        episodeId: z.string().min(1),
+        /** Required for monetized universes; ignored for fun. */
+        txHash: z
+          .string()
+          .regex(/^0x[a-fA-F0-9]{64}$/)
+          .optional(),
+        /** On-chain canon tip node id at the moment of canonization. Recorded
+         *  for forward-compat with a future multi-branch canon model. */
+        canonTipNodeId: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ref = episodesCol().doc(input.episodeId);
+      const doc = await ref.get();
+      if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND' });
+
+      const data = doc.data()!;
+      if (data.isCanon) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Episode is already canon',
+        });
+      }
+
+      const universeId = (data.universeId as string | undefined)?.toLowerCase();
+      if (!universeId) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Episode is missing universeId',
+        });
+      }
+
+      const callerUid = ctx.user.uid.toLowerCase();
+      const isCreator = data.creatorId?.toLowerCase?.() === callerUid;
+      const isAdmin = await isUniverseAdmin(universeId, ctx.user.uid);
+      if (!isCreator && !isAdmin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the episode creator or the universe admin can publish canon',
+        });
+      }
+
+      const universeDoc = await db.collection('cinematicUniverses').doc(universeId).get();
+      if (!universeDoc.exists) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Universe not found' });
+      }
+      const universeType =
+        (universeDoc.data()?.universeType as 'fun' | 'monetized' | undefined) ?? 'monetized';
+
+      const now = new Date().toISOString();
+
+      if (universeType === 'fun') {
+        const batch = db.batch();
+        batch.update(ref, {
+          isCanon: true,
+          canonizedAt: now,
+          canonTipNodeId: input.canonTipNodeId ?? null,
+          updatedAt: now,
+        });
+        batch.set(db.collection('contentAuditLog').doc(), {
+          action: 'episode_canonized',
+          universeId,
+          episodeId: input.episodeId,
+          universeType,
+          actorUid: ctx.user.uid,
+          actorAddress: ctx.user.address ?? null,
+          createdAt: now,
+        });
+        await batch.commit();
+        return { ok: true, isCanon: true, universeType };
+      }
+
+      // Monetized: on-chain canon required. The creator must have already
+      // called `Universe.setCanonForEpisode(tipNodeId, episodeHash)` and passes
+      // the resulting txHash here. We fetch the receipt, verify the
+      // `EpisodeCanonized` event matches this episode, then flip the Firestore
+      // mirror. The on-chain event is the source of truth; this mirror exists
+      // only for fast listing queries.
+      if (!input.txHash || !input.canonTipNodeId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message:
+            'Monetized universes require txHash + canonTipNodeId from a signed setCanonForEpisode transaction',
+        });
+      }
+
+      const chainId = universeDoc.data()?.chainId as number | undefined;
+      const client = getChainClient(chainId);
+      const receipt = await client.getTransactionReceipt({
+        hash: input.txHash as `0x${string}`,
+      });
+      if (receipt.status !== 'success') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Transaction did not succeed on-chain',
+        });
+      }
+
+      const expectedAddress = getAddress(universeId);
+      const expectedEpisodeHash = keccak256(toBytes(input.episodeId));
+      let expectedTipNodeId: bigint;
+      try {
+        expectedTipNodeId = BigInt(input.canonTipNodeId);
+      } catch {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'canonTipNodeId is not a valid integer',
+        });
+      }
+
+      let matched = false;
+      let canonizer: string | null = null;
+      for (const log of receipt.logs) {
+        if (getAddress(log.address) !== expectedAddress) continue;
+        try {
+          const decoded = decodeEventLog({
+            abi: EPISODE_CANONIZED_EVENT_ABI,
+            data: log.data,
+            topics: log.topics,
+          });
+          if (decoded.eventName !== 'EpisodeCanonized') continue;
+          const args = decoded.args as {
+            episodeHash: `0x${string}`;
+            tipNodeId: bigint;
+            canonizer: `0x${string}`;
+          };
+          if (
+            args.episodeHash.toLowerCase() === expectedEpisodeHash.toLowerCase() &&
+            args.tipNodeId === expectedTipNodeId
+          ) {
+            matched = true;
+            canonizer = args.canonizer.toLowerCase();
+            break;
+          }
+        } catch {
+          // Not an EpisodeCanonized log; keep scanning.
+        }
+      }
+
+      if (!matched) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message:
+            'Receipt did not contain an EpisodeCanonized event matching this episode and tip node',
+        });
+      }
+
+      const batch = db.batch();
+      batch.update(ref, {
+        isCanon: true,
+        canonizedAt: now,
+        canonTipNodeId: input.canonTipNodeId,
+        canonTxHash: input.txHash,
+        canonizer,
+        updatedAt: now,
+      });
+      batch.set(db.collection('contentAuditLog').doc(), {
+        action: 'episode_canonized',
+        universeId,
+        episodeId: input.episodeId,
+        universeType,
+        txHash: input.txHash,
+        canonTipNodeId: input.canonTipNodeId,
+        canonizer,
+        actorUid: ctx.user.uid,
+        actorAddress: ctx.user.address ?? null,
+        createdAt: now,
+      });
+      await batch.commit();
+
+      return { ok: true, isCanon: true, universeType, txHash: input.txHash };
     }),
 
   /** Delete an episode */
@@ -976,13 +1219,18 @@ export const episodesRouter = router({
       return { jobId, credits };
     }),
 
-  /** Poll export job status */
-  exportStatus: publicProcedure
+  /** Poll export job status. Owner-only — UUIDs are unguessable but a leaked
+   *  jobId (logs, screen-share, debug trace) would otherwise expose another
+   *  user's outputUrl + error strings. */
+  exportStatus: protectedProcedure
     .input(z.object({ jobId: z.string().min(1) }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const doc = await exportJobsCol().doc(input.jobId).get();
       if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND' });
       const data = doc.data()!;
+      if (data.userId && data.userId !== ctx.user.uid) {
+        throw new TRPCError({ code: 'NOT_FOUND' });
+      }
       return {
         status: data.status as string,
         progress: data.progress as number,
@@ -1097,13 +1345,16 @@ export const episodesRouter = router({
       return { jobId, clipCount: scenes.length, totalCredits, creditsPerClip };
     }),
 
-  /** Poll script-to-episode job progress */
-  scriptJobStatus: publicProcedure
+  /** Poll script-to-episode job progress. Owner-only — see exportStatus. */
+  scriptJobStatus: protectedProcedure
     .input(z.object({ jobId: z.string().min(1) }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const doc = await scriptJobsCol().doc(input.jobId).get();
       if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND' });
       const data = doc.data()!;
+      if (data.userId && data.userId !== ctx.user.uid) {
+        throw new TRPCError({ code: 'NOT_FOUND' });
+      }
       return {
         status: data.status as string,
         currentSceneIndex: data.currentSceneIndex as number,

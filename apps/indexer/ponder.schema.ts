@@ -205,6 +205,67 @@ export const nodeContent = onchainTable('node_content', (t) => ({
   plot: t.text().notNull(), // Full plot text from event
 }));
 
+// ============= Revenue / Credits / Subscriptions =============
+
+export const creditEvent = onchainTable(
+  'credit_event',
+  (t) => ({
+    id: t.text().primaryKey(), // txHash:logIndex
+    kind: t.text().notNull(), // 'granted' | 'purchased' | 'loar_purchased' | 'spent'
+    user: t.hex().notNull(),
+    amount: t.text().notNull(), // bigint as string
+    packageId: t.text(), // numeric id as string when applicable
+    bonusCredits: t.text(),
+    paidWei: t.text(),
+    paidLoar: t.text(),
+    generationType: t.text(),
+    universeId: t.text(),
+    reason: t.text(),
+    timestamp: t.integer().notNull(),
+    blockNumber: t.integer().notNull(),
+  }),
+  (table) => ({
+    userIdx: index('credit_user_idx').on(table.user),
+    kindIdx: index('credit_kind_idx').on(table.kind),
+  })
+);
+
+export const paymentEvent = onchainTable(
+  'payment_event',
+  (t) => ({
+    id: t.text().primaryKey(),
+    kind: t.text().notNull(), // 'routed' | 'loar_routed' | 'claimed' | 'loar_claimed'
+    creator: t.hex().notNull(),
+    creatorAmount: t.text(), // bigint as string
+    platformAmount: t.text(),
+    feeBps: t.integer(),
+    timestamp: t.integer().notNull(),
+    blockNumber: t.integer().notNull(),
+  }),
+  (table) => ({
+    creatorIdx: index('payment_creator_idx').on(table.creator),
+    kindIdx: index('payment_kind_idx').on(table.kind),
+  })
+);
+
+export const subscriptionEvent = onchainTable(
+  'subscription_event',
+  (t) => ({
+    id: t.text().primaryKey(),
+    kind: t.text().notNull(), // 'subscribed' | 'cancelled' | 'renewed'
+    user: t.hex().notNull(),
+    universeId: t.text().notNull(),
+    tier: t.integer(), // SubscriptionTier enum
+    expiresAt: t.integer(),
+    timestamp: t.integer().notNull(),
+    blockNumber: t.integer().notNull(),
+  }),
+  (table) => ({
+    userIdx: index('subscription_user_idx').on(table.user),
+    universeIdx: index('subscription_universe_idx').on(table.universeId),
+  })
+);
+
 // ============= Token Transfer Tracking =============
 
 export const tokenTransfer = onchainTable(

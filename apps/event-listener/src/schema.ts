@@ -356,6 +356,7 @@ export const COLLECTIONS = {
   hookEvents: 'indexer_hookEvents',
   nodes: 'indexer_nodes',
   nodeCanonizations: 'indexer_nodeCanonizations',
+  episodeCanonizations: 'indexer_episodeCanonizations',
   nodeContents: 'indexer_nodeContents',
   tokenTransfers: 'indexer_tokenTransfers',
   tokenHolders: 'indexer_tokenHolders',

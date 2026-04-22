@@ -752,23 +752,23 @@ function GlobalSearchResults({
 function WikiPage() {
   const { universe: universeAddress, tab: urlTab } = useSearch({ from: '/wiki/' });
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<WikiTab>((urlTab as WikiTab) ?? 'person');
+  const [activeTab, setActiveTab] = useState<WikiTab>((urlTab as WikiTab) ?? 'gallery');
   const [globalSearch, setGlobalSearch] = useState('');
 
   // Keep component state in sync with the URL when the user navigates back/forward
   // or when another surface (e.g. the /gallery redirect) changes ?tab=.
-  // Missing ?tab= means the default tab ('person').
-  const expectedTab = ((urlTab as WikiTab) ?? 'person') as WikiTab;
+  // Missing ?tab= means the default tab ('gallery') — the wiki's discovery surface.
+  const expectedTab = ((urlTab as WikiTab) ?? 'gallery') as WikiTab;
   if (expectedTab !== activeTab) {
     setActiveTab(expectedTab);
   }
 
-  // Build a /wiki search object. 'person' is the default, so it's omitted from
+  // Build a /wiki search object. 'gallery' is the default, so it's omitted from
   // the URL to keep the no-tab case clean.
   const buildSearch = (tab: WikiTab, universe: string | undefined) => {
     const s: { universe?: string; tab?: string } = {};
     if (universe) s.universe = universe;
-    if (tab !== 'person') s.tab = tab;
+    if (tab !== 'gallery') s.tab = tab;
     return s;
   };
 

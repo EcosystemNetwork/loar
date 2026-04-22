@@ -24,6 +24,9 @@ interface CreateUniverseInput {
   mintTxHash?: string;
   unstoppableDomain?: string | null;
   chainId?: number;
+  /** 'fun' = sandbox, starts private until owner launches it publicly.
+   *  'monetized' = launchpad universe, public from mint. */
+  universeType?: 'fun' | 'monetized';
 }
 
 /** Firestore collection name kept as 'cinematicUniverses' for data continuity. */
@@ -40,6 +43,12 @@ export async function createUniverse(input: CreateUniverseInput) {
     if (existing.exists) {
       throw new Error('A universe with this timeline contract address already exists');
     }
+
+    const universeType = input.universeType ?? 'monetized';
+    // Fun universes start private and require an explicit "Launch Publicly"
+    // gesture. Monetized universes are always public (they ship via the
+    // launchpad, so hiding them post-mint would unlist a trading token).
+    const isPrivate = universeType === 'fun';
 
     const data = {
       address: input.address,
@@ -58,8 +67,8 @@ export async function createUniverse(input: CreateUniverseInput) {
       isMultiSig: false,
       multiSigAddress: null,
       accessModel: 'open', // open | subscription | token_gate | both
-      universeType: 'monetized', // 'fun' (no monetization) | 'monetized' (revenue-bearing)
-      isPrivate: false, // owner-controlled: hides universe + its content from all public surfaces
+      universeType,
+      isPrivate,
       created_at: new Date(),
       updated_at: new Date(),
     };

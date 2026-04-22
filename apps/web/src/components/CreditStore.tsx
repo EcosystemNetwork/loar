@@ -135,10 +135,8 @@ function CardPaymentSection({
         return;
       }
 
-      const amountCents = Math.round(pkg.fiatPriceUsd * 100);
       const result = await trpcClient.stripe.createPaymentIntent.mutate({
         packageId: pkg.id,
-        amountCents,
       });
 
       setClientSecret(result.clientSecret);

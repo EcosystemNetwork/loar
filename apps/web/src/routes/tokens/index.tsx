@@ -348,7 +348,15 @@ function TokenLaunchpad() {
                 ) : (
                   <div className="space-y-1.5 max-h-[600px] overflow-y-auto">
                     {enrichedSwaps.map((swap) => {
-                      const isBuy = BigInt(swap.amount0) > 0n;
+                      // ETH side of the swap depends on which side of the
+                      // pool our token sits on. Fall back to amount0 when we
+                      // couldn't match the swap to a known launchpad token.
+                      const ethAmountSigned = swap.token
+                        ? BigInt(swap.token.tokenIsCurrency0 ? swap.amount1 : swap.amount0)
+                        : BigInt(swap.amount0);
+                      const isBuy = ethAmountSigned > 0n;
+                      const ethAmountAbs =
+                        ethAmountSigned < 0n ? -ethAmountSigned : ethAmountSigned;
                       return (
                         <Link
                           key={swap.id}
@@ -385,7 +393,7 @@ function TokenLaunchpad() {
                           </div>
                           <div className="text-right flex-shrink-0">
                             <p className="font-mono text-[11px] font-semibold">
-                              {formatEth(swap.amount1)}
+                              {formatEth(ethAmountAbs.toString())}
                             </p>
                           </div>
                         </Link>

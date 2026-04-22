@@ -34,6 +34,9 @@ import {
   canonVote,
   license,
   collab,
+  creditEvent,
+  paymentEvent,
+  subscriptionEvent,
 } from 'ponder:schema';
 import { getAddress } from 'viem';
 
@@ -471,9 +474,14 @@ ponder.on('Universe:NodeCreated', async ({ event, context }) => {
   }
 });
 
-ponder.on('Universe:NodeCanonized', async ({ event, context }) => {
+// Universe.sol emits `CanonChanged(newCanonId, previousCanonId, canonizer)` —
+// the legacy `NodeCanonized` event is deprecated and never emitted in current
+// contracts. The new `EpisodeCanonized(episodeHash, tipNodeId, canonizer)`
+// event is also emitted but isn't yet in the generated ABI; handler will be
+// added after `forge build && wagmi generate`.
+ponder.on('Universe:CanonChanged', async ({ event, context }) => {
   const universeAddress = getAddress(event.log.address).toLowerCase() as `0x${string}`;
-  const nodeId = Number(event.args.id);
+  const nodeId = Number(event.args.newCanonId);
 
   await context.db.insert(nodeCanonization).values({
     id: `${universeAddress}:${nodeId}:${event.id}`,
@@ -884,4 +892,150 @@ ponder.on('CollabManager:CollabCompleted', async ({ event, context }) => {
 
 ponder.on('CollabManager:CollabCancelled', async ({ event, context }) => {
   await context.db.update(collab, { id: event.args.collabId.toString() }).set({ status: 4 });
+});
+
+// ============= CreditManager Events =============
+// All four credit-flow events project into the same `credit_event` table with
+// a discriminator `kind`, so callers can sum spend by user without joining
+// across separate tables.
+
+ponder.on('CreditManager:CreditsGranted', async ({ event, context }) => {
+  await context.db.insert(creditEvent).values({
+    id: event.id,
+    kind: 'granted',
+    user: getAddress(event.args.user).toLowerCase() as `0x${string}`,
+    amount: event.args.amount.toString(),
+    reason: event.args.reason,
+    timestamp: Number(event.block.timestamp),
+    blockNumber: Number(event.block.number),
+  });
+});
+
+ponder.on('CreditManager:CreditsPurchased', async ({ event, context }) => {
+  await context.db.insert(creditEvent).values({
+    id: event.id,
+    kind: 'purchased',
+    user: getAddress(event.args.user).toLowerCase() as `0x${string}`,
+    amount: event.args.credits.toString(),
+    packageId: event.args.packageId.toString(),
+    bonusCredits: event.args.bonus.toString(),
+    paidWei: event.args.paid.toString(),
+    timestamp: Number(event.block.timestamp),
+    blockNumber: Number(event.block.number),
+  });
+});
+
+ponder.on('CreditManager:CreditsLoarPurchased', async ({ event, context }) => {
+  await context.db.insert(creditEvent).values({
+    id: event.id,
+    kind: 'loar_purchased',
+    user: getAddress(event.args.user).toLowerCase() as `0x${string}`,
+    amount: event.args.credits.toString(),
+    packageId: event.args.packageId.toString(),
+    bonusCredits: event.args.bonus.toString(),
+    paidLoar: event.args.loarPaid.toString(),
+    timestamp: Number(event.block.timestamp),
+    blockNumber: Number(event.block.number),
+  });
+});
+
+ponder.on('CreditManager:CreditsSpent', async ({ event, context }) => {
+  await context.db.insert(creditEvent).values({
+    id: event.id,
+    kind: 'spent',
+    user: getAddress(event.args.user).toLowerCase() as `0x${string}`,
+    amount: event.args.amount.toString(),
+    generationType: event.args.generationType,
+    universeId: event.args.universeId.toString(),
+    timestamp: Number(event.block.timestamp),
+    blockNumber: Number(event.block.number),
+  });
+});
+
+// ============= PaymentRouter Events =============
+
+ponder.on('PaymentRouter:PaymentRouted', async ({ event, context }) => {
+  await context.db.insert(paymentEvent).values({
+    id: event.id,
+    kind: 'routed',
+    creator: getAddress(event.args.creator).toLowerCase() as `0x${string}`,
+    creatorAmount: event.args.creatorAmount.toString(),
+    platformAmount: event.args.platformAmount.toString(),
+    feeBps: Number(event.args.feeBps),
+    timestamp: Number(event.block.timestamp),
+    blockNumber: Number(event.block.number),
+  });
+});
+
+ponder.on('PaymentRouter:LoarPaymentRouted', async ({ event, context }) => {
+  await context.db.insert(paymentEvent).values({
+    id: event.id,
+    kind: 'loar_routed',
+    creator: getAddress(event.args.creator).toLowerCase() as `0x${string}`,
+    creatorAmount: event.args.creatorAmount.toString(),
+    platformAmount: event.args.platformAmount.toString(),
+    feeBps: Number(event.args.feeBps),
+    timestamp: Number(event.block.timestamp),
+    blockNumber: Number(event.block.number),
+  });
+});
+
+ponder.on('PaymentRouter:Claimed', async ({ event, context }) => {
+  await context.db.insert(paymentEvent).values({
+    id: event.id,
+    kind: 'claimed',
+    creator: getAddress(event.args.creator).toLowerCase() as `0x${string}`,
+    creatorAmount: event.args.amount.toString(),
+    timestamp: Number(event.block.timestamp),
+    blockNumber: Number(event.block.number),
+  });
+});
+
+ponder.on('PaymentRouter:LoarClaimed', async ({ event, context }) => {
+  await context.db.insert(paymentEvent).values({
+    id: event.id,
+    kind: 'loar_claimed',
+    creator: getAddress(event.args.creator).toLowerCase() as `0x${string}`,
+    creatorAmount: event.args.amount.toString(),
+    timestamp: Number(event.block.timestamp),
+    blockNumber: Number(event.block.number),
+  });
+});
+
+// ============= SubscriptionManager Events =============
+
+ponder.on('SubscriptionManager:Subscribed', async ({ event, context }) => {
+  await context.db.insert(subscriptionEvent).values({
+    id: event.id,
+    kind: 'subscribed',
+    user: getAddress(event.args.user).toLowerCase() as `0x${string}`,
+    universeId: event.args.universeId.toString(),
+    tier: Number(event.args.tier),
+    expiresAt: Number(event.args.expiresAt),
+    timestamp: Number(event.block.timestamp),
+    blockNumber: Number(event.block.number),
+  });
+});
+
+ponder.on('SubscriptionManager:SubscriptionCancelled', async ({ event, context }) => {
+  await context.db.insert(subscriptionEvent).values({
+    id: event.id,
+    kind: 'cancelled',
+    user: getAddress(event.args.user).toLowerCase() as `0x${string}`,
+    universeId: event.args.universeId.toString(),
+    timestamp: Number(event.block.timestamp),
+    blockNumber: Number(event.block.number),
+  });
+});
+
+ponder.on('SubscriptionManager:SubscriptionRenewed', async ({ event, context }) => {
+  await context.db.insert(subscriptionEvent).values({
+    id: event.id,
+    kind: 'renewed',
+    user: getAddress(event.args.user).toLowerCase() as `0x${string}`,
+    universeId: event.args.universeId.toString(),
+    expiresAt: Number(event.args.newExpiry),
+    timestamp: Number(event.block.timestamp),
+    blockNumber: Number(event.block.number),
+  });
 });

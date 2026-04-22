@@ -77,8 +77,15 @@ async function lookupDynamic(chainId: number, address: string): Promise<boolean>
   }
 
   const lowered = LOWER(address);
-  // Universe tokens are recorded with `tokenAddress: lowercase`.
-  const snap = await db.collection('universes').where('tokenAddress', '==', lowered).limit(1).get();
+  // Universe tokens are recorded with `tokenAddress: lowercase`. The Firestore
+  // collection is `cinematicUniverses` (the legacy name was kept for data
+  // continuity) — querying `universes` always returns empty, breaking the
+  // dynamic per-universe allowlist branch.
+  const snap = await db
+    .collection('cinematicUniverses')
+    .where('tokenAddress', '==', lowered)
+    .limit(1)
+    .get();
 
   const allowed = !snap.empty;
   dynamicCache.set(key, { allowed, expiresAt: Date.now() + DYNAMIC_TTL_MS });

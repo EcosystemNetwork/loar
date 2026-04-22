@@ -63,34 +63,51 @@ const POLL_INTERVAL_MS = 5000;
 // ── Service ──────────────────────────────────────────────────────────────
 
 export class ByteDanceService {
-  private apiKey: string | null = null;
+  private apiKeys: string[] | null = null;
+  private activeKeyIdx = 0;
 
-  private ensureConfigured(): string {
-    if (!this.apiKey) {
-      this.apiKey = process.env.BYTEDANCE_API_KEY || null;
+  private ensureConfigured(): string[] {
+    if (!this.apiKeys) {
+      const raw = process.env.BYTEDANCE_API_KEY || '';
+      this.apiKeys = raw
+        .split(',')
+        .map((k) => k.trim())
+        .filter(Boolean);
     }
-    if (!this.apiKey) {
+    if (this.apiKeys.length === 0) {
       throw new Error(
         'BYTEDANCE_API_KEY environment variable is required for ByteDance generation'
       );
     }
-    return this.apiKey;
+    return this.apiKeys;
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const apiKey = this.ensureConfigured();
+    const keys = this.ensureConfigured();
     const url = `${BASE_URL}${path}`;
+    let lastErr: Error | null = null;
 
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-        ...options.headers,
-      },
-    });
+    for (let i = 0; i < keys.length; i++) {
+      const idx = (this.activeKeyIdx + i) % keys.length;
+      const apiKey = keys[idx];
 
-    if (!response.ok) {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+          ...options.headers,
+        },
+      });
+
+      if (response.ok) {
+        if (idx !== this.activeKeyIdx) {
+          console.log(`[ByteDance] Rotated to backup key #${idx + 1}/${keys.length}`);
+          this.activeKeyIdx = idx;
+        }
+        return response.json() as Promise<T>;
+      }
+
       const body = await response.text().catch(() => '');
       let detail = '';
       try {
@@ -99,10 +116,17 @@ export class ByteDanceService {
       } catch {
         detail = body;
       }
-      throw new Error(`ByteDance API error ${response.status}: ${detail}`.slice(0, 500));
+      const err = new Error(`ByteDance API error ${response.status}: ${detail}`.slice(0, 500));
+
+      const rotatable =
+        response.status === 401 || response.status === 403 || response.status === 429;
+      if (!rotatable || keys.length === 1) throw err;
+
+      console.warn(`[ByteDance] Key #${idx + 1} failed (${response.status}), trying next`);
+      lastErr = err;
     }
 
-    return response.json() as Promise<T>;
+    throw lastErr ?? new Error('ByteDance API error: all keys exhausted');
   }
 
   // ── Video Generation (Seedance 2.0) ──────────────────────────────────

@@ -569,6 +569,7 @@ function CinematicUniverseCreate() {
               signature,
               message,
               nonce,
+              universeType: universeMode === 'monetize' ? 'monetized' : 'fun',
             });
 
             // Registration succeeded

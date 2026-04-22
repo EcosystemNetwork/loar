@@ -14,8 +14,7 @@ import { useState, useMemo, useCallback } from 'react';
 import {
   useTokenListData,
   usePoolData,
-  priceFromSqrtX96,
-  priceFromTick,
+  ethPricePerToken,
   formatTokenAmount,
   computePriceImpactBps,
   type EnrichedToken,
@@ -86,13 +85,27 @@ function SwapPage() {
   // Pool data for the selected token
   const { data: poolData } = usePoolData(selectedToken?.poolId);
 
-  // Current price from pool
+  // Which side of the pool holds the selected token — `selectedToken` is
+  // already populated from the enriched list, so we prefer that and fall
+  // back to a direct pool lookup.
+  const tokenIsCurrency0 = useMemo(() => {
+    if (selectedToken) return selectedToken.tokenIsCurrency0;
+    if (poolData && selectedTokenAddress) {
+      return poolData.currency0.toLowerCase() === selectedTokenAddress.toLowerCase();
+    }
+    return true;
+  }, [selectedToken, poolData, selectedTokenAddress]);
+
+  // Current ETH-per-token quote. Prefer fresh pool data, fall back to the
+  // enriched token's cached price. `ethPricePerToken` nulls out untraded
+  // pools so we never feed a bogus 1.0 into the estimate.
   const currentPrice = useMemo(() => {
-    if (poolData?.sqrtPriceX96) return priceFromSqrtX96(poolData.sqrtPriceX96);
-    if (poolData?.tick != null) return priceFromTick(poolData.tick);
-    if (selectedToken?.price) return selectedToken.price;
-    return null;
-  }, [poolData, selectedToken]);
+    if (poolData && selectedTokenAddress) {
+      const p = ethPricePerToken(poolData, selectedTokenAddress);
+      if (p != null) return p;
+    }
+    return selectedToken?.price ?? null;
+  }, [poolData, selectedToken, selectedTokenAddress]);
 
   // Estimated output
   const estimatedOutput = useMemo(() => {
@@ -122,10 +135,10 @@ function SwapPage() {
     const liquidity = selectedToken.latestLiquidity;
     if (!sqrtPriceX96 || !liquidity) return null;
 
-    // Determine zeroForOne: input is currency0 iff input currency's address < output's.
-    // For native-ETH pools ETH (0x0) is currency0, so buy (ETH→token) is zeroForOne=true
-    // and sell (token→ETH) is zeroForOne=false — matches the router flow.
-    const zeroForOne = mode === 'buy';
+    // zeroForOne is true when the *input* currency sits on currency0.
+    // Buy: input is WETH → zeroForOne iff WETH is currency0 (i.e. token is currency1).
+    // Sell: input is the token → zeroForOne iff the token is currency0.
+    const zeroForOne = mode === 'buy' ? !tokenIsCurrency0 : tokenIsCurrency0;
 
     // Input in wei: ETH for buy, tokens for sell (both 18 decimals).
     let amountInWei: bigint;
@@ -141,7 +154,7 @@ function SwapPage() {
       amountInWei,
       zeroForOne,
     });
-  }, [amount, selectedToken, poolData, mode]);
+  }, [amount, selectedToken, poolData, mode, tokenIsCurrency0]);
 
   // Price impact severity
   const impactSeverity = useMemo(() => {
