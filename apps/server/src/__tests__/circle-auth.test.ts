@@ -71,18 +71,16 @@ function installOtpStore() {
       };
     }
     if (name === 'authOTPIssuances') {
+      // Single-doc-per-email shape: { timestamps: number[] }
       return {
-        add: vi.fn().mockImplementation(async () => {
-          issuanceLog.push(Date.now());
-          return { id: 'iss-' + issuanceLog.length };
-        }),
-        where: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockReturnValue({
-          get: vi.fn().mockImplementation(async () => {
-            // count only recent issuances (<15 min); prod would rely on
-            // where('issuedAt', '>=', windowStart) in Firestore itself.
-            const fresh = issuanceLog.filter((t) => Date.now() - t < 15 * 60_000);
-            return { size: fresh.length, docs: fresh.map(() => ({})) };
+        doc: (_id: string) => ({
+          get: vi.fn().mockImplementation(async () => ({
+            exists: issuanceLog.length > 0,
+            data: () => ({ timestamps: issuanceLog }),
+          })),
+          set: vi.fn().mockImplementation(async (val: any) => {
+            issuanceLog.length = 0;
+            if (Array.isArray(val.timestamps)) issuanceLog.push(...val.timestamps);
           }),
         }),
       };

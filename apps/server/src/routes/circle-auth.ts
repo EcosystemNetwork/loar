@@ -79,39 +79,41 @@ function generateOTP(): string {
 }
 
 /**
- * Returns true when the email may receive another OTP in this window.
- * Does NOT record the new issuance — call `recordIssuance` after a successful
- * send to avoid penalising the caller for rate-limit checks that return false.
+ * Single-doc design: `authOTPIssuances/{email}` stores `{ timestamps: number[] }`
+ * (ms since epoch). One read/write per issuance, filtered in-memory by the
+ * 15-min window. Avoids a composite index on (email, issuedAt) and bounds
+ * Firestore cost regardless of how many historical issuances exist.
  */
-async function canIssueOTP(email: string): Promise<boolean> {
-  const windowStart = new Date(Date.now() - OTP_ISSUE_WINDOW_MS);
-
+async function readIssuanceTimestamps(email: string): Promise<number[]> {
   if (firebaseAvailable) {
-    const snap = await db
-      .collection('authOTPIssuances')
-      .where('email', '==', email)
-      .where('issuedAt', '>=', windowStart)
-      .limit(OTP_ISSUE_MAX)
-      .get();
-    return snap.size < OTP_ISSUE_MAX;
+    const doc = await db.collection('authOTPIssuances').doc(email).get();
+    const raw = (doc.exists ? (doc.data()?.timestamps as unknown) : []) ?? [];
+    return Array.isArray(raw) ? raw.filter((t): t is number => typeof t === 'number') : [];
   }
+  return memIssueLog.get(email) ?? [];
+}
 
-  const times = (memIssueLog.get(email) ?? []).filter((t) => Date.now() - t < OTP_ISSUE_WINDOW_MS);
-  memIssueLog.set(email, times);
-  return times.length < OTP_ISSUE_MAX;
+async function canIssueOTP(email: string): Promise<boolean> {
+  const now = Date.now();
+  const all = await readIssuanceTimestamps(email);
+  const fresh = all.filter((t) => now - t < OTP_ISSUE_WINDOW_MS);
+  return fresh.length < OTP_ISSUE_MAX;
 }
 
 async function recordIssuance(email: string): Promise<void> {
+  const now = Date.now();
+  const all = await readIssuanceTimestamps(email);
+  const fresh = all.filter((t) => now - t < OTP_ISSUE_WINDOW_MS);
+  fresh.push(now);
+
   if (firebaseAvailable) {
-    await db.collection('authOTPIssuances').add({
-      email,
-      issuedAt: new Date(),
-    });
+    await db
+      .collection('authOTPIssuances')
+      .doc(email)
+      .set({ timestamps: fresh, updatedAt: new Date() });
     return;
   }
-  const times = memIssueLog.get(email) ?? [];
-  times.push(Date.now());
-  memIssueLog.set(email, times);
+  memIssueLog.set(email, fresh);
 }
 
 async function storeOTP(email: string, code: string): Promise<void> {
