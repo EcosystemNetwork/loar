@@ -9,7 +9,6 @@ import { TRPCError } from '@trpc/server';
 import { getPlatformConfig, bpsToFraction } from '../../services/platformConfig';
 import { randomUUID } from 'crypto';
 import { getStorageManager } from '../../services/storage';
-import { resolveActingUid } from '../../services/agentAuth';
 import { assertContentOperable } from '../../lib/content-status';
 
 const submissionsCol = () => {
@@ -53,18 +52,14 @@ export const marketplaceRouter = router({
         submissionFeeTxHash: z.string().optional(),
         /** On-chain uint256 submission id returned by CanonMarketplace.submit(). Enables on-chain finalize/license. */
         onChainSubmissionId: z.string().optional(),
-        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       try {
-        const { onBehalfOfUid, ...submitInput } = input;
-        const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'marketplace');
-
         const submission = {
-          ...submitInput,
-          onChainSubmissionId: submitInput.onChainSubmissionId ?? null,
-          creatorUid: actingUid,
+          ...input,
+          onChainSubmissionId: input.onChainSubmissionId ?? null,
+          creatorUid: ctx.user.uid,
           creatorAddress: ctx.user.address || null,
           status: 'VOTING' as const,
           votesFor: 0,
@@ -302,14 +297,10 @@ export const marketplaceRouter = router({
         submissionId: z.string(),
         fee: z.string(), // wei
         txHash: z.string(),
-        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { onBehalfOfUid, ...licenseInput } = input;
-      const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'marketplace');
-
-      const subDoc = await submissionsCol().doc(licenseInput.submissionId).get();
+      const subDoc = await submissionsCol().doc(input.submissionId).get();
       if (!subDoc.exists) throw new Error('Submission not found');
       const sub = subDoc.data()!;
       if (sub.status !== 'ACCEPTED') throw new Error('Not accepted canon');
@@ -321,13 +312,13 @@ export const marketplaceRouter = router({
 
       const config = await getPlatformConfig();
       const feeBps = config.marketplacePlatformFeeBps;
-      const feeWei = BigInt(licenseInput.fee);
+      const feeWei = BigInt(input.fee);
       const platformFeeWei = (feeWei * BigInt(feeBps)) / BigInt(10_000);
       const creatorReceivesWei = feeWei - platformFeeWei;
 
       const license = {
-        submissionId: licenseInput.submissionId,
-        licenseeUid: actingUid,
+        submissionId: input.submissionId,
+        licenseeUid: ctx.user.uid,
         licenseeAddress: ctx.user.address || null,
         creatorUid: sub.creatorUid || null,
         creatorAddress: sub.creatorAddress || null,

@@ -74,10 +74,6 @@ import { feedRouter } from './feed/feed.routes';
 import { playerRouter } from './player/player.routes';
 import { loraRouter } from './generation/lora.routes';
 import { privateSectionRouter } from './privateSection/privateSection.routes';
-import { talentAgentsRouter } from './talentAgents/talentAgents.routes';
-import { aiAgentsRouter } from './aiAgents/aiAgents.routes';
-import { aiPipelinesRouter } from './aiPipelines/aiPipelines.routes';
-import { apiKeysRouter } from './apiKeys/apiKeys.routes';
 import { bountiesRouter } from './bounties/bounties.routes';
 import { splitsRouter } from './splits/splits.routes';
 import { universeGenConfigRouter } from './universeGenConfig/universeGenConfig.routes';
@@ -259,12 +255,6 @@ export const appRouter = router({
 
   // ── $LOAR Token Economy ─────────────────────────────────────────────
   bounties: bountiesRouter,
-
-  // ── Agent Systems ──────────────────────────────────────────────────
-  talentAgents: talentAgentsRouter,
-  aiAgents: aiAgentsRouter,
-  aiPipelines: aiPipelinesRouter,
-  apiKeys: apiKeysRouter,
 
   // ── Pricing ────────────────────────────────────────────────────────
   pricing: pricingRouter,
