@@ -19,7 +19,9 @@
  *   fields:
  *     universeAddress: string (lowercase)
  *     nodeId:          number
- *     videoLink:       string (final rendered URL — IPFS gateway or signed URL)
+ *     videoLink:       string? (final rendered URL — IPFS gateway or signed URL)
+ *     hidden:          boolean? (true hides the node from the rendered timeline —
+ *                       used when original content can't be recovered)
  *     reason:          string? (why this override was set)
  *     updatedAt:       Date
  *     updatedBy:       string (admin wallet lowercase)
@@ -45,12 +47,15 @@ export const nodeMediaRouter = router({
     .query(async ({ input }) => {
       const universeAddress = input.universeId.toLowerCase();
       const snap = await col().where('universeAddress', '==', universeAddress).get();
-      const overrides: Record<number, { videoLink: string; reason?: string; updatedAt: number }> =
-        {};
+      const overrides: Record<
+        number,
+        { videoLink?: string; hidden?: boolean; reason?: string; updatedAt: number }
+      > = {};
       for (const doc of snap.docs) {
         const d = doc.data();
         overrides[d.nodeId as number] = {
-          videoLink: d.videoLink as string,
+          videoLink: (d.videoLink as string | undefined) || undefined,
+          hidden: d.hidden === true ? true : undefined,
           reason: d.reason as string | undefined,
           updatedAt:
             d.updatedAt instanceof Date
@@ -61,15 +66,20 @@ export const nodeMediaRouter = router({
       return { overrides };
     }),
 
-  /** Set a media override — universe admin only. */
+  /** Set a media override — universe admin only. Either `videoLink` or `hidden` must be provided. */
   setOverride: protectedProcedure
     .input(
-      z.object({
-        universeId: z.string().regex(/^0x[0-9a-fA-F]{40}$/, 'Expected on-chain universe address'),
-        nodeId: z.number().int().positive(),
-        videoLink: z.string().url(),
-        reason: z.string().max(500).optional(),
-      })
+      z
+        .object({
+          universeId: z.string().regex(/^0x[0-9a-fA-F]{40}$/, 'Expected on-chain universe address'),
+          nodeId: z.number().int().positive(),
+          videoLink: z.string().url().optional(),
+          hidden: z.boolean().optional(),
+          reason: z.string().max(500).optional(),
+        })
+        .refine((d) => d.videoLink != null || d.hidden != null, {
+          message: 'Provide videoLink or hidden',
+        })
     )
     .mutation(async ({ ctx, input }) => {
       const caller = ctx.user.address ?? ctx.user.uid;
@@ -83,14 +93,15 @@ export const nodeMediaRouter = router({
       }
 
       const id = docId(input.universeId, input.nodeId);
-      const record = {
+      const record: Record<string, unknown> = {
         universeAddress: input.universeId.toLowerCase(),
         nodeId: input.nodeId,
-        videoLink: input.videoLink,
         reason: input.reason ?? '',
         updatedAt: new Date(),
         updatedBy: caller.toLowerCase(),
       };
+      if (input.videoLink !== undefined) record.videoLink = input.videoLink;
+      if (input.hidden !== undefined) record.hidden = input.hidden;
       await col().doc(id).set(record, { merge: true });
       return { ok: true, id };
     }),

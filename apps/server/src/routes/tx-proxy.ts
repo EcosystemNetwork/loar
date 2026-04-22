@@ -13,7 +13,7 @@
 import { Hono } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { verifySessionToken } from '../lib/siwe';
-import { executeTransaction } from '../lib/circle-wallets';
+import { executeTransaction, getTransactionStatus } from '../lib/circle-wallets';
 import { isContractAllowed } from '../lib/contract-allowlist';
 import { consumeRateLimit } from '../middleware/rate-limit';
 import { db, firebaseAvailable } from '../lib/firebase';
@@ -110,6 +110,9 @@ txProxyRoutes.post('/write', async (c) => {
     data?: `0x${string}`;
     value?: string;
     chainId?: number;
+    /** If true, return as soon as Circle accepts the tx. Caller polls
+     *  GET /api/tx/status/:txId until state is terminal. */
+    async?: boolean;
   }>();
 
   if (!body.address) {
@@ -172,7 +175,31 @@ txProxyRoutes.post('/write', async (c) => {
       calldata,
       chainId,
       value: body.value,
+      async: body.async === true,
     });
+
+    // Record ownership for async status polls. Required for async mode
+    // (otherwise the caller can never poll); best-effort for sync mode since
+    // the txHash is already in the response.
+    if (firebaseAvailable && result.txId) {
+      try {
+        await db
+          .collection('circleTxs')
+          .doc(result.txId)
+          .set({
+            walletAddress: walletAddress.toLowerCase(),
+            contractAddress: body.address,
+            chainId,
+            functionName: body.functionName ?? null,
+            createdAt: new Date(),
+          });
+      } catch (err) {
+        if (body.async === true) {
+          return c.json({ error: 'Could not record transaction ownership — please retry' }, 500);
+        }
+        console.warn('[TX] ownership record failed (sync tx already sent):', err);
+      }
+    }
 
     // Track analytics
     void import('../lib/analytics').then(({ captureServerEvent }) =>
@@ -180,6 +207,7 @@ txProxyRoutes.post('/write', async (c) => {
         distinctId: walletAddress,
         functionName: body.functionName ?? 'raw',
         txHash: result.txHash,
+        async: body.async === true,
       })
     );
 
@@ -191,6 +219,52 @@ txProxyRoutes.post('/write', async (c) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Transaction failed';
     console.error('[TX] Circle transaction failed:', err);
+    return c.json({ error: message }, 500);
+  }
+});
+
+/**
+ * GET /api/tx/status/:txId
+ *
+ * Poll the current state of a Circle transaction. Only the wallet that
+ * submitted the tx can read its status — otherwise a session could enumerate
+ * other users' tx ids.
+ */
+txProxyRoutes.get('/status/:txId', async (c) => {
+  const token = getCookie(c, COOKIE_NAME);
+  if (!token) {
+    return c.json({ error: 'Not authenticated' }, 401);
+  }
+  const payload = await verifySessionToken(token);
+  if (!payload?.sub) {
+    return c.json({ error: 'Invalid session' }, 401);
+  }
+  const walletAddress = payload.sub.toLowerCase();
+
+  const txId = c.req.param('txId');
+  if (!txId) {
+    return c.json({ error: 'Missing txId' }, 400);
+  }
+
+  // Ownership check — if we have a Firestore record, the session's address
+  // must match. Unknown txIds (no record) are rejected; this avoids leaking
+  // Circle state to anyone who can guess a UUID.
+  if (firebaseAvailable) {
+    const doc = await db.collection('circleTxs').doc(txId).get();
+    if (!doc.exists) {
+      return c.json({ error: 'Transaction not found' }, 404);
+    }
+    const owner = doc.data()?.walletAddress;
+    if (owner !== walletAddress) {
+      return c.json({ error: 'Not authorized for this transaction' }, 403);
+    }
+  }
+
+  try {
+    const result = await getTransactionStatus(txId);
+    return c.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Status lookup failed';
     return c.json({ error: message }, 500);
   }
 });

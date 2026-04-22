@@ -354,6 +354,57 @@ export function priceFromSqrtX96(sqrtPriceX96: string): number {
 }
 
 /**
+ * Compute price impact for a single-tick Uniswap v4 swap (constant-L approx).
+ *
+ * Math (token0 price measured in token1):
+ *  - zeroForOne (sell token0 → token1): sqrtP' = (L · Q96 · sqrtP) / (L · Q96 + amountIn · sqrtP)
+ *  - !zeroForOne (buy token0 with token1): sqrtP' = sqrtP + (amountIn · Q96) / L
+ *
+ * Impact = |price' − price| / price, where price = sqrtP².
+ * This is accurate while the swap stays inside a single tick range. For large
+ * trades that would cross ticks, it underestimates impact — good enough for a
+ * UX signal, not for execution routing.
+ *
+ * Returns a percentage (e.g. 2.5 for 2.5%) or null when inputs are insufficient.
+ */
+export function computePriceImpactBps({
+  sqrtPriceX96,
+  liquidity,
+  amountInWei,
+  zeroForOne,
+}: {
+  sqrtPriceX96: string | null | undefined;
+  liquidity: string | null | undefined;
+  amountInWei: bigint;
+  zeroForOne: boolean;
+}): number | null {
+  if (!sqrtPriceX96 || !liquidity || amountInWei <= 0n) return null;
+  const sqrtP = BigInt(sqrtPriceX96);
+  const L = BigInt(liquidity);
+  if (sqrtP === 0n || L === 0n) return null;
+
+  const Q96 = 1n << 96n;
+  let sqrtPNext: bigint;
+
+  if (zeroForOne) {
+    // sqrtP' = (L * Q96 * sqrtP) / (L * Q96 + amountIn * sqrtP)
+    const num = L * Q96 * sqrtP;
+    const denom = L * Q96 + amountInWei * sqrtP;
+    if (denom === 0n) return null;
+    sqrtPNext = num / denom;
+  } else {
+    // sqrtP' = sqrtP + (amountIn * Q96) / L
+    sqrtPNext = sqrtP + (amountInWei * Q96) / L;
+  }
+
+  // price ratio = (sqrtP'/sqrtP)² — work in floats for the final % (bigint ratios lose precision)
+  const ratio = Number(sqrtPNext) / Number(sqrtP);
+  const priceRatio = ratio * ratio;
+  const impact = Math.abs(priceRatio - 1) * 100;
+  return Math.min(impact, 99);
+}
+
+/**
  * Calculate price from tick
  * price = 1.0001^tick
  */
@@ -412,6 +463,10 @@ export interface EnrichedToken extends Token {
   bondingCurve: BondingCurveData | null;
   stage: TokenStage;
   graduationPct: number; // 0..100, 100 once graduated
+  // Latest pool state pulled from the most recent swap (for price-impact math).
+  // Null while the pool has no swaps yet or the token hasn't graduated.
+  latestSqrtPriceX96: string | null;
+  latestLiquidity: string | null;
 }
 
 const TOTAL_SUPPLY = 1_000_000_000; // 1B tokens per universe
@@ -441,7 +496,7 @@ export function useTokenListData() {
     ...ponderQueryDefaults,
   });
 
-  // Fetch recent swaps (expanded limit for volume + sparkline)
+  // Fetch recent swaps (expanded limit for volume + sparkline + latest pool state)
   const swapsQuery = useQuery({
     queryKey: ['all-recent-swaps-enriched'],
     queryFn: async () => {
@@ -450,7 +505,7 @@ export function useTokenListData() {
       }>(`query {
         swaps(orderBy: "timestamp", orderDirection: "desc", limit: 500) {
           items {
-            id poolId sender amount0 amount1 tick timestamp
+            id poolId sender amount0 amount1 tick timestamp sqrtPriceX96 liquidity
           }
         }
       }`);
@@ -579,6 +634,11 @@ export function useTokenListData() {
         graduationPct = 100; // no curve = already on Uniswap
       }
 
+      // Latest pool state (for price impact math) — pull from most recent swap
+      const latestSwap = tokenSwaps[0];
+      const latestSqrtPriceX96 = latestSwap?.sqrtPriceX96 ?? pool?.sqrtPriceX96 ?? null;
+      const latestLiquidity = latestSwap?.liquidity ?? null;
+
       return {
         ...token,
         price,
@@ -592,6 +652,8 @@ export function useTokenListData() {
         bondingCurve,
         stage,
         graduationPct,
+        latestSqrtPriceX96,
+        latestLiquidity,
       };
     });
   }, [tokensQuery.data, poolsQuery.data, swapsQuery.data, holdersQuery.data, curvesQuery.data]);

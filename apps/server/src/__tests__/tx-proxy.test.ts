@@ -15,8 +15,10 @@ import { db } from '../lib/firebase';
 // Stub the Circle signer before loading tx-proxy so executeTransaction is
 // captured and we can assert on what the proxy asked it to sign.
 const executeMock = vi.fn();
+const statusMock = vi.fn();
 vi.mock('../lib/circle-wallets', () => ({
   executeTransaction: (req: any) => executeMock(req),
+  getTransactionStatus: (id: string) => statusMock(id),
   getUserWallet: vi.fn(),
 }));
 
@@ -41,6 +43,10 @@ async function makeSessionCookie(sub: string): Promise<string> {
 //
 // Other collections (e.g. `universes`, which the allowlist's dynamic check
 // queries) must stay empty, so we dispatch on collection name.
+// In-memory stand-in for the `circleTxs` collection so the ownership write
+// + status read in the new async path can round-trip in tests.
+const txDocs = new Map<string, any>();
+
 function stubUserWalletLookup(walletId: string, address: string) {
   const walletSnap = {
     empty: false,
@@ -55,8 +61,23 @@ function stubUserWalletLookup(walletId: string, address: string) {
     where: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnValue({ get: vi.fn().mockResolvedValue(walletSnap) }),
   };
+  const txCollection = {
+    doc: (id: string) => ({
+      get: vi.fn().mockImplementation(() =>
+        Promise.resolve({
+          exists: txDocs.has(id),
+          data: () => txDocs.get(id),
+        })
+      ),
+      set: vi.fn().mockImplementation((val: any) => {
+        txDocs.set(id, val);
+        return Promise.resolve();
+      }),
+    }),
+  };
   (db as any).collection = vi.fn().mockImplementation((name: string) => {
     if (name === 'userAccounts' || name === 'circleWallets') return walletQuery;
+    if (name === 'circleTxs') return txCollection;
     return emptyQuery;
   });
 }
@@ -71,6 +92,7 @@ async function loadApp() {
 describe('/api/tx/write', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    txDocs.clear();
     executeMock.mockResolvedValue({
       txId: 'tx-mock',
       txHash: '0xdeadbeef',
@@ -173,5 +195,91 @@ describe('/api/tx/write', () => {
     expect(call.value).toBe('1000000000000000000');
     // calldata is the encoded `ping()` selector (4 bytes)
     expect(call.calldata).toMatch(/^0x[0-9a-fA-F]{8}$/);
+  });
+
+  it('returns immediately with async:true and lets the caller poll status', async () => {
+    executeMock.mockResolvedValue({
+      txId: 'tx-async',
+      txHash: undefined,
+      state: 'INITIATED',
+    });
+    const app = await loadApp();
+    stubUserWalletLookup('w-1', SESSION_ADDR);
+    const cookie = await makeSessionCookie(SESSION_ADDR);
+    const allowed = (addresses as any).PaymentRouter['84532'];
+
+    const writeRes = await app.fetch(
+      new Request('http://x/api/tx/write', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', cookie },
+        body: JSON.stringify({
+          address: allowed,
+          abi: [
+            { type: 'function', name: 'ping', stateMutability: 'payable', inputs: [], outputs: [] },
+          ],
+          functionName: 'ping',
+          async: true,
+          chainId: 84532,
+        }),
+      })
+    );
+    expect(writeRes.status).toBe(200);
+    const writeBody = await writeRes.json();
+    expect(writeBody.txId).toBe('tx-async');
+    expect(writeBody.state).toBe('INITIATED');
+    expect(executeMock.mock.calls[0][0].async).toBe(true);
+
+    // Session owner can read status.
+    statusMock.mockResolvedValue({ txId: 'tx-async', state: 'COMPLETE', txHash: '0xbeef' });
+    const statusRes = await app.fetch(
+      new Request('http://x/api/tx/status/tx-async', { headers: { cookie } })
+    );
+    expect(statusRes.status).toBe(200);
+    const statusBody = await statusRes.json();
+    expect(statusBody.state).toBe('COMPLETE');
+    expect(statusBody.txHash).toBe('0xbeef');
+  });
+
+  it('blocks status reads from a different session than the submitter', async () => {
+    executeMock.mockResolvedValue({
+      txId: 'tx-other',
+      txHash: undefined,
+      state: 'INITIATED',
+    });
+    const app = await loadApp();
+    stubUserWalletLookup('w-1', SESSION_ADDR);
+    const submitCookie = await makeSessionCookie(SESSION_ADDR);
+    const allowed = (addresses as any).PaymentRouter['84532'];
+
+    await app.fetch(
+      new Request('http://x/api/tx/write', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', cookie: submitCookie },
+        body: JSON.stringify({
+          address: allowed,
+          data: '0xabcdef00',
+          async: true,
+          chainId: 84532,
+        }),
+      })
+    );
+
+    const attackerCookie = await makeSessionCookie('0xbadbad00000000000000000000000000000bad00');
+    const res = await app.fetch(
+      new Request('http://x/api/tx/status/tx-other', { headers: { cookie: attackerCookie } })
+    );
+    expect(res.status).toBe(403);
+    expect(statusMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for an unknown txId (no enumeration of Circle ids)', async () => {
+    const app = await loadApp();
+    stubUserWalletLookup('w-1', SESSION_ADDR);
+    const cookie = await makeSessionCookie(SESSION_ADDR);
+    const res = await app.fetch(
+      new Request('http://x/api/tx/status/tx-never-submitted', { headers: { cookie } })
+    );
+    expect(res.status).toBe(404);
+    expect(statusMock).not.toHaveBeenCalled();
   });
 });

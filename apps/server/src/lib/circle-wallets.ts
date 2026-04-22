@@ -194,6 +194,12 @@ export interface TxRequest {
   chainId: number;
   /** Native-token value as a wei string (e.g. "1000000000000000000" = 1 ETH). */
   value?: string;
+  /**
+   * If true, return as soon as Circle accepts the tx — caller is responsible
+   * for polling `getTransactionStatus(txId)` until terminal. Defaults to false
+   * (sync path: poll up to 60s and throw if not COMPLETE).
+   */
+  async?: boolean;
 }
 
 export interface TxResult {
@@ -202,22 +208,29 @@ export interface TxResult {
   state: string;
 }
 
+const TERMINAL_STATES = new Set(['COMPLETE', 'FAILED', 'CANCELLED', 'DENIED']);
+
 /**
  * Execute a contract call via Circle's developer-controlled wallet.
  * The server signs and broadcasts — no client-side key material needed.
  */
 export async function executeTransaction(req: TxRequest): Promise<TxResult> {
   const client = getClient();
-  // Blockchain isn't passed on contract-execution calls — Circle derives it
-  // from the walletId — but we still validate the chain is recognised so a
-  // caller can't silently route across networks.
-  circleBlockchain(req.chainId);
+  const expectedBlockchain = circleBlockchain(req.chainId);
 
-  // Get the wallet address from Circle
+  // Fetch the wallet so we can cross-check that its network matches the chain
+  // the caller asked for. Circle derives chain from walletId for contract
+  // execution, so a mismatch would silently land the tx on the wrong network
+  // (e.g. user has a BASE-SEPOLIA wallet but caller sent chainId=11155111).
   const walletResp = await client.getWallet({ id: req.walletId });
-  const walletAddress = walletResp.data?.wallet?.address;
-  if (!walletAddress) {
+  const wallet = walletResp.data?.wallet;
+  if (!wallet?.address) {
     throw new Error(`Wallet ${req.walletId} not found`);
+  }
+  if (wallet.blockchain && wallet.blockchain !== expectedBlockchain) {
+    throw new Error(
+      `Wallet ${req.walletId} is on ${wallet.blockchain} but chainId ${req.chainId} expects ${expectedBlockchain}`
+    );
   }
 
   // Circle takes `amount` as a decimal native-token string (e.g. "0.01"),
@@ -244,12 +257,18 @@ export async function executeTransaction(req: TxRequest): Promise<TxResult> {
     throw new Error('Transaction creation failed — no ID returned');
   }
 
-  // Poll for completion (max 60 seconds)
-  const TERMINAL_STATES = new Set(['COMPLETE', 'FAILED', 'CANCELLED', 'DENIED']);
   let state = txResp.data?.state ?? 'INITIATED';
   let txHash: string | undefined;
-  const deadline = Date.now() + 60_000;
 
+  // Async path: caller will poll via getTransactionStatus. Useful for slow
+  // networks where the sync 60s budget isn't enough and we'd otherwise throw
+  // on a tx that actually lands.
+  if (req.async) {
+    return { txId, txHash, state };
+  }
+
+  // Sync path: poll for completion (max 60 seconds) and throw if not COMPLETE.
+  const deadline = Date.now() + 60_000;
   while (!TERMINAL_STATES.has(state) && Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 2000));
     const poll = await client.getTransaction({ id: txId });
@@ -265,24 +284,21 @@ export async function executeTransaction(req: TxRequest): Promise<TxResult> {
 }
 
 /**
- * Sign a message with a Circle wallet (for SIWE-compatible flows).
+ * Fetch the current state + txHash for a Circle tx id. Used by the async
+ * /api/tx/status endpoint.
  */
-export async function signMessage(walletId: string, message: string): Promise<string> {
+export async function getTransactionStatus(txId: string): Promise<TxResult> {
   const client = getClient();
-
-  // Circle's sign message API
-  const resp = await (client as any).signMessage({
-    walletId,
-    message,
-    encoding: 'UTF-8',
-  });
-
-  const signature = resp.data?.signature;
-  if (!signature) {
-    throw new Error('Message signing failed — no signature returned');
+  const resp = await client.getTransaction({ id: txId });
+  const tx = resp.data?.transaction;
+  if (!tx) {
+    throw new Error(`Transaction ${txId} not found`);
   }
-
-  return signature;
+  return {
+    txId,
+    state: tx.state ?? 'UNKNOWN',
+    txHash: tx.txHash ?? undefined,
+  };
 }
 
 /**

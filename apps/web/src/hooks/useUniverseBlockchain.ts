@@ -239,13 +239,16 @@ export function useUniverseBlockchain({
   // Off-chain media URL overrides (for nodes whose event-emitted link has
   // rotted — e.g. expired signed URLs). Server-side writes are gated to the
   // universe admin; reads are public. When an override exists for a nodeId,
-  // it takes precedence over Ponder's event-derived videoLink.
+  // it takes precedence over Ponder's event-derived videoLink. An override
+  // with `hidden: true` drops the node from the rendered timeline entirely —
+  // used when the original content is unrecoverable.
   const { data: mediaOverrides } = useQuery({
     queryKey: ['nodeMediaOverrides', onChainContractAddress],
     queryFn: async () => {
-      if (!onChainContractAddress) return {} as Record<number, { videoLink: string }>;
+      if (!onChainContractAddress)
+        return {} as Record<number, { videoLink?: string; hidden?: boolean }>;
       const res = await trpcClient.nodeMedia.list.query({ universeId: onChainContractAddress });
-      return (res?.overrides ?? {}) as Record<number, { videoLink: string }>;
+      return (res?.overrides ?? {}) as Record<number, { videoLink?: string; hidden?: boolean }>;
     },
     enabled: !!onChainContractAddress,
     staleTime: 30_000,
@@ -269,15 +272,40 @@ export function useUniverseBlockchain({
       if (onChainContractAddress && fullGraphData) {
         const [nodeIds, contentHashes, plotHashes, previousIds, nextIds, flags] = fullGraphData;
 
+        const rawNodeIds = (nodeIds || []) as readonly (string | number | bigint)[];
         const hashStrings = (contentHashes || []) as readonly string[];
         const plotHashStrings = (plotHashes || []) as readonly string[];
+        const rawPrevious = (previousIds || []) as readonly (string | number | bigint)[];
+        const rawChildren = (nextIds || []) as readonly (string | number | bigint)[][];
+        const rawFlags = (flags || []) as readonly boolean[];
 
-        // Resolve URLs and descriptions from indexer content map
+        // Nodes with an override marked `hidden: true` are dropped from the
+        // rendered graph (used when content is unrecoverable). We re-index the
+        // parallel arrays and strip references to hidden nodeIds from every
+        // `children` list and from `previousNodes` — so surviving nodes whose
+        // parent was hidden render as roots rather than pointing into the void.
+        const hiddenIdSet = new Set<string>();
+        for (let i = 0; i < rawNodeIds.length; i++) {
+          const nid = String(rawNodeIds[i]);
+          if (mediaOverrides?.[Number(nid)]?.hidden) hiddenIdSet.add(nid);
+        }
+
+        const keptIndices: number[] = [];
+        for (let i = 0; i < rawNodeIds.length; i++) {
+          if (!hiddenIdSet.has(String(rawNodeIds[i]))) keptIndices.push(i);
+        }
+
         const resolvedUrls: string[] = [];
         const resolvedDescriptions: string[] = [];
+        const keptNodeIds: (string | number | bigint)[] = [];
+        const keptContentHashes: string[] = [];
+        const keptPlotHashes: string[] = [];
+        const keptPrevious: (string | number | bigint)[] = [];
+        const keptChildren: (string | number | bigint)[][] = [];
+        const keptFlags: boolean[] = [];
 
-        for (let i = 0; i < (nodeIds || []).length; i++) {
-          const nid = String(nodeIds[i]);
+        for (const i of keptIndices) {
+          const nid = String(rawNodeIds[i]);
           const content = contentMap?.get(nid);
           const override = mediaOverrides?.[Number(nid)];
 
@@ -286,18 +314,29 @@ export function useUniverseBlockchain({
             override?.videoLink || content?.videoLink || String(hashStrings[i] || '')
           );
           resolvedDescriptions.push(content?.plot || String(plotHashStrings[i] || ''));
+          keptNodeIds.push(rawNodeIds[i]);
+          keptContentHashes.push(String(hashStrings[i] || ''));
+          keptPlotHashes.push(String(plotHashStrings[i] || ''));
+          // Drop the parent pointer if it refers to a hidden node so the
+          // survivor renders as a root instead of pointing at a ghost.
+          const prev = rawPrevious[i];
+          keptPrevious.push(hiddenIdSet.has(String(prev)) ? '' : prev);
+          keptChildren.push((rawChildren[i] || []).filter((c) => !hiddenIdSet.has(String(c))));
+          keptFlags.push(Boolean(rawFlags[i]));
         }
 
         return {
-          nodeIds: (nodeIds || []) as readonly (string | number | bigint)[],
-          contentHashes: hashStrings,
-          plotHashes: plotHashStrings,
+          nodeIds: keptNodeIds as readonly (string | number | bigint)[],
+          contentHashes: keptContentHashes as readonly string[],
+          plotHashes: keptPlotHashes as readonly string[],
           urls: resolvedUrls,
           descriptions: resolvedDescriptions,
-          previousNodes: (previousIds || []) as readonly (string | number | bigint)[],
-          children: (nextIds || []) as readonly (string | number | bigint)[][],
-          flags: flags || [],
-          canonChain: (canonChainData || []) as readonly (string | number | bigint)[],
+          previousNodes: keptPrevious as readonly (string | number | bigint)[],
+          children: keptChildren as readonly (string | number | bigint)[][],
+          flags: keptFlags as readonly boolean[],
+          canonChain: ((canonChainData || []) as readonly (string | number | bigint)[]).filter(
+            (c) => !hiddenIdSet.has(String(c))
+          ),
         };
       }
 

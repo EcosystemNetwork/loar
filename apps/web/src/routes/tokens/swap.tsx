@@ -17,6 +17,7 @@ import {
   priceFromSqrtX96,
   priceFromTick,
   formatTokenAmount,
+  computePriceImpactBps,
   type EnrichedToken,
 } from '@/hooks/useTokens';
 import { useSwapExecution, type SwapConfig } from '@/hooks/useSwapExecution';
@@ -110,18 +111,37 @@ function SwapPage() {
     return estimatedOutput * (1 - slippage / 100);
   }, [estimatedOutput, slippage]);
 
-  // Price impact estimate (simplified — based on pool liquidity)
+  // Price impact via constant-L Uniswap v4 math using latest pool state.
+  // For bonding-curve tokens (no pool liquidity yet) we return null and hide the row.
   const priceImpact = useMemo(() => {
-    if (!amount || !currentPrice || !selectedToken) return null;
+    if (!amount || !selectedToken) return null;
     const val = Number(amount);
-    if (val <= 0 || !selectedToken.volume24h) return null;
-    // Rough estimate: impact = trade_size / (daily_volume * 2)
-    // This is a simplified heuristic; real impact requires on-chain simulation
-    const tradeEth = mode === 'buy' ? val : val * currentPrice;
-    const dailyVol = selectedToken.volume24h > 0 ? selectedToken.volume24h : 0.1;
-    const impact = (tradeEth / (dailyVol * 2)) * 100;
-    return Math.min(impact, 99);
-  }, [amount, currentPrice, selectedToken, mode]);
+    if (val <= 0 || !Number.isFinite(val)) return null;
+
+    const sqrtPriceX96 = selectedToken.latestSqrtPriceX96 ?? poolData?.sqrtPriceX96 ?? null;
+    const liquidity = selectedToken.latestLiquidity;
+    if (!sqrtPriceX96 || !liquidity) return null;
+
+    // Determine zeroForOne: input is currency0 iff input currency's address < output's.
+    // For native-ETH pools ETH (0x0) is currency0, so buy (ETH→token) is zeroForOne=true
+    // and sell (token→ETH) is zeroForOne=false — matches the router flow.
+    const zeroForOne = mode === 'buy';
+
+    // Input in wei: ETH for buy, tokens for sell (both 18 decimals).
+    let amountInWei: bigint;
+    try {
+      amountInWei = BigInt(Math.floor(val * 1e18));
+    } catch {
+      return null;
+    }
+
+    return computePriceImpactBps({
+      sqrtPriceX96,
+      liquidity,
+      amountInWei,
+      zeroForOne,
+    });
+  }, [amount, selectedToken, poolData, mode]);
 
   // Price impact severity
   const impactSeverity = useMemo(() => {
