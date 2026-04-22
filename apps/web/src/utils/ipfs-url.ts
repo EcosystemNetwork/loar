@@ -3,6 +3,10 @@ const CONFIGURED_GATEWAY = (import.meta.env.VITE_PINATA_GATEWAY_URL || PUBLIC_GA
   .trim()
   .replace(/\/$/, '');
 const GATEWAY_TOKEN = (import.meta.env.VITE_PINATA_GATEWAY_TOKEN || '').trim();
+const PREFER_PUBLIC =
+  String(import.meta.env.VITE_PINATA_PREFER_PUBLIC || '')
+    .trim()
+    .toLowerCase() === 'true';
 
 let CONFIGURED_HOST = '';
 try {
@@ -12,10 +16,10 @@ try {
 }
 
 const IS_DEDICATED_GATEWAY = CONFIGURED_HOST.endsWith('.mypinata.cloud');
+const BYPASS_DEDICATED = PREFER_PUBLIC || (IS_DEDICATED_GATEWAY && !GATEWAY_TOKEN);
 
-const ACTIVE_GATEWAY = IS_DEDICATED_GATEWAY && !GATEWAY_TOKEN ? PUBLIC_GATEWAY : CONFIGURED_GATEWAY;
-const ACTIVE_HOST =
-  IS_DEDICATED_GATEWAY && !GATEWAY_TOKEN ? 'gateway.pinata.cloud' : CONFIGURED_HOST;
+const ACTIVE_GATEWAY = BYPASS_DEDICATED ? PUBLIC_GATEWAY : CONFIGURED_GATEWAY;
+const ACTIVE_HOST = BYPASS_DEDICATED ? 'gateway.pinata.cloud' : CONFIGURED_HOST;
 
 if (IS_DEDICATED_GATEWAY && !GATEWAY_TOKEN && typeof console !== 'undefined') {
   console.warn(
@@ -27,6 +31,10 @@ function appendToken(url: string): string {
   try {
     const parsed = new URL(url);
     if (!parsed.host.endsWith('.mypinata.cloud') && parsed.host !== ACTIVE_HOST) return url;
+    if (BYPASS_DEDICATED) {
+      parsed.searchParams.delete('pinataGatewayToken');
+      return parsed.toString();
+    }
     const existing = parsed.searchParams.get('pinataGatewayToken');
     if (existing !== null) {
       const cleaned = existing.trim();
@@ -44,17 +52,13 @@ function appendToken(url: string): string {
   }
 }
 
-/**
- * Rewrites legacy dedicated-gateway URLs that are now 403ing because the gateway
- * requires a token we don't have. Returns the original URL untouched if it's not
- * a known-broken dedicated-gateway URL.
- */
 function rewriteBrokenDedicatedGatewayUrl(url: string): string {
-  if (GATEWAY_TOKEN) return url;
+  if (!BYPASS_DEDICATED) return url;
   try {
     const parsed = new URL(url);
     if (!parsed.host.endsWith('.mypinata.cloud')) return url;
-    return `${PUBLIC_GATEWAY}${parsed.pathname}${parsed.search}`;
+    parsed.searchParams.delete('pinataGatewayToken');
+    return `${PUBLIC_GATEWAY}${parsed.pathname}${parsed.search ? parsed.search : ''}`;
   } catch {
     return url;
   }
