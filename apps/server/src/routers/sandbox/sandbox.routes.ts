@@ -292,10 +292,56 @@ export const sandboxRouter = router({
   }),
 
   /**
-   * Promote a sandbox draft into a universe as gallery content.
-   * The draft becomes a content item in the universe (still mutable, stored in Firebase).
-   * Users can later mint it as an NFT or submit it for canon.
+   * List universes the caller can directly promote content into. Powers the
+   * Sandbox auto-send picker so users only see valid targets — picking an
+   * unauthorised universe would fail server-side anyway (promoteToUniverse
+   * enforces isUniverseAdmin), but filtering here avoids the bad UX.
+   *
+   * Single-owner universes match on `creator == caller.address`.
+   * Multi-sig universes are checked on-chain via isUniverseAdmin, so this
+   * may issue N RPC calls — kept bounded by the small testnet universe set.
    */
+  myPromotableUniverses: protectedProcedure.query(async ({ ctx }) => {
+    if (!db) return [];
+    const address = ctx.user.address?.toLowerCase();
+    if (!address) return [];
+
+    const col = db.collection('cinematicUniverses');
+
+    const [ownedSnap, multiSigSnap] = await Promise.all([
+      col.where('creator', '==', address).get(),
+      col.where('isMultiSig', '==', true).get(),
+    ]);
+
+    const byId = new Map<string, FirebaseFirestore.DocumentData>();
+    for (const doc of ownedSnap.docs) byId.set(doc.id, doc.data());
+
+    // Multi-sig: only include after on-chain ownership check passes.
+    if (!multiSigSnap.empty) {
+      const { isUniverseAdmin } = await import('../../lib/safe-admin');
+      const checks = await Promise.all(
+        multiSigSnap.docs
+          .filter((d) => !byId.has(d.id))
+          .map(async (d) => ({
+            id: d.id,
+            data: d.data(),
+            isAdmin: await isUniverseAdmin(d.id, address, d.data().chainId),
+          }))
+      );
+      for (const c of checks) if (c.isAdmin) byId.set(c.id, c.data);
+    }
+
+    return Array.from(byId.entries())
+      .filter(([, d]) => !d.isHidden)
+      .map(([id, d]) => ({
+        id,
+        name: (d.name as string | null) ?? null,
+        image_url: (d.image_url as string | null) ?? null,
+        isMultiSig: Boolean(d.isMultiSig),
+      }))
+      .sort((a, b) => (a.name ?? a.id).localeCompare(b.name ?? b.id));
+  }),
+
   /**
    * Promote a sandbox draft to gallery content.
    * If universeId is provided, it goes into that universe's gallery.

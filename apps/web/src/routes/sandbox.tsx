@@ -144,6 +144,77 @@ function SandboxPage() {
   // Drafts panel filter
   const [draftFilter, setDraftFilter] = useState<'all' | GenKind>('all');
 
+  // Auto-send: after each generation auto-saves to drafts, optionally promote it
+  // straight into a universe (or the user's gallery). Persists across reloads.
+  // '__off__' = drafts only, '__gallery__' = promote to personal gallery (no
+  // universe), any other value = universe id (Firestore doc id / contract addr).
+  const AUTO_SEND_KEY = 'sandbox.autoSendTarget';
+  const AUTO_SEND_CLASSIFICATION_KEY = 'sandbox.autoSendClassification';
+  const AUTO_SEND_VISIBILITY_KEY = 'sandbox.autoSendVisibility';
+
+  const readLocal = (key: string, fallback: string) => {
+    if (typeof window === 'undefined') return fallback;
+    try {
+      return window.localStorage.getItem(key) || fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const [autoSendTarget, setAutoSendTarget] = useState<string>(() =>
+    readLocal(AUTO_SEND_KEY, '__off__')
+  );
+  const [autoSendClassification, setAutoSendClassification] = useState<
+    'fan' | 'original' | 'licensed'
+  >(() => readLocal(AUTO_SEND_CLASSIFICATION_KEY, 'fan') as 'fan' | 'original' | 'licensed');
+  const [autoSendVisibility, setAutoSendVisibility] = useState<'public' | 'unlisted' | 'private'>(
+    () => readLocal(AUTO_SEND_VISIBILITY_KEY, 'unlisted') as 'public' | 'unlisted' | 'private'
+  );
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(AUTO_SEND_KEY, autoSendTarget);
+      window.localStorage.setItem(AUTO_SEND_CLASSIFICATION_KEY, autoSendClassification);
+      window.localStorage.setItem(AUTO_SEND_VISIBILITY_KEY, autoSendVisibility);
+    } catch {}
+  }, [autoSendTarget, autoSendClassification, autoSendVisibility]);
+
+  // Refs so autoSaveDraft reads the latest values without re-building every
+  // run* callback (and their long dep chains) when settings change.
+  const autoSendTargetRef = React.useRef(autoSendTarget);
+  const autoSendClassificationRef = React.useRef(autoSendClassification);
+  const autoSendVisibilityRef = React.useRef(autoSendVisibility);
+  React.useEffect(() => {
+    autoSendTargetRef.current = autoSendTarget;
+    autoSendClassificationRef.current = autoSendClassification;
+    autoSendVisibilityRef.current = autoSendVisibility;
+  }, [autoSendTarget, autoSendClassification, autoSendVisibility]);
+
+  // Only list universes the caller can actually promote into — server does the
+  // creator-match + multi-sig owner check.
+  const { data: autoSendUniversesResult } = useQuery({
+    queryKey: ['sandbox-promotable-universes'],
+    queryFn: () => trpcClient.sandbox.myPromotableUniverses.query(),
+    enabled: isAuthenticated,
+  });
+  const autoSendUniverses: any[] = Array.isArray(autoSendUniversesResult)
+    ? autoSendUniversesResult
+    : [];
+
+  // If the user previously saved a universe id that they no longer admin,
+  // gracefully fall back to off so we don't silently fail on every generation.
+  React.useEffect(() => {
+    if (
+      autoSendTarget !== '__off__' &&
+      autoSendTarget !== '__gallery__' &&
+      autoSendUniversesResult &&
+      !autoSendUniverses.some((u) => u.id === autoSendTarget)
+    ) {
+      setAutoSendTarget('__off__');
+    }
+  }, [autoSendTarget, autoSendUniversesResult, autoSendUniverses]);
+
   // Voice / audio / talking-scene state
   const [voiceMode, setVoiceMode] = useState<'tts' | 'sfx'>('tts');
   const [voiceId, setVoiceId] = useState<string>('');
@@ -273,6 +344,27 @@ function SandboxPage() {
         });
         updateGen(gen.id, { draftId: result.id, draftSaveError: undefined });
         queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] });
+
+        // Auto-send: if the user has picked a target, promote the freshly
+        // saved draft straight to the gallery or a universe. Server enforces
+        // universe admin access — a rejection surfaces as a toast but does
+        // not fail the generation itself.
+        const target = autoSendTargetRef.current;
+        if (target && target !== '__off__') {
+          try {
+            const universeId = target === '__gallery__' ? undefined : target;
+            await trpcClient.sandbox.promoteToUniverse.mutate({
+              draftId: result.id,
+              ...(universeId ? { universeId } : {}),
+              classification: autoSendClassificationRef.current,
+              visibility: autoSendVisibilityRef.current,
+            });
+            queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] });
+          } catch (e: any) {
+            const msg = e?.message || 'Auto-send failed';
+            toast.error('Saved to drafts, but auto-send failed: ' + msg);
+          }
+        }
       } catch (e: any) {
         // Generation succeeded but the draft record didn't persist — surface
         // it on the card so the user can retry instead of silently losing it.
@@ -2079,6 +2171,95 @@ function SandboxPage() {
 
             {/* Right: drafts */}
             <div className="flex flex-col gap-4">
+              {/* Auto-send setting: fire-and-forget promotion after each generation */}
+              <Card>
+                <CardContent className="py-3 space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold">
+                    <Rocket className="h-3 w-3" />
+                    Auto-send generations
+                  </div>
+                  <Select value={autoSendTarget} onValueChange={setAutoSendTarget}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__off__" className="text-xs">
+                        Off — save to drafts only
+                      </SelectItem>
+                      <SelectItem value="__gallery__" className="text-xs">
+                        My Gallery (no universe)
+                      </SelectItem>
+                      {autoSendUniverses.length > 0 && (
+                        <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+                          Your universes
+                        </div>
+                      )}
+                      {autoSendUniverses.map((u: any) => (
+                        <SelectItem key={u.id} value={u.id} className="text-xs">
+                          {u.name || u.id.slice(0, 12)}
+                          {u.isMultiSig ? ' (multi-sig)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {autoSendTarget !== '__off__' && (
+                    <>
+                      <div className="pt-1">
+                        <div className="text-[10px] text-muted-foreground mb-1">Rights</div>
+                        <div className="flex gap-1">
+                          {(['fan', 'original', 'licensed'] as const).map((c) => (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => setAutoSendClassification(c)}
+                              className={`flex-1 text-[10px] py-1 rounded-md border transition-colors ${
+                                autoSendClassification === c
+                                  ? 'bg-primary text-primary-foreground border-primary'
+                                  : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+                              }`}
+                            >
+                              {c.charAt(0).toUpperCase() + c.slice(1)}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="pt-1">
+                        <div className="text-[10px] text-muted-foreground mb-1">Visibility</div>
+                        <Select
+                          value={autoSendVisibility}
+                          onValueChange={(v) =>
+                            setAutoSendVisibility(v as typeof autoSendVisibility)
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="public" className="text-xs">
+                              Public
+                            </SelectItem>
+                            <SelectItem value="unlisted" className="text-xs">
+                              Unlisted
+                            </SelectItem>
+                            <SelectItem value="private" className="text-xs">
+                              Private
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {autoSendClassification === 'licensed' && (
+                        <p className="text-[10px] text-amber-600 dark:text-amber-500 leading-snug">
+                          Licensed content enters pending review before it appears publicly.
+                        </p>
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <h2 className="text-lg font-semibold">Your Drafts</h2>
                 {drafts && drafts.length > 0 && (
