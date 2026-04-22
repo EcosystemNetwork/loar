@@ -1,5 +1,5 @@
 /**
- * Legacy /gallery route — now redirects into the Wiki's Gallery tab.
+ * Legacy /gallery route — now redirects into the Wiki (Gallery is the default tab).
  * Kept so existing links (discover, search, edit.inpaint, external) don't 404.
  */
 import { createFileRoute, redirect } from '@tanstack/react-router';
@@ -15,10 +15,7 @@ export const Route = createFileRoute('/gallery')({
   beforeLoad: ({ search }) => {
     throw redirect({
       to: '/wiki',
-      search: {
-        tab: 'gallery',
-        ...(search.universe ? { universe: search.universe } : {}),
-      },
+      search: search.universe ? { universe: search.universe } : {},
     });
   },
 });
