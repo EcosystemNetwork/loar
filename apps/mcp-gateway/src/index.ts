@@ -64,6 +64,51 @@ if (!SERVICE_KEY) {
   process.exit(1);
 }
 
+// Registered OAuth clients — `client_id:redirect_uri_prefix` entries, newline
+// or comma separated. Without an allowlist any attacker can request an authz
+// code bound to their own redirect URI and receive the victim's wallet-bound
+// token. Entries match by prefix so multiple redirect paths on the same host
+// can share a single client. Example:
+//   claude-code:https://claude.ai/api/mcp/auth/callback/,hermes:https://hermes.app/oauth
+const OAUTH_CLIENT_ALLOWLIST = (process.env.OAUTH_CLIENT_ALLOWLIST || '')
+  .split(/[\n,]/)
+  .map((s) => s.trim())
+  .filter(Boolean)
+  .map((entry) => {
+    const [clientId, redirectUriPrefix] = entry.split(':');
+    return { clientId, redirectUriPrefix };
+  });
+
+function isRegisteredClient(clientId: string, redirectUri: string): boolean {
+  // When the allowlist is empty, fall back to localhost-only (dev mode) so
+  // prod deploys without an allowlist fail closed instead of open.
+  if (OAUTH_CLIENT_ALLOWLIST.length === 0) {
+    return /^http:\/\/(127\.0\.0\.1|localhost)(:|\/)/.test(redirectUri);
+  }
+  return OAUTH_CLIENT_ALLOWLIST.some(
+    (e) => e.clientId === clientId && redirectUri.startsWith(e.redirectUriPrefix || '')
+  );
+}
+
+// Structured audit log at the trust boundary. Every tool invocation + authz
+// step emits one line so operators can trace "what did agent X do?" post-hoc.
+function auditLog(event: {
+  kind: string;
+  sessionId?: string;
+  walletAddress?: string;
+  clientId?: string;
+  toolName?: string;
+  status?: string | number;
+  reason?: string;
+  durationMs?: number;
+}) {
+  try {
+    console.log(`[mcp-audit] ${JSON.stringify({ ts: new Date().toISOString(), ...event })}`);
+  } catch {
+    // never block on audit log failure
+  }
+}
+
 // ── Active MCP transports (in-memory — SSE streams cannot be serialized) ──
 
 const transports = new Map<
@@ -102,7 +147,10 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/authorize') {
       return handleAuthorize(req, res, url);
     }
-    if (req.method === 'GET' && url.pathname === '/callback') {
+    // POST is the preferred path — the SIWE signature stays out of access
+    // logs, browser history, and Referer headers. GET is still accepted for
+    // backwards compatibility but logged as deprecated.
+    if ((req.method === 'GET' || req.method === 'POST') && url.pathname === '/callback') {
       return handleCallback(req, res, url);
     }
     if (req.method === 'POST' && url.pathname === '/token') {
@@ -158,6 +206,14 @@ async function handleAuthorize(req: http.IncomingMessage, res: http.ServerRespon
   if (!codeChallenge || codeChallengeMethod !== 'S256') {
     return oauthError(res, 'invalid_request', 'PKCE S256 code_challenge required');
   }
+  if (!isRegisteredClient(clientId, redirectUri)) {
+    auditLog({
+      kind: 'authz.reject',
+      clientId,
+      reason: 'client_id/redirect_uri not registered',
+    });
+    return oauthError(res, 'invalid_client', 'client_id and redirect_uri must be registered');
+  }
 
   const authzCode = `authz_${crypto.randomBytes(24).toString('hex')}`;
   await sessionStore.savePendingAuthorization(authzCode, {
@@ -178,10 +234,41 @@ async function handleAuthorize(req: http.IncomingMessage, res: http.ServerRespon
 // ── Callback ───────────────────────────────────────────────────────────
 
 async function handleCallback(req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
-  const authzCode = url.searchParams.get('authz');
-  const address = url.searchParams.get('address');
-  const signature = url.searchParams.get('signature');
-  const message = url.searchParams.get('message');
+  let authzCode: string | null;
+  let address: string | null;
+  let signature: string | null;
+  let message: string | null;
+
+  if (req.method === 'POST') {
+    const body = await readBody(req);
+    const ct = (req.headers['content-type'] || '').split(';')[0]?.trim();
+    let params: URLSearchParams;
+    if (ct === 'application/json') {
+      try {
+        const json = JSON.parse(body || '{}') as Record<string, string>;
+        params = new URLSearchParams(json);
+      } catch {
+        return oauthError(res, 'invalid_request', 'invalid JSON body');
+      }
+    } else {
+      params = new URLSearchParams(body);
+    }
+    authzCode = params.get('authz');
+    address = params.get('address');
+    signature = params.get('signature');
+    message = params.get('message');
+  } else {
+    // Deprecated GET fallback. Log so operators can migrate the web callback
+    // to the POST flow and drop the signature-in-URL risk.
+    auditLog({
+      kind: 'callback.deprecated_get',
+      reason: 'SIWE signature arrived via URL query — move LOAR_WEB callback to POST',
+    });
+    authzCode = url.searchParams.get('authz');
+    address = url.searchParams.get('address');
+    signature = url.searchParams.get('signature');
+    message = url.searchParams.get('message');
+  }
 
   if (!authzCode || !address || !signature || !message) {
     return oauthError(res, 'invalid_request', 'missing authz/address/signature/message');
@@ -418,11 +505,53 @@ async function handleMessages(req: http.IncomingMessage, res: http.ServerRespons
       .end(JSON.stringify({ error: 'unknown sessionId' }));
     return;
   }
+  // Buffer the body, peek the JSON-RPC method + tool name for the audit log,
+  // then re-stream to handlePostMessage. SSEServerTransport reads `req`
+  // directly, so we wrap it in a PassThrough with the saved payload.
+  const started = Date.now();
+  let auditedMethod: string | undefined;
+  let auditedTool: string | undefined;
   try {
-    await entry.transport.handlePostMessage(req, res);
+    const body = await readBody(req);
+    try {
+      const parsed = JSON.parse(body) as {
+        method?: string;
+        params?: { name?: string };
+      };
+      auditedMethod = parsed?.method;
+      if (parsed?.method === 'tools/call') auditedTool = parsed?.params?.name;
+    } catch {
+      // Non-JSON (e.g. batched array) — skip tool extraction but still audit.
+    }
+
+    const { PassThrough } = await import('node:stream');
+    const replay = new PassThrough();
+    replay.end(body);
+    Object.assign(replay, {
+      headers: req.headers,
+      method: req.method,
+      url: req.url,
+    });
+    await entry.transport.handlePostMessage(replay as unknown as http.IncomingMessage, res);
+    auditLog({
+      kind: 'mcp.dispatch',
+      sessionId,
+      walletAddress: entry.walletAddress,
+      toolName: auditedTool,
+      status: auditedMethod,
+      durationMs: Date.now() - started,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[gateway] handlePostMessage failed (${sessionId}): ${msg}`);
+    auditLog({
+      kind: 'mcp.dispatch.error',
+      sessionId,
+      walletAddress: entry.walletAddress,
+      toolName: auditedTool,
+      reason: msg,
+      durationMs: Date.now() - started,
+    });
     if (!res.headersSent) res.writeHead(500).end(msg);
   }
 }

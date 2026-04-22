@@ -44,6 +44,10 @@ export interface UniverseAdminInfo {
   threshold: number;
   /** Loading state */
   isLoading: boolean;
+  /** True when the admin lookup itself failed — caller should not bounce the
+   *  user out of admin UI in that case (could be a flaky RPC, not a real
+   *  permission denial). */
+  isError: boolean;
 }
 
 export function useIsUniverseAdmin(universeAddress: `0x${string}` | undefined): UniverseAdminInfo {
@@ -52,7 +56,11 @@ export function useIsUniverseAdmin(universeAddress: `0x${string}` | undefined): 
   const chainId = useChainId();
 
   // Read the on-chain admin address
-  const { data: adminAddress, isLoading: isLoadingAdmin } = useReadContract({
+  const {
+    data: adminAddress,
+    isLoading: isLoadingAdmin,
+    isError: isErrorAdmin,
+  } = useReadContract({
     address: universeAddress,
     abi: universeAbi,
     functionName: 'getAdmin',
@@ -128,5 +136,6 @@ export function useIsUniverseAdmin(universeAddress: `0x${string}` | undefined): 
     owners,
     threshold,
     isLoading: isLoadingAdmin || isLoadingSafe,
+    isError: isErrorAdmin,
   };
 }

@@ -361,6 +361,8 @@ export const proposal = onchainTable(
     createdAt: t.integer().notNull(),
     executed: t.boolean().notNull().default(false),
     cancelled: t.boolean().notNull().default(false),
+    queued: t.boolean().notNull().default(false),
+    queuedEta: t.integer(), // unix seconds when timelock can execute
   }),
   (table) => ({
     governorIdx: index('proposal_governor_idx').on(table.governorAddress),

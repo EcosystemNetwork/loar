@@ -93,8 +93,12 @@ contract RevenueModuleFactory is Ownable {
     }
 
     /// @notice Deploy all revenue modules for a universe as BeaconProxy instances.
+    /// @dev Owner-gated. Without this gate any address could front-run the
+    ///      platform's deployment bot, claim the slot with default fees, and
+    ///      block per-universe customization.
     function deployModules(uint256 universeId)
         external
+        onlyOwner
         returns (
             address episodes,
             address characters,

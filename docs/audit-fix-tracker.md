@@ -627,6 +627,8 @@ Independent fresh pass after the sixth-pass sign-off surfaced six new issues. Al
 
 1. **UPGRADE-01 follow-on** — After a first successful CI run that emits storage-layouts, commit the baseline JSON artifacts so future PRs can diff layouts automatically.
 
+2. **TIMELOCK-01 (NEW, 2026-04-22)** — `UniverseTokenDeployerV3` stores a single `address public timelock` and passes it to every `governorFactory.deployGovernor(token, timelock)` call. Combined with GOV-01 transferring all UUPS ownership to that same timelock, every per-universe governor becomes a PROPOSER on one shared TimelockController — a single low-quorum/compromised universe can queue protocol-wide admin calls. **Required architectural fix**: deploy a fresh `TimelockController` per universe inside `deployTokenAndGovernance` (or `GovernorFactory._deploy`), and transfer only that universe's contracts to its own timelock. Migration path needed for already-deployed universes (none on mainnet yet — testnet only as of audit date). **Severity**: CRITICAL — blocks mainnet under current architecture.
+
 ### Operational / deployment
 
 4. **GOV-01** — Deploy Safe (≥3/5), deploy TimelockController (48h delay), wire Safe as PROPOSER+EXECUTOR, run `TransferToMultisig.s.sol` on Base mainnet. Verify `owner()` returns Timelock for every contract.

@@ -141,12 +141,8 @@ export async function runEditingLayer(cfg: SmokeConfig, token: string): Promise<
 
   // ── Authenticated reads (need SIWE JWT) ────────────────────────────────
   if (token) {
-    // PRD 9: Workflows (protected)
-    checks.push(
-      await check('workflows.list → registered (auth)', async () =>
-        probe(cfg, 'workflows.list', { limit: 10 }, token)
-      )
-    );
+    // NOTE: PRD 9 workflows router was removed in commit 595c5ccb ("remove
+    // workflow feature set"). If it ever comes back, re-add the check here.
     // PRD 7: Shot templates (protected list)
     checks.push(
       await check('shotTemplates.list → registered (auth)', async () =>

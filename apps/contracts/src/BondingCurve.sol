@@ -78,6 +78,17 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
     /// @notice Total ETH held as pending refunds — excluded from graduation LP to protect refund claimants
     uint256 public totalPendingRefunds;
 
+    /// @notice CURVE-03: Per-address cumulative tokens bought across the curve's lifetime.
+    ///         The per-tx `MAX_BUY_AMOUNT` alone lets a whale split a buy across
+    ///         many txs from the same address; this mapping enforces a 4× ceiling
+    ///         cumulatively.
+    mapping(address => uint256) public cumulativeBought;
+
+    /// @notice Cumulative cap per address (4× per-tx max).
+    uint256 public immutable MAX_CUMULATIVE_BUY;
+
+    error ExceedsCumulativeCap();
+
     event RefundPending(address indexed buyer, uint256 amount);
     event RefundClaimed(address indexed buyer, uint256 amount);
     event HaltQueued(uint256 indexed universeId, bool halted, uint256 executeAfter);
@@ -180,6 +191,7 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
         TOTAL_CURVE_SUPPLY = _totalCurveSupply;
         GRADUATION_ETH = _graduationEth;
         MAX_BUY_AMOUNT = (_totalCurveSupply * _maxBuyBps) / BPS;
+        MAX_CUMULATIVE_BUY = MAX_BUY_AMOUNT * 4;
 
         // slope_scaled = (2 * graduationEth * PRECISION) / totalCurveSupply²
         // Uses mulDiv for 512-bit intermediate to avoid overflow/precision loss.
@@ -214,6 +226,12 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
         if (tokensBought > MAX_BUY_AMOUNT) revert ExceedsMaxBuy();
         if (tokensBought < minTokensOut) revert SlippageExceeded();
         if (tokensBought == 0) revert ZeroAmount();
+
+        // CURVE-03: enforce cumulative per-address cap. Without this the
+        // per-tx cap is bypassable by splitting a buy across many txs.
+        uint256 newCumulative = cumulativeBought[msg.sender] + tokensBought;
+        if (newCumulative > MAX_CUMULATIVE_BUY) revert ExceedsCumulativeCap();
+        cumulativeBought[msg.sender] = newCumulative;
 
         // Calculate actual cost for the tokens bought (may be less than msg.value if capped)
         uint256 actualCost = _getCostForTokens(tokensBought, tokensSold);

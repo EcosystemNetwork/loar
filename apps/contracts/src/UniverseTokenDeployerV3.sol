@@ -118,6 +118,13 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
     IGovernorFactory public governorFactory;
     IBondingCurveFactory public bondingCurveFactory;
     address public owner;
+    /// @notice WARNING (TIMELOCK-01): Single shared TimelockController across
+    ///         every per-universe Governor deployed by this factory. Combined
+    ///         with GOV-01 transferring all UUPS ownership to this timelock,
+    ///         a single compromised/low-quorum universe Governor can queue
+    ///         protocol-wide admin calls. Mainnet blocker — do NOT enable this
+    ///         path on mainnet until each universe gets its own
+    ///         TimelockController. See docs/audit-fix-tracker.md TIMELOCK-01.
     address public timelock;
 
     /// @notice TOKEN-04: Distinct recipient for community allocations.

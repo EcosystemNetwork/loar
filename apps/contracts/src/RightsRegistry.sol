@@ -203,6 +203,15 @@ contract RightsRegistry is IRightsRegistry, Initializable, UUPSUpgradeable, Owna
             creatorNonce[creator]++;
         }
 
+        // Once a creator is recorded for a contentHash, only that creator (or
+        // the contract owner, used for legitimate cleanup) can re-sign for it.
+        // Without this guard a malicious operator + a forged "creator" claim
+        // could overwrite the original creator and reroute revenue.
+        address existingCreator = contentCreator[contentHash];
+        if (existingCreator != address(0) && existingCreator != creator && msg.sender != owner()) {
+            revert InvalidSignature();
+        }
+
         // Creator signature binds the content to this creator even on first classification.
         contentCreator[contentHash] = creator;
         rights[contentHash] = rightsType;

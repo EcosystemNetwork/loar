@@ -10,6 +10,7 @@
  * without a universe.
  */
 import { db } from '../../lib/firebase';
+import { rehostEphemeralUrl } from '../../lib/rehost-ephemeral';
 import {
   type Entity,
   type CreateEntityInput,
@@ -22,6 +23,17 @@ import {
   VALID_PARENTS,
   STRUCTURAL_KINDS,
 } from './entities.types';
+
+async function pinEntityImage(
+  imageUrl: string | null | undefined,
+  entityId: string,
+  creator: string
+): Promise<string | null> {
+  if (!imageUrl) return null;
+  const filename = `entity-${entityId}.jpg`;
+  const { url } = await rehostEphemeralUrl(imageUrl, filename, creator);
+  return url;
+}
 
 function entitiesCol() {
   return db.collection('entities');
@@ -103,6 +115,8 @@ export async function createEntity(
     throw new Error('Rights declaration is required for monetized entities');
   }
 
+  const pinnedImageUrl = await pinEntityImage(input.imageUrl, ref.id, creator.toLowerCase());
+
   const entity: Entity = {
     id: ref.id,
     name: input.name,
@@ -111,7 +125,7 @@ export async function createEntity(
     universeAddress: input.universeAddress ? input.universeAddress.toLowerCase() : null,
     parentId,
     nodeIds: input.nodeIds ?? [],
-    imageUrl: input.imageUrl ?? null,
+    imageUrl: pinnedImageUrl,
     metadata: input.metadata ?? {},
     creator: creator.toLowerCase(),
     monetized,
@@ -258,7 +272,9 @@ export async function updateEntity(
     updates.universeAddress = input.universeAddress ? input.universeAddress.toLowerCase() : null;
   if (input.parentId !== undefined) updates.parentId = input.parentId;
   if (input.nodeIds !== undefined) updates.nodeIds = input.nodeIds;
-  if (input.imageUrl !== undefined) updates.imageUrl = input.imageUrl;
+  if (input.imageUrl !== undefined) {
+    updates.imageUrl = await pinEntityImage(input.imageUrl, entityId, existing.creator || 'system');
+  }
   if (input.metadata !== undefined) updates.metadata = input.metadata;
   if (input.monetized !== undefined) {
     updates.monetized = input.monetized;

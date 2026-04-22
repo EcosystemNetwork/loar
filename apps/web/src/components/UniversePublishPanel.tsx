@@ -133,11 +133,16 @@ export function UniversePublishPanel({ universeId, onClose }: UniversePublishPan
       }
 
       const episodeHash = keccak256(toBytes(episodeId));
+      // Pin the chain explicitly. Without this the wallet signs against
+      // whatever network it currently shows, which may be a different chain
+      // where the same address resolves to an unrelated contract.
+      const universeChainId = (universeData as { chainId?: number } | undefined)?.chainId;
       const txHash = await writeContractAsync({
         address: getAddress(universeId),
         abi: SET_CANON_FOR_EPISODE_ABI,
         functionName: 'setCanonForEpisode',
         args: [tipNodeId, episodeHash],
+        ...(universeChainId ? { chainId: universeChainId } : {}),
       });
 
       return await trpcClient.episodes.publishAsCanon.mutate({

@@ -43,7 +43,7 @@ import {
 import { useChainId, useBalance } from 'wagmi';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { getExplorerTxUrl } from '@/configs/chains';
-import { formatEther, type Address } from 'viem';
+import { formatEther, parseUnits, type Address } from 'viem';
 import { trpcClient } from '@/utils/trpc';
 
 export const Route = createFileRoute('/tokens/swap')({
@@ -143,7 +143,7 @@ function SwapPage() {
     // Input in wei: ETH for buy, tokens for sell (both 18 decimals).
     let amountInWei: bigint;
     try {
-      amountInWei = BigInt(Math.floor(val * 1e18));
+      amountInWei = parseUnits(val.toFixed(18), 18);
     } catch {
       return null;
     }
@@ -193,9 +193,13 @@ function SwapPage() {
       : null;
 
     // Expected output in wei: tokens (18 decimals) for buy, ETH (18 decimals) for sell.
+    // `BigInt(Math.floor(x * 1e18))` silently overflows for low-priced tokens
+    // (a 0.5 ETH buy of a 1e-9-priced token is ~5e26 wei, far above MAX_SAFE_INTEGER).
+    // viem's `parseUnits` walks the decimal string in bigint and is the only
+    // safe path for arbitrary-magnitude swap output.
     const expectedOutWei =
       estimatedOutput !== null && estimatedOutput > 0
-        ? BigInt(Math.floor(estimatedOutput * 1e18))
+        ? parseUnits(estimatedOutput.toFixed(18), 18)
         : undefined;
 
     const result = await executeSwap({
@@ -244,11 +248,19 @@ function SwapPage() {
     setCustomSlippage('');
   };
 
+  // Hard cap at 5% by default. Anything higher requires the user to type
+  // "I understand" into a confirmation modal — Uniswap-style guard against
+  // wallet UIs that pre-fill 50% slippage on thin universe-token pools.
+  const HARD_SLIPPAGE_CAP = 5;
   const handleCustomSlippage = (val: string) => {
     setCustomSlippage(val);
     const parsed = parseFloat(val);
-    if (!isNaN(parsed) && parsed > 0 && parsed <= 50) {
+    if (!isNaN(parsed) && parsed > 0 && parsed <= HARD_SLIPPAGE_CAP) {
       setSlippage(parsed);
+    } else if (!isNaN(parsed) && parsed > HARD_SLIPPAGE_CAP) {
+      // Don't silently apply — keep slippage at last safe value until the
+      // user explicitly acknowledges the high-slippage risk.
+      setSlippage(HARD_SLIPPAGE_CAP);
     }
   };
 
@@ -316,7 +328,7 @@ function SwapPage() {
                     className="h-8 text-xs pr-6"
                     step="0.1"
                     min="0.1"
-                    max="50"
+                    max={HARD_SLIPPAGE_CAP}
                   />
                   <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
                     %
@@ -429,7 +441,7 @@ function SwapPage() {
                   <span className="text-xl font-mono text-foreground/80">
                     {estimatedOutput !== null && estimatedOutput > 0
                       ? mode === 'buy'
-                        ? formatTokenAmount(String(BigInt(Math.floor(estimatedOutput * 1e18))))
+                        ? formatTokenAmount(String(parseUnits(estimatedOutput.toFixed(18), 18)))
                         : estimatedOutput.toFixed(6)
                       : '0.0'}
                   </span>
@@ -518,7 +530,7 @@ function SwapPage() {
                     <span className="text-muted-foreground">Minimum received</span>
                     <span className="font-mono">
                       {mode === 'buy'
-                        ? formatTokenAmount(String(BigInt(Math.floor(minimumOutput * 1e18))))
+                        ? formatTokenAmount(String(parseUnits(minimumOutput.toFixed(18), 18)))
                         : minimumOutput.toFixed(6)}{' '}
                       {mode === 'buy' ? `$${selectedToken.symbol}` : 'ETH'}
                     </span>

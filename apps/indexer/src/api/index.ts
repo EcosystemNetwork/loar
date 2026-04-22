@@ -38,6 +38,48 @@ app.use(
   })
 );
 
+// ── Per-IP rate limit ────────────────────────────────────────────────
+// CORS is not enough — server-to-server scrapers bypass origin checks.
+// Simple in-memory token bucket: 60 req/min per IP for REST endpoints,
+// 30 req/min for GraphQL (more expensive per call).
+const rateLimitBuckets = new Map<string, { tokens: number; lastRefill: number }>();
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
+function clientIp(c: any): string {
+  return (
+    c.req.header('cf-connecting-ip') ||
+    c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
+    'unknown'
+  );
+}
+
+function rateLimit(max: number) {
+  return async (c: any, next: any) => {
+    const ip = clientIp(c);
+    const key = `${c.req.path.startsWith('/graphql') || c.req.path === '/' ? 'gql' : 'rest'}:${ip}`;
+    const now = Date.now();
+    const bucket = rateLimitBuckets.get(key) ?? { tokens: max, lastRefill: now };
+    const elapsed = now - bucket.lastRefill;
+    bucket.tokens = Math.min(max, bucket.tokens + (elapsed / RATE_LIMIT_WINDOW_MS) * max);
+    bucket.lastRefill = now;
+    if (bucket.tokens < 1) {
+      rateLimitBuckets.set(key, bucket);
+      c.header('Retry-After', '60');
+      return c.json({ error: 'rate_limit_exceeded' }, 429);
+    }
+    bucket.tokens -= 1;
+    rateLimitBuckets.set(key, bucket);
+    await next();
+  };
+}
+
+setInterval(() => {
+  const cutoff = Date.now() - 10 * 60_000;
+  for (const [k, b] of rateLimitBuckets) {
+    if (b.lastRefill < cutoff) rateLimitBuckets.delete(k);
+  }
+}, 60_000).unref?.();
+
 // ── Query limits to prevent DoS ──────────────────────────────────────
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
@@ -174,6 +216,47 @@ app.get('/universe/:address/proposals', async (c) => {
   return c.json({ proposals });
 });
 
+// Enforce rate limits on the REST + GraphQL surface.
+app.use('/creator/*', rateLimit(60));
+app.use('/universe/*', rateLimit(60));
+app.use('/graphql/*', rateLimit(30));
+
+// Cheap structural guard on incoming GraphQL queries: reject queries with
+// excessive nesting, aliases, or document length. Universe→nodes→universe
+// cycles otherwise let an attacker force thousands of joins per request.
+const MAX_GQL_DEPTH = 7;
+const MAX_GQL_ALIASES = 20;
+const MAX_GQL_LENGTH = 10_000;
+app.use('/graphql', async (c, next) => {
+  if (c.req.method !== 'POST') return next();
+  const raw = await c.req.text();
+  const body = raw.length <= MAX_GQL_LENGTH ? raw : null;
+  if (!body) return c.json({ error: 'query_too_long' }, 400);
+  try {
+    const json = JSON.parse(body) as { query?: string };
+    const query = json.query ?? '';
+    const depth = estimateGraphQLDepth(query);
+    if (depth > MAX_GQL_DEPTH) return c.json({ error: 'query_too_deep', depth }, 400);
+    const aliases = (query.match(/:\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\(/g) || []).length;
+    if (aliases > MAX_GQL_ALIASES) return c.json({ error: 'too_many_aliases' }, 400);
+  } catch {
+    // Non-JSON or malformed — let ponder's graphql middleware produce the real error.
+  }
+  c.req.raw = new Request(c.req.raw, { body, headers: c.req.raw.headers, method: 'POST' });
+  await next();
+});
+
+function estimateGraphQLDepth(query: string): number {
+  let depth = 0;
+  let max = 0;
+  for (const ch of query) {
+    if (ch === '{') max = Math.max(max, ++depth);
+    else if (ch === '}') depth = Math.max(0, depth - 1);
+  }
+  return max;
+}
+
+app.use('/', rateLimit(30));
 app.use('/', graphql({ db, schema }));
 app.use('/graphql', graphql({ db, schema }));
 

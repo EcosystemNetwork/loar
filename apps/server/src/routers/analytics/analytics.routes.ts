@@ -56,12 +56,19 @@ export const analyticsRouter = router({
       z.object({
         universeId: z.string(),
         episodeId: z.string(),
-        viewerAddress: z.string().optional(),
+        viewerAddress: z
+          .string()
+          .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid wallet address')
+          .optional(),
         duration: z.number().optional(), // seconds watched
       })
     )
-    .mutation(async ({ input }) => {
-      checkAnalyticsRate(`view:${input.universeId}:${input.viewerAddress || 'anon'}`);
+    .mutation(async ({ input, ctx }) => {
+      // Key the rate limit on (uid || IP) so an attacker can't rotate
+      // `viewerAddress` to bypass the 30/min per-key cap and pump fake
+      // view counts into the trending dashboard.
+      const limitKey = ctx.user?.uid ?? `ip:${ctx.clientIp}`;
+      checkAnalyticsRate(`view:${input.universeId}:${limitKey}`);
       await viewsCol().add({
         ...input,
         viewedAt: new Date(),
@@ -99,11 +106,15 @@ export const analyticsRouter = router({
         universeId: z.string(),
         episodeId: z.string(),
         type: z.enum(['like', 'share', 'comment', 'bookmark']),
-        userAddress: z.string().optional(),
+        userAddress: z
+          .string()
+          .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid wallet address')
+          .optional(),
       })
     )
-    .mutation(async ({ input }) => {
-      checkAnalyticsRate(`engage:${input.universeId}:${input.userAddress || 'anon'}`);
+    .mutation(async ({ input, ctx }) => {
+      const limitKey = ctx.user?.uid ?? `ip:${ctx.clientIp}`;
+      checkAnalyticsRate(`engage:${input.universeId}:${limitKey}`);
       await engagementCol().add({
         ...input,
         createdAt: new Date(),

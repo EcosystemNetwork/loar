@@ -4075,7 +4075,7 @@ function EditorAdminGate() {
   const admin = useIsUniverseAdmin(id as `0x${string}`);
 
   useEffect(() => {
-    if (admin.isLoading) return;
+    if (admin.isLoading || admin.isError) return;
     if (!admin.isAdmin) {
       navigate({
         to: '/universe/$id/watch',
@@ -4083,7 +4083,27 @@ function EditorAdminGate() {
         replace: true,
       });
     }
-  }, [admin.isLoading, admin.isAdmin, id, navigate]);
+  }, [admin.isLoading, admin.isAdmin, admin.isError, id, navigate]);
+
+  if (admin.isError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4 max-w-sm">
+          <p className="text-sm text-muted-foreground">
+            Couldn&apos;t verify editor access — the RPC provider returned an error. Server-side
+            mutations remain protected; this is a UI-only check.
+          </p>
+          <button
+            type="button"
+            className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm hover:bg-primary/20"
+            onClick={() => window.location.reload()}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (admin.isLoading || !admin.isAdmin) {
     return (

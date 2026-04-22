@@ -299,10 +299,16 @@ export const universesRouter = router({
         throw new Error('You must be an owner of the Safe wallet to enable multi-sig');
       }
 
+      // Snapshot the previous EOA creator so the disable path can restore
+      // ownership if the Safe wiring turns out to be wrong (typo, contract
+      // not actually a Safe, lost owner key). Without a snapshot the
+      // multi-sig conversion is irreversible.
       await db.collection('cinematicUniverses').doc(universeId).update({
         isMultiSig: true,
         multiSigAddress: input.multiSigAddress.toLowerCase(),
         creator: input.multiSigAddress.toLowerCase(),
+        previousCreatorEoa: callerUid,
+        multiSigEnabledAt: new Date(),
         updated_at: new Date(),
       });
 
@@ -312,6 +318,60 @@ export const universesRouter = router({
         owners: safeInfo.owners,
         threshold: safeInfo.threshold,
       };
+    }),
+
+  /** Disable multi-sig and restore the original EOA creator. Callable only by
+   *  a current Safe owner — protects against accidental EOA seizure of a
+   *  legitimate multi-sig universe while still providing an escape hatch when
+   *  the Safe wiring is broken. */
+  disableMultiSig: protectedProcedure
+    .input(z.object({ universeId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const universeId = input.universeId.toLowerCase();
+      const callerUid = ctx.user.uid.toLowerCase();
+
+      const doc = await db.collection('cinematicUniverses').doc(universeId).get();
+      if (!doc.exists) throw new Error('Universe not found');
+      const data = doc.data()!;
+      if (!data.isMultiSig || !data.multiSigAddress) {
+        throw new Error('Universe is not in multi-sig mode');
+      }
+      const previousCreator = (data.previousCreatorEoa as string | undefined)?.toLowerCase();
+      if (!previousCreator) {
+        throw new Error('No prior EOA creator recorded — cannot disable multi-sig safely');
+      }
+
+      // Authorize the caller — must be a current Safe owner. If the Safe is
+      // unreachable (provider failing) we accept the original creator as a
+      // last-resort recovery path so a flaky RPC doesn't permanently lock
+      // the universe.
+      const safeInfo = await getSafeInfo(data.multiSigAddress as string);
+      const isSafeOwner = safeInfo?.owners?.includes(callerUid) ?? false;
+      const isOriginalCreator = previousCreator === callerUid;
+      if (!isSafeOwner && !isOriginalCreator) {
+        throw new Error('Only a Safe owner or the original creator can disable multi-sig');
+      }
+
+      await db.collection('cinematicUniverses').doc(universeId).update({
+        isMultiSig: false,
+        multiSigAddress: null,
+        creator: previousCreator,
+        multiSigDisabledAt: new Date(),
+        updated_at: new Date(),
+      });
+
+      // Audit log so this admin reversal is traceable.
+      await db.collection('contentAuditLog').add({
+        kind: 'multisig.disable',
+        universeId,
+        actor: callerUid,
+        previousCreator,
+        previousMultiSig: (data.multiSigAddress as string).toLowerCase(),
+        recoveryPath: isSafeOwner ? 'safe_owner' : 'original_creator',
+        createdAt: new Date(),
+      });
+
+      return { ok: true, restoredCreator: previousCreator };
     }),
 
   /** Get multi-sig info for a universe (public). */

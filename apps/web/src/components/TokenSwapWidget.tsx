@@ -19,7 +19,7 @@ import {
 } from '@/hooks/useBondingCurve';
 import { useChainId, useBalance } from 'wagmi';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
-import { formatEther, type Address } from 'viem';
+import { formatEther, parseUnits, type Address } from 'viem';
 import {
   ArrowUpDown,
   ExternalLink,
@@ -348,7 +348,7 @@ export function TokenSwapWidget({
         <div className="p-2 bg-white/50 dark:bg-black/20 rounded text-center">
           <p className="text-xs text-muted-foreground">You receive (est.)</p>
           <p className="font-bold font-mono text-sm">
-            {formatTokenAmount(String(BigInt(Math.floor(estimatedTokens * 1e18))))} $
+            {formatTokenAmount(String(parseUnits(estimatedTokens.toFixed(18), 18)))} $
             {pool.tokenSymbol}
           </p>
         </div>

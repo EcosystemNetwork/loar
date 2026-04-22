@@ -16,8 +16,13 @@ contract LoarFaucet is Ownable {
     /// @notice Amount of $LOAR dispensed per claim (default: 1000 tokens)
     uint256 public claimAmount = 1_000 * 1e18;
 
-    /// @notice Cooldown between claims per address (disabled for testnet)
-    uint256 public cooldown = 0;
+    /// @notice Lower bound on `cooldown`. Owner can raise but cannot drop
+    ///         below this floor — protects against misconfigured cooldown=0
+    ///         + sybil drain on any chain where this faucet is pre-funded.
+    uint256 public constant MIN_COOLDOWN = 1 hours;
+
+    /// @notice Cooldown between claims per address. Defaults to MIN_COOLDOWN.
+    uint256 public cooldown = MIN_COOLDOWN;
 
     /// @notice Last claim timestamp per address
     mapping(address => uint256) public lastClaimed;
@@ -29,12 +34,18 @@ contract LoarFaucet is Ownable {
 
     error CooldownNotElapsed(uint256 availableAt);
     error InsufficientFaucetBalance();
+    error CooldownBelowFloor();
 
     constructor(address _loarToken) Ownable(msg.sender) {
         loarToken = IERC20(_loarToken);
     }
 
-    /// @notice Claim $LOAR tokens from the faucet
+    /// @notice Claim $LOAR tokens from the faucet.
+    /// @dev Per-address cooldown (>= 1h) defeats single-tx sybil drains
+    ///      economically — N addresses = N hours of waiting. A tx.origin
+    ///      guard would tighten this further but breaks legitimate
+    ///      smart-account / Safe users, so the cooldown floor is the
+    ///      minimum-friction defense.
     function claim() external {
         uint256 nextClaimAt = lastClaimed[msg.sender] + cooldown;
         if (block.timestamp < nextClaimAt) {
@@ -74,6 +85,7 @@ contract LoarFaucet is Ownable {
     }
 
     function setCooldown(uint256 newCooldown) external onlyOwner {
+        if (newCooldown < MIN_COOLDOWN) revert CooldownBelowFloor();
         emit CooldownUpdated(cooldown, newCooldown);
         cooldown = newCooldown;
     }

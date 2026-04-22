@@ -675,10 +675,20 @@ export function useUniverseForToken(universeAddress: string | undefined) {
 /**
  * Calculate price from sqrtPriceX96 (Uniswap v4 format)
  * price = (sqrtPriceX96 / 2^96)^2
+ *
+ * Casting `Number(BigInt(sqrtPriceX96))` truncates a 256-bit integer to a
+ * JS double (~15.95 significant digits), which biases the result for very
+ * small/large prices (e.g. fresh post-graduation tokens). Stay in bigint
+ * until the final ratio.
  */
 export function priceFromSqrtX96(sqrtPriceX96: string): number {
-  const sqrtPrice = Number(BigInt(sqrtPriceX96)) / 2 ** 96;
-  return sqrtPrice * sqrtPrice;
+  const sqrtP = BigInt(sqrtPriceX96);
+  // price = sqrtP² / 2^192. Multiply by 1e18 first so we keep enough
+  // precision for the final Number() cast.
+  const SCALE = 10n ** 18n;
+  const Q192 = 1n << 192n;
+  const scaled = (sqrtP * sqrtP * SCALE) / Q192;
+  return Number(scaled) / 1e18;
 }
 
 /**

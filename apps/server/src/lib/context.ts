@@ -28,7 +28,14 @@ export async function createContext({ context }: CreateContextOptions) {
     }
   }
 
-  return { user };
+  // Expose request headers so procedures can read client IP / UA without
+  // depending on the Hono context object (keeps the tRPC surface portable).
+  const clientIp =
+    context.req.header('cf-connecting-ip') ||
+    context.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
+    'unknown';
+
+  return { user, clientIp };
 }
 
 export type Context = Awaited<ReturnType<typeof createContext>>;

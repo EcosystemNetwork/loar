@@ -42,9 +42,16 @@
           "autoVerify": true,
           "data": [
             {
-              "scheme": "loarvault"
+              "scheme": "https",
+              "host": "loar.fun",
+              "pathPrefix": "/oauth/callback"
             }
           ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        },
+        {
+          "action": "VIEW",
+          "data": [{ "scheme": "loarvault" }],
           "category": ["BROWSABLE", "DEFAULT"]
         }
       ]

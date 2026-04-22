@@ -23,6 +23,8 @@ import { loadCheckpoint, writeCheckpoint } from './checkpoint.js';
 import { ingestRange } from './ingest.js';
 import { COLLECTIONS } from './schema.js';
 
+const CHAIN = env.LISTENER_CHAIN;
+
 // All indexer collections that hold per-event documents (i.e. have
 // `_event.blockHash` set). Checkpoints + factoryChildren are excluded because
 // they're keyed on stable identifiers and survive re-orgs.
@@ -106,6 +108,29 @@ async function purgeFromBlock(blockNumber: number): Promise<number> {
     }
     totalDeleted += deletedInColl;
   }
+
+  // Also purge factoryChildren for the reorged range. Originally these were
+  // kept for stability across reorgs, but a reorg that *un-creates* a Universe
+  // leaves orphaned spawned-contract addresses in the registry — subsequent
+  // getLogs against those dead addresses returns empty (silently), masking
+  // the missing data. Re-derive the factoryChildren from the re-ingest path.
+  let childDeleted = 0;
+  while (true) {
+    const snap = await db
+      .collection(COLLECTIONS.factoryChildren)
+      .where('chain', '==', CHAIN)
+      .where('createdAtBlock', '>=', blockNumber)
+      .limit(500)
+      .get();
+    if (snap.empty) break;
+    const batch = db.batch();
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+    childDeleted += snap.size;
+    if (snap.size < 500) break;
+  }
+  totalDeleted += childDeleted;
+
   return totalDeleted;
 }
 

@@ -2,6 +2,7 @@ import { db } from './firebase';
 import { triggerContentThumbnailAsync } from '../services/content-cover-image';
 import { recordAssetEventAsync } from '../services/lineage';
 import type { AssetOutputKind } from '../services/lineage/types';
+import { isEphemeralUrl as _isEphemeralUrl, rehostEphemeralUrl } from './rehost-ephemeral';
 
 export type GalleryMediaType = 'image' | 'ai-image' | 'video' | 'ai-video' | 'audio' | '3d';
 
@@ -34,30 +35,11 @@ export interface PublishGalleryInput {
   sourceAudioGenerationId?: string | null;
 }
 
-/**
- * Hosts that return expiring signed URLs we must NOT persist — they 403 once
- * the signature expires (usually hours to days). Any mediaUrl from these hosts
- * is rehosted to Pinata before we write the gallery doc.
- *
- * If you add a new model provider, add its CDN host here.
- */
-const EPHEMERAL_HOSTS = [
-  'volces.com', // ByteDance ModelArk / Seedance / Seedream
-  'fal.media',
-  'replicate.delivery',
-  'oaidalleapiprodscus.blob.core.windows.net', // OpenAI DALL-E
-  'pbxt.replicate.delivery',
-  'ark-acg', // ByteDance TOS prefix
-];
-
-function isEphemeralUrl(url: string): boolean {
-  try {
-    const host = new URL(url).host.toLowerCase();
-    return EPHEMERAL_HOSTS.some((ep) => host.includes(ep));
-  } catch {
-    return false;
-  }
-}
+// Ephemeral-host detection lives in ./rehost-ephemeral so entities and other
+// callers can share the same provider-CDN list. Re-exported below for callers
+// importing through this module.
+const isEphemeralUrl = _isEphemeralUrl;
+export { isEphemeralUrl };
 
 function extOf(mediaType: GalleryMediaType, fallbackUrl: string): string {
   if (mediaType.includes('image')) return 'png';
@@ -69,49 +51,26 @@ function extOf(mediaType: GalleryMediaType, fallbackUrl: string): string {
   return 'mp4';
 }
 
-/**
- * Downloads a remote URL and rehosts it via the shared StorageManager so
- * the gallery doc holds a permanent Pinata/Lighthouse URL.
- *
- * Retries the rehost up to {@link REHOST_ATTEMPTS} times with exponential
- * backoff before giving up — the first attempt often fails because the
- * provider CDN hasn't propagated the freshly-generated asset yet (5xx /
- * 404). Falling through to the ephemeral URL is the absolute last resort
- * because those links 403 once the signature expires.
- */
-const REHOST_ATTEMPTS = 3;
-const REHOST_BASE_DELAY_MS = 500;
-
 async function rehostIfEphemeral(
   input: PublishGalleryInput
-): Promise<{ mediaUrl: string; contentHash?: string }> {
-  if (!isEphemeralUrl(input.mediaUrl)) {
-    return { mediaUrl: input.mediaUrl };
-  }
+): Promise<{ mediaUrl: string; thumbnailUrl: string | null; contentHash?: string }> {
   const ext = extOf(input.mediaType, input.mediaUrl);
-  const filename = `${input.generationId || 'gallery'}.${ext}`;
-  let lastErr: unknown;
-  for (let attempt = 1; attempt <= REHOST_ATTEMPTS; attempt++) {
-    try {
-      const { getStorageManager } = await import('../services/storage');
-      const manager = getStorageManager();
-      const manifest = await manager.uploadFromUrl(input.mediaUrl, filename, input.creatorUid);
-      const permanent = manifest.uploads[0]?.url;
-      if (permanent) return { mediaUrl: permanent, contentHash: manifest.contentHash };
-      lastErr = new Error('storage manager returned no permanent URL');
-    } catch (err) {
-      lastErr = err;
-    }
-    if (attempt < REHOST_ATTEMPTS) {
-      const delay = REHOST_BASE_DELAY_MS * 2 ** (attempt - 1);
-      await new Promise((r) => setTimeout(r, delay));
-    }
+  const baseFilename = `${input.generationId || 'gallery'}.${ext}`;
+
+  const mediaResult = await rehostEphemeralUrl(input.mediaUrl, baseFilename, input.creatorUid);
+
+  let thumbnailUrl: string | null = input.thumbnailUrl ?? null;
+  if (thumbnailUrl) {
+    const thumbFilename = `${input.generationId || 'gallery'}-thumb.jpg`;
+    const thumbResult = await rehostEphemeralUrl(thumbnailUrl, thumbFilename, input.creatorUid);
+    thumbnailUrl = thumbResult.url;
   }
-  console.error(
-    `[gallery] rehost failed after ${REHOST_ATTEMPTS} attempts for ${input.mediaUrl.slice(0, 80)} — publishing ephemeral URL:`,
-    lastErr
-  );
-  return { mediaUrl: input.mediaUrl };
+
+  return {
+    mediaUrl: mediaResult.url,
+    thumbnailUrl,
+    contentHash: mediaResult.contentHash,
+  };
 }
 
 export function buildGalleryDoc(
@@ -231,11 +190,11 @@ async function maybeAutoTag(input: PublishGalleryInput): Promise<string[]> {
 export async function publishToGallery(input: PublishGalleryInput): Promise<void> {
   if (!db) return;
 
-  // Rehost ephemeral URLs before writing so the gallery never stores a URL
-  // that will 403 once the provider's signature expires.
-  const { mediaUrl, contentHash } = await rehostIfEphemeral(input);
+  // Rehost ephemeral URLs (media + thumbnail) before writing so the gallery
+  // never stores a URL that will 403 once the provider's signature expires.
+  const { mediaUrl, thumbnailUrl, contentHash } = await rehostIfEphemeral(input);
   const tags = await maybeAutoTag({ ...input, mediaUrl });
-  const resolvedInput: PublishGalleryInput = { ...input, mediaUrl, tags };
+  const resolvedInput: PublishGalleryInput = { ...input, mediaUrl, thumbnailUrl, tags };
 
   try {
     const ref = await db.collection('content').add(buildGalleryDoc(resolvedInput, { contentHash }));
