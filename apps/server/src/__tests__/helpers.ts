@@ -8,9 +8,11 @@ type AuthUser = { uid: string; address: string; email?: string };
 /** The wallet address used by createAdminCaller — set ADMIN_ADDRESSES to match */
 export const ADMIN_TEST_ADDRESS = '0xad0000000000000000000000000000000000dead';
 
+const TEST_CLIENT_IP = '127.0.0.1';
+
 /** Create a tRPC caller with no auth (anonymous/public) */
 export function createPublicCaller() {
-  return appRouter.createCaller({ user: null });
+  return appRouter.createCaller({ user: null, clientIp: TEST_CLIENT_IP });
 }
 
 /** Create a tRPC caller with a mock authenticated user (non-admin) */
@@ -21,7 +23,7 @@ export function createAuthCaller(overrides?: Partial<AuthUser>) {
     email: 'test@example.com',
     ...overrides,
   };
-  return appRouter.createCaller({ user });
+  return appRouter.createCaller({ user, clientIp: TEST_CLIENT_IP });
 }
 
 /**
@@ -35,5 +37,5 @@ export function createAdminCaller(overrides?: Partial<AuthUser>) {
     email: 'admin@example.com',
     ...overrides,
   };
-  return appRouter.createCaller({ user });
+  return appRouter.createCaller({ user, clientIp: TEST_CLIENT_IP });
 }
