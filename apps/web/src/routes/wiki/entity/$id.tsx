@@ -70,6 +70,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { EndorseButton } from '@/components/curation/EndorseButton';
 
 // Firestore Timestamps serialize to {_seconds, _nanoseconds} over JSON, which
 // `new Date(...)` can't parse. Accept both the serialized shape and native
@@ -890,9 +891,12 @@ function EntityPage() {
               <div className="aspect-square w-full overflow-hidden rounded-lg">
                 {safeUrl(entity.imageUrl) ? (
                   <img
-                    src={safeUrl(entity.imageUrl)}
+                    src={resolveIpfsUrl(safeUrl(entity.imageUrl))}
                     alt={entity.name}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = 'none';
+                    }}
                   />
                 ) : (
                   <div className="w-full h-full bg-muted flex flex-col items-center justify-center gap-3">
@@ -977,6 +981,12 @@ function EntityPage() {
                 <CardHeader className="flex flex-row items-start justify-between gap-4">
                   <CardTitle className="text-2xl">{entity.name}</CardTitle>
                   <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                    <EndorseButton
+                      targetType="entity"
+                      targetId={entity.id}
+                      universeAddress={entity.universeAddress ?? null}
+                      variant="inline"
+                    />
                     {canMint && (
                       <Button
                         variant="default"

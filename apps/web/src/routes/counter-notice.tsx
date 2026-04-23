@@ -13,8 +13,15 @@ export const Route = createFileRoute('/counter-notice')({
 });
 
 function CounterNoticePage() {
+  // The § 512(g)(1) email + in-app notice deep-links here with
+  // ?takedownRequestId=<id>; pre-fill so the user doesn't have to copy
+  // the reference manually.
+  const initialTakedownId =
+    typeof window !== 'undefined'
+      ? (new URLSearchParams(window.location.search).get('takedownRequestId') ?? '')
+      : '';
   const [form, setForm] = useState({
-    takedownRequestId: '',
+    takedownRequestId: initialTakedownId,
     respondentName: '',
     respondentEmail: '',
     respondentAddress: '',

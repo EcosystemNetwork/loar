@@ -127,25 +127,36 @@ export async function generateNonce(): Promise<string> {
   return nonce;
 }
 
-/** Consume a server-issued nonce (marks as used, throws if invalid/expired/reused). */
+/**
+ * Consume a server-issued nonce (one-time use: deletion IS the enforcement).
+ *
+ * SRV-7: the nonce document is never flipped to `used:true` anywhere — the
+ * delete-on-consume path below is the only state transition. An earlier
+ * `nonceData.used` check was retained post-refactor and is dead; removing it
+ * so a future contributor doesn't assume the flag is load-bearing and miss
+ * the real invariant.
+ */
 export async function consumeNonce(nonce: string): Promise<void> {
   const col = getNoncesCol();
   if (col) {
-    const nonceDoc = await col.doc(nonce).get();
-    if (!nonceDoc.exists) throw new Error('Invalid or expired nonce');
-    const nonceData = nonceDoc.data()!;
-    if (nonceData.used) throw new Error('Invalid or expired nonce');
-    if (new Date() > nonceData.expiresAt.toDate()) throw new Error('Invalid or expired nonce');
-    // AUTH-03: Delete nonce from Firestore on consume (one-time use)
-    await col.doc(nonce).delete();
+    // Firestore: run the read + delete inside a transaction so two concurrent
+    // consumes on different replicas can't both succeed.
+    await db.runTransaction(async (tx) => {
+      const ref = col.doc(nonce);
+      const doc = await tx.get(ref);
+      if (!doc.exists) throw new Error('Invalid or expired nonce');
+      const data = doc.data()!;
+      if (new Date() > data.expiresAt.toDate()) throw new Error('Invalid or expired nonce');
+      tx.delete(ref);
+    });
   } else {
-    // Atomic nonce consumption: delete IMMEDIATELY to prevent TOCTOU race.
-    // If two requests arrive with the same nonce, only the first delete returns
-    // truthy data; the second sees undefined and is rejected.
+    // In-memory (dev only): delete IMMEDIATELY. Map.delete returns a boolean
+    // but the value we actually need is whether the entry existed before we
+    // asked for it — Map.get then delete is fine because Node is single-
+    // threaded within a process.
     const nonceData = memoryNonces.get(nonce);
     if (!nonceData) throw new Error('Invalid or expired nonce');
-    memoryNonces.delete(nonce); // consume before any async work
-    if (nonceData.used) throw new Error('Invalid or expired nonce');
+    memoryNonces.delete(nonce);
     if (new Date() > nonceData.expiresAt) throw new Error('Invalid or expired nonce');
   }
 }

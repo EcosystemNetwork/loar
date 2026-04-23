@@ -24,20 +24,16 @@ contract LoarTokenTest is Test {
     // ── Constructor ──
 
     function test_constructor_distribution() public view {
-        // 70% to treasury (40% + 20% community + 10% reserve)
-        uint256 treasuryExpected = (MAX_SUPPLY * 40) / 100 + (MAX_SUPPLY * 20) / 100
-            + (MAX_SUPPLY
-                - (MAX_SUPPLY * 40)
-                / 100
-                - (MAX_SUPPLY * 30)
-                / 100
-                - (MAX_SUPPLY * 20)
-                / 100);
-        uint256 holderExpected = (MAX_SUPPLY * 30) / 100;
+        // Constructor mints only the seed allocation (10% treasury + 10%
+        // initial holder = 20% of MAX_SUPPLY). The remaining 80% headroom
+        // is mintable post-launch by authorized minters or the owner.
+        uint256 treasuryExpected = (MAX_SUPPLY * 10) / 100;
+        uint256 holderExpected = (MAX_SUPPLY * 10) / 100;
 
         assertEq(token.balanceOf(treasury), treasuryExpected);
         assertEq(token.balanceOf(holder), holderExpected);
-        assertEq(token.totalSupply(), MAX_SUPPLY);
+        assertEq(token.totalSupply(), treasuryExpected + holderExpected);
+        assertEq(token.totalMinted(), treasuryExpected + holderExpected);
     }
 
     function test_constructor_feeExemptions() public view {
@@ -59,13 +55,16 @@ contract LoarTokenTest is Test {
     // ── Minting ──
 
     function test_mint_byOwner_reverts_afterFullDistribution() public {
-        // Constructor distributes MAX_SUPPLY and sets totalMinted = MAX_SUPPLY.
-        // Burns reduce totalSupply() but NOT totalMinted, so mint headroom
-        // can never be reopened — this is the correct C2 fix behavior.
+        // Mint up to MAX_SUPPLY first (constructor only seeds 20%), then verify
+        // burns do not reopen the cap — totalMinted is monotonic, so once the
+        // cap is reached the owner cannot mint even after a burn (TOKEN-03).
+        uint256 headroom = MAX_SUPPLY - token.totalMinted();
+        vm.prank(owner);
+        token.mint(alice, headroom);
+
         vm.prank(treasury);
         token.burn(1000e18);
 
-        // Even after burn, owner cannot mint because totalMinted is still MAX_SUPPLY
         vm.prank(owner);
         vm.expectRevert(LoarToken.ExceedsMaxSupply.selector);
         token.mint(alice, 1000e18);
@@ -75,10 +74,15 @@ contract LoarTokenTest is Test {
         vm.prank(owner);
         token.setMinter(minter, true);
 
+        // Mint up to MAX_SUPPLY first
+        uint256 headroom = MAX_SUPPLY - token.totalMinted();
+        vm.prank(minter);
+        token.mint(alice, headroom);
+
         vm.prank(treasury);
         token.burn(500e18);
 
-        // Even after burn, minter cannot mint — totalMinted is permanent
+        // Even after burn, minter cannot mint — totalMinted is monotonic
         vm.prank(minter);
         vm.expectRevert(LoarToken.ExceedsMaxSupply.selector);
         token.mint(alice, 500e18);
@@ -91,7 +95,12 @@ contract LoarTokenTest is Test {
     }
 
     function test_mint_revert_exceedsMaxSupply() public {
-        // Total supply is already MAX_SUPPLY, so any mint should revert
+        // Constructor mints 20% of MAX_SUPPLY; mint up to the cap first, then
+        // verify any further mint reverts with ExceedsMaxSupply.
+        uint256 headroom = MAX_SUPPLY - token.totalMinted();
+        vm.prank(owner);
+        token.mint(alice, headroom);
+
         vm.prank(owner);
         vm.expectRevert(LoarToken.ExceedsMaxSupply.selector);
         token.mint(alice, 1);

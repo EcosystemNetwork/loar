@@ -23,13 +23,13 @@ export function FeaturedCard({ item }: FeaturedCardProps) {
       {isVideo && item.mediaUrl ? (
         <video
           ref={videoRef}
-          src={ready ? `${item.mediaUrl}#t=0.5` : undefined}
+          src={ready ? `${resolveIpfsUrl(item.mediaUrl)}#t=0.5` : undefined}
           className="w-full h-full object-cover"
           muted
           loop
           playsInline
           preload="none"
-          poster={item.thumbnailUrl || undefined}
+          poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
           onLoadedData={() => onLoaded()}
           onError={() => onLoaded()}
           onMouseEnter={(e) => {

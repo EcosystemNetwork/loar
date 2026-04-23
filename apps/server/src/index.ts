@@ -119,6 +119,14 @@ app.route('/images', imageRouter);
 const { unstoppableRoutes } = await import('./routes/unstoppable');
 app.route('/api/ud', unstoppableRoutes);
 
+// IPFS URL resolver — server-side Pinata gateway token stays on the server
+// (WEB-1). Clients pass an ipfs:// URL or known gateway URL and get back a
+// signed gateway URL they can use directly. Public, rate-limited by shared
+// IP bucket below.
+const { ipfsRoutes } = await import('./routes/ipfs');
+app.use('/api/ipfs/*', rateLimiter({ windowMs: 60_000, max: 120 }));
+app.route('/api/ipfs', ipfsRoutes);
+
 // Admin cost ledger CSV download (admin-address-gated). Lives outside tRPC
 // because tRPC batches JSON — CSV streaming is simpler as a plain REST route.
 const { adminCostRoutes } = await import('./routes/admin-cost');
@@ -135,6 +143,36 @@ app.route('/api', mcpGatewayRoutes);
 app.use('/api/paymaster/*', rateLimiter({ windowMs: 60_000, max: 20 }));
 const { paymasterRoutes } = await import('./routes/paymaster');
 app.route('/api/paymaster', paymasterRoutes);
+
+/**
+ * Sanitize a browser-supplied filename before it reaches any storage backend.
+ * See SRV-6: path separators, NULs, leading dots, and oversized names can
+ * surprise backends that treat the name as a key. We normalize to
+ * `[A-Za-z0-9._-]`, preserve at most one extension, and cap to 128 chars.
+ */
+function sanitizeUploadFilename(raw: string): string {
+  const fallback = 'upload.bin';
+  if (typeof raw !== 'string' || raw.length === 0) return fallback;
+
+  // Strip any path components the browser sent (IE does this, some mobile
+  // browsers do too) and null/control chars.
+  const basename = raw.split(/[\\/]/).pop() ?? '';
+  const stripped = basename.replace(/[\x00-\x1f\x7f]/g, '').trim();
+  if (!stripped) return fallback;
+
+  const dot = stripped.lastIndexOf('.');
+  let name = dot > 0 ? stripped.slice(0, dot) : stripped;
+  let ext = dot > 0 ? stripped.slice(dot + 1) : '';
+
+  name = name
+    .replace(/[^A-Za-z0-9._-]+/g, '_')
+    .replace(/^\.+/, '')
+    .slice(0, 96);
+  ext = ext.replace(/[^A-Za-z0-9]+/g, '').slice(0, 16);
+
+  if (!name) name = 'upload';
+  return ext ? `${name}.${ext}` : name;
+}
 
 /** Detect MIME type from file magic bytes. Returns null if unrecognised. */
 function detectMimeFromMagic(header: Buffer): string | null {
@@ -360,7 +398,13 @@ app.post('/api/upload', async (c) => {
       }
     }
 
-    const manifest = await manager.upload(buffer, file.name, clientMime);
+    // SRV-6: sanitize the browser-supplied filename before passing it to any
+    // storage backend. Previous code forwarded `file.name` verbatim, leaving
+    // path separators, NULs, control chars, and oversized names to the
+    // backend's own (sometimes permissive) handling. Normalize to a small
+    // ASCII-safe set and cap length; extension is preserved when present.
+    const sanitizedFilename = sanitizeUploadFilename(file.name);
+    const manifest = await manager.upload(buffer, sanitizedFilename, clientMime);
 
     // Post-upload CSAM scan — fire-and-forget with result written back to
     // `content` collection by the moderation pipeline. We don't block the
@@ -714,16 +758,13 @@ app.get('/api/takedown/:id/status', async (c) => {
       contentCreatorUid = contentDoc.data()?.creatorUid;
     }
 
-    // Admin wallet-address allowlist reuses the same env the tRPC adminProcedure uses.
-    const adminAddrs = new Set(
-      (process.env.ADMIN_ADDRESSES ?? '')
-        .split(',')
-        .map((a) => a.trim().toLowerCase())
-        .filter(Boolean)
-    );
-    if (process.env.ADMIN_WALLET) adminAddrs.add(process.env.ADMIN_WALLET.toLowerCase());
-    const callerAddr = (authedUser.address ?? authedUser.uid).toLowerCase();
-    const isAdmin = adminAddrs.has(callerAddr);
+    // SRV-9: delegate to the authoritative allowlist in lib/trpc.ts so there
+    // is exactly one parser. Previously every takedown-status call re-split
+    // the env vars; any future tightening of admin rules only needs to touch
+    // the single isAdminAddress helper.
+    const { isAdminAddress } = await import('./lib/trpc');
+    const callerAddr = authedUser.address ?? authedUser.uid;
+    const isAdmin = isAdminAddress(callerAddr);
 
     const isContentOwner =
       !!contentCreatorUid && contentCreatorUid.toLowerCase() === authedUser.uid.toLowerCase();

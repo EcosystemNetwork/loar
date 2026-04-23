@@ -98,6 +98,9 @@ import { mcpRouter } from './mcp/mcp.routes';
 import { jobsRouter } from './jobs/jobs.routes';
 import { vlmRouter } from './vlm/vlm.index';
 import { indexerRouter } from './indexer/indexer.routes';
+import { notebookRouter } from './notebook/notebook.index';
+import { physicsRouter } from './physics/physics.index';
+import { curationRouter } from './curation/curation.index';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
@@ -322,6 +325,15 @@ export const appRouter = router({
   // ── VLM subsystem (extract, proposals, canon, search, moderation, copilot, recap, governance) ─
   // See docs/prd-vlm-subsystem.md
   vlm: vlmRouter,
+
+  // ── Creator Notebook (private scratch → promote to Entity) ───────────
+  notebook: notebookRouter,
+
+  // ── Universe Physics (invariants, conservation rules, validator) ─────
+  physics: physicsRouter,
+
+  // ── Curation (endorsements + leaderboards — positive taste layer) ────
+  curation: curationRouter,
 });
 
 export type AppRouter = typeof appRouter;

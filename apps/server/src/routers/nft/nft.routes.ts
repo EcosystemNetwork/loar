@@ -22,7 +22,11 @@ import { sepolia, baseSepolia } from 'viem/chains';
 import { getStorageManager } from '../../services/storage';
 import { throwApiError } from '../../lib/errors';
 import { recordRevenueEvent } from '../../services/revenue-recorder';
-import { assertContentOperable, assertCanonReadyForMonetization } from '../../lib/content-status';
+import {
+  assertContentOperable,
+  assertContentHashOperable,
+  assertCanonReadyForMonetization,
+} from '../../lib/content-status';
 
 // ── Chain clients for on-chain TX verification ──────────────────────
 const sepoliaClient = createPublicClient({
@@ -204,6 +208,11 @@ export const nftRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // SRV-2: episode NFT listings set a mintPrice, so this is a monetizing
+      // mutation. The listing is keyed by contentHash (not contentId); resolve
+      // via the hash helper which no-ops if there's no off-chain content doc.
+      await assertContentHashOperable(input.contentHash);
+
       const episodeData = {
         ...input,
         creatorUid: ctx.user.uid,
@@ -248,6 +257,11 @@ export const nftRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       if (!db) throw new Error('Firebase is not configured');
+
+      // SRV-2: gate every episode in the batch on its content status. Do
+      // these in parallel so a 50-episode drop stays responsive — total
+      // work is one Firestore read per unique contentHash.
+      await Promise.all(input.episodes.map((ep) => assertContentHashOperable(ep.contentHash)));
 
       const batch = db.batch();
       const now = new Date();

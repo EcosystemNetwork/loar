@@ -36,9 +36,12 @@ Audit-driven checklist. Items are grouped by launch phase.
   - Publish designated agent info on the `/dmca` page after registration
   - Cost: ~$6 filing fee
 
-- [ ] **#4 Counter-Notice Flow** — Implement 10-14 day hold + putback for DMCA
-  - Without this, cannot complete the 512(g) safe harbor loop
-  - Requires: server-side timer, email notification to claimant, auto-reinstate after hold
+- [x] **#4 Counter-Notice Flow** — § 512(g) safe-harbor loop complete _(2026-04-23)_
+  - Public `/counter-notice` form + `POST /api/counter-notice` REST + Firestore `counterNotices` collection
+  - `dmca-putback` job restores content after the hold period; **uses business-day arithmetic** (not calendar days) to satisfy § 512(g)(2)(C)'s "≥10 business days" floor even when federal holidays land in the window
+  - Email templates for all three statutory notices: takedown-to-subscriber (§ 512(g)(1)), counter-notice-to-claimant (§ 512(g)(2)(B)), putback-to-claimant
+  - § 512(g)(1) subscriber notification: when admin transitions content to `hidden`/`removed`, an in-app notification + best-effort email is dispatched to the content creator with a deep-link to the pre-filled counter-notice form
+  - **Operational gate before public beta**: set `DMCA_PUTBACK_ENABLED=true` on exactly ONE replica in prod (job is single-writer; the env defaults to off so dev/CI doesn't auto-restore)
 
 - [x] **#7 Placeholder Contracts** — UI gated for unused Sepolia contracts
   - All PARTIAL-feature routes (`/tokens`, `/licensing`, `/collabs`, `/ads`, `/market`, `/sell`, `/staking`, `/bounties`) now redirect to `/coming-soon`

@@ -5,16 +5,26 @@ import {Test} from "forge-std/Test.sol";
 import {CollectiveTokenFactory} from "../src/revenue/CollectiveTokenFactory.sol";
 import {CollectiveERC20} from "../src/revenue/CollectiveTokenFactory.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+import {MockUniverseManager} from "./mocks/MockUniverseManager.sol";
 
 contract CollectiveTokenFactoryTest is Test {
     CollectiveTokenFactory public factory;
+    MockUniverseManager public universeManager;
 
     address creator = makeAddr("creator");
 
     uint256 constant UNIVERSE_ID = 1;
 
     function setUp() public {
-        factory = new CollectiveTokenFactory(address(this));
+        // CollectiveTokenFactory.deployCollective falls through to
+        // `IUniverseManagerOwner(universeManager).ownerOf(universeId)` when
+        // the caller isn't the universeManager itself. Pointing the factory
+        // at this Test contract leaves the call hitting an undefined ownerOf
+        // (silent revert) — every test fails with "EvmError: Revert". Wire a
+        // proper MockUniverseManager and seed the universe owner instead.
+        universeManager = new MockUniverseManager();
+        universeManager.setOwner(UNIVERSE_ID, creator);
+        factory = new CollectiveTokenFactory(address(universeManager));
     }
 
     // ---- deployCollective (FACTION) ----

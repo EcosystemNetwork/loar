@@ -281,6 +281,20 @@ export const moderationRouter = router({
         await batch.commit();
       }
 
+      // § 512(g)(1): notify the subscriber if their content was just
+      // hidden or removed in response to a takedown. Without this notice
+      // the user can't file a counter-notice and the safe-harbor loop
+      // breaks. In-app notification is the always-on channel; email is
+      // best-effort if the user has shared an address.
+      if (input.newStatus === 'hidden' || input.newStatus === 'removed') {
+        void notifySubscriberOfTakedown({
+          contentId: input.contentId,
+          newStatus: input.newStatus,
+          reason: input.reason,
+          adminUid: ctx.user.uid.toLowerCase(),
+        });
+      }
+
       // PostHog: admin moderation audit trail.
       void import('../../lib/analytics').then(({ captureServerEvent }) =>
         captureServerEvent('moderation:content_status_changed', {
@@ -356,3 +370,95 @@ export const moderationRouter = router({
       return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     }),
 });
+
+/**
+ * § 512(g)(1) subscriber notification on takedown.
+ *
+ * Fire-and-forget: best-effort. The audit-log row written by the caller
+ * is the durable proof of admin action; this function only delivers the
+ * user-facing notice. Failures are logged and swallowed so they cannot
+ * roll back the status change.
+ *
+ * Channels:
+ *   - In-app `notifications/` row (always — works for wallet-only users)
+ *   - Email via Resend (only if user has stored an `email` field on
+ *     their `users/{addressLower}` doc; many won't, which is fine)
+ *
+ * The notification deep-links to `/counter-notice?takedownRequestId=…`
+ * so the form arrives pre-filled with the takedown reference.
+ */
+async function notifySubscriberOfTakedown(params: {
+  contentId: string;
+  newStatus: 'hidden' | 'removed';
+  reason?: string;
+  adminUid: string;
+}): Promise<void> {
+  if (!firebaseAvailable || !db) return;
+  try {
+    const cDoc = await db.collection('content').doc(params.contentId).get();
+    if (!cDoc.exists) return;
+    const content = cDoc.data() as
+      | { creatorUid?: string; title?: string; name?: string }
+      | undefined;
+    const creatorUid = content?.creatorUid;
+    if (!creatorUid) return;
+
+    // Look up the most recent takedown that targets this content. The
+    // counter-notice flow keys off `takedownRequestId`, so we surface
+    // the freshest one. Status filter is intentionally absent — even a
+    // resolved/actioned takedown is a valid counter-notice anchor.
+    const tdSnap = await db
+      .collection('takedownRequests')
+      .where('contentId', '==', params.contentId)
+      .orderBy('createdAt', 'desc')
+      .limit(1)
+      .get();
+    const takedownRequestId = tdSnap.empty ? null : tdSnap.docs[0].id;
+    if (!takedownRequestId) {
+      // Status flip without a corresponding takedown — could be admin
+      // judgment call. Still notify, but without a counter-notice link
+      // the user can use the generic /counter-notice form path.
+      console.warn(
+        `[moderation] takedown notice fired for ${params.contentId} but no takedownRequest found`
+      );
+    }
+
+    const appBase = process.env.APP_BASE_URL ?? 'https://loar.fun';
+    const counterNoticeUrl = takedownRequestId
+      ? `${appBase}/counter-notice?takedownRequestId=${encodeURIComponent(takedownRequestId)}`
+      : `${appBase}/counter-notice`;
+    const verb = params.newStatus === 'removed' ? 'removed' : 'hidden';
+
+    // 1. In-app notification (always)
+    await db.collection('notifications').add({
+      recipientUid: creatorUid.toLowerCase(),
+      type: 'dmca_takedown',
+      message: `Your content was ${verb} following a DMCA takedown notice. You may file a counter-notice.`,
+      actorUid: 'system_dmca',
+      targetType: 'content',
+      targetId: params.contentId,
+      url: counterNoticeUrl,
+      read: false,
+      createdAt: new Date(),
+    });
+
+    // 2. Email (best-effort, only if user has stored an email)
+    const userDoc = await db.collection('users').doc(creatorUid.toLowerCase()).get();
+    const subscriberEmail = userDoc.data()?.email as string | undefined;
+    const subscriberDisplayName = userDoc.data()?.displayName as string | undefined;
+    if (subscriberEmail && takedownRequestId) {
+      const { emailTakedownToSubscriber } = await import('../../lib/dmca-email');
+      void emailTakedownToSubscriber({
+        subscriberEmail,
+        subscriberDisplayName,
+        contentId: params.contentId,
+        contentTitle: content?.title ?? content?.name,
+        takedownRequestId,
+        newStatus: params.newStatus,
+        reason: params.reason,
+      });
+    }
+  } catch (err) {
+    console.error('[moderation] notifySubscriberOfTakedown failed:', err);
+  }
+}

@@ -94,6 +94,29 @@ export function isMcpServerKey(perms: string[] | undefined | null): boolean {
   return !!perms?.includes('mcp_server');
 }
 
+/**
+ * Decide whether an MCP relay key may impersonate the given end-user address.
+ *
+ * Rules (fail-closed):
+ *   1. Key must be an `mcp_server` key.
+ *   2. Address always allowed if it equals the key's `ownerUid` (gateway pattern:
+ *      one MCP key minted per wallet, can only act for itself).
+ *   3. Otherwise, address must appear in `allowedEndUserAddresses` (opt-in for
+ *      multi-tenant relays).
+ *   4. Anything else → false. The auth layer treats this as a rejected request
+ *      so impersonation attempts are loud, not silently downgraded.
+ *
+ * `address` and stored entries are compared lower-case.
+ */
+export function isEndUserAddressAllowed(keyDoc: ApiKeyDoc, address: string): boolean {
+  if (!isMcpServerKey(keyDoc.permissions)) return false;
+  const target = address.toLowerCase();
+  if (target === keyDoc.ownerUid.toLowerCase()) return true;
+  const allow = keyDoc.allowedEndUserAddresses;
+  if (!allow || allow.length === 0) return false;
+  return allow.includes(target);
+}
+
 /** Default rate limits per-key-per-minute for mcp_server vs direct keys. */
 export const MCP_SERVER_RATE_LIMIT = 300;
 export const DIRECT_KEY_RATE_LIMIT = 60;
@@ -108,6 +131,14 @@ export interface ApiKeyDoc {
   ownerUid: string; // wallet address of key creator
   aiAgentId: string | null; // linked AI agent (if any)
   permissions: string[]; // scoped permissions
+  /**
+   * Explicit allowlist of end-user wallet addresses this key may impersonate
+   * via `X-Loar-End-User-Address`. Only meaningful for `mcp_server` keys.
+   * If unset/empty, the header is only honoured when it equals `ownerUid` —
+   * which is the gateway-minted-per-wallet pattern.
+   * All entries are stored lower-case.
+   */
+  allowedEndUserAddresses?: string[];
   rateLimitPerMinute: number;
   totalRequests: number;
   lastUsedAt: Date | null;
@@ -149,6 +180,30 @@ function hashKey(key: string): string {
 // In-memory rate limit tracking
 const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
 
+// INF-6: per-key concurrency cap. Rate limit bounds requests-per-minute but
+// says nothing about how many long-running jobs (video render, 3D gen, VLM
+// extraction) a single key can have in flight. A compromised or abusive key
+// could start 500 video generations before the RPM limit kicked in. This
+// counter is decremented by `releaseKeyConcurrencySlot` when the caller
+// finishes its work (typically in a `finally`).
+const concurrencyMap = new Map<string, number>();
+const MAX_CONCURRENT_PER_KEY_DEFAULT = 8;
+const MAX_CONCURRENT_PER_MCP_KEY_DEFAULT = 32;
+
+export function acquireKeyConcurrencySlot(keyId: string, isMcp: boolean): boolean {
+  const cap = isMcp ? MAX_CONCURRENT_PER_MCP_KEY_DEFAULT : MAX_CONCURRENT_PER_KEY_DEFAULT;
+  const current = concurrencyMap.get(keyId) ?? 0;
+  if (current >= cap) return false;
+  concurrencyMap.set(keyId, current + 1);
+  return true;
+}
+
+export function releaseKeyConcurrencySlot(keyId: string): void {
+  const current = concurrencyMap.get(keyId) ?? 0;
+  if (current <= 1) concurrencyMap.delete(keyId);
+  else concurrencyMap.set(keyId, current - 1);
+}
+
 // ── Key Generation ─────────────────────────────────────────────────────
 
 /**
@@ -159,6 +214,12 @@ export async function generateApiKey(params: {
   ownerUid: string;
   aiAgentId?: string;
   permissions: string[];
+  /**
+   * Allowlist of end-user addresses this key may relay for. Only meaningful
+   * for `mcp_server` keys. Stored lower-case. The owner address is implicitly
+   * allowed and does not need to be repeated here.
+   */
+  allowedEndUserAddresses?: string[];
   rateLimitPerMinute?: number;
   expiresInDays?: number;
 }): Promise<{ rawKey: string; keyDoc: ApiKeyDoc }> {
@@ -191,6 +252,10 @@ export async function generateApiKey(params: {
     ? MCP_SERVER_RATE_LIMIT
     : DIRECT_KEY_RATE_LIMIT;
 
+  const normalizedAllow = (params.allowedEndUserAddresses ?? [])
+    .map((a) => a.trim().toLowerCase())
+    .filter((a) => /^0x[0-9a-f]{40}$/.test(a));
+
   const doc: Omit<ApiKeyDoc, 'id'> = {
     keyHash,
     keyPrefix,
@@ -198,6 +263,7 @@ export async function generateApiKey(params: {
     ownerUid: params.ownerUid,
     aiAgentId: params.aiAgentId || null,
     permissions: params.permissions,
+    allowedEndUserAddresses: normalizedAllow.length > 0 ? normalizedAllow : undefined,
     rateLimitPerMinute: params.rateLimitPerMinute ?? defaultRateLimit,
     totalRequests: 0,
     lastUsedAt: null,

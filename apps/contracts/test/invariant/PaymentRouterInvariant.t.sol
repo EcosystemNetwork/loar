@@ -48,12 +48,21 @@ contract PaymentRouterHandler is Test {
         loar = _loar;
         goodTreasury = _treasury;
 
+        // Constructor only builds the actor list — the handler has no LOAR
+        // balance yet at construction time, so any transfer here reverts.
+        // The test must call fundActors() after seeding the handler.
         for (uint256 i = 0; i < 5; i++) {
             address actor = makeAddr(string(abi.encodePacked("actor", vm.toString(i))));
             actors.push(actor);
             vm.deal(actor, 100 ether);
-            // Seed each actor with mockLOAR so they can call routeLoar
-            _loar.transfer(actor, 10_000e18);
+        }
+    }
+
+    /// @notice Distribute mockLOAR to the actor list. Call from the test's
+    ///         setUp AFTER the handler has been funded.
+    function fundActors() external {
+        for (uint256 i = 0; i < actors.length; i++) {
+            loar.transfer(actors[i], 10_000e18);
         }
     }
 
@@ -171,8 +180,9 @@ contract PaymentRouterInvariantTest is Test {
 
         handler = new PaymentRouterHandler(router, loar, treasury);
 
-        // Give handler LOAR so it can seed actors
+        // Give handler LOAR so it can seed actors, then trigger seeding.
         loar.transfer(address(handler), LOAR_SUPPLY / 2);
+        handler.fundActors();
 
         targetContract(address(handler));
     }
@@ -263,6 +273,7 @@ contract PaymentRouterPendingWithdrawalInvariantTest is Test {
         // Use the good treasury for the handler's reference (handler doesn't depend on it).
         handler = new PaymentRouterHandler(router, loar, goodTreasury);
         loar.transfer(address(handler), LOAR_SUPPLY / 2);
+        handler.fundActors();
         targetContract(address(handler));
     }
 

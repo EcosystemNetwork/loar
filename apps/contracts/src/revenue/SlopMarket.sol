@@ -84,6 +84,8 @@ contract SlopMarket is ReentrancyGuard, Ownable {
     error RefundFailed();
     error FeeTooHigh();
     error ContentNotMonetizable();
+    /// @notice A malicious ERC-2981 returned a royalty > totalPrice. SC-4.
+    error RoyaltyExceedsPrice();
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
@@ -201,13 +203,25 @@ contract SlopMarket is ReentrancyGuard, Ownable {
             royaltyAmount = royaltyAmt;
         } catch {}
 
-        if (royaltyAmount > 0 && royaltyReceiver != address(0) && royaltyReceiver != l.seller) {
-            // Route royalty to creator, remaining to seller
+        // SC-4: previously, when `royaltyReceiver == l.seller`, the entire
+        // branch collapsed into the `else` and the seller was routed the full
+        // `totalPrice` — the ERC-2981 "royalty" was paid implicitly on top of
+        // the seller payout, double-counting when listed through a malicious
+        // token that returns an inflated royaltyAmount. Two defenses:
+        //   1. Clamp royalty to <= totalPrice (otherwise it reverts under
+        //      solidity 0.8 on the subtraction, but we want a clean error).
+        //   2. When `royaltyReceiver == seller`, still subtract royaltyAmount
+        //      from the seller payout so the net payout never exceeds
+        //      totalPrice, then pay the royalty leg directly (same seller).
+        if (royaltyAmount > totalPrice) revert RoyaltyExceedsPrice();
+        if (royaltyAmount > 0 && royaltyReceiver != address(0)) {
             uint256 sellerAmount = totalPrice - royaltyAmount;
+            if (sellerAmount > 0) {
+                paymentRouter.route{value: sellerAmount}(l.seller, platformFeeBps);
+            }
+            // Royalty leg does NOT take platform fee (matches prior semantics).
             paymentRouter.route{value: royaltyAmount}(royaltyReceiver, 0);
-            paymentRouter.route{value: sellerAmount}(l.seller, platformFeeBps);
         } else {
-            // Route payment: platform cut to treasury, rest accrues to seller
             paymentRouter.route{value: totalPrice}(l.seller, platformFeeBps);
         }
 

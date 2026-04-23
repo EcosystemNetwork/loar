@@ -17,6 +17,7 @@ import {
   buildSetSplitsCalldata,
   recordContentSplit,
 } from '../../services/split-orchestrator';
+import { assertContentOperable } from '../../lib/content-status';
 
 const splitConfigsCol = () => {
   if (!db)
@@ -119,6 +120,11 @@ export const splitsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // SRV-2: splits decide who receives every future payment for this
+      // content, so it's a monetization decision on par with listing the
+      // content for sale. Enforce the moderation gate before persisting.
+      await assertContentOperable(input.contentId);
+
       const splits = await computeSplitsForContent(input.universeId, input.generatorAddress);
       const entityHash = computeEntityHash(input.contentId);
       const calldata = buildSetSplitsCalldata(entityHash, splits.splits);

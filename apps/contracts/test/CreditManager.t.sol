@@ -1124,9 +1124,11 @@ contract CreditManagerTest is Test {
         assertEq(credits.getBalance(user), expected);
     }
 
-    function test_purchaseWithLoar_fallbackDirectTreasuryTransfer() public {
-        // Deploy CreditManager with paymentRouter = address(0)
-        // In this case, LOAR goes directly to treasury
+    function test_purchaseWithLoar_revertsWhenPaymentRouterUnset() public {
+        // CREDIT-05: the legacy "fallback to direct treasury transfer" path
+        // when paymentRouter is unset has been removed (it bypassed routing
+        // accounting). The contract now hard-requires a configured router
+        // and reverts on purchase attempts otherwise.
         vm.startPrank(deployer);
         CreditManager impl = new CreditManager();
         CreditManager noRouterCredits = CreditManager(
@@ -1140,24 +1142,17 @@ contract CreditManagerTest is Test {
                 )
             )
         );
-        // Make it fee-exempt too
         loarToken.setFeeExempt(address(noRouterCredits), true);
         vm.stopPrank();
 
         vm.prank(platform);
         noRouterCredits.createPackage("Starter", 100, 0.01 ether, 50e18, 5);
 
-        uint256 treasuryLoarBefore = loarToken.balanceOf(treasury);
-
         vm.startPrank(user);
         loarToken.approve(address(noRouterCredits), 50e18);
+        vm.expectRevert(bytes("PaymentRouter not set"));
         noRouterCredits.purchaseWithLoar(0);
         vm.stopPrank();
-
-        // Credits granted
-        assertEq(noRouterCredits.getBalance(user), 115);
-        // LOAR went directly to treasury (no router)
-        assertEq(loarToken.balanceOf(treasury) - treasuryLoarBefore, 50e18);
     }
 
     function test_spendCredits_zeroAmount() public {

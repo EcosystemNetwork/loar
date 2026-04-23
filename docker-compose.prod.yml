@@ -52,7 +52,18 @@ services:
   redis:
     image: redis:7-alpine
     container_name: loar-redis
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save "" --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set - generate with openssl rand -hex 32}
+    # INF-9: force persistence off (cache/queue only), enable protected mode,
+    # and require a password ≥32 bytes. Intentionally no `ports:` mapping so
+    # Redis is only reachable inside loar-network — exposing 6379 to the host
+    # is never correct in prod.
+    command: >-
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
+      --protected-mode yes
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set - generate with openssl rand -hex 32}
     restart: unless-stopped
     networks:
       - loar-network

@@ -292,11 +292,23 @@ contract LoarSwapRouter is IUnlockCallback, Ownable {
     ///      already sitting in the contract (accidental sends, stuck
     ///      prior-swap remnants) stays out of reach of the swap caller
     ///      and can only be withdrawn via `rescueETH` by the owner.
-    function _refundETH(address recipient, uint256 baseline) internal {
+    /// @dev SC-5 hardening: callers pass both the pre-swap baseline AND the
+    ///      `maxRefund` cap (typically `msg.value`). Refund is
+    ///      `min(balance - baseline, maxRefund)` so a future refactor that
+    ///      accidentally inflates the delta — e.g. by moving the baseline
+    ///      snapshot around — cannot drain stale ETH that belongs to another
+    ///      caller. The original overload delegates for backwards-compat.
+    function _refundETH(address recipient, uint256 baseline, uint256 maxRefund) internal {
         uint256 balance = address(this).balance;
-        if (balance > baseline) {
-            Address.sendValue(payable(recipient), balance - baseline);
-        }
+        if (balance <= baseline) return;
+        uint256 owed = balance - baseline;
+        if (owed > maxRefund) owed = maxRefund;
+        if (owed == 0) return;
+        Address.sendValue(payable(recipient), owed);
+    }
+
+    function _refundETH(address recipient, uint256 baseline) internal {
+        _refundETH(recipient, baseline, msg.value);
     }
 
     // Uniswap v4 sqrt price limits (from TickMath)

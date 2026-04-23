@@ -9,6 +9,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { trpcClient } from '@/utils/trpc';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { UserText } from '@/components/user-text';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -227,7 +228,11 @@ function ProfilePage() {
               </Badge>
             </div>
 
-            {bio && <p className="mt-2 text-muted-foreground max-w-2xl">{bio}</p>}
+            {bio && (
+              <p className="mt-2 text-muted-foreground max-w-2xl break-words">
+                <UserText>{bio}</UserText>
+              </p>
+            )}
 
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-3">

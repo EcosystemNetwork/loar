@@ -157,6 +157,7 @@ const _validationPromise = validateSessionOnStartup();
 async function validateSessionOnStartup() {
   if (!hasSession()) {
     _sessionValidated = true;
+    emitChange();
     return;
   }
 
@@ -174,11 +175,26 @@ async function validateSessionOnStartup() {
     // Network failure — keep the session (don't log out on transient errors)
   }
   _sessionValidated = true;
+  emitChange();
+}
+
+/**
+ * WEB-6: expose the validation state + a promise so callers (route loaders,
+ * protected layouts) can block sensitive queries until the server has
+ * confirmed the stored session is still good. Previously the UI rendered as
+ * authenticated based on localStorage before `/auth/me` had answered, letting
+ * queued mutations fire in the window between "we think you're logged in"
+ * and the 401 that clears the session.
+ */
+export function isSessionValidated(): boolean {
+  return _sessionValidated;
 }
 
 function getSessionValidationDone(): Promise<void> {
   return _validationPromise;
 }
+
+export { getSessionValidationDone as awaitSessionValidation };
 
 // ── Session refresh timer ───────────────────────────────────────
 
@@ -345,6 +361,14 @@ export function useWalletAuth() {
     address,
     isConnected,
     isAuthenticated,
+    /**
+     * WEB-6: true once the server-side /auth/me check has resolved. Consumers
+     * that gate mutations on auth (tx writes, payments) should check this
+     * instead of `isAuthenticated` alone — the authed flag is true from
+     * localStorage hydration onward, but `sessionReady` only flips after the
+     * cookie has been confirmed live.
+     */
+    sessionReady: validated,
     isAuthenticating,
     needsManualSignIn: false,
     error,

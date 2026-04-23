@@ -30,13 +30,23 @@ contract LaunchpadStakingHandler is Test {
         staking = _staking;
         loar = _loar;
 
+        // Only build the actor + universe lists in the constructor — the
+        // handler has no LOAR balance yet, so any transfer here reverts.
+        // The test calls fundActors() after seeding the handler with LOAR.
         for (uint256 i = 0; i < 5; i++) {
             address actor = makeAddr(string(abi.encodePacked("staker", vm.toString(i))));
             actors.push(actor);
-            _loar.transfer(actor, 1_000_000e18);
         }
         for (uint256 u = 1; u <= 3; u++) {
             universeIds.push(u);
+        }
+    }
+
+    /// @notice Distribute LOAR to the actor list. Call from the test's setUp
+    ///         AFTER the handler has been funded.
+    function fundActors() external {
+        for (uint256 i = 0; i < actors.length; i++) {
+            loar.transfer(actors[i], 1_000_000e18);
         }
     }
 
@@ -140,6 +150,9 @@ contract LaunchpadStakingInvariantTest is Test {
 
         handler = new LaunchpadStakingHandler(staking, loar);
         loar.transfer(address(handler), LOAR_SUPPLY / 2);
+        // Fund actors AFTER the handler has its LOAR balance. The handler's
+        // constructor cannot do this because it runs before the transfer.
+        handler.fundActors();
         targetContract(address(handler));
     }
 

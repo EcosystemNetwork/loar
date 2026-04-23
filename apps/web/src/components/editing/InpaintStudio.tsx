@@ -15,6 +15,7 @@
 import { useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 import { InpaintCanvas, type InpaintCanvasHandle } from './InpaintCanvas';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -616,9 +617,12 @@ export function InpaintStudio({
                 >
                   {j.outputUrl ? (
                     <img
-                      src={j.outputUrl}
+                      src={resolveIpfsUrl(j.outputUrl)}
                       alt=""
                       className="w-10 h-10 rounded object-cover shrink-0"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
                     />
                   ) : (
                     <div className="w-10 h-10 rounded bg-muted/20 shrink-0" />

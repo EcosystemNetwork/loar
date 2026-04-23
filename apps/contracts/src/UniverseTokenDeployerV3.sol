@@ -78,6 +78,14 @@ interface IGovernorFactory {
     function deployGovernor(address token, address timelock) external returns (address);
 }
 
+interface IUniverseGovernorLike {
+    /// OpenZeppelin Governor exposes `token()` returning the IVotes it tracks;
+    /// we call it through a minimal interface so the deployer can cross-check
+    /// the governor was bound to the token we just deployed (SC-2).
+    function token() external view returns (address);
+    function timelock() external view returns (address);
+}
+
 interface IBondingCurveFactory {
     function deployBondingCurve(
         address token,
@@ -156,6 +164,14 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
     error OnlyUniverseManager();
     error OnlyOwner();
     error BondingCurveFactoryNotSet();
+    // SC-2: governor sanity-check errors — the factory must return a governor
+    // actually bound to the token + timelock we just deployed.
+    error GovernorMissing();
+    error GovernorTokenMismatch();
+    error GovernorTimelockMismatch();
+    // SC-7: the community allocation recipient is user-supplied and may be a
+    // contract that can't receive ERC-20 transfers. Surface that explicitly.
+    error InvalidCommunityRecipient();
 
     event TokenDeployed(
         uint256 indexed universeId,
@@ -228,6 +244,22 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
     ///         deployed universe token. Set to address(0) to revert to legacy behavior
     ///         (community merged with treasury in UniverseManager).
     function setCommunityRecipient(address _communityRecipient) external onlyOwner {
+        // SC-7: the community fund is a meaningful share of supply; if the
+        // configured recipient can't receive ERC-20 (self-destructed contract,
+        // non-ERC20-compatible proxy) the deployment leg that transfers to it
+        // will revert and brick the universe launch. We can't prove a contract
+        // will accept tokens, but we can at least reject obvious mistakes:
+        // - zero address is permitted (it's the legacy opt-out)
+        // - the deployer, manager, or zero-delegate addresses must not be set
+        //   as community recipient because the transfer pattern would loop
+        //   back into protocol-controlled addresses.
+        if (_communityRecipient != address(0)) {
+            if (
+                _communityRecipient == address(this)
+                    || _communityRecipient == universeManager
+                    || _communityRecipient == address(0xdead)
+            ) revert InvalidCommunityRecipient();
+        }
         communityRecipient = _communityRecipient;
     }
 
@@ -371,6 +403,17 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
         }
 
         governor = governorFactory.deployGovernor(tokenAddress, governorTimelock);
+
+        // SC-2: bind check — the governor must actually track the token we
+        // just deployed AND the timelock we just deployed. A malicious
+        // governor factory could otherwise return an address pointing at an
+        // unrelated IVotes shim, leaving the real token holders with zero
+        // voting power over treasury funds.
+        if (governor == address(0)) revert GovernorMissing();
+        address govToken = IUniverseGovernorLike(governor).token();
+        address govTimelock = IUniverseGovernorLike(governor).timelock();
+        if (govToken != tokenAddress) revert GovernorTokenMismatch();
+        if (govTimelock != governorTimelock) revert GovernorTimelockMismatch();
 
         if (address(timelockFactory) != address(0)) {
             timelockFactory.wireProposer(governorTimelock, governor);

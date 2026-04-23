@@ -57,93 +57,11 @@ jobs:
           SSH_HOST: ${{secrets.SSH_HOST}}
           SSH_USER: ${{secrets.SSH_USER}}
           WORK_DIR: ${{secrets.WORK_DIR}}
+        # INF-8: delegate all deploy logic to the checked-in script so every
+        # line that touches production is visible in code review. The only
+        # thing the workflow does itself is: set known_hosts, cd into the
+        # deploy checkout, and run the repo's versioned deploy script.
         run: |
-          ssh-keyscan -H $SSH_HOST >> ~/.ssh/known_hosts 2>/dev/null
-
-          ssh -o StrictHostKeyChecking=yes $SSH_USER@$SSH_HOST << 'ENDSSH'
-            set -e
-            cd ${{ secrets.WORK_DIR }}
-
-            # ── 1. Record rollback point before touching anything ──────────────
-            PREV_SHA=$(git rev-parse HEAD 2>/dev/null || echo "none")
-            DEPLOY_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-            echo "Previous SHA : $PREV_SHA"
-
-            # ── 2. Pull latest code ────────────────────────────────────────────
-            git pull origin main
-            CURRENT_SHA=$(git rev-parse HEAD)
-            echo "Current SHA  : $CURRENT_SHA"
-
-            # Persist deploy state — rollback.sh reads PREV_SHA from here
-            printf 'PREV_SHA=%s\nCURRENT_SHA=%s\nDEPLOY_TIME=%s\n' \
-              "$PREV_SHA" "$CURRENT_SHA" "$DEPLOY_TIME" > .loar-deploy
-
-            chmod +x scripts/smoke-test.sh scripts/rollback.sh
-
-            # ── 3. Build & start containers (production: nginx LB + Redis + workers) ─
-            # Replica counts come from .env (SERVER_REPLICAS / WORKER_REPLICAS).
-            # Defaults match compose file defaults. `deploy.replicas` is
-            # ignored under plain compose, so --scale flags are required.
-            SERVER_REPLICAS="${SERVER_REPLICAS:-4}"
-            WORKER_REPLICAS="${WORKER_REPLICAS:-2}"
-            docker compose -f docker-compose.prod.yml build
-            docker compose -f docker-compose.prod.yml up -d \
-              --scale server=$SERVER_REPLICAS \
-              --scale worker=$WORKER_REPLICAS
-            docker compose -f docker-compose.prod.yml ps
-
-            # ── 4. Wait for HTTP health endpoints (max 90s) ────────────────────
-            echo ""
-            echo "Waiting for services to become ready..."
-            READY=0
-            for i in $(seq 1 18); do
-              SRV=$(curl -sf --max-time 5 http://localhost/health  >/dev/null 2>&1 && echo ok || echo no)
-              IDX=$(curl -sf --max-time 5 http://localhost:42069/health >/dev/null 2>&1 && echo ok || echo no)
-              RDS=$(docker compose -f docker-compose.prod.yml exec -T redis redis-cli ping 2>/dev/null | grep -q PONG && echo ok || echo no)
-              if [ "$SRV" = "ok" ] && [ "$IDX" = "ok" ] && [ "$RDS" = "ok" ]; then
-                READY=1
-                echo "  All services responding after $((i * 5))s"
-                break
-              fi
-              echo "  [$i/18] nginx=$SRV indexer=$IDX redis=$RDS — retrying in 5s..."
-              sleep 5
-            done
-
-            if [ "$READY" -eq 0 ]; then
-              echo ""
-              echo "ERROR: Services did not respond within 90s — triggering rollback"
-              ROLLBACK_SHA="$PREV_SHA" ./scripts/rollback.sh || true
-              printf 'DEPLOY_STATUS=failed_timeout\n' >> .loar-deploy
-              exit 1
-            fi
-
-            # ── 5. Smoke tests ─────────────────────────────────────────────────
-            echo ""
-            if ! ./scripts/smoke-test.sh; then
-              echo "Smoke tests FAILED — triggering rollback to $PREV_SHA"
-              ROLLBACK_SHA="$PREV_SHA" ./scripts/rollback.sh || true
-              printf 'DEPLOY_STATUS=failed_smoke\n' >> .loar-deploy
-              exit 1
-            fi
-
-            printf 'DEPLOY_STATUS=ok\n' >> .loar-deploy
-
-            # ── 6. Deploy summary ──────────────────────────────────────────────
-            REPLICAS=$(docker compose -f docker-compose.prod.yml ps --format '{{.Service}}' | grep -c server || echo "?")
-            WORKERS=$(docker compose -f docker-compose.prod.yml ps --format '{{.Service}}' | grep -c worker || echo "?")
-            echo ""
-            echo "========================================"
-            echo "  Deploy Summary"
-            echo "========================================"
-            echo "  Commit   : $CURRENT_SHA"
-            echo "  App      : https://loar.fun"
-            echo "  API      : https://api.loar.fun"
-            echo "  Indexer  : https://idx.loar.fun"
-            echo "  Servers  : $REPLICAS replicas"
-            echo "  Workers  : $WORKERS replicas"
-            echo "  Redis    : redis:6379"
-            echo "  LB       : nginx:80"
-            echo "  Smoke    : PASSED"
-            echo "  Time     : $DEPLOY_TIME"
-            echo "========================================"
-          ENDSSH
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" \
+            "cd \"$WORK_DIR\" && git pull origin main && chmod +x scripts/deploy-server.sh && ./scripts/deploy-server.sh"

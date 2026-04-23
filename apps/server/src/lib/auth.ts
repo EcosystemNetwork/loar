@@ -9,7 +9,7 @@
  * Returns a normalized AuthUser for use in tRPC context.
  */
 import { verifySessionToken } from './siwe';
-import { verifyApiKey, isMcpServerKey, type ApiKeyDoc } from './apiKeys';
+import { verifyApiKey, isMcpServerKey, isEndUserAddressAllowed, type ApiKeyDoc } from './apiKeys';
 
 const ETH_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
@@ -44,14 +44,26 @@ export async function verifyAuth(headers: Headers, cookieToken?: string): Promis
   if (apiKey) {
     const result = await verifyApiKey(apiKey);
     if (result) {
-      // Honour X-Loar-End-User-Address ONLY when the key is an MCP relay.
-      // Direct API keys cannot impersonate a different end-user.
+      // Honour X-Loar-End-User-Address ONLY when (a) the key is an MCP relay
+      // AND (b) the address is permitted for this key (key owner, or an entry
+      // in the explicit `allowedEndUserAddresses` allowlist). Anything else
+      // is rejected outright — silently downgrading to the relay's own
+      // identity would let a compromised relay key impersonate any wallet
+      // by sending an unrelated header. See SRV-1 in the security audit.
       let endUserAddress: string | undefined;
-      if (isMcpServerKey(result.keyDoc.permissions)) {
-        const raw = headers.get('X-Loar-End-User-Address')?.trim();
-        if (raw && ETH_ADDRESS_RE.test(raw)) {
-          endUserAddress = raw.toLowerCase();
+      const rawEndUser = headers.get('X-Loar-End-User-Address')?.trim();
+      if (rawEndUser) {
+        if (!isMcpServerKey(result.keyDoc.permissions)) {
+          // Direct keys must not send this header.
+          return null;
         }
+        if (!ETH_ADDRESS_RE.test(rawEndUser)) {
+          return null;
+        }
+        if (!isEndUserAddressAllowed(result.keyDoc, rawEndUser)) {
+          return null;
+        }
+        endUserAddress = rawEndUser.toLowerCase();
       }
       return {
         ...result.user,

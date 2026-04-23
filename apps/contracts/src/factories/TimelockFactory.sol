@@ -37,6 +37,12 @@ contract TimelockFactory {
     error UnknownTimelock();
     error AlreadyWired();
     error ZeroAddress();
+    /// @notice The factory is no longer DEFAULT_ADMIN of the timelock it was asked to wire.
+    /// @dev Fires when an external actor somehow acquired admin and revoked the
+    ///      factory's role before `wireProposer` — we refuse to pretend the
+    ///      renounce succeeded, since `renounceRole` is a no-op if the caller
+    ///      does not hold the role (SC-1).
+    error FactoryAdminLost();
 
     /// @notice Deploy a new TimelockController with this factory as admin.
     ///         The caller (typically `UniverseTokenDeployerV3`) must follow
@@ -60,6 +66,12 @@ contract TimelockFactory {
     /// @notice Grant PROPOSER + CANCELLER to the spawned governor and
     ///         renounce admin so future role changes go through the
     ///         timelock's own queued proposals. Single-use per timelock.
+    /// @dev SC-1: explicitly assert the factory still holds DEFAULT_ADMIN_ROLE
+    ///      before trusting the grants + renounce. `renounceRole` is a no-op
+    ///      if the caller doesn't hold the role, so without this check an
+    ///      attacker who had somehow acquired admin and stripped the factory
+    ///      could watch `wireProposer` succeed-on-paper while leaving the
+    ///      timelock under their control.
     function wireProposer(address timelock, address governor) external {
         if (governor == address(0) || timelock == address(0)) revert ZeroAddress();
         if (!isFactoryTimelock[timelock]) revert UnknownTimelock();
@@ -67,12 +79,19 @@ contract TimelockFactory {
         wired[timelock] = true;
 
         TimelockController tl = TimelockController(payable(timelock));
+        bytes32 adminRole = tl.DEFAULT_ADMIN_ROLE();
+        if (!tl.hasRole(adminRole, address(this))) revert FactoryAdminLost();
+
         tl.grantRole(tl.PROPOSER_ROLE(), governor);
         tl.grantRole(tl.CANCELLER_ROLE(), governor);
         // Renounce admin so this factory has no further power over the
         // per-universe timelock. From this point, only the timelock itself
         // (via queued proposals) can change roles.
-        tl.renounceRole(tl.DEFAULT_ADMIN_ROLE(), address(this));
+        tl.renounceRole(adminRole, address(this));
+        // Post-condition: admin must now be empty on this factory. If an
+        // external contract re-granted it between grant+renounce, surface it.
+        if (tl.hasRole(adminRole, address(this))) revert FactoryAdminLost();
+
         emit TimelockWired(timelock, governor);
     }
 }

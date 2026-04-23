@@ -26,14 +26,22 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:
 // (rotated independently of OAUTH_JWT_SECRET) so a backing-store leak is
 // not equivalent to credential exfiltration.
 function getCacheEncryptionKey(): Buffer {
-  const secret =
-    process.env.MCP_KEY_CACHE_SECRET ||
-    process.env.OAUTH_JWT_SECRET || // fall back to JWT secret if dedicated one absent
-    '';
+  // INF-4: do NOT fall back to OAUTH_JWT_SECRET. A shared secret means a
+  // single compromise (session-token signing key) yields the AES key for
+  // every cached `loar_*` MCP credential, and combined with the impersonation
+  // surface that's full account takeover. Require an explicitly-set,
+  // independently-rotatable cache key.
+  const secret = process.env.MCP_KEY_CACHE_SECRET ?? '';
   if (!secret) {
     throw new Error(
-      'MCP_KEY_CACHE_SECRET (or fallback OAUTH_JWT_SECRET) required to cache MCP keys'
+      'MCP_KEY_CACHE_SECRET is required to cache MCP keys. Generate with `openssl rand -hex 32` and set distinct from OAUTH_JWT_SECRET.'
     );
+  }
+  if (secret === process.env.OAUTH_JWT_SECRET) {
+    throw new Error('MCP_KEY_CACHE_SECRET must not equal OAUTH_JWT_SECRET (rotate independently).');
+  }
+  if (Buffer.byteLength(secret, 'utf8') < 32) {
+    throw new Error('MCP_KEY_CACHE_SECRET must be at least 32 bytes of entropy.');
   }
   // Derive a stable 32-byte key from the configured secret.
   return createHash('sha256').update(secret).digest();

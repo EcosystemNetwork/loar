@@ -44,6 +44,7 @@ import { trackPageView } from './lib/ga';
 import { WalletProvider } from './lib/wallet-provider';
 import { Web3ModeProvider } from './lib/web3-mode';
 import { hasSession } from './lib/wallet-auth';
+import { TxConfirmRoot } from './components/tx-confirm';
 
 const router = createRouter({
   routeTree,
@@ -53,7 +54,13 @@ const router = createRouter({
   Wrap: function WrapComponent({ children }: { children: React.ReactNode }) {
     return (
       <WalletProvider queryClient={queryClient}>
-        <Web3ModeProvider>{children}</Web3ModeProvider>
+        <Web3ModeProvider>
+          {children}
+          {/* WEB-4: singleton tx-confirm modal mounted once at the root.
+              Hooks across the app call `confirmTx({...})` before every
+              writeContractAsync / sendTransaction. */}
+          <TxConfirmRoot />
+        </Web3ModeProvider>
       </WalletProvider>
     );
   },

@@ -19,6 +19,7 @@ import { useWriteContract, useSendTransaction } from '@/hooks/useThirdwebWrite';
 import { useChainId } from 'wagmi';
 import { parseEther, parseUnits, type Address } from 'viem';
 import { useVocab } from '@/hooks/use-vocab';
+import { confirmTx } from '@/components/tx-confirm';
 import { getEvmAddresses, isZeroAddress } from '@/configs/addresses';
 
 const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS as Address | undefined;
@@ -111,6 +112,25 @@ function CheckoutPage() {
               return;
             }
             const loarAmount = parseUnits(displayPrice, 18);
+            // WEB-4: explicit confirm — treasury address comes from env at
+            // build time and is a MitM target. Show the user exactly where
+            // the tokens are going before the wallet popup.
+            const okLoar = await confirmTx({
+              title: 'Pay subscription in $LOAR',
+              description: `Tier: ${tier} · Universe: ${universeId}`,
+              chainName: `Chain ${chainId}`,
+              functionName: 'transfer',
+              to: LOAR_TOKEN_ADDRESS,
+              summary: [
+                ['Recipient (treasury)', recipient],
+                ['Amount', `${displayPrice} LOAR`],
+              ],
+              confirmLabel: 'Confirm payment',
+            });
+            if (!okLoar) {
+              toast.info('Payment cancelled');
+              return;
+            }
             toast.info('Confirm $LOAR transfer in your wallet...');
             txHash = await writeContractAsync({
               address: LOAR_TOKEN_ADDRESS,
@@ -124,6 +144,20 @@ function CheckoutPage() {
               return;
             }
             const ethAmount = parseEther((subPrice / 3000).toFixed(18));
+            const okEth = await confirmTx({
+              title: 'Pay subscription in ETH',
+              description: `Tier: ${tier} · Universe: ${universeId}`,
+              chainName: `Chain ${chainId}`,
+              functionName: 'sendTransaction',
+              to: TREASURY_ADDRESS,
+              valueEth: (subPrice / 3000).toFixed(6),
+              summary: [['Recipient (treasury)', TREASURY_ADDRESS]],
+              confirmLabel: 'Confirm payment',
+            });
+            if (!okEth) {
+              toast.info('Payment cancelled');
+              return;
+            }
             toast.info('Confirm ETH transfer in your wallet...');
             txHash = await sendTransactionAsync({
               to: TREASURY_ADDRESS,

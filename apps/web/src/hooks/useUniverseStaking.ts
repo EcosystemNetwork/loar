@@ -10,6 +10,22 @@ import { launchpadStakingAbi, loarTokenAbi } from '@loar/abis/generated';
 import { formatEther, parseEther, type Address } from 'viem';
 import { useWalletAccount } from '@/hooks/useWalletAccount';
 import { getEvmAddresses } from '@/configs/addresses';
+import { confirmTx } from '@/components/tx-confirm';
+
+function stakingChainName(id: number | undefined): string {
+  switch (id) {
+    case 11155111:
+      return 'Sepolia';
+    case 84532:
+      return 'Base Sepolia';
+    case 8453:
+      return 'Base';
+    case 1:
+      return 'Ethereum';
+    default:
+      return id ? `Chain ${id}` : 'Unknown chain';
+  }
+}
 
 // LaunchpadStaking deployment addresses per chain
 const LAUNCHPAD_STAKING: Record<number, Address> = {
@@ -175,6 +191,18 @@ export function useApproveLoar() {
 
   const approve = async (amount: bigint) => {
     if (!loarToken || !stakingAddress) throw new Error('Contracts not deployed on this chain');
+    const ok = await confirmTx({
+      title: 'Approve $LOAR for staking contract',
+      chainName: stakingChainName(chainId),
+      functionName: 'approve',
+      to: loarToken,
+      summary: [
+        ['Spender (staking)', stakingAddress],
+        ['Amount', formatEther(amount)],
+      ],
+      confirmLabel: 'Approve',
+    });
+    if (!ok) throw new Error('Cancelled by user');
     await writeContractAsync({
       address: loarToken,
       abi: loarTokenAbi,
@@ -197,6 +225,19 @@ export function useStakeInUniverse() {
 
   const stakeInUniverse = async (universeId: number, amount: string) => {
     if (!stakingAddress) throw new Error('Staking not deployed on this chain');
+    const ok = await confirmTx({
+      title: 'Stake $LOAR in universe pool',
+      description: 'Tokens lock until unstake. Early unstake incurs a 5% penalty.',
+      chainName: stakingChainName(chainId),
+      functionName: 'stakeInUniverse',
+      to: stakingAddress,
+      summary: [
+        ['Universe #', String(universeId)],
+        ['Amount staked', `${amount} LOAR`],
+      ],
+      confirmLabel: 'Stake',
+    });
+    if (!ok) throw new Error('Cancelled by user');
     await writeContractAsync({
       address: stakingAddress,
       abi: launchpadStakingAbi,
@@ -219,6 +260,19 @@ export function useUnstakeFromUniverse() {
 
   const unstakeFromUniverse = async (universeId: number, amount: string) => {
     if (!stakingAddress) throw new Error('Staking not deployed on this chain');
+    const ok = await confirmTx({
+      title: 'Unstake $LOAR',
+      description: 'Early unstake may incur a 5% penalty if still inside the lock window.',
+      chainName: stakingChainName(chainId),
+      functionName: 'unstakeFromUniverse',
+      to: stakingAddress,
+      summary: [
+        ['Universe #', String(universeId)],
+        ['Amount unstaked', `${amount} LOAR`],
+      ],
+      confirmLabel: 'Unstake',
+    });
+    if (!ok) throw new Error('Cancelled by user');
     await writeContractAsync({
       address: stakingAddress,
       abi: launchpadStakingAbi,

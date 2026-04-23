@@ -194,9 +194,10 @@ contract BondingCurveTest is Test {
         assertFalse(curveV1.tradingHalted());
         assertFalse(curveV1.emergencyHaltUsed(), "Emergency fuse resets after resume");
 
-        // Can buy again
+        // Can buy again — use a wide deadline that survives any vm.warp
+        // accumulation in earlier assertions.
         vm.prank(alice);
-        curveV1.buy{value: 0.1 ether}(0, block.timestamp + 1 hours);
+        curveV1.buy{value: 0.1 ether}(0, type(uint256).max);
     }
 
     function test_haltTimelock_queueAndExecute() public {

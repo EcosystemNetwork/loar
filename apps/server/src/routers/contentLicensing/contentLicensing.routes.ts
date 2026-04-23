@@ -13,6 +13,7 @@ import { computeEntityHash } from '../../services/split-orchestrator';
 import { recordRevenueEvent } from '../../services/revenue-recorder';
 import { verifyAndClaimTx } from '../../services/tx-verify';
 import { isUniverseAdmin } from '../../lib/safe-admin';
+import { assertContentOperable } from '../../lib/content-status';
 
 const registrationsCol = () => {
   if (!db)
@@ -55,6 +56,12 @@ export const contentLicensingRouter = router({
           message: 'Only the universe admin can register content for licensing',
         });
       }
+
+      // SRV-2: moderation gate must fire before we persist a price. Flagged /
+      // removed / under-review content cannot accept new commercial deals —
+      // otherwise a creator can race the moderation team by listing right
+      // before a takedown lands.
+      await assertContentOperable(input.contentId);
 
       // Verify content is not fan-classified (non-commercial content cannot be licensed)
       const contentDoc = await db.collection('content').doc(input.contentId).get();
@@ -313,6 +320,12 @@ export const contentLicensingRouter = router({
       const regData = regDoc.data()!;
       if (!regData.active)
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Content is no longer available' });
+
+      // SRV-2: also gate license requests on the content moderation status,
+      // in case the registration was made before a flag/takedown landed.
+      if (regData.contentId) {
+        await assertContentOperable(regData.contentId);
+      }
 
       // Can't request your own content
       if (regData.creatorUid === ctx.user.uid)

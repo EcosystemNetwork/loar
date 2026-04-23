@@ -21,14 +21,33 @@ import { createPublicClient, http, parseUnits, type Hash } from 'viem';
 import { sepolia, baseSepolia } from 'viem/chains';
 
 // ── Chain clients for on-chain tx verification ───────────────────────
+//
+// SRV-5: require a non-empty URL per chain. An empty string is accepted by
+// viem's `http()` silently and falls back to the chain's default RPC (public
+// Infura endpoints with aggressive rate limits), which can make verification
+// either silently fail or cross-contaminate chain state under load. In
+// production we refuse to boot with empty URLs; in dev we log loudly.
+function requireRpc(name: string, ...candidates: (string | undefined)[]): string {
+  const url = candidates.map((c) => (c ?? '').trim()).find((c) => c.length > 0);
+  if (!url) {
+    const msg = `[credits] ${name} is required for on-chain payment verification`;
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(msg);
+    }
+    console.warn(`${msg} (using viem default for dev only — DO NOT deploy like this)`);
+    return '';
+  }
+  return url;
+}
+
 const sepoliaClient = createPublicClient({
   chain: sepolia,
-  transport: http(process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? ''),
+  transport: http(requireRpc('RPC_URL', process.env.RPC_URL, process.env.PONDER_RPC_URL_2)),
 });
 
 const baseSepoliaClient = createPublicClient({
   chain: baseSepolia,
-  transport: http(process.env.RPC_URL_BASE_SEPOLIA ?? ''),
+  transport: http(requireRpc('RPC_URL_BASE_SEPOLIA', process.env.RPC_URL_BASE_SEPOLIA)),
 });
 
 /** Allowed chain IDs for on-chain payment verification. */
@@ -105,10 +124,15 @@ async function verifyEthPayment(
   const client = getChainClient(chainId);
   const chainName = getChainName(chainId);
 
+  // SRV-8: cache keys include chainId so a hash that exists on one chain can't
+  // satisfy a lookup for a different chain during the TTL window. (Verification
+  // still re-checks every field per call, but keeping the cache tight prevents
+  // future refactors from accidentally shipping a replay.)
+  const cacheChain = String(chainId ?? sepolia.id);
   let tx: any;
   try {
     tx = await getCachedOrFetch(
-      `tx-${paymentRef}`,
+      `tx-${cacheChain}-${paymentRef}`,
       () => client.getTransaction({ hash: paymentRef as Hash }) as any
     );
   } catch {
@@ -117,7 +141,7 @@ async function verifyEthPayment(
     );
   }
 
-  const receipt = await getCachedOrFetch(`receipt-${paymentRef}`, () =>
+  const receipt = await getCachedOrFetch(`receipt-${cacheChain}-${paymentRef}`, () =>
     client.getTransactionReceipt({ hash: paymentRef as Hash })
   );
   if (receipt.status !== 'success') {
@@ -143,8 +167,9 @@ async function verifyEthPayment(
   // Amplifies PAY-01: reject txs older than MAX_TX_AGE_SECONDS. Combined with dedup
   // this shrinks the window in which a leaked tx hash is replayable.
   try {
-    const block = await getCachedOrFetch(`block-${receipt.blockNumber.toString()}`, () =>
-      client.getBlock({ blockNumber: receipt.blockNumber })
+    const block = await getCachedOrFetch(
+      `block-${cacheChain}-${receipt.blockNumber.toString()}`,
+      () => client.getBlock({ blockNumber: receipt.blockNumber })
     );
     const ageSeconds = Math.floor(Date.now() / 1000) - Number(block.timestamp);
     if (ageSeconds > MAX_TX_AGE_SECONDS) {

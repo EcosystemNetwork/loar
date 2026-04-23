@@ -242,7 +242,7 @@ function ProductDetailPage() {
               src={resolveIpfsUrl(l.mediaUrl)}
               controls
               className="w-full h-full object-contain"
-              poster={l.thumbnailUrl ?? undefined}
+              poster={resolveIpfsUrl(l.thumbnailUrl) || undefined}
             />
           ) : (
             <img

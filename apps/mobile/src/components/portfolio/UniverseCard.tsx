@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import type { Universe } from '../../types';
+import { resolveIpfsUrl } from '../../lib/ipfs-url';
 
 interface UniverseCardProps {
   universe: Universe;
@@ -21,7 +22,11 @@ export function UniverseCard({ universe }: UniverseCardProps) {
       style={{ width: 160 }}
     >
       {universe.imageUrl ? (
-        <Image source={{ uri: universe.imageUrl }} className="w-full h-24" resizeMode="cover" />
+        <Image
+          source={{ uri: resolveIpfsUrl(universe.imageUrl) }}
+          className="w-full h-24"
+          resizeMode="cover"
+        />
       ) : (
         <View className="w-full h-24 bg-zinc-900 items-center justify-center">
           <Text className="text-3xl">🌌</Text>

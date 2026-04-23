@@ -325,7 +325,15 @@ contract SubscriptionManagerTest is Test {
     }
 
     function test_subscribe_revert_creatorNotRegistered() public {
-        // Configure a tier on an unregistered universe via platform
+        // Seed a placeholder owner for universe 999 so `_currentCreator(999)`
+        // (called from both configureTier and subscribe) doesn't revert with
+        // "ERC721: invalid token ID" before the contract's own
+        // `CreatorNotRegistered` check fires. Without the registerUniverse
+        // call, `universeCreators[999]` remains zero and the subscribe path
+        // reverts as expected.
+        universeManager.setOwner(999, makeAddr("placeholder-owner"));
+
+        // Configure a tier on the unregistered universe via platform
         vm.prank(platform);
         sub.configureTier(
             999,

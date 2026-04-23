@@ -56,15 +56,28 @@ function LoginPage() {
 
   const googleBtnRef = useRef<HTMLDivElement | null>(null);
 
-  // Redirect once authenticated — only allow internal paths (prevent open redirect)
+  // Redirect once authenticated. WEB-2: parse the candidate against the page
+  // origin and only follow it when the resolved origin matches. The previous
+  // `startsWith('/') && !startsWith('//')` check missed `\evil.com`,
+  // protocol-relative variants, and tab/CR/LF-prefixed payloads, all of which
+  // some browsers normalize before navigation.
   useEffect(() => {
-    if (isAuthenticated) {
-      const target =
-        redirect && redirect.startsWith('/') && !redirect.startsWith('//')
-          ? redirect
-          : '/dashboard';
-      navigate({ to: target });
+    if (!isAuthenticated) return;
+    let target = '/dashboard';
+    if (redirect) {
+      try {
+        const candidate = new URL(redirect, window.location.origin);
+        const sameOrigin = candidate.origin === window.location.origin;
+        // Reject pseudo-protocols even if origin somehow matches.
+        const safeProto = candidate.protocol === 'http:' || candidate.protocol === 'https:';
+        if (sameOrigin && safeProto) {
+          target = candidate.pathname + candidate.search + candidate.hash;
+        }
+      } catch {
+        // Malformed URL → ignore, fall through to default.
+      }
     }
+    navigate({ to: target });
   }, [isAuthenticated, navigate, redirect]);
 
   const handleSendOTP = async (e: React.FormEvent) => {

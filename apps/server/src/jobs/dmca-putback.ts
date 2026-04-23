@@ -27,22 +27,37 @@
  */
 import { db, firebaseAvailable } from '../lib/firebase';
 import { sendSlackAlert } from '../lib/slack';
+import { businessDaysBetween } from '../lib/business-days';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface DmcaPutbackConfig {
   /** How often the scan runs. Default 1 hour. */
   intervalMs: number;
-  /** How old a pending counter-notice must be before auto-putback fires. */
-  holdDays: number;
+  /**
+   * How many BUSINESS DAYS must elapse before auto-putback fires.
+   *
+   * 17 U.S.C. § 512(g)(2)(C) requires the floor to be ≥10 business days
+   * and the ceiling to be ≤14 business days. We default to 12 — safely
+   * inside both bounds, with margin for federal holidays that shift the
+   * calendar-day → business-day mapping. Setting this <10 or >14 is a
+   * statutory violation; the code clamps to [10, 14].
+   */
+  holdBusinessDays: number;
   /** Max rows processed per tick (bounds Firestore usage). */
   batchLimit: number;
 }
 
+function clampHoldDays(n: number): number {
+  if (!Number.isFinite(n)) return 12;
+  return Math.min(14, Math.max(10, Math.floor(n)));
+}
+
 const DEFAULT_CONFIG: DmcaPutbackConfig = {
   intervalMs: parseInt(process.env.DMCA_PUTBACK_INTERVAL_MS ?? String(60 * 60_000), 10),
-  // 10 business days ≈ 14 calendar days in the conservative case.
-  holdDays: parseInt(process.env.DMCA_PUTBACK_HOLD_DAYS ?? '14', 10),
+  holdBusinessDays: clampHoldDays(
+    parseInt(process.env.DMCA_PUTBACK_HOLD_BUSINESS_DAYS ?? '12', 10)
+  ),
   batchLimit: parseInt(process.env.DMCA_PUTBACK_BATCH_LIMIT ?? '50', 10),
 };
 
@@ -67,7 +82,16 @@ export async function dmcaPutbackOnce(
   if (!firebaseAvailable || !db) return result;
 
   const config: DmcaPutbackConfig = { ...DEFAULT_CONFIG, ...cfg };
-  const cutoff = new Date(Date.now() - config.holdDays * DAY_MS);
+  const holdBusinessDays = clampHoldDays(config.holdBusinessDays);
+  const now = new Date();
+
+  // First pass: cheap calendar-day pre-filter so we don't load every
+  // pending counter-notice on every tick. The minimum calendar span that
+  // can contain `holdBusinessDays` business days is `holdBusinessDays`
+  // itself (impossible) — but a true business-day span of 10 needs at
+  // least 12 calendar days (one weekend), so we floor with that.
+  const calendarFloor = Math.max(holdBusinessDays, holdBusinessDays + 2);
+  const cutoff = new Date(Date.now() - calendarFloor * DAY_MS);
 
   // `counterNotices.createdAt` is written as an ISO string (see index.ts
   // /api/counter-notice handler), so string comparison is correct here.
@@ -86,9 +110,27 @@ export async function dmcaPutbackOnce(
     const cn = cnDoc.data() as {
       takedownRequestId?: string;
       respondentEmail?: string;
+      createdAt?: string;
     };
     if (!cn.takedownRequestId) {
       result.skipped.push({ id: cnDoc.id, reason: 'missing takedownRequestId' });
+      continue;
+    }
+
+    // Second pass: confirm the BUSINESS-day floor before we restore.
+    // § 512(g)(2)(C) requires "not less than 10 ... business days", so
+    // restoring a day early on a holiday week is a statutory violation.
+    const createdAt = cn.createdAt ? new Date(cn.createdAt) : null;
+    if (!createdAt || Number.isNaN(createdAt.getTime())) {
+      result.skipped.push({ id: cnDoc.id, reason: 'missing/invalid createdAt' });
+      continue;
+    }
+    const elapsedBusinessDays = businessDaysBetween(createdAt, now);
+    if (elapsedBusinessDays < holdBusinessDays) {
+      result.skipped.push({
+        id: cnDoc.id,
+        reason: `business-day floor not met (${elapsedBusinessDays}/${holdBusinessDays})`,
+      });
       continue;
     }
 
@@ -171,7 +213,7 @@ async function processOnePutback(
     takedownRequestId: takedownId,
     counterNoticeId,
     adminUid: 'system_dmca_putback',
-    reason: `Auto-putback per 17 U.S.C. § 512(g): counter-notice hold period (${DEFAULT_CONFIG.holdDays} days) expired without court action.`,
+    reason: `Auto-putback per 17 U.S.C. § 512(g): counter-notice hold period (${DEFAULT_CONFIG.holdBusinessDays} business days) expired without court action.`,
     createdAt: now,
   });
 
@@ -223,8 +265,10 @@ export function startDmcaPutbackJob(): void {
     return;
   }
 
-  const { intervalMs, holdDays } = DEFAULT_CONFIG;
-  console.log(`[dmca-putback] enabled — interval ${intervalMs}ms, hold ${holdDays} days`);
+  const { intervalMs, holdBusinessDays } = DEFAULT_CONFIG;
+  console.log(
+    `[dmca-putback] enabled — interval ${intervalMs}ms, hold ${holdBusinessDays} business days`
+  );
 
   const tick = async () => {
     if (running) return;

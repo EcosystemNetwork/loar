@@ -11,6 +11,7 @@ import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { useWalletAccount } from '@/hooks/useWalletAccount';
 import { parseEther, formatEther, type Address } from 'viem';
 import { useVisibilityAwareInterval, POLL_INTERVALS } from './useSmartPolling';
+import { confirmTx } from '@/components/tx-confirm';
 
 /**
  * Default slippage tolerance for bonding-curve trades (5%).
@@ -222,10 +223,26 @@ export function useMaxBuyAmount(bondingCurveAddress: Address | undefined) {
 type BuyOpts = { slippageBps?: number; minTokensOut?: bigint };
 type SellOpts = { slippageBps?: number; minEthOut?: bigint };
 
+function chainNameFor(id: number | undefined): string {
+  switch (id) {
+    case 11155111:
+      return 'Sepolia';
+    case 84532:
+      return 'Base Sepolia';
+    case 8453:
+      return 'Base';
+    case 1:
+      return 'Ethereum';
+    default:
+      return id ? `Chain ${id}` : 'Unknown chain';
+  }
+}
+
 export function useBondingCurveActions(bondingCurveAddress: Address | undefined) {
   const { isConnected } = useWalletAccount();
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
+  const chainId = useChainId();
   const [status, setStatus] = useState<'idle' | 'confirming' | 'pending' | 'success' | 'error'>(
     'idle'
   );
@@ -309,6 +326,25 @@ export function useBondingCurveActions(bondingCurveAddress: Address | undefined)
 
         const deadline = BigInt(Math.floor(Date.now() / 1000) + 300);
 
+        // WEB-4: decode + confirm before sign. Bail on reject.
+        const approved = await confirmTx({
+          title: 'Buy from bonding curve',
+          description: 'Pre-graduation token purchase. Slippage protected.',
+          chainName: chainNameFor(chainId),
+          functionName: 'buy',
+          to: bondingCurveAddress,
+          valueEth: formatEther(value),
+          summary: [
+            ['Min tokens out', minTokensOut.toString()],
+            ['Slippage max', `${slippageBps / 100}%`],
+          ],
+          confirmLabel: 'Confirm & sign in wallet',
+        });
+        if (!approved) {
+          setStatus('idle');
+          return;
+        }
+
         const hash = (await writeContractAsync({
           address: bondingCurveAddress,
           abi: BONDING_CURVE_ABI,
@@ -382,6 +418,24 @@ export function useBondingCurveActions(bondingCurveAddress: Address | undefined)
         }
 
         const deadline = BigInt(Math.floor(Date.now() / 1000) + 300);
+
+        const approved = await confirmTx({
+          title: 'Sell to bonding curve',
+          description: 'Burn tokens back into the curve for ETH.',
+          chainName: chainNameFor(chainId),
+          functionName: 'sell',
+          to: bondingCurveAddress,
+          summary: [
+            ['Tokens burned', tokenAmount.toString()],
+            ['Min ETH out', `${formatEther(minEthOut)} ETH`],
+            ['Slippage max', `${slippageBps / 100}%`],
+          ],
+          confirmLabel: 'Confirm & sign in wallet',
+        });
+        if (!approved) {
+          setStatus('idle');
+          return;
+        }
 
         const hash = (await writeContractAsync({
           address: bondingCurveAddress,

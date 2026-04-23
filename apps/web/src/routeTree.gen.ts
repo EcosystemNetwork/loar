@@ -22,9 +22,11 @@ import { Route as RelightRouteImport } from './routes/relight'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as NotificationsRouteImport } from './routes/notifications'
+import { Route as NotebookRouteImport } from './routes/notebook'
 import { Route as MyWorksRouteImport } from './routes/my-works'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as GalleryRouteImport } from './routes/gallery'
 import { Route as FaucetRouteImport } from './routes/faucet'
 import { Route as EditorRouteImport } from './routes/editor'
@@ -59,6 +61,7 @@ import { Route as ProductIdRouteImport } from './routes/product/$id'
 import { Route as PlayUniverseIdRouteImport } from './routes/play/$universeId'
 import { Route as OrderIdRouteImport } from './routes/order/$id'
 import { Route as OauthSiweRouteImport } from './routes/oauth/siwe'
+import { Route as NotebookIdRouteImport } from './routes/notebook.$id'
 import { Route as LineageAssetIdRouteImport } from './routes/lineage.$assetId'
 import { Route as GovernanceUniverseIdRouteImport } from './routes/governance/$universeId'
 import { Route as ExtractJobIdRouteImport } from './routes/extract.$jobId'
@@ -68,6 +71,7 @@ import { Route as DashboardRevenueRouteImport } from './routes/dashboard.revenue
 import { Route as CreateKindRouteImport } from './routes/create/$kind'
 import { Route as CharactersUniverseIdRouteImport } from './routes/characters.$universeId'
 import { Route as CanonUniverseIdRouteImport } from './routes/canon/$universeId'
+import { Route as AnatomyUniverseRouteImport } from './routes/anatomy.$universe'
 import { Route as AnalyticsUniverseIdRouteImport } from './routes/analytics.$universeId'
 import { Route as AdminUniversesRouteImport } from './routes/admin/universes'
 import { Route as AdminOpsRouteImport } from './routes/admin/ops'
@@ -83,6 +87,7 @@ import { Route as UniverseIdGenConfigRouteImport } from './routes/universe/$id/g
 import { Route as UniverseIdGalleryRouteImport } from './routes/universe/$id/gallery'
 import { Route as UniverseIdDeployTokenRouteImport } from './routes/universe/$id.deploy-token'
 import { Route as UniverseAddressPollsRouteImport } from './routes/universe.$address.polls'
+import { Route as UniverseAddressPhysicsRouteImport } from './routes/universe.$address.physics'
 import { Route as TokensCreatorAddressRouteImport } from './routes/tokens/creator.$address'
 import { Route as StudioEditAssetIdRouteImport } from './routes/studio.edit.$assetId'
 import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
@@ -152,6 +157,11 @@ const NotificationsRoute = NotificationsRouteImport.update({
   path: '/notifications',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NotebookRoute = NotebookRouteImport.update({
+  id: '/notebook',
+  path: '/notebook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MyWorksRoute = MyWorksRouteImport.update({
   id: '/my-works',
   path: '/my-works',
@@ -165,6 +175,11 @@ const MarketRoute = MarketRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeaderboardRoute = LeaderboardRouteImport.update({
+  id: '/leaderboard',
+  path: '/leaderboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GalleryRoute = GalleryRouteImport.update({
@@ -337,6 +352,11 @@ const OauthSiweRoute = OauthSiweRouteImport.update({
   path: '/oauth/siwe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NotebookIdRoute = NotebookIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => NotebookRoute,
+} as any)
 const LineageAssetIdRoute = LineageAssetIdRouteImport.update({
   id: '/lineage/$assetId',
   path: '/lineage/$assetId',
@@ -380,6 +400,11 @@ const CharactersUniverseIdRoute = CharactersUniverseIdRouteImport.update({
 const CanonUniverseIdRoute = CanonUniverseIdRouteImport.update({
   id: '/canon/$universeId',
   path: '/canon/$universeId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnatomyUniverseRoute = AnatomyUniverseRouteImport.update({
+  id: '/anatomy/$universe',
+  path: '/anatomy/$universe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AnalyticsUniverseIdRoute = AnalyticsUniverseIdRouteImport.update({
@@ -457,6 +482,11 @@ const UniverseAddressPollsRoute = UniverseAddressPollsRouteImport.update({
   path: '/universe/$address/polls',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UniverseAddressPhysicsRoute = UniverseAddressPhysicsRouteImport.update({
+  id: '/universe/$address/physics',
+  path: '/universe/$address/physics',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TokensCreatorAddressRoute = TokensCreatorAddressRouteImport.update({
   id: '/tokens/creator/$address',
   path: '/tokens/creator/$address',
@@ -488,9 +518,11 @@ export interface FileRoutesByFullPath {
   '/editor': typeof EditorRoute
   '/faucet': typeof FaucetRoute
   '/gallery': typeof GalleryRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
   '/my-works': typeof MyWorksRoute
+  '/notebook': typeof NotebookRouteWithChildren
   '/notifications': typeof NotificationsRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
@@ -510,6 +542,7 @@ export interface FileRoutesByFullPath {
   '/admin/ops': typeof AdminOpsRoute
   '/admin/universes': typeof AdminUniversesRoute
   '/analytics/$universeId': typeof AnalyticsUniverseIdRoute
+  '/anatomy/$universe': typeof AnatomyUniverseRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
   '/characters/$universeId': typeof CharactersUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
@@ -519,6 +552,7 @@ export interface FileRoutesByFullPath {
   '/extract/$jobId': typeof ExtractJobIdRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
   '/lineage/$assetId': typeof LineageAssetIdRoute
+  '/notebook/$id': typeof NotebookIdRoute
   '/oauth/siwe': typeof OauthSiweRoute
   '/order/$id': typeof OrderIdRoute
   '/play/$universeId': typeof PlayUniverseIdRoute
@@ -542,6 +576,7 @@ export interface FileRoutesByFullPath {
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/studio/edit/$assetId': typeof StudioEditAssetIdRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
+  '/universe/$address/physics': typeof UniverseAddressPhysicsRoute
   '/universe/$address/polls': typeof UniverseAddressPollsRoute
   '/universe/$id/deploy-token': typeof UniverseIdDeployTokenRoute
   '/universe/$id/gallery': typeof UniverseIdGalleryRoute
@@ -567,9 +602,11 @@ export interface FileRoutesByTo {
   '/editor': typeof EditorRoute
   '/faucet': typeof FaucetRoute
   '/gallery': typeof GalleryRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
   '/my-works': typeof MyWorksRoute
+  '/notebook': typeof NotebookRouteWithChildren
   '/notifications': typeof NotificationsRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
@@ -589,6 +626,7 @@ export interface FileRoutesByTo {
   '/admin/ops': typeof AdminOpsRoute
   '/admin/universes': typeof AdminUniversesRoute
   '/analytics/$universeId': typeof AnalyticsUniverseIdRoute
+  '/anatomy/$universe': typeof AnatomyUniverseRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
   '/characters/$universeId': typeof CharactersUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
@@ -598,6 +636,7 @@ export interface FileRoutesByTo {
   '/extract/$jobId': typeof ExtractJobIdRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
   '/lineage/$assetId': typeof LineageAssetIdRoute
+  '/notebook/$id': typeof NotebookIdRoute
   '/oauth/siwe': typeof OauthSiweRoute
   '/order/$id': typeof OrderIdRoute
   '/play/$universeId': typeof PlayUniverseIdRoute
@@ -621,6 +660,7 @@ export interface FileRoutesByTo {
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/studio/edit/$assetId': typeof StudioEditAssetIdRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
+  '/universe/$address/physics': typeof UniverseAddressPhysicsRoute
   '/universe/$address/polls': typeof UniverseAddressPollsRoute
   '/universe/$id/deploy-token': typeof UniverseIdDeployTokenRoute
   '/universe/$id/gallery': typeof UniverseIdGalleryRoute
@@ -647,9 +687,11 @@ export interface FileRoutesById {
   '/editor': typeof EditorRoute
   '/faucet': typeof FaucetRoute
   '/gallery': typeof GalleryRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
   '/my-works': typeof MyWorksRoute
+  '/notebook': typeof NotebookRouteWithChildren
   '/notifications': typeof NotificationsRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
@@ -669,6 +711,7 @@ export interface FileRoutesById {
   '/admin/ops': typeof AdminOpsRoute
   '/admin/universes': typeof AdminUniversesRoute
   '/analytics/$universeId': typeof AnalyticsUniverseIdRoute
+  '/anatomy/$universe': typeof AnatomyUniverseRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
   '/characters/$universeId': typeof CharactersUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
@@ -678,6 +721,7 @@ export interface FileRoutesById {
   '/extract/$jobId': typeof ExtractJobIdRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
   '/lineage/$assetId': typeof LineageAssetIdRoute
+  '/notebook/$id': typeof NotebookIdRoute
   '/oauth/siwe': typeof OauthSiweRoute
   '/order/$id': typeof OrderIdRoute
   '/play/$universeId': typeof PlayUniverseIdRoute
@@ -701,6 +745,7 @@ export interface FileRoutesById {
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/studio/edit/$assetId': typeof StudioEditAssetIdRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
+  '/universe/$address/physics': typeof UniverseAddressPhysicsRoute
   '/universe/$address/polls': typeof UniverseAddressPollsRoute
   '/universe/$id/deploy-token': typeof UniverseIdDeployTokenRoute
   '/universe/$id/gallery': typeof UniverseIdGalleryRoute
@@ -728,9 +773,11 @@ export interface FileRouteTypes {
     | '/editor'
     | '/faucet'
     | '/gallery'
+    | '/leaderboard'
     | '/login'
     | '/market'
     | '/my-works'
+    | '/notebook'
     | '/notifications'
     | '/pricing'
     | '/privacy'
@@ -750,6 +797,7 @@ export interface FileRouteTypes {
     | '/admin/ops'
     | '/admin/universes'
     | '/analytics/$universeId'
+    | '/anatomy/$universe'
     | '/canon/$universeId'
     | '/characters/$universeId'
     | '/create/$kind'
@@ -759,6 +807,7 @@ export interface FileRouteTypes {
     | '/extract/$jobId'
     | '/governance/$universeId'
     | '/lineage/$assetId'
+    | '/notebook/$id'
     | '/oauth/siwe'
     | '/order/$id'
     | '/play/$universeId'
@@ -782,6 +831,7 @@ export interface FileRouteTypes {
     | '/event/$universe/$event'
     | '/studio/edit/$assetId'
     | '/tokens/creator/$address'
+    | '/universe/$address/physics'
     | '/universe/$address/polls'
     | '/universe/$id/deploy-token'
     | '/universe/$id/gallery'
@@ -807,9 +857,11 @@ export interface FileRouteTypes {
     | '/editor'
     | '/faucet'
     | '/gallery'
+    | '/leaderboard'
     | '/login'
     | '/market'
     | '/my-works'
+    | '/notebook'
     | '/notifications'
     | '/pricing'
     | '/privacy'
@@ -829,6 +881,7 @@ export interface FileRouteTypes {
     | '/admin/ops'
     | '/admin/universes'
     | '/analytics/$universeId'
+    | '/anatomy/$universe'
     | '/canon/$universeId'
     | '/characters/$universeId'
     | '/create/$kind'
@@ -838,6 +891,7 @@ export interface FileRouteTypes {
     | '/extract/$jobId'
     | '/governance/$universeId'
     | '/lineage/$assetId'
+    | '/notebook/$id'
     | '/oauth/siwe'
     | '/order/$id'
     | '/play/$universeId'
@@ -861,6 +915,7 @@ export interface FileRouteTypes {
     | '/event/$universe/$event'
     | '/studio/edit/$assetId'
     | '/tokens/creator/$address'
+    | '/universe/$address/physics'
     | '/universe/$address/polls'
     | '/universe/$id/deploy-token'
     | '/universe/$id/gallery'
@@ -886,9 +941,11 @@ export interface FileRouteTypes {
     | '/editor'
     | '/faucet'
     | '/gallery'
+    | '/leaderboard'
     | '/login'
     | '/market'
     | '/my-works'
+    | '/notebook'
     | '/notifications'
     | '/pricing'
     | '/privacy'
@@ -908,6 +965,7 @@ export interface FileRouteTypes {
     | '/admin/ops'
     | '/admin/universes'
     | '/analytics/$universeId'
+    | '/anatomy/$universe'
     | '/canon/$universeId'
     | '/characters/$universeId'
     | '/create/$kind'
@@ -917,6 +975,7 @@ export interface FileRouteTypes {
     | '/extract/$jobId'
     | '/governance/$universeId'
     | '/lineage/$assetId'
+    | '/notebook/$id'
     | '/oauth/siwe'
     | '/order/$id'
     | '/play/$universeId'
@@ -940,6 +999,7 @@ export interface FileRouteTypes {
     | '/event/$universe/$event'
     | '/studio/edit/$assetId'
     | '/tokens/creator/$address'
+    | '/universe/$address/physics'
     | '/universe/$address/polls'
     | '/universe/$id/deploy-token'
     | '/universe/$id/gallery'
@@ -966,9 +1026,11 @@ export interface RootRouteChildren {
   EditorRoute: typeof EditorRoute
   FaucetRoute: typeof FaucetRoute
   GalleryRoute: typeof GalleryRoute
+  LeaderboardRoute: typeof LeaderboardRoute
   LoginRoute: typeof LoginRoute
   MarketRoute: typeof MarketRoute
   MyWorksRoute: typeof MyWorksRoute
+  NotebookRoute: typeof NotebookRouteWithChildren
   NotificationsRoute: typeof NotificationsRoute
   PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
@@ -988,6 +1050,7 @@ export interface RootRouteChildren {
   AdminOpsRoute: typeof AdminOpsRoute
   AdminUniversesRoute: typeof AdminUniversesRoute
   AnalyticsUniverseIdRoute: typeof AnalyticsUniverseIdRoute
+  AnatomyUniverseRoute: typeof AnatomyUniverseRoute
   CanonUniverseIdRoute: typeof CanonUniverseIdRoute
   CharactersUniverseIdRoute: typeof CharactersUniverseIdRoute
   CreateKindRoute: typeof CreateKindRoute
@@ -1018,6 +1081,7 @@ export interface RootRouteChildren {
   WikiIndexRoute: typeof WikiIndexRoute
   EventUniverseEventRoute: typeof EventUniverseEventRoute
   TokensCreatorAddressRoute: typeof TokensCreatorAddressRoute
+  UniverseAddressPhysicsRoute: typeof UniverseAddressPhysicsRoute
   UniverseAddressPollsRoute: typeof UniverseAddressPollsRoute
   WikiCharacterIdRoute: typeof WikiCharacterIdRoute
   WikiEntityIdRoute: typeof WikiEntityIdRoute
@@ -1116,6 +1180,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/notebook': {
+      id: '/notebook'
+      path: '/notebook'
+      fullPath: '/notebook'
+      preLoaderRoute: typeof NotebookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/my-works': {
       id: '/my-works'
       path: '/my-works'
@@ -1135,6 +1206,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leaderboard': {
+      id: '/leaderboard'
+      path: '/leaderboard'
+      fullPath: '/leaderboard'
+      preLoaderRoute: typeof LeaderboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/gallery': {
@@ -1375,6 +1453,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OauthSiweRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/notebook/$id': {
+      id: '/notebook/$id'
+      path: '/$id'
+      fullPath: '/notebook/$id'
+      preLoaderRoute: typeof NotebookIdRouteImport
+      parentRoute: typeof NotebookRoute
+    }
     '/lineage/$assetId': {
       id: '/lineage/$assetId'
       path: '/lineage/$assetId'
@@ -1436,6 +1521,13 @@ declare module '@tanstack/react-router' {
       path: '/canon/$universeId'
       fullPath: '/canon/$universeId'
       preLoaderRoute: typeof CanonUniverseIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/anatomy/$universe': {
+      id: '/anatomy/$universe'
+      path: '/anatomy/$universe'
+      fullPath: '/anatomy/$universe'
+      preLoaderRoute: typeof AnatomyUniverseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/analytics/$universeId': {
@@ -1543,6 +1635,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UniverseAddressPollsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/universe/$address/physics': {
+      id: '/universe/$address/physics'
+      path: '/universe/$address/physics'
+      fullPath: '/universe/$address/physics'
+      preLoaderRoute: typeof UniverseAddressPhysicsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tokens/creator/$address': {
       id: '/tokens/creator/$address'
       path: '/tokens/creator/$address'
@@ -1577,6 +1676,18 @@ const DashboardRouteChildren: DashboardRouteChildren = {
 
 const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
   DashboardRouteChildren,
+)
+
+interface NotebookRouteChildren {
+  NotebookIdRoute: typeof NotebookIdRoute
+}
+
+const NotebookRouteChildren: NotebookRouteChildren = {
+  NotebookIdRoute: NotebookIdRoute,
+}
+
+const NotebookRouteWithChildren = NotebookRoute._addFileChildren(
+  NotebookRouteChildren,
 )
 
 interface StudioRouteChildren {
@@ -1627,9 +1738,11 @@ const rootRouteChildren: RootRouteChildren = {
   EditorRoute: EditorRoute,
   FaucetRoute: FaucetRoute,
   GalleryRoute: GalleryRoute,
+  LeaderboardRoute: LeaderboardRoute,
   LoginRoute: LoginRoute,
   MarketRoute: MarketRoute,
   MyWorksRoute: MyWorksRoute,
+  NotebookRoute: NotebookRouteWithChildren,
   NotificationsRoute: NotificationsRoute,
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
@@ -1649,6 +1762,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminOpsRoute: AdminOpsRoute,
   AdminUniversesRoute: AdminUniversesRoute,
   AnalyticsUniverseIdRoute: AnalyticsUniverseIdRoute,
+  AnatomyUniverseRoute: AnatomyUniverseRoute,
   CanonUniverseIdRoute: CanonUniverseIdRoute,
   CharactersUniverseIdRoute: CharactersUniverseIdRoute,
   CreateKindRoute: CreateKindRoute,
@@ -1679,6 +1793,7 @@ const rootRouteChildren: RootRouteChildren = {
   WikiIndexRoute: WikiIndexRoute,
   EventUniverseEventRoute: EventUniverseEventRoute,
   TokensCreatorAddressRoute: TokensCreatorAddressRoute,
+  UniverseAddressPhysicsRoute: UniverseAddressPhysicsRoute,
   UniverseAddressPollsRoute: UniverseAddressPollsRoute,
   WikiCharacterIdRoute: WikiCharacterIdRoute,
   WikiEntityIdRoute: WikiEntityIdRoute,

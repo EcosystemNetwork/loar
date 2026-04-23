@@ -689,7 +689,7 @@ function ThreeDModelsTab({ universeAddress }: { universeAddress?: string }) {
             <div className="h-[60vh] w-full">
               <ModelViewer
                 src={resolveIpfsUrl(selectedItem.mediaUrl)}
-                poster={selectedItem.thumbnailUrl || undefined}
+                poster={resolveIpfsUrl(selectedItem.thumbnailUrl) || undefined}
                 alt={selectedItem.title || '3D Model'}
                 className="h-full"
               />

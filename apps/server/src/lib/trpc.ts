@@ -6,7 +6,13 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import { getAddress } from 'viem';
 import type { Context } from './context';
 import { withCostScope } from '../services/cost-tracker/scope';
-import { hasScope, isMcpServerKey, trackApiKeyUsage } from './apiKeys';
+import {
+  hasScope,
+  isMcpServerKey,
+  trackApiKeyUsage,
+  acquireKeyConcurrencySlot,
+  releaseKeyConcurrencySlot,
+} from './apiKeys';
 
 export const t = initTRPC.context<Context>().create();
 
@@ -63,11 +69,59 @@ export const protectedProcedure = t.procedure.use(costScopeMiddleware).use(({ ct
 });
 
 /**
+ * INF-6: per-key concurrency slot — wrap tRPC procedures that hit expensive
+ * paid external APIs (image / video / voice / 3D / VLM). Caps how many jobs a
+ * single API key can have in flight regardless of the rate-limit window. JWT
+ * / cookie sessions are not gated here (they use an IP-level rate limit
+ * upstream); only API-key-authenticated calls acquire a slot.
+ *
+ * Usage:
+ *
+ *     export const imageRouter = router({
+ *       generate: expensiveProcedure.mutation(async ({ ctx, input }) => { ... }),
+ *     });
+ */
+const concurrencySlotMiddleware = t.middleware(async ({ ctx, next }) => {
+  const keyId = ctx.user?.apiKeyId;
+  if (!keyId) {
+    // JWT or anonymous path — no per-key slot applies.
+    return next();
+  }
+  const isMcp = isMcpServerKey(ctx.user?.apiKeyPermissions);
+  const acquired = acquireKeyConcurrencySlot(keyId, isMcp);
+  if (!acquired) {
+    throw new TRPCError({
+      code: 'TOO_MANY_REQUESTS',
+      message:
+        'Per-key concurrency cap reached for this API key. Wait for in-flight jobs to finish before starting new ones.',
+    });
+  }
+  try {
+    return await next();
+  } finally {
+    releaseKeyConcurrencySlot(keyId);
+  }
+});
+
+export const expensiveProcedure = protectedProcedure.use(concurrencySlotMiddleware);
+
+/**
  * Admin addresses — consolidated from ADMIN_ADDRESSES (comma-separated list)
  * with fallback to legacy ADMIN_WALLET (single address).
  * Validated at load time: invalid addresses are rejected with a warning.
  */
 const ETH_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+/**
+ * Public helper (SRV-9): returns true if the given wallet address is in the
+ * admin allowlist derived at module load from `ADMIN_ADDRESSES` +
+ * `ADMIN_WALLET`. Case-insensitive. Callers outside tRPC (Hono routes, scripts)
+ * should use this instead of re-parsing the env themselves — avoids the risk
+ * of a second parser diverging from the authoritative one.
+ */
+export function isAdminAddress(address: string | null | undefined): boolean {
+  if (!address) return false;
+  return ADMIN_ADDRESSES.includes(address.toLowerCase());
+}
 const ADMIN_ADDRESSES: string[] = (() => {
   const raw = [
     ...(process.env.ADMIN_ADDRESSES ?? '').split(','),

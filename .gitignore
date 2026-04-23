@@ -4,6 +4,12 @@ node_modules
 coverage/
 .nyc_output
 
+# Built TypeScript output for server-side packages — never commit; CI builds these.
+# packages/abis/dist is intentionally committed (consumed as a published-style
+# package by other apps). apps/mobile/dist is Expo bundle output kept for now.
+apps/mcp-gateway/dist/
+apps/mcp/dist/
+
 .env
 .env.local
 .playwright-mcp

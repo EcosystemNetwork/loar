@@ -178,26 +178,40 @@ txProxyRoutes.post('/write', async (c) => {
       async: body.async === true,
     });
 
-    // Record ownership for async status polls. Required for async mode
-    // (otherwise the caller can never poll); best-effort for sync mode since
-    // the txHash is already in the response.
+    // SRV-4: record ownership with retries. Circle assigns the txId, so we
+    // cannot pre-reserve; the previous code performed a single write and
+    // returned a 500 on failure while the tx was already in-flight — the
+    // user then saw the request fail, retried, paid gas twice. Instead:
+    //   1. Retry the doc write up to 3× with backoff so transient Firestore
+    //      blips don't leave an unpollable tx.
+    //   2. If every retry fails, still return txId/txHash but flag the
+    //      caller so they can show "submitted but un-pollable" and use the
+    //      explorer link. Swallowing the in-flight tx is always wrong.
+    let ownershipRecorded = false;
     if (firebaseAvailable && result.txId) {
-      try {
-        await db
-          .collection('circleTxs')
-          .doc(result.txId)
-          .set({
-            walletAddress: walletAddress.toLowerCase(),
-            contractAddress: body.address,
-            chainId,
-            functionName: body.functionName ?? null,
-            createdAt: new Date(),
-          });
-      } catch (err) {
-        if (body.async === true) {
-          return c.json({ error: 'Could not record transaction ownership — please retry' }, 500);
+      for (let attempt = 0; attempt < 3 && !ownershipRecorded; attempt++) {
+        try {
+          await db
+            .collection('circleTxs')
+            .doc(result.txId)
+            .set({
+              walletAddress: walletAddress.toLowerCase(),
+              contractAddress: body.address,
+              chainId,
+              functionName: body.functionName ?? null,
+              createdAt: new Date(),
+            });
+          ownershipRecorded = true;
+        } catch (err) {
+          if (attempt === 2) {
+            console.error(
+              `[TX] ownership record failed after 3 attempts (tx ${result.txId} is in-flight):`,
+              err
+            );
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
         }
-        console.warn('[TX] ownership record failed (sync tx already sent):', err);
       }
     }
 
@@ -215,6 +229,10 @@ txProxyRoutes.post('/write', async (c) => {
       txHash: result.txHash,
       txId: result.txId,
       state: result.state,
+      // SRV-4: surface the ownership-record state so the client can render a
+      // "submitted, not trackable — check explorer" fallback if persistence
+      // failed. Only meaningful in async mode.
+      ownershipRecorded,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Transaction failed';

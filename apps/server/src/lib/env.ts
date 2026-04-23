@@ -221,6 +221,43 @@ export function validateEnv(): Env {
       prodErrors.push(
         'At least one of ADMIN_ADDRESSES or ADMIN_WALLET must be set in production for admin authorization'
       );
+    } else {
+      // SRV-3: also verify that after trimming + regex-filtering, the
+      // allowlist still contains at least one valid address. Prior behaviour
+      // accepted " , , " or "0xGARBAGE" and yielded an empty list that only
+      // failed at runtime on the first admin call.
+      const ETH_RE = /^0x[0-9a-fA-F]{40}$/;
+      const candidates = [...(env.ADMIN_ADDRESSES ?? '').split(','), env.ADMIN_WALLET ?? '']
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0 && ETH_RE.test(s));
+      if (candidates.length === 0) {
+        prodErrors.push(
+          'ADMIN_ADDRESSES/ADMIN_WALLET are set but contain no valid 0x-prefixed Ethereum addresses'
+        );
+      }
+    }
+
+    // INF-4: MCP gateway key cache must have an independent, high-entropy
+    // secret that is not reused as the session-JWT signing key.
+    const mcpCacheSecret = process.env.MCP_KEY_CACHE_SECRET ?? '';
+    if (!mcpCacheSecret || mcpCacheSecret.length < 32) {
+      prodErrors.push(
+        'MCP_KEY_CACHE_SECRET must be set to ≥32 bytes of entropy (openssl rand -hex 32)'
+      );
+    } else if (mcpCacheSecret === env.SIWE_JWT_SECRET) {
+      prodErrors.push('MCP_KEY_CACHE_SECRET must not equal SIWE_JWT_SECRET (rotate independently)');
+    }
+
+    // SRV-5: RPC URLs are validated as URLs above, but reject whitespace-only
+    // values that would stringify to an empty viem transport.
+    for (const [name, value] of [
+      ['RPC_URL', env.RPC_URL],
+      ['RPC_URL_BASE_SEPOLIA', env.RPC_URL_BASE_SEPOLIA],
+      ['RPC_URL_BASE', env.RPC_URL_BASE],
+    ] as const) {
+      if (value !== undefined && value.trim() === '') {
+        prodErrors.push(`${name} is set but empty — remove the variable or provide a real URL`);
+      }
     }
 
     if (!env.REDIS_URL) {

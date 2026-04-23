@@ -31,6 +31,9 @@ contract ContentLicensingTest is Test {
     uint16 constant LICENSE_ROYALTY_BPS = 1000; // 10%
 
     function setUp() public {
+        // Warp past the SplitRouter SPLIT-02 cooldown window so the initial
+        // setSplits call doesn't revert with SplitChangeCooldownActive.
+        vm.warp(2 days);
         vm.deal(treasury, 0);
         vm.deal(buyer, 100 ether);
         vm.deal(alice, 100 ether);

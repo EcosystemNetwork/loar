@@ -437,7 +437,20 @@
 ### LEGAL-02: DMCA agent registration
 
 - **Sources**: A
-- **Status**: [ ] NOT STARTED — $6 filing for 512(c) safe harbor.
+- **Status**: [ ] NOT STARTED — $6 filing for 512(c) safe harbor. Note: § 512(g) **counter-notice loop** is now fully implemented in code (see DMCA-01 below) — only the agent-of-record registration remains.
+
+### DMCA-01: § 512(g) counter-notice safe-harbor loop
+
+- **Sources**: Pre-launch checklist #4 (Phase 1)
+- **Status**: [x] FIXED — Full loop implemented and tested:
+  - Public `/counter-notice` page + `POST /api/counter-notice` REST endpoint (auth-gated to content owner) + `counterNotices` Firestore collection
+  - `apps/server/src/jobs/dmca-putback.ts` runs hourly under `DMCA_PUTBACK_ENABLED=true`, scans pending counter-notices, restores content after the hold period, writes `contentAuditLog` row, fires Slack alert
+  - `apps/server/src/lib/business-days.ts` computes US-federal-holiday-aware business days (covers MLK, Memorial Day, Juneteenth, Inauguration, observed-day shifts). Putback job uses ≥10 business days (default 12) instead of 14 calendar days — closes the worst-case underflow where Memorial-Day week reduces 14 calendar = 9 business days. 13/13 unit tests in `apps/server/src/__tests__/business-days.test.ts`.
+  - § 512(g)(1) subscriber notification: `moderation.updateContentStatus` to `hidden`/`removed` now writes an in-app `notifications` row keyed to the content creator + dispatches `emailTakedownToSubscriber` (best-effort if user has stored an email). Notification deep-links to `/counter-notice?takedownRequestId=…`; the form pre-fills the reference from the query string.
+  - § 512(g)(2)(B) claimant forwarding: `emailCounterNoticeToClaimant` fires inline when the counter-notice REST endpoint accepts a submission.
+  - § 512(g)(2)(C) putback notice: `emailPutbackToClaimant` fires from the job after auto-restoration.
+  - Admin endpoints to override: `admin.moderation.markCourtAction`, `admin.moderation.runDmcaPutbackSweep`, `admin.moderation.listCounterNotices`.
+- **Operational blocker**: set `DMCA_PUTBACK_ENABLED=true` on exactly ONE replica in prod (single-writer job; env defaults to off in dev/CI).
 
 ### LEGAL-03: NYSE ticker collision — $LOAR vs LOAR Holdings
 

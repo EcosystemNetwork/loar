@@ -935,7 +935,7 @@ export function ContentCard({ item }: { item: any }) {
           isVideo && item.mediaUrl ? (
             <video
               src={resolveIpfsUrl(item.mediaUrl)}
-              poster={item.thumbnailUrl || undefined}
+              poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
               className="w-full h-full object-cover"
               muted
               preload="metadata"

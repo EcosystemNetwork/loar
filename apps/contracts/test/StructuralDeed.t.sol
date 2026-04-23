@@ -32,6 +32,11 @@ contract StructuralDeedTest is Test {
         router = new MockPaymentRouter(treasury);
         registry = new MockRightsRegistry();
         universeManager = new MockUniverseManager();
+        // StructuralDeed.mintDeed checks
+        // `IERC721(universeManager).ownerOf(universeId) == msg.sender`.
+        // Without seeding the mock the call reverts with "ERC721: invalid
+        // token ID" before any deed-specific revert can fire.
+        universeManager.setOwner(UNIVERSE_ID, alice);
 
         deed = new StructuralDeed(
             platform,
@@ -209,6 +214,10 @@ contract StructuralDeedTest is Test {
     // ---- View functions ----
 
     function test_getDeedsByLayer() public {
+        // Seed alice as owner of the second universe so the cross-universe
+        // mint at the end of the setup doesn't trip the ownerOf check.
+        universeManager.setOwner(2, alice);
+
         vm.startPrank(alice);
         deed.mintDeed{value: 0.001 ether}(
             UNIVERSE_ID, StructuralDeed.Layer.DOMAIN, "D1", keccak256("d1"), 0, URI

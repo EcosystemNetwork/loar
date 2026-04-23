@@ -13,6 +13,7 @@ import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { UserText } from '@/components/user-text';
 import {
   MessageCircle,
   Heart,
@@ -265,7 +266,9 @@ function CommentItem({
               {formatTime(comment.createdAt)}
             </span>
           </div>
-          <p className="text-sm break-words">{comment.text}</p>
+          <p className="text-sm break-words">
+            <UserText>{comment.text}</UserText>
+          </p>
           {comment.imageUrl && (
             <img
               src={resolveIpfsUrl(comment.imageUrl)}
@@ -356,7 +359,9 @@ function CommentItem({
                   {formatTime(reply.createdAt)}
                 </span>
               </div>
-              <p className="text-xs break-words">{reply.text}</p>
+              <p className="text-xs break-words">
+                <UserText>{reply.text}</UserText>
+              </p>
             </div>
           ))}
         </div>

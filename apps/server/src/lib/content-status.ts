@@ -22,6 +22,28 @@ export async function assertContentOperable(contentId: string): Promise<void> {
 }
 
 /**
+ * SRV-2: some paths (episode-NFT listings) identify content by its on-chain
+ * `contentHash` instead of the Firestore `contentId`. This variant resolves
+ * hash → contentId and delegates. If no matching content doc exists (e.g.
+ * content was never recorded off-chain) the call is a no-op rather than an
+ * error — the Firestore moderation collection is the source of truth, and
+ * content that hasn't been recorded there has no status to enforce.
+ */
+export async function assertContentHashOperable(contentHash: string): Promise<void> {
+  if (!contentHash) return;
+  const snap = await db
+    .collection('content')
+    .where('contentHash', '==', contentHash)
+    .limit(1)
+    .get();
+  if (snap.empty) return;
+  const status = snap.docs[0].data()?.contentStatus as ContentStatus | undefined;
+  if (status && !OPERABLE_STATUSES.includes(status)) {
+    throw new Error(`Content is not available (status: ${status})`);
+  }
+}
+
+/**
  * Gate mint / list / license operations on canon for monetized universes.
  *
  * Rule: a monetized universe must have at least one canon episode before any

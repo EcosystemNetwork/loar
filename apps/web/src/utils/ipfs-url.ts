@@ -2,7 +2,11 @@ const PUBLIC_GATEWAY = 'https://gateway.pinata.cloud';
 const CONFIGURED_GATEWAY = (import.meta.env.VITE_PINATA_GATEWAY_URL || PUBLIC_GATEWAY)
   .trim()
   .replace(/\/$/, '');
-const GATEWAY_TOKEN = (import.meta.env.VITE_PINATA_GATEWAY_TOKEN || '').trim();
+// WEB-1: `VITE_PINATA_GATEWAY_TOKEN` is deprecated. The token now lives on
+// the server and is attached by `/api/ipfs/resolve`. This constant is kept
+// only as a deprecation-warning source so legacy configs still work during
+// the rollout window. Remove the env var from every production frontend.
+const GATEWAY_TOKEN_LEGACY = (import.meta.env.VITE_PINATA_GATEWAY_TOKEN || '').trim();
 const PREFER_PUBLIC =
   String(import.meta.env.VITE_PINATA_PREFER_PUBLIC || '')
     .trim()
@@ -16,18 +20,24 @@ try {
 }
 
 const IS_DEDICATED_GATEWAY = CONFIGURED_HOST.endsWith('.mypinata.cloud');
-const BYPASS_DEDICATED = PREFER_PUBLIC || (IS_DEDICATED_GATEWAY && !GATEWAY_TOKEN);
+// Without a client-side token we can only use dedicated gateways via the
+// server resolver (see resolveIpfsUrlAsync). Fall back to the public gateway
+// for synchronous URL composition.
+const BYPASS_DEDICATED = PREFER_PUBLIC || IS_DEDICATED_GATEWAY;
 
 const ACTIVE_GATEWAY = BYPASS_DEDICATED ? PUBLIC_GATEWAY : CONFIGURED_GATEWAY;
 const ACTIVE_HOST = BYPASS_DEDICATED ? 'gateway.pinata.cloud' : CONFIGURED_HOST;
 
-if (IS_DEDICATED_GATEWAY && !GATEWAY_TOKEN && typeof console !== 'undefined') {
+if (GATEWAY_TOKEN_LEGACY && typeof console !== 'undefined') {
   console.warn(
-    '[ipfs-url] Dedicated Pinata gateway configured without VITE_PINATA_GATEWAY_TOKEN — falling back to public gateway. Dedicated gateways on *.mypinata.cloud require a token or custom domain.'
+    '[ipfs-url] VITE_PINATA_GATEWAY_TOKEN is deprecated (WEB-1). The token is now injected server-side by /api/ipfs/resolve. Remove VITE_PINATA_GATEWAY_TOKEN from the web env.'
   );
 }
 
 function appendToken(url: string): string {
+  // With the token server-side the only thing left to normalize synchronously
+  // is stripping a stale `pinataGatewayToken` query param off URLs that have
+  // been routed to the public gateway.
   try {
     const parsed = new URL(url);
     if (!parsed.host.endsWith('.mypinata.cloud') && parsed.host !== ACTIVE_HOST) return url;
@@ -35,18 +45,7 @@ function appendToken(url: string): string {
       parsed.searchParams.delete('pinataGatewayToken');
       return parsed.toString();
     }
-    const existing = parsed.searchParams.get('pinataGatewayToken');
-    if (existing !== null) {
-      const cleaned = existing.trim();
-      if (cleaned !== existing) {
-        parsed.searchParams.set('pinataGatewayToken', cleaned);
-        return parsed.toString();
-      }
-      return url;
-    }
-    if (!GATEWAY_TOKEN) return url;
-    parsed.searchParams.set('pinataGatewayToken', GATEWAY_TOKEN);
-    return parsed.toString();
+    return url;
   } catch {
     return url;
   }
@@ -171,4 +170,43 @@ export function getNextIpfsFallback(currentUrl?: string | null): string | null {
 export function isIpfsGatewayUrl(url?: string | null): boolean {
   if (!url) return false;
   return extractIpfsPath(url) !== null;
+}
+
+// ── Server-signed gateway URL (WEB-1) ─────────────────────────────────────
+//
+// For cases where a dedicated (token-gated) Pinata gateway is required —
+// typically private/token-gated content — ask the server to compose the URL.
+// The gateway token stays on the server; the returned URL is short-lived.
+// Successful lookups are cached in-memory per session to keep render paths
+// snappy. Failures fall through to the public-gateway URL.
+
+const SERVER_URL = (import.meta.env.VITE_SERVER_URL || '').replace(/\/$/, '');
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+
+export async function resolveIpfsUrlAsync(url?: string | null): Promise<string> {
+  if (!url) return '';
+  const parts = extractIpfsPath(url);
+  if (!parts) return resolveIpfsUrl(url);
+
+  const cacheKey = parts.cidPath.split('?')[0];
+  const cached = signedUrlCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now() + 10_000) return cached.url;
+
+  if (!SERVER_URL) return resolveIpfsUrl(url);
+
+  try {
+    const res = await fetch(`${SERVER_URL}/api/ipfs/resolve?url=${encodeURIComponent(url)}`, {
+      credentials: 'include',
+    });
+    if (!res.ok) return resolveIpfsUrl(url);
+    const json = (await res.json()) as { url?: string; expiresAt?: number };
+    if (!json.url) return resolveIpfsUrl(url);
+    signedUrlCache.set(cacheKey, {
+      url: json.url,
+      expiresAt: json.expiresAt ?? Date.now() + 60_000,
+    });
+    return json.url;
+  } catch {
+    return resolveIpfsUrl(url);
+  }
 }

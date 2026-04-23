@@ -16,6 +16,28 @@ import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import { toast } from 'sonner';
 
+// WEB-7: resolve the server URL once, centrally. In production we pin the
+// origin to the canonical API host and refuse build-time overrides — a
+// poisoned CI/dev env that tries to swap VITE_SERVER_URL will still talk to
+// the real backend instead of silently shipping a phishing proxy. In dev we
+// honour VITE_SERVER_URL so local builds against alternate origins keep
+// working.
+const PROD_SERVER_URL = 'https://api.loar.fun';
+const RAW_SERVER_URL = (import.meta.env.VITE_SERVER_URL ?? '').trim().replace(/\/$/, '');
+
+export const SERVER_URL = (() => {
+  if (import.meta.env.PROD) {
+    if (RAW_SERVER_URL && RAW_SERVER_URL !== PROD_SERVER_URL) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[trpc] VITE_SERVER_URL="${RAW_SERVER_URL}" ignored in production build; using ${PROD_SERVER_URL}`
+      );
+    }
+    return PROD_SERVER_URL;
+  }
+  return RAW_SERVER_URL || '';
+})();
+
 /** Shared React Query client. Retries 5xx errors and shows toast on failure. */
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -93,7 +115,7 @@ export const queryClient = new QueryClient({
         const hadSession = !!(address && expiry && Date.now() < Number(expiry));
         if (!hadSession) return;
 
-        void fetch(`${import.meta.env.VITE_SERVER_URL || ''}/auth/me`, {
+        void fetch(`${SERVER_URL}/auth/me`, {
           credentials: 'include',
         })
           .then((r) => r.json())
@@ -137,7 +159,7 @@ export const queryClient = new QueryClient({
 export const trpcClient = createTRPCClient<AppRouter>({
   links: [
     httpBatchLink({
-      url: `${import.meta.env.VITE_SERVER_URL || ''}/trpc`,
+      url: `${SERVER_URL}/trpc`,
       // httpOnly cookie is sent automatically via credentials: 'include'
       fetch(url, options) {
         return fetch(url, { ...options, credentials: 'include' });

@@ -29,6 +29,7 @@ import {
   Crown,
   Palette,
   Images,
+  NotebookPen,
 } from 'lucide-react';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
@@ -41,6 +42,13 @@ interface EntityTypeCard {
 }
 
 const ENTITY_TYPES: EntityTypeCard[] = [
+  {
+    kind: 'notebook',
+    label: 'Notebook',
+    description: 'Private scratch for raw ideas. Promote drafts to canon when ready.',
+    icon: NotebookPen,
+    color: 'from-yellow-500/20 to-amber-500/20 border-yellow-500/30',
+  },
   {
     kind: 'universe',
     label: 'Universe',
@@ -223,9 +231,16 @@ function CreateHub() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {ENTITY_TYPES.filter(({ kind }) => (universeAddress ? kind !== 'universe' : true)).map(
           ({ kind, label, description, icon: Icon, color }) => {
-            const href = kind === 'universe' ? '/cinematicUniverseCreate' : `/create/${kind}`;
+            const href =
+              kind === 'universe'
+                ? '/cinematicUniverseCreate'
+                : kind === 'notebook'
+                  ? '/notebook'
+                  : `/create/${kind}`;
             const search =
-              kind !== 'universe' && universeAddress ? { universe: universeAddress } : undefined;
+              kind !== 'universe' && kind !== 'notebook' && universeAddress
+                ? { universe: universeAddress }
+                : undefined;
             return (
               <Link
                 key={kind}

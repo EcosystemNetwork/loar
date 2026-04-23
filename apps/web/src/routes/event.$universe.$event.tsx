@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { UserText } from '@/components/user-text';
 import { Label } from '@/components/ui/label';
 import {
   Dialog,
@@ -739,8 +740,8 @@ function EventPage() {
                 </h3>
                 <div className="prose prose-lg max-w-none">
                   <div className="bg-card/80 backdrop-blur-sm rounded-xl p-4 border border-primary/10">
-                    <p className="text-sm leading-relaxed whitespace-pre-line text-foreground/90">
-                      {wiki.plot}
+                    <p className="text-sm leading-relaxed whitespace-pre-line break-words text-foreground/90">
+                      <UserText>{wiki.plot}</UserText>
                     </p>
                   </div>
                 </div>

@@ -82,7 +82,20 @@ function OAuthSiwePage() {
       const now = new Date();
       const expires = new Date(now.getTime() + 2 * 60 * 1000);
       const chainId = chain?.id ?? 8453;
-      const host = gatewayOrigin ?? 'mcp.loar.fun';
+      // WEB-3: pin the SIWE message `host` to the canonical gateway, not to
+      // whatever origin was parsed out of `return_to`. The returnAllowed
+      // check above rejects unknown hosts, but the signed message itself
+      // should commit to a single domain so a misconfigured CDN rule or
+      // subdomain takeover cannot widen the replay surface.
+      const PROD_GATEWAY_HOST = 'mcp.loar.fun';
+      const DEV_GATEWAY_HOSTS: Record<string, string> = {
+        'http://localhost:3334': 'localhost:3334',
+        'http://127.0.0.1:3334': '127.0.0.1:3334',
+      };
+      const host =
+        import.meta.env.DEV && gatewayOrigin && DEV_GATEWAY_HOSTS[gatewayOrigin]
+          ? DEV_GATEWAY_HOSTS[gatewayOrigin]
+          : PROD_GATEWAY_HOST;
       const message = [
         `${host} wants you to sign in with your Ethereum account:`,
         address,

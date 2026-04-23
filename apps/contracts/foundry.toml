@@ -10,6 +10,21 @@ via_ir=true
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 
+# Test profile: keep via_ir on (contracts use deeply-nested locals that need
+# it to compile at all) but disable the optimizer. The optimizer trips a
+# solc 0.8.30 internal "Tag too large for reserved space" assembly bug when
+# CreditManager + PaymentRouter + LoarToken get compiled together. Production
+# builds keep the optimizer; test bytecode has no size constraint.
+# Run with: `forge test --profile test` or `FOUNDRY_PROFILE=test forge test`.
+[profile.test]
+src = "src"
+out = "out"
+libs = ["lib", "dependencies"]
+
+auto_detect_solc=true
+optimizer=false
+via_ir=true
+
 [rpc_endpoints]
 mainnet = "${RPC_1}"
 sepolia = "${RPC_11155111}"

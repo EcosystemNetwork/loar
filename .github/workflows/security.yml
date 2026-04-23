@@ -205,3 +205,28 @@ jobs:
 
       - name: Audit dependencies (high severity)
         run: pnpm audit --audit-level=high
+
+  # INF-7: gitleaks — scan every push and PR for accidentally-committed
+  # secrets (API keys, JWT signing keys, private keys, wallet mnemonics).
+  # Blocking: any detection fails the workflow.
+  secrets-scan:
+    name: Secrets Scan (gitleaks)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Fetch full history so we scan every commit on the branch, not
+          # just the tip. gitleaks --log-opts below limits the scope to the
+          # push range on pushes / PR diff on pull_requests.
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Fail the job on any finding. Set to `false` only for a time-
+          # boxed remediation window.
+          GITLEAKS_ENABLE_COMMENTS: 'true'
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'true'

@@ -425,19 +425,24 @@ contract LaunchpadStaking is
         }
 
         // Cooldown — prevents drip-distribution around the per-distribution cap.
+        // SC-3: use the floor when storage is still uninitialized (legacy
+        // deployments pre-`initializeDistributionGuardV2`) so the attack
+        // surface is closed by default even without owner action.
         uint256 lastBlock = lastDistributionBlock[universeId];
-        uint256 interval = minDistributionInterval; // SLOAD once
-        if (lastBlock != 0 && interval != 0 && block.number < lastBlock + interval) {
+        uint256 interval = minDistributionInterval;
+        if (interval < MIN_DISTRIBUTION_INTERVAL) interval = MIN_DISTRIBUTION_INTERVAL;
+        if (lastBlock != 0 && block.number < lastBlock + interval) {
             revert DistributionTooSoon();
         }
 
         // Per-distribution cap — bounds a sandwich attacker's gross take so
-        // it cannot exceed the early-unstake penalty (5%). Set 0 to disable.
-        uint16 maxBps = maxRewardBpsPerDistribution; // SLOAD once
-        if (maxBps != 0) {
-            uint256 cap = (pool.totalStaked * maxBps) / 10_000;
-            if (amount > cap) revert DistributionExceedsCap();
-        }
+        // it cannot exceed the early-unstake penalty (5%). SC-3: enforce the
+        // floor even when storage says 0, for the same legacy-deployment
+        // reason as above.
+        uint16 maxBps = maxRewardBpsPerDistribution;
+        if (maxBps < MIN_MAX_REWARD_BPS) maxBps = MIN_MAX_REWARD_BPS;
+        uint256 cap = (pool.totalStaked * maxBps) / 10_000;
+        if (amount > cap) revert DistributionExceedsCap();
 
         loarToken.safeTransferFrom(msg.sender, address(this), amount);
         pool.accRewardPerShare += (amount * 1e18) / pool.totalStaked;
@@ -612,16 +617,32 @@ contract LaunchpadStaking is
         emit DistributorChanged(who, allowed);
     }
 
+    /// @notice Hard floor for the per-distribution cap (bps of pool). SC-3:
+    ///         was previously admin-settable to 0, which enabled a mempool
+    ///         sandwich: stake 1 wei, wait for a large distribution, claim,
+    ///         and unstake paying only the flat penalty. Clamping the minimum
+    ///         to 100 bps (1% of pool) guarantees a sandwicher cannot absorb
+    ///         more than that fraction in one shot.
+    uint16 public constant MIN_MAX_REWARD_BPS = 100; // 1%
+    /// @notice Hard floor for per-pool distribution cooldown. SC-3: admin could
+    ///         previously set this to 0. We now require at least a 1-block
+    ///         gap so two distributions can never land in the same block as
+    ///         an attacker's stake+claim.
+    uint256 public constant MIN_DISTRIBUTION_INTERVAL = 1;
+
     /// @notice Configure the sandwich-mitigation guards for distributions.
     /// @param newMinInterval Min blocks between distributions to a single pool.
     /// @param newMaxRewardBps Max distribution size as fraction of pool (bps).
-    /// @dev Pass `newMaxRewardBps == 0` to disable the per-distribution cap.
-    ///      Must be <= 10_000 (100% of the pool); recommended 500 (5%).
+    /// @dev SC-3: both parameters have hard floors now; passing 0 reverts.
+    ///      This closes the sandwich attack surface regardless of admin key
+    ///      posture (compromised owner key, misconfigured multisig, etc.).
     function setDistributionGuard(uint256 newMinInterval, uint16 newMaxRewardBps)
         external
         onlyOwner
     {
+        require(newMaxRewardBps >= MIN_MAX_REWARD_BPS, "Max bps below floor");
         require(newMaxRewardBps <= 10_000, "Max bps > 100%");
+        require(newMinInterval >= MIN_DISTRIBUTION_INTERVAL, "Interval below floor");
         require(newMinInterval <= 100_000, "Interval too large");
         minDistributionInterval = newMinInterval;
         maxRewardBpsPerDistribution = newMaxRewardBps;

@@ -8,9 +8,25 @@ import { useState, useCallback } from 'react';
 import { useChainId, usePublicClient } from 'wagmi';
 import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { useWalletAccount } from '@/hooks/useWalletAccount';
-import { parseEther, type Address, maxUint256 } from 'viem';
+import { parseEther, formatEther, type Address, maxUint256 } from 'viem';
 import { getSwapUrl } from '@/hooks/useTokenSwap';
 import { openExternal } from '@/utils/open-external';
+import { confirmTx } from '@/components/tx-confirm';
+
+function swapChainName(id: number | undefined): string {
+  switch (id) {
+    case 11155111:
+      return 'Sepolia';
+    case 84532:
+      return 'Base Sepolia';
+    case 8453:
+      return 'Base';
+    case 1:
+      return 'Ethereum';
+    default:
+      return id ? `Chain ${id}` : 'Unknown chain';
+  }
+}
 
 // Minimal ERC20 subset for allowance + approve (used for native sell)
 const ERC20_ABI = [
@@ -176,6 +192,24 @@ export function useSwapExecution() {
           const bps = BigInt(slippageBps);
           const amountOutMinimum = (config.expectedOutWei * (10_000n - bps)) / 10_000n;
 
+          const approved = await confirmTx({
+            title: 'Swap ETH → token',
+            description: 'Spot swap via LoarSwapRouter. Slippage-protected.',
+            chainName: swapChainName(chainId),
+            functionName: 'swapExactInput',
+            to: routerAddress,
+            valueEth: formatEther(amountIn),
+            summary: [
+              ['Min out', amountOutMinimum.toString()],
+              ['Slippage max', `${slippageBps / 100}%`],
+            ],
+            confirmLabel: 'Confirm swap',
+          });
+          if (!approved) {
+            setStatus('idle');
+            return { fallback: false, error: undefined };
+          }
+
           const hash = await writeContractAsync({
             address: routerAddress,
             abi: SWAP_ROUTER_ABI,
@@ -236,6 +270,23 @@ export function useSwapExecution() {
           })) as bigint;
 
           if (allowance < amountIn) {
+            const approveOk = await confirmTx({
+              title: 'Approve token for swap router',
+              description:
+                'Unlimited (maxUint256) approval so future sells do not require a fresh approval.',
+              chainName: swapChainName(chainId),
+              functionName: 'approve',
+              to: tokenAddr,
+              summary: [
+                ['Spender', routerAddress],
+                ['Amount', 'unlimited'],
+              ],
+              confirmLabel: 'Approve',
+            });
+            if (!approveOk) {
+              setStatus('idle');
+              return { fallback: false, error: undefined };
+            }
             setStatus('approving');
             const approveHash = await writeContractAsync({
               address: tokenAddr,
@@ -251,6 +302,24 @@ export function useSwapExecution() {
           }
 
           // 2) Swap.
+          const swapOk = await confirmTx({
+            title: 'Swap token → ETH',
+            description: 'Spot swap via LoarSwapRouter. Slippage-protected.',
+            chainName: swapChainName(chainId),
+            functionName: 'swapExactInput',
+            to: routerAddress,
+            summary: [
+              ['Token in', tokenAddr],
+              ['Amount in', amountIn.toString()],
+              ['Min ETH out', `${formatEther(amountOutMinimum)} ETH`],
+              ['Slippage max', `${slippageBps / 100}%`],
+            ],
+            confirmLabel: 'Confirm swap',
+          });
+          if (!swapOk) {
+            setStatus('idle');
+            return { fallback: false, error: undefined };
+          }
           setStatus('confirming');
           const hash = await writeContractAsync({
             address: routerAddress,

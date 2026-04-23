@@ -111,9 +111,14 @@ contract UniverseTest is Test {
     }
 
     function test_setMedia() public {
+        // createNode() is called as address(this), so this Test contract is
+        // the original creator — that satisfies UNIVERSE-01's
+        // `msg.sender == originalCreator` branch even though the root node
+        // was auto-promoted to canon. The previous `vm.prank(msg.sender)` set
+        // the caller to the test runner (not address(this) = creator) and
+        // hit the canon-immutability revert.
         uint256 id = createNode();
         bytes32 newHash = keccak256("new-link");
-        vm.prank(msg.sender); // admin is msg.sender from setUp
         universe.setMedia(id, newHash, "new-link.org");
         assertEq(universe.getMedia(id), newHash);
     }

@@ -30,6 +30,11 @@ contract CollabManagerTest is Test {
 
         router = new MockPaymentRouter(treasury);
         universeManager = new MockUniverseManager();
+        // Wire the universe-NFT owners the CollabManager checks via
+        // `IERC721(universeManager).ownerOf(universeId) == msg.sender` —
+        // without this every propose/accept hits "ERC721: invalid token ID".
+        universeManager.setOwner(UNIVERSE_A, proposer);
+        universeManager.setOwner(UNIVERSE_B, acceptor);
 
         CollabManager impl = new CollabManager();
         cm = CollabManager(
@@ -151,8 +156,11 @@ contract CollabManagerTest is Test {
     function test_acceptCollab_revert_notAcceptor() public {
         uint256 collabId = _proposeCollab();
 
+        // COLLAB-01: Acceptor authorization is now enforced by on-chain
+        // ownership of universeB rather than a stored `targetAcceptor`.
+        // alice doesn't own universeB so the require fires.
         vm.prank(alice);
-        vm.expectRevert(CollabManager.NotAcceptor.selector);
+        vm.expectRevert(bytes("Not universe B owner"));
         cm.acceptCollab(collabId);
     }
 

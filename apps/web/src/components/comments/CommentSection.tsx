@@ -13,6 +13,7 @@ import { trpc } from '@/utils/trpc';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import { MessageSquare, Heart, Trash2, Reply, Send, Loader2 } from 'lucide-react';
+import { UserText } from '@/components/user-text';
 
 interface CommentSectionProps {
   targetId: string;
@@ -212,7 +213,9 @@ export function CommentSection({ targetId, targetType }: CommentSectionProps) {
                   </span>
                   <span>{formatTime(comment.createdAt)}</span>
                 </div>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-300">{comment.text}</p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-sm text-zinc-300">
+                  <UserText>{comment.text}</UserText>
+                </p>
               </div>
 
               {/* Delete button (own comments only) */}
@@ -295,8 +298,8 @@ export function CommentSection({ targetId, targetType }: CommentSectionProps) {
                           </span>
                           <span>{formatTime(reply.createdAt)}</span>
                         </div>
-                        <p className="mt-0.5 whitespace-pre-wrap text-sm text-zinc-300">
-                          {reply.text}
+                        <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-zinc-300">
+                          <UserText>{reply.text}</UserText>
                         </p>
                       </div>
                       {isAuthenticated && reply.authorUid === uid && (
