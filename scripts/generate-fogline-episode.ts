@@ -23,6 +23,7 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { readFileSync } from 'fs';
 import { randomUUID } from 'crypto';
 import { keccak256, toBytes } from 'viem';
+import { rehostVideoToPinata, isEphemeralVideoUrl } from './lib/rehost-video';
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 // ── Firebase Init ───────────────────────────────────────────────────────
@@ -823,9 +824,23 @@ async function generateSceneVideo(
 
   try {
     // Generate via ByteDance Seedance 2.0 direct API
-    const videoUrl = await generateSeedanceVideo(fullPrompt, scene.duration, scene.hasDialogue);
+    const ephemeralUrl = await generateSeedanceVideo(fullPrompt, scene.duration, scene.hasDialogue);
 
     const generationId = randomUUID();
+
+    // Rehost the ephemeral ByteDance URL to Pinata BEFORE writing anything to
+    // Firestore. Historical data loss was caused by writing the volces.com URL
+    // directly — once the 24h signature expired, every reference to the video
+    // was dead. Throw if rehost fails so we don't persist a rotting link.
+    let videoUrl = ephemeralUrl;
+    if (isEphemeralVideoUrl(ephemeralUrl)) {
+      const rehosted = await rehostVideoToPinata(ephemeralUrl, {
+        filename: `fogline-scene-${scene.id}.mp4`,
+        pinName: `Fogline — ${scene.title}`,
+      });
+      videoUrl = rehosted.url;
+      console.log(`    ↳ Rehosted to Pinata (${rehosted.size} bytes): ${videoUrl.slice(0, 70)}`);
+    }
 
     // Persist generation record to Firestore
     await db.collection('videoGenerations').doc(generationId).set({

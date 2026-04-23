@@ -9,6 +9,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { readFileSync } from 'fs';
 import { randomUUID } from 'crypto';
 import { ByteDanceService } from '../apps/server/src/services/bytedance.js';
+import { rehostVideoToPinata, isEphemeralVideoUrl } from './lib/rehost-video';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
@@ -81,6 +82,17 @@ async function main() {
         continue;
       }
 
+      // Rehost ephemeral ByteDance URL to Pinata before persisting
+      let videoUrl = r.videoUrl;
+      if (isEphemeralVideoUrl(videoUrl)) {
+        const rehosted = await rehostVideoToPinata(videoUrl, {
+          filename: `first-proof-scene-${s.id}.mp4`,
+          pinName: `First Proof — ${s.title}`,
+        });
+        videoUrl = rehosted.url;
+        console.log(`  ↳ Rehosted to Pinata: ${videoUrl.slice(0, 70)}`);
+      }
+
       const gid = randomUUID();
       await db.collection('videoGenerations').doc(gid).set({
         id: gid,
@@ -88,7 +100,7 @@ async function main() {
         fullPrompt: s.prompt,
         model: MODEL,
         mode: 'text_to_video',
-        videoUrl: r.videoUrl,
+        videoUrl,
         status: 'completed',
         universeId: UNIVERSE_ID,
         creatorUid: CREATOR,
@@ -104,7 +116,7 @@ async function main() {
       await db.collection('content').add({
         title: `First Proof — ${s.title}`,
         description: s.prompt.slice(0, 300),
-        mediaUrl: r.videoUrl,
+        mediaUrl: videoUrl,
         mediaType: 'ai-video',
         classification: 'original',
         tags: ['dostopia', 'first-proof', 'the-unfinished', 'episode', `scene-${s.id}`],

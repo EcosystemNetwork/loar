@@ -15,6 +15,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { readFileSync } from 'fs';
 import { randomUUID } from 'crypto';
 import { ByteDanceService } from '../apps/server/src/services/bytedance.js';
+import { rehostVideoToPinata, isEphemeralVideoUrl } from './lib/rehost-video';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
@@ -114,7 +115,16 @@ async function main() {
         continue;
       }
 
-      const videoUrl = result.videoUrl;
+      // Rehost ephemeral ByteDance URL to Pinata before persisting
+      let videoUrl = result.videoUrl;
+      if (isEphemeralVideoUrl(videoUrl)) {
+        const rehosted = await rehostVideoToPinata(videoUrl, {
+          filename: `first-proof-scene-${scene.id}.mp4`,
+          pinName: `First Proof — ${scene.title}`,
+        });
+        videoUrl = rehosted.url;
+        console.log(`  ↳ Rehosted to Pinata: ${videoUrl.slice(0, 70)}`);
+      }
       const generationId = randomUUID();
 
       await db.collection('videoGenerations').doc(generationId).set({

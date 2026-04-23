@@ -22,6 +22,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { readFileSync } from 'fs';
 import { randomUUID } from 'crypto';
 import { ByteDanceService } from '../apps/server/src/services/bytedance.js';
+import { rehostVideoToPinata, isEphemeralVideoUrl } from './lib/rehost-video';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
@@ -882,8 +883,21 @@ async function generateSceneVideo(
       throw new Error(result.error || 'No video URL returned');
     }
 
-    const videoUrl = result.videoUrl;
+    const ephemeralUrl = result.videoUrl;
     const generationId = randomUUID();
+
+    // Rehost ephemeral ByteDance URL to Pinata BEFORE writing to Firestore.
+    // Writing the volces.com URL directly rotted the previous generation —
+    // the 24h presign expired and every reference became dead.
+    let videoUrl = ephemeralUrl;
+    if (isEphemeralVideoUrl(ephemeralUrl)) {
+      const rehosted = await rehostVideoToPinata(ephemeralUrl, {
+        filename: `first-proof-scene-${scene.id}.mp4`,
+        pinName: `First Proof — ${scene.title}`,
+      });
+      videoUrl = rehosted.url;
+      console.log(`  ↳ Rehosted to Pinata (${rehosted.size} bytes): ${videoUrl.slice(0, 70)}`);
+    }
 
     // Persist to Firestore
     await db.collection('videoGenerations').doc(generationId).set({
