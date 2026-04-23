@@ -89,6 +89,11 @@ interface IBondingCurveFactory {
     ) external returns (address);
 }
 
+interface ITimelockFactory {
+    function deployTimelock(uint256 universeId, uint256 minDelay) external returns (address);
+    function wireProposer(address timelock, address governor) external;
+}
+
 /**
  * @title UniverseTokenDeployerV3
  * @notice Split-contract version — token, governor, and bonding curve bytecode live in
@@ -118,14 +123,22 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
     IGovernorFactory public governorFactory;
     IBondingCurveFactory public bondingCurveFactory;
     address public owner;
-    /// @notice WARNING (TIMELOCK-01): Single shared TimelockController across
-    ///         every per-universe Governor deployed by this factory. Combined
-    ///         with GOV-01 transferring all UUPS ownership to this timelock,
-    ///         a single compromised/low-quorum universe Governor can queue
-    ///         protocol-wide admin calls. Mainnet blocker — do NOT enable this
-    ///         path on mainnet until each universe gets its own
-    ///         TimelockController. See docs/audit-fix-tracker.md TIMELOCK-01.
+    /// @notice LEGACY shared timelock — used as a fallback when
+    ///         `timelockFactory` is unset (testnet history). Mainnet
+    ///         deployments MUST set `timelockFactory` so each universe
+    ///         gets its own TimelockController; see TIMELOCK-01.
     address public timelock;
+
+    /// @notice TIMELOCK-01 fix: per-universe timelock factory. When set,
+    ///         every `deployTokenAndGovernance` call deploys a fresh
+    ///         TimelockController for that universe and wires the spawned
+    ///         Governor as its sole proposer/canceller. Eliminates the
+    ///         "one compromised governor → protocol takeover" path.
+    ITimelockFactory public timelockFactory;
+
+    /// @notice Per-universe minimum delay applied to spawned timelocks.
+    ///         Defaults to the factory's DEFAULT_MIN_DELAY when unset.
+    uint256 public perUniverseTimelockDelay;
 
     /// @notice TOKEN-04: Distinct recipient for community allocations.
     ///         When unset, community share falls back to UniverseManager (legacy behavior).
@@ -198,6 +211,17 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
 
     function setTimelock(address _timelock) external onlyOwner {
         timelock = _timelock;
+    }
+
+    /// @notice TIMELOCK-01: opt-in to per-universe timelocks. Once a factory
+    ///         is set, all subsequent universes get a dedicated timelock and
+    ///         the legacy shared `timelock` fallback is bypassed.
+    function setTimelockFactory(address _factory) external onlyOwner {
+        timelockFactory = ITimelockFactory(_factory);
+    }
+
+    function setPerUniverseTimelockDelay(uint256 delay) external onlyOwner {
+        perUniverseTimelockDelay = delay;
     }
 
     /// @notice TOKEN-04: Set a distinct recipient for the community portion of every
@@ -329,9 +353,28 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
             IERC20(tokenAddress).safeTransfer(universeManager, treasuryAmount + communityAmount);
         }
 
-        // Deploy governor via factory
-        require(timelock != address(0), "Timelock not set");
-        governor = governorFactory.deployGovernor(tokenAddress, timelock);
+        // Deploy governor via factory.
+        // TIMELOCK-01: prefer per-universe timelocks when the factory is
+        // configured. The factory deploys with itself as admin, we deploy
+        // the governor against the new timelock, then wireProposer() grants
+        // PROPOSER/CANCELLER to the governor and renounces factory admin.
+        // Legacy shared `timelock` is the fallback for testnet continuity.
+        address governorTimelock;
+        if (address(timelockFactory) != address(0)) {
+            governorTimelock = timelockFactory.deployTimelock(
+                universeId,
+                perUniverseTimelockDelay
+            );
+        } else {
+            require(timelock != address(0), "Timelock not set");
+            governorTimelock = timelock;
+        }
+
+        governor = governorFactory.deployGovernor(tokenAddress, governorTimelock);
+
+        if (address(timelockFactory) != address(0)) {
+            timelockFactory.wireProposer(governorTimelock, governor);
+        }
 
         emit TokenDeployed(
             universeId,

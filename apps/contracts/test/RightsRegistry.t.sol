@@ -81,7 +81,9 @@ contract RightsRegistryTest is Test {
     }
 
     function test_setRights_revert_frozen() public {
-        vm.prank(platform);
+        // emergencyFreeze is onlyOwner — operators must use the two-step
+        // requestFreeze + owner confirmFreeze path (RIGHTS-02).
+        vm.prank(deployer);
         registry.emergencyFreeze(hash1, "DMCA");
         vm.prank(deployer);
         vm.expectRevert(RightsRegistry.AlreadyFrozen.selector);
@@ -91,13 +93,13 @@ contract RightsRegistryTest is Test {
     // ── emergencyFreeze ──
 
     function test_emergencyFreeze() public {
-        vm.prank(platform);
+        vm.prank(deployer);
         registry.emergencyFreeze(hash1, "DMCA takedown");
         assertEq(uint256(registry.rights(hash1)), uint256(IRightsRegistry.RightsType.FROZEN));
     }
 
     function test_emergencyFreeze_revert_zeroHash() public {
-        vm.prank(platform);
+        vm.prank(deployer);
         vm.expectRevert(RightsRegistry.ZeroHash.selector);
         registry.emergencyFreeze(bytes32(0), "reason");
     }
@@ -127,7 +129,7 @@ contract RightsRegistryTest is Test {
     }
 
     function test_isMonetizable_frozen_blocked() public {
-        vm.prank(platform);
+        vm.prank(deployer);
         registry.emergencyFreeze(hash1, "dispute");
         assertFalse(registry.isMonetizable(hash1));
     }

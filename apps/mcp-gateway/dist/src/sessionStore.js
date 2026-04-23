@@ -1,3 +1,51 @@
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
+// ── Encryption-at-rest for cached API keys ─────────────────────────────
+// The MCP `loar_*` key cached for a wallet is the literal credential the
+// upstream LOAR server matches via SHA-256 — i.e. anyone who reads the
+// cache (Redis dump, Firestore export) can act as that wallet for up to
+// the cache TTL. Encrypt with AES-256-GCM keyed off MCP_KEY_CACHE_SECRET
+// (rotated independently of OAUTH_JWT_SECRET) so a backing-store leak is
+// not equivalent to credential exfiltration.
+function getCacheEncryptionKey() {
+    const secret = process.env.MCP_KEY_CACHE_SECRET ||
+        process.env.OAUTH_JWT_SECRET || // fall back to JWT secret if dedicated one absent
+        '';
+    if (!secret) {
+        throw new Error('MCP_KEY_CACHE_SECRET (or fallback OAUTH_JWT_SECRET) required to cache MCP keys');
+    }
+    // Derive a stable 32-byte key from the configured secret.
+    return createHash('sha256').update(secret).digest();
+}
+function encryptCachedKey(plain) {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', getCacheEncryptionKey(), iv);
+    const enc = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    // Format: v1:<iv-hex>:<tag-hex>:<ciphertext-hex>
+    return `v1:${iv.toString('hex')}:${tag.toString('hex')}:${enc.toString('hex')}`;
+}
+function decryptCachedKey(blob) {
+    // Backwards-compat: pre-encryption entries were stored as raw `loar_*` keys.
+    // Treat anything missing the `v1:` prefix as plaintext to avoid forced
+    // mass-eviction during the migration window.
+    if (!blob.startsWith('v1:'))
+        return blob;
+    const parts = blob.split(':');
+    if (parts.length !== 4)
+        return null;
+    try {
+        const iv = Buffer.from(parts[1], 'hex');
+        const tag = Buffer.from(parts[2], 'hex');
+        const ct = Buffer.from(parts[3], 'hex');
+        const decipher = createDecipheriv('aes-256-gcm', getCacheEncryptionKey(), iv);
+        decipher.setAuthTag(tag);
+        return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8');
+    }
+    catch {
+        // Tag mismatch (key rotated, payload tampered) → invalidate the cache entry.
+        return null;
+    }
+}
 // ── In-memory backend ──────────────────────────────────────────────────
 const PENDING_TTL_MS = 10 * 60 * 1000;
 const BOUND_TTL_MS = 2 * 60 * 1000;
@@ -50,7 +98,10 @@ class MemoryBackend {
         return rest;
     }
     async cacheApiKey(walletAddress, rawKey, ttlMs) {
-        this.keys.set(walletAddress.toLowerCase(), { rawKey, expiresAt: Date.now() + ttlMs });
+        this.keys.set(walletAddress.toLowerCase(), {
+            rawKey: encryptCachedKey(rawKey),
+            expiresAt: Date.now() + ttlMs,
+        });
     }
     async getCachedApiKey(walletAddress) {
         const entry = this.keys.get(walletAddress.toLowerCase());
@@ -60,7 +111,7 @@ class MemoryBackend {
             this.keys.delete(walletAddress.toLowerCase());
             return null;
         }
-        return entry.rawKey;
+        return decryptCachedKey(entry.rawKey);
     }
 }
 // ── Redis backend ──────────────────────────────────────────────────────
@@ -112,10 +163,13 @@ class RedisBackend {
         }
     }
     async cacheApiKey(walletAddress, rawKey, ttlMs) {
-        await this.client.set(KEY_API(walletAddress), rawKey, 'PX', ttlMs);
+        await this.client.set(KEY_API(walletAddress), encryptCachedKey(rawKey), 'PX', ttlMs);
     }
     async getCachedApiKey(walletAddress) {
-        return this.client.get(KEY_API(walletAddress));
+        const blob = await this.client.get(KEY_API(walletAddress));
+        if (!blob)
+            return null;
+        return decryptCachedKey(blob);
     }
 }
 // ── Backend selection ──────────────────────────────────────────────────

@@ -29,6 +29,44 @@ const takedownCol = () => (firebaseAvailable ? db.collection('takedownRequests')
 const auditCol = () => (firebaseAvailable ? db.collection('contentAuditLog') : null);
 const contentCol = () => (firebaseAvailable ? db.collection('content') : null);
 
+type ContentPreview = {
+  id: string;
+  title: string | null;
+  mediaUrl: string | null;
+  thumbnailUrl: string | null;
+  mediaType: string | null;
+  contentStatus: string;
+  creatorUid: string | null;
+};
+
+/**
+ * Batch-fetch content previews for the moderation review queue.
+ * Admins must see hidden/removed content to verify flags, so this bypasses
+ * the public status filter used by `content.get`.
+ */
+async function fetchContentPreviews(contentIds: string[]): Promise<Record<string, ContentPreview>> {
+  const col = contentCol();
+  if (!col || contentIds.length === 0) return {};
+  const unique = Array.from(new Set(contentIds));
+  const refs = unique.map((id) => col.doc(id));
+  const snaps = await db.getAll(...refs);
+  const out: Record<string, ContentPreview> = {};
+  for (const snap of snaps) {
+    if (!snap.exists) continue;
+    const data = snap.data()!;
+    out[snap.id] = {
+      id: snap.id,
+      title: data.title ?? null,
+      mediaUrl: data.mediaUrl ?? null,
+      thumbnailUrl: data.thumbnailUrl ?? null,
+      mediaType: data.mediaType ?? null,
+      contentStatus: data.contentStatus ?? 'active',
+      creatorUid: data.creatorUid ?? null,
+    };
+  }
+  return out;
+}
+
 // ── Router ────────────────────────────────────────────────────────────────
 
 export const moderationRouter = router({
@@ -172,7 +210,14 @@ export const moderationRouter = router({
           .orderBy('createdAt', 'desc')
           .limit(input.limit)
           .get();
-        return snap.docs.map((d) => ({ id: d.id, type: 'takedown', ...d.data() }));
+        const takedowns = snap.docs.map((d) => ({ id: d.id, type: 'takedown', ...d.data() }));
+        const previews = await fetchContentPreviews(
+          takedowns.map((t: any) => t.contentId).filter(Boolean)
+        );
+        return takedowns.map((t: any) => ({
+          ...t,
+          contentPreview: t.contentId ? (previews[t.contentId] ?? null) : null,
+        }));
       }
 
       const col = flagsCol();
@@ -182,7 +227,14 @@ export const moderationRouter = router({
         .orderBy('createdAt', 'desc')
         .limit(input.limit)
         .get();
-      return snap.docs.map((d) => ({ id: d.id, type: 'flag', ...d.data() }));
+      const flags = snap.docs.map((d) => ({ id: d.id, type: 'flag', ...d.data() }));
+      const previews = await fetchContentPreviews(
+        flags.map((f: any) => f.contentId).filter(Boolean)
+      );
+      return flags.map((f: any) => ({
+        ...f,
+        contentPreview: f.contentId ? (previews[f.contentId] ?? null) : null,
+      }));
     }),
 
   // ── Admin: update content status ──────────────────────────────

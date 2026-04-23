@@ -20,6 +20,11 @@ contract SplitRouterTest is Test {
     bytes32 constant ENTITY_HASH = keccak256("universe:1");
 
     function setUp() public {
+        // Warp past the SPLIT-02 cooldown window so the first setSplits call
+        // doesn't get blocked by `block.timestamp < 0 + 1 days`. Without this
+        // every setUp + setSplits at block.timestamp == 1 reverts with
+        // SplitChangeCooldownActive.
+        vm.warp(2 days);
         vm.deal(treasury, 0);
         vm.deal(sender, 100 ether);
 

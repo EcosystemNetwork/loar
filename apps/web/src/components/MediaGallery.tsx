@@ -42,6 +42,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { LoarIcon } from '@/components/loar-icons';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 const CATEGORY_ICONS: Record<MediaCategory, React.ReactNode> = {
   image: <LoarIcon name="gallery" size={14} />,
@@ -157,11 +158,19 @@ function AttachmentRow({ item, variants, isOwner, onDetach, detaching }: Attachm
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {/* Inline image thumbnail */}
           {isImage(item) && item.url && (
-            <a href={item.url} target="_blank" rel="noreferrer" className="shrink-0">
+            <a
+              href={resolveIpfsUrl(item.url)}
+              target="_blank"
+              rel="noreferrer"
+              className="shrink-0"
+            >
               <img
-                src={item.url}
+                src={resolveIpfsUrl(item.url)}
                 alt={displayName}
                 className="w-12 h-12 rounded object-cover border"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                }}
               />
             </a>
           )}
@@ -213,7 +222,7 @@ function AttachmentRow({ item, variants, isOwner, onDetach, detaching }: Attachm
           </div>
         </div>
         <div className="flex items-center gap-0.5 shrink-0">
-          <a href={item.url} target="_blank" rel="noreferrer">
+          <a href={resolveIpfsUrl(item.url)} target="_blank" rel="noreferrer">
             <Button variant="ghost" size="icon" className="h-7 w-7">
               <ExternalLink className="w-3 h-3" />
             </Button>
@@ -242,11 +251,19 @@ function AttachmentRow({ item, variants, isOwner, onDetach, detaching }: Attachm
             >
               <div className="flex items-center gap-2 min-w-0">
                 {isImage(v) && v.url && (
-                  <a href={v.url} target="_blank" rel="noreferrer" className="shrink-0">
+                  <a
+                    href={resolveIpfsUrl(v.url)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0"
+                  >
                     <img
-                      src={v.url}
+                      src={resolveIpfsUrl(v.url)}
                       alt={v.label || v.originalFilename}
                       className="w-8 h-8 rounded object-cover border"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
                     />
                   </a>
                 )}
@@ -275,7 +292,7 @@ function AttachmentRow({ item, variants, isOwner, onDetach, detaching }: Attachm
                 </div>
               </div>
               <div className="flex items-center gap-0.5 shrink-0">
-                <a href={v.url} target="_blank" rel="noreferrer">
+                <a href={resolveIpfsUrl(v.url)} target="_blank" rel="noreferrer">
                   <Button variant="ghost" size="icon" className="h-6 w-6">
                     <ExternalLink className="w-2.5 h-2.5" />
                   </Button>
@@ -342,15 +359,18 @@ export function MediaGallery({ targetType, targetId, isOwner }: MediaGalleryProp
             {allImages.map((img) => (
               <a
                 key={img.id}
-                href={img.url}
+                href={resolveIpfsUrl(img.url)}
                 target="_blank"
                 rel="noreferrer"
                 className="group relative aspect-square rounded-lg overflow-hidden border bg-muted/30 hover:ring-2 hover:ring-primary transition-all"
               >
                 <img
-                  src={img.url}
+                  src={resolveIpfsUrl(img.url)}
                   alt={img.label || img.originalFilename}
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = 'none';
+                  }}
                 />
                 <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <p className="text-white text-xs truncate">{img.label || img.originalFilename}</p>
@@ -374,8 +394,8 @@ export function MediaGallery({ targetType, targetId, isOwner }: MediaGalleryProp
             <span className="text-xs font-semibold uppercase tracking-wider">3D Model Preview</span>
           </div>
           <ModelViewer
-            src={heroGlb.url}
-            poster={heroThumbnail}
+            src={resolveIpfsUrl(heroGlb.url)}
+            poster={resolveIpfsUrl(heroThumbnail)}
             alt={heroGlb.label || '3D Model'}
             className="aspect-square max-h-[400px]"
           />

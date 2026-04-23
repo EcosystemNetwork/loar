@@ -12,6 +12,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -116,17 +117,20 @@ function AssetPreview({ event }: { event: AssetEvent }) {
   if (event.outputKind === 'image') {
     return (
       <img
-        src={event.outputUrl}
+        src={resolveIpfsUrl(event.outputUrl)}
         alt={event.prompt || 'asset'}
         className="aspect-video w-full object-cover rounded-md bg-zinc-900"
         loading="lazy"
+        onError={(e) => {
+          (e.currentTarget as HTMLImageElement).style.display = 'none';
+        }}
       />
     );
   }
   if (event.outputKind === 'video') {
     return (
       <video
-        src={event.outputUrl}
+        src={resolveIpfsUrl(event.outputUrl)}
         muted
         playsInline
         controls

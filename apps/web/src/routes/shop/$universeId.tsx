@@ -76,7 +76,14 @@ function UniverseShopPage() {
       <div className="relative">
         <div className="h-40 bg-gradient-to-br from-primary/20 via-primary/5 to-background flex items-center justify-center">
           {(universe as any)?.bannerUrl ? (
-            <img src={(universe as any).bannerUrl} alt="" className="w-full h-full object-cover" />
+            <img
+              src={resolveIpfsUrl((universe as any).bannerUrl)}
+              alt=""
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = 'none';
+              }}
+            />
           ) : (
             <Store className="w-16 h-16 text-primary/20" />
           )}

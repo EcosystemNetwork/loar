@@ -220,16 +220,21 @@ contract CharacterNFTTest is Test {
     }
 
     function test_createCharacter_revert_funContent() public {
+        // visualHash is already classified ORIGINAL in setUp; reclassifying it
+        // FUN now hits the creator-only guard. Use a fresh hash so the FUN
+        // path is exercised directly.
+        bytes32 funHash = keccak256("fun-content");
         vm.prank(platform);
-        registry.setRights(visualHash, IRightsRegistry.RightsType.FUN);
+        registry.setRights(funHash, IRightsRegistry.RightsType.FUN);
 
         vm.prank(creator);
         vm.expectRevert(CharacterNFT.ContentNotMonetizable.selector);
-        nft.createCharacter(1, "Alice", visualHash, "ipfs://alice", 0, 0);
+        nft.createCharacter(1, "Alice", funHash, "ipfs://alice", 0, 0);
     }
 
     function test_createCharacter_revert_frozenContent() public {
-        vm.prank(platform);
+        // emergencyFreeze is onlyOwner — operators must use the two-step path.
+        vm.prank(deployer);
         registry.emergencyFreeze(visualHash, "dispute");
 
         vm.prank(creator);

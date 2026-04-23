@@ -387,19 +387,26 @@ function ShortCard({ item }: { item: any }) {
         {isVideo && item.mediaUrl ? (
           <video
             ref={videoRef}
-            src={item.thumbnailUrl ? item.mediaUrl : `${item.mediaUrl}#t=0.5`}
+            src={
+              item.thumbnailUrl
+                ? resolveIpfsUrl(item.mediaUrl)
+                : `${resolveIpfsUrl(item.mediaUrl)}#t=0.5`
+            }
             className="w-full h-full object-cover"
             muted={muted}
             loop
             playsInline
             preload="metadata"
-            poster={item.thumbnailUrl || undefined}
+            poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
           />
         ) : item.thumbnailUrl ? (
           <img
             src={resolveIpfsUrl(item.thumbnailUrl)}
             alt={item.title}
             className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = 'none';
+            }}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
@@ -485,13 +492,17 @@ function LongCard({ item }: { item: any }) {
         {isVideo && item.mediaUrl ? (
           <video
             ref={videoRef}
-            src={item.thumbnailUrl ? item.mediaUrl : `${item.mediaUrl}#t=0.5`}
+            src={
+              item.thumbnailUrl
+                ? resolveIpfsUrl(item.mediaUrl)
+                : `${resolveIpfsUrl(item.mediaUrl)}#t=0.5`
+            }
             className="w-full h-full object-cover"
             muted={muted}
             loop
             playsInline
             preload="metadata"
-            poster={item.thumbnailUrl || undefined}
+            poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
           />
         ) : item.thumbnailUrl ? (
           <img

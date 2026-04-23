@@ -29,6 +29,97 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { RiskBadge } from '@/components/vlm/RiskBadge';
+import { resolveIpfsUrl } from '@/utils/ipfs-url';
+
+type ContentPreview = {
+  id: string;
+  title: string | null;
+  mediaUrl: string | null;
+  thumbnailUrl: string | null;
+  mediaType: string | null;
+  contentStatus: string;
+  creatorUid: string | null;
+};
+
+function ContentPreviewCard({ preview }: { preview: ContentPreview | null }) {
+  if (!preview) {
+    return (
+      <div className="mt-3 p-3 rounded border border-dashed border-muted-foreground/30 text-xs text-muted-foreground">
+        Content record not found — may have been hard-deleted.
+      </div>
+    );
+  }
+
+  const isVideo = preview.mediaType === 'video' || preview.mediaType === 'ai-video';
+  const isImage =
+    preview.mediaType === 'image' || preview.mediaType === 'ai-image' || preview.mediaType === '3d';
+  const mediaSrc = resolveIpfsUrl(preview.mediaUrl);
+  const posterSrc = resolveIpfsUrl(preview.thumbnailUrl);
+
+  return (
+    <div className="mt-3 flex gap-3 p-2 rounded border bg-muted/30">
+      <div className="w-32 h-32 flex-shrink-0 rounded overflow-hidden bg-black/40 flex items-center justify-center">
+        {isVideo && mediaSrc ? (
+          <video
+            src={mediaSrc}
+            poster={posterSrc || undefined}
+            controls
+            muted
+            playsInline
+            preload="metadata"
+            className="w-full h-full object-cover"
+          />
+        ) : isImage && (posterSrc || mediaSrc) ? (
+          <img
+            src={posterSrc || mediaSrc}
+            alt={preview.title || 'flagged content'}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        ) : posterSrc ? (
+          <img
+            src={posterSrc}
+            alt={preview.title || 'flagged content'}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        ) : (
+          <span className="text-xs text-muted-foreground px-2 text-center">no preview</span>
+        )}
+      </div>
+      <div className="min-w-0 flex-1 text-xs space-y-1">
+        <p className="font-semibold truncate">{preview.title || 'Untitled'}</p>
+        <div className="flex flex-wrap gap-1">
+          {preview.mediaType && (
+            <Badge variant="outline" className="text-[10px]">
+              {preview.mediaType}
+            </Badge>
+          )}
+          <Badge variant="outline" className="text-[10px]">
+            status: {preview.contentStatus}
+          </Badge>
+        </div>
+        {preview.creatorUid && (
+          <p className="text-muted-foreground font-mono truncate">creator: {preview.creatorUid}</p>
+        )}
+        {mediaSrc && (
+          <a
+            href={mediaSrc}
+            target="_blank"
+            rel="noreferrer"
+            className="text-primary hover:underline text-[11px] inline-block"
+          >
+            Open source ↗
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export const Route = createFileRoute('/admin/moderation')({
   beforeLoad: ({ context }) => {
@@ -266,6 +357,7 @@ function ModerationDashboard() {
                         })}
                       </div>
                     </div>
+                    <ContentPreviewCard preview={flag.contentPreview ?? null} />
                   </CardContent>
                 </Card>
               ))}
@@ -312,6 +404,7 @@ function ModerationDashboard() {
                         <span className="text-muted-foreground">Explanation:</span> {td.explanation}
                       </p>
                     </div>
+                    <ContentPreviewCard preview={td.contentPreview ?? null} />
                     <div className="flex gap-2 pt-2">
                       <Button
                         size="sm"

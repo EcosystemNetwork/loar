@@ -168,9 +168,11 @@ contract BondingCurveTest is Test {
         assertTrue(curveV1.tradingHalted());
         assertTrue(curveV1.emergencyHaltUsed());
 
-        // Cannot fire emergencyHalt twice in the same cycle
+        // Cannot fire emergencyHalt twice in the same cycle. Contract checks
+        // `emergencyHaltUsed` (0x09) before `tradingHalted` (0x0A); after the
+        // first call both are true, so the more-specific 0x09 fires first.
         vm.prank(address(manager));
-        vm.expectRevert(abi.encodeWithSignature("HaltError(uint8)", 0x0A)); // already halted
+        vm.expectRevert(abi.encodeWithSignature("HaltError(uint8)", 0x09)); // already used this cycle
         curveV1.emergencyHalt();
 
         // Can't buy when halted
