@@ -553,21 +553,50 @@ export function ActivityTicker() {
     const universeMap = new Map<string, Universe>();
     universesData.forEach((u) => universeMap.set(u.id.toLowerCase(), u));
 
-    return nodesData
-      .map((n) => {
-        const content = contentMap.get(`${n.universeAddress.toLowerCase()}:${n.nodeId}`);
-        const uni = universeMap.get(n.universeAddress.toLowerCase());
-        return {
-          id: n.id,
-          universeName: uni?.name || `Universe ${n.universeAddress.slice(0, 8)}`,
-          action: content?.plot ? 'New Episode' : 'Created',
-          universeId: n.universeAddress,
-        };
-      })
+    // Dedupe by universe — when one universe posts a burst of nodes, we want
+    // the ticker to list it once (with a count) rather than repeat the same
+    // entry across the marquee. `nodesData` is already sorted newest-first,
+    // so the first hit per universe wins for display metadata.
+    const perUniverse = new Map<
+      string,
+      { id: string; universeName: string; action: string; universeId: string; count: number }
+    >();
+
+    for (const n of nodesData) {
+      const key = n.universeAddress.toLowerCase();
+      const content = contentMap.get(`${key}:${n.nodeId}`);
+      const existing = perUniverse.get(key);
+      if (existing) {
+        existing.count += 1;
+        continue;
+      }
+      const uni = universeMap.get(key);
+      perUniverse.set(key, {
+        id: n.id,
+        universeName: uni?.name || `Universe ${n.universeAddress.slice(0, 8)}`,
+        action: content?.plot ? 'New Episode' : 'Created',
+        universeId: n.universeAddress,
+        count: 1,
+      });
+    }
+
+    return Array.from(perUniverse.values())
+      .map((a) => ({
+        ...a,
+        action: a.count > 1 ? `${a.count} new episodes` : a.action,
+      }))
       .slice(0, 15);
   }, [nodesData, nodeContentData, universesData]);
 
-  const marqueeItems = [...activities, ...activities];
+  // Repeat the reel enough times that the marquee never shows a gap even when
+  // `activities` is short (1–2 distinct universes). Cap the repeat so we don't
+  // allocate hundreds of DOM nodes if activity is healthy.
+  const marqueeItems = useMemo(() => {
+    if (activities.length === 0) return [];
+    const targetLength = Math.max(activities.length * 2, 12);
+    const repeats = Math.ceil(targetLength / activities.length);
+    return Array.from({ length: repeats }, () => activities).flat();
+  }, [activities]);
 
   if (activities.length === 0) return null;
 

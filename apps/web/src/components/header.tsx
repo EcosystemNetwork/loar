@@ -44,8 +44,13 @@ const primaryLinksBase = [
   { to: '/dashboard', label: 'Dashboard' },
 ] as const;
 
-/** Grouped secondary links — organized by function with section headers */
-const moreGroups = [
+type MoreLink = { to: string; label: string; beta?: boolean };
+type MoreGroup = { label: string; links: MoreLink[] };
+
+/** Grouped secondary links — organized by function with section headers.
+ *  Studio + Gallery appear under "My Stuff" only when the caller has universes
+ *  (appended at render time in `buildMoreGroups`). */
+const moreGroupsBase: MoreGroup[] = [
   {
     label: 'Explore',
     links: [
@@ -75,9 +80,23 @@ const moreGroups = [
       { to: '/docs', label: 'Docs' },
     ],
   },
-] as const;
+];
 
-const moreLinks = moreGroups.flatMap((g) => g.links.filter((l) => !HIDDEN_ROUTES.has(l.to)));
+function buildMoreGroups(hasUniverses: boolean): MoreGroup[] {
+  if (!hasUniverses) return moreGroupsBase;
+  return moreGroupsBase.map((g) =>
+    g.label === 'My Stuff'
+      ? {
+          ...g,
+          links: [
+            { to: '/studio', label: 'Studio' },
+            { to: '/gallery', label: 'Gallery' },
+            ...g.links,
+          ],
+        }
+      : g
+  );
+}
 
 export default function Header() {
   const matchRoute = useMatchRoute();
@@ -95,20 +114,12 @@ export default function Header() {
     staleTime: 60_000,
   });
 
-  const primaryLinks = (
-    hasUniverses
-      ? ([
-          { to: '/discover', label: 'Discover' },
-          { to: '/create', label: 'Create' },
-          { to: '/studio', label: 'Studio' },
-          { to: '/editor', label: 'Editor' },
-          { to: '/tokens', label: 'Launchpad' },
-          { to: '/gallery', label: 'Gallery' },
-          { to: '/wiki', label: 'Wiki' },
-          { to: '/dashboard', label: 'Dashboard' },
-        ] as const)
-      : primaryLinksBase
-  ).filter((l) => !HIDDEN_ROUTES.has(l.to));
+  // Studio + Gallery surface only for users with universes, but we keep them
+  // in the More dropdown instead of inline to avoid overflowing the header on
+  // 1440px viewports.
+  const primaryLinks = primaryLinksBase.filter((l) => !HIDDEN_ROUTES.has(l.to));
+  const moreGroups = buildMoreGroups(!!hasUniverses);
+  const moreLinks = moreGroups.flatMap((g) => g.links.filter((l) => !HIDDEN_ROUTES.has(l.to)));
 
   const moreIsActive = moreLinks.some(({ to }) => matchRoute({ to, fuzzy: true }));
 
@@ -116,24 +127,24 @@ export default function Header() {
     <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-lg">
       <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between px-4 lg:px-6">
         {/* ── Left: Logo + Nav ── */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4 min-w-0">
           <Link to="/" className="flex-shrink-0">
             <img src="/loarIconTextLogo.png" alt="LOAR" className="h-7 w-auto object-contain" />
           </Link>
 
-          <nav className="hidden xl:flex items-center">
+          <nav className="hidden lg:flex items-center">
             {primaryLinks.map(({ to, label }) => (
               <Link
                 key={to}
                 to={to as any}
-                className="relative px-3 py-1.5 text-[13px] font-medium tracking-wide transition-colors text-muted-foreground hover:text-foreground [&.active]:text-foreground"
+                className="relative px-2.5 py-1.5 text-[13px] font-medium tracking-wide transition-colors text-muted-foreground hover:text-foreground [&.active]:text-foreground"
                 activeProps={{ className: 'active group' }}
               >
                 {({ isActive }: { isActive: boolean }) => (
                   <>
                     {label}
                     {isActive && (
-                      <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-primary rounded-full" />
+                      <span className="absolute bottom-0 left-2.5 right-2.5 h-[2px] bg-primary rounded-full" />
                     )}
                   </>
                 )}
@@ -143,14 +154,14 @@ export default function Header() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className={`relative inline-flex items-center gap-1 px-3 py-1.5 text-[13px] font-medium tracking-wide transition-colors ${
+                  className={`relative inline-flex items-center gap-1 px-2.5 py-1.5 text-[13px] font-medium tracking-wide transition-colors ${
                     moreIsActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   More
                   <ChevronDown className="h-3 w-3 opacity-50" />
                   {moreIsActive && (
-                    <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-primary rounded-full" />
+                    <span className="absolute bottom-0 left-2.5 right-2.5 h-[2px] bg-primary rounded-full" />
                   )}
                 </button>
               </DropdownMenuTrigger>
@@ -190,7 +201,7 @@ export default function Header() {
         </div>
 
         {/* ── Right: Actions ── */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           <LoarBalance />
           <NotificationBell />
           <WalletConnectButton size="sm" />
@@ -201,7 +212,7 @@ export default function Header() {
           <Button
             variant="ghost"
             size="icon"
-            className="xl:hidden ml-0.5 h-8 w-8"
+            className="lg:hidden ml-0.5 h-8 w-8"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
             aria-expanded={mobileOpen}
@@ -214,7 +225,7 @@ export default function Header() {
 
       {/* ── Mobile Navigation ── */}
       {mobileOpen && (
-        <div className="xl:hidden fixed inset-x-0 top-14 bottom-0 z-40 bg-background/95 backdrop-blur-xl border-t border-border/40 overflow-y-auto">
+        <div className="lg:hidden fixed inset-x-0 top-14 bottom-0 z-40 bg-background/95 backdrop-blur-xl border-t border-border/40 overflow-y-auto">
           <nav
             id="mobile-nav"
             aria-label="Mobile navigation"
