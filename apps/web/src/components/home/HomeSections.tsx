@@ -716,16 +716,14 @@ export function RecentEpisodes({ universes }: { universes: EnrichedUniverse[] })
  * ────────────────────────────────────────── */
 export function Top10Strip({ universes }: { universes: EnrichedUniverse[] }) {
   const sorted = useMemo(() => {
-    return [...universes]
-      .sort((a, b) => {
-        const aScore =
-          (a.nodeCount || 0) * 100 + (a.tokenData ? 50 : 0) + (a.swapVolume || 0) / 1e18;
-        const bScore =
-          (b.nodeCount || 0) * 100 + (b.tokenData ? 50 : 0) + (b.swapVolume || 0) / 1e18;
-        return bScore - aScore;
-      })
-      .slice(0, 10)
-      .map((u, i) => ({ ...u, _rank: i }));
+    const isPinned = (u: EnrichedUniverse) => u.name?.trim().toLowerCase() === 'space fleet';
+    const score = (u: EnrichedUniverse) =>
+      (u.nodeCount || 0) * 100 + (u.tokenData ? 50 : 0) + (u.swapVolume || 0) / 1e18;
+
+    const pinned = universes.filter(isPinned);
+    const rest = universes.filter((u) => !isPinned(u)).sort((a, b) => score(b) - score(a));
+
+    return [...pinned, ...rest].slice(0, 10).map((u, i) => ({ ...u, _rank: i }));
   }, [universes]);
 
   if (sorted.length === 0) return null;

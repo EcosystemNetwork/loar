@@ -21,7 +21,16 @@ COPY apps/contracts/package.json ./apps/contracts/
 COPY packages/abis/package.json ./packages/abis/
 COPY packages/shared/package.json ./packages/shared/
 
-# Remove vitest from indexer devDeps (conflicts with Ponder's vite-node) and skip husky
+# Remove vitest from indexer devDeps (conflicts with Ponder's vite-node) and skip husky.
+#
+# NOTE on --no-frozen-lockfile: the in-container `delete p.devDependencies.vitest`
+# above mutates apps/indexer/package.json at build time, so the lockfile is
+# intentionally out of sync with the on-disk manifest. `--frozen-lockfile`
+# would fail the install. Supply-chain risk is bounded because the monorepo
+# lockfile is still committed and is what ships for every OTHER workspace —
+# only the indexer's devDeps diverge, and `pnpm prune --prod` on line 46
+# drops all devDeps before the image is promoted. Do NOT flip this flag
+# without also finding a way to strip vitest from the lockfile pre-install.
 RUN npm pkg set scripts.prepare="echo skip"
 RUN node -e "\
   const fs=require('fs'); \

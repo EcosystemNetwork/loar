@@ -16,11 +16,13 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # TODO(ops): create a `production` GitHub Environment in repo settings
-    # with required reviewers + branch protection, move
-    # SSH_PRIVATE_KEY / SSH_HOST / SSH_USER / WORK_DIR secrets into it, and
-    # uncomment the line below so deploys need explicit approval.
-    # environment: production
+    # Fail-closed: until the `production` Environment exists in repo settings,
+    # this line makes the workflow fail immediately rather than silently
+    # deploying to prod on every main push. Once you create the Environment
+    # (Settings → Environments → New environment → 'production'), move the
+    # SSH_PRIVATE_KEY / SSH_HOST / SSH_USER / WORK_DIR secrets into it and
+    # add required reviewers, deploys will resume with an approval gate.
+    environment: production
     # Only deploy if CI passed — skip on failure or cancellation
     if: github.event.workflow_run.conclusion == 'success'
     steps:

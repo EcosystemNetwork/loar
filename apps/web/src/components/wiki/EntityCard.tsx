@@ -61,13 +61,16 @@ export function EntityCard({ entity, showActions = true }: EntityCardProps) {
   const { isAuthenticated } = useWalletAuth();
   const queryClient = useQueryClient();
   const [flagOpen, setFlagOpen] = useState(false);
+  // Defer the isLiked query until the user hovers — the bookmark UI is hidden
+  // until hover, so up-front fetching 100+ like states per grid wastes network.
+  const [likeQueryEnabled, setLikeQueryEnabled] = useState(false);
 
   const classification: 'fan' | 'original' | 'licensed' = entity.rightsDeclaration ?? 'fan';
 
   const { data: likedData } = useQuery({
     queryKey: ['social', 'isLiked', entity.id],
     queryFn: () => trpcClient.social.isLiked.query({ targetId: entity.id }),
-    enabled: !!isAuthenticated && !!showActions,
+    enabled: !!isAuthenticated && !!showActions && likeQueryEnabled,
   });
   const isLiked = !!likedData?.liked;
 
@@ -86,7 +89,10 @@ export function EntityCard({ entity, showActions = true }: EntityCardProps) {
 
   return (
     <>
-      <Card className="hover:shadow-lg transition-shadow h-full overflow-hidden group relative">
+      <Card
+        className="hover:shadow-lg transition-shadow h-full overflow-hidden group relative"
+        onMouseEnter={() => setLikeQueryEnabled(true)}
+      >
         <Link to="/wiki/entity/$id" params={{ id: entity.id }} className="block">
           <div className="aspect-video w-full overflow-hidden relative bg-muted">
             <div className="absolute inset-0 flex items-center justify-center">
@@ -96,6 +102,8 @@ export function EntityCard({ entity, showActions = true }: EntityCardProps) {
               <img
                 src={resolveIpfsUrl(entity.imageUrl)}
                 alt={entity.name}
+                loading="lazy"
+                decoding="async"
                 className="absolute inset-0 w-full h-full object-cover"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';

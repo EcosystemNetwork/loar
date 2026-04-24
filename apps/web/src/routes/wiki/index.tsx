@@ -10,7 +10,7 @@
  */
 import { createFileRoute, Link, useSearch, useNavigate } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { z } from 'zod';
 import { Input } from '@/components/ui/input';
@@ -73,6 +73,7 @@ import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 // New wiki components
 import { EntityCard } from '@/components/wiki/EntityCard';
+import { WikiGridSkeleton } from '@/components/wiki/WikiGridSkeleton';
 import { GalleryGrid } from '@/components/gallery/GalleryGrid';
 import { GalleryFilters } from '@/components/gallery/GalleryFilters';
 import { useGalleryTrending } from '@/hooks/useGallery';
@@ -137,6 +138,11 @@ const TABS: {
   { id: 'bookmarks', label: 'Bookmarks', icon: Heart, section: 'personal' },
 ];
 
+// Wiki entity/gallery lists rarely change mid-session. Caching for 5 minutes
+// makes tab switches back to a previously-viewed tab instant (no refetch),
+// matching the feel of YouTube's cached home/subscriptions rows.
+const WIKI_LIST_STALE_TIME = 5 * 60 * 1000;
+
 interface Character {
   id: string;
   character_name: string;
@@ -162,6 +168,7 @@ function EntityTab({ kind, universeAddress }: { kind: EntityKind; universeAddres
       universeAddress
         ? trpcClient.entities.list.query({ universeAddress, kind })
         : trpcClient.entities.listByKind.query({ kind }),
+    staleTime: WIKI_LIST_STALE_TIME,
   });
 
   const entities = (data?.entities ?? []) as WikiEntity[];
@@ -195,7 +202,7 @@ function EntityTab({ kind, universeAddress }: { kind: EntityKind; universeAddres
         </Link>
       </div>
 
-      {isLoading && <div className="text-center py-12 text-muted-foreground">Loading...</div>}
+      {isLoading && <WikiGridSkeleton count={8} aspect="video" />}
       {error && <div className="text-center py-12 text-red-500 text-sm">{error.message}</div>}
 
       {!isLoading && !error && sorted.length === 0 && (
@@ -211,11 +218,13 @@ function EntityTab({ kind, universeAddress }: { kind: EntityKind; universeAddres
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {sorted.map((entity) => (
-          <EntityCard key={entity.id} entity={entity} />
-        ))}
-      </div>
+      {!isLoading && !error && sorted.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {sorted.map((entity) => (
+            <EntityCard key={entity.id} entity={entity} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -240,6 +249,7 @@ function GalleryTab({ universeAddress }: { universeAddress?: string }) {
         sortBy,
         limit: 40,
       }),
+    staleTime: WIKI_LIST_STALE_TIME,
   });
 
   const { data: trending } = useGalleryTrending(universeAddress, 8);
@@ -300,6 +310,8 @@ function GalleryTab({ universeAddress }: { universeAddress?: string }) {
                       <img
                         src={resolveIpfsUrl(visualThumbnail) || visualThumbnail}
                         alt={item.title || 'Trending'}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
                           (e.currentTarget as HTMLImageElement).src = '/placeholder.jpg';
@@ -385,6 +397,7 @@ function CollectionTab() {
   const { data, isLoading } = useQuery({
     queryKey: ['wiki', 'characters'],
     queryFn: () => trpcClient.wiki.characters.query(),
+    staleTime: WIKI_LIST_STALE_TIME,
   });
 
   const characters: Character[] = data?.characters ?? [];
@@ -408,7 +421,7 @@ function CollectionTab() {
         />
       </div>
 
-      {isLoading && <div className="text-center py-12 text-muted-foreground">Loading...</div>}
+      {isLoading && <WikiGridSkeleton count={8} aspect="square" />}
 
       {!isLoading && filtered.length === 0 && (
         <div className="text-center py-16 text-muted-foreground">No characters found.</div>
@@ -426,6 +439,8 @@ function CollectionTab() {
                   <img
                     src={resolveIpfsUrl(char.image_url)}
                     alt={char.character_name}
+                    loading="lazy"
+                    decoding="async"
                     className="absolute inset-0 w-full h-full object-cover"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none';
@@ -470,6 +485,7 @@ function CharacterProfilesTab({ universeAddress }: { universeAddress?: string })
       universeAddress
         ? trpcClient.entities.list.query({ universeAddress, kind: 'person' })
         : trpcClient.entities.listByKind.query({ kind: 'person' }),
+    staleTime: WIKI_LIST_STALE_TIME,
   });
 
   const entities = ((data?.entities ?? []) as WikiEntity[]).filter(
@@ -507,7 +523,7 @@ function CharacterProfilesTab({ universeAddress }: { universeAddress?: string })
         </Link>
       </div>
 
-      {isLoading && <div className="text-center py-12 text-muted-foreground">Loading...</div>}
+      {isLoading && <WikiGridSkeleton count={6} layout="row" />}
 
       {!isLoading && filtered.length === 0 && (
         <div className="text-center py-16 text-muted-foreground">
@@ -539,6 +555,8 @@ function CharacterProfilesTab({ universeAddress }: { universeAddress?: string })
                     <img
                       src={resolveIpfsUrl(entity.imageUrl)}
                       alt={entity.name}
+                      loading="lazy"
+                      decoding="async"
                       className="absolute inset-0 w-full h-full object-cover"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
@@ -591,6 +609,7 @@ function ThreeDModelsTab({ universeAddress }: { universeAddress?: string }) {
         sortBy: 'newest',
         limit: 50,
       }),
+    staleTime: WIKI_LIST_STALE_TIME,
   });
 
   const galleryItems = galleryData?.items ?? [];
@@ -621,7 +640,7 @@ function ThreeDModelsTab({ universeAddress }: { universeAddress?: string }) {
         </div>
       </div>
 
-      {galleryLoading && <div className="text-center py-12 text-muted-foreground">Loading...</div>}
+      {galleryLoading && <WikiGridSkeleton count={8} aspect="square" />}
 
       {!galleryLoading && filteredGallery.length === 0 && (
         <div className="text-center py-16 text-muted-foreground">
@@ -654,6 +673,8 @@ function ThreeDModelsTab({ universeAddress }: { universeAddress?: string }) {
                   <img
                     src={resolveIpfsUrl(item.thumbnailUrl || item.mediaUrl)}
                     alt={item.title}
+                    loading="lazy"
+                    decoding="async"
                     className="absolute inset-0 w-full h-full object-cover"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none';
@@ -753,8 +774,75 @@ function GlobalSearchResults({
 function WikiPage() {
   const { universe: universeAddress, tab: urlTab } = useSearch({ from: '/wiki/' });
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<WikiTab>((urlTab as WikiTab) ?? 'gallery');
   const [globalSearch, setGlobalSearch] = useState('');
+
+  // Prefetch a tab's primary query when the user hovers the tab button so the
+  // click feels instant. We only prefetch tabs whose queries live in this file
+  // — sub-tab components (episodes/audio/graph/etc.) manage their own fetching.
+  const prefetchTab = (tab: WikiTab) => {
+    const run = (key: readonly unknown[], fn: () => Promise<unknown>) =>
+      queryClient.prefetchQuery({
+        queryKey: key as unknown[],
+        queryFn: fn,
+        staleTime: WIKI_LIST_STALE_TIME,
+      });
+
+    const tabDef = TABS.find((t) => t.id === tab);
+    if (tabDef?.kind) {
+      const kind = tabDef.kind;
+      if (universeAddress) {
+        void run(['entities', 'list', universeAddress, kind], () =>
+          trpcClient.entities.list.query({ universeAddress, kind })
+        );
+      } else {
+        void run(['entities', 'listByKind', kind], () =>
+          trpcClient.entities.listByKind.query({ kind })
+        );
+      }
+      return;
+    }
+    if (tab === 'character-profiles') {
+      if (universeAddress) {
+        void run(['entities', 'list', universeAddress, 'person'], () =>
+          trpcClient.entities.list.query({ universeAddress, kind: 'person' })
+        );
+      } else {
+        void run(['entities', 'listByKind', 'person'], () =>
+          trpcClient.entities.listByKind.query({ kind: 'person' })
+        );
+      }
+      return;
+    }
+    if (tab === '3d-models') {
+      void run(['wiki', '3d-gallery', universeAddress], () =>
+        trpcClient.gallery.browse.query({
+          universeId: universeAddress,
+          mediaType: '3d',
+          sortBy: 'newest',
+          limit: 50,
+        })
+      );
+      return;
+    }
+    if (tab === 'gallery') {
+      void run(['wiki', 'gallery', universeAddress, 'all', 'newest', 'all'], () =>
+        trpcClient.gallery.browse.query({
+          universeId: universeAddress,
+          mediaType: 'all',
+          origin: 'all',
+          sortBy: 'newest',
+          limit: 40,
+        })
+      );
+      return;
+    }
+    if (tab === 'collection') {
+      void run(['wiki', 'characters'], () => trpcClient.wiki.characters.query());
+      return;
+    }
+  };
 
   // Keep component state in sync with the URL when the user navigates back/forward
   // or when another surface (e.g. the /gallery redirect) changes ?tab=.
@@ -886,6 +974,8 @@ function WikiPage() {
                 <img
                   src={resolveIpfsUrl(u.image_url)}
                   alt=""
+                  loading="lazy"
+                  decoding="async"
                   className="h-5 w-5 rounded object-cover flex-shrink-0"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
@@ -912,6 +1002,8 @@ function WikiPage() {
             <img
               src={resolveIpfsUrl(universeInfo.image_url)}
               alt=""
+              loading="lazy"
+              decoding="async"
               className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
             />
           )}
@@ -941,6 +1033,7 @@ function WikiPage() {
                 tab={tab}
                 isActive={tab.id === activeTab}
                 onClick={() => selectTab(tab.id)}
+                onHover={() => prefetchTab(tab.id)}
               />
             ))}
           </div>
@@ -989,15 +1082,19 @@ function TabButton({
   tab,
   isActive,
   onClick,
+  onHover,
 }: {
   tab: (typeof TABS)[number];
   isActive: boolean;
   onClick: () => void;
+  onHover?: () => void;
 }) {
   const Icon = tab.icon;
   return (
     <button
       onClick={onClick}
+      onMouseEnter={onHover}
+      onFocus={onHover}
       className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-t-md whitespace-nowrap transition-colors border-b-2 -mb-px ${
         isActive
           ? 'border-primary text-primary bg-primary/5'

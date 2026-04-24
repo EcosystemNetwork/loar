@@ -15,7 +15,7 @@ COPY packages/abis/package.json ./packages/abis/
 COPY packages/shared/package.json ./packages/shared/
 
 RUN mkdir -p .git && npm pkg set scripts.prepare="echo skip" && \
-    pnpm install --no-frozen-lockfile --filter "event-listener..." && \
+    pnpm install --frozen-lockfile --filter "event-listener..." && \
     rm -rf .git
 
 COPY apps/event-listener/src ./apps/event-listener/src
