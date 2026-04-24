@@ -379,11 +379,16 @@ circleAuthRoutes.post('/verify-otp', async (c) => {
       })
     );
 
+    // Native mobile clients have no cookie jar — echo the bearer token in
+    // the body when the client identifies itself. Web clients omit the
+    // header and continue to rely on the httpOnly cookie.
+    const isMobile = c.req.header('x-mobile-client') === '1';
     return c.json({
       address: wallet.address,
       email,
       walletId: wallet.walletId,
       expiresAt: payload.exp * 1000,
+      ...(isMobile ? { token } : {}),
     });
   } catch (err) {
     recordAuthEvent('circle_verify', 'failure');
@@ -457,11 +462,13 @@ circleAuthRoutes.post('/social', async (c) => {
       })
     );
 
+    const isMobile = c.req.header('x-mobile-client') === '1';
     return c.json({
       address: wallet.address,
       email,
       walletId: wallet.walletId,
       expiresAt: payload.exp * 1000,
+      ...(isMobile ? { token } : {}),
     });
   } catch (err) {
     recordAuthEvent('circle_social', 'failure');

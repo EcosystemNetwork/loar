@@ -127,8 +127,11 @@ vi.mock('../services/storage', () => ({
 // Stub safe-admin (universe admin checks)
 vi.mock('../lib/safe-admin', () => ({
   isUniverseAdmin: vi.fn().mockResolvedValue(false),
+  isUniverseAdminStrict: vi.fn().mockResolvedValue(false),
+  isUniverseCollaborator: vi.fn().mockResolvedValue(false),
   getSafeInfo: vi.fn().mockResolvedValue(null),
   getUniverseAdminAddress: vi.fn().mockResolvedValue(null),
+  getChainClient: vi.fn(),
 }));
 
 // Stub universeTeam getMembership (used by universeTreasury routes)

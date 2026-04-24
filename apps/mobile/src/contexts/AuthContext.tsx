@@ -1,22 +1,28 @@
 /**
- * Auth context for the mobile app.
+ * Auth context for the mobile app — Circle DCW only.
  *
- * Manages:
- *  - wallet connection state via Reown AppKit
- *  - SIWE sign-in / sign-out
- *  - JWT storage in expo-secure-store
- *  - silent reconnect on app resume
+ * Mirrors `apps/web/src/lib/wallet-auth.ts`:
+ *   1. `requestEmailOTP(email)` — server emails a 6-digit code
+ *   2. `signInWithEmail(email, code)` — verify code, receive JWT + wallet
+ *   3. `signInWithGoogle(idToken)` — native Google sign-in path
+ *
+ * The JWT is stored in expo-secure-store. On app launch we restore the
+ * session if the token is still within its stored expiry.
  */
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { clearSession, getStoredAddress, getToken, setSession } from '../lib/storage';
-import { buildSiweMessage, fetchNonce, verifySignature } from '../lib/siwe';
-
-// ── Types ──────────────────────────────────────────────────────────────
+import {
+  requestEmailOTP as apiRequestEmailOTP,
+  socialLogin,
+  verifyEmailOTP,
+  type CircleAuthResult,
+} from '../lib/circle-auth';
+import { clearSession, getStoredSession, setSession } from '../lib/storage';
 
 interface AuthState {
   address: string | null;
   token: string | null;
-  isConnected: boolean;
+  email: string | null;
+  expiresAt: number | null;
   isAuthenticated: boolean;
   isAuthenticating: boolean;
   isLoading: boolean;
@@ -24,19 +30,14 @@ interface AuthState {
 }
 
 interface AuthContextValue extends AuthState {
-  /** Connect wallet and sign SIWE message to get JWT. */
-  signIn: (
-    address: string,
-    signMessage: (msg: string) => Promise<string>,
-    chainId?: number
-  ) => Promise<void>;
-  /** Clear session and disconnect. */
+  requestEmailOTP: (
+    email: string
+  ) => Promise<{ ok: boolean; throttled?: boolean; _devOtp?: string }>;
+  signInWithEmail: (email: string, code: string) => Promise<void>;
+  signInWithGoogle: (idToken: string) => Promise<void>;
   signOut: () => Promise<void>;
-  /** Clear any auth error. */
   clearError: () => void;
 }
-
-// ── Context ────────────────────────────────────────────────────────────
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -46,71 +47,83 @@ export function useAuth(): AuthContextValue {
   return ctx;
 }
 
-// ── Provider ───────────────────────────────────────────────────────────
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({
     address: null,
     token: null,
-    isConnected: false,
+    email: null,
+    expiresAt: null,
     isAuthenticated: false,
     isAuthenticating: false,
     isLoading: true,
     error: null,
   });
 
-  // Restore session on mount
   useEffect(() => {
     (async () => {
-      const [token, address] = await Promise.all([getToken(), getStoredAddress()]);
-      if (token && address) {
+      const session = await getStoredSession();
+      if (session) {
         setState((s) => ({
           ...s,
-          token,
-          address,
-          isConnected: true,
+          token: session.token,
+          address: session.address,
+          email: session.email,
+          expiresAt: session.expiresAt,
           isAuthenticated: true,
           isLoading: false,
         }));
       } else {
+        // Drop any stale fragments from an older install (e.g. thirdweb token).
+        await clearSession().catch(() => undefined);
         setState((s) => ({ ...s, isLoading: false }));
       }
     })();
   }, []);
 
-  const signIn = useCallback(
-    async (
-      address: string,
-      signMessage: (msg: string) => Promise<string>,
-      chainId = 84532 // Base Sepolia
-    ) => {
+  const persist = useCallback(async (result: CircleAuthResult) => {
+    await setSession({
+      token: result.token,
+      address: result.address,
+      email: result.email,
+      expiresAt: result.expiresAt,
+    });
+    setState((s) => ({
+      ...s,
+      token: result.token,
+      address: result.address,
+      email: result.email,
+      expiresAt: result.expiresAt,
+      isAuthenticated: true,
+      isAuthenticating: false,
+      error: null,
+    }));
+  }, []);
+
+  const runAuth = useCallback(
+    async (fn: () => Promise<CircleAuthResult>) => {
       setState((s) => ({ ...s, isAuthenticating: true, error: null }));
       try {
-        const nonce = await fetchNonce();
-        const message = buildSiweMessage({ address, nonce, chainId });
-        const signature = await signMessage(message);
-        const result = await verifySignature(message, signature);
-        await setSession(result.token, result.address);
-        setState((s) => ({
-          ...s,
-          address: result.address,
-          token: result.token,
-          isConnected: true,
-          isAuthenticated: true,
-          isAuthenticating: false,
-        }));
+        const result = await fn();
+        await persist(result);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Sign-in failed';
-        const isRejection =
-          msg.toLowerCase().includes('reject') || msg.toLowerCase().includes('cancel');
-        setState((s) => ({
-          ...s,
-          isAuthenticating: false,
-          error: isRejection ? null : msg,
-        }));
+        setState((s) => ({ ...s, isAuthenticating: false, error: msg }));
+        throw err;
       }
     },
-    []
+    [persist]
+  );
+
+  const requestEmailOTP = useCallback((email: string) => apiRequestEmailOTP(email), []);
+
+  const signInWithEmail = useCallback(
+    (email: string, code: string) => runAuth(() => verifyEmailOTP(email, code)),
+    [runAuth]
+  );
+
+  const signInWithGoogle = useCallback(
+    (idToken: string) => runAuth(() => socialLogin('google', idToken)),
+    [runAuth]
   );
 
   const signOut = useCallback(async () => {
@@ -118,7 +131,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState({
       address: null,
       token: null,
-      isConnected: false,
+      email: null,
+      expiresAt: null,
       isAuthenticated: false,
       isAuthenticating: false,
       isLoading: false,
@@ -131,7 +145,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ ...state, signIn, signOut, clearError }}>
+    <AuthContext.Provider
+      value={{
+        ...state,
+        requestEmailOTP,
+        signInWithEmail,
+        signInWithGoogle,
+        signOut,
+        clearError,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -1,8 +1,13 @@
 /**
- * Wallet settings screen — thirdweb wallet session management.
+ * Wallet settings screen — Circle-managed EOA details + session controls.
+ *
+ * With Circle DCW the wallet is server-managed (KMS). There is no
+ * per-device "connection" to toggle — showing up on this screen with a
+ * live JWT is, by definition, being connected. The reconnect flow from
+ * the thirdweb era is gone; signing out and back in is the equivalent.
  */
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AssetRow } from '../src/components/portfolio/AssetRow';
@@ -11,36 +16,18 @@ import { Button } from '../src/components/ui/Button';
 import { Card } from '../src/components/ui/Card';
 import { SectionHeader } from '../src/components/ui/SectionHeader';
 import { useAuth } from '../src/contexts/AuthContext';
-import { connectWallet, disconnectWallet, getWalletChainId } from '../src/lib/thirdweb';
 
 export default function WalletSettingsScreen() {
   const router = useRouter();
-  const { address, signOut } = useAuth();
-  const [chainId, setChainId] = useState<number | null>(null);
-
-  useEffect(() => {
-    getWalletChainId()
-      .then(setChainId)
-      .catch(() => setChainId(null));
-  }, []);
-
-  const SUPPORTED_CHAINS: Record<number, string> = {
-    11155111: 'Sepolia Testnet',
-    84532: 'Base Sepolia',
-    1: 'Ethereum Mainnet',
-    8453: 'Base',
-  };
-  const networkName = chainId ? (SUPPORTED_CHAINS[chainId] ?? `Chain ${chainId}`) : 'Unknown';
-  const networkOk = chainId === 11155111 || chainId === 84532;
+  const { address, email, expiresAt, signOut } = useAuth();
 
   const handleDisconnect = () => {
-    Alert.alert('Disconnect', 'Disconnect your wallet and sign out?', [
+    Alert.alert('Sign out', 'End this session and return to the login screen?', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Disconnect',
+        text: 'Sign out',
         style: 'destructive',
         onPress: async () => {
-          await disconnectWallet().catch(() => {});
           await signOut();
           router.replace('/(auth)/login');
         },
@@ -48,15 +35,7 @@ export default function WalletSettingsScreen() {
     ]);
   };
 
-  const handleReconnect = async () => {
-    try {
-      await connectWallet('google');
-      const id = await getWalletChainId();
-      setChainId(id);
-    } catch {
-      // user cancelled
-    }
-  };
+  const expiresLabel = expiresAt ? new Date(expiresAt).toLocaleString() : null;
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['bottom']}>
@@ -73,9 +52,9 @@ export default function WalletSettingsScreen() {
         <Card>
           <View className="gap-4">
             <View className="flex-row items-center justify-between">
-              <Text className="text-text-primary font-bold">Connected Wallet</Text>
+              <Text className="text-text-primary font-bold">Wallet</Text>
               <Badge variant={address ? 'success' : 'error'}>
-                {address ? 'Connected' : 'Disconnected'}
+                {address ? 'Active' : 'Inactive'}
               </Badge>
             </View>
 
@@ -88,16 +67,13 @@ export default function WalletSettingsScreen() {
               </View>
             ) : null}
 
-            <View className="flex-row items-center justify-between">
-              <Text className="text-text-secondary text-sm">Network</Text>
-              <Badge variant={networkOk ? 'success' : 'warning'}>{networkName}</Badge>
-            </View>
-
-            {!networkOk && chainId !== null ? (
-              <Text className="text-warning text-xs">
-                LOAR runs on Sepolia or Base Sepolia testnet. Switch your wallet to a supported
-                network.
-              </Text>
+            {email ? (
+              <View className="bg-zinc-900 rounded-xl p-3 gap-1">
+                <Text className="text-text-tertiary text-xs">Signed in as</Text>
+                <Text className="text-text-secondary text-sm" numberOfLines={1}>
+                  {email}
+                </Text>
+              </View>
             ) : null}
           </View>
         </Card>
@@ -108,44 +84,26 @@ export default function WalletSettingsScreen() {
           <View className="bg-card rounded-2xl border border-border px-4">
             <AssetRow
               icon="🔑"
-              label="SIWE Session"
-              subtitle={
-                address
-                  ? `Active — ${address.slice(0, 6)}…${address.slice(-4)}`
-                  : 'No active session'
-              }
-              badge={
-                <Badge variant={address ? 'success' : 'muted'}>{address ? 'Active' : 'None'}</Badge>
-              }
-            />
-          </View>
-        </View>
-
-        {/* Wallet actions */}
-        <View>
-          <SectionHeader title="Wallet" />
-          <View className="bg-card rounded-2xl border border-border px-4">
-            <AssetRow
-              icon="🔄"
-              label="Reconnect"
-              subtitle="Re-authenticate your wallet session"
-              onPress={handleReconnect}
+              label="Session Token"
+              subtitle={expiresLabel ? `Expires ${expiresLabel}` : 'Active'}
+              badge={<Badge variant="success">Active</Badge>}
             />
           </View>
         </View>
 
         {/* Security note */}
         <View className="bg-zinc-900 rounded-2xl p-4 gap-2">
-          <Text className="text-text-primary font-semibold text-sm">Security</Text>
+          <Text className="text-text-primary font-semibold text-sm">How this works</Text>
           <Text className="text-text-tertiary text-xs leading-relaxed">
-            LOAR Vault is non-custodial. Your keys are managed by a thirdweb in-app wallet (Google,
-            Apple, passkey, or email). We only store a SIWE session JWT, which can be revoked at any
-            time by disconnecting.
+            LOAR uses Circle Developer Controlled Wallets. Your signing keys are held in
+            Circle&apos;s KMS and never touch this device. Contract writes are proxied through the
+            LOAR server, which enforces an on-chain contract allowlist before signing. Sign out to
+            revoke this session.
           </Text>
         </View>
 
         <Button onPress={handleDisconnect} variant="danger" fullWidth>
-          Disconnect Wallet
+          Sign Out
         </Button>
       </ScrollView>
     </SafeAreaView>

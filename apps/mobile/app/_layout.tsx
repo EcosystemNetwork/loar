@@ -1,15 +1,9 @@
 /**
  * Root layout — wraps all screens with:
  *  - QueryClientProvider (React Query)
- *  - AuthProvider (SIWE session state)
+ *  - AuthProvider (Circle DCW session state)
  *  - Expo Router Stack
- *
- * The thirdweb client is initialised lazily in src/lib/thirdweb.ts — no
- * global provider is required here.
  */
-// thirdweb requires crypto.getRandomValues; polyfill must import before any thirdweb code.
-import 'react-native-get-random-values';
-
 // Side-effect import: initializes Sentry if EXPO_PUBLIC_SENTRY_DSN is set.
 // Must run before any JS-layer error handlers so bootstrap crashes are captured.
 import '../src/lib/sentry';
