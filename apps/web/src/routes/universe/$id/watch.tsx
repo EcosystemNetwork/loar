@@ -7,8 +7,9 @@
  */
 
 import { createFileRoute, Link, useNavigate, useParams } from '@tanstack/react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useRef, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { trpcClient } from '@/utils/trpc';
@@ -34,6 +35,8 @@ import {
   Share2,
   Info,
   Loader2,
+  RefreshCw,
+  CheckCircle2,
 } from 'lucide-react';
 
 export const Route = createFileRoute('/universe/$id/watch')({
@@ -86,6 +89,26 @@ function WatchPage() {
     ...ponderQueryDefaults,
   });
 
+  // Curated Firestore episodes (titles, descriptions, canon status). Merged
+  // onto the on-chain node list below so the rail prefers editor-authored
+  // metadata when present and falls back to raw plot otherwise.
+  const { data: fsEpisodes } = useQuery({
+    queryKey: ['universe', 'watch', 'fs-episodes', idLower],
+    queryFn: () =>
+      trpcClient.episodes.list.query({ universeId: idLower, limit: 50 }) as Promise<
+        Array<{
+          id: string;
+          title?: string;
+          description?: string;
+          isCanon?: boolean;
+          clips?: Array<{ nodeId?: string; videoUrl?: string; label?: string }>;
+          sourceNodeId?: string;
+          sourceCreator?: string | null;
+        }>
+      >,
+    staleTime: 15_000,
+  });
+
   const { data: token } = useQuery({
     queryKey: ['universe', 'watch', 'token', idLower],
     queryFn: () =>
@@ -100,22 +123,55 @@ function WatchPage() {
   // Admin check so managers can pivot to the editor from here
   const admin = useIsUniverseAdmin(idLower as `0x${string}`);
 
-  // Build episodes
+  // Build episodes — merge on-chain nodes with curated Firestore episodes.
+  // Firestore title/description wins when present; raw plot is the fallback.
   const episodes = useMemo(() => {
     if (!nodes) return [];
     const contentMap = new Map<string, PonderNodeContent>();
     (nodeContents || []).forEach((c) => contentMap.set(c.id, c));
+
+    const fsByNodeId = new Map<
+      string,
+      { id: string; title?: string; description?: string; isCanon?: boolean }
+    >();
+    for (const ep of fsEpisodes || []) {
+      const sourceId = ep.sourceNodeId ?? ep.clips?.[0]?.nodeId;
+      if (sourceId) fsByNodeId.set(String(sourceId), ep);
+    }
+
     return nodes
       .map((n) => {
         const c = contentMap.get(`${n.universeAddress.toLowerCase()}:${n.nodeId}`);
+        const fs = fsByNodeId.get(String(n.nodeId));
         return {
           ...n,
           videoLink: c?.videoLink,
           plot: c?.plot,
+          fsEpisodeId: fs?.id,
+          fsTitle: fs?.title,
+          fsDescription: fs?.description,
+          fsIsCanon: fs?.isCanon,
         };
       })
       .filter((n) => n.videoLink || n.plot);
-  }, [nodes, nodeContents]);
+  }, [nodes, nodeContents, fsEpisodes]);
+
+  // Nodes on-chain that have no matching Firestore episode yet — the count
+  // drives the admin Sync banner.
+  const unsyncedCount = useMemo(() => {
+    if (!nodes || !fsEpisodes) return 0;
+    const claimed = new Set<string>();
+    for (const ep of fsEpisodes) {
+      const sourceId = ep.sourceNodeId ?? ep.clips?.[0]?.nodeId;
+      if (sourceId) claimed.add(String(sourceId));
+    }
+    const contentMap = new Map<string, PonderNodeContent>();
+    (nodeContents || []).forEach((c) => contentMap.set(c.id, c));
+    return nodes.filter((n) => {
+      const c = contentMap.get(`${n.universeAddress.toLowerCase()}:${n.nodeId}`);
+      return !!c?.videoLink && !claimed.has(String(n.nodeId));
+    }).length;
+  }, [nodes, nodeContents, fsEpisodes]);
 
   if (universeLoading) {
     return (
@@ -251,6 +307,16 @@ function WatchPage() {
         </div>
       </section>
 
+      {/* ── Admin sync banner ───────────────────────── */}
+      {admin.isAdmin && !admin.isLoading && unsyncedCount > 0 && (
+        <SyncEpisodesBanner
+          universeId={idLower}
+          unsyncedCount={unsyncedCount}
+          nodes={nodes || []}
+          nodeContents={nodeContents || []}
+        />
+      )}
+
       {/* ── Episode rail ────────────────────────────── */}
       {episodes.length > 0 && <EpisodeRail universeId={idLower} episodes={episodes} />}
 
@@ -281,12 +347,158 @@ function WatchPage() {
 /* ──────────────────────────────────────────
  * Episode horizontal rail
  * ────────────────────────────────────────── */
+type EpisodeRailItem = PonderNode & {
+  videoLink?: string;
+  plot?: string;
+  fsEpisodeId?: string;
+  fsTitle?: string;
+  fsDescription?: string;
+  fsIsCanon?: boolean;
+};
+
+function shortAddr(addr?: string): string {
+  if (!addr) return '';
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
+function EpisodeCard({
+  universeId,
+  episode,
+  index,
+}: {
+  universeId: string;
+  episode: EpisodeRailItem;
+  index: number;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [duration, setDuration] = useState<number | null>(null);
+  const [posterReady, setPosterReady] = useState(false);
+
+  // Title resolution: curated FS title → first sentence of plot → "Episode N"
+  const title = useMemo(() => {
+    if (episode.fsTitle) return episode.fsTitle;
+    const firstLine = (episode.plot || '').split(/[\n.!?]/)[0]?.trim();
+    if (firstLine && firstLine.length > 0) return firstLine.slice(0, 80);
+    return `Episode ${index + 1}`;
+  }, [episode.fsTitle, episode.plot, index]);
+
+  const description = episode.fsDescription || episode.plot || '';
+  const isCurated = !!episode.fsEpisodeId;
+  const isCanon = episode.fsIsCanon;
+
+  const videoSrc = episode.videoLink ? resolveIpfsUrl(episode.videoLink) : undefined;
+
+  const onMouseEnter = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.currentTime = 0;
+    v.play().catch(() => {
+      /* autoplay blocked — leave as poster */
+    });
+  };
+
+  const onMouseLeave = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.pause();
+    v.currentTime = 0;
+  };
+
+  const fmtDuration = (secs: number): string => {
+    if (!Number.isFinite(secs) || secs <= 0) return '';
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <Link
+      to="/event/$universe/$event"
+      params={{ universe: universeId, event: episode.nodeId.toString() }}
+      className="group flex-shrink-0 w-[280px] md:w-[320px] snap-start"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      <div className="relative aspect-video rounded-xl overflow-hidden bg-muted ring-1 ring-white/5 group-hover:ring-primary/60 transition-all">
+        {videoSrc ? (
+          <video
+            ref={videoRef}
+            src={videoSrc}
+            className="w-full h-full object-cover"
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            onLoadedMetadata={(e) => {
+              const d = (e.currentTarget as HTMLVideoElement).duration;
+              if (Number.isFinite(d)) setDuration(d);
+            }}
+            onLoadedData={() => setPosterReady(true)}
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-900/40 to-pink-900/40">
+            <BookOpen className="h-8 w-8 text-white/60" />
+          </div>
+        )}
+
+        {/* Shimmer while the first frame is still loading */}
+        {videoSrc && !posterReady && (
+          <div className="absolute inset-0 bg-gradient-to-br from-stone-900 to-stone-950 animate-pulse" />
+        )}
+
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+        {/* Centered hover play */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
+            <Play className="h-5 w-5 text-primary-foreground fill-primary-foreground ml-0.5" />
+          </div>
+        </div>
+
+        {/* Top-left: episode number */}
+        <div className="absolute top-2 left-2 text-xs font-semibold bg-black/70 text-white px-2 py-0.5 rounded backdrop-blur-sm">
+          EP {String(index + 1).padStart(2, '0')}
+        </div>
+
+        {/* Top-right: canon badge when curated */}
+        {isCurated && isCanon && (
+          <div className="absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-wider bg-primary/90 text-primary-foreground px-1.5 py-0.5 rounded backdrop-blur-sm flex items-center gap-1">
+            <CheckCircle2 className="h-2.5 w-2.5" />
+            Canon
+          </div>
+        )}
+
+        {/* Bottom-right: duration pill */}
+        {duration !== null && (
+          <div className="absolute bottom-2 right-2 text-[10px] font-mono bg-black/70 text-white px-1.5 py-0.5 rounded backdrop-blur-sm">
+            {fmtDuration(duration)}
+          </div>
+        )}
+      </div>
+
+      <div className="pt-2 space-y-0.5">
+        <p className="text-sm font-medium text-white group-hover:text-primary transition-colors line-clamp-1">
+          {title}
+        </p>
+        {description && description !== title && (
+          <p className="text-xs text-muted-foreground line-clamp-2">{description}</p>
+        )}
+        {episode.creator && (
+          <p className="text-[10px] text-muted-foreground/70 font-mono pt-0.5">
+            by {shortAddr(episode.creator)}
+          </p>
+        )}
+      </div>
+    </Link>
+  );
+}
+
 function EpisodeRail({
   universeId,
   episodes,
 }: {
   universeId: string;
-  episodes: Array<PonderNode & { videoLink?: string; plot?: string }>;
+  episodes: EpisodeRailItem[];
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollL, setCanScrollL] = useState(false);
@@ -315,13 +527,19 @@ function EpisodeRail({
 
   // Show in chronological order (oldest first)
   const ordered = [...episodes].sort((a, b) => a.nodeId - b.nodeId);
+  const curatedCount = ordered.filter((e) => e.fsEpisodeId).length;
 
   return (
     <section className="relative py-10 -mt-10">
       <div className="max-w-[1440px] mx-auto px-4 md:px-12 mb-4 flex items-end justify-between">
         <div>
           <h2 className="text-xl md:text-2xl font-display italic">Episodes</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">{ordered.length} released</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {ordered.length} released
+            {curatedCount > 0 && curatedCount < ordered.length && (
+              <span className="text-muted-foreground/60"> · {curatedCount} curated</span>
+            )}
+          </p>
         </div>
         <div className="hidden md:flex gap-1">
           <button
@@ -348,47 +566,110 @@ function EpisodeRail({
         className="flex gap-4 overflow-x-auto scroll-smooth snap-x px-4 md:px-12 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {ordered.map((ep, i) => (
-          <Link
-            key={ep.id}
-            to="/event/$universe/$event"
-            params={{ universe: universeId, event: ep.nodeId.toString() }}
-            className="group flex-shrink-0 w-[280px] md:w-[320px] snap-start"
-          >
-            <div className="relative aspect-video rounded-xl overflow-hidden bg-muted ring-1 ring-white/5 group-hover:ring-primary/60 transition-all">
-              {ep.videoLink ? (
-                <video
-                  src={resolveIpfsUrl(ep.videoLink)}
-                  className="w-full h-full object-cover"
-                  muted
-                  preload="metadata"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-900/40 to-pink-900/40">
-                  <BookOpen className="h-8 w-8 text-white/60" />
-                </div>
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
-                  <Play className="h-5 w-5 text-primary-foreground fill-primary-foreground ml-0.5" />
-                </div>
-              </div>
-              <div className="absolute top-2 left-2 text-xs font-semibold bg-black/60 text-white px-2 py-0.5 rounded backdrop-blur-sm">
-                EP {i + 1}
-              </div>
-            </div>
-            <div className="pt-2">
-              <p className="text-sm font-medium text-white group-hover:text-primary transition-colors line-clamp-1">
-                {ep.plot ? ep.plot.slice(0, 60) : `Episode ${i + 1}`}
-              </p>
-              {ep.plot && (
-                <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{ep.plot}</p>
-              )}
-            </div>
-          </Link>
+          <EpisodeCard key={ep.id} universeId={universeId} episode={ep} index={i} />
         ))}
       </div>
     </section>
+  );
+}
+
+/* ──────────────────────────────────────────
+ * Admin-only sync banner — backfills canon episodes
+ * from on-chain video nodes that have no Firestore
+ * episode yet. One-click, idempotent.
+ * ────────────────────────────────────────── */
+function SyncEpisodesBanner({
+  universeId,
+  unsyncedCount,
+  nodes,
+  nodeContents,
+}: {
+  universeId: string;
+  unsyncedCount: number;
+  nodes: PonderNode[];
+  nodeContents: PonderNodeContent[];
+}) {
+  const qc = useQueryClient();
+
+  const backfill = useMutation({
+    mutationFn: async () => {
+      const contentMap = new Map<string, PonderNodeContent>();
+      nodeContents.forEach((c) => contentMap.set(c.id, c));
+
+      const payload = nodes
+        .map((n) => {
+          const c = contentMap.get(`${n.universeAddress.toLowerCase()}:${n.nodeId}`);
+          if (!c?.videoLink) return null;
+          return {
+            nodeId: String(n.nodeId),
+            videoUrl: resolveIpfsUrl(c.videoLink),
+            plot: c.plot || '',
+            creator: n.creator,
+            createdAt: n.createdAt,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => !!x);
+
+      if (payload.length === 0) {
+        throw new Error('No video nodes with content to sync');
+      }
+
+      return trpcClient.episodes.backfillFromNodes.mutate({
+        universeId,
+        nodes: payload,
+      }) as Promise<{
+        created: number;
+        skipped: number;
+        universeType: string;
+        autoCanoned: number;
+      }>;
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['universe', 'watch', 'fs-episodes', universeId] });
+      if (res.created > 0) {
+        const autoCanon = res.autoCanoned > 0 ? ` (${res.autoCanoned} auto-canoned)` : '';
+        toast.success(`Created ${res.created} episode${res.created === 1 ? '' : 's'}${autoCanon}`);
+      } else {
+        toast.message('All nodes are already synced');
+      }
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Sync failed');
+    },
+  });
+
+  return (
+    <div className="max-w-[1440px] mx-auto px-4 md:px-12 -mt-8 mb-2 relative z-10">
+      <div className="flex items-center justify-between gap-4 rounded-xl border border-primary/30 bg-primary/[0.08] backdrop-blur-sm px-4 py-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-primary/20 border border-primary/40 flex items-center justify-center flex-shrink-0">
+            <Film className="h-4 w-4 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-white">
+              {unsyncedCount} on-chain video node{unsyncedCount === 1 ? '' : 's'} not yet listed as
+              episodes
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Sync to create curated episode entries viewers can browse.
+            </p>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          className="rounded-full flex-shrink-0"
+          onClick={() => backfill.mutate()}
+          disabled={backfill.isPending}
+        >
+          {backfill.isPending ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4 mr-2" />
+          )}
+          {backfill.isPending ? 'Syncing…' : 'Sync episodes'}
+        </Button>
+      </div>
+    </div>
   );
 }
 

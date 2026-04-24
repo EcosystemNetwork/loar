@@ -1201,6 +1201,122 @@ export const episodesRouter = router({
       return { ok: true };
     }),
 
+  /**
+   * Backfill canon episodes from on-chain video nodes.
+   *
+   * Takes an already-fetched list of video nodes (client reads from Ponder
+   * and forwards) and creates one Firestore episode per node that doesn't
+   * already have a clip referencing it. For `fun` universes the new episodes
+   * are auto-canoned (off-chain flag). For `monetized` universes they stay
+   * as drafts — canon requires the on-chain `setCanonForEpisode` gesture.
+   *
+   * Admin-only: caller must be the universe creator or a Safe signer.
+   */
+  backfillFromNodes: protectedProcedure
+    .input(
+      z.object({
+        universeId: z.string().min(1),
+        nodes: z
+          .array(
+            z.object({
+              nodeId: z.string().min(1),
+              videoUrl: z.string().url(),
+              plot: z.string().default(''),
+              creator: z.string().optional(),
+              createdAt: z.number().optional(),
+            })
+          )
+          .min(1)
+          .max(500),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const universeId = input.universeId.toLowerCase();
+
+      const isAdmin = await isUniverseAdmin(universeId, ctx.user.uid);
+      if (!isAdmin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the universe admin can backfill episodes',
+        });
+      }
+
+      const uDoc = await db.collection('cinematicUniverses').doc(universeId).get();
+      const universeType =
+        (uDoc.data()?.universeType as 'fun' | 'monetized' | undefined) ?? 'monetized';
+
+      // Index existing episodes by nodeId so we don't duplicate. Episodes
+      // can hold multiple clips; we dedup on any clip that already points to
+      // a given on-chain node.
+      const existing = await episodesCol().where('universeId', '==', universeId).get();
+      const claimed = new Set<string>();
+      for (const doc of existing.docs) {
+        const clips = (doc.data().clips || []) as Array<{ nodeId?: string }>;
+        for (const c of clips) {
+          if (c?.nodeId) claimed.add(String(c.nodeId));
+        }
+      }
+
+      const now = new Date().toISOString();
+      const batch = db.batch();
+      let created = 0;
+
+      for (const n of input.nodes) {
+        if (claimed.has(String(n.nodeId))) continue;
+
+        const plot = (n.plot || '').trim();
+        const firstLine =
+          plot
+            .split(/[\n.!?]/)[0]
+            ?.trim()
+            .slice(0, 120) || '';
+        const title = firstLine || `Episode ${n.nodeId}`;
+
+        const episodeId = randomUUID();
+        const ref = episodesCol().doc(episodeId);
+        const isFun = universeType === 'fun';
+
+        batch.set(ref, {
+          id: episodeId,
+          universeId,
+          title,
+          description: plot,
+          clips: [
+            {
+              nodeId: String(n.nodeId),
+              label: title,
+              videoUrl: n.videoUrl,
+              trimStart: 0,
+              trimEnd: 0,
+            },
+          ],
+          clipCount: 1,
+          creatorId: ctx.user.uid,
+          createdAt: now,
+          updatedAt: now,
+          exportUrl: null,
+          isCanon: isFun,
+          canonizedAt: isFun ? now : null,
+          canonTipNodeId: null,
+          canonTxHash: null,
+          sourceNodeId: String(n.nodeId),
+          sourceCreator: n.creator ?? null,
+          sourceCreatedAt: n.createdAt ?? null,
+        });
+        claimed.add(String(n.nodeId));
+        created++;
+      }
+
+      if (created > 0) await batch.commit();
+
+      return {
+        created,
+        skipped: input.nodes.length - created,
+        universeType,
+        autoCanoned: universeType === 'fun' ? created : 0,
+      };
+    }),
+
   /** Kick off a background export job — concat all clips into one MP4 */
   export: protectedProcedure
     .input(z.object({ episodeId: z.string().min(1) }))
