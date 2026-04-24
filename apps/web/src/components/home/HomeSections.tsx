@@ -333,9 +333,15 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   const featured = useMemo(() => {
-    let picks = universes.filter((u) => u.tokenData || u.nodeCount > 0).slice(0, 5);
-    if (picks.length === 0) picks = universes.slice(0, 5);
-    return picks;
+    const FEATURED_FIRST = 'space fleet';
+    const eligible = universes.filter((u) => u.tokenData || u.nodeCount > 0);
+    const pool = eligible.length > 0 ? eligible : universes;
+    const sorted = [...pool].sort((a, b) => {
+      const aHit = a.name?.toLowerCase().trim() === FEATURED_FIRST ? -1 : 0;
+      const bHit = b.name?.toLowerCase().trim() === FEATURED_FIRST ? -1 : 0;
+      return aHit - bHit;
+    });
+    return sorted.slice(0, 5);
   }, [universes]);
 
   // Auto-advance every 8 seconds

@@ -121,7 +121,7 @@ export default function Header() {
             <img src="/loarIconTextLogo.png" alt="LOAR" className="h-7 w-auto object-contain" />
           </Link>
 
-          <nav className="hidden lg:flex items-center">
+          <nav className="hidden xl:flex items-center">
             {primaryLinks.map(({ to, label }) => (
               <Link
                 key={to}
@@ -201,7 +201,7 @@ export default function Header() {
           <Button
             variant="ghost"
             size="icon"
-            className="lg:hidden ml-0.5 h-8 w-8"
+            className="xl:hidden ml-0.5 h-8 w-8"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
             aria-expanded={mobileOpen}
@@ -214,7 +214,7 @@ export default function Header() {
 
       {/* ── Mobile Navigation ── */}
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-x-0 top-14 bottom-0 z-40 bg-background/95 backdrop-blur-xl border-t border-border/40 overflow-y-auto">
+        <div className="xl:hidden fixed inset-x-0 top-14 bottom-0 z-40 bg-background/95 backdrop-blur-xl border-t border-border/40 overflow-y-auto">
           <nav
             id="mobile-nav"
             aria-label="Mobile navigation"
