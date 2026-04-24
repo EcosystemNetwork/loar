@@ -9,6 +9,7 @@
 import { Link } from '@tanstack/react-router';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { Button } from '@/components/ui/button';
+import { QA_EVENTS } from '@/lib/qa-events';
 import { useState, useEffect } from 'react';
 import { Rocket, Globe, ChevronRight, X, CheckCircle2, Sparkles, Wallet } from 'lucide-react';
 
@@ -25,6 +26,16 @@ export function GettingStartedPopup() {
       setVisible(true);
     }
   }, [isConnected, isAuthenticated, dismissed]);
+
+  useEffect(() => {
+    const open = () => {
+      localStorage.removeItem(DISMISS_KEY);
+      setDismissed(false);
+      setVisible(true);
+    };
+    window.addEventListener(QA_EVENTS.OPEN_GETTING_STARTED, open);
+    return () => window.removeEventListener(QA_EVENTS.OPEN_GETTING_STARTED, open);
+  }, []);
 
   if (!visible) return null;
 

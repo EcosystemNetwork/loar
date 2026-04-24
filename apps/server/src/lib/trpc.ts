@@ -179,14 +179,16 @@ export function requirePermission(permission: string) {
 
 /** Protected procedure that also requires admin role */
 export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
-  // API-key authenticated requests must not reach admin routes unless the key
-  // explicitly carries the `admin.all` scope. Admin-wallet-owned keys minted
-  // with narrow scopes (e.g. `entities.create`) would otherwise inherit the
-  // admin principal and bypass scope enforcement.
-  if (ctx.user.apiKeyId && !hasScope(ctx.user.apiKeyPermissions, 'admin.all')) {
+  // API-key authenticated requests must NEVER reach admin routes. The
+  // mint-time scope check in `apiKeys.ts` already forbids granting
+  // `admin.all` to any API key, so this branch is defense-in-depth: any
+  // direct-Firestore-inserted or legacy key that somehow carries `admin.all`
+  // must still be rejected by the middleware. Admin actions require a
+  // freshly-minted session JWT (cookie or bearer on mobile).
+  if (ctx.user.apiKeyId) {
     throw new TRPCError({
       code: 'FORBIDDEN',
-      message: 'Admin routes require a session token, not a scoped API key',
+      message: 'Admin routes require a session token, not an API key',
     });
   }
   const rawAddress = ctx.user.address;
@@ -199,8 +201,17 @@ export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
       message: 'Admin access not configured. Set ADMIN_ADDRESSES or ADMIN_WALLET env var.',
     });
   }
-  // Normalize via getAddress() for checksummed comparison consistency
-  const address = getAddress(rawAddress).toLowerCase();
+  // Normalize via getAddress() for checksummed comparison consistency.
+  // Wrap in try/catch: a legacy JWT issued before the canonical sub
+  // normalization could carry a malformed address, in which case getAddress
+  // throws — we want a clean FORBIDDEN, not an uncaught 500 that leaks the
+  // pre-vs-post-check timing distinction to a probing attacker.
+  let address: string;
+  try {
+    address = getAddress(rawAddress).toLowerCase();
+  } catch {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+  }
   if (!ADMIN_ADDRESSES.includes(address)) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
   }

@@ -14,7 +14,7 @@
  *   transcribe       2 credits
  *   generateCaptions 3 credits
  */
-import { router, protectedProcedure, requirePermission } from '../../lib/trpc';
+import { router, protectedProcedure, requirePermission, expensiveProcedure } from '../../lib/trpc';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
@@ -159,7 +159,8 @@ function segmentsToVTT(segments: Array<{ start: number; end: number; text: strin
 export const lipsyncRouter = router({
   // ── Lip-sync video with audio ─────────────────────────────────────
 
-  sync: protectedProcedure
+  // INF-6: FAL lip-sync service (~$0.05 per call).
+  sync: expensiveProcedure
     .use(requirePermission('generation.lipsync'))
     .input(
       z.object({
@@ -348,7 +349,8 @@ export const lipsyncRouter = router({
 
   // ── Transcribe audio ──────────────────────────────────────────────
 
-  transcribe: protectedProcedure
+  // INF-6: FAL Whisper-style transcription (paid).
+  transcribe: expensiveProcedure
     .use(requirePermission('generation.lipsync'))
     .input(
       z.object({
@@ -427,7 +429,8 @@ export const lipsyncRouter = router({
 
   // ── Generate captions from video ──────────────────────────────────
 
-  generateCaptions: protectedProcedure
+  // INF-6: caption generation via paid model.
+  generateCaptions: expensiveProcedure
     .use(requirePermission('generation.lipsync'))
     .input(
       z.object({

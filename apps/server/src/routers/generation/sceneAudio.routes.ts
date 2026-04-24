@@ -24,7 +24,7 @@
  *   Composite:       2 credits
  *   Full pipeline:   sum of above per scene
  */
-import { router, protectedProcedure, requirePermission } from '../../lib/trpc';
+import { router, protectedProcedure, requirePermission, expensiveProcedure } from '../../lib/trpc';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
@@ -164,7 +164,8 @@ export const sceneAudioRouter = router({
    * Design a voice profile for a character in a universe.
    * Saves to Firestore for reuse across scenes and sessions.
    */
-  designVoice: protectedProcedure
+  // INF-6: ElevenLabs voice design (~$0.08 per call).
+  designVoice: expensiveProcedure
     .input(
       z.object({
         universeId: z.string().min(1),
@@ -298,7 +299,8 @@ export const sceneAudioRouter = router({
    * Generate dialogue TTS for a scene's dialogue lines.
    * Returns a single merged audio file URL.
    */
-  generateDialogue: protectedProcedure
+  // INF-6: ElevenLabs TTS for scene dialogue.
+  generateDialogue: expensiveProcedure
     .input(
       z.object({
         universeId: z.string().min(1),
@@ -379,7 +381,8 @@ export const sceneAudioRouter = router({
   /**
    * Generate sound effects for a scene.
    */
-  generateSFX: protectedProcedure
+  // INF-6: ElevenLabs SFX (~$0.08 per call).
+  generateSFX: expensiveProcedure
     .input(
       z.object({
         universeId: z.string().min(1),
@@ -428,7 +431,8 @@ export const sceneAudioRouter = router({
   /**
    * Generate background music for a scene or segment.
    */
-  generateMusic: protectedProcedure
+  // INF-6: FAL music generation (~$0.04 per call).
+  generateMusic: expensiveProcedure
     .input(
       z.object({
         universeId: z.string().min(1),
@@ -483,7 +487,8 @@ export const sceneAudioRouter = router({
    * Uses FAL's lipsync model (with sadtalker fallback) to detect faces
    * and re-render mouth movements to match the audio.
    */
-  lipSync: protectedProcedure
+  // INF-6: FAL lip-sync (~$0.05 per call).
+  lipSync: expensiveProcedure
     .input(
       z.object({
         universeId: z.string().min(1),
@@ -534,7 +539,8 @@ export const sceneAudioRouter = router({
    *
    * This is the main entry point when editing a universe timeline — call it per scene.
    */
-  processScene: protectedProcedure
+  // INF-6: full scene audio pipeline (dialogue + SFX + music + lipsync).
+  processScene: expensiveProcedure
     .input(
       z.object({
         universeId: z.string().min(1),
@@ -731,7 +737,8 @@ export const sceneAudioRouter = router({
    * Process multiple scenes in a timeline sequence.
    * Shares music segments across grouped scenes for continuity.
    */
-  processTimeline: protectedProcedure
+  // INF-6: timeline-wide audio generation (large parallel fanout to paid APIs).
+  processTimeline: expensiveProcedure
     .input(
       z.object({
         universeId: z.string().min(1),

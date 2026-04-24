@@ -25,6 +25,7 @@ import {
   Building2,
 } from 'lucide-react';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { UserText } from '@/components/user-text';
 
 const VALID_KINDS = [
   'person',
@@ -197,8 +198,8 @@ function WikiKindPage() {
                     {kind}
                   </Badge>
                   {entity.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-3">
-                      {entity.description}
+                    <p className="text-sm text-muted-foreground line-clamp-3 break-words">
+                      <UserText>{entity.description}</UserText>
                     </p>
                   )}
                   {entity.universeAddress && (

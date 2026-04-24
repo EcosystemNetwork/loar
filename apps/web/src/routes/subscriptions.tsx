@@ -29,12 +29,17 @@ const TIER_ICONS: Record<string, React.ReactNode> = {
 };
 
 function SubscriptionsPage() {
-  const { isAuthenticated } = useWalletAuth();
+  const { isAuthenticated, sessionReady } = useWalletAuth();
   const { data: subscriptions, isLoading } = useMySubscriptions();
   const qc = useQueryClient();
 
   const cancelMutation = useMutation({
-    mutationFn: (universeId: string) => trpcClient.subscriptions.cancel.mutate({ universeId }),
+    mutationFn: async (universeId: string) => {
+      // WEB-6: cancellation is destructive — require the cookie to be
+      // server-confirmed before acting on localStorage-derived auth state.
+      if (!sessionReady) throw new Error('Session still validating, please retry');
+      return trpcClient.subscriptions.cancel.mutate({ universeId });
+    },
     onSuccess: () => {
       toast.success('Subscription cancelled successfully.');
       qc.invalidateQueries({ queryKey: ['my-subs'] });
@@ -54,7 +59,7 @@ function SubscriptionsPage() {
   }
 
   // ── Auth guard ──
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !sessionReady) {
     return (
       <div className="container mx-auto px-4 py-20 text-center">
         <CreditCard className="mx-auto h-12 w-12 text-zinc-500 mb-4" />

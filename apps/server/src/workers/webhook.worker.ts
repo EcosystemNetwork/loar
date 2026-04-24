@@ -47,10 +47,10 @@ async function deliver(job: Job<WebhookJobData, WebhookJobResult>): Promise<Webh
   // not enough — an attacker can register a webhook at an attacker-controlled
   // domain, then flip the A record to 169.254.169.254 / 10.x / 127.0.0.1
   // before the worker fires, exfiltrating the signed payload to internal
-  // services. Redirects are also refused so a 3xx to the same targets can't
-  // bypass the DNS check.
-  const { validateUploadUrl } = await import('../lib/url-validator');
-  await validateUploadUrl(url);
+  // services. safeFetch pins the resolved IP through the TCP connect so a
+  // second rebinding between our resolve() and fetch's internal resolve()
+  // also cannot redirect us. Redirects are refused so a 3xx cannot bypass.
+  const { safeFetch } = await import('../lib/url-validator');
 
   // Stable payload shape — receivers should treat unknown fields as
   // additive; never rely on field order.
@@ -69,7 +69,7 @@ async function deliver(job: Job<WebhookJobData, WebhookJobResult>): Promise<Webh
   const timer = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS);
 
   try {
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

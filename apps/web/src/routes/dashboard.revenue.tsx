@@ -101,7 +101,7 @@ function formatCompact(value: number): string {
 // ── Main Component ───────────────────────────────────────────────────
 
 function RevenueDashboardPage() {
-  const { isAuthenticated, address } = useWalletAuth();
+  const { isAuthenticated, sessionReady, address } = useWalletAuth();
   const navigate = useNavigate();
   const [period, setPeriod] = useState<Period>('month');
   const [chartPeriod, setChartPeriod] = useState<ChartPeriod>('month');
@@ -131,14 +131,18 @@ function RevenueDashboardPage() {
   });
 
   const exportMutation = useMutation({
-    mutationFn: (params: { format: ExportFormat; period: Period }) =>
-      trpcClient.revenueDashboard.export.mutate({
+    mutationFn: async (params: { format: ExportFormat; period: Period }) => {
+      // WEB-6: revenue export leaks the caller's earnings history; don't
+      // run it until the server-side auth check has confirmed this session.
+      if (!sessionReady) throw new Error('Session still validating, please retry');
+      return trpcClient.revenueDashboard.export.mutate({
         format: params.format,
         period:
           params.period === 'all' || params.period === 'day' || params.period === 'week'
             ? 'month'
             : (params.period as 'month' | 'quarter' | 'year'),
-      }),
+      });
+    },
     onSuccess: (data: any) => {
       if (data?.downloadUrl) {
         window.open(data.downloadUrl, '_blank');

@@ -151,7 +151,7 @@ export async function consumeRateLimit(
 const IP_RE = /^(\d{1,3}\.){3}\d{1,3}$|^[0-9a-fA-F:]+$/;
 const TRUST_PROXY = process.env.TRUST_PROXY === 'true';
 
-function getClientKey(c: Context): string {
+export function getClientKey(c: Context): string {
   // Only trust forwarding headers when explicitly behind a reverse proxy
   if (TRUST_PROXY) {
     const xff = c.req.header('x-forwarded-for');

@@ -16,7 +16,7 @@
  *   Meshy text-to-texture ~$0.15/task
  *   Total pipeline      ~$0.34
  */
-import { router, protectedProcedure } from '../../lib/trpc';
+import { router, protectedProcedure, expensiveProcedure } from '../../lib/trpc';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
@@ -492,7 +492,9 @@ export const characterPipelineRouter = router({
    *
    * Returns immediately with a pipeline ID — poll `getStatus` for progress.
    */
-  launch: protectedProcedure
+  // INF-6: full character pipeline — Imagen + Meshy + textures (~$0.34 per call).
+  // Highest-cost path; per-key concurrency slot required.
+  launch: expensiveProcedure
     .input(
       z.object({
         // Entity fields

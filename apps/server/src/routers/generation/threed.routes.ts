@@ -18,7 +18,13 @@
  *   text-to-3D refine   ~$0.20
  *   image-to-3D         ~$0.15
  */
-import { router, protectedProcedure, publicProcedure, requirePermission } from '../../lib/trpc';
+import {
+  router,
+  protectedProcedure,
+  publicProcedure,
+  requirePermission,
+  expensiveProcedure,
+} from '../../lib/trpc';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
@@ -326,7 +332,8 @@ const artStyleSchema = z.enum(['realistic', 'cartoon', 'low-poly', 'sculpture', 
 export const threedRouter = router({
   // ── Text-to-3D preview ────────────────────────────────────────────────
 
-  textTo3DPreview: protectedProcedure
+  // INF-6: Meshy text-to-3D preview (~$0.05 per call) → per-key concurrency slot
+  textTo3DPreview: expensiveProcedure
     .use(requirePermission('generation.3d'))
     .input(
       z.object({
@@ -471,7 +478,8 @@ export const threedRouter = router({
 
   // ── Text-to-3D refine ─────────────────────────────────────────────────
 
-  textTo3DRefine: protectedProcedure
+  // INF-6: Meshy text-to-3D refine (~$0.20 per call)
+  textTo3DRefine: expensiveProcedure
     .use(requirePermission('generation.3d'))
     .input(
       z.object({
@@ -562,7 +570,8 @@ export const threedRouter = router({
 
   // ── Image-to-3D ───────────────────────────────────────────────────────
 
-  imageTo3D: protectedProcedure
+  // INF-6: Meshy image-to-3D (~$0.15 per call)
+  imageTo3D: expensiveProcedure
     .input(
       z.object({
         imageUrls: z.array(z.string().url()).min(1).max(4),

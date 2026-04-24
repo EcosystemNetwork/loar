@@ -11,7 +11,7 @@
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
-import { isUniverseAdmin } from '../../lib/safe-admin';
+import { isUniverseAdmin, isUniverseAdminStrict } from '../../lib/safe-admin';
 
 const teamCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -43,7 +43,9 @@ export const universeTeamRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      if (!(await isUniverseAdmin(input.universeId, ctx.user.uid))) {
+      // INF-5: adding a team member grants a monthly credit allowance — real
+      // fund-access power. Use the strict admin check (chain + Firestore).
+      if (!(await isUniverseAdminStrict(input.universeId, ctx.user.uid))) {
         throw new Error('Only the universe admin can manage team members');
       }
 
@@ -74,7 +76,8 @@ export const universeTeamRouter = router({
   removeMember: protectedProcedure
     .input(z.object({ universeId: z.string(), memberUid: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      if (!(await isUniverseAdmin(input.universeId, ctx.user.uid))) {
+      // INF-5: removal flips access to universe credits; strict check too.
+      if (!(await isUniverseAdminStrict(input.universeId, ctx.user.uid))) {
         throw new Error('Only the universe admin can manage team members');
       }
 
@@ -101,7 +104,9 @@ export const universeTeamRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      if (!(await isUniverseAdmin(input.universeId, ctx.user.uid))) {
+      // INF-5: updateMember can raise `monthlyAllowance`, which directly
+      // widens fund-draw capacity for the member. Strict check required.
+      if (!(await isUniverseAdminStrict(input.universeId, ctx.user.uid))) {
         throw new Error('Only the universe admin can manage team members');
       }
 

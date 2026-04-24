@@ -9,6 +9,7 @@
  */
 
 import { createFileRoute, redirect } from '@tanstack/react-router';
+import { awaitSessionValidation } from '@/lib/wallet-auth';
 import { useState, useRef, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,10 +45,12 @@ export const Route = createFileRoute('/editor')({
     image: (search.image as string) || undefined,
     audio: (search.audio as string) || undefined,
   }),
-  beforeLoad: ({ context }) => {
+  // WEB-6: await /auth/me so paid edit jobs can't fire during the auth hydration window.
+  beforeLoad: async ({ context }) => {
     if (!context.hasSession()) {
       throw redirect({ to: '/login', search: { redirect: '/editor' } });
     }
+    await awaitSessionValidation();
   },
   component: EditorPage,
 });

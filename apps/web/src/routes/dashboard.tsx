@@ -36,6 +36,7 @@ import { formatEther } from 'viem';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
 import { QuestsPanel } from '@/components/QuestsPanel';
+import { UserText } from '@/components/user-text';
 import { DailyCheckin } from '@/components/DailyCheckin';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
 import { FaucetBanner } from '@/components/FaucetBanner';
@@ -944,7 +945,9 @@ function NotificationsWidget() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="leading-tight line-clamp-2">{notif.message}</p>
+                    <p className="leading-tight line-clamp-2 break-words">
+                      <UserText>{notif.message}</UserText>
+                    </p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
                       {time.getTime() > 0 ? relativeTime(time) : ''}
                     </p>

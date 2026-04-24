@@ -23,7 +23,7 @@ import { base, sepolia, baseSepolia } from 'viem/chains';
 import { DEFAULT_PACKAGES, buildPackagesFromConfig } from '../credits/credits.routes';
 import { verifyStripePayment } from '../credits/stripe.routes';
 import { getMembership } from '../universeTeam/universeTeam.routes';
-import { isUniverseAdmin } from '../../lib/safe-admin';
+import { isUniverseAdmin, isUniverseAdminStrict } from '../../lib/safe-admin';
 
 const TREASURY_ADDRESS = (process.env.TREASURY_ADDRESS || '0x') as `0x${string}`;
 const LOAR_TOKEN_ADDRESS = (process.env.LOAR_TOKEN_ADDRESS || '0x') as `0x${string}`;
@@ -280,7 +280,10 @@ export const universeTreasuryRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      if (!(await isUniverseAdmin(input.universeId, ctx.user.uid, input.chainId))) {
+      // INF-5: fundPool moves real money into the universe credit pool.
+      // Use the strict admin check so a Firestore-side creator tamper alone
+      // does not unlock treasury funding.
+      if (!(await isUniverseAdminStrict(input.universeId, ctx.user.uid, input.chainId))) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'Only the universe admin can fund the universe credit pool',
@@ -526,7 +529,9 @@ export const universeTreasuryRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const universeId = input.universeId.toLowerCase();
-      if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
+      // INF-5: allocation grants real credit-spend power to a member, so
+      // require the strict on-chain owner check alongside the baseline.
+      if (!(await isUniverseAdminStrict(universeId, ctx.user.uid))) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'Only the universe admin can allocate credits to members',
@@ -651,7 +656,9 @@ export const universeTreasuryRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const universeId = input.universeId.toLowerCase();
-      if (!(await isUniverseAdmin(universeId, ctx.user.uid, input.chainId))) {
+      // INF-5: depositRevenue mints credits into the pool off of an on-chain
+      // ETH claim, so the admin gate MUST reflect current chain state.
+      if (!(await isUniverseAdminStrict(universeId, ctx.user.uid, input.chainId))) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'Only the universe admin can deposit revenue',

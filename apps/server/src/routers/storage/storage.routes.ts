@@ -86,12 +86,17 @@ export const storageRouter = router({
     }),
 
   /** Poll the status of an upload job. */
-  uploadStatus: publicProcedure.input(z.object({ jobId: z.string() })).query(({ input }) => {
-    const queue = getUploadQueue();
-    const job = queue.getStatus(input.jobId);
-    if (!job) return null;
-    return job;
-  }),
+  uploadStatus: protectedProcedure
+    .input(z.object({ jobId: z.string() }))
+    .query(({ input, ctx }) => {
+      const queue = getUploadQueue();
+      const job = queue.getStatus(input.jobId);
+      if (!job) return null;
+      // IDOR guard: jobIds leaked via logs/Sentry/URL surfaces must not
+      // expose another user's source URL, error payload, or manifest.
+      if (job.userId !== ctx.user.uid) return null;
+      return job;
+    }),
 
   /** Get all active uploads for the current user. */
   activeUploads: protectedProcedure.query(({ ctx }) => {

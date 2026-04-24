@@ -27,6 +27,7 @@ import { routeModel, getModelById } from '../../services/video-models';
 import { dispatchGeneration, saveGenerationRecord } from '../generation/generation.routes';
 import { publishToGallery } from '../../lib/gallery-publish';
 import { isUniverseCollaborator, isUniverseAdmin, getChainClient } from '../../lib/safe-admin';
+import { validateAgainstLaws } from '../physics/physics.handlers';
 import { decodeEventLog, getAddress, keccak256, toBytes } from 'viem';
 
 /**
@@ -1038,6 +1039,30 @@ export const episodesRouter = router({
       }
       const universeType =
         (universeDoc.data()?.universeType as 'fun' | 'monetized' | undefined) ?? 'monetized';
+
+      // Physics gate: block canon if the episode content (description +
+      // clip labels) trips any `must`-severity law. `should` violations are
+      // advisory; universes with no declared laws return zero violations.
+      // Concatenate and call once — one Firestore read for laws, and the
+      // handler emits at most one violation per law so dedup isn't needed.
+      const description = (data.description as string | undefined) ?? '';
+      const clipLabels = Array.isArray(data.clips)
+        ? (data.clips as Array<{ label?: string }>)
+            .map((c) => c?.label ?? '')
+            .filter((s) => s.length > 0)
+            .join('\n')
+        : '';
+      const physicsBlob = [description, clipLabels].filter((s) => s.length > 0).join('\n');
+      if (physicsBlob.trim().length > 0) {
+        const { violations } = await validateAgainstLaws(universeId, physicsBlob);
+        const blocking = violations.filter((v) => v.severity === 'must');
+        if (blocking.length > 0) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Canon blocked by physics: ${blocking.map((v) => v.name).join(', ')}`,
+          });
+        }
+      }
 
       const now = new Date().toISOString();
 

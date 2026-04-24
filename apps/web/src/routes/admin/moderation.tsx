@@ -110,7 +110,10 @@ function ContentPreviewCard({ preview }: { preview: ContentPreview | null }) {
           <a
             href={mediaSrc}
             target="_blank"
-            rel="noreferrer"
+            // noopener: don't give the opened tab access to window.opener.
+            // noreferrer: don't leak the admin page URL in the Referer header.
+            // nofollow: hint to crawlers not to follow user-flagged content.
+            rel="noopener noreferrer nofollow"
             className="text-primary hover:underline text-[11px] inline-block"
           >
             Open source ↗

@@ -1,33 +1,20 @@
 /**
  * useIsUniverseAdmin — check if connected wallet is a universe admin
  *
- * Handles both:
- *   - Direct EOA admin (address === getAdmin())
- *   - Safe multi-sig signer (address in Safe.getOwners())
+ * Resolves admin status via the server (`universes.adminInfo` tRPC query)
+ * rather than the wallet's RPC provider. The server reads Firestore for the
+ * universe record and calls `getOwners()` on its own RPC endpoint for
+ * multi-sig universes. This avoids the "Couldn't verify editor access"
+ * flash that happens when the user's wallet provider rate-limits or the
+ * wallet is on a different chain than the universe was deployed on.
  *
- * Returns admin status, whether admin is a Safe, and Safe metadata.
+ * Recognises both:
+ *   - Direct EOA admin (Firestore `creator`)
+ *   - Safe multi-sig signer (address is in the Safe's owners)
  */
-import { usePublicClient, useReadContract, useChainId } from 'wagmi';
-import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { useQuery } from '@tanstack/react-query';
-import { universeAbi } from '@loar/abis/generated';
-
-const SAFE_OWNERS_ABI = [
-  {
-    name: 'getOwners',
-    type: 'function',
-    inputs: [],
-    outputs: [{ name: '', type: 'address[]' }],
-    stateMutability: 'view',
-  },
-  {
-    name: 'getThreshold',
-    type: 'function',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-] as const;
+import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
+import { trpc } from '@/utils/trpc';
 
 export interface UniverseAdminInfo {
   /** Whether the connected wallet has admin access */
@@ -52,90 +39,29 @@ export interface UniverseAdminInfo {
 
 export function useIsUniverseAdmin(universeAddress: `0x${string}` | undefined): UniverseAdminInfo {
   const { address: connectedAddress } = useAccount();
-  const publicClient = usePublicClient();
-  const chainId = useChainId();
 
-  // Read the on-chain admin address
-  const {
-    data: adminAddress,
-    isLoading: isLoadingAdmin,
-    isError: isErrorAdmin,
-  } = useReadContract({
-    address: universeAddress,
-    abi: universeAbi,
-    functionName: 'getAdmin',
-    query: { enabled: !!universeAddress },
-    chainId,
-  });
-
-  // Check if admin is a contract (Safe) and get owners
-  const { data: safeData, isLoading: isLoadingSafe } = useQuery({
-    queryKey: ['safe-admin-check', adminAddress, connectedAddress, chainId],
-    queryFn: async () => {
-      if (!adminAddress || !connectedAddress || !publicClient) {
-        return { isSafe: false, owners: [] as string[], threshold: 0 };
+  const { data, isLoading, isError } = useQuery(
+    trpc.universes.adminInfo.queryOptions(
+      {
+        universeId: universeAddress ?? '0x',
+        address: connectedAddress,
+      },
+      {
+        enabled: !!universeAddress,
+        staleTime: 30_000,
+        retry: 2,
       }
-
-      // If direct match, no need to check Safe
-      if (adminAddress.toLowerCase() === connectedAddress.toLowerCase()) {
-        return { isSafe: false, owners: [], threshold: 0 };
-      }
-
-      // Check if admin address has bytecode (i.e., is a contract)
-      const bytecode = await publicClient.getCode({ address: adminAddress as `0x${string}` });
-      if (!bytecode || bytecode === '0x') {
-        return { isSafe: false, owners: [], threshold: 0 };
-      }
-
-      // Try reading Safe owners — if it fails, it's not a Safe
-      try {
-        const [owners, threshold] = await Promise.all([
-          publicClient.readContract({
-            address: adminAddress as `0x${string}`,
-            abi: SAFE_OWNERS_ABI,
-            functionName: 'getOwners',
-          }),
-          publicClient.readContract({
-            address: adminAddress as `0x${string}`,
-            abi: SAFE_OWNERS_ABI,
-            functionName: 'getThreshold',
-          }),
-        ]);
-
-        return {
-          isSafe: true,
-          owners: owners.map((o) => o.toLowerCase()),
-          threshold: Number(threshold),
-        };
-      } catch {
-        // Not a Safe contract
-        return { isSafe: false, owners: [], threshold: 0 };
-      }
-    },
-    enabled: !!adminAddress && !!connectedAddress && !!publicClient,
-    staleTime: 60_000,
-  });
-
-  const isSafe = safeData?.isSafe ?? false;
-  const owners = safeData?.owners ?? [];
-  const threshold = safeData?.threshold ?? 0;
-
-  const isDirectAdmin =
-    !!connectedAddress &&
-    !!adminAddress &&
-    adminAddress.toLowerCase() === connectedAddress.toLowerCase();
-
-  const isSafeSigner =
-    isSafe && !!connectedAddress && owners.includes(connectedAddress.toLowerCase());
+    )
+  );
 
   return {
-    isAdmin: isDirectAdmin || isSafeSigner,
-    isSafe,
-    adminAddress: adminAddress as string | undefined,
-    safeAddress: isSafe ? (adminAddress as string) : undefined,
-    owners,
-    threshold,
-    isLoading: isLoadingAdmin || isLoadingSafe,
-    isError: isErrorAdmin,
+    isAdmin: data?.isAdmin ?? false,
+    isSafe: data?.isSafe ?? false,
+    adminAddress: data?.adminAddress,
+    safeAddress: data?.safeAddress,
+    owners: data?.owners ?? [],
+    threshold: data?.threshold ?? 0,
+    isLoading,
+    isError,
   };
 }

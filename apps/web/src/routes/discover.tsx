@@ -9,6 +9,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
+import { UserText } from '@/components/user-text';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -486,8 +487,8 @@ function UniverseCard({ universe }: { universe: any }) {
                 {universe.name || 'Untitled Universe'}
               </h3>
               {universe.description && (
-                <p className="text-white/60 text-sm mt-1 line-clamp-2 leading-snug">
-                  {universe.description}
+                <p className="text-white/60 text-sm mt-1 line-clamp-2 leading-snug break-words">
+                  <UserText>{universe.description}</UserText>
                 </p>
               )}
               <div className="flex items-center gap-3 mt-2">
@@ -1149,7 +1150,9 @@ function CreatorCard({ profile }: { profile: any }) {
             <p className="text-sm text-muted-foreground">@{profile.username}</p>
 
             {profile.bio && (
-              <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{profile.bio}</p>
+              <p className="text-sm text-muted-foreground mt-2 line-clamp-2 break-words">
+                <UserText>{profile.bio}</UserText>
+              </p>
             )}
 
             <div className="flex flex-wrap gap-1 mt-3">

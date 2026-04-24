@@ -6,6 +6,7 @@ import { trpc } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Users } from 'lucide-react';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { UserText } from '@/components/user-text';
 
 interface Character {
   id: string;
@@ -130,7 +131,9 @@ function CharacterPage() {
               <CardTitle className="text-2xl">{character.character_name}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground leading-relaxed">{character.description}</p>
+              <p className="text-muted-foreground leading-relaxed break-words">
+                <UserText>{character.description}</UserText>
+              </p>
             </CardContent>
           </Card>
 

@@ -10,7 +10,7 @@ import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-ro
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { trpcClient } from '@/utils/trpc';
-import { useWalletAuth } from '@/lib/wallet-auth';
+import { useWalletAuth, awaitSessionValidation } from '@/lib/wallet-auth';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,10 +25,12 @@ import type { FirestoreUniverse } from '@/types/firestore';
 import { Plus, Settings, BarChart3, Eye, Film, Loader2, Wand2, Coins, Layers } from 'lucide-react';
 
 export const Route = createFileRoute('/studio')({
-  beforeLoad: ({ context }) => {
+  // WEB-6: await /auth/me before studio mutations become reachable.
+  beforeLoad: async ({ context }) => {
     if (!context.hasSession()) {
       throw redirect({ to: '/login', search: { redirect: '/studio' } });
     }
+    await awaitSessionValidation();
   },
   component: StudioPage,
 });

@@ -10,17 +10,42 @@
  *   contentAuditLog/{autoId}  — immutable audit trail (no updates/deletes)
  */
 import { z } from 'zod';
-import { router, protectedProcedure, publicProcedure, adminProcedure } from '../../lib/trpc';
+import {
+  router,
+  protectedProcedure,
+  publicProcedure,
+  adminProcedure,
+  isAdminAddress,
+} from '../../lib/trpc';
 import { db, firebaseAvailable } from '../../lib/firebase';
 import { consumeRateLimit } from '../../middleware/rate-limit';
 
-// Max 3 takedown requests per email per hour. Backed by Redis in prod so the
-// limit survives process restarts and applies across replicas (Railway can
-// scale the server horizontally).
-async function checkTakedownRateLimit(email: string): Promise<void> {
-  const { blocked } = await consumeRateLimit(`takedown:email:${email}`, 60 * 60 * 1000, 3);
-  if (blocked) {
+// Max 3 takedown requests per email per hour + max 5 takedowns against the
+// same content per hour. Backed by Redis in prod so the limit survives
+// process restarts and applies across replicas.
+//
+// The per-content cap is the censorship-flood defense: per-email alone can
+// be bypassed with disposable inboxes, so an attacker could queue dozens of
+// takedowns against a single creator in minutes. Per-content caps that flood
+// without interfering with legitimate distinct-claimant notices.
+async function checkTakedownRateLimit(email: string, contentId: string): Promise<void> {
+  const { blocked: emailBlocked } = await consumeRateLimit(
+    `takedown:email:${email}`,
+    60 * 60 * 1000,
+    3
+  );
+  if (emailBlocked) {
     throw new Error('Rate limit exceeded: max 3 takedown requests per hour');
+  }
+  const { blocked: contentBlocked } = await consumeRateLimit(
+    `takedown:content:${contentId}`,
+    60 * 60 * 1000,
+    5
+  );
+  if (contentBlocked) {
+    throw new Error(
+      'This content has received several takedown notices recently. Please try again later.'
+    );
   }
 }
 
@@ -139,13 +164,25 @@ export const moderationRouter = router({
       const col = takedownCol();
       if (!col) throw new Error('Not available');
 
-      // Rate limit: max 3 takedown requests per email per hour
-      await checkTakedownRateLimit(input.claimantEmail.toLowerCase());
+      // § 512(c)(3)(A)(i) identity binding: the typed electronic signature
+      // must match the declared claimant name. Without this, a spammer can
+      // sign as "Disney Legal — CEO Bob Iger" and the admin UI surfaces the
+      // impersonated name verbatim. Normalized (lowercase, trimmed) match.
+      const sig = input.signature.trim().toLowerCase();
+      const name = input.claimantName.trim().toLowerCase();
+      if (sig !== name) {
+        throw new Error('Signature must match the claimant name exactly.');
+      }
+
+      const emailLower = input.claimantEmail.toLowerCase();
+
+      // Rate limit: per-email + per-content (see checkTakedownRateLimit).
+      await checkTakedownRateLimit(emailLower, input.contentId);
 
       // Dedup: prevent same email from filing multiple takedowns for same content
       const existing = await col
         .where('contentId', '==', input.contentId)
-        .where('claimantEmail', '==', input.claimantEmail)
+        .where('claimantEmailLower', '==', emailLower)
         .limit(1)
         .get();
       if (!existing.empty) {
@@ -157,6 +194,8 @@ export const moderationRouter = router({
         contentId: input.contentId,
         claimantName: input.claimantName,
         claimantEmail: input.claimantEmail,
+        // Normalized copy for case-insensitive dedup/queries (see counter-notice).
+        claimantEmailLower: emailLower,
         claimantAddress: input.claimantAddress,
         claimantPhone: input.claimantPhone,
         copyrightWork: input.copyrightWork,
@@ -178,18 +217,34 @@ export const moderationRouter = router({
     }),
 
   // ── Check content status (public) ─────────────────────────────
+  // Public callers learn only whether content is active — the underlying
+  // hidden/removed/under_review states are moderation-internal and would
+  // otherwise be an enumeration oracle (timing admin action, deducing
+  // takedown state, building a public moderation feed). Owner + admin see
+  // the real status so creators can tell whether their content was hit.
   getContentStatus: publicProcedure
     .input(z.object({ contentId: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const col = contentCol();
-      if (!col) return { contentStatus: 'active' };
+      if (!col) return { contentStatus: 'active', updatedAt: null as string | null };
       const doc = await col.doc(input.contentId).get();
-      if (!doc.exists) return { contentStatus: 'active' };
+      if (!doc.exists) return { contentStatus: 'active', updatedAt: null };
       const data = doc.data()!;
-      return {
-        contentStatus: data.contentStatus || 'active',
-        updatedAt: data.contentStatusUpdatedAt || null,
-      };
+      const realStatus = (data.contentStatus as string | undefined) ?? 'active';
+      const viewerUid = ctx.user?.uid?.toLowerCase() ?? null;
+      const isOwner = !!viewerUid && data.creatorUid === viewerUid;
+      const isAdmin = isAdminAddress(ctx.user?.address ?? null);
+      if (isOwner || isAdmin) {
+        return {
+          contentStatus: realStatus,
+          updatedAt: (data.contentStatusUpdatedAt as string | undefined) ?? null,
+        };
+      }
+      // Public callers: treat anything other than active/reinstated as
+      // "not available". No timestamp leak (would reveal action timing).
+      const publicStatus =
+        realStatus === 'active' || realStatus === 'reinstated' ? 'active' : 'unavailable';
+      return { contentStatus: publicStatus, updatedAt: null };
     }),
 
   // ── Admin: review queue ───────────────────────────────────────

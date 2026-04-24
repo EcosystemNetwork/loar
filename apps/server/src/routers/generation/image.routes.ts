@@ -24,6 +24,7 @@ import {
   publicProcedure,
   adminProcedure,
   requirePermission,
+  expensiveProcedure,
 } from '../../lib/trpc';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
@@ -489,7 +490,8 @@ function autoPublishToGallery(opts: {
 export const imageRouter = router({
   // ── Routed generation (new primary endpoint) ─────────────────────────
 
-  generate: protectedProcedure
+  // INF-6: FAL / Google Imagen image generation ($0.04–0.12 per call).
+  generate: expensiveProcedure
     .use(requirePermission('generation.image'))
     .input(generateSchema)
     .mutation(async ({ input, ctx }) => {
@@ -1063,7 +1065,8 @@ export const imageRouter = router({
   // style, subject, previous-shot) plus optional angle preset. Pinned to
   // the Google nano-banana-pro-preview model which natively accepts
   // interleaved text + image parts via generateContent.
-  generateControlled: protectedProcedure
+  // INF-6: ControlNet/guided image generation (paid FAL pipeline).
+  generateControlled: expensiveProcedure
     .use(requirePermission('generation.image'))
     .input(
       z.object({
@@ -1515,7 +1518,8 @@ export const imageRouter = router({
 
   // ── Backward-compat raw endpoints (legacy endpoints — user-facing with credit billing) ───
 
-  generateImage: protectedProcedure
+  // INF-6: alternative image-gen entry (paid FAL pipeline).
+  generateImage: expensiveProcedure
     .input(
       z.object({
         prompt: z.string().min(1, 'Prompt is required'),
@@ -1606,7 +1610,8 @@ export const imageRouter = router({
       return result;
     }),
 
-  editImage: protectedProcedure
+  // INF-6: paid FAL inpaint/outpaint edit.
+  editImage: expensiveProcedure
     .input(
       z.object({
         prompt: z.string().min(1, 'Edit prompt is required'),
@@ -1682,7 +1687,8 @@ export const imageRouter = router({
       return result;
     }),
 
-  imageToImage: protectedProcedure
+  // INF-6: image-to-image transform (paid FAL pipeline).
+  imageToImage: expensiveProcedure
     .input(
       z.object({
         prompt: z.string().min(1).max(2000),
@@ -1763,7 +1769,8 @@ export const imageRouter = router({
       return result;
     }),
 
-  generateCharacter: protectedProcedure
+  // INF-6: character portrait generation (Imagen).
+  generateCharacter: expensiveProcedure
     .input(
       z.object({
         name: z.string().min(1),

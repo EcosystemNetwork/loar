@@ -10,7 +10,7 @@
 import { createFileRoute, Link as RouterLink, useNavigate, redirect } from '@tanstack/react-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useBalance, useChainId, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi';
-import { useWalletAuth } from '@/lib/wallet-auth';
+import { useWalletAuth, awaitSessionValidation } from '@/lib/wallet-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -58,10 +58,14 @@ import {
 } from '@/configs/chains';
 
 export const Route = createFileRoute('/cinematicUniverseCreate')({
-  beforeLoad: ({ context }) => {
+  // WEB-6: block entry until /auth/me confirms the session. The component
+  // fires an on-chain universe deploy, which costs gas even if the server
+  // side later rejects the subsequent tRPC call.
+  beforeLoad: async ({ context }) => {
     if (!context.hasSession()) {
       throw redirect({ to: '/login', search: { redirect: '/cinematicUniverseCreate' } });
     }
+    await awaitSessionValidation();
   },
   component: CinematicUniverseCreate,
 });

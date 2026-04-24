@@ -61,16 +61,17 @@ class StorageService {
   }
 
   async uploadFromUrl(url: string, filename?: string): Promise<string> {
-    const { validateUploadUrl } = await import('../lib/url-validator');
-    await validateUploadUrl(url);
+    const { safeFetch } = await import('../lib/url-validator');
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    const response = await fetch(url, {
+    // safeFetch pins the resolved IP so DNS rebinding between validation
+    // and connection cannot redirect us to link-local / metadata endpoints.
+    const response = await safeFetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LOARUploader/1.0)' },
       signal: controller.signal,
-      redirect: 'error', // Prevent SSRF bypass via 3xx to internal metadata endpoints
+      redirect: 'error',
     });
 
     clearTimeout(timeoutId);

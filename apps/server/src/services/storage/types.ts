@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { validateUploadUrl } from '../../lib/url-validator';
+import { safeFetch } from '../../lib/url-validator';
 
 // ─── Core Types ──────────────────────────────────────────────
 
@@ -102,17 +102,18 @@ export async function fetchToBuffer(
   timeoutMs = 30_000,
   maxBytes = 200 * 1024 * 1024
 ): Promise<{ buffer: Buffer; contentType: string }> {
-  await validateUploadUrl(url);
-
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(url, {
+    // safeFetch validates + pins the resolved IP, so DNS rebinding between
+    // the check and the connection cannot redirect us to link-local / cloud
+    // metadata endpoints.
+    const response = await safeFetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; LOARStorage/1.0)',
       },
-      redirect: 'error', // Prevent redirect-based SSRF bypass
+      redirect: 'error',
       signal: controller.signal,
     });
 

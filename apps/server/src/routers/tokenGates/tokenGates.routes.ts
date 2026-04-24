@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { TRPCError } from '@trpc/server';
+import { isUniverseAdminStrict } from '../../lib/safe-admin';
 
 const tokenGatesCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -56,14 +57,24 @@ const removeGateSchema = z.object({
   target: gateTargetEnum,
 });
 
-/** Helper: verify caller is the universe creator */
+/**
+ * Helper: verify caller is the universe creator.
+ *
+ * INF-5: token-gate rules control who can read paid content. A Firestore-
+ * only creator check is not enough — we also require the on-chain owner()
+ * to match via `isUniverseAdminStrict`. If the universe doc doesn't have a
+ * contract address the strict check falls back to the baseline Firestore
+ * comparison, so fun/unlaunched universes aren't blocked.
+ */
 async function verifyCreator(universeId: string, callerAddress: string | undefined) {
+  if (!callerAddress) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Wallet address required' });
+  }
   const universeDoc = await universesCol().doc(universeId.toLowerCase()).get();
   if (!universeDoc.exists) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Universe not found' });
   }
-  const universeData = universeDoc.data();
-  if (universeData?.creator?.toLowerCase() !== callerAddress?.toLowerCase()) {
+  if (!(await isUniverseAdminStrict(universeId, callerAddress))) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Only the universe creator can manage token gates',

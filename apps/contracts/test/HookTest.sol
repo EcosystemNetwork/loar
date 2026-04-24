@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Uniswap Hooks (last updated v1.2.0) (test/utils/HookTest.sol)
-pragma solidity =0.8.30;
+//
+// NOTE: pragma intentionally widened to ^0.8.26 — uniswap-v4-core's
+// PoolManager.sol is pinned to exactly 0.8.26, so this test utility can't
+// share the rest of the repo's exact-pin (=0.8.30) without an unsatisfiable
+// pragma intersection. Foundry's auto_detect_solc compiles this file's
+// import graph under 0.8.26 separately from the src/ contracts.
+pragma solidity ^0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 import {Deployers} from "@uniswap/v4-core/test/utils/Deployers.sol";

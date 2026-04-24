@@ -3,6 +3,7 @@
  * Shows on-chain $LOAR token balance and off-chain credit balance.
  */
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useReadContract } from 'wagmi';
 import { formatUnits } from 'viem';
@@ -12,6 +13,7 @@ import { useWalletAccount } from '@/hooks/useWalletAccount';
 import { getEvmAddresses } from '@/configs/addresses';
 import { SUPPORTED_EVM_CHAIN_IDS } from '@/configs/chains';
 import { loarTokenAbi } from '@loar/abis/generated';
+import { QA_EVENTS } from '@/lib/qa-events';
 import { CreditStore } from './CreditStore';
 
 function useLoarTokenBalance() {
@@ -69,6 +71,12 @@ export function LoarBalance() {
     }
   }, [showStore, handleKeyDown]);
 
+  useEffect(() => {
+    const open = () => setShowStore(true);
+    window.addEventListener(QA_EVENTS.OPEN_CREDIT_STORE, open);
+    return () => window.removeEventListener(QA_EVENTS.OPEN_CREDIT_STORE, open);
+  }, []);
+
   if (!isAuthenticated) return null;
 
   return (
@@ -90,22 +98,23 @@ export function LoarBalance() {
         {isLow && <span className="text-[9px] text-red-400">LOW</span>}
       </button>
 
-      {/* Credit Store Modal */}
-      {showStore && (
-        <div
-          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Credit Store"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowStore(false);
-          }}
-        >
-          <div className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-y-auto p-6 mx-4">
-            <CreditStore onClose={() => setShowStore(false)} />
-          </div>
-        </div>
-      )}
+      {showStore &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Credit Store"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowStore(false);
+            }}
+          >
+            <div className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-y-auto p-6 mx-4">
+              <CreditStore onClose={() => setShowStore(false)} />
+            </div>
+          </div>,
+          document.body
+        )}
     </>
   );
 }

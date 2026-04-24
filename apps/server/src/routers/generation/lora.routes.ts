@@ -5,7 +5,13 @@
  * train a LoRA model on FAL (~5-10 min), then use it for consistent generation.
  */
 import { z } from 'zod';
-import { protectedProcedure, publicProcedure, router, requirePermission } from '../../lib/trpc';
+import {
+  protectedProcedure,
+  publicProcedure,
+  router,
+  requirePermission,
+  expensiveProcedure,
+} from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { TRPCError } from '@trpc/server';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -27,7 +33,8 @@ const TRAINING_COST_CREDITS = 75;
 
 export const loraRouter = router({
   /** Start LoRA training for a character */
-  startTraining: protectedProcedure
+  // INF-6: FAL Flux LoRA training (~$0.12 per call, multi-minute).
+  startTraining: expensiveProcedure
     .use(requirePermission('generation.image'))
     .input(
       z.object({
@@ -298,7 +305,8 @@ export const loraRouter = router({
     }),
 
   /** Generate image using a trained LoRA model */
-  generateWithLora: protectedProcedure
+  // INF-6: LoRA-guided image gen (paid FAL pipeline).
+  generateWithLora: expensiveProcedure
     .use(requirePermission('generation.image'))
     .input(
       z.object({

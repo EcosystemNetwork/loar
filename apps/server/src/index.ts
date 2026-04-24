@@ -102,6 +102,12 @@ app.route('/api/stripe', stripeWebhookRoutes);
 // SIWE authentication routes — stricter rate limit (20 req/min per IP)
 // Each sign-in needs nonce + verify (2 reqs), plus /me checks and /refresh calls
 app.use('/auth/*', rateLimiter({ windowMs: 60_000, max: 20 }));
+// Extra-tight bucket on /auth/nonce specifically: each nonce is a Firestore
+// write, and the shared `/auth/*` bucket of 20/min lets an attacker pull ~29k
+// nonces/day per IP (burning Firestore quota + outrunning the 15-min cleanup
+// sweep). Legitimate clients call nonce once per login attempt, so 6/min is
+// generous.
+app.use('/auth/nonce', rateLimiter({ windowMs: 60_000, max: 6 }));
 app.route('/auth', authRoutes);
 
 // Circle Developer Controlled Wallet auth routes (email/social login)
@@ -273,7 +279,10 @@ app.post('/api/upload', async (c) => {
         ogg: ['audio/ogg'],
         flac: ['audio/flac'],
         pdf: ['application/pdf'],
-        svg: ['image/svg+xml'],
+        // SVG removed: admin-moderation UI opens the stored URL via
+        // <a target="_blank"> on user-controlled IPFS gateway domains, and
+        // SVG is a script-executing format. Rasterize client-side or accept
+        // as a sandboxed preview only — not as a generic upload target.
       };
       const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
       const expectedMimes = extMimeMap[ext];
@@ -306,7 +315,6 @@ app.post('/api/upload', async (c) => {
       'image/avif',
       'image/heic',
       'image/heif',
-      'image/svg+xml',
       // Design formats with standard MIME types
       'image/vnd.adobe.photoshop',
       'image/x-xcf',
@@ -509,16 +517,30 @@ app.post('/api/takedown', async (c) => {
       signature,
     } = parsed.data;
 
+    // § 512(c)(3)(A)(i) identity binding — see moderation.submitTakedown.
+    const sigLc = signature.trim().toLowerCase();
+    const nameLc = claimantName.trim().toLowerCase();
+    if (sigLc !== nameLc) {
+      return c.json(
+        { code: 'BAD_REQUEST', message: 'Signature must match the claimant name exactly.' },
+        400
+      );
+    }
+
     const { firebaseAvailable: fbAvail, db: fireDb } = await import('./lib/firebase');
     if (!fbAvail || !fireDb) {
       return c.json({ code: 'SERVICE_UNAVAILABLE', message: 'Service not available' }, 503);
     }
 
-    // Rate limit per claimant email: max 5 takedowns per day per email
+    const claimantEmailLower = claimantEmail.toLowerCase();
+
+    // Rate limit per claimant email (5/day) + per-contentId flood cap (5/h)
+    // via shared limiter store. The per-content bucket is the censorship-
+    // flood defense — disposable-email rotation bypasses per-email alone.
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const recentByEmail = await fireDb
       .collection('takedownRequests')
-      .where('claimantEmail', '==', claimantEmail)
+      .where('claimantEmailLower', '==', claimantEmailLower)
       .where('createdAt', '>=', oneDayAgo)
       .limit(5)
       .get();
@@ -531,12 +553,29 @@ app.post('/api/takedown', async (c) => {
         429
       );
     }
+    const { consumeRateLimit } = await import('./middleware/rate-limit');
+    const { blocked: contentBlocked } = await consumeRateLimit(
+      `takedown:content:${contentId}`,
+      60 * 60 * 1000,
+      5
+    );
+    if (contentBlocked) {
+      return c.json(
+        {
+          code: 'TOO_MANY_REQUESTS',
+          message:
+            'This content has received several takedown notices recently. Please try again later.',
+        },
+        429
+      );
+    }
 
     const now = new Date();
     const request = {
       contentId,
       claimantName,
       claimantEmail,
+      claimantEmailLower,
       claimantAddress,
       claimantPhone,
       copyrightWork,
@@ -635,11 +674,15 @@ app.post('/api/counter-notice', async (c) => {
       );
     }
 
-    // Prevent duplicate counter-notices for the same takedown from the same email
+    // Prevent duplicate counter-notices for the same takedown from the same
+    // email. Firestore `where` is case-sensitive, so we dedup on a normalized
+    // lowercase copy — an attacker otherwise bypasses dedup by varying case
+    // ("Owner@X" vs "owner@x") and spams the claimant with repeat notices.
+    const respondentEmailLower = respondentEmail.toLowerCase();
     const existing = await fireDb
       .collection('counterNotices')
       .where('takedownRequestId', '==', takedownRequestId)
-      .where('respondentEmail', '==', respondentEmail)
+      .where('respondentEmailLower', '==', respondentEmailLower)
       .limit(1)
       .get();
     if (!existing.empty) {
@@ -657,6 +700,7 @@ app.post('/api/counter-notice', async (c) => {
       takedownRequestId,
       respondentName,
       respondentEmail,
+      respondentEmailLower,
       respondentAddress,
       explanation,
       status: 'pending', // pending | reviewed | rejected

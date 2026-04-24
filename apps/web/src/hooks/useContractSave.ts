@@ -20,6 +20,7 @@ import { trpcClient } from '@/utils/trpc';
 import { universeAbi } from '@loar/abis/generated';
 import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test';
 import { type GraphData } from '@/hooks/useUniverseBlockchain';
+import { confirmTx } from '@/components/tx-confirm';
 
 export interface UseContractSaveProps {
   generatedVideoUrl: string | null;
@@ -215,7 +216,25 @@ export function useContractSave({
         ? (universeId as Address)
         : (TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address);
 
-      // Step 4: Create node on-chain (hashes stored, full strings emitted in event)
+      // Step 4: Create node on-chain. WEB-4: confirm the target contract +
+      // content hashes before sign. createNode is a gas-only action but it's
+      // still the commit that writes narrative into a universe's canon, so
+      // we don't want it firing against a universe the user didn't mean to
+      // target (MitM swap of `universeId`).
+      const approved = await confirmTx({
+        title: 'Record node on-chain',
+        description: 'Commit this generation to the universe timeline.',
+        chainName: `Chain ${chainId}`,
+        functionName: 'createNode',
+        to: contractAddressToUse,
+        summary: [
+          ['Previous node', String(previousNodeId)],
+          ['Content hash', contentHash.slice(0, 18) + '…'],
+        ],
+        confirmLabel: 'Create node',
+      });
+      if (!approved) throw new Error('Cancelled by user');
+
       const txHash = await writeContractAsync({
         abi: universeAbi,
         address: contractAddressToUse,

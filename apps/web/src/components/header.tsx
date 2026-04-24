@@ -34,7 +34,7 @@ import { trpcClient } from '@/utils/trpc';
  */
 const HIDDEN_ROUTES = new Set<string>([]);
 
-/** Core navigation — the 5 most important user flows */
+/** Core navigation — primary user flows shown inline. */
 const primaryLinksBase = [
   { to: '/discover', label: 'Discover' },
   { to: '/create', label: 'Create' },
@@ -104,6 +104,7 @@ export default function Header() {
           { to: '/editor', label: 'Editor' },
           { to: '/tokens', label: 'Launchpad' },
           { to: '/gallery', label: 'Gallery' },
+          { to: '/wiki', label: 'Wiki' },
           { to: '/dashboard', label: 'Dashboard' },
         ] as const)
       : primaryLinksBase

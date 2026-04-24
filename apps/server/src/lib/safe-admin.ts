@@ -140,6 +140,67 @@ export async function getUniverseAdminAddress(universeId: string): Promise<strin
   return (doc.data()?.creator as string | undefined)?.toLowerCase() ?? null;
 }
 
+// Minimal Ownable ABI for on-chain cross-checks.
+const ABI_OWNABLE = [
+  {
+    name: 'owner',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'address' }],
+  },
+] as const;
+
+/**
+ * INF-5 strict variant — verify the caller against the ON-CHAIN owner in
+ * addition to the Firestore `creator` field, for universe contracts that
+ * expose `owner()`. Use this from tRPC routes that move funds (e.g.
+ * `universeTreasury.*`, `universeTeam.addMember`) so that a compromised
+ * Firestore does not equal a compromised treasury.
+ *
+ * Fallback: if the universe has no `contractAddress` on file, OR the on-chain
+ * read fails transiently, we defer to the existing `isUniverseAdmin` result.
+ * The ceiling for "strict" is still the same auth chain; this call only adds
+ * a positive chain confirmation when possible.
+ */
+export async function isUniverseAdminStrict(
+  universeId: string,
+  callerAddress: string,
+  chainId?: number
+): Promise<boolean> {
+  const baseline = await isUniverseAdmin(universeId, callerAddress, chainId);
+  if (!baseline) return false;
+
+  const doc = await universesCol().doc(universeId.toLowerCase()).get();
+  if (!doc.exists) return false;
+  const data = doc.data()!;
+  const contractAddress = data.contractAddress as string | undefined;
+  if (!contractAddress) return baseline;
+
+  // Multi-sig path already walks the chain via `getOwners()` inside
+  // `isUniverseAdmin`; no additional read needed.
+  if (data.isMultiSig) return baseline;
+
+  try {
+    const resolvedChainId = chainId ?? (data.chainId as number | undefined);
+    const onchainOwner = (await getChainClient(resolvedChainId).readContract({
+      address: contractAddress as `0x${string}`,
+      abi: ABI_OWNABLE,
+      functionName: 'owner',
+    })) as string;
+    return onchainOwner.toLowerCase() === callerAddress.toLowerCase();
+  } catch (err) {
+    // Transient RPC failures: fail CLOSED when the strict path is invoked,
+    // because the whole point is defense-in-depth against Firestore lies.
+    console.error(
+      `[isUniverseAdminStrict] on-chain owner() failed for universe ${universeId} ` +
+        `(contract: ${contractAddress}). Refusing strict admin check:`,
+      err instanceof Error ? err.message : err
+    );
+    return false;
+  }
+}
+
 /**
  * Broader than `isUniverseAdmin` — returns true if the caller is the universe
  * admin (creator or Safe signer) OR an active member of the universe team.

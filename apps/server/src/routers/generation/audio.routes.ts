@@ -15,7 +15,13 @@
  *   musicgen-large          ~$0.02/gen  (standard, up to 30s)
  *   musicgen-stereo-large   ~$0.03/gen  (standard stereo, up to 30s)
  */
-import { router, protectedProcedure, publicProcedure, requirePermission } from '../../lib/trpc';
+import {
+  router,
+  protectedProcedure,
+  publicProcedure,
+  requirePermission,
+  expensiveProcedure,
+} from '../../lib/trpc';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
@@ -239,7 +245,8 @@ export const audioRouter = router({
     }),
 
   // ── Generate music/audio ───────────────────────────────────────────
-  generate: protectedProcedure
+  // INF-6: FAL stable-audio / musicgen (~$0.02–0.04 per call).
+  generate: expensiveProcedure
     .use(requirePermission('generation.audio'))
     .input(
       z.object({

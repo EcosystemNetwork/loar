@@ -604,8 +604,8 @@ function EventPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium">Event #{previousEventData.id}</p>
-                      <p className="text-xs text-muted-foreground line-clamp-2">
-                        {previousEventData.description}
+                      <p className="text-xs text-muted-foreground line-clamp-2 break-words">
+                        <UserText>{previousEventData.description}</UserText>
                       </p>
                     </div>
                   </div>
@@ -651,8 +651,8 @@ function EventPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium">Event #{nextEventData[0].id}</p>
-                        <p className="text-xs text-muted-foreground line-clamp-2">
-                          {nextEventData[0].description}
+                        <p className="text-xs text-muted-foreground line-clamp-2 break-words">
+                          <UserText>{nextEventData[0].description}</UserText>
                         </p>
                       </div>
                     </div>
@@ -689,8 +689,8 @@ function EventPage() {
                             <p className="text-sm font-medium">
                               Branch {idx + 1} - Event #{event.id}
                             </p>
-                            <p className="text-xs text-muted-foreground line-clamp-1">
-                              {event.description}
+                            <p className="text-xs text-muted-foreground line-clamp-1 break-words">
+                              <UserText>{event.description}</UserText>
                             </p>
                           </div>
                           <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary flex-shrink-0 transition-colors" />
@@ -724,7 +724,9 @@ function EventPage() {
                   {wiki.title}
                 </h2>
                 {wiki.summary && (
-                  <p className="text-base text-muted-foreground leading-relaxed">{wiki.summary}</p>
+                  <p className="text-base text-muted-foreground leading-relaxed break-words">
+                    <UserText>{wiki.summary}</UserText>
+                  </p>
                 )}
               </div>
             </div>
@@ -794,8 +796,8 @@ function EventPage() {
                                 <h4 className="text-lg font-bold mb-2 text-foreground group-hover:text-primary transition-colors">
                                   {element.name}
                                 </h4>
-                                <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-                                  {element.description}
+                                <p className="text-sm text-muted-foreground leading-relaxed mb-3 break-words">
+                                  <UserText>{element.description}</UserText>
                                 </p>
 
                                 {element.actions && element.actions.length > 0 && (
@@ -851,8 +853,8 @@ function EventPage() {
                           <span className="flex-shrink-0 w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary/70 text-primary-foreground text-sm font-bold flex items-center justify-center shadow group-hover:scale-110 transition-transform duration-300">
                             {idx + 1}
                           </span>
-                          <span className="text-sm leading-relaxed pt-0.5 text-foreground/90 group-hover:text-foreground">
-                            {momentText}
+                          <span className="text-sm leading-relaxed pt-0.5 text-foreground/90 group-hover:text-foreground break-words">
+                            <UserText>{momentText}</UserText>
                           </span>
                         </li>
                       );
@@ -885,8 +887,8 @@ function EventPage() {
                           <span className="text-primary mt-0.5 group-hover:scale-125 transition-transform duration-300">
                             <LoarIcon name="sparkle" size={12} />
                           </span>
-                          <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">
-                            {detailText}
+                          <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors break-words">
+                            <UserText>{detailText}</UserText>
                           </span>
                         </li>
                       );

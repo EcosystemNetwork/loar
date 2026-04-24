@@ -6,14 +6,30 @@ on:
     types: [completed]
     branches: [main]
 
+# Least-privilege token. This workflow only reads source and SSHes to prod;
+# it does not write to the repo/issues/releases. Without this, `GITHUB_TOKEN`
+# inherits the org default (often write-all on older orgs), so any compromised
+# step (pnpm post-install, buildx action) could push to main.
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # TODO(ops): create a `production` GitHub Environment in repo settings
+    # with required reviewers + branch protection, move
+    # SSH_PRIVATE_KEY / SSH_HOST / SSH_USER / WORK_DIR secrets into it, and
+    # uncomment the line below so deploys need explicit approval.
+    # environment: production
     # Only deploy if CI passed — skip on failure or cancellation
     if: github.event.workflow_run.conclusion == 'success'
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          # Hardened: don't leave GITHUB_TOKEN in .git/config for later
+          # steps to pick up. This workflow doesn't push to the repo.
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v4
         with:

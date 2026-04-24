@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Uniswap Hooks (last updated v1.2.0) (test/utils/interfaces/IPoolManagerEvents.sol)
-pragma solidity =0.8.30;
+// Widened to ^0.8.26 so HookTest.sol can include this interface without
+// colliding with uniswap-v4-core PoolManager's pinned 0.8.26.
+pragma solidity ^0.8.26;
 
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";

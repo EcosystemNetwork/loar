@@ -11,6 +11,7 @@
  * after consent is 'all' — see `src/lib/sentry.ts`.
  */
 import { useEffect, useState } from 'react';
+import { QA_EVENTS } from '@/lib/qa-events';
 
 export const CONSENT_KEY = 'loar_consent_v1';
 export type ConsentLevel = 'all' | 'essential';
@@ -34,6 +35,15 @@ export function CookieConsent() {
     const onStorage = () => setLevel(readConsent());
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  useEffect(() => {
+    const open = () => {
+      window.localStorage.removeItem(CONSENT_KEY);
+      setLevel(null);
+    };
+    window.addEventListener(QA_EVENTS.OPEN_COOKIE_CONSENT, open);
+    return () => window.removeEventListener(QA_EVENTS.OPEN_COOKIE_CONSENT, open);
   }, []);
 
   if (level !== null) return null;

@@ -77,11 +77,21 @@ const JWT_ISSUER = 'loar-server';
 const JWT_AUDIENCE = 'loar-app';
 const JWT_EXPIRY = '24h';
 
-/** Allowed SIWE domains. In production, SIWE_ALLOWED_DOMAINS must be set explicitly. */
+/** Allowed SIWE domains. In production, SIWE_ALLOWED_DOMAINS must be set explicitly.
+ *
+ *  Hardening: empty-string entries (from a trailing comma in the env var) and
+ *  syntactically invalid domains are filtered. Without this, `"loar.fun,"`
+ *  produces a Set containing `""` and any message whose line-1 lazy-match
+ *  captures an empty string matches.
+ */
+const DOMAIN_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i;
 const ALLOWED_DOMAINS = new Set(
   (() => {
     const raw = process.env.SIWE_ALLOWED_DOMAINS || 'localhost,loar.fun';
-    const domains = raw.split(',').map((d) => d.trim());
+    const domains = raw
+      .split(',')
+      .map((d) => d.trim())
+      .filter((d) => d.length > 0 && DOMAIN_RE.test(d));
     // Reject localhost in production to prevent domain spoofing
     if (process.env.NODE_ENV === 'production') {
       const filtered = domains.filter((d) => d !== 'localhost');
@@ -96,12 +106,27 @@ const ALLOWED_DOMAINS = new Set(
   })()
 );
 
-/** Allowed Chain IDs. Base L2 mainnet (8453) + Base Sepolia (84532) + Sepolia testnet (11155111) + localhost. */
+/** Allowed Chain IDs. Base mainnet (8453) + testnets + anvil in dev only.
+ *  Production defaults lock to 8453 to prevent cross-env replay (a SIWE
+ *  signature from a test dApp on Sepolia must not auth to prod). */
 const ALLOWED_CHAIN_IDS = new Set(
-  (process.env.SIWE_ALLOWED_CHAIN_IDS || '8453,84532,11155111,31337')
-    .split(',')
-    .map((id) => id.trim())
+  (() => {
+    const raw = process.env.SIWE_ALLOWED_CHAIN_IDS;
+    if (raw)
+      return raw
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean);
+    return process.env.NODE_ENV === 'production'
+      ? ['8453']
+      : ['8453', '84532', '11155111', '31337'];
+  })()
 );
+
+/** Max allowed lifetime of a SIWE message from issue → expiration. Caps the
+ *  replay window on intercepted-but-not-yet-used messages. EIP-4361 leaves
+ *  this to the verifier; 10 min matches the nonce TTL + clock-skew budget. */
+const MAX_SIWE_LIFETIME_MS = 10 * 60 * 1000;
 
 export interface SiweSessionPayload extends JWTPayload {
   sub: string; // checksummed wallet address
@@ -173,7 +198,12 @@ export async function verifySiweSignature(
   // `evil.com` to the wallet UI while bypassing the domain + origin check.
   const lines = message.split('\n');
   const domainLine = lines[0]?.trim();
-  const domainMatch = domainLine?.match(/^(.+?) wants you to sign in/);
+  // Strict EIP-4361 preamble: `<domain> wants you to sign in with your
+  // Ethereum account:` — anchored at both ends, domain must be a single
+  // whitespace-free token. The previous lazy-greedy regex let an attacker
+  // smuggle `evil.com wants you to sign in to victim.com wants you to sign
+  // in with your Ethereum account:` past the capture group.
+  const domainMatch = domainLine?.match(/^(\S+) wants you to sign in with your Ethereum account:$/);
   if (!domainMatch) {
     throw new Error('SIWE message is missing or malformed domain line');
   }
@@ -227,8 +257,14 @@ export async function verifySiweSignature(
   if (isNaN(expiresAt.getTime())) {
     throw new Error('Invalid Expiration Time in SIWE message');
   }
-  if (new Date() > expiresAt) {
+  const now = new Date();
+  if (now > expiresAt) {
     throw new Error('SIWE message has expired. Please sign in again.');
+  }
+  // Cap the max lifetime — protects against messages with year-9999
+  // expirations being relayed later.
+  if (expiresAt.getTime() - now.getTime() > MAX_SIWE_LIFETIME_MS) {
+    throw new Error('SIWE message expiration is too far in the future.');
   }
 
   // Validate Chain ID (REQUIRED per EIP-4361)
@@ -256,8 +292,10 @@ export async function verifySiweSignature(
     throw new Error('SIWE message contains an invalid URI');
   }
 
-  // Extract and validate nonce
-  const nonceMatch = message.match(/Nonce: ([a-f0-9]+)/);
+  // Extract and validate nonce. Anchored to full-line, fixed 64-char length
+  // (matches generateNonce output) so an unanchored match can't capture a
+  // prefix of a nonce from an adjacent field.
+  const nonceMatch = message.match(/^Nonce: ([a-f0-9]{64})$/m);
   if (!nonceMatch) {
     throw new Error('Could not extract nonce from SIWE message');
   }

@@ -99,7 +99,18 @@ authRoutes.post('/verify', async (c) => {
     ALLOWED_ORIGINS.add('http://localhost:3000');
   }
   const originUrl = origin.replace(/\/$/, '');
-  if (!ALLOWED_ORIGINS.has(originUrl) && !(originUrl.includes('localhost') && !IS_PRODUCTION)) {
+  // Structural origin check — never substring-match `.includes('localhost')`,
+  // because `http://localhost.evil.com` would pass. In dev, only the exact
+  // localhost hostname is accepted; the allowlist set already covers prod.
+  let isDevLocalhost = false;
+  if (!IS_PRODUCTION) {
+    try {
+      isDevLocalhost = new URL(originUrl).hostname === 'localhost';
+    } catch {
+      isDevLocalhost = false;
+    }
+  }
+  if (!ALLOWED_ORIGINS.has(originUrl) && !isDevLocalhost) {
     return c.json({ error: 'Origin not allowed' }, 403);
   }
 

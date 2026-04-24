@@ -16,7 +16,7 @@
  *   sourceVideoGenerationId  = i2v genId
  *   sourceAudioGenerationId  = tts genId
  */
-import { router, protectedProcedure, requirePermission } from '../../lib/trpc';
+import { router, protectedProcedure, requirePermission, expensiveProcedure } from '../../lib/trpc';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
@@ -231,7 +231,8 @@ export const talkingSceneRouter = router({
       };
     }),
 
-  create: protectedProcedure
+  // INF-6: ElevenLabs TTS + FAL I2V + lip-sync chain (~$0.18-0.24 per call).
+  create: expensiveProcedure
     .use(requirePermission('generation.lipsync'))
     .input(
       z.object({

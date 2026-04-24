@@ -53,6 +53,7 @@ import {
   Heart,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { UserText } from '@/components/user-text';
 import {
   Select,
   SelectContent,
@@ -437,8 +438,8 @@ function CollectionTab() {
                 <p className="text-xs text-muted-foreground">
                   {char.collection} #{char.token_id}
                 </p>
-                <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                  {char.description}
+                <p className="text-sm text-muted-foreground line-clamp-2 mt-1 break-words">
+                  <UserText>{char.description}</UserText>
                 </p>
                 <div className="flex flex-wrap gap-1 mt-2">
                   {Object.entries(char.traits)
@@ -553,8 +554,8 @@ function CharacterProfilesTab({ universeAddress }: { universeAddress?: string })
                     </p>
                   ) : null}
                   {entity.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                      {entity.description}
+                    <p className="text-sm text-muted-foreground line-clamp-2 mt-1 break-words">
+                      <UserText>{entity.description}</UserText>
                     </p>
                   )}
                   <div className="flex gap-1 mt-2 flex-wrap">
@@ -667,8 +668,8 @@ function ThreeDModelsTab({ universeAddress }: { universeAddress?: string }) {
               <CardContent className="p-3">
                 <p className="text-sm font-medium truncate">{item.title}</p>
                 {item.description && (
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">
-                    {item.description}
+                  <p className="text-xs text-muted-foreground truncate mt-0.5 break-words">
+                    <UserText>{item.description}</UserText>
                   </p>
                 )}
               </CardContent>

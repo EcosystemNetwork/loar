@@ -22,7 +22,13 @@
  * Voice design:  ~$0.08 flat fee
  * Instant clone: ~$0.09 flat fee
  */
-import { router, protectedProcedure, publicProcedure, requirePermission } from '../../lib/trpc';
+import {
+  router,
+  protectedProcedure,
+  publicProcedure,
+  requirePermission,
+  expensiveProcedure,
+} from '../../lib/trpc';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
@@ -221,7 +227,8 @@ const voiceModelSchema = z.enum([
 export const voiceRouter = router({
   // ── TTS with billing ──────────────────────────────────────────────────
 
-  synthesize: protectedProcedure
+  // INF-6: ElevenLabs TTS — cost scales with character count ($0.00004/char).
+  synthesize: expensiveProcedure
     .use(requirePermission('generation.voice'))
     .input(
       z.object({
@@ -412,7 +419,8 @@ export const voiceRouter = router({
 
   // ── Sound effects ─────────────────────────────────────────────────────
 
-  soundEffect: protectedProcedure
+  // INF-6: ElevenLabs SFX (~$0.08 per call).
+  soundEffect: expensiveProcedure
     .use(requirePermission('generation.voice'))
     .input(
       z.object({
@@ -576,7 +584,8 @@ export const voiceRouter = router({
 
   // ── Voice design ──────────────────────────────────────────────────────
 
-  designVoice: protectedProcedure
+  // INF-6: ElevenLabs voice design (~$0.08 per call).
+  designVoice: expensiveProcedure
     .use(requirePermission('generation.voice'))
     .input(
       z.object({
@@ -662,7 +671,8 @@ export const voiceRouter = router({
 
   // ── Instant voice clone ───────────────────────────────────────────────
 
-  cloneVoice: protectedProcedure
+  // INF-6: ElevenLabs voice cloning — uploads samples + trains.
+  cloneVoice: expensiveProcedure
     .use(requirePermission('generation.voice'))
     .input(
       z.object({
@@ -744,7 +754,8 @@ export const voiceRouter = router({
 
   // ── Voice modify (swap + effect) ──────────────────────────────────────
 
-  modify: protectedProcedure
+  // INF-6: ElevenLabs voice modification (~$0.08 per call).
+  modify: expensiveProcedure
     .use(requirePermission('generation.voice'))
     .input(
       z.object({

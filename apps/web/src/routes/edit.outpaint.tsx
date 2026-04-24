@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ImageIcon, ArrowLeft } from 'lucide-react';
+import { awaitSessionValidation } from '@/lib/wallet-auth';
 
 export const Route = createFileRoute('/edit/outpaint')({
   validateSearch: z.object({
@@ -19,10 +20,12 @@ export const Route = createFileRoute('/edit/outpaint')({
     universeId: z.string().optional(),
     entityId: z.string().optional(),
   }),
-  beforeLoad: ({ context, location }) => {
+  // WEB-6: paid FAL outpaint jobs; wait for /auth/me before mount.
+  beforeLoad: async ({ context, location }) => {
     if (!context.hasSession()) {
       throw redirect({ to: '/login', search: { redirect: location.href } });
     }
+    await awaitSessionValidation();
   },
   component: OutpaintPage,
 });

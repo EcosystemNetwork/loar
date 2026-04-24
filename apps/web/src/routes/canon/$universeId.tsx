@@ -23,6 +23,8 @@ import {
   FileCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { confirmTx } from '@/components/tx-confirm';
+import { UserText } from '@/components/user-text';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -306,8 +308,8 @@ function SubmissionCard({
         </div>
 
         {submission.description && (
-          <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
-            {submission.description}
+          <p className="text-xs text-muted-foreground line-clamp-2 mb-3 break-words">
+            <UserText>{submission.description}</UserText>
           </p>
         )}
 
@@ -413,8 +415,8 @@ function CanonCard({ entry }: { entry: any }) {
               )}
             </p>
             {entry.description && (
-              <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">
-                {entry.description}
+              <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2 break-words">
+                <UserText>{entry.description}</UserText>
               </p>
             )}
           </div>
@@ -495,6 +497,22 @@ function LicenseCanonDialog({
     }
     setSubmitting(true);
     try {
+      // WEB-4: licenseCanon sends ETH to the CanonMarketplace contract.
+      // Confirm the exact amount + target before the wallet sign step.
+      const approved = await confirmTx({
+        title: 'License canon submission',
+        description: 'Pay the ETH license fee to the CanonMarketplace.',
+        chainName: 'Base Sepolia',
+        functionName: 'licenseCanon',
+        to: canonAddress,
+        valueEth: ethAmount,
+        summary: [['Submission id', String(onChainSubmissionId)]],
+        confirmLabel: 'License',
+      });
+      if (!approved) {
+        setSubmitting(false);
+        return;
+      }
       const hash = await writeContractAsync({
         address: canonAddress,
         abi: canonMarketplaceAbi,

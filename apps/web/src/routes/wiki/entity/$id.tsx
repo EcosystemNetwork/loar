@@ -15,6 +15,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { toast } from 'sonner';
+import { UserText } from '@/components/user-text';
 import { trpcClient } from '@/utils/trpc';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -589,7 +590,9 @@ function RelationshipsCard({ entityId, isOwner }: { entityId: string; isOwner: b
                     </Link>
                   </div>
                   {rel.description && (
-                    <p className="text-xs text-muted-foreground truncate">{rel.description}</p>
+                    <p className="text-xs text-muted-foreground truncate break-words">
+                      <UserText>{rel.description}</UserText>
+                    </p>
                   )}
                 </div>
                 {isOwner && (
@@ -1047,7 +1050,9 @@ function EntityPage() {
                 </CardHeader>
                 {entity.description && (
                   <CardContent>
-                    <p className="text-muted-foreground leading-relaxed">{entity.description}</p>
+                    <p className="text-muted-foreground leading-relaxed break-words">
+                      <UserText>{entity.description}</UserText>
+                    </p>
                   </CardContent>
                 )}
               </Card>

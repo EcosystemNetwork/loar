@@ -8,6 +8,7 @@ import type { Context as HonoContext } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { getAddress } from 'viem';
 import { verifyAuth, type AuthUser } from './auth';
+import { getClientKey } from '../middleware/rate-limit';
 
 export type CreateContextOptions = {
   context: HonoContext;
@@ -28,12 +29,13 @@ export async function createContext({ context }: CreateContextOptions) {
     }
   }
 
-  // Expose request headers so procedures can read client IP / UA without
-  // depending on the Hono context object (keeps the tRPC surface portable).
-  const clientIp =
-    context.req.header('cf-connecting-ip') ||
-    context.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
-    'unknown';
+  // Reuse the same extractor the HTTP rate limiter uses so both paths agree
+  // on what counts as "the client IP". Previously this trusted XFF/CF
+  // unconditionally, which let any caller set `X-Forwarded-For: <random>`
+  // and punch through per-IP rate limits on tRPC procedures (notably
+  // analytics.recordView). getClientKey gates XFF trust on TRUST_PROXY
+  // and validates IP format.
+  const clientIp = getClientKey(context);
 
   return { user, clientIp };
 }

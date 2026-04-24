@@ -53,6 +53,77 @@ function serialize(data: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
+type ViewerCtx = { user: { uid: string; address?: string | null } | null };
+
+/**
+ * Batch-checks which asset IDs are viewable by the caller. An asset is
+ * viewable iff:
+ *   - its `content` doc has contentStatus of 'active' or 'reinstated'
+ *     (i.e. not hidden/removed/flagged/under_review), OR
+ *   - the caller is the creator (so creators can still see their own
+ *     moderated content in lineage).
+ *
+ * Assets with no backing `content` doc (pre-moderation-schema rows) are
+ * treated as viewable — this preserves the legacy behaviour for data
+ * created before the moderation field existed.
+ *
+ * Similarly screens out events belonging to private universes unless the
+ * caller is the universe creator.
+ *
+ * Returns a Set of assetIds the caller may see.
+ */
+async function filterVisibleAssets(assetIds: string[], ctx: ViewerCtx): Promise<Set<string>> {
+  if (assetIds.length === 0) return new Set();
+  const unique = Array.from(new Set(assetIds));
+  const contentRefs = unique.map((id) => db!.collection('content').doc(id));
+  const snaps = await db!.getAll(...contentRefs);
+  const viewerUid = ctx.user?.uid?.toLowerCase() ?? null;
+  const visible = new Set<string>();
+  const universeIdsToCheck = new Map<string, string[]>(); // universeId -> assetIds
+  for (let i = 0; i < unique.length; i++) {
+    const id = unique[i]!;
+    const snap = snaps[i];
+    if (!snap || !snap.exists) {
+      // No content doc — legacy row, assume visible. Universe check still applies
+      // at the event layer below.
+      visible.add(id);
+      continue;
+    }
+    const c = snap.data() ?? {};
+    const status = (c.contentStatus as string | undefined) ?? 'active';
+    const isOwner = viewerUid && c.creatorUid === viewerUid;
+    if (isOwner || status === 'active' || status === 'reinstated') {
+      visible.add(id);
+    }
+  }
+  return visible;
+}
+
+/** Returns true iff the caller may see an event with this universeId. */
+async function universeVisibleToViewer(
+  universeId: string | null | undefined,
+  cache: Map<string, boolean>,
+  ctx: ViewerCtx
+): Promise<boolean> {
+  if (!universeId) return true;
+  if (cache.has(universeId)) return cache.get(universeId)!;
+  const doc = await db!.collection('cinematicUniverses').doc(universeId).get();
+  if (!doc.exists) {
+    cache.set(universeId, true);
+    return true;
+  }
+  const data = doc.data() ?? {};
+  const visibility = data.visibility as string | undefined;
+  if (visibility !== 'private') {
+    cache.set(universeId, true);
+    return true;
+  }
+  const viewerUid = ctx.user?.uid?.toLowerCase() ?? null;
+  const ok = !!viewerUid && data.creatorUid === viewerUid;
+  cache.set(universeId, ok);
+  return ok;
+}
+
 async function assertUniverseOwner(
   universeId: string,
   ctx: { user: { uid: string; address?: string | null } }
@@ -93,27 +164,53 @@ const rangeSchema = z.enum(['day', 'week', 'month', 'all']).default('month');
 
 export const lineageRouter = router({
   /** Fetch a single asset event by its assetId (generationId | jobId | contentId). */
-  getEvent: publicProcedure.input(z.object({ assetId: z.string() })).query(async ({ input }) => {
-    const doc = await eventsCol().doc(input.assetId).get();
-    if (!doc.exists) return null;
-    return serialize({ ...(doc.data() as AssetEvent), id: doc.id });
-  }),
+  getEvent: publicProcedure
+    .input(z.object({ assetId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const doc = await eventsCol().doc(input.assetId).get();
+      if (!doc.exists) return null;
+      const ev = doc.data() as AssetEvent;
+      // Moderation gate: if the underlying content has been hidden/removed
+      // via DMCA/abuse flow, lineage must not leak its prompt, IPFS URL, or
+      // creator — legal surface. Creators still see their own moderated
+      // content.
+      const visible = await filterVisibleAssets([input.assetId], ctx);
+      if (!visible.has(input.assetId)) return null;
+      const uniCache = new Map<string, boolean>();
+      if (!(await universeVisibleToViewer(ev.universeId, uniCache, ctx))) return null;
+      return serialize({ ...ev, id: doc.id });
+    }),
 
   /** Walk parentAssetId from self up to root. Bounded to 32 to avoid cycles. */
-  ancestors: publicProcedure.input(z.object({ assetId: z.string() })).query(async ({ input }) => {
-    const chain: Record<string, unknown>[] = [];
-    let current: string | null = input.assetId;
-    const visited = new Set<string>();
-    while (current && !visited.has(current) && chain.length < 32) {
-      visited.add(current);
-      const doc = await eventsCol().doc(current).get();
-      if (!doc.exists) break;
-      const data = doc.data() as AssetEvent;
-      chain.push(serialize({ ...data, id: doc.id }));
-      current = data.parentAssetId ?? null;
-    }
-    return chain.reverse(); // root-first
-  }),
+  ancestors: publicProcedure
+    .input(z.object({ assetId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const chain: Record<string, unknown>[] = [];
+      const assetIds: string[] = [];
+      const events: AssetEvent[] = [];
+      let current: string | null = input.assetId;
+      const visited = new Set<string>();
+      while (current && !visited.has(current) && chain.length < 32) {
+        visited.add(current);
+        const doc = await eventsCol().doc(current).get();
+        if (!doc.exists) break;
+        const data = doc.data() as AssetEvent;
+        assetIds.push(doc.id);
+        events.push(data);
+        chain.push(serialize({ ...data, id: doc.id }));
+        current = data.parentAssetId ?? null;
+      }
+      const visible = await filterVisibleAssets(assetIds, ctx);
+      const uniCache = new Map<string, boolean>();
+      const filtered: Record<string, unknown>[] = [];
+      for (let i = 0; i < chain.length; i++) {
+        const id = assetIds[i]!;
+        if (!visible.has(id)) continue;
+        if (!(await universeVisibleToViewer(events[i]!.universeId, uniCache, ctx))) continue;
+        filtered.push(chain[i]!);
+      }
+      return filtered.reverse(); // root-first
+    }),
 
   /** Direct children of an asset. */
   descendants: publicProcedure
@@ -123,12 +220,27 @@ export const lineageRouter = router({
         limit: z.number().min(1).max(200).default(50),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const snap = await eventsCol()
         .where('parentAssetId', '==', input.assetId)
         .limit(input.limit)
         .get();
-      return snap.docs.map((d) => serialize({ ...(d.data() as AssetEvent), id: d.id }));
+      const nodes = snap.docs.map((d) => ({
+        id: d.id,
+        ev: d.data() as AssetEvent,
+      }));
+      const visible = await filterVisibleAssets(
+        nodes.map((n) => n.id),
+        ctx
+      );
+      const uniCache = new Map<string, boolean>();
+      const out: Record<string, unknown>[] = [];
+      for (const n of nodes) {
+        if (!visible.has(n.id)) continue;
+        if (!(await universeVisibleToViewer(n.ev.universeId, uniCache, ctx))) continue;
+        out.push(serialize({ ...n.ev, id: n.id }));
+      }
+      return out;
     }),
 
   /** Full subtree rooted at a node. Useful for a provenance UI. */
@@ -139,20 +251,31 @@ export const lineageRouter = router({
         limit: z.number().min(1).max(500).default(200),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const snap = await eventsCol()
         .where('rootAssetId', '==', input.rootAssetId)
         .limit(input.limit)
         .get();
-      const nodes = snap.docs.map((d) => serialize({ ...(d.data() as AssetEvent), id: d.id }));
+      const nodes = snap.docs.map((d) => ({ id: d.id, ev: d.data() as AssetEvent }));
       // Include the root itself even if it wasn't part of the query result
       if (!nodes.some((n) => n.id === input.rootAssetId)) {
         const rootDoc = await eventsCol().doc(input.rootAssetId).get();
         if (rootDoc.exists) {
-          nodes.unshift(serialize({ ...(rootDoc.data() as AssetEvent), id: rootDoc.id }));
+          nodes.unshift({ id: rootDoc.id, ev: rootDoc.data() as AssetEvent });
         }
       }
-      return nodes;
+      const visible = await filterVisibleAssets(
+        nodes.map((n) => n.id),
+        ctx
+      );
+      const uniCache = new Map<string, boolean>();
+      const out: Record<string, unknown>[] = [];
+      for (const n of nodes) {
+        if (!visible.has(n.id)) continue;
+        if (!(await universeVisibleToViewer(n.ev.universeId, uniCache, ctx))) continue;
+        out.push(serialize({ ...n.ev, id: n.id }));
+      }
+      return out;
     }),
 
   /** Universe-scoped feed with filters (rights class, creator, kind, step). */

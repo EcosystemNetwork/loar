@@ -3,6 +3,22 @@ import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { universeGovernorAbi } from '@loar/abis/generated';
 import { decodeEventLog, encodeAbiParameters } from 'viem';
 import { universeAbi as universeAbiForEncoding } from '@loar/abis/generated';
+import { confirmTx } from '@/components/tx-confirm';
+
+function governorChainName(id: number | undefined): string {
+  switch (id) {
+    case 11155111:
+      return 'Sepolia';
+    case 84532:
+      return 'Base Sepolia';
+    case 8453:
+      return 'Base';
+    case 1:
+      return 'Ethereum';
+    default:
+      return id ? `Chain ${id}` : 'Unknown chain';
+  }
+}
 
 /**
  * Hook for interacting with a UniverseGovernor contract
@@ -30,6 +46,24 @@ export function useUniverseGovernor(governorAddress: `0x${string}` | undefined) 
     if (!governorAddress) {
       throw new Error('Governor address is required');
     }
+
+    // WEB-4: propose() can queue arbitrary calldata that — if passed and
+    // executed — moves treasury funds. Show the targets explicitly so the
+    // user eyeballs which contracts they're authorizing votes against.
+    const ok = await confirmTx({
+      title: 'Create governance proposal',
+      description: params.description.slice(0, 140),
+      chainName: governorChainName(chainId),
+      functionName: 'propose',
+      to: governorAddress,
+      summary: [
+        ['Targets', `${params.targets.length} contract${params.targets.length === 1 ? '' : 's'}`],
+        ['First target', params.targets[0] ?? '—'],
+        ['Total ETH committed', params.values.reduce((a, b) => a + b, 0n).toString() + ' wei'],
+      ],
+      confirmLabel: 'Sign proposal',
+    });
+    if (!ok) throw new Error('Cancelled by user');
 
     const txHash = await writeContractAsync({
       address: governorAddress,
@@ -137,6 +171,23 @@ export function useUniverseGovernor(governorAddress: `0x${string}` | undefined) 
     if (!governorAddress) {
       throw new Error('Governor address is required');
     }
+
+    // WEB-4: execute() runs arbitrary calldata post-timelock — this is the
+    // actual "fire the treasury transfer" step. Confirm loudly.
+    const ok = await confirmTx({
+      title: 'Execute governance proposal',
+      description: 'This runs every queued call in the proposal.',
+      chainName: governorChainName(chainId),
+      functionName: 'execute',
+      to: governorAddress,
+      summary: [
+        ['Targets', `${params.targets.length} contract${params.targets.length === 1 ? '' : 's'}`],
+        ['First target', params.targets[0] ?? '—'],
+        ['Total ETH moved', params.values.reduce((a, b) => a + b, 0n).toString() + ' wei'],
+      ],
+      confirmLabel: 'Execute',
+    });
+    if (!ok) throw new Error('Cancelled by user');
 
     const txHash = await writeContractAsync({
       address: governorAddress,

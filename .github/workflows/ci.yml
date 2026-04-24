@@ -139,7 +139,7 @@ jobs:
         with:
           name: server-test-results-${{ github.run_id }}
           path: apps/server/test-results/junit.xml
-          retention-days: 30
+          retention-days: 14
 
   address-registry:
     name: Address Registry
@@ -225,7 +225,7 @@ jobs:
         with:
           name: forge-test-results-${{ github.run_id }}
           path: apps/contracts/forge-test-output.txt
-          retention-days: 30
+          retention-days: 14
 
   # Single required status check — require this in branch protection settings.
   # It only passes when every parallel job above passes.

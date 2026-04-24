@@ -12,6 +12,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { UserText } from '@/components/user-text';
 
 export const Route = createFileRoute('/notifications')({
   component: NotificationsPage,
@@ -207,9 +208,9 @@ function NotificationsPage() {
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <p
-                      className={`text-sm leading-snug ${!notif.read ? 'text-zinc-100' : 'text-zinc-400'}`}
+                      className={`text-sm leading-snug break-words ${!notif.read ? 'text-zinc-100' : 'text-zinc-400'}`}
                     >
-                      {notif.message}
+                      <UserText>{notif.message}</UserText>
                     </p>
                     <p className="text-xs text-zinc-600 mt-1">
                       {notif.createdAt

@@ -7,7 +7,7 @@
 import { createFileRoute, useNavigate, Link, redirect } from '@tanstack/react-router';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
-import { useWalletAuth } from '@/lib/wallet-auth';
+import { useWalletAuth, awaitSessionValidation } from '@/lib/wallet-auth';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
 import { Card } from '@/components/ui/card';
@@ -34,10 +34,14 @@ import { MintContentDialog } from '@/components/MintContentDialog';
 import { useVocab } from '@/hooks/use-vocab';
 
 export const Route = createFileRoute('/my-works')({
-  beforeLoad: ({ context }) => {
+  // WEB-6: wait for /auth/me before the destructive delete mutation becomes
+  // reachable. Otherwise localStorage-hydrated auth state lets a queued
+  // delete fire against a stale cookie.
+  beforeLoad: async ({ context }) => {
     if (!context.hasSession()) {
       throw redirect({ to: '/login', search: { redirect: '/my-works' } });
     }
+    await awaitSessionValidation();
   },
   component: MyWorksPage,
 });

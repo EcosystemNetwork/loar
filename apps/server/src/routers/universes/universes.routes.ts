@@ -15,7 +15,7 @@ import {
   setUniversePrivate,
   deleteUniverse,
 } from './universes.handlers';
-import { isUniverseAdmin, getSafeInfo } from '../../lib/safe-admin';
+import { isUniverseAdmin, isUniverseAdminStrict, getSafeInfo } from '../../lib/safe-admin';
 import { db } from '../../lib/firebase';
 import { generateNonce, consumeNonce } from '../../lib/siwe';
 
@@ -374,6 +374,72 @@ export const universesRouter = router({
       return { ok: true, restoredCreator: previousCreator };
     }),
 
+  /**
+   * Resolve admin info for a universe from the server-side Firestore record +
+   * server RPC. Used by the web `useIsUniverseAdmin` hook so UI gating does
+   * not depend on the user's wallet RPC provider (which is frequently rate
+   * limited on public Sepolia / Base Sepolia endpoints).
+   *
+   * Returns a consistent shape for both EOA and Safe multi-sig admins. When
+   * `address` is omitted, `isAdmin` is always false but the rest of the
+   * fields are populated (so callers can still render Safe metadata).
+   */
+  adminInfo: publicProcedure
+    .input(
+      z.object({
+        universeId: z.string(),
+        address: z
+          .string()
+          .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid address')
+          .optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const id = input.universeId.toLowerCase();
+      const caller = input.address?.toLowerCase();
+
+      const doc = await db.collection('cinematicUniverses').doc(id).get();
+      if (!doc.exists) {
+        return {
+          isAdmin: false,
+          isSafe: false,
+          adminAddress: undefined as string | undefined,
+          safeAddress: undefined as string | undefined,
+          owners: [] as string[],
+          threshold: 0,
+        };
+      }
+
+      const data = doc.data()!;
+      const creator = (data.creator as string | undefined)?.toLowerCase();
+      const chainId = data.chainId as number | undefined;
+
+      if (data.isMultiSig && data.multiSigAddress) {
+        const safeAddress = (data.multiSigAddress as string).toLowerCase();
+        const safeInfo = await getSafeInfo(safeAddress, chainId);
+        const owners = safeInfo?.owners ?? [];
+        const threshold = safeInfo?.threshold ?? 0;
+        const isAdmin = !!caller && (caller === creator || owners.includes(caller));
+        return {
+          isAdmin,
+          isSafe: true,
+          adminAddress: safeAddress,
+          safeAddress,
+          owners,
+          threshold,
+        };
+      }
+
+      return {
+        isAdmin: !!caller && caller === creator,
+        isSafe: false,
+        adminAddress: creator,
+        safeAddress: undefined as string | undefined,
+        owners: [] as string[],
+        threshold: 0,
+      };
+    }),
+
   /** Get multi-sig info for a universe (public). */
   getMultiSigInfo: publicProcedure
     .input(z.object({ universeId: z.string() }))
@@ -427,8 +493,10 @@ export const universesRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // INF-5: access model switches control token-gate / subscription
+      // revenue paths — strict on-chain owner check required.
       const universeId = input.universeId.toLowerCase();
-      if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
+      if (!(await isUniverseAdminStrict(universeId, ctx.user.uid))) {
         throw new Error('Only the universe admin can update access settings');
       }
 
@@ -503,8 +571,9 @@ export const universesRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // INF-5: privacy flips can hide monetized content from buyers. Strict check.
       const universeId = input.universeId.toLowerCase();
-      if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
+      if (!(await isUniverseAdminStrict(universeId, ctx.user.uid))) {
         throw new Error('Only the universe creator can change privacy');
       }
 
@@ -569,8 +638,10 @@ export const universesRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // INF-5: universeType flip (fun → monetized) unlocks the revenue
+      // mode — treat it like a treasury action and require strict admin.
       const universeId = input.universeId.toLowerCase();
-      if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
+      if (!(await isUniverseAdminStrict(universeId, ctx.user.uid))) {
         throw new Error('Only the universe admin can update the universe type');
       }
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWalletAuth, getSiweAddress } from '@/lib/wallet-auth';
-import { useRouterState } from '@tanstack/react-router';
+import { useRouterState, useNavigate } from '@tanstack/react-router';
+import { QA_EVENTS, fireQaEvent } from '@/lib/qa-events';
 import { useChainId, useBalance } from 'wagmi';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { Button } from './ui/button';
@@ -173,12 +174,13 @@ export default function AdminToolbar() {
   const [navHistory, setNavHistory] = useState<NavEntry[]>([]);
   const [networkEntries, setNetworkEntries] = useState<NetworkEntry[]>([]);
   const [fps, setFps] = useState<number>(0);
-  const [activeTab, setActiveTab] = useState<'info' | 'analytics'>('analytics');
+  const [activeTab, setActiveTab] = useState<'info' | 'analytics' | 'qa'>('analytics');
   const lastPathRef = useRef<string>('');
   const lastNavTimeRef = useRef<number>(Date.now());
 
-  const { address: walletAddress, isAuthenticated } = useWalletAuth();
+  const { address: walletAddress, isAuthenticated, signOut } = useWalletAuth();
   const routerState = useRouterState();
+  const navigate = useNavigate();
   const { address, isConnected, connector } = useAccount();
   const chainId = useChainId();
   const { data: balance } = useBalance({ address });
@@ -446,6 +448,12 @@ export default function AdminToolbar() {
               className={`px-2 py-0.5 text-[10px] rounded ${activeTab === 'info' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}
             >
               System Info
+            </button>
+            <button
+              onClick={() => setActiveTab('qa')}
+              className={`px-2 py-0.5 text-[10px] rounded ${activeTab === 'qa' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}
+            >
+              QA
             </button>
           </div>
 
@@ -1063,6 +1071,239 @@ export default function AdminToolbar() {
                   {window.innerWidth}x{window.innerHeight}
                 </span>
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════ QA TAB ═══════════ */}
+      {activeTab === 'qa' && (
+        <div className="px-4 py-2 space-y-1">
+          {/* ── Overlays & Modals ── */}
+          <SectionToggle
+            label="Overlays & Modals"
+            icon={Eye}
+            section="qa-overlays"
+            expanded={expandedSection}
+            onToggle={toggleSection}
+          />
+          {expandedSection === 'qa-overlays' && (
+            <div className="ml-5 pb-3 flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] bg-zinc-800 border-zinc-700 hover:bg-zinc-700"
+                onClick={() => fireQaEvent(QA_EVENTS.OPEN_CREDIT_STORE)}
+              >
+                Open Credit Store
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] bg-zinc-800 border-zinc-700 hover:bg-zinc-700"
+                onClick={() => {
+                  // Getting Started popup is only mounted on the home route.
+                  if (routerState.location.pathname !== '/') {
+                    navigate({ to: '/' });
+                    setTimeout(() => fireQaEvent(QA_EVENTS.OPEN_GETTING_STARTED), 400);
+                  } else {
+                    fireQaEvent(QA_EVENTS.OPEN_GETTING_STARTED);
+                  }
+                }}
+              >
+                Open Getting Started
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] bg-zinc-800 border-zinc-700 hover:bg-zinc-700"
+                onClick={() => fireQaEvent(QA_EVENTS.OPEN_COOKIE_CONSENT)}
+              >
+                Open Cookie Consent
+              </Button>
+            </div>
+          )}
+
+          {/* ── Toasts ── */}
+          <SectionToggle
+            label="Toasts"
+            icon={Zap}
+            section="qa-toasts"
+            expanded={expandedSection}
+            onToggle={toggleSection}
+          />
+          {expandedSection === 'qa-toasts' && (
+            <div className="ml-5 pb-3 flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] bg-zinc-800 border-zinc-700 hover:bg-zinc-700"
+                onClick={() => toast.success('Success toast — sample')}
+              >
+                Success
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] bg-zinc-800 border-zinc-700 hover:bg-zinc-700"
+                onClick={() => toast.error('Error toast — something broke')}
+              >
+                Error
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] bg-zinc-800 border-zinc-700 hover:bg-zinc-700"
+                onClick={() => toast.info('Info toast — FYI')}
+              >
+                Info
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] bg-zinc-800 border-zinc-700 hover:bg-zinc-700"
+                onClick={() => toast.warning('Warning — check your balance')}
+              >
+                Warning
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] bg-zinc-800 border-zinc-700 hover:bg-zinc-700"
+                onClick={() => {
+                  const id = toast.loading('Generating...');
+                  setTimeout(() => toast.success('Done!', { id }), 2000);
+                }}
+              >
+                Loading → Success
+              </Button>
+            </div>
+          )}
+
+          {/* ── Quick Navigation ── */}
+          <SectionToggle
+            label="Quick Navigation"
+            icon={Globe}
+            section="qa-nav"
+            expanded={expandedSection}
+            onToggle={toggleSection}
+          />
+          {expandedSection === 'qa-nav' && (
+            <div className="ml-5 pb-3 grid grid-cols-4 md:grid-cols-6 gap-1.5">
+              {[
+                '/',
+                '/discover',
+                '/create',
+                '/editor',
+                '/studio',
+                '/wiki',
+                '/dashboard',
+                '/tokens',
+                '/market',
+                '/gallery',
+                '/activity',
+                '/my-works',
+                '/notifications',
+                '/credits',
+                '/subscriptions',
+                '/pricing',
+                '/sell',
+                '/faucet',
+                '/dmca',
+                '/admin/moderation',
+                '/privacy',
+                '/docs',
+              ].map((path) => (
+                <button
+                  key={path}
+                  onClick={() => navigate({ to: path as any })}
+                  className={`px-2 py-1 text-[10px] font-mono text-left rounded border transition-colors ${
+                    routerState.location.pathname === path
+                      ? 'bg-primary/10 text-primary border-primary/30'
+                      : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
+                  }`}
+                >
+                  {path}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* ── Reset Local State ── */}
+          <SectionToggle
+            label="Reset Local State"
+            icon={Trash2}
+            section="qa-reset"
+            expanded={expandedSection}
+            onToggle={toggleSection}
+          />
+          {expandedSection === 'qa-reset' && (
+            <div className="ml-5 pb-3 flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] bg-zinc-800 border-zinc-700 hover:bg-zinc-700"
+                onClick={() => {
+                  localStorage.removeItem('loar-onboarding-dismissed');
+                  toast.success('Onboarding flag cleared — visit / to see popup');
+                }}
+              >
+                Reset Onboarding Flag
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] bg-zinc-800 border-zinc-700 hover:bg-zinc-700"
+                onClick={() => {
+                  localStorage.removeItem('loar_consent_v1');
+                  fireQaEvent(QA_EVENTS.OPEN_COOKIE_CONSENT);
+                  toast.success('Cookie consent reset');
+                }}
+              >
+                Reset Cookie Consent
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] bg-zinc-800 border-zinc-700 hover:bg-zinc-700"
+                onClick={() => {
+                  // Keep SIWE auth keys so you don't bounce off the admin gate.
+                  const keep = new Set(['siwe-address', 'siwe-expiry', 'siwe-token']);
+                  const toDelete: string[] = [];
+                  for (let i = 0; i < localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    if (!k) continue;
+                    if ((k.startsWith('loar-') || k.startsWith('loar_')) && !keep.has(k)) {
+                      toDelete.push(k);
+                    }
+                  }
+                  toDelete.forEach((k) => localStorage.removeItem(k));
+                  toast.success(`Cleared ${toDelete.length} LOAR keys (auth kept)`);
+                }}
+              >
+                Clear LOAR keys (keep auth)
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] bg-zinc-800 border-zinc-700 hover:bg-zinc-700"
+                onClick={clearQueryCache}
+              >
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Clear Query Cache
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] bg-red-900/30 border-red-700/50 text-red-300 hover:bg-red-900/50"
+                onClick={() => {
+                  signOut();
+                  toast.success('Signed out');
+                }}
+              >
+                <User className="h-3 w-3 mr-1" />
+                Sign Out
+              </Button>
             </div>
           )}
         </div>

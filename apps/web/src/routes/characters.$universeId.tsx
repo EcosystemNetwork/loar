@@ -14,6 +14,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { UserText } from '@/components/user-text';
 
 export const Route = createFileRoute('/characters/$universeId')({
   component: CharactersGalleryPage,
@@ -201,7 +202,9 @@ function CharacterCard({ character }: { character: any }) {
         <CardContent className="p-3 space-y-1">
           <p className="font-medium text-sm truncate">{character.name}</p>
           {character.description && (
-            <p className="text-xs text-muted-foreground line-clamp-2">{character.description}</p>
+            <p className="text-xs text-muted-foreground line-clamp-2 break-words">
+              <UserText>{character.description}</UserText>
+            </p>
           )}
           {createdDate && (
             <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">

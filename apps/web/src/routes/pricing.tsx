@@ -74,7 +74,7 @@ const ERC20_TRANSFER_ABI = [
 
 function PricingPage() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useWalletAuth();
+  const { isAuthenticated, sessionReady } = useWalletAuth();
   const walletChainId = useChainId();
   const queryClient = useQueryClient();
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
@@ -103,6 +103,8 @@ function PricingPage() {
       const loarTokens = billing === 'annual' ? tier.annualLoarTokens : tier.monthlyLoarTokens;
       const totalLoarForPeriod = billing === 'annual' ? loarTokens * 12 : loarTokens;
 
+      // WEB-6: don't act on localStorage-only auth — require /auth/me OK.
+      if (!sessionReady) throw new Error('Session still validating, please retry');
       if (!isAuthenticated) throw new Error('Not signed in');
 
       // Dynamically import viem for encoding
