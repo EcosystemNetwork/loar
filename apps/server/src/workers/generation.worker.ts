@@ -92,6 +92,11 @@ async function processGenerationBody(
 
       // Dispatch to provider
       if (model.provider === 'bytedance') {
+        // BYOK — look up the requesting user's stored ByteDance key, if any.
+        const { getUserSecret } = await import('../services/userSecrets');
+        const bdApiKey = data.userId
+          ? ((await getUserSecret(data.userId, 'bytedance')) ?? undefined)
+          : undefined;
         return bytedanceService.generateVideo({
           prompt: input.prompt,
           model: model.bytedanceModelId || 'seedance-2.0',
@@ -112,6 +117,7 @@ async function processGenerationBody(
             role: 'subject' as const,
           })),
           endImageUrl: input.endFrameUrl,
+          apiKey: bdApiKey,
         });
       }
 

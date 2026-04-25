@@ -621,126 +621,112 @@ export function ActivityTicker() {
 }
 
 /* ──────────────────────────────────────────
- * Recent Videos Row (Webtoons episode feed)
+ * Recent Episodes Row — curated canon episodes from Firestore (cross-universe)
+ *
+ * Pulls from `episodes.feed`, which surfaces multi-clip episodes built by
+ * grouping consecutive on-chain video nodes per creator. Falls back to nothing
+ * when no canon episodes exist yet — universes with raw nodes are still shown
+ * via the universe-card rails below.
  * ────────────────────────────────────────── */
-export function RecentEpisodes({ universes }: { universes: EnrichedUniverse[] }) {
-  const { data: nodesData } = useQuery({
-    queryKey: ['ponder', 'nodes', 'recent-10'],
-    queryFn: () =>
-      ponderGql<{ nodes: { items: Node[] } }>(`{
-        nodes(orderBy: "createdAt", orderDirection: "desc", limit: 10) {
-          items { id universeAddress nodeId previousNodeId creator createdAt }
-        }
-      }`).then((d) => d.nodes.items),
-    ...ponderQueryDefaults,
+type FeedEpisode = {
+  id: string;
+  universeId: string;
+  title: string;
+  description: string;
+  clipCount: number;
+  videoUrl: string | null;
+  sourceCreator: string | null;
+  createdAt: string | null;
+  isCanon: boolean;
+  universe: { id: string; name: string; imageURL: string; creator: string | null };
+};
+
+export function RecentEpisodes() {
+  const { data: episodes } = useQuery<FeedEpisode[]>({
+    queryKey: ['episodes', 'feed', 20],
+    queryFn: () => trpcClient.episodes.feed.query({ limit: 20 }) as Promise<FeedEpisode[]>,
+    staleTime: 30_000,
   });
 
-  const { data: nodeContentData } = useQuery({
-    queryKey: ['ponder', 'nodeContents'],
-    queryFn: () =>
-      ponderGql<{ nodeContents: { items: NodeContent[] } }>(`{
-        nodeContents(limit: 1000) {
-          items { id videoLink plot }
-        }
-      }`).then((d) => d.nodeContents.items),
-    ...ponderQueryDefaults,
-  });
-
-  const episodes = useMemo(() => {
-    if (!nodesData || !nodeContentData) {
-      return [];
-    }
-
-    const contentMap = new Map<string, NodeContent>();
-    nodeContentData.forEach((c) => contentMap.set(c.id, c));
-
-    const uniMap = new Map<string, any>();
-    universes.forEach((u) => uniMap.set(u.id.toLowerCase(), u));
-
-    return nodesData
-      .map((n) => {
-        const content = contentMap.get(`${n.universeAddress.toLowerCase()}:${n.nodeId}`);
-        const uni = uniMap.get(n.universeAddress.toLowerCase());
-        if (!content?.videoLink && !content?.plot) return null;
-        return {
-          id: n.id,
-          videoLink: content?.videoLink,
-          plot: content?.plot,
-          universeName: uni?.name || `Universe ${n.universeAddress.slice(0, 8)}`,
-          universeImage: uni?.imageURL || uni?.tokenData?.imageURL,
-          universeId: n.universeAddress,
-          nodeId: n.nodeId,
-          timestamp: Number(n.createdAt) * 1000,
-        };
-      })
-      .filter(Boolean)
-      .slice(0, 10);
-  }, [nodesData, nodeContentData, universes]);
-
-  if (episodes.length === 0) return null;
+  if (!episodes || episodes.length === 0) return null;
 
   return (
     <section className="py-6">
-      <SectionHeader icon={Clock} title="New Episodes" subtitle="Latest story updates" />
+      <SectionHeader
+        icon={Clock}
+        title="New Episodes"
+        subtitle="Latest canon from across the multiverse"
+      />
       <ScrollRow>
-        {episodes.map((ep: any) => (
-          <Link
-            key={ep.id}
-            to="/event/$universe/$event"
-            params={{ universe: ep.universeId, event: ep.nodeId.toString() }}
-            className="group flex-shrink-0 w-[260px] md:w-[300px]"
-          >
-            {/* Video thumbnail */}
-            <div className="relative aspect-video rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all">
-              {ep.videoLink ? (
-                <>
-                  <video
-                    src={resolveIpfsUrl(ep.videoLink)}
-                    className="w-full h-full object-cover"
-                    muted
-                    preload="metadata"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
-                    <Play className="h-8 w-8 text-white fill-white" />
+        {episodes.map((ep) => {
+          const ts = ep.createdAt ? new Date(ep.createdAt).getTime() : 0;
+          return (
+            <Link
+              key={ep.id}
+              to="/episode/$id"
+              params={{ id: ep.id }}
+              className="group flex-shrink-0 w-[260px] md:w-[300px]"
+            >
+              {/* Video thumbnail */}
+              <div className="relative aspect-video rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all">
+                {ep.videoUrl ? (
+                  <>
+                    <video
+                      src={resolveIpfsUrl(ep.videoUrl)}
+                      className="w-full h-full object-cover"
+                      muted
+                      preload="metadata"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
+                      <Play className="h-8 w-8 text-white fill-white" />
+                    </div>
+                  </>
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-900/40 to-pink-900/40">
+                    <BookOpen className="h-8 w-8 text-white/60" />
                   </div>
-                </>
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-900/40 to-pink-900/40">
-                  <BookOpen className="h-8 w-8 text-white/60" />
-                </div>
-              )}
-              {/* Timestamp */}
-              <div className="absolute top-2 right-2 px-2 py-0.5 bg-black/70 backdrop-blur-sm rounded text-[10px] text-white font-medium">
-                {new Date(ep.timestamp).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                })}
-              </div>
-            </div>
+                )}
 
-            {/* Info */}
-            <div className="flex gap-2 items-start px-0.5">
-              {ep.universeImage ? (
-                <img
-                  src={resolveIpfsUrl(ep.universeImage)}
-                  alt=""
-                  loading="lazy"
-                  className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5"
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex-shrink-0 mt-0.5" />
-              )}
-              <div className="min-w-0">
-                <h4 className="text-sm font-semibold text-white truncate group-hover:text-primary transition-colors">
-                  {ep.universeName}
-                </h4>
-                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                  {ep.plot || 'New episode added'}
-                </p>
+                {/* Clip-count pill (top-left) — surfaces concat episodes */}
+                {ep.clipCount > 1 && (
+                  <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/70 backdrop-blur-sm rounded text-[10px] text-white font-semibold flex items-center gap-1">
+                    <Tv className="h-3 w-3" />
+                    {ep.clipCount} parts
+                  </div>
+                )}
+
+                {/* Timestamp (top-right) */}
+                {ts > 0 && (
+                  <div className="absolute top-2 right-2 px-2 py-0.5 bg-black/70 backdrop-blur-sm rounded text-[10px] text-white font-medium">
+                    {new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </div>
+                )}
               </div>
-            </div>
-          </Link>
-        ))}
+
+              {/* Info */}
+              <div className="flex gap-2 items-start px-0.5">
+                {ep.universe.imageURL ? (
+                  <img
+                    src={resolveIpfsUrl(ep.universe.imageURL)}
+                    alt=""
+                    loading="lazy"
+                    className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex-shrink-0 mt-0.5" />
+                )}
+                <div className="min-w-0">
+                  <h4 className="text-sm font-semibold text-white truncate group-hover:text-primary transition-colors">
+                    {ep.title}
+                  </h4>
+                  <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                    {ep.universe.name || 'Untitled universe'}
+                  </p>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
       </ScrollRow>
     </section>
   );
@@ -869,12 +855,32 @@ export function NewArrivalsRow({ universes }: { universes: EnrichedUniverse[] })
  * Most Episodes Row
  * ────────────────────────────────────────── */
 export function MostEpisodesRow({ universes }: { universes: EnrichedUniverse[] }) {
+  // Rank by real canon-episode count so multi-clip episodes count once each.
+  // Falls back gracefully to nodeCount if the server query is unavailable.
+  const { data: topData } = useQuery<Array<{ universeId: string; count: number }>>({
+    queryKey: ['episodes', 'top-universes', 15],
+    queryFn: () =>
+      trpcClient.episodes.topUniverses.query({ limit: 15 }) as Promise<
+        Array<{ universeId: string; count: number }>
+      >,
+    staleTime: 60_000,
+  });
+
   const byEpisodes = useMemo(() => {
+    if (topData && topData.length > 0) {
+      const uniMap = new Map<string, EnrichedUniverse>();
+      universes.forEach((u) => uniMap.set(u.id.toLowerCase(), u));
+      const ordered = topData
+        .map((t) => uniMap.get(t.universeId.toLowerCase()))
+        .filter((u): u is EnrichedUniverse => !!u);
+      if (ordered.length > 0) return ordered.slice(0, 10);
+    }
+    // Fallback: nodeCount-based rank when no canon episodes exist yet.
     return [...universes]
       .filter((u) => u.nodeCount > 0)
       .sort((a, b) => (b.nodeCount || 0) - (a.nodeCount || 0))
       .slice(0, 10);
-  }, [universes]);
+  }, [universes, topData]);
 
   if (byEpisodes.length === 0) return null;
 

@@ -63,6 +63,7 @@ const moreGroupsBase: MoreGroup[] = [
       { to: '/my-works', label: 'My Works' },
       { to: '/notifications', label: 'Notifications' },
       { to: '/credits', label: 'Credits' },
+      { to: '/settings/api-keys', label: 'API Keys' },
     ],
   },
   {

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VideosRouteImport } from './routes/videos'
 import { Route as UploadRouteImport } from './routes/upload'
+import { Route as TestnetRouteImport } from './routes/testnet'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
 import { Route as StudioControlledRouteImport } from './routes/studio-controlled'
@@ -52,6 +53,7 @@ import { Route as TokensPortfolioRouteImport } from './routes/tokens/portfolio'
 import { Route as TokensLaunchRouteImport } from './routes/tokens/launch'
 import { Route as TokensAddressRouteImport } from './routes/tokens/$address'
 import { Route as ShopUniverseIdRouteImport } from './routes/shop/$universeId'
+import { Route as SettingsApiKeysRouteImport } from './routes/settings.api-keys'
 import { Route as SellNewRouteImport } from './routes/sell/new'
 import { Route as SellEarningsRouteImport } from './routes/sell/earnings'
 import { Route as ProfileEditRouteImport } from './routes/profile/edit'
@@ -64,6 +66,7 @@ import { Route as NotebookIdRouteImport } from './routes/notebook.$id'
 import { Route as LineageAssetIdRouteImport } from './routes/lineage.$assetId'
 import { Route as GovernanceUniverseIdRouteImport } from './routes/governance/$universeId'
 import { Route as ExtractJobIdRouteImport } from './routes/extract.$jobId'
+import { Route as EpisodeIdRouteImport } from './routes/episode.$id'
 import { Route as EditOutpaintRouteImport } from './routes/edit.outpaint'
 import { Route as EditInpaintRouteImport } from './routes/edit.inpaint'
 import { Route as DashboardRevenueRouteImport } from './routes/dashboard.revenue'
@@ -99,6 +102,11 @@ const VideosRoute = VideosRouteImport.update({
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
   path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestnetRoute = TestnetRouteImport.update({
+  id: '/testnet',
+  path: '/testnet',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermsRoute = TermsRouteImport.update({
@@ -306,6 +314,11 @@ const ShopUniverseIdRoute = ShopUniverseIdRouteImport.update({
   path: '/shop/$universeId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsApiKeysRoute = SettingsApiKeysRouteImport.update({
+  id: '/settings/api-keys',
+  path: '/settings/api-keys',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SellNewRoute = SellNewRouteImport.update({
   id: '/sell/new',
   path: '/sell/new',
@@ -364,6 +377,11 @@ const GovernanceUniverseIdRoute = GovernanceUniverseIdRouteImport.update({
 const ExtractJobIdRoute = ExtractJobIdRouteImport.update({
   id: '/extract/$jobId',
   path: '/extract/$jobId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EpisodeIdRoute = EpisodeIdRouteImport.update({
+  id: '/episode/$id',
+  path: '/episode/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EditOutpaintRoute = EditOutpaintRouteImport.update({
@@ -527,6 +545,7 @@ export interface FileRoutesByFullPath {
   '/studio-controlled': typeof StudioControlledRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/terms': typeof TermsRoute
+  '/testnet': typeof TestnetRoute
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
   '/admin/cost': typeof AdminCostRoute
@@ -542,6 +561,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/revenue': typeof DashboardRevenueRoute
   '/edit/inpaint': typeof EditInpaintRoute
   '/edit/outpaint': typeof EditOutpaintRoute
+  '/episode/$id': typeof EpisodeIdRoute
   '/extract/$jobId': typeof ExtractJobIdRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
   '/lineage/$assetId': typeof LineageAssetIdRoute
@@ -554,6 +574,7 @@ export interface FileRoutesByFullPath {
   '/profile/edit': typeof ProfileEditRoute
   '/sell/earnings': typeof SellEarningsRoute
   '/sell/new': typeof SellNewRoute
+  '/settings/api-keys': typeof SettingsApiKeysRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
   '/tokens/launch': typeof TokensLaunchRoute
@@ -610,6 +631,7 @@ export interface FileRoutesByTo {
   '/studio-controlled': typeof StudioControlledRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/terms': typeof TermsRoute
+  '/testnet': typeof TestnetRoute
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
   '/admin/cost': typeof AdminCostRoute
@@ -625,6 +647,7 @@ export interface FileRoutesByTo {
   '/dashboard/revenue': typeof DashboardRevenueRoute
   '/edit/inpaint': typeof EditInpaintRoute
   '/edit/outpaint': typeof EditOutpaintRoute
+  '/episode/$id': typeof EpisodeIdRoute
   '/extract/$jobId': typeof ExtractJobIdRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
   '/lineage/$assetId': typeof LineageAssetIdRoute
@@ -637,6 +660,7 @@ export interface FileRoutesByTo {
   '/profile/edit': typeof ProfileEditRoute
   '/sell/earnings': typeof SellEarningsRoute
   '/sell/new': typeof SellNewRoute
+  '/settings/api-keys': typeof SettingsApiKeysRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
   '/tokens/launch': typeof TokensLaunchRoute
@@ -694,6 +718,7 @@ export interface FileRoutesById {
   '/studio-controlled': typeof StudioControlledRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/terms': typeof TermsRoute
+  '/testnet': typeof TestnetRoute
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
   '/admin/cost': typeof AdminCostRoute
@@ -709,6 +734,7 @@ export interface FileRoutesById {
   '/dashboard/revenue': typeof DashboardRevenueRoute
   '/edit/inpaint': typeof EditInpaintRoute
   '/edit/outpaint': typeof EditOutpaintRoute
+  '/episode/$id': typeof EpisodeIdRoute
   '/extract/$jobId': typeof ExtractJobIdRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
   '/lineage/$assetId': typeof LineageAssetIdRoute
@@ -721,6 +747,7 @@ export interface FileRoutesById {
   '/profile/edit': typeof ProfileEditRoute
   '/sell/earnings': typeof SellEarningsRoute
   '/sell/new': typeof SellNewRoute
+  '/settings/api-keys': typeof SettingsApiKeysRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
   '/tokens/launch': typeof TokensLaunchRoute
@@ -779,6 +806,7 @@ export interface FileRouteTypes {
     | '/studio-controlled'
     | '/subscriptions'
     | '/terms'
+    | '/testnet'
     | '/upload'
     | '/videos'
     | '/admin/cost'
@@ -794,6 +822,7 @@ export interface FileRouteTypes {
     | '/dashboard/revenue'
     | '/edit/inpaint'
     | '/edit/outpaint'
+    | '/episode/$id'
     | '/extract/$jobId'
     | '/governance/$universeId'
     | '/lineage/$assetId'
@@ -806,6 +835,7 @@ export interface FileRouteTypes {
     | '/profile/edit'
     | '/sell/earnings'
     | '/sell/new'
+    | '/settings/api-keys'
     | '/shop/$universeId'
     | '/tokens/$address'
     | '/tokens/launch'
@@ -862,6 +892,7 @@ export interface FileRouteTypes {
     | '/studio-controlled'
     | '/subscriptions'
     | '/terms'
+    | '/testnet'
     | '/upload'
     | '/videos'
     | '/admin/cost'
@@ -877,6 +908,7 @@ export interface FileRouteTypes {
     | '/dashboard/revenue'
     | '/edit/inpaint'
     | '/edit/outpaint'
+    | '/episode/$id'
     | '/extract/$jobId'
     | '/governance/$universeId'
     | '/lineage/$assetId'
@@ -889,6 +921,7 @@ export interface FileRouteTypes {
     | '/profile/edit'
     | '/sell/earnings'
     | '/sell/new'
+    | '/settings/api-keys'
     | '/shop/$universeId'
     | '/tokens/$address'
     | '/tokens/launch'
@@ -945,6 +978,7 @@ export interface FileRouteTypes {
     | '/studio-controlled'
     | '/subscriptions'
     | '/terms'
+    | '/testnet'
     | '/upload'
     | '/videos'
     | '/admin/cost'
@@ -960,6 +994,7 @@ export interface FileRouteTypes {
     | '/dashboard/revenue'
     | '/edit/inpaint'
     | '/edit/outpaint'
+    | '/episode/$id'
     | '/extract/$jobId'
     | '/governance/$universeId'
     | '/lineage/$assetId'
@@ -972,6 +1007,7 @@ export interface FileRouteTypes {
     | '/profile/edit'
     | '/sell/earnings'
     | '/sell/new'
+    | '/settings/api-keys'
     | '/shop/$universeId'
     | '/tokens/$address'
     | '/tokens/launch'
@@ -1029,6 +1065,7 @@ export interface RootRouteChildren {
   StudioControlledRoute: typeof StudioControlledRoute
   SubscriptionsRoute: typeof SubscriptionsRoute
   TermsRoute: typeof TermsRoute
+  TestnetRoute: typeof TestnetRoute
   UploadRoute: typeof UploadRoute
   VideosRoute: typeof VideosRoute
   AdminCostRoute: typeof AdminCostRoute
@@ -1043,6 +1080,7 @@ export interface RootRouteChildren {
   CreateKindRoute: typeof CreateKindRoute
   EditInpaintRoute: typeof EditInpaintRoute
   EditOutpaintRoute: typeof EditOutpaintRoute
+  EpisodeIdRoute: typeof EpisodeIdRoute
   ExtractJobIdRoute: typeof ExtractJobIdRoute
   GovernanceUniverseIdRoute: typeof GovernanceUniverseIdRoute
   LineageAssetIdRoute: typeof LineageAssetIdRoute
@@ -1054,6 +1092,7 @@ export interface RootRouteChildren {
   ProfileEditRoute: typeof ProfileEditRoute
   SellEarningsRoute: typeof SellEarningsRoute
   SellNewRoute: typeof SellNewRoute
+  SettingsApiKeysRoute: typeof SettingsApiKeysRoute
   ShopUniverseIdRoute: typeof ShopUniverseIdRoute
   TokensAddressRoute: typeof TokensAddressRoute
   TokensLaunchRoute: typeof TokensLaunchRoute
@@ -1088,6 +1127,13 @@ declare module '@tanstack/react-router' {
       path: '/upload'
       fullPath: '/upload'
       preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/testnet': {
+      id: '/testnet'
+      path: '/testnet'
+      fullPath: '/testnet'
+      preLoaderRoute: typeof TestnetRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/terms': {
@@ -1377,6 +1423,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShopUniverseIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/api-keys': {
+      id: '/settings/api-keys'
+      path: '/settings/api-keys'
+      fullPath: '/settings/api-keys'
+      preLoaderRoute: typeof SettingsApiKeysRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sell/new': {
       id: '/sell/new'
       path: '/sell/new'
@@ -1459,6 +1512,13 @@ declare module '@tanstack/react-router' {
       path: '/extract/$jobId'
       fullPath: '/extract/$jobId'
       preLoaderRoute: typeof ExtractJobIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/episode/$id': {
+      id: '/episode/$id'
+      path: '/episode/$id'
+      fullPath: '/episode/$id'
+      preLoaderRoute: typeof EpisodeIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/edit/outpaint': {
@@ -1733,6 +1793,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioControlledRoute: StudioControlledRoute,
   SubscriptionsRoute: SubscriptionsRoute,
   TermsRoute: TermsRoute,
+  TestnetRoute: TestnetRoute,
   UploadRoute: UploadRoute,
   VideosRoute: VideosRoute,
   AdminCostRoute: AdminCostRoute,
@@ -1747,6 +1808,7 @@ const rootRouteChildren: RootRouteChildren = {
   CreateKindRoute: CreateKindRoute,
   EditInpaintRoute: EditInpaintRoute,
   EditOutpaintRoute: EditOutpaintRoute,
+  EpisodeIdRoute: EpisodeIdRoute,
   ExtractJobIdRoute: ExtractJobIdRoute,
   GovernanceUniverseIdRoute: GovernanceUniverseIdRoute,
   LineageAssetIdRoute: LineageAssetIdRoute,
@@ -1758,6 +1820,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProfileEditRoute: ProfileEditRoute,
   SellEarningsRoute: SellEarningsRoute,
   SellNewRoute: SellNewRoute,
+  SettingsApiKeysRoute: SettingsApiKeysRoute,
   ShopUniverseIdRoute: ShopUniverseIdRoute,
   TokensAddressRoute: TokensAddressRoute,
   TokensLaunchRoute: TokensLaunchRoute,

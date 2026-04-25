@@ -141,6 +141,11 @@ export default defineConfig({
     dedupe: ['wagmi', 'viem', 'thirdweb', '@tanstack/react-query', 'react', 'react-dom'],
   },
   build: {
+    // Main entry stays ~470KB gzip after splitting MetaMask/WalletConnect/viem.
+    // Further splitting (thirdweb, radix, wagmi) risks dual-React-instance
+    // crashes and is deferred to a post-testnet pass. Bumping the warn limit
+    // to 1700KB to silence the noisy warning on chunks we've audited.
+    chunkSizeWarningLimit: 1700,
     rollupOptions: {
       output: {
         // Split large non-React deps into their own chunks to reduce initial

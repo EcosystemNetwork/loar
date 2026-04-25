@@ -263,12 +263,18 @@ async function dispatchImageGen(
   }
 
   if (model.provider === 'bytedance') {
+    // BYOK — let users plug in their own ModelArk credits.
+    const { getUserSecret } = await import('../../services/userSecrets');
+    const userKey = ctx.userId
+      ? ((await getUserSecret(ctx.userId, 'bytedance')) ?? undefined)
+      : undefined;
     const result = await bytedanceService.generateImage({
       prompt: input.prompt,
       model: model.bytedanceModelId || 'seedream-5-0-260128',
       negativePrompt: input.negativePrompt,
       numImages: input.numImages,
       seed: input.seed,
+      apiKey: userKey,
     });
     if (result.status === 'completed' && result.images?.length) {
       return {

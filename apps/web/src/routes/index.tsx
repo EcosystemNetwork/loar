@@ -278,7 +278,7 @@ function HomeComponent() {
         <div className="-mt-16 relative z-10 pb-20 space-y-2">
           <Top10Strip universes={universes} />
           <TrendingRow universes={universes} />
-          {ponderOnline && <RecentEpisodes universes={universes} />}
+          <RecentEpisodes />
           <NewArrivalsRow universes={universes} />
           <AllUniversesRow universes={universes} />
           <MostEpisodesRow universes={universes} />

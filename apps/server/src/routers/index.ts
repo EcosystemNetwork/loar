@@ -101,6 +101,7 @@ import { indexerRouter } from './indexer/indexer.routes';
 import { notebookRouter } from './notebook/notebook.index';
 import { physicsRouter } from './physics/physics.index';
 import { curationRouter } from './curation/curation.index';
+import { userSecretsRouter } from './userSecrets/userSecrets.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
@@ -243,6 +244,7 @@ export const appRouter = router({
 
   // ── User ────────────────────────────────────────────────────────────
   profiles: profilesRouter,
+  userSecrets: userSecretsRouter,
   quests: questsRouter,
   sandbox: sandboxRouter,
 

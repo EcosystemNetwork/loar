@@ -102,7 +102,9 @@ function WatchPage() {
           description?: string;
           isCanon?: boolean;
           clips?: Array<{ nodeId?: string; videoUrl?: string; label?: string }>;
+          clipCount?: number;
           sourceNodeId?: string;
+          sourceNodeIds?: string[];
           sourceCreator?: string | null;
         }>
       >,
@@ -123,23 +125,43 @@ function WatchPage() {
   // Admin check so managers can pivot to the editor from here
   const admin = useIsUniverseAdmin(idLower as `0x${string}`);
 
-  // Build episodes — merge on-chain nodes with curated Firestore episodes.
-  // Firestore title/description wins when present; raw plot is the fallback.
+  // Build episodes — merge on-chain nodes with curated Firestore episodes,
+  // then collapse nodes that belong to the same multi-clip episode into a
+  // single rail item. Standalone nodes (no Firestore episode yet) keep one
+  // card each. Firestore title/description wins; raw plot is the fallback.
   const episodes = useMemo(() => {
     if (!nodes) return [];
     const contentMap = new Map<string, PonderNodeContent>();
     (nodeContents || []).forEach((c) => contentMap.set(c.id, c));
 
+    // Map every node-id covered by a Firestore episode (across all clips,
+    // not just the source) so multi-clip episodes resolve from any member.
     const fsByNodeId = new Map<
       string,
-      { id: string; title?: string; description?: string; isCanon?: boolean }
+      {
+        id: string;
+        title?: string;
+        description?: string;
+        isCanon?: boolean;
+        clipCount: number;
+      }
     >();
     for (const ep of fsEpisodes || []) {
-      const sourceId = ep.sourceNodeId ?? ep.clips?.[0]?.nodeId;
-      if (sourceId) fsByNodeId.set(String(sourceId), ep);
+      const ids = new Set<string>();
+      for (const id of ep.sourceNodeIds || []) if (id) ids.add(String(id));
+      for (const c of ep.clips || []) if (c?.nodeId) ids.add(String(c.nodeId));
+      if (ep.sourceNodeId) ids.add(String(ep.sourceNodeId));
+      const slim = {
+        id: ep.id,
+        title: ep.title,
+        description: ep.description,
+        isCanon: ep.isCanon,
+        clipCount: ep.clipCount ?? ep.clips?.length ?? ids.size,
+      };
+      for (const id of ids) fsByNodeId.set(id, slim);
     }
 
-    return nodes
+    const enriched = nodes
       .map((n) => {
         const c = contentMap.get(`${n.universeAddress.toLowerCase()}:${n.nodeId}`);
         const fs = fsByNodeId.get(String(n.nodeId));
@@ -151,9 +173,27 @@ function WatchPage() {
           fsTitle: fs?.title,
           fsDescription: fs?.description,
           fsIsCanon: fs?.isCanon,
+          fsClipCount: fs?.clipCount ?? 1,
         };
       })
       .filter((n) => n.videoLink || n.plot);
+
+    // Collapse: one rail item per Firestore episode (its earliest node is
+    // the representative), one item per standalone node otherwise.
+    const seenEpisodeIds = new Set<string>();
+    const collapsed: typeof enriched = [];
+    // Sort ascending by nodeId so the representative is the chronological
+    // start of the episode (matches the order Firestore stores clips in).
+    const ascending = [...enriched].sort((a, b) => a.nodeId - b.nodeId);
+    for (const item of ascending) {
+      if (item.fsEpisodeId) {
+        if (seenEpisodeIds.has(item.fsEpisodeId)) continue;
+        seenEpisodeIds.add(item.fsEpisodeId);
+      }
+      collapsed.push(item);
+    }
+    // Restore the original (descending) order so latest episodes lead.
+    return collapsed.sort((a, b) => b.nodeId - a.nodeId);
   }, [nodes, nodeContents, fsEpisodes]);
 
   // Nodes on-chain that have no matching Firestore episode yet — the count
@@ -162,8 +202,9 @@ function WatchPage() {
     if (!nodes || !fsEpisodes) return 0;
     const claimed = new Set<string>();
     for (const ep of fsEpisodes) {
-      const sourceId = ep.sourceNodeId ?? ep.clips?.[0]?.nodeId;
-      if (sourceId) claimed.add(String(sourceId));
+      for (const id of ep.sourceNodeIds || []) if (id) claimed.add(String(id));
+      for (const c of ep.clips || []) if (c?.nodeId) claimed.add(String(c.nodeId));
+      if (ep.sourceNodeId) claimed.add(String(ep.sourceNodeId));
     }
     const contentMap = new Map<string, PonderNodeContent>();
     (nodeContents || []).forEach((c) => contentMap.set(c.id, c));
@@ -354,6 +395,7 @@ type EpisodeRailItem = PonderNode & {
   fsTitle?: string;
   fsDescription?: string;
   fsIsCanon?: boolean;
+  fsClipCount?: number;
 };
 
 function shortAddr(addr?: string): string {
@@ -411,10 +453,22 @@ function EpisodeCard({
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
+  // Multi-clip episodes route to the sequential player; standalone nodes
+  // (no Firestore episode yet) keep the per-node /event/ surface so admins
+  // can still drill in before backfill runs.
+  const linkProps = episode.fsEpisodeId
+    ? ({
+        to: '/episode/$id' as const,
+        params: { id: episode.fsEpisodeId },
+      } as const)
+    : ({
+        to: '/event/$universe/$event' as const,
+        params: { universe: universeId, event: episode.nodeId.toString() },
+      } as const);
+
   return (
     <Link
-      to="/event/$universe/$event"
-      params={{ universe: universeId, event: episode.nodeId.toString() }}
+      {...linkProps}
       className="group flex-shrink-0 w-[280px] md:w-[320px] snap-start"
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -459,6 +513,14 @@ function EpisodeCard({
         <div className="absolute top-2 left-2 text-xs font-semibold bg-black/70 text-white px-2 py-0.5 rounded backdrop-blur-sm">
           EP {String(index + 1).padStart(2, '0')}
         </div>
+
+        {/* Multi-clip pill — surfaces concat episodes */}
+        {(episode.fsClipCount ?? 1) > 1 && (
+          <div className="absolute top-2 left-14 text-[10px] font-semibold bg-black/70 text-white px-1.5 py-0.5 rounded backdrop-blur-sm flex items-center gap-1">
+            <Film className="h-2.5 w-2.5" />
+            {episode.fsClipCount} parts
+          </div>
+        )}
 
         {/* Top-right: canon badge when curated */}
         {isCurated && isCanon && (

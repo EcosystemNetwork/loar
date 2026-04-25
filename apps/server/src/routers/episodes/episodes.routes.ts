@@ -108,6 +108,13 @@ export type EpisodeClip = z.infer<typeof clipSchema>;
 const EXPORT_BASE_CREDITS = 5; // base cost
 const EXPORT_PER_CLIP_CREDITS = 1; // per clip in the episode
 
+// ── Backfill grouping ───────────────────────────────────────────────────
+
+/** Max clips concatenated into a single auto-grouped episode. */
+const BACKFILL_MAX_CLIPS = 6;
+/** Time gap (ms) that breaks a contiguous run between same-creator nodes. */
+const BACKFILL_GAP_MS = 24 * 60 * 60 * 1000;
+
 // ── Helpers ─────────────────────────────────────────────────────────────
 
 async function deductCredits(uid: string, credits: number): Promise<void> {
@@ -979,6 +986,98 @@ export const episodesRouter = router({
     }),
 
   /**
+   * Cross-universe feed of canon episodes for the home page rails. Returns
+   * each episode hydrated with light universe metadata (name, image, creator)
+   * so the client can render Netflix-style cards without a second round-trip.
+   * Hidden and private universes are filtered out.
+   */
+  feed: publicProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(50).default(20),
+      })
+    )
+    .query(async ({ input }) => {
+      const snap = await episodesCol()
+        .where('isCanon', '==', true)
+        .orderBy('createdAt', 'desc')
+        .limit(input.limit * 2) // overfetch — we filter hidden/private universes after join
+        .get();
+
+      const episodes = snap.docs.map((d) => d.data() as any);
+      if (episodes.length === 0) return [] as Array<any>;
+
+      const universeIds = Array.from(
+        new Set(
+          episodes
+            .map((e) => (e.universeId as string | undefined)?.toLowerCase())
+            .filter((id): id is string => !!id)
+        )
+      );
+      if (universeIds.length === 0) return [] as Array<any>;
+
+      const refs = universeIds.map((id) => db.collection('cinematicUniverses').doc(id));
+      const universeDocs = await db.getAll(...refs);
+      const universeMap = new Map<
+        string,
+        { id: string; name: string; imageURL: string; creator: string | null }
+      >();
+      for (const doc of universeDocs) {
+        if (!doc.exists) continue;
+        const data = doc.data() as any;
+        if (data.isHidden || data.isPrivate) continue;
+        universeMap.set(doc.id, {
+          id: doc.id,
+          name: data.name || data.description?.slice(0, 40) || '',
+          imageURL: data.image_url || data.imageURL || data.portrait_image_url || '',
+          creator: data.creator || null,
+        });
+      }
+
+      return episodes
+        .map((ep) => {
+          const u = universeMap.get((ep.universeId as string)?.toLowerCase?.() ?? '');
+          if (!u) return null;
+          const firstClip = Array.isArray(ep.clips) ? ep.clips[0] : null;
+          return {
+            id: ep.id as string,
+            universeId: ep.universeId as string,
+            title: (ep.title as string) || 'Untitled episode',
+            description: (ep.description as string) || '',
+            clipCount: (ep.clipCount as number) ?? (Array.isArray(ep.clips) ? ep.clips.length : 0),
+            videoUrl: (firstClip?.videoUrl as string | undefined) ?? null,
+            sourceCreator: (ep.sourceCreator as string | null) ?? null,
+            createdAt: (ep.createdAt as string | null) ?? null,
+            isCanon: !!ep.isCanon,
+            universe: u,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => !!x)
+        .slice(0, input.limit);
+    }),
+
+  /**
+   * Top universes ranked by canon-episode count. Used by the home page
+   * "Binge-Worthy" rail so we can rank by real episodes (multi-clip groups
+   * count once each) rather than raw on-chain node count.
+   */
+  topUniverses: publicProcedure
+    .input(z.object({ limit: z.number().min(1).max(50).default(15) }))
+    .query(async ({ input }) => {
+      const snap = await episodesCol().where('isCanon', '==', true).get();
+      const counts = new Map<string, number>();
+      for (const doc of snap.docs) {
+        const uid = (doc.data().universeId as string | undefined)?.toLowerCase();
+        if (!uid) continue;
+        counts.set(uid, (counts.get(uid) ?? 0) + 1);
+      }
+      return Array.from(counts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, input.limit)
+        .map(([universeId, count]) => ({ universeId, count }));
+    }),
+
+  /**
    * Promote an episode to canon. **One-way** — cannot be reversed.
    *
    * For `fun` universes, canon is a Firestore flag only (off-chain).
@@ -1204,11 +1303,17 @@ export const episodesRouter = router({
   /**
    * Backfill canon episodes from on-chain video nodes.
    *
-   * Takes an already-fetched list of video nodes (client reads from Ponder
-   * and forwards) and creates one Firestore episode per node that doesn't
-   * already have a clip referencing it. For `fun` universes the new episodes
-   * are auto-canoned (off-chain flag). For `monetized` universes they stay
-   * as drafts — canon requires the on-chain `setCanonForEpisode` gesture.
+   * Walks the input nodes in chronological order and groups consecutive
+   * nodes from the same creator into a single multi-clip episode. A new
+   * episode starts whenever the creator changes, the gap between two
+   * adjacent nodes exceeds {@link BACKFILL_GAP_MS}, or the running group
+   * already holds {@link BACKFILL_MAX_CLIPS} clips. Nodes already claimed
+   * by an existing Firestore episode are skipped (and act as a group
+   * boundary, since they break the contiguous run).
+   *
+   * For `fun` universes the new episodes are auto-canoned (off-chain
+   * flag). For `monetized` universes they stay as drafts — canon requires
+   * the on-chain `setCanonForEpisode` gesture.
    *
    * Admin-only: caller must be the universe creator or a Safe signer.
    */
@@ -1257,40 +1362,95 @@ export const episodesRouter = router({
         }
       }
 
+      // Sort chronologically so chain-walk grouping is deterministic. Nodes
+      // without `createdAt` sink to the end (treated as newest).
+      const sorted = [...input.nodes].sort((a, b) => {
+        const ta = a.createdAt ?? Number.MAX_SAFE_INTEGER;
+        const tb = b.createdAt ?? Number.MAX_SAFE_INTEGER;
+        if (ta !== tb) return ta - tb;
+        return Number(a.nodeId) - Number(b.nodeId);
+      });
+
+      type Group = {
+        creator: string | null;
+        nodes: typeof sorted;
+      };
+      const groups: Group[] = [];
+      let skippedClaimed = 0;
+
+      for (const n of sorted) {
+        if (claimed.has(String(n.nodeId))) {
+          skippedClaimed++;
+          continue;
+        }
+        const creator = (n.creator ?? '').toLowerCase() || null;
+        const last = groups[groups.length - 1];
+        const lastNode = last?.nodes[last.nodes.length - 1];
+        const gapMs =
+          last && lastNode && n.createdAt && lastNode.createdAt
+            ? (n.createdAt - lastNode.createdAt) * 1000
+            : 0;
+        const startNew =
+          !last ||
+          last.creator !== creator ||
+          last.nodes.length >= BACKFILL_MAX_CLIPS ||
+          gapMs > BACKFILL_GAP_MS;
+        if (startNew) {
+          groups.push({ creator, nodes: [n] });
+        } else {
+          last.nodes.push(n);
+        }
+      }
+
       const now = new Date().toISOString();
       const batch = db.batch();
       let created = 0;
 
-      for (const n of input.nodes) {
-        if (claimed.has(String(n.nodeId))) continue;
-
-        const plot = (n.plot || '').trim();
+      for (const group of groups) {
+        const head = group.nodes[0];
+        const plot = (head.plot || '').trim();
         const firstLine =
           plot
             .split(/[\n.!?]/)[0]
             ?.trim()
             .slice(0, 120) || '';
-        const title = firstLine || `Episode ${n.nodeId}`;
+        const baseTitle = firstLine || `Episode ${head.nodeId}`;
+        const title =
+          group.nodes.length > 1 ? `${baseTitle} (${group.nodes.length} parts)` : baseTitle;
 
         const episodeId = randomUUID();
         const ref = episodesCol().doc(episodeId);
         const isFun = universeType === 'fun';
 
+        const clips = group.nodes.map((n, i) => {
+          const nPlot = (n.plot || '').trim();
+          const nFirst =
+            nPlot
+              .split(/[\n.!?]/)[0]
+              ?.trim()
+              .slice(0, 120) || '';
+          return {
+            nodeId: String(n.nodeId),
+            label: nFirst || `Part ${i + 1}`,
+            videoUrl: n.videoUrl,
+            trimStart: 0,
+            trimEnd: 0,
+          };
+        });
+
+        const description =
+          group.nodes
+            .map((n) => (n.plot || '').trim())
+            .filter(Boolean)
+            .join('\n\n') || plot;
+
         batch.set(ref, {
           id: episodeId,
           universeId,
           title,
-          description: plot,
-          clips: [
-            {
-              nodeId: String(n.nodeId),
-              label: title,
-              videoUrl: n.videoUrl,
-              trimStart: 0,
-              trimEnd: 0,
-            },
-          ],
-          clipCount: 1,
+          description,
+          clips,
+          clipCount: clips.length,
           creatorId: ctx.user.uid,
           createdAt: now,
           updatedAt: now,
@@ -1299,11 +1459,12 @@ export const episodesRouter = router({
           canonizedAt: isFun ? now : null,
           canonTipNodeId: null,
           canonTxHash: null,
-          sourceNodeId: String(n.nodeId),
-          sourceCreator: n.creator ?? null,
-          sourceCreatedAt: n.createdAt ?? null,
+          sourceNodeId: String(head.nodeId),
+          sourceNodeIds: group.nodes.map((n) => String(n.nodeId)),
+          sourceCreator: head.creator ?? null,
+          sourceCreatedAt: head.createdAt ?? null,
         });
-        claimed.add(String(n.nodeId));
+        for (const n of group.nodes) claimed.add(String(n.nodeId));
         created++;
       }
 
@@ -1311,9 +1472,10 @@ export const episodesRouter = router({
 
       return {
         created,
-        skipped: input.nodes.length - created,
+        skipped: skippedClaimed,
         universeType,
         autoCanoned: universeType === 'fun' ? created : 0,
+        clipsTotal: groups.reduce((acc, g) => acc + g.nodes.length, 0),
       };
     }),
 

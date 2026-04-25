@@ -225,7 +225,8 @@ function buildByteDanceInput(
 export async function dispatchGeneration(
   model: NonNullable<ReturnType<typeof getModelById>>,
   input: z.infer<typeof generateInputSchema>,
-  resolvedCastUrls?: string[]
+  resolvedCastUrls?: string[],
+  callerUid?: string
 ): Promise<{ id: string; status: string; videoUrl?: string; error?: string }> {
   // ── Scene Controls: Apply style preset to prompt ────────────────
   if (input.stylePreset) {
@@ -263,6 +264,13 @@ export async function dispatchGeneration(
 
   if (model.provider === 'bytedance') {
     const bdInput = buildByteDanceInput(model, input, resolvedCastUrls);
+    // BYOK: if the caller has a stored ByteDance key, route their gen calls
+    // through it so they spend their own ModelArk credits — not the platform's.
+    if (callerUid) {
+      const { getUserSecret } = await import('../../services/userSecrets');
+      const userKey = await getUserSecret(callerUid, 'bytedance');
+      if (userKey) bdInput.apiKey = userKey;
+    }
     return bytedanceService.generateVideo(bdInput);
   }
 
@@ -1133,7 +1141,7 @@ export const generationRouter = router({
         record.status = 'running';
         await generationsCol().doc(generationId).update({ status: 'running' });
 
-        const result = await dispatchGeneration(model, input, resolvedCastUrls);
+        const result = await dispatchGeneration(model, input, resolvedCastUrls, ctx.user.uid);
 
         const latencyMs = Date.now() - startTime;
 
@@ -1141,7 +1149,12 @@ export const generationRouter = router({
           markProviderUnhealthy(model.provider);
 
           if (input.routingMode === 'auto' && input.allowFallback) {
-            const fallbackResult = await attemptFallback(input, model.id, generationId);
+            const fallbackResult = await attemptFallback(
+              input,
+              model.id,
+              generationId,
+              ctx.user.uid
+            );
             if (fallbackResult) {
               await generationsCol()
                 .doc(generationId)
@@ -1965,6 +1978,13 @@ export const generationRouter = router({
           }
         }
 
+        // BYOK lookup — only matters when calling ByteDance
+        let bdApiKey: string | undefined;
+        if (isByteDance) {
+          const { getUserSecret } = await import('../../services/userSecrets');
+          bdApiKey = (await getUserSecret(ctx.user.uid, 'bytedance')) ?? undefined;
+        }
+
         result = isByteDance
           ? await bytedanceService.generateVideo({
               prompt,
@@ -1985,6 +2005,7 @@ export const generationRouter = router({
               negativePrompt: input.negativePrompt,
               seed: input.seed,
               ...cameraParams,
+              apiKey: bdApiKey,
             })
           : await falService.generateVideo({ ...input, prompt });
       } catch (genError) {
@@ -2317,7 +2338,8 @@ export const generationRouter = router({
 async function attemptFallback(
   input: z.infer<typeof generateInputSchema>,
   failedModelId: string,
-  generationId: string
+  generationId: string,
+  callerUid?: string
 ): Promise<{ videoUrl: string; fallbackModelId: string } | null> {
   // Get fallback candidates
   const candidates = getModelsForMode(input.mode).filter(
@@ -2338,7 +2360,7 @@ async function attemptFallback(
     try {
       console.log(`Attempting fallback: ${failedModelId} -> ${candidate.id}`);
 
-      const result = await dispatchGeneration(candidate, input);
+      const result = await dispatchGeneration(candidate, input, undefined, callerUid);
 
       if (result.status === 'completed' && result.videoUrl) {
         markProviderHealthy(candidate.provider);

@@ -119,11 +119,13 @@ export async function verifyAndClaimTx(
   let tx: any;
   try {
     [receipt, tx] = await Promise.all([
-      getCachedOrFetch(`receipt-${normalizedHash}`, () =>
-        client.getTransactionReceipt({ hash: normalizedHash as Hash })
+      getCachedOrFetch<any>(
+        `receipt-${normalizedHash}`,
+        () => client.getTransactionReceipt({ hash: normalizedHash as Hash }) as Promise<any>
       ),
-      getCachedOrFetch(`tx-${normalizedHash}`, () =>
-        client.getTransaction({ hash: normalizedHash as Hash })
+      getCachedOrFetch<any>(
+        `tx-${normalizedHash}`,
+        () => client.getTransaction({ hash: normalizedHash as Hash }) as Promise<any>
       ),
     ]);
   } catch {

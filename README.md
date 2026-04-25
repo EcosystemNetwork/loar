@@ -18,6 +18,23 @@
 
 ---
 
+## 🏆 Hackathon Submission — AI Lab: Seed Agents Challenge
+
+**LOAR is an autonomous studio for original IP.** Seed agents read story canon, plan multi-scene episodes, and generate them with character consistency on Seedance — then the community votes which episodes become canonical, on-chain.
+
+| What we use                               | Where it shows up                                     |
+| ----------------------------------------- | ----------------------------------------------------- |
+| **Seedance 2.0** (T2V, I2V, ref-to-video) | Episode + clip generation across the studio           |
+| **Seedream 5.0**                          | Keyframe / storyboard generation, character portraits |
+| **Seed 2.0** (chat completions)           | Episode planner, prompt enhancement, dialog scripting |
+| **Seed Speech / OmniHuman**               | Talking-scene flow for character-to-camera moments    |
+
+**🔑 Bring-Your-Own-Key:** Every user can plug in their own ModelArk API key at [/settings/api-keys](apps/web/src/routes/settings.api-keys.tsx). Keys are encrypted at rest with AES-256-GCM and never returned to the client. Judges can demo on their own credits.
+
+See **[HACKATHON.md](HACKATHON.md)** for the 2-min demo script, architecture diagram, track positioning, and submission-form copy.
+
+---
+
 ## What is LOAR?
 
 LOAR is a platform where creators deploy cinematic universes as smart contracts, generate AI video/image content, build branching narratives, and set up multiple revenue streams — all governed by token holders.

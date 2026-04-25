@@ -7,6 +7,7 @@
 import { createFileRoute, Link, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
+import { useWalletAuth } from '@/lib/wallet-auth';
 import { z } from 'zod';
 import {
   Users,
@@ -189,6 +190,7 @@ const ENTITY_TYPES: EntityTypeCard[] = [
 
 function CreateHub() {
   const { universe: universeAddress } = useSearch({ from: '/create/' });
+  const { address } = useWalletAuth();
 
   const { data: universeResult } = useQuery({
     queryKey: ['universe', universeAddress],
@@ -198,6 +200,22 @@ function CreateHub() {
   const universeInfo = universeResult?.data as
     | { id: string; name?: string; image_url?: string }
     | undefined;
+
+  const { data: myUniverses } = useQuery({
+    queryKey: ['create', 'my-universes', address],
+    queryFn: () => trpcClient.universes.getByCreator.query({ creator: address! }),
+    enabled: !!address && !universeAddress,
+    staleTime: 30_000,
+  });
+  const myUniverseList = ((myUniverses as any)?.data ?? []) as Array<{
+    id: string;
+    name?: string;
+    description?: string;
+    image_url?: string;
+    imageURL?: string;
+    portrait_image_url?: string;
+    isPrivate?: boolean;
+  }>;
 
   return (
     <div className="container mx-auto px-4 py-10 max-w-6xl">
@@ -227,6 +245,59 @@ function CreateHub() {
             : 'Anything in your universe is a first-class object. Build people, places, factions, and lore — or deploy a new universe on-chain.'}
         </p>
       </div>
+
+      {!universeAddress && address && myUniverseList.length > 0 && (
+        <div className="mb-10">
+          <div className="mb-4 flex items-end justify-between">
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight">Your Universes</h2>
+              <p className="text-sm text-muted-foreground">
+                Pick one to author entities into, or start something new below.
+              </p>
+            </div>
+            <Link to="/dashboard" className="text-sm text-muted-foreground hover:text-foreground">
+              Manage all →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {myUniverseList.map((u) => {
+              const img = u.image_url || u.imageURL || u.portrait_image_url || '';
+              return (
+                <Link
+                  key={u.id}
+                  to="/create"
+                  search={{ universe: u.id }}
+                  className="group flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-violet-500/40 transition-all"
+                >
+                  {img ? (
+                    <img
+                      src={resolveIpfsUrl(img)}
+                      alt=""
+                      loading="lazy"
+                      className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-violet-500/40 to-purple-500/40 flex-shrink-0" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold truncate">{u.name || 'Untitled universe'}</p>
+                      {u.isPrivate && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          Private
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {u.description || `${u.id.slice(0, 6)}…${u.id.slice(-4)}`}
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {ENTITY_TYPES.filter(({ kind }) => (universeAddress ? kind !== 'universe' : true)).map(

@@ -43,6 +43,8 @@ interface HealthPayload {
 function StatusPage() {
   const serverUrl = (import.meta.env.VITE_SERVER_URL as string | undefined) || '';
   const healthUrl = `${serverUrl}/health`;
+  const indexerUrl = (import.meta.env.VITE_PONDER_URL as string | undefined) || '';
+  const indexerHealthUrl = indexerUrl ? `${indexerUrl.replace(/\/$/, '')}/health` : '';
 
   const { data, error, isFetching, isLoading } = useQuery<HealthPayload>({
     queryKey: ['public-health', healthUrl],
@@ -53,6 +55,18 @@ function StatusPage() {
       });
       if (!res.ok) throw new Error(`health returned ${res.status}`);
       return (await res.json()) as HealthPayload;
+    },
+    refetchInterval: 30_000,
+    retry: 1,
+  });
+
+  const { data: indexerHealthy } = useQuery<boolean>({
+    queryKey: ['public-indexer-health', indexerHealthUrl],
+    enabled: Boolean(indexerHealthUrl),
+    queryFn: async () => {
+      const res = await fetch(indexerHealthUrl, { credentials: 'omit' });
+      // Ponder returns 200 (often empty body) when healthy, 503 while syncing
+      return res.status === 200;
     },
     refetchInterval: 30_000,
     retry: 1,
@@ -100,6 +114,18 @@ function StatusPage() {
             {Object.entries(data.checks).map(([name, value]) => (
               <DependencyRow key={name} name={name} status={value} />
             ))}
+            {indexerHealthUrl && (
+              <DependencyRow
+                name="indexer"
+                status={
+                  indexerHealthy === undefined
+                    ? 'not_initialized'
+                    : indexerHealthy
+                      ? 'ok'
+                      : 'degraded'
+                }
+              />
+            )}
           </CardContent>
         </Card>
       )}

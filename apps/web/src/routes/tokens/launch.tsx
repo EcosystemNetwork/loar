@@ -234,8 +234,10 @@ function LaunchTokenPage() {
                   label="Drop image here or click to upload"
                   acceptedTypes={['image/jpeg', 'image/png', 'image/webp', 'image/gif']}
                   maxSizeMB={5}
-                  onUploadComplete={(_manifest, previewUrl) => {
-                    setImageURL(previewUrl);
+                  onUploadComplete={(manifest, previewUrl) => {
+                    // Persistent IPFS URL goes on-chain; fall back to the
+                    // local blob preview only if the manifest is empty.
+                    setImageURL(manifest.uploads[0]?.url || previewUrl);
                   }}
                 />
               )}
