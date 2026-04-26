@@ -1,14 +1,8 @@
 /**
- * CreditStore — Purchase generation credits with card or ETH.
- *
- * $LOAR token payments are disabled for the alpha launch.
+ * CreditStore — Purchase generation credits with credit card.
  */
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useChainId, usePublicClient } from 'wagmi';
-import { useSendTransaction } from '@/hooks/useThirdwebWrite';
-import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
-import { parseEther, formatUnits, type Address } from 'viem';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { trpcClient } from '@/utils/trpc';
@@ -16,12 +10,6 @@ import { toast } from 'sonner';
 
 const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
 const stripePromise = STRIPE_PK ? loadStripe(STRIPE_PK) : null;
-
-// Platform treasury address (EOA — chain-independent, safe to keep as env)
-const TREASURY_ADDRESS = (import.meta.env.VITE_TREASURY_ADDRESS ??
-  '0x0000000000000000000000000000000000000000') as Address;
-
-type PaymentTab = 'card' | 'crypto';
 
 interface CreditPackage {
   id: string;
@@ -122,7 +110,7 @@ function CardPaymentSection({
     try {
       const { available } = await trpcClient.stripe.isAvailable.query();
       if (!available) {
-        toast.info('Card payments are not yet configured. Please use ETH or $LOAR.');
+        toast.error('Card payments are not yet configured. Please try again later.');
         setIsCreating(false);
         return;
       }
@@ -196,21 +184,8 @@ function CardPaymentSection({
 /*  Main CreditStore component                                        */
 /* ------------------------------------------------------------------ */
 export function CreditStore({ onClose }: { onClose?: () => void }) {
-  const [paymentTab, setPaymentTab] = useState<PaymentTab>('card');
   const [selectedPkg, setSelectedPkg] = useState<string | null>(null);
-  const [isPaying, setIsPaying] = useState(false);
   const queryClient = useQueryClient();
-  const { isConnected, address } = useAccount();
-  const chainId = useChainId();
-  const { sendTransactionAsync } = useSendTransaction();
-  const publicClient = usePublicClient();
-
-  const { data: ethPriceData } = useQuery({
-    queryKey: ['ethPrice'],
-    queryFn: () => trpcClient.credits.getEthPrice.query(),
-    staleTime: 5 * 60 * 1000,
-  });
-  const ethPriceUsd = ethPriceData?.ethPriceUsd ?? 3000;
 
   const { data: packages, isLoading } = useQuery({
     queryKey: ['creditPackages'],
@@ -232,12 +207,10 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
     onSuccess: (data) => {
       toast.success(`Added ${data.creditsAdded} credits!`);
       queryClient.invalidateQueries({ queryKey: ['credit-balance'] });
-      setIsPaying(false);
       setSelectedPkg(null);
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : 'Purchase failed');
-      setIsPaying(false);
     },
   });
 
@@ -269,26 +242,6 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
             Close
           </button>
         )}
-      </div>
-
-      {/* Payment Method Tabs */}
-      <div className="flex rounded-lg bg-zinc-900 p-1 gap-1">
-        <button
-          onClick={() => setPaymentTab('card')}
-          className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all ${
-            paymentTab === 'card' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-zinc-200'
-          }`}
-        >
-          Credit Card
-        </button>
-        <button
-          onClick={() => setPaymentTab('crypto')}
-          className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all ${
-            paymentTab === 'crypto' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-zinc-200'
-          }`}
-        >
-          ETH / Crypto
-        </button>
       </div>
 
       {/* Package Grid */}
@@ -342,65 +295,11 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
       {/* Purchase Button */}
       {selectedPkg && (
         <div className="pt-2">
-          {!isConnected && paymentTab !== 'card' ? (
-            <p className="text-center text-sm text-zinc-400 py-3">
-              Connect your wallet to purchase credits
-            </p>
-          ) : paymentTab === 'card' ? (
-            (() => {
-              const pkg = pkgs.find((p) => p.id === selectedPkg);
-              if (!pkg) return null;
-              return <CardPaymentSection key={pkg.id} pkg={pkg} onSuccess={handleCardSuccess} />;
-            })()
-          ) : (
-            <button
-              disabled={isPaying}
-              onClick={async () => {
-                const pkg = pkgs.find((p) => p.id === selectedPkg);
-                if (!pkg) return;
-                setIsPaying(true);
-                try {
-                  const ethPrice = pkg.fiatPriceUsd / ethPriceUsd;
-                  const ethAmount = parseEther(ethPrice.toFixed(18));
-
-                  // Pre-check: verify user has enough ETH
-                  if (address && publicClient) {
-                    const ethBalance = await publicClient.getBalance({ address });
-                    if (ethBalance < ethAmount) {
-                      const have = formatUnits(ethBalance, 18);
-                      const need = ethPrice.toFixed(6);
-                      toast.error(
-                        `Insufficient ETH balance. You have ${Number(have).toFixed(6)} ETH but need ~${need} ETH.`
-                      );
-                      setIsPaying(false);
-                      return;
-                    }
-                  }
-
-                  toast.info('Confirm ETH transfer in your wallet...');
-                  const txHash = await sendTransactionAsync({
-                    to: TREASURY_ADDRESS,
-                    value: ethAmount,
-                  });
-                  toast.info('ETH sent! Confirming credits...');
-                  await purchaseFiatMutation.mutateAsync({
-                    packageId: pkg.id,
-                    paymentMethod: 'eth',
-                    paymentRef: txHash,
-                    chainId,
-                  });
-                } catch (err) {
-                  if (err instanceof Error && !err.message.includes('rejected')) {
-                    toast.error('ETH payment failed: ' + err.message);
-                  }
-                  setIsPaying(false);
-                }
-              }}
-              className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
-            >
-              {isPaying ? 'Processing...' : 'Pay with ETH'}
-            </button>
-          )}
+          {(() => {
+            const pkg = pkgs.find((p) => p.id === selectedPkg);
+            if (!pkg) return null;
+            return <CardPaymentSection key={pkg.id} pkg={pkg} onSuccess={handleCardSuccess} />;
+          })()}
         </div>
       )}
     </div>

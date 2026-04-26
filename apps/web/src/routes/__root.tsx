@@ -169,7 +169,7 @@ function RootComponent() {
           {/* Testnet warning banner — only visible in testnet mode */}
           {(import.meta.env.VITE_CHAIN_ENV ?? 'testnet') === 'testnet' && (
             <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 text-center text-sm text-amber-600 dark:text-amber-400">
-              <strong>Testnet beta</strong> — Funds and tokens have no real value.{' '}
+              <strong>Testnet beta</strong> — Universes will be migrated onchain with real value.{' '}
               <Link to="/testnet" className="underline underline-offset-2 hover:text-amber-300">
                 What's live, what's not →
               </Link>
