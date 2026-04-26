@@ -553,39 +553,69 @@ export function ActivityTicker() {
     const universeMap = new Map<string, Universe>();
     universesData.forEach((u) => universeMap.set(u.id.toLowerCase(), u));
 
-    // Dedupe by universe — when one universe posts a burst of nodes, we want
-    // the ticker to list it once (with a count) rather than repeat the same
-    // entry across the marquee. `nodesData` is already sorted newest-first,
-    // so the first hit per universe wins for display metadata.
-    const perUniverse = new Map<
-      string,
-      { id: string; universeName: string; action: string; universeId: string; count: number }
-    >();
+    // Mix node mints with universe creations so a single bursty universe
+    // doesn't collapse the ticker. Cap each universe to 3 node entries; the
+    // overflow surfaces as a single "+N more episodes" tail so quieter
+    // universes still get screen time.
+    const PER_UNIVERSE_NODE_CAP = 3;
+    const perUniverseNodeCount = new Map<string, number>();
+    const items: Array<{
+      id: string;
+      universeName: string;
+      action: string;
+      universeId: string;
+      createdAt: number;
+    }> = [];
+    let overflow = 0;
 
     for (const n of nodesData) {
       const key = n.universeAddress.toLowerCase();
-      const content = contentMap.get(`${key}:${n.nodeId}`);
-      const existing = perUniverse.get(key);
-      if (existing) {
-        existing.count += 1;
+      const used = perUniverseNodeCount.get(key) ?? 0;
+      if (used >= PER_UNIVERSE_NODE_CAP) {
+        overflow += 1;
         continue;
       }
+      perUniverseNodeCount.set(key, used + 1);
+      const content = contentMap.get(`${key}:${n.nodeId}`);
       const uni = universeMap.get(key);
-      perUniverse.set(key, {
+      items.push({
         id: n.id,
         universeName: uni?.name || `Universe ${n.universeAddress.slice(0, 8)}`,
-        action: content?.plot ? 'New Episode' : 'Created',
+        action: content?.plot ? 'new episode' : 'minted a node',
         universeId: n.universeAddress,
-        count: 1,
+        createdAt: n.createdAt,
       });
     }
 
-    return Array.from(perUniverse.values())
-      .map((a) => ({
-        ...a,
-        action: a.count > 1 ? `${a.count} new episodes` : a.action,
-      }))
-      .slice(0, 15);
+    // Recent universe creations — gives the strip variety even when no new
+    // nodes have been minted. Sorted newest-first; capped at 8 so the merge
+    // doesn't drown out node activity.
+    const recentUniverses = [...universesData]
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, 8);
+    for (const u of recentUniverses) {
+      items.push({
+        id: `universe-${u.id}`,
+        universeName: u.name || `Universe ${u.id.slice(0, 8)}`,
+        action: 'launched',
+        universeId: u.id,
+        createdAt: u.createdAt,
+      });
+    }
+
+    items.sort((a, b) => b.createdAt - a.createdAt);
+
+    if (overflow > 0) {
+      items.push({
+        id: `overflow-${overflow}`,
+        universeName: 'Multiverse',
+        action: `+${overflow} more episodes`,
+        universeId: items[0]?.universeId ?? '',
+        createdAt: 0,
+      });
+    }
+
+    return items.slice(0, 20);
   }, [nodesData, nodeContentData, universesData]);
 
   // Repeat the reel enough times that the marquee never shows a gap even when

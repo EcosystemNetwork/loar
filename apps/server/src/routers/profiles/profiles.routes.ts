@@ -13,6 +13,30 @@ const profilesCol = () => {
   return db.collection('profiles');
 };
 
+// Partial-update helper that tolerates a missing profile doc. The full
+// `upsert` mutation requires a username — but small toggles (visibility,
+// web3 mode, layout) can fire before a user has run that flow, and a
+// raw `.update()` would 500 with NOT_FOUND. Mirrors the conditional-
+// `createdAt` pattern from `upsert` so we don't clobber the original
+// creation timestamp on subsequent writes.
+async function upsertProfileFields(uid: string, fields: Record<string, unknown>) {
+  const ref = profilesCol().doc(uid);
+  const now = new Date();
+  await db!.runTransaction(async (txn) => {
+    const doc = await txn.get(ref);
+    txn.set(
+      ref,
+      {
+        ...fields,
+        uid,
+        updatedAt: now,
+        ...(doc.exists ? {} : { createdAt: now }),
+      },
+      { merge: true }
+    );
+  });
+}
+
 const profileLayoutSchema = z.object({
   theme: z.enum(['default', 'minimal', 'cinematic', 'neon', 'retro']).default('default'),
   accentColor: z
@@ -180,8 +204,7 @@ export const profilesRouter = router({
 
   /** Update just the layout/theme settings */
   updateLayout: protectedProcedure.input(profileLayoutSchema).mutation(async ({ ctx, input }) => {
-    const ref = profilesCol().doc(ctx.user.uid);
-    await ref.update({ layout: input, updatedAt: new Date() });
+    await upsertProfileFields(ctx.user.uid, { layout: input });
     return { ok: true };
   }),
 
@@ -189,10 +212,7 @@ export const profilesRouter = router({
   setVisibility: protectedProcedure
     .input(z.object({ visibility: z.enum(['public', 'private']) }))
     .mutation(async ({ ctx, input }) => {
-      await profilesCol().doc(ctx.user.uid).update({
-        visibility: input.visibility,
-        updatedAt: new Date(),
-      });
+      await upsertProfileFields(ctx.user.uid, { visibility: input.visibility });
       return { ok: true, visibility: input.visibility };
     }),
 
@@ -200,10 +220,7 @@ export const profilesRouter = router({
   setWeb3Mode: protectedProcedure
     .input(z.object({ web3Enabled: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
-      await profilesCol().doc(ctx.user.uid).update({
-        web3Enabled: input.web3Enabled,
-        updatedAt: new Date(),
-      });
+      await upsertProfileFields(ctx.user.uid, { web3Enabled: input.web3Enabled });
       return { ok: true, web3Enabled: input.web3Enabled };
     }),
 

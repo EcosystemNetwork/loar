@@ -862,7 +862,11 @@ app.get('/api/takedown/:id/status', async (c) => {
 app.use('/trpc/generation.*', aiRateLimiter({ windowMs: 60_000, max: 3 })); // video ~$0.25, 2–5 min
 app.use('/trpc/studio.*', aiRateLimiter({ windowMs: 60_000, max: 2 })); // orchestrator — fans out
 app.use('/trpc/characterPipeline.*', aiRateLimiter({ windowMs: 60_000, max: 2 })); // full pipeline ~$0.34
-app.use('/trpc/episodes.*', aiRateLimiter({ windowMs: 60_000, max: 2 })); // generateFromScript is heavy
+// Only the heavy script→clips generator burns AI budget. Read-only routes
+// (`feed`, `get`, `list`, `topUniverses`) and status polls must not share this
+// bucket — the home page rail polls `episodes.feed` and the previous
+// `episodes.*` glob bricked it after two page loads per wallet.
+app.use('/trpc/episodes.generateFromScript', aiRateLimiter({ windowMs: 60_000, max: 2 }));
 app.use('/trpc/cutdown.*', aiRateLimiter({ windowMs: 60_000, max: 5 })); // video reframe, medium-heavy
 app.use('/trpc/threed.*', aiRateLimiter({ windowMs: 60_000, max: 5 })); // Meshy polling, ~$0.15
 app.use('/trpc/lipsync.*', aiRateLimiter({ windowMs: 60_000, max: 10 })); // medium
