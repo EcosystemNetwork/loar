@@ -39,6 +39,7 @@ import { useListingsBrowse } from '@/hooks/useListings';
 import { useTrending, usePlatformStats } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { ListingPrice } from '@/components/Price';
 
 export const Route = createFileRoute('/market')({
   component: MarketPage,
@@ -258,9 +259,11 @@ function ListingCard({ listing }: { listing: any }) {
         <CardContent className="p-2">
           <p className="text-xs font-medium truncate">{listing.title}</p>
           <div className="flex items-center justify-between mt-1">
-            <span className="text-xs text-primary font-semibold">
-              {listing.price === '0' ? 'Free' : `${listing.price} ${listing.currency}`}
-            </span>
+            <ListingPrice
+              amount={listing.price}
+              currency={listing.currency}
+              className="text-xs text-primary font-semibold"
+            />
             {listing.sold > 0 && (
               <span className="text-xs text-muted-foreground">{listing.sold} sold</span>
             )}

@@ -155,25 +155,33 @@ export const entitiesRouter = router({
 
   /**
    * List entities globally by kind — used by the wiki to show all people,
-   * places, etc. across all universes.
+   * places, etc. across all universes. Cursor-paginated; the cursor is the
+   * id of the last entity in the previous page (opaque to clients).
+   *
+   * The excluded-universe post-filter can drop items from any page. The
+   * `nextCursorId` always tracks the last *fetched* doc (not the last
+   * *visible* doc) so subsequent pages don't drift or duplicate when filter
+   * losses straddle a page boundary.
    */
   listByKind: publicProcedure
     .input(
       z.object({
         kind: entityKindSchema,
         limit: z.number().int().positive().max(200).default(100),
+        cursor: z.string().optional(),
       })
     )
     .query(async ({ input, ctx }) => {
       const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
-      // Fetch extra to compensate for post-filter losses so the caller still gets
-      // close to its requested limit of publicly-visible entities.
-      const fetchLimit = excluded.size > 0 ? Math.min(input.limit * 2, 200) : input.limit;
-      const raw = await getEntitiesByKind(input.kind, fetchLimit);
-      const entities = raw
-        .filter((e) => !e.universeAddress || !excluded.has(e.universeAddress.toLowerCase()))
-        .slice(0, input.limit);
-      return { entities, total: entities.length };
+      const { entities: raw, nextCursorId } = await getEntitiesByKind(
+        input.kind,
+        input.limit,
+        input.cursor
+      );
+      const entities = raw.filter(
+        (e) => !e.universeAddress || !excluded.has(e.universeAddress.toLowerCase())
+      );
+      return { entities, total: entities.length, nextCursor: nextCursorId };
     }),
 
   /** List entities created by a specific address. */

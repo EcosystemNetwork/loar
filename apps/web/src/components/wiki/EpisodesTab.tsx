@@ -1,4 +1,4 @@
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +9,7 @@ interface EpisodesTabProps {
   universeAddress?: string;
 }
 
-interface EpisodeRecord {
+interface ScopedEpisode {
   id: string;
   title?: string;
   description?: string;
@@ -21,7 +21,34 @@ interface EpisodeRecord {
   createdAt?: string | { _seconds?: number };
 }
 
-function tsOf(e: EpisodeRecord): number {
+interface FeedEpisode {
+  id: string;
+  universeId: string;
+  title: string;
+  description: string;
+  clipCount: number;
+  videoUrl: string | null;
+  thumbnailUrl: string | null;
+  exportUrl: string | null;
+  sourceCreator: string | null;
+  createdAt: string | null;
+  isCanon: boolean;
+  universe: { id: string; name: string; imageURL: string; creator: string | null };
+}
+
+interface DisplayEpisode {
+  id: string;
+  title?: string;
+  description?: string;
+  universeId: string;
+  universeName?: string;
+  clipCount: number;
+  thumbnailUrl?: string | null;
+  exportUrl?: string | null;
+  ts: number;
+}
+
+function tsOfScoped(e: ScopedEpisode): number {
   const v = e.createdAt;
   if (!v) return 0;
   if (typeof v === 'object' && v && '_seconds' in v && typeof v._seconds === 'number') {
@@ -32,43 +59,52 @@ function tsOf(e: EpisodeRecord): number {
 }
 
 export function EpisodesTab({ universeAddress }: EpisodesTabProps) {
-  // When scoped to a universe → just call episodes.list once.
+  // Per-universe view: single tRPC call, server-paginated.
   const scopedQuery = useQuery({
-    queryKey: ['wiki', 'episodes', universeAddress],
-    queryFn: () => trpcClient.episodes.list.query({ universeId: universeAddress!, limit: 50 }),
+    queryKey: ['wiki', 'episodes', 'scoped', universeAddress],
+    queryFn: () =>
+      trpcClient.episodes.list.query({
+        universeId: universeAddress!,
+        limit: 50,
+      }) as Promise<ScopedEpisode[]>,
     enabled: !!universeAddress,
   });
 
-  // When global → fetch a list of universes first, then fan out.
-  const universesQuery = useQuery({
-    queryKey: ['all-universes'],
-    queryFn: () => trpcClient.universes.getAll.query(),
+  // Global view: single call to the cross-universe canon feed. Server joins
+  // universe metadata and filters hidden/private universes — the previous
+  // getAll → fan-out waterfall is gone.
+  const feedQuery = useQuery({
+    queryKey: ['wiki', 'episodes', 'feed', 50],
+    queryFn: () => trpcClient.episodes.feed.query({ limit: 50 }) as Promise<FeedEpisode[]>,
     enabled: !universeAddress,
   });
-  const universes = ((universesQuery.data as any)?.data ?? universesQuery.data ?? []) as Array<{
-    id: string;
-    name?: string;
-    image_url?: string;
-  }>;
-  const publicUniverseIds = universes.map((u) => u.id).slice(0, 20);
 
-  const fanout = useQueries({
-    queries: publicUniverseIds.map((id) => ({
-      queryKey: ['wiki', 'episodes', id],
-      queryFn: () => trpcClient.episodes.list.query({ universeId: id, limit: 5 }),
-      enabled: !universeAddress,
-    })),
-  });
+  const isLoading = universeAddress ? scopedQuery.isLoading : feedQuery.isLoading;
 
-  const isLoading = universeAddress
-    ? scopedQuery.isLoading
-    : universesQuery.isLoading || fanout.some((q) => q.isLoading);
+  const display: DisplayEpisode[] = universeAddress
+    ? ((scopedQuery.data ?? []) as ScopedEpisode[]).map((ep) => ({
+        id: ep.id,
+        title: ep.title,
+        description: ep.description,
+        universeId: ep.universeId,
+        clipCount: ep.clipCount ?? ep.clips?.length ?? 0,
+        thumbnailUrl: ep.thumbnailUrl ?? null,
+        exportUrl: ep.exportUrl ?? null,
+        ts: tsOfScoped(ep),
+      }))
+    : ((feedQuery.data ?? []) as FeedEpisode[]).map((ep) => ({
+        id: ep.id,
+        title: ep.title,
+        description: ep.description,
+        universeId: ep.universeId,
+        universeName: ep.universe?.name,
+        clipCount: ep.clipCount,
+        thumbnailUrl: ep.thumbnailUrl,
+        exportUrl: ep.exportUrl,
+        ts: ep.createdAt ? new Date(ep.createdAt).getTime() : 0,
+      }));
 
-  const episodes: EpisodeRecord[] = universeAddress
-    ? ((scopedQuery.data as EpisodeRecord[]) ?? [])
-    : fanout.flatMap((q) => (q.data as EpisodeRecord[] | undefined) ?? []);
-
-  const sorted = [...episodes].sort((a, b) => tsOf(b) - tsOf(a));
+  const sorted = [...display].sort((a, b) => b.ts - a.ts);
 
   return (
     <div className="space-y-4">
@@ -89,57 +125,55 @@ export function EpisodesTab({ universeAddress }: EpisodesTabProps) {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {sorted.map((ep) => {
-          const universeMeta = universes.find((u) => u.id === ep.universeId);
-          const clipCount = ep.clipCount ?? ep.clips?.length ?? 0;
-          return (
-            <Card key={ep.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-              <div className="aspect-video bg-muted relative">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Film className="h-8 w-8 text-muted-foreground/30" />
-                </div>
-                {ep.thumbnailUrl && (
-                  <img
-                    src={resolveIpfsUrl(ep.thumbnailUrl)}
-                    alt={ep.title || ep.id}
-                    className="absolute inset-0 w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
-                )}
-                {ep.exportUrl && (
-                  <a
-                    href={ep.exportUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity"
-                  >
-                    <Play className="h-12 w-12 text-white" />
-                  </a>
-                )}
-                <Badge className="absolute top-2 left-2 bg-black/60 text-white border-0 text-[10px]">
-                  {clipCount} clip{clipCount !== 1 ? 's' : ''}
-                </Badge>
+        {sorted.map((ep) => (
+          <Card key={ep.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+            <div className="aspect-video bg-muted relative">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Film className="h-8 w-8 text-muted-foreground/30" />
               </div>
-              <CardContent className="p-3">
-                <p className="text-sm font-medium truncate">
-                  {ep.title || `Episode ${ep.id.slice(0, 6)}`}
+              {ep.thumbnailUrl && (
+                <img
+                  src={resolveIpfsUrl(ep.thumbnailUrl)}
+                  alt={ep.title || ep.id}
+                  loading="lazy"
+                  decoding="async"
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              )}
+              {ep.exportUrl && (
+                <a
+                  href={ep.exportUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity"
+                >
+                  <Play className="h-12 w-12 text-white" />
+                </a>
+              )}
+              <Badge className="absolute top-2 left-2 bg-black/60 text-white border-0 text-[10px]">
+                {ep.clipCount} clip{ep.clipCount !== 1 ? 's' : ''}
+              </Badge>
+            </div>
+            <CardContent className="p-3">
+              <p className="text-sm font-medium truncate">
+                {ep.title || `Episode ${ep.id.slice(0, 6)}`}
+              </p>
+              {ep.description && (
+                <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                  {ep.description}
                 </p>
-                {ep.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                    {ep.description}
-                  </p>
-                )}
-                {!universeAddress && universeMeta?.name && (
-                  <Badge variant="outline" className="mt-2 text-[10px]">
-                    {universeMeta.name}
-                  </Badge>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
+              )}
+              {!universeAddress && ep.universeName && (
+                <Badge variant="outline" className="mt-2 text-[10px]">
+                  {ep.universeName}
+                </Badge>
+              )}
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   );

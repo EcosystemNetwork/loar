@@ -21,6 +21,7 @@ import { parseEther, parseUnits, type Address } from 'viem';
 import { useVocab } from '@/hooks/use-vocab';
 import { confirmTx } from '@/components/tx-confirm';
 import { getEvmAddresses, isZeroAddress } from '@/configs/addresses';
+import { ListingPrice, usePriceText } from '@/components/Price';
 
 const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS as Address | undefined;
 
@@ -66,6 +67,7 @@ function CheckoutPage() {
   const { writeContractAsync } = useWriteContract();
   const { sendTransactionAsync } = useSendTransaction();
   const chainId = useChainId();
+  const priceText = usePriceText();
   const LOAR_TOKEN_ADDRESS = getEvmAddresses(chainId)?.loarToken;
   const hasLoarToken = !!LOAR_TOKEN_ADDRESS && !isZeroAddress(LOAR_TOKEN_ADDRESS);
 
@@ -255,7 +257,7 @@ function CheckoutPage() {
               </div>
               <div className="text-right shrink-0">
                 <p className="font-bold text-lg text-primary">
-                  {isFree ? 'Free' : `${displayPrice} ${displayCurrency}`}
+                  <ListingPrice amount={displayPrice} currency={displayCurrency} />
                 </p>
                 <p className="text-xs text-muted-foreground">1 item</p>
               </div>
@@ -263,7 +265,7 @@ function CheckoutPage() {
             <div className="border-t pt-3 flex justify-between font-semibold">
               <span>Total</span>
               <span className="text-primary">
-                {isFree ? 'Free' : `${displayPrice} ${displayCurrency}`}
+                <ListingPrice amount={displayPrice} currency={displayCurrency} />
               </span>
             </div>
           </CardContent>
@@ -331,7 +333,7 @@ function CheckoutPage() {
               ? 'Confirm & Claim'
               : displayCurrency === 'LOAR'
                 ? `Pay ${displayPrice} $LOAR`
-                : `Confirm Purchase · ${displayPrice} ${displayCurrency}`}
+                : `Confirm Purchase · ${priceText({ eth: parseFloat(displayPrice) }, { hideChain: true })}`}
           </Button>
         </div>
       </div>

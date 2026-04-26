@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Price } from '@/components/Price';
 import {
   Rocket,
   ArrowLeft,
@@ -265,7 +266,9 @@ function LaunchTokenPage() {
             {feeEth !== null && (
               <div className="flex items-center justify-between text-xs p-3 rounded-md bg-muted/40">
                 <span className="text-muted-foreground">Launch fee</span>
-                <span className="font-mono tabular-nums">{feeEth.toFixed(4)} ETH</span>
+                <span className="font-mono tabular-nums">
+                  <Price eth={feeEth} hideChain />
+                </span>
               </div>
             )}
 

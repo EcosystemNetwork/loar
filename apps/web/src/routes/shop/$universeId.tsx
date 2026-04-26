@@ -26,6 +26,7 @@ import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { useVocab } from '@/hooks/use-vocab';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { ListingPrice, Price } from '@/components/Price';
 
 export const Route = createFileRoute('/shop/$universeId')({
   component: UniverseShopPage,
@@ -231,9 +232,11 @@ function ShopListingCard({ listing }: { listing: any }) {
         </div>
         <CardContent className="p-2">
           <p className="text-xs font-medium truncate">{listing.title}</p>
-          <p className="text-xs text-primary font-semibold mt-0.5">
-            {listing.price === '0' ? 'Free' : `${listing.price} ${listing.currency}`}
-          </p>
+          <ListingPrice
+            amount={listing.price}
+            currency={listing.currency}
+            className="text-xs text-primary font-semibold mt-0.5 block"
+          />
         </CardContent>
       </Card>
     </Link>
@@ -265,7 +268,14 @@ function SubTierCard({ tier, universeId }: { tier: any; universeId: string }) {
             {tier.tier}
           </CardTitle>
           <span className="font-bold text-primary">
-            {tier.pricePerMonth === '0' ? 'Free' : `${tier.pricePerMonth} ETH/mo`}
+            {tier.pricePerMonth === '0' ? (
+              'Free'
+            ) : (
+              <>
+                <Price eth={parseFloat(tier.pricePerMonth)} hideChain />
+                /mo
+              </>
+            )}
           </span>
         </div>
       </CardHeader>

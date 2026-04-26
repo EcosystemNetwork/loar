@@ -40,6 +40,7 @@ import {
   useUniverseMetrics,
 } from '@/hooks/useRevenue';
 import { useVocab } from '@/hooks/use-vocab';
+import { Price } from '@/components/Price';
 
 interface RevenuePanelProps {
   universeId: string;
@@ -127,7 +128,7 @@ function OverviewTab({ universeId }: { universeId: string }) {
         <MetricCard
           icon={<Coins className="w-4 h-4" />}
           label="Total Revenue"
-          value={formatWei((metrics as any)?.totalRevenue ?? '0')}
+          value={<Price wei={(metrics as any)?.totalRevenue ?? '0'} hideChain />}
         />
       </div>
     </div>
@@ -212,7 +213,9 @@ function NFTTab({ universeId }: { universeId: string }) {
                       {ep.minted} minted {ep.maxSupply > 0 ? `/ ${ep.maxSupply}` : ''}
                     </p>
                   </div>
-                  <p className="text-sm font-mono">{formatWei(ep.mintPrice)} ETH</p>
+                  <p className="text-sm font-mono">
+                    <Price wei={ep.mintPrice} hideChain />
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -302,7 +305,7 @@ function MetricCard({
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string | number;
+  value: React.ReactNode;
 }) {
   return (
     <Card>

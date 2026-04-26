@@ -9,8 +9,8 @@
  * Universe scoping is preserved via the ?universe= search param.
  */
 import { createFileRoute, Link, useSearch, useNavigate } from '@tanstack/react-router';
-import { useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { z } from 'zod';
 import { Input } from '@/components/ui/input';
@@ -159,23 +159,63 @@ interface Character {
 function EntityTab({ kind, universeAddress }: { kind: EntityKind; universeAddress?: string }) {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<WikiSort>('newest');
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: universeAddress
-      ? ['entities', 'list', universeAddress, kind]
-      : ['entities', 'listByKind', kind],
-    queryFn: () =>
-      universeAddress
-        ? trpcClient.entities.list.query({ universeAddress, kind })
-        : trpcClient.entities.listByKind.query({ kind }),
+  // Per-universe view: single query — entity counts inside one universe are
+  // small enough that paginating here would just add round-trips.
+  const scopedQuery = useQuery({
+    queryKey: ['entities', 'list', universeAddress, kind],
+    queryFn: () => trpcClient.entities.list.query({ universeAddress: universeAddress!, kind }),
+    enabled: !!universeAddress,
     staleTime: WIKI_LIST_STALE_TIME,
   });
 
-  const entities = (data?.entities ?? []) as WikiEntity[];
+  // Global view: cursor-paginated. The first ~40 are visible immediately;
+  // an IntersectionObserver-driven sentinel auto-loads the next page when
+  // the user scrolls near the bottom.
+  const globalQuery = useInfiniteQuery({
+    queryKey: ['entities', 'listByKind', kind],
+    queryFn: ({ pageParam }) =>
+      trpcClient.entities.listByKind.query({
+        kind,
+        limit: 40,
+        cursor: pageParam ?? undefined,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    enabled: !universeAddress,
+    staleTime: WIKI_LIST_STALE_TIME,
+  });
+
+  const entities: WikiEntity[] = universeAddress
+    ? ((scopedQuery.data?.entities ?? []) as WikiEntity[])
+    : ((globalQuery.data?.pages.flatMap((p) => p.entities) ?? []) as WikiEntity[]);
+  const isLoading = universeAddress ? scopedQuery.isLoading : globalQuery.isLoading;
+  const error = universeAddress ? scopedQuery.error : globalQuery.error;
+  const hasMore = !universeAddress && (globalQuery.hasNextPage ?? false);
+  const isFetchingNextPage = !universeAddress && globalQuery.isFetchingNextPage;
+
   const filtered = search.trim()
     ? entities.filter((e) => e.name.toLowerCase().includes(search.toLowerCase()))
     : entities;
   const sorted = useMemo(() => sortEntities(filtered, sort), [filtered, sort]);
+
+  useEffect(() => {
+    if (universeAddress) return;
+    if (!hasMore) return;
+    const node = loadMoreRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !isFetchingNextPage) {
+          globalQuery.fetchNextPage();
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, isFetchingNextPage, universeAddress, globalQuery]);
 
   return (
     <div className="space-y-4">
@@ -219,11 +259,24 @@ function EntityTab({ kind, universeAddress }: { kind: EntityKind; universeAddres
       )}
 
       {!isLoading && !error && sorted.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {sorted.map((entity) => (
-            <EntityCard key={entity.id} entity={entity} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {sorted.map((entity) => (
+              <EntityCard key={entity.id} entity={entity} />
+            ))}
+          </div>
+          {hasMore && (
+            <div ref={loadMoreRef} className="flex justify-center py-4">
+              {isFetchingNextPage ? (
+                <span className="text-xs text-muted-foreground">Loading more…</span>
+              ) : (
+                <Button variant="ghost" size="sm" onClick={() => globalQuery.fetchNextPage()}>
+                  Load more
+                </Button>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -777,6 +830,8 @@ function WikiPage() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<WikiTab>((urlTab as WikiTab) ?? 'gallery');
   const [globalSearch, setGlobalSearch] = useState('');
+  const [universePickerOpen, setUniversePickerOpen] = useState(false);
+  const [universePickerQuery, setUniversePickerQuery] = useState('');
 
   // Prefetch a tab's primary query when the user hovers the tab button so the
   // click feels instant. We only prefetch tabs whose queries live in this file
@@ -885,6 +940,32 @@ function WikiPage() {
     ? universes.filter((u: any) => u.accessModel !== 'private' && u.accessModel !== 'token_gate')
     : [];
 
+  // Cap the inline strip so the DOM (and IPFS image fetches) don't grow with
+  // the universe count. If the active filter scoped to a universe that lives
+  // past the cap, pin it to the visible slice so the user always sees their
+  // current selection highlighted.
+  const VISIBLE_UNIVERSE_LIMIT = 12;
+  const inlineUniverses = (() => {
+    if (publicUniverses.length <= VISIBLE_UNIVERSE_LIMIT) return publicUniverses;
+    const head = publicUniverses.slice(0, VISIBLE_UNIVERSE_LIMIT);
+    const activeIdx = publicUniverses.findIndex((u: any) => u.id === universeAddress);
+    if (activeIdx >= 0 && activeIdx >= VISIBLE_UNIVERSE_LIMIT) {
+      head[head.length - 1] = publicUniverses[activeIdx];
+    }
+    return head;
+  })();
+  const overflowCount = Math.max(0, publicUniverses.length - inlineUniverses.length);
+
+  const filteredPickerUniverses = (() => {
+    const q = universePickerQuery.trim().toLowerCase();
+    if (!q) return publicUniverses;
+    return publicUniverses.filter((u: any) => {
+      const name = String(u.name ?? '').toLowerCase();
+      const id = String(u.id ?? '').toLowerCase();
+      return name.includes(q) || id.includes(q);
+    });
+  })();
+
   const sectionedTabs = useMemo(() => {
     const sections: Array<{ section: string; tabs: typeof TABS }> = [
       { section: 'creator', tabs: TABS.filter((t) => t.section === 'creator') },
@@ -960,7 +1041,7 @@ function WikiPage() {
             <Globe className="h-4 w-4" />
             All Universes
           </button>
-          {publicUniverses.map((u: any) => (
+          {inlineUniverses.map((u: any) => (
             <button
               key={u.id}
               onClick={() => navigate({ to: '/wiki', search: buildSearch(activeTab, u.id) })}
@@ -989,11 +1070,88 @@ function WikiPage() {
               {u.name || u.id.slice(0, 10) + '...'}
             </button>
           ))}
+          {overflowCount > 0 && (
+            <button
+              onClick={() => {
+                setUniversePickerQuery('');
+                setUniversePickerOpen(true);
+              }}
+              className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 border-border bg-background hover:bg-muted hover:border-foreground/40 text-muted-foreground hover:text-foreground"
+            >
+              <Search className="h-4 w-4" />+{overflowCount} more
+            </button>
+          )}
           {publicUniverses.length === 0 && (
             <p className="text-xs text-muted-foreground py-1.5 px-2">No universes found.</p>
           )}
         </div>
       </div>
+
+      <Dialog open={universePickerOpen} onOpenChange={setUniversePickerOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Filter by Universe</DialogTitle>
+            <DialogDescription>
+              {publicUniverses.length} public universe{publicUniverses.length !== 1 ? 's' : ''} —
+              search by name or address.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              autoFocus
+              value={universePickerQuery}
+              onChange={(e) => setUniversePickerQuery(e.target.value)}
+              placeholder="Search universes..."
+              className="pl-9"
+            />
+          </div>
+          <div className="max-h-[60vh] overflow-y-auto -mx-1 px-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {filteredPickerUniverses.slice(0, 200).map((u: any) => (
+                <button
+                  key={u.id}
+                  onClick={() => {
+                    navigate({ to: '/wiki', search: buildSearch(activeTab, u.id) });
+                    setUniversePickerOpen(false);
+                  }}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium text-left transition-all ${
+                    universeAddress === u.id
+                      ? 'border-violet-500 bg-violet-500/10 text-violet-400'
+                      : 'border-border bg-background hover:bg-muted hover:border-foreground/20 text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {u.image_url ? (
+                    <img
+                      src={resolveIpfsUrl(u.image_url)}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="h-6 w-6 rounded object-cover flex-shrink-0"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="h-6 w-6 rounded bg-gradient-to-br from-violet-500/30 to-purple-500/30 flex items-center justify-center flex-shrink-0">
+                      <Globe className="h-3 w-3" />
+                    </div>
+                  )}
+                  <span className="truncate">{u.name || u.id.slice(0, 10) + '...'}</span>
+                </button>
+              ))}
+            </div>
+            {filteredPickerUniverses.length === 0 && (
+              <p className="text-xs text-muted-foreground py-6 text-center">No matches.</p>
+            )}
+            {filteredPickerUniverses.length > 200 && (
+              <p className="text-[11px] text-muted-foreground py-2 text-center">
+                Showing first 200 of {filteredPickerUniverses.length} — refine your search.
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Universe banner when scoped */}
       {universeInfo && (

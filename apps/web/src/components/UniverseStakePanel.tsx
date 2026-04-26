@@ -27,6 +27,7 @@ const STAKING_CHAINS = new Set([84532]); // Base Sepolia
 import { useWalletAccount } from '@/hooks/useWalletAccount';
 import { toast } from 'sonner';
 import { parseEther } from 'viem';
+import { useWeb3Mode } from '@/lib/web3-mode';
 import {
   Coins,
   ArrowDownToLine,
@@ -46,6 +47,8 @@ interface UniverseStakePanelProps {
 export function UniverseStakePanel({ universeId, universeName }: UniverseStakePanelProps) {
   const chainId = useChainId();
   const { address } = useWalletAccount();
+  const { web3Mode } = useWeb3Mode();
+  const tokenLabel = web3Mode ? 'LOAR' : 'credits';
   const { pool, refetch: refetchPool } = useUniversePool(universeId);
   const { stake, refetch: refetchStake } = useUniverseStake(universeId);
   const { pendingFormatted, pending, refetch: refetchPending } = usePendingReward(universeId);
@@ -151,7 +154,7 @@ export function UniverseStakePanel({ universeId, universeName }: UniverseStakePa
                     maximumFractionDigits: 0,
                   })
                 : '0'}{' '}
-              LOAR
+              {tokenLabel}
             </p>
           </div>
           <div className="bg-muted/50 rounded-lg p-2.5">
@@ -162,7 +165,7 @@ export function UniverseStakePanel({ universeId, universeName }: UniverseStakePa
                     maximumFractionDigits: 2,
                   })
                 : '0'}{' '}
-              LOAR
+              {tokenLabel}
             </p>
           </div>
         </div>
@@ -176,7 +179,7 @@ export function UniverseStakePanel({ universeId, universeName }: UniverseStakePa
                 {Number(stake.amountFormatted).toLocaleString(undefined, {
                   maximumFractionDigits: 2,
                 })}{' '}
-                LOAR
+                {tokenLabel}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -185,7 +188,7 @@ export function UniverseStakePanel({ universeId, universeName }: UniverseStakePa
               </span>
               <span className="font-semibold text-sm text-green-500">
                 {Number(pendingFormatted).toLocaleString(undefined, { maximumFractionDigits: 4 })}{' '}
-                LOAR
+                {tokenLabel}
               </span>
             </div>
             {isLocked && (

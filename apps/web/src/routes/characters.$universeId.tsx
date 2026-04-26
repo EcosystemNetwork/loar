@@ -6,7 +6,6 @@
  */
 import { createFileRoute, Link, useParams } from '@tanstack/react-router';
 import { useState } from 'react';
-import { formatEther } from 'viem';
 import { ArrowLeft, Users, TrendingUp, Crown, Clock, Search, Wand2 } from 'lucide-react';
 import { useCharacterNFTs } from '@/hooks/useRevenue';
 import { Button } from '@/components/ui/button';
@@ -15,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
 import { UserText } from '@/components/user-text';
+import { Price } from '@/components/Price';
 
 export const Route = createFileRoute('/characters/$universeId')({
   component: CharactersGalleryPage,
@@ -83,7 +83,7 @@ function CharactersGalleryPage() {
           <StatCard
             icon={<Crown className="w-4 h-4 text-primary" />}
             label="Royalties accumulated"
-            value={`${formatEther(totalRoyalties)} ETH`}
+            value={<Price wei={totalRoyalties} hideChain />}
           />
         </div>
 
@@ -146,7 +146,15 @@ function CharactersGalleryPage() {
   );
 }
 
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function StatCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: React.ReactNode;
+}) {
   return (
     <Card>
       <CardContent className="pt-4 pb-4">
@@ -195,7 +203,7 @@ function CharacterCard({ character }: { character: any }) {
               className="absolute top-2 right-2 gap-1 bg-primary/80 text-primary-foreground border-0"
             >
               <Crown className="h-3 w-3" />
-              {Number(formatEther(royalties)).toFixed(3)}Ξ
+              <Price wei={royalties} hideChain decimals={3} />
             </Badge>
           )}
         </div>

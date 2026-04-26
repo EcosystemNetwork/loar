@@ -55,7 +55,13 @@ function WatchPage() {
       trpcClient.universes.get.query({ id: idLower }).then((r: any) => (r?.data ?? r) as any),
   });
 
-  // Ponder enrichment (nodes, token)
+  // Fun-mode universes have no Universe.sol contract — their address field is
+  // a synthetic placeholder (not a deployed EVM address), so Ponder has no
+  // events for them. Read offChainNodes from Firestore instead. Default to
+  // on-chain (matches server-side default `universeType: monetized`).
+  const isOnChain = (universe as any)?.universeType !== 'fun';
+
+  // Ponder enrichment (nodes, token) — on-chain universes only.
   const { data: ponderUniverse } = useQuery({
     queryKey: ['universe', 'watch', 'ponder', idLower],
     queryFn: () =>
@@ -65,6 +71,7 @@ function WatchPage() {
         }
       }`).then((d) => d.universe),
     ...ponderQueryDefaults,
+    enabled: isOnChain,
   });
 
   const { data: nodes } = useQuery({
@@ -76,6 +83,7 @@ function WatchPage() {
         }
       }`).then((d) => d.nodes.items),
     ...ponderQueryDefaults,
+    enabled: isOnChain,
   });
 
   const { data: nodeContents } = useQuery({
@@ -87,6 +95,30 @@ function WatchPage() {
         }
       }`).then((d) => d.nodeContents.items),
     ...ponderQueryDefaults,
+    enabled: isOnChain,
+  });
+
+  // Off-chain timeline (fun-mode universes). Mirrors createNode shape but
+  // lives in Firestore, so the rail can render without a deployed contract.
+  const { data: offChainNodes } = useQuery({
+    queryKey: ['universe', 'watch', 'off-chain-nodes', idLower],
+    queryFn: () =>
+      trpcClient.offChainNodes.list.query({ universeId: idLower }) as Promise<{
+        nodes: Array<{
+          id: string;
+          universeId: string;
+          nodeId: number;
+          creator?: string;
+          previousNodeId?: number;
+          videoUrl?: string;
+          plot?: string;
+          title?: string;
+          createdAt?: any;
+        }>;
+        total: number;
+      }>,
+    enabled: !isOnChain && !universeLoading,
+    staleTime: 15_000,
   });
 
   // Curated Firestore episodes (titles, descriptions, canon status). Merged
@@ -125,15 +157,11 @@ function WatchPage() {
   // Admin check so managers can pivot to the editor from here
   const admin = useIsUniverseAdmin(idLower as `0x${string}`);
 
-  // Build episodes — merge on-chain nodes with curated Firestore episodes,
+  // Build episodes — merge timeline nodes with curated Firestore episodes,
   // then collapse nodes that belong to the same multi-clip episode into a
   // single rail item. Standalone nodes (no Firestore episode yet) keep one
   // card each. Firestore title/description wins; raw plot is the fallback.
   const episodes = useMemo(() => {
-    if (!nodes) return [];
-    const contentMap = new Map<string, PonderNodeContent>();
-    (nodeContents || []).forEach((c) => contentMap.set(c.id, c));
-
     // Map every node-id covered by a Firestore episode (across all clips,
     // not just the source) so multi-clip episodes resolve from any member.
     const fsByNodeId = new Map<
@@ -161,27 +189,58 @@ function WatchPage() {
       for (const id of ids) fsByNodeId.set(id, slim);
     }
 
-    const enriched = nodes
-      .map((n) => {
-        const c = contentMap.get(`${n.universeAddress.toLowerCase()}:${n.nodeId}`);
-        const fs = fsByNodeId.get(String(n.nodeId));
-        return {
-          ...n,
-          videoLink: c?.videoLink,
-          plot: c?.plot,
-          fsEpisodeId: fs?.id,
-          fsTitle: fs?.title,
-          fsDescription: fs?.description,
-          fsIsCanon: fs?.isCanon,
-          fsClipCount: fs?.clipCount ?? 1,
-        };
-      })
-      .filter((n) => n.videoLink || n.plot);
+    let enriched: EpisodeRailItem[];
+
+    if (isOnChain) {
+      if (!nodes) return [];
+      const contentMap = new Map<string, PonderNodeContent>();
+      (nodeContents || []).forEach((c) => contentMap.set(c.id, c));
+
+      enriched = nodes
+        .map((n) => {
+          const c = contentMap.get(`${n.universeAddress.toLowerCase()}:${n.nodeId}`);
+          const fs = fsByNodeId.get(String(n.nodeId));
+          return {
+            ...n,
+            videoLink: c?.videoLink,
+            plot: c?.plot,
+            fsEpisodeId: fs?.id,
+            fsTitle: fs?.title,
+            fsDescription: fs?.description,
+            fsIsCanon: fs?.isCanon,
+            fsClipCount: fs?.clipCount ?? 1,
+          };
+        })
+        .filter((n) => n.videoLink || n.plot);
+    } else {
+      const ocNodes = offChainNodes?.nodes;
+      if (!ocNodes) return [];
+      enriched = ocNodes
+        .map((n) => {
+          const fs = fsByNodeId.get(String(n.nodeId));
+          return {
+            id: `${idLower}:${n.nodeId}`,
+            universeAddress: idLower,
+            nodeId: n.nodeId,
+            previousNodeId: n.previousNodeId ?? 0,
+            creator: n.creator ?? '',
+            createdAt: 0,
+            videoLink: n.videoUrl,
+            plot: n.plot,
+            fsEpisodeId: fs?.id,
+            fsTitle: fs?.title ?? n.title,
+            fsDescription: fs?.description,
+            fsIsCanon: fs?.isCanon,
+            fsClipCount: fs?.clipCount ?? 1,
+          } satisfies EpisodeRailItem;
+        })
+        .filter((n) => n.videoLink || n.plot);
+    }
 
     // Collapse: one rail item per Firestore episode (its earliest node is
     // the representative), one item per standalone node otherwise.
     const seenEpisodeIds = new Set<string>();
-    const collapsed: typeof enriched = [];
+    const collapsed: EpisodeRailItem[] = [];
     // Sort ascending by nodeId so the representative is the chronological
     // start of the episode (matches the order Firestore stores clips in).
     const ascending = [...enriched].sort((a, b) => a.nodeId - b.nodeId);
@@ -194,11 +253,13 @@ function WatchPage() {
     }
     // Restore the original (descending) order so latest episodes lead.
     return collapsed.sort((a, b) => b.nodeId - a.nodeId);
-  }, [nodes, nodeContents, fsEpisodes]);
+  }, [isOnChain, nodes, nodeContents, offChainNodes, fsEpisodes, idLower]);
 
   // Nodes on-chain that have no matching Firestore episode yet — the count
-  // drives the admin Sync banner.
+  // drives the admin Sync banner. Fun universes have no on-chain nodes to
+  // sync, so the banner is suppressed for them.
   const unsyncedCount = useMemo(() => {
+    if (!isOnChain) return 0;
     if (!nodes || !fsEpisodes) return 0;
     const claimed = new Set<string>();
     for (const ep of fsEpisodes) {
@@ -212,7 +273,7 @@ function WatchPage() {
       const c = contentMap.get(`${n.universeAddress.toLowerCase()}:${n.nodeId}`);
       return !!c?.videoLink && !claimed.has(String(n.nodeId));
     }).length;
-  }, [nodes, nodeContents, fsEpisodes]);
+  }, [isOnChain, nodes, nodeContents, fsEpisodes]);
 
   if (universeLoading) {
     return (

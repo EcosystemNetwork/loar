@@ -35,6 +35,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Link } from '@tanstack/react-router';
 import { openExternal } from '@/utils/open-external';
+import { Price } from '@/components/Price';
 
 interface TokenSwapWidgetProps {
   universeAddress: string;
@@ -178,7 +179,9 @@ export function TokenSwapWidget({
         {isInBondingPhase && progress && (
           <div className="space-y-1">
             <div className="flex justify-between text-[10px] text-muted-foreground">
-              <span>{formatEther(progress.raised)} ETH raised</span>
+              <span>
+                <Price wei={progress.raised} hideChain /> raised
+              </span>
               <span>{progressPct.toFixed(1)}%</span>
             </div>
             <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -188,7 +191,7 @@ export function TokenSwapWidget({
               />
             </div>
             <p className="text-[9px] text-center text-muted-foreground">
-              Graduates to LP at {formatEther(progress.target)} ETH
+              Graduates to LP at <Price wei={progress.target} hideChain />
             </p>
           </div>
         )}
@@ -210,7 +213,7 @@ export function TokenSwapWidget({
                 }
               }}
             >
-              {val} ETH
+              <Price eth={parseFloat(val)} hideChain />
             </Button>
           ))}
         </div>
@@ -306,8 +309,12 @@ export function TokenSwapWidget({
             />
           </div>
           <div className="flex justify-between text-[10px] text-muted-foreground">
-            <span>{formatEther(progress.raised)} ETH raised</span>
-            <span>{formatEther(progress.target)} ETH target</span>
+            <span>
+              <Price wei={progress.raised} hideChain /> raised
+            </span>
+            <span>
+              <Price wei={progress.target} hideChain /> target
+            </span>
           </div>
         </div>
       )}
@@ -331,7 +338,7 @@ export function TokenSwapWidget({
               onClick={() => setBuyAmount(ethBalance.formatted)}
               className="hover:text-foreground"
             >
-              Balance: {Number(ethBalance.formatted).toFixed(4)}
+              Balance: <Price wei={ethBalance.value} hideChain />
             </button>
           )}
         </div>

@@ -17,7 +17,17 @@ import { trpcClient } from '@/utils/trpc';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
-import { AlertTriangle, Loader2, Shield, ShieldOff, Save, Flag, Check, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  Loader2,
+  Shield,
+  ShieldOff,
+  Save,
+  Flag,
+  Check,
+  X,
+  Sparkles,
+} from 'lucide-react';
 
 export const Route = createFileRoute('/admin/ops')({
   beforeLoad: ({ context }) => {
@@ -242,6 +252,9 @@ function OpsDashboard() {
         </CardContent>
       </Card>
 
+      {/* Retro auto-canon for fun universes */}
+      <RetroCanonSection />
+
       {/* Abuse flags */}
       <AbuseFlagsSection />
 
@@ -400,6 +413,109 @@ function AbuseFlagsSection() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function RetroCanonSection() {
+  const [universeId, setUniverseId] = useState('');
+  const [lastResult, setLastResult] = useState<{
+    universesProcessed: number;
+    totalCreated: number;
+    totalSkipped: number;
+  } | null>(null);
+
+  const retro = useMutation({
+    mutationFn: (input: { universeId?: string }) =>
+      trpcClient.episodes.retroBackfillFunUniverses.mutate(input),
+    onSuccess: (res) => {
+      setLastResult({
+        universesProcessed: res.universesProcessed,
+        totalCreated: res.totalCreated,
+        totalSkipped: res.totalSkipped,
+      });
+      toast.success(
+        `Auto-canoned ${res.totalCreated} node${res.totalCreated === 1 ? '' : 's'} across ${res.universesProcessed} universe${res.universesProcessed === 1 ? '' : 's'}`
+      );
+    },
+    onError: (err: Error) => toast.error(`Backfill failed: ${err.message}`),
+  });
+
+  const runAll = () => {
+    const confirmed = window.confirm(
+      'Auto-canon EVERY on-chain node from EVERY fun universe?\n\n' +
+        'Idempotent — re-running is safe. Monetized universes are not touched.'
+    );
+    if (!confirmed) return;
+    retro.mutate({});
+  };
+
+  const runOne = () => {
+    const trimmed = universeId.trim();
+    if (!/^0x[a-f0-9]{40}$/i.test(trimmed)) {
+      toast.error('Enter a valid 0x-prefixed 40-char universe address');
+      return;
+    }
+    retro.mutate({ universeId: trimmed });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5" /> Retro auto-canon (fun universes)
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-muted-foreground text-sm">
+          Walks every fun universe's on-chain video nodes and creates a canon episode for any that
+          aren't already covered. New nodes auto-canon via the event listener — this fills the gap
+          for nodes minted before that handler shipped. Idempotent.
+        </p>
+
+        <div className="flex items-end gap-3">
+          <div className="flex-1">
+            <Label htmlFor="retro-universe">Specific universe (optional)</Label>
+            <Input
+              id="retro-universe"
+              placeholder="0x… (leave blank to process all fun universes)"
+              value={universeId}
+              onChange={(e) => setUniverseId(e.target.value)}
+            />
+          </div>
+          <Button
+            variant="outline"
+            onClick={runOne}
+            disabled={retro.isPending || !universeId.trim()}
+          >
+            {retro.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="mr-2 h-4 w-4" />
+            )}
+            Run for one
+          </Button>
+          <Button onClick={runAll} disabled={retro.isPending}>
+            {retro.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="mr-2 h-4 w-4" />
+            )}
+            Run for all
+          </Button>
+        </div>
+
+        {lastResult && (
+          <div className="rounded-md border bg-muted/30 p-3 text-sm">
+            <p>
+              <strong>{lastResult.totalCreated}</strong> episodes created,{' '}
+              <strong>{lastResult.totalSkipped}</strong> skipped (already canon or no media), across{' '}
+              <strong>{lastResult.universesProcessed}</strong> universe
+              {lastResult.universesProcessed === 1 ? '' : 's'}.
+            </p>
           </div>
         )}
       </CardContent>

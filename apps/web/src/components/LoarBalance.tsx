@@ -10,6 +10,7 @@ import { formatUnits } from 'viem';
 import { trpcClient } from '@/utils/trpc';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { useWalletAccount } from '@/hooks/useWalletAccount';
+import { useWeb3Mode } from '@/lib/web3-mode';
 import { getEvmAddresses } from '@/configs/addresses';
 import { SUPPORTED_EVM_CHAIN_IDS } from '@/configs/chains';
 import { loarTokenAbi } from '@loar/abis/generated';
@@ -42,6 +43,7 @@ function useLoarTokenBalance() {
 export function LoarBalance() {
   const [showStore, setShowStore] = useState(false);
   const { isAuthenticated } = useWalletAuth();
+  const { web3Mode } = useWeb3Mode();
   const tokenBalance = useLoarTokenBalance();
 
   const { data: balance } = useQuery({
@@ -83,16 +85,24 @@ export function LoarBalance() {
     <>
       <button
         onClick={() => setShowStore(true)}
-        aria-label={`${tokenBalance ?? '—'} $LOAR tokens, ${credits} credits. Click to buy more.`}
+        aria-label={
+          web3Mode
+            ? `${tokenBalance ?? '—'} $LOAR tokens, ${credits} credits. Click to buy more.`
+            : `${credits} credits. Click to buy more.`
+        }
         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
           isLow
             ? 'bg-red-900/30 border border-red-700/50 text-red-400 hover:bg-red-900/50'
             : 'bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700'
         }`}
       >
-        <span className="text-emerald-400 font-bold">{tokenBalance ?? '0'}</span>
-        <span className="text-zinc-500">$LOAR</span>
-        <span className="text-zinc-600 mx-0.5">|</span>
+        {web3Mode && (
+          <>
+            <span className="text-emerald-400 font-bold">{tokenBalance ?? '0'}</span>
+            <span className="text-zinc-500">$LOAR</span>
+            <span className="text-zinc-600 mx-0.5">|</span>
+          </>
+        )}
         <span className="text-amber-400 font-bold">{credits}</span>
         <span className="text-zinc-500">credits</span>
         {isLow && <span className="text-[9px] text-red-400">LOW</span>}

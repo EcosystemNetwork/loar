@@ -24,6 +24,7 @@ import {
 } from '@/hooks/useUniverseStaking';
 import { useWalletAccount } from '@/hooks/useWalletAccount';
 import { toast } from 'sonner';
+import { Price } from '@/components/Price';
 import {
   Coins,
   ArrowDownToLine,
@@ -167,7 +168,9 @@ export function LPYieldManager({
               <p className="text-sm font-medium text-green-600 dark:text-green-400">
                 Claimable Fees
               </p>
-              <p className="text-2xl font-bold">{claimableFeesFormatted} ETH</p>
+              <p className="text-2xl font-bold">
+                <Price wei={claimableFees ?? 0n} hideChain />
+              </p>
             </div>
             <Button
               size="sm"

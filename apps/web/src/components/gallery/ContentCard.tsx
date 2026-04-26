@@ -25,11 +25,11 @@ import {
   Users,
 } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
-import { formatEther } from 'viem';
 import { useVideoLoad } from '@/hooks/useVideoLoad';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { ClaimToUniverseDialog } from './ClaimToUniverseDialog';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { Price } from '@/components/Price';
 
 interface ContentCardProps {
   content: {
@@ -63,15 +63,6 @@ interface ContentCardProps {
   onRent?: () => void;
   onLicense?: () => void;
   onClick?: () => void;
-}
-
-function formatPrice(wei: string | undefined): string {
-  if (!wei || wei === '0') return '';
-  try {
-    return `${formatEther(BigInt(wei))} ETH`;
-  } catch {
-    return wei;
-  }
 }
 
 export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: ContentCardProps) {
@@ -354,7 +345,7 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
                 }}
               >
                 <ShoppingCart className="h-3 w-3 mr-1" />
-                {formatPrice(content.licensing!.buyPrice)}
+                <Price wei={content.licensing!.buyPrice} hideChain />
               </Button>
             )}
             {content.licensing!.rentPricePerDay && content.licensing!.rentPricePerDay !== '0' && (
@@ -368,7 +359,8 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
                 }}
               >
                 <Clock className="h-3 w-3 mr-1" />
-                {formatPrice(content.licensing!.rentPricePerDay)}/day
+                <Price wei={content.licensing!.rentPricePerDay} hideChain />
+                /day
               </Button>
             )}
             {content.licensing!.licenseFee && content.licensing!.licenseFee !== '0' && (

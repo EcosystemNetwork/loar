@@ -48,7 +48,7 @@ import {
 } from '@/components/ui/select';
 import { useUniverseManager, useDefaultDeploymentConfig } from '@/hooks/useUniverseManager';
 import { SafeSetup } from '@/components/SafeSetup';
-import { decodeEventLog, formatEther } from 'viem';
+import { decodeEventLog } from 'viem';
 import { universeManagerAbi } from '@loar/abis/generated';
 import {
   isSupportedChain,
@@ -56,6 +56,7 @@ import {
   CHAIN_NAMES,
   SUPPORTED_CHAIN_IDS,
 } from '@/configs/chains';
+import { Price, usePriceText } from '@/components/Price';
 
 export const Route = createFileRoute('/cinematicUniverseCreate')({
   // WEB-6: block entry until /auth/me confirms the session. The component
@@ -88,6 +89,7 @@ function CinematicUniverseCreate() {
   const chainId = useChainId();
   const { data: balance } = useBalance({ address });
   const { switchChain } = useSwitchChain();
+  const priceText = usePriceText();
 
   // Form state
   const [universeName, setUniverseName] = useState('');
@@ -667,7 +669,7 @@ function CinematicUniverseCreate() {
       const gasBuffer = BigInt(5e15); // ~0.005 ETH buffer for gas
       if (balance.value < mintFee + gasBuffer) {
         toast.error(
-          `Insufficient balance. You need at least ${formatEther(mintFee + gasBuffer)} ETH (mint fee + gas).`
+          `Insufficient balance. You need at least ${priceText({ wei: mintFee + gasBuffer }, { hideChain: true })} (mint fee + gas).`
         );
         return;
       }
@@ -1621,9 +1623,9 @@ function CinematicUniverseCreate() {
                       <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border text-sm">
                         <Info className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                         <span className="text-muted-foreground">
-                          {universeMode === 'monetize'
-                            ? `Mint fee: ${mintFee !== undefined ? `${formatEther(mintFee)} ETH` : 'loading...'} (seeds LP pool)`
-                            : `Mint fee: ${mintFee !== undefined ? `${formatEther(mintFee)} ETH` : 'loading...'}`}
+                          Mint fee:{' '}
+                          {mintFee !== undefined ? <Price wei={mintFee} hideChain /> : 'loading...'}
+                          {universeMode === 'monetize' ? ' (seeds LP pool)' : ''}
                           {' + gas'}
                         </span>
                       </div>
@@ -1643,8 +1645,8 @@ function CinematicUniverseCreate() {
                               <div>
                                 <p className="font-medium text-red-500">Insufficient balance</p>
                                 <p className="text-xs text-red-400 mt-0.5">
-                                  You need at least {formatEther(needed)} ETH but have{' '}
-                                  {formatEther(balance.value)} ETH.
+                                  You need at least <Price wei={needed} hideChain /> but have{' '}
+                                  <Price wei={balance.value} hideChain />.
                                   {(import.meta.env.VITE_CHAIN_ENV ?? 'testnet') === 'testnet' && (
                                     <>
                                       {' '}
@@ -1824,7 +1826,7 @@ function CinematicUniverseCreate() {
                         LP Seed
                       </p>
                       <p className="text-sm font-bold">
-                        {mintFee !== undefined ? `${formatEther(mintFee)} ETH` : '...'}
+                        {mintFee !== undefined ? <Price wei={mintFee} hideChain /> : '...'}
                       </p>
                     </div>
                     <div className="p-2.5 rounded-lg bg-muted/50">

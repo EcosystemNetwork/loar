@@ -15,6 +15,7 @@ import { ExternalLink, Droplets, X, Copy, Check } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { isSupportedChain } from '@/configs/chains';
+import { useWeb3Mode } from '@/lib/web3-mode';
 
 // Hand-picked public faucets, in order of reliability/ease. No auth walls
 // beyond a wallet connect / GitHub/Twitter for some.
@@ -47,6 +48,7 @@ const MIN_GAS_WEI = 1_000_000_000_000_000n; // 0.001 ETH — rough floor for a f
 
 export function FaucetBanner({ address }: { address: `0x${string}` | undefined }) {
   const chainId = useChainId();
+  const { web3Mode } = useWeb3Mode();
   const [dismissed, setDismissed] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -56,6 +58,7 @@ export function FaucetBanner({ address }: { address: `0x${string}` | undefined }
     query: { enabled: !!address, refetchInterval: 15_000 },
   });
 
+  if (!web3Mode) return null;
   if (!address || dismissed || isLoading) return null;
   if (balance && balance.value >= MIN_GAS_WEI) return null;
   if (!isSupportedChain(chainId)) return null;

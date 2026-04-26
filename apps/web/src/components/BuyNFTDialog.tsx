@@ -9,7 +9,7 @@ import { useState, useMemo } from 'react';
 import { useWaitForTransactionReceipt, useBalance, useChainId } from 'wagmi';
 import { useWriteContract } from '@/hooks/useThirdwebWrite';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
-import { parseEther, formatEther } from 'viem';
+import { parseEther } from 'viem';
 import { useRecordMint } from '@/hooks/useRevenue';
 import { toast } from 'sonner';
 import { Loader2, ShoppingCart, X, CheckCircle2, ExternalLink, Coins } from 'lucide-react';
@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { getExplorerTxUrl } from '@/configs/chains';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { Price, usePriceText } from '@/components/Price';
 
 // EpisodeNFT.mint ABI
 const EPISODE_NFT_MINT_ABI = [
@@ -65,6 +66,7 @@ export function BuyNFTDialog({ listing, onClose, onSuccess }: BuyNFTDialogProps)
   });
   const recordMint = useRecordMint();
   const [step, setStep] = useState<'preview' | 'confirming' | 'pending' | 'success'>('preview');
+  const priceText = usePriceText();
 
   const priceWei = useMemo(() => {
     try {
@@ -202,10 +204,12 @@ export function BuyNFTDialog({ listing, onClose, onSuccess }: BuyNFTDialogProps)
           {/* Price & Supply */}
           <div className="flex items-center justify-between p-3 bg-muted rounded-lg mb-4">
             <div>
-              <p className="text-2xl font-bold">{isFree ? 'Free' : `${listing.mintPrice} ETH`}</p>
+              <p className="text-2xl font-bold">
+                {isFree ? 'Free' : <Price eth={parseFloat(listing.mintPrice || '0')} hideChain />}
+              </p>
               {!isFree && balance && (
                 <p className="text-xs text-muted-foreground">
-                  Balance: {Number(formatEther(balance.value)).toFixed(4)} ETH
+                  Balance: <Price wei={balance.value} hideChain />
                 </p>
               )}
             </div>
@@ -270,7 +274,9 @@ export function BuyNFTDialog({ listing, onClose, onSuccess }: BuyNFTDialogProps)
             ) : (
               <>
                 <ShoppingCart className="h-5 w-5 mr-2" />
-                {isFree ? 'Mint for Free' : `Buy for ${listing.mintPrice} ETH`}
+                {isFree
+                  ? 'Mint for Free'
+                  : `Buy for ${priceText({ eth: parseFloat(listing.mintPrice || '0') }, { hideChain: true })}`}
               </>
             )}
           </Button>

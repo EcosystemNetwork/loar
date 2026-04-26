@@ -41,13 +41,14 @@ const nodeCreated: Handler<typeof nodeCreatedEvent> = {
     const universeAddress = ctx.address;
     const nodeId = Number(ctx.args.id);
     const compositeId = `${universeAddress}:${nodeId}`;
+    const creator = getAddress(ctx.args.creator).toLowerCase() as Hex;
 
     const nodeDoc: IndexerNode = {
       id: compositeId,
       universeAddress,
       nodeId,
       previousNodeId: Number(ctx.args.previous),
-      creator: getAddress(ctx.args.creator).toLowerCase() as Hex,
+      creator,
       createdAt: ctx.block.timestamp,
       contentHash: (ctx.args.contentHash as Hex) ?? null,
       plotHash: (ctx.args.plotHash as Hex) ?? null,
@@ -72,6 +73,59 @@ const nodeCreated: Handler<typeof nodeCreatedEvent> = {
       if (!snap.exists) return;
       const current = snap.data() as { nodeCount: number };
       tx.update(universeRef, { nodeCount: current.nodeCount + 1 });
+    });
+
+    // Fun universes auto-canon every node so it surfaces on the cross-universe
+    // landing rail without requiring a manual admin "Sync" or `publishAsCanon`
+    // gesture. Monetized universes still go through the explicit on-chain
+    // `setCanonForEpisode` + server `publishAsCanon` flow — landing real
+    // estate for those is intentional, not a firehose of mints.
+    const cinematicSnap = await db.collection('cinematicUniverses').doc(universeAddress).get();
+    if (!cinematicSnap.exists) return;
+    const universeType = (cinematicSnap.data()?.universeType as string | undefined) ?? 'monetized';
+    if (universeType !== 'fun') return;
+
+    const videoLink = ctx.args.link;
+    if (!videoLink) return;
+
+    const plot = (ctx.args.plot || '').trim();
+    const firstLine =
+      plot
+        .split(/[\n.!?]/)[0]
+        ?.trim()
+        .slice(0, 120) || '';
+    const title = firstLine || `Episode ${nodeId}`;
+    const createdAtIso = new Date(Number(ctx.block.timestamp) * 1000).toISOString();
+    const episodeId = `auto-${universeAddress}-${nodeId}`;
+
+    ctx.batcher.set(db.collection('episodes').doc(episodeId), {
+      id: episodeId,
+      universeId: universeAddress,
+      title,
+      description: plot,
+      clips: [
+        {
+          nodeId: String(nodeId),
+          label: title,
+          videoUrl: videoLink,
+          trimStart: 0,
+          trimEnd: 0,
+        },
+      ],
+      clipCount: 1,
+      creatorId: creator,
+      createdAt: createdAtIso,
+      updatedAt: createdAtIso,
+      exportUrl: null,
+      isCanon: true,
+      canonizedAt: createdAtIso,
+      canonTipNodeId: null,
+      canonTxHash: null,
+      sourceNodeId: String(nodeId),
+      sourceNodeIds: [String(nodeId)],
+      sourceCreator: creator,
+      sourceCreatedAt: Number(ctx.block.timestamp),
+      autoCanon: true,
     });
   },
 };

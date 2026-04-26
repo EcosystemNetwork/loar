@@ -176,14 +176,28 @@ export async function getEntitiesByUniverse(
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
 }
 
-export async function getEntitiesByKind(kind: EntityKind, limit = 100): Promise<Entity[]> {
-  const snapshot = await entitiesCol()
+export async function getEntitiesByKind(
+  kind: EntityKind,
+  limit = 100,
+  cursorId?: string
+): Promise<{ entities: Entity[]; nextCursorId: string | null }> {
+  let query: FirebaseFirestore.Query = entitiesCol()
     .where('kind', '==', kind)
     .orderBy('createdAt', 'desc')
-    .limit(limit)
-    .get();
+    .orderBy('__name__', 'desc');
 
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
+  if (cursorId) {
+    const cursorDoc = await entitiesCol().doc(cursorId).get();
+    if (cursorDoc.exists) {
+      query = query.startAfter(cursorDoc);
+    }
+  }
+
+  const snapshot = await query.limit(limit).get();
+  const entities = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
+  const nextCursorId =
+    snapshot.docs.length === limit ? snapshot.docs[snapshot.docs.length - 1].id : null;
+  return { entities, nextCursorId };
 }
 
 export async function getEntitiesByCreator(

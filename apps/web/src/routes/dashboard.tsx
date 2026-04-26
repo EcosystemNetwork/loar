@@ -32,7 +32,6 @@ import {
   Users,
   Vote,
 } from 'lucide-react';
-import { formatEther } from 'viem';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
 import { QuestsPanel } from '@/components/QuestsPanel';
@@ -41,6 +40,7 @@ import { DailyCheckin } from '@/components/DailyCheckin';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
 import { FaucetBanner } from '@/components/FaucetBanner';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { Price, usePriceText } from '@/components/Price';
 import { useCreditBalance, useMyNFTs, useUniversesMetricsBatch } from '@/hooks/useRevenue';
 import { useTokenListData, type EnrichedToken } from '@/hooks/useTokens';
 
@@ -64,6 +64,7 @@ function RouteComponent() {
   const { data: creditData } = useCreditBalance();
   const { data: myNfts } = useMyNFTs();
   const { data: tokenList } = useTokenListData();
+  const priceText = usePriceText();
 
   const { data: portfolioData } = useQuery({
     queryKey: ['portfolio-summary'],
@@ -224,7 +225,7 @@ function RouteComponent() {
               <StatCard
                 icon={<TrendingUp className="h-4 w-4 text-green-500" />}
                 label="Revenue (30d)"
-                value={revenue30d > 0 ? `${revenue30d.toFixed(4)} ETH` : '--'}
+                value={revenue30d > 0 ? priceText({ eth: revenue30d }, { hideChain: true }) : '--'}
                 sub={revenueTxCount > 0 ? `${revenueTxCount} txns` : undefined}
                 accent="green"
               />
@@ -305,9 +306,7 @@ function RouteComponent() {
                   <h2 className="text-lg font-semibold">Your Tokens</h2>
                   {totalTokenMarketCap > 0 && (
                     <Badge variant="secondary" className="text-xs">
-                      {totalTokenMarketCap >= 1000
-                        ? `${(totalTokenMarketCap / 1000).toFixed(1)}K ETH MCap`
-                        : `${totalTokenMarketCap.toFixed(2)} ETH MCap`}
+                      <Price eth={totalTokenMarketCap} hideChain compact /> MCap
                     </Badge>
                   )}
                 </div>
@@ -475,10 +474,7 @@ function TokenMiniCard({ token }: { token: EnrichedToken }) {
               )}
               {token.marketCap != null && token.marketCap > 0 && (
                 <span className="text-[10px] text-muted-foreground tabular-nums">
-                  {token.marketCap >= 1000
-                    ? `${(token.marketCap / 1000).toFixed(1)}K`
-                    : token.marketCap.toFixed(2)}{' '}
-                  ETH
+                  <Price eth={token.marketCap} hideChain compact />
                 </span>
               )}
             </div>
@@ -581,12 +577,6 @@ function UniverseCard({
   const mints = m?.totalMints ?? 0;
   const subscribers = m?.totalSubscribers ?? 0;
   const votes = m?.totalVotes ?? 0;
-  let revenueEth = '0';
-  try {
-    revenueEth = m?.totalRevenue ? Number(formatEther(BigInt(m.totalRevenue))).toFixed(3) : '0';
-  } catch {
-    revenueEth = '0';
-  }
   const hasAnyActivity = views > 0 || mints > 0 || subscribers > 0 || votes > 0;
 
   return (
@@ -653,7 +643,11 @@ function UniverseCard({
           <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-3">
             <span className="flex items-center gap-1">
               <Coins className="h-2.5 w-2.5" />
-              {hasAnyActivity ? `${revenueEth} ETH` : 'No activity yet'}
+              {hasAnyActivity ? (
+                <Price wei={m?.totalRevenue ?? '0'} hideChain decimals={3} />
+              ) : (
+                'No activity yet'
+              )}
             </span>
             <RouterLink
               to="/analytics/$universeId"

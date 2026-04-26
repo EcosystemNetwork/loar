@@ -32,6 +32,7 @@ import { useVocab } from '@/hooks/use-vocab';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getEvmAddresses, isZeroAddress } from '@/configs/addresses';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { ListingPrice, usePriceText } from '@/components/Price';
 
 const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS as Address | undefined;
 
@@ -67,6 +68,7 @@ function ProductDetailPage() {
   const v = useVocab();
   const { data: listing, isLoading } = useListing(id);
   const [buying, setBuying] = useState(false);
+  const priceText = usePriceText();
   const [showNftBuy, setShowNftBuy] = useState(false);
   const { writeContractAsync } = useWriteContract();
   const { sendTransactionAsync } = useSendTransaction();
@@ -294,7 +296,7 @@ function ProductDetailPage() {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-2xl font-bold text-primary">
-                  {l.price === '0' ? 'Free' : `${l.price} ${l.currency}`}
+                  <ListingPrice amount={l.price} currency={l.currency} />
                 </p>
                 {l.royaltyBps > 0 && (
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -381,7 +383,7 @@ function ProductDetailPage() {
                 : (l.currency === 'ETH' || l.currency === 'LOAR') && !l.contractAddress
                   ? 'Purchase Unavailable'
                   : l.currency === 'ETH'
-                    ? `Pay ${l.price} ETH`
+                    ? `Pay ${priceText({ eth: parseFloat(l.price) }, { hideChain: true })}`
                     : `Buy for ${l.price} ${l.currency}`}
             </Button>
           )}

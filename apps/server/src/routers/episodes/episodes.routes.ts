@@ -15,7 +15,7 @@
  *   episodes.generateFromScript — Batch-generate clips from script, auto-assemble episode
  *   episodes.scriptJobStatus    — Poll script-to-episode job progress
  */
-import { router, protectedProcedure, publicProcedure } from '../../lib/trpc';
+import { router, protectedProcedure, publicProcedure, adminProcedure } from '../../lib/trpc';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
@@ -1046,6 +1046,8 @@ export const episodesRouter = router({
             description: (ep.description as string) || '',
             clipCount: (ep.clipCount as number) ?? (Array.isArray(ep.clips) ? ep.clips.length : 0),
             videoUrl: (firstClip?.videoUrl as string | undefined) ?? null,
+            thumbnailUrl: (ep.thumbnailUrl as string | undefined) ?? null,
+            exportUrl: (ep.exportUrl as string | undefined) ?? null,
             sourceCreator: (ep.sourceCreator as string | null) ?? null,
             createdAt: (ep.createdAt as string | null) ?? null,
             isCanon: !!ep.isCanon,
@@ -1476,6 +1478,178 @@ export const episodesRouter = router({
         universeType,
         autoCanoned: universeType === 'fun' ? created : 0,
         clipsTotal: groups.reduce((acc, g) => acc + g.nodes.length, 0),
+      };
+    }),
+
+  /**
+   * One-shot retro-canon for fun universes. Mirrors the auto-canon path the
+   * event-listener now runs on every new `NodeCreated`, but applied to every
+   * pre-existing on-chain node we missed before that handler shipped.
+   *
+   * Idempotent — uses the same deterministic episode ID as the event-listener
+   * (`auto-{universe}-{nodeId}`), so re-running just overwrites with the same
+   * payload and never double-creates. Honors existing manually-created
+   * episodes too (those nodes are already "claimed" via `clips[].nodeId` and
+   * are skipped).
+   *
+   * Platform-admin only (ADMIN_ADDRESSES). Does NOT touch monetized universes.
+   */
+  retroBackfillFunUniverses: adminProcedure
+    .input(
+      z.object({
+        universeId: z.string().optional(),
+        maxNodesPerUniverse: z.number().int().min(1).max(50000).default(10000),
+      })
+    )
+    .mutation(async ({ input }) => {
+      // 1. Resolve target set: a single fun universe (if specified) or all of them.
+      let funUniverseIds: string[] = [];
+      if (input.universeId) {
+        const lc = input.universeId.toLowerCase();
+        const doc = await db.collection('cinematicUniverses').doc(lc).get();
+        const data = doc.data();
+        if (!doc.exists || (data?.universeType as string | undefined) !== 'fun') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Universe is not a fun universe',
+          });
+        }
+        funUniverseIds = [lc];
+      } else {
+        const snap = await db
+          .collection('cinematicUniverses')
+          .where('universeType', '==', 'fun')
+          .get();
+        funUniverseIds = snap.docs.map((d) => d.id);
+      }
+
+      let totalCreated = 0;
+      let totalSkipped = 0;
+      const perUniverse: Array<{ id: string; created: number; skipped: number }> = [];
+
+      for (const universeId of funUniverseIds) {
+        // 2. Build the "claimed" node-id set from any existing episodes for this
+        // universe. Both manual `backfillFromNodes` and the event-listener
+        // auto-canon land here, so this picks up either source.
+        const existing = await episodesCol().where('universeId', '==', universeId).get();
+        const claimed = new Set<string>();
+        for (const d of existing.docs) {
+          const clips = (d.data().clips || []) as Array<{ nodeId?: string }>;
+          for (const c of clips) {
+            if (c?.nodeId) claimed.add(String(c.nodeId));
+          }
+        }
+
+        // 3. Pull on-chain nodes for this universe from the indexer mirror.
+        const nodesSnap = await db
+          .collection('indexer_nodes')
+          .where('universeAddress', '==', universeId)
+          .get();
+        const nodes = nodesSnap.docs.map(
+          (d) => d.data() as { nodeId: number; creator: string | null; createdAt: number }
+        );
+        if (nodes.length === 0) {
+          perUniverse.push({ id: universeId, created: 0, skipped: 0 });
+          continue;
+        }
+
+        // 4. Bulk-fetch matching content docs in chunks (Firestore getAll cap).
+        const contentMap = new Map<string, { videoLink: string | null; plot: string | null }>();
+        for (let i = 0; i < nodes.length; i += 300) {
+          const slice = nodes.slice(i, i + 300);
+          const refs = slice.map((n) =>
+            db.collection('indexer_nodeContents').doc(`${universeId}:${n.nodeId}`)
+          );
+          const docs = await db.getAll(...refs);
+          for (const d of docs) {
+            if (!d.exists) continue;
+            const cd = d.data() as { videoLink?: string | null; plot?: string | null };
+            contentMap.set(d.id, { videoLink: cd.videoLink ?? null, plot: cd.plot ?? null });
+          }
+        }
+
+        // 5. Write auto-canon episodes in batches of 400 (Firestore batch cap is 500).
+        let batch = db.batch();
+        let batchCount = 0;
+        let created = 0;
+        let skipped = 0;
+        let processed = 0;
+
+        for (const n of nodes) {
+          if (processed >= input.maxNodesPerUniverse) break;
+          processed++;
+          const nodeId = String(n.nodeId);
+          if (claimed.has(nodeId)) {
+            skipped++;
+            continue;
+          }
+          const content = contentMap.get(`${universeId}:${nodeId}`);
+          if (!content?.videoLink) {
+            skipped++;
+            continue;
+          }
+          const plot = (content.plot || '').trim();
+          const firstLine =
+            plot
+              .split(/[\n.!?]/)[0]
+              ?.trim()
+              .slice(0, 120) || '';
+          const title = firstLine || `Episode ${nodeId}`;
+          const createdAtIso = new Date(Number(n.createdAt || 0) * 1000).toISOString();
+          const episodeId = `auto-${universeId}-${nodeId}`;
+          const creator = (n.creator || '').toLowerCase() || null;
+
+          batch.set(episodesCol().doc(episodeId), {
+            id: episodeId,
+            universeId,
+            title,
+            description: plot,
+            clips: [
+              {
+                nodeId,
+                label: title,
+                videoUrl: content.videoLink,
+                trimStart: 0,
+                trimEnd: 0,
+              },
+            ],
+            clipCount: 1,
+            creatorId: creator,
+            createdAt: createdAtIso,
+            updatedAt: createdAtIso,
+            exportUrl: null,
+            isCanon: true,
+            canonizedAt: createdAtIso,
+            canonTipNodeId: null,
+            canonTxHash: null,
+            sourceNodeId: nodeId,
+            sourceNodeIds: [nodeId],
+            sourceCreator: creator,
+            sourceCreatedAt: Number(n.createdAt || 0),
+            autoCanon: true,
+            autoCanonRetro: true,
+          });
+          batchCount++;
+          created++;
+
+          if (batchCount >= 400) {
+            await batch.commit();
+            batch = db.batch();
+            batchCount = 0;
+          }
+        }
+        if (batchCount > 0) await batch.commit();
+
+        totalCreated += created;
+        totalSkipped += skipped;
+        perUniverse.push({ id: universeId, created, skipped });
+      }
+
+      return {
+        universesProcessed: funUniverseIds.length,
+        totalCreated,
+        totalSkipped,
+        perUniverse,
       };
     }),
 
