@@ -3,7 +3,7 @@
  * candlestick chart, watchlist, share, creator link, maturity progress.
  */
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   useTokenDetail,
   useSwapHistory,
@@ -51,7 +51,7 @@ import {
   Bookmark,
   User,
 } from 'lucide-react';
-import { useChainId, useBalance } from 'wagmi';
+import { useChainId, useBalance, useBytecode } from 'wagmi';
 import { parseUnits, formatEther } from 'viem';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { getExplorerAddressUrl } from '@/configs/chains';
@@ -75,8 +75,28 @@ function TokenDetailPage() {
   const [shareToast, setShareToast] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: tokenData, isLoading: tokenLoading } = useTokenDetail(tokenAddress);
+  const {
+    data: tokenData,
+    isLoading: tokenLoading,
+    refetch: refetchToken,
+  } = useTokenDetail(tokenAddress);
   const token = tokenData?.token;
+
+  // Distinguish "indexer lag" from "doesn't exist" — if there's bytecode at
+  // the address, the deploy landed and ponder just hasn't caught up yet.
+  const isHexAddress = /^0x[0-9a-fA-F]{40}$/.test(tokenAddress);
+  const { data: bytecode, isLoading: bytecodeLoading } = useBytecode({
+    address: isHexAddress ? (tokenAddress as `0x${string}`) : undefined,
+    query: { enabled: isHexAddress },
+  });
+  const hasContract = !!bytecode && bytecode !== '0x';
+
+  // Auto-poll while we know a contract exists but ponder hasn't indexed it.
+  useEffect(() => {
+    if (token || tokenLoading || !hasContract) return;
+    const id = setInterval(() => refetchToken(), 5000);
+    return () => clearInterval(id);
+  }, [token, tokenLoading, hasContract, refetchToken]);
   // Stable reference so dependent memos don't re-run on every render when the
   // server returns no holders (would otherwise produce a fresh [] each time).
   const holders = useMemo(() => tokenData?.holders ?? [], [tokenData?.holders]);
@@ -235,7 +255,7 @@ function TokenDetailPage() {
     return warnings;
   }, [holderStats, token, totalSwaps]);
 
-  if (tokenLoading) {
+  if (tokenLoading || (!token && bytecodeLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -244,20 +264,50 @@ function TokenDetailPage() {
   }
 
   if (!token) {
+    const indexing = isHexAddress && hasContract;
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card className="max-w-md">
           <CardContent className="text-center py-12">
-            <h2 className="text-xl font-bold mb-2">Token Not Found</h2>
-            <p className="text-muted-foreground mb-4">
-              This token doesn't exist or hasn't been indexed yet.
-            </p>
-            <Link to="/tokens">
-              <Button variant="outline">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Launchpad
-              </Button>
-            </Link>
+            {indexing ? (
+              <>
+                <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto mb-3" />
+                <h2 className="text-xl font-bold mb-2">Indexing in progress</h2>
+                <p className="text-muted-foreground mb-1">
+                  This token is deployed on-chain but the indexer hasn't caught up yet.
+                </p>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Auto-refreshing every 5s. New deploys typically appear within ~30s.
+                </p>
+                <div className="flex items-center justify-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => refetchToken()}>
+                    Refresh now
+                  </Button>
+                  <Link to="/tokens">
+                    <Button variant="ghost" size="sm">
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Back to Launchpad
+                    </Button>
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="text-xl font-bold mb-2">Token Not Found</h2>
+                <p className="text-muted-foreground mb-1">
+                  No contract is deployed at this address on the connected chain.
+                </p>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Double-check the address and that your wallet is on the right network.
+                </p>
+                <Link to="/tokens">
+                  <Button variant="outline">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back to Launchpad
+                  </Button>
+                </Link>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
