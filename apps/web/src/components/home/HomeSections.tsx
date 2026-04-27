@@ -650,7 +650,9 @@ export function RecentEpisodes() {
   const { data: episodes } = useQuery<FeedEpisode[]>({
     queryKey: ['episodes', 'feed', 20],
     queryFn: () => trpcClient.episodes.feed.query({ limit: 20 }) as Promise<FeedEpisode[]>,
-    staleTime: 30_000,
+    staleTime: 60_000,
+    retry: false,
+    meta: { silent: true },
   });
 
   if (!episodes || episodes.length === 0) return null;
@@ -880,6 +882,8 @@ export function MostEpisodesRow({ universes }: { universes: EnrichedUniverse[] }
         Array<{ universeId: string; count: number }>
       >,
     staleTime: 60_000,
+    retry: false,
+    meta: { silent: true },
   });
 
   const byEpisodes = useMemo(() => {
@@ -948,6 +952,7 @@ export function CommunityCreations() {
     queryFn: () => trpcClient.content.feed.query({ limit: 20 }),
     staleTime: 60_000,
     retry: false,
+    meta: { silent: true },
   });
 
   const items = data?.items;
@@ -984,7 +989,11 @@ export function ContentCard({ item }: { item: any }) {
   const isVideo = item.mediaType === 'ai-video' || item.mediaType === 'video';
 
   return (
-    <Link to="/discover" className="group flex-shrink-0 w-[180px] md:w-[200px]">
+    <Link
+      to="/lineage/$assetId"
+      params={{ assetId: item.id }}
+      className="group flex-shrink-0 w-[180px] md:w-[200px]"
+    >
       <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-xl group-hover:shadow-primary/20">
         {item.thumbnailUrl || item.mediaUrl ? (
           isVideo && item.mediaUrl ? (

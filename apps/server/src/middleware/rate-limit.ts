@@ -222,11 +222,15 @@ export function aiRateLimiter(opts: { windowMs: number; max: number }) {
       );
     }
 
-    // Per-wallet rate limit (10 req/min per wallet across all AI endpoints).
-    // Browser clients authenticate via the `siwe-session` httpOnly cookie and
-    // never send Authorization, so we must check both. Without the cookie
-    // fallback, every browser-authed user only hits the per-IP bucket and the
-    // 200/day per-wallet ceiling is unreachable.
+    // Per-wallet rate limit — fixed at 60 req/min per wallet across ALL AI
+    // endpoints. Must NOT use opts.max: that field is per-route (2..30) and the
+    // wallet bucket is shared, so the first AI route a wallet hits in a window
+    // would otherwise cap their wallet bucket at that route's tiny limit (e.g.
+    // 2 from `episodes.generateFromScript`), 429ing every subsequent AI call —
+    // and any tRPC error toast persists in the React Query cache, which is why
+    // it can surface on later page loads with unrelated errors. The per-route
+    // bucket above already enforces route-specific budgets.
+    const WALLET_LIMIT_PER_MIN = 60;
     const authHeader = c.req.header('authorization');
     const { getCookie } = await import('hono/cookie');
     const cookieToken = getCookie(c, 'siwe-session');
@@ -245,7 +249,7 @@ export function aiRateLimiter(opts: { windowMs: number; max: number }) {
         const wallet = (payload?.sub || '').toLowerCase();
         if (wallet) {
           const walletKey = `ai-wallet:${wallet}`;
-          const walletResult = await getStore().consume(walletKey, opts.windowMs, opts.max);
+          const walletResult = await getStore().consume(walletKey, 60_000, WALLET_LIMIT_PER_MIN);
           if (walletResult.blocked) {
             c.header('Retry-After', String(Math.ceil(opts.windowMs / 1000)));
             return c.json(
