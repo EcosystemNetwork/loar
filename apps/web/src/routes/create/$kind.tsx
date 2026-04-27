@@ -35,13 +35,17 @@ import {
   X,
   Star,
   Plus,
+  Wand2,
+  Dices,
 } from 'lucide-react';
-import { ModelSelector } from '@/components/ModelSelector';
+import { ModelSelector, type ModelOption } from '@/components/ModelSelector';
 import {
   StyleControls,
   DEFAULT_STYLE_CONTROLS_VALUE,
   type StyleControlsValue,
 } from '@/components/StyleControls';
+import { STYLE_PRESETS } from '@/components/sandbox/constants';
+import { RANDOM_NAME_SEEDS, pickRandom, baseArtPromptForKind } from '@/lib/random-entity';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 type EntityKind =
@@ -896,8 +900,16 @@ function EntityCreateForm() {
     return parts.join(', ');
   };
 
-  const handleGenerateCharacter = async (opts: { variant?: string } = {}) => {
-    const finalPrompt = buildCharacterPrompt(opts.variant);
+  const handleGenerateCharacter = async (
+    opts: {
+      variant?: string;
+      promptOverride?: string;
+      modelOverride?: string;
+      modeOverride?: '2d' | '3d';
+    } = {}
+  ) => {
+    const mode = opts.modeOverride ?? characterMode;
+    const finalPrompt = opts.promptOverride?.trim() || buildCharacterPrompt(opts.variant);
     if (!finalPrompt.trim()) {
       toast.error('Add a name or describe the character first');
       return;
@@ -908,7 +920,7 @@ function EntityCreateForm() {
       opts.variant?.trim() || (isFirst ? 'Main' : `Variant ${characterGens.length + 1}`);
     const stub: CharacterGen = {
       id: localId,
-      type: characterMode,
+      type: mode,
       label,
       status: 'generating',
       prompt: finalPrompt,
@@ -917,14 +929,15 @@ function EntityCreateForm() {
     setCharacterGens((prev) => [...prev, stub]);
     setGeneratingCharacter(true);
     try {
-      if (characterMode === '2d') {
+      if (mode === '2d') {
+        const modelId = opts.modelOverride ?? character2dModel;
         const result = await trpcClient.image.generate.mutate({
           prompt: finalPrompt,
           task: 'text_to_image',
           imageSize: 'square_hd',
           numImages: 1,
-          routingMode: character2dModel ? 'manual' : 'auto',
-          ...(character2dModel ? { selectedModelId: character2dModel } : {}),
+          routingMode: modelId ? 'manual' : 'auto',
+          ...(modelId ? { selectedModelId: modelId } : {}),
           universeId: universeAddress || undefined,
           stylePackEntityId: styleControls.stylePackEntityId ?? undefined,
           moodboardEntityId: styleControls.moodboardEntityId ?? undefined,
@@ -1015,6 +1028,119 @@ function EntityCreateForm() {
       toast.error(err.message ?? 'AI generation failed');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  // ── Surprise me — full random roll ──────────────────────────────────
+  // Picks a random name, style preset, and image model so a creator can
+  // "click through the kinds" and assemble a universe of varied looks.
+  const [surprising, setSurprising] = useState(false);
+  const [lastRoll, setLastRoll] = useState<{
+    style: string;
+    model: string;
+  } | null>(null);
+
+  const handleSurpriseMe = async () => {
+    if (!VALID_KINDS.includes(kind as EntityKind)) return;
+    const typedKind = kind as EntityKind;
+    setSurprising(true);
+    setLastRoll(null);
+    try {
+      // 1) Roll a name (use what the user typed if any, else a random seed).
+      const seedNames = RANDOM_NAME_SEEDS[typedKind] ?? ['Untitled'];
+      const rolledName = name.trim() || pickRandom(seedNames);
+      if (!name.trim()) setName(rolledName);
+
+      // 2) Roll a style preset and an image model.
+      const preset = pickRandom(STYLE_PRESETS);
+      let models: ModelOption[] = [];
+      try {
+        models = (await trpcClient.image.listModels.query({
+          task: 'text_to_image',
+        })) as ModelOption[];
+      } catch {
+        models = [];
+      }
+      const rolledModel = models.length > 0 ? pickRandom(models) : null;
+      const rolledModelId = rolledModel?.id ?? '';
+      setLastRoll({
+        style: preset.label,
+        model: rolledModel?.displayName ?? 'Auto',
+      });
+
+      // 3) Generate profile (description + metadata) and image in parallel.
+      const profilePromise = trpcClient.entities.generateProfile
+        .mutate({
+          name: rolledName,
+          kind: typedKind,
+          hint: description || '',
+        })
+        .then((profile) => {
+          setDescription(profile.description);
+          const newFields: Record<string, string> = {};
+          for (const [key, value] of Object.entries(profile.metadata)) {
+            if (typeof value === 'string' && value) newFields[key] = value;
+          }
+          setFieldValues((prev) => ({ ...prev, ...newFields }));
+          return profile;
+        })
+        .catch((err: any) => {
+          toast.error(err?.message ?? 'Profile generation failed');
+          return null;
+        });
+
+      const artPrompt = `${baseArtPromptForKind(typedKind, rolledName, '')}, ${preset.suffix}`;
+      setArtworkPrompt(artPrompt);
+      setArtworkModel(rolledModelId);
+      setShowArtwork(true);
+
+      if (typedKind === 'person') {
+        // Reuse the Character Generation flow so the rolled image lands in
+        // the variants grid the same way a manual gen would.
+        setCharacterPrompt(artPrompt);
+        setCharacterMode('2d');
+        if (rolledModelId) setCharacter2dModel(rolledModelId);
+        await Promise.all([
+          profilePromise,
+          handleGenerateCharacter({
+            promptOverride: artPrompt,
+            modelOverride: rolledModelId || undefined,
+            modeOverride: '2d',
+          }),
+        ]);
+      } else {
+        const imagePromise = trpcClient.image.generate
+          .mutate({
+            prompt: artPrompt,
+            task: 'text_to_image',
+            imageSize: 'square_hd',
+            numImages: 1,
+            routingMode: rolledModelId ? 'manual' : 'auto',
+            ...(rolledModelId ? { selectedModelId: rolledModelId } : {}),
+            universeId: universeAddress || undefined,
+            stylePackEntityId: styleControls.stylePackEntityId ?? undefined,
+            moodboardEntityId: styleControls.moodboardEntityId ?? undefined,
+            styleStrength: styleControls.styleStrength,
+            retexture: styleControls.retexture,
+            respectCanonStyle: styleControls.respectCanonStyle,
+          })
+          .then((result) => {
+            if (result.status === 'completed' && result.imageUrls?.[0]) {
+              setImageUrl(result.imageUrls[0]);
+              // Surprise already produced the artwork — don't double-bill on submit.
+              setArtworkPrompt('');
+              toast.success(`Rolled ${preset.label} on ${rolledModel?.displayName ?? 'auto'}`);
+            } else {
+              throw new Error('Image generation did not complete');
+            }
+          })
+          .catch((err: any) => {
+            toast.error(err?.message ?? 'Image generation failed');
+          });
+        await Promise.all([profilePromise, imagePromise]);
+      }
+    } finally {
+      setSurprising(false);
     }
   };
 
@@ -1230,6 +1356,61 @@ function EntityCreateForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Quick Generate — top of every entity form. "Surprise me" rolls a
+            random name + random style preset + random image model so a
+            creator can click through the kinds and assemble a varied
+            universe in minutes. */}
+        <Card className="border-violet-500/30 bg-gradient-to-br from-violet-500/5 to-purple-500/5">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Wand2 className="w-4 h-4 text-violet-400" />
+              Quick Generate
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Generate this {label.toLowerCase()} from a name, or roll a fully random one — each
+              roll picks a fresh style and image model so a whole universe can be built with varied
+              looks.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleGenerateAI}
+                disabled={generating || surprising || !name.trim()}
+              >
+                {generating ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4 mr-2" />
+                )}
+                {generating ? 'Generating…' : 'Generate from name'}
+              </Button>
+              <Button type="button" onClick={handleSurpriseMe} disabled={generating || surprising}>
+                {surprising ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Dices className="w-4 h-4 mr-2" />
+                )}
+                {surprising ? 'Rolling…' : 'Surprise me'}
+              </Button>
+            </div>
+            {!name.trim() && (
+              <p className="text-[11px] text-muted-foreground">
+                Type a name above to use "Generate from name", or hit "Surprise me" to roll
+                everything — name, profile, style, and artwork.
+              </p>
+            )}
+            {lastRoll && (
+              <p className="text-[11px] text-muted-foreground">
+                Rolled <span className="text-violet-300">{lastRoll.style}</span> on{' '}
+                <span className="text-violet-300">{lastRoll.model}</span>
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Character generation (person only) — sits at the top so creators
             can riff on visuals before committing to details. */}
         {isPerson && (
@@ -1462,22 +1643,8 @@ function EntityCreateForm() {
 
         {/* Core fields */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader>
             <CardTitle className="text-base">Core</CardTitle>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleGenerateAI}
-              disabled={generating || !name.trim()}
-            >
-              {generating ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Sparkles className="w-4 h-4 mr-2" />
-              )}
-              {generating ? 'Generating...' : 'Generate with AI'}
-            </Button>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -1822,6 +1989,7 @@ function EntityCreateForm() {
               saving ||
               generatingArt ||
               generatingMusic ||
+              surprising ||
               anyGenInFlight ||
               !name.trim() ||
               (monetized && !rightsDeclaration)

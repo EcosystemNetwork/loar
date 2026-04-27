@@ -48,7 +48,7 @@ export interface ZaiChatTool {
 }
 
 export interface ZaiChatOptions extends ZaiCallOptions {
-  /** Model id — defaults to 'glm-4.6' as a sensible cost/perf balance. */
+  /** Model id — defaults to 'glm-4.7' (devpack-tier coverage + latest GLM). */
   model?: string;
   messages: ZaiChatMessage[];
   temperature?: number;
@@ -72,6 +72,8 @@ export interface ZaiChatToolCall {
 
 export interface ZaiChatResult {
   content: string;
+  /** Chain-of-thought from GLM reasoning models (4.7, 5.1). Empty on non-reasoning models. */
+  reasoningContent?: string;
   toolCalls?: ZaiChatToolCall[];
   finishReason?: string;
   usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
@@ -263,7 +265,7 @@ class ZaiServiceImpl {
 
   async chat(opts: ZaiChatOptions): Promise<ZaiChatResult> {
     const body: Record<string, unknown> = {
-      model: opts.model ?? 'glm-4.6',
+      model: opts.model ?? 'glm-4.7',
       messages: opts.messages,
       temperature: opts.temperature ?? 0.7,
       ...(opts.topP !== undefined ? { top_p: opts.topP } : {}),
@@ -285,6 +287,7 @@ class ZaiServiceImpl {
       choices?: Array<{
         message?: {
           content?: string;
+          reasoning_content?: string;
           tool_calls?: ZaiChatToolCall[];
         };
         finish_reason?: string;
@@ -295,6 +298,7 @@ class ZaiServiceImpl {
     const choice = raw.choices?.[0];
     return {
       content: choice?.message?.content ?? '',
+      reasoningContent: choice?.message?.reasoning_content,
       toolCalls: choice?.message?.tool_calls,
       finishReason: choice?.finish_reason,
       usage: {
@@ -309,7 +313,7 @@ class ZaiServiceImpl {
   /** Convenience: chat with strict-JSON output, parsed for the caller. */
   async chatJson<T = unknown>(
     opts: Omit<ZaiChatOptions, 'jsonMode'> & { schema?: Record<string, unknown> }
-  ): Promise<{ data: T; usage?: ZaiChatResult['usage'] }> {
+  ): Promise<{ data: T; usage?: ZaiChatResult['usage']; reasoningContent?: string }> {
     const result = await this.chat({
       ...opts,
       jsonMode: !opts.schema,
@@ -326,7 +330,7 @@ class ZaiServiceImpl {
         .trim();
       data = JSON.parse(stripped) as T;
     }
-    return { data, usage: result.usage };
+    return { data, usage: result.usage, reasoningContent: result.reasoningContent };
   }
 
   // ── Vision (GLM-5V / 4.6V) ──────────────────────────────────────────

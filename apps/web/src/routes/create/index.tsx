@@ -33,6 +33,7 @@ import {
   NotebookPen,
 } from 'lucide-react';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { RandomUniverseBuilder } from '@/components/RandomUniverseBuilder';
 
 interface EntityTypeCard {
   kind: string;
@@ -267,6 +268,15 @@ function CreateHub() {
               Gallery
             </Link>
           </div>
+        </div>
+      )}
+
+      {universeAddress && (
+        <div className="mb-10">
+          <RandomUniverseBuilder
+            universeAddress={universeAddress}
+            universeName={universeInfo?.name}
+          />
         </div>
       )}
 

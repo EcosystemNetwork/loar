@@ -857,10 +857,11 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     bestFor: 'Runway premium text-to-video',
   },
 
-  // ── Z.AI / Zhipu — Vidu Q1 ──────────────────────────────────────────
-  // Live-confirmed against api.z.ai paas/v4 on 2026-04-26: only the typed
-  // `viduq1-text` and `viduq1-image` ids are accepted. `cogvideox-*`,
-  // `cogvideox-3`, and bare `viduq1` all return code 1211 "Unknown Model".
+  // ── Z.AI / Zhipu — Vidu Q1 + CogVideoX-3 ────────────────────────────
+  // Live-confirmed against api.z.ai paas/v4 on 2026-04-26: `viduq1-text`,
+  // `viduq1-image`, and `cogvideox-3` all accept jobs. CogVideoX-3 requires
+  // duration ≥5 (rejects 2). `vidu2-*`, `viduq2-*`, and `cogvideox-2` are
+  // rejected (1211 / 1214).
   {
     id: 'viduq1-t2v',
     provider: 'zai',
@@ -916,6 +917,34 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     allowedPlans: [],
     tags: ['standard', 'zai', 'vidu', 'image-animation'],
     bestFor: 'Animate a still frame — preserves character + scene identity',
+  },
+  {
+    id: 'cogvideox-3',
+    provider: 'zai',
+    displayName: 'CogVideoX-3 (Z.AI)',
+    shortDescription: 'Z.AI premium video — cinematic motion + inline audio support',
+    falModelId: '',
+    zaiModelId: 'cogvideox-3',
+    mode: ['text_to_video', 'image_to_video'],
+    qualityTier: 'premium',
+    speedTier: 'medium',
+    priceTier: 'medium',
+    supportsAudio: true,
+    supports1080p: true,
+    supports4k: false,
+    maxDurationSec: 10,
+    supportedDurations: [5, 10],
+    supportedAspectRatios: ['16:9', '9:16', '1:1'],
+    supportedResolutions: ['720p', '1080p'],
+    creditCost: usdToLoar(withFiatMargin(0.22)),
+    providerCostUsd: 0.22,
+    fiatPriceUsd: withFiatMargin(0.22),
+    loarPriceUsd: withLoarMargin(0.22),
+    isEnabled: true,
+    isVisibleToUsers: true,
+    allowedPlans: [],
+    tags: ['premium', 'zai', 'cogvideox', 'audio'],
+    bestFor: 'Premium cinematic video with optional inline audio track',
   },
 ];
 

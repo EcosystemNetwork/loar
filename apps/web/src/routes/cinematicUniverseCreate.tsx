@@ -4,7 +4,7 @@
  * Two-step wizard for deploying a new narrative universe on-chain:
  * 1. Create the Universe smart contract (name, image, description).
  * 2. Deploy a governance token and liquidity pool for the universe.
- * Includes AI-powered cover image generation via fal.ai.
+ * Includes AI-powered cover image generation via the routed image catalog.
  */
 
 import { createFileRoute, Link as RouterLink, useNavigate, redirect } from '@tanstack/react-router';
@@ -57,6 +57,7 @@ import {
   SUPPORTED_CHAIN_IDS,
 } from '@/configs/chains';
 import { Price, usePriceText } from '@/components/Price';
+import { ModelSelector } from '@/components/ModelSelector';
 
 export const Route = createFileRoute('/cinematicUniverseCreate')({
   // WEB-6: block entry until /auth/me confirms the session. The component
@@ -197,8 +198,10 @@ function CinematicUniverseCreate() {
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [portraitPreview, setPortraitPreview] = useState<string | null>(null);
   const [portraitImageUrl, setPortraitImageUrl] = useState('');
+  // '' = auto routing (server picks model via image.generate routing engine).
+  // VITE_DEFAULT_IMAGE_MODEL still overrides if set, so ops can pin a model.
   const [coverModel, setCoverModel] = useState<string>(
-    import.meta.env.VITE_DEFAULT_IMAGE_MODEL || 'fal-ai/nano-banana'
+    import.meta.env.VITE_DEFAULT_IMAGE_MODEL || ''
   );
   const [coverInputMode, setCoverInputMode] = useState<'upload' | 'url' | 'generate'>('upload');
   const coverFileRef = useRef<HTMLInputElement>(null);
@@ -251,22 +254,26 @@ function CinematicUniverseCreate() {
     }
   };
 
-  // Cover image generation mutation — generates via fal.ai then pins to Pinata
+  // Cover image generation — routes through image.generate so the same model
+  // catalog, auto-routing, and credit accounting used everywhere else apply
+  // here too. coverModel === '' falls back to auto routing.
   const generateCoverMutation = useMutation({
     mutationFn: async () => {
       const prompt = `Epic cinematic universe cover art for "${universeName}". ${description}. Professional movie poster style, high quality, dramatic lighting`;
 
-      const result = await trpcClient.image.generateImage.mutate({
+      const result = await trpcClient.image.generate.mutate({
         prompt,
-        model: coverModel as any,
+        task: 'text_to_image',
         imageSize: 'landscape_16_9',
+        numImages: 1,
+        routingMode: coverModel ? 'manual' : 'auto',
+        ...(coverModel ? { selectedModelId: coverModel } : {}),
       });
 
       return result;
     },
     onSuccess: async (data) => {
-      // API returns imageUrl (single) or images array
-      const tempUrl = data?.imageUrl ?? data?.images?.[0]?.url;
+      const tempUrl = data?.status === 'completed' ? data.imageUrls?.[0] : undefined;
       if (!tempUrl) {
         toast.error('Image was generated but no URL was returned. Please try again.');
         return;
@@ -1242,35 +1249,17 @@ function CinematicUniverseCreate() {
                   {/* AI Generate mode */}
                   {coverInputMode === 'generate' && (
                     <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <Select
-                          value={coverModel}
-                          onValueChange={setCoverModel}
-                          disabled={deploymentStep !== DeploymentStep.IDLE}
-                        >
-                          <SelectTrigger className="h-11 flex-1 text-xs">
-                            <SelectValue placeholder="Select model" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="fal-ai/nano-banana">Nano Banana</SelectItem>
-                            <SelectItem value="fal-ai/nano-banana-2">Nano Banana 2</SelectItem>
-                            <SelectItem value="fal-ai/nano-banana-pro">Nano Banana Pro</SelectItem>
-                            <SelectItem value="fal-ai/flux/schnell">Flux Schnell</SelectItem>
-                            <SelectItem value="fal-ai/flux/dev">Flux Dev</SelectItem>
-                            <SelectItem value="fal-ai/flux-pro">Flux Pro</SelectItem>
-                            <SelectItem value="fal-ai/flux-pro/v1.1">Flux Pro v1.1</SelectItem>
-                            <SelectItem value="fal-ai/flux-2-pro">Flux 2 Pro</SelectItem>
-                            <SelectItem value="fal-ai/flux-pro/kontext">
-                              Flux Pro Kontext
-                            </SelectItem>
-                            <SelectItem value="fal-ai/recraft/v4/pro/text-to-image">
-                              Recraft v4 Pro
-                            </SelectItem>
-                            <SelectItem value="fal-ai/ideogram/v3/generate">Ideogram v3</SelectItem>
-                            <SelectItem value="fal-ai/wan/v2.7/text-to-image">Wan v2.7</SelectItem>
-                            <SelectItem value="fal-ai/qwen-image">Qwen Image</SelectItem>
-                          </SelectContent>
-                        </Select>
+                      <div className="flex items-end gap-2">
+                        <div className="flex-1 min-w-0">
+                          <ModelSelector
+                            type="image"
+                            task="text_to_image"
+                            value={coverModel}
+                            onChange={setCoverModel}
+                            label="Model"
+                            compact
+                          />
+                        </div>
                         <Button
                           type="button"
                           onClick={handleGenerateCover}

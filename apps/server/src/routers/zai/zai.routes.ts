@@ -62,6 +62,15 @@ async function rehostUrl(
 
 // ── Schemas ───────────────────────────────────────────────────────────────
 
+// Live-confirmed against api.z.ai paas/v4 on 2026-04-26. The full menu of
+// chat models the keys can hit:
+//   glm-4.5-air, glm-4.5, glm-4.5v       — GLM-4.5 family + vision variant
+//   glm-4.6, glm-4.6v                     — GLM-4.6 + vision variant
+//   glm-4.7                               — GLM-4.7 (current devpack-tier flagship)
+//   glm-4-plus                            — GLM-4 Plus
+//   glm-zero-preview                      — early preview tier
+//   glm-5, glm-5-turbo, glm-5.1           — GLM-5 family (flagship reasoning)
+//   glm-5v-turbo                          — GLM-5 vision turbo
 const chatModelSchema = z
   .enum([
     'glm-4.5-air',
@@ -69,12 +78,15 @@ const chatModelSchema = z
     'glm-4.5v',
     'glm-4.6',
     'glm-4.6v',
+    'glm-4.7',
+    'glm-4-plus',
+    'glm-zero-preview',
     'glm-5',
     'glm-5-turbo',
     'glm-5.1',
     'glm-5v-turbo',
   ])
-  .default('glm-4.6');
+  .default('glm-4.7');
 
 const messageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant']),
@@ -194,11 +206,11 @@ export const zaiRouter = router({
     );
 
     // 2. Chat with structured JSON output — the worldbuilder's contract.
-    await run('chat json mode (glm-4.6)', () =>
+    await run('chat json mode (glm-4.7)', () =>
       zaiService.chatJson<{ ok: boolean }>({
         apiKey,
-        model: 'glm-4.6',
-        maxTokens: 50,
+        model: 'glm-4.7',
+        maxTokens: 500,
         messages: [
           {
             role: 'system',
@@ -348,9 +360,9 @@ export const zaiRouter = router({
     .mutation(async ({ ctx, input }) => {
       const apiKey = await resolveKey(ctx.user.uid);
 
-      const { data } = await zaiService.chatJson<WorldbuildBundle>({
+      const { data, reasoningContent } = await zaiService.chatJson<WorldbuildBundle>({
         apiKey,
-        model: input.model ?? 'glm-4.6',
+        model: input.model ?? 'glm-4.7',
         temperature: 0.85,
         maxTokens: 4000,
         messages: [
@@ -400,6 +412,7 @@ export const zaiRouter = router({
         entityCount: filtered.length,
         entityIds: createdIds,
         entities: filtered,
+        reasoning: reasoningContent ?? null,
       };
     }),
 
@@ -429,7 +442,7 @@ export const zaiRouter = router({
 
       const { data } = await zaiService.chatJson<WorldbuildBundle>({
         apiKey,
-        model: input.model ?? 'glm-4.6',
+        model: input.model ?? 'glm-4.7',
         temperature: 0.7,
         maxTokens: 4000,
         messages: [
@@ -563,7 +576,7 @@ export const zaiRouter = router({
     .input(
       z.object({
         prompt: z.string().min(2).max(2000),
-        model: z.enum(['viduq1-text', 'viduq1-image']).default('viduq1-text'),
+        model: z.enum(['viduq1-text', 'viduq1-image', 'cogvideox-3']).default('viduq1-text'),
         imageUrl: z.string().url().optional(),
         endImageUrl: z.string().url().optional(),
         duration: z.number().int().min(2).max(15).optional(),
@@ -625,7 +638,7 @@ export const zaiRouter = router({
     .input(
       z.object({
         prompt: z.string().min(2).max(2000),
-        model: z.enum(['viduq1-text', 'viduq1-image']).default('viduq1-text'),
+        model: z.enum(['viduq1-text', 'viduq1-image', 'cogvideox-3']).default('viduq1-text'),
         imageUrl: z.string().url().optional(),
         endImageUrl: z.string().url().optional(),
         duration: z.number().int().min(2).max(15).optional(),
@@ -914,7 +927,7 @@ Output JSON only.`,
         charterAlignment: string;
       }>({
         apiKey,
-        model: 'glm-4.6',
+        model: 'glm-4.7',
         temperature: 0.4,
         maxTokens: 1200,
         thinking: true,
@@ -1006,7 +1019,7 @@ Output JSON only.`,
         scenes: Array<{ heading: string; action: string; dialogue?: string }>;
       }>({
         apiKey,
-        model: 'glm-4.6',
+        model: 'glm-4.7',
         temperature: 0.7,
         maxTokens: 2000,
         messages: [
@@ -1041,6 +1054,113 @@ Output JSON only.`,
         language: transcript.language,
         draft: data,
         draftId,
+      };
+    }),
+
+  /**
+   * 12. Script writer — turns a logline into a fully-blocked screenplay
+   *     scene list (heading, location, time of day, action paragraphs, and
+   *     character dialogue with optional parentheticals). Designed for the
+   *     /lab/zai Script tab's A/B model comparison: same prompt, two models,
+   *     two scripts side-by-side.
+   *
+   *     Output is strict JSON; no in-memory state, no Firestore writes —
+   *     creators promote interesting scripts to Notebook drafts via the
+   *     existing flow.
+   */
+  writeScript: expensiveProcedure
+    .use(requirePermission('generation.create'))
+    .input(
+      z.object({
+        prompt: z.string().min(8).max(2000),
+        model: chatModelSchema.optional(),
+        sceneCount: z.number().int().min(2).max(12).default(5),
+        tone: z.string().max(80).optional(),
+        characters: z.string().max(400).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const apiKey = await resolveKey(ctx.user.uid);
+
+      const sys = `You are LOAR's screenwriter. Convert a logline into a structured short-film script. Output **strict JSON only** matching this TypeScript interface:
+
+interface Script {
+  title: string;
+  logline: string;
+  tone: string;                                    // e.g. "neon-noir cyberpunk"
+  characters: Array<{ name: string; role: string }>; // 2-5 characters
+  scenes: Array<{
+    heading: string;                               // Slugline e.g. "INT. NEON BAR — NIGHT"
+    location: string;
+    time: "DAY" | "NIGHT" | "DUSK" | "DAWN" | "CONTINUOUS";
+    action: string;                                // 1-3 sentences of stage direction
+    dialogue: Array<{
+      character: string;
+      line: string;
+      parenthetical?: string;                      // e.g. "(whispering)"
+    }>;
+  }>;
+}
+
+Rules:
+- Generate exactly ${input.sceneCount} scenes.
+- Each scene: 2-4 dialogue beats minimum.
+- Headings follow industry slugline format (INT./EXT. LOCATION — TIME).
+- No prose outside the JSON. No code fences.${input.tone ? `\n- Tone: ${input.tone}.` : ''}${
+        input.characters ? `\n- Required characters: ${input.characters}.` : ''
+      }`;
+
+      const t0 = Date.now();
+      const { data, usage } = await zaiService.chatJson<{
+        title: string;
+        logline: string;
+        tone: string;
+        characters: Array<{ name: string; role: string }>;
+        scenes: Array<{
+          heading: string;
+          location: string;
+          time: string;
+          action: string;
+          dialogue: Array<{ character: string; line: string; parenthetical?: string }>;
+        }>;
+      }>({
+        apiKey,
+        model: input.model ?? 'glm-4.7',
+        temperature: 0.85,
+        maxTokens: 6000,
+        messages: [
+          { role: 'system', content: sys },
+          { role: 'user', content: input.prompt },
+        ],
+      });
+
+      // Defensive: clamp scene count and ensure dialogue arrays exist so
+      // the UI doesn't crash on a malformed bundle.
+      const scenes = (data.scenes ?? []).slice(0, input.sceneCount).map((s) => ({
+        heading: s.heading ?? '',
+        location: s.location ?? '',
+        time: s.time ?? 'DAY',
+        action: s.action ?? '',
+        dialogue: Array.isArray(s.dialogue)
+          ? s.dialogue.map((d) => ({
+              character: d.character ?? 'CHARACTER',
+              line: d.line ?? '',
+              parenthetical: d.parenthetical,
+            }))
+          : [],
+      }));
+
+      return {
+        title: data.title ?? 'Untitled',
+        logline: data.logline ?? input.prompt,
+        tone: data.tone ?? input.tone ?? '',
+        characters: Array.isArray(data.characters) ? data.characters : [],
+        scenes,
+        meta: {
+          model: input.model ?? 'glm-4.7',
+          latencyMs: Date.now() - t0,
+          usage,
+        },
       };
     }),
 });
