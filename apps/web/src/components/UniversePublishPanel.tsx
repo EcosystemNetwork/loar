@@ -470,7 +470,6 @@ export function UniversePublishPanel({ universeId, onClose }: UniversePublishPan
                         {advisory.verdict}
                       </Badge>
                       {advisory.thumbUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={advisory.thumbUrl}
                           alt="frame analyzed"

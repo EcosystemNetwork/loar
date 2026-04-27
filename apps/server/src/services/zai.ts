@@ -314,7 +314,7 @@ class ZaiServiceImpl {
     let data: T;
     try {
       data = JSON.parse(result.content) as T;
-    } catch (err) {
+    } catch {
       // Some models wrap JSON in code fences — strip them and retry.
       const stripped = result.content
         .replace(/^```(?:json)?\s*/i, '')

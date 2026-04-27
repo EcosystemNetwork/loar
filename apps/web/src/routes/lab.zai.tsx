@@ -354,7 +354,6 @@ function ImageCard() {
           {mut.isPending ? 'Painting…' : 'Generate'}
         </Button>
         {mut.data?.images?.[0]?.url && (
-          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={mut.data.images[0].url}
             alt={prompt}

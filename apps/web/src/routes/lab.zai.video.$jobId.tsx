@@ -163,7 +163,6 @@ function VideoJobPage() {
           {data?.imageUrl && (
             <details className="text-xs text-muted-foreground">
               <summary className="cursor-pointer">Source image</summary>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={data.imageUrl}
                 alt="i2v reference"
