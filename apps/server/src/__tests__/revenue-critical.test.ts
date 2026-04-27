@@ -48,7 +48,6 @@ describe('marketplace router', () => {
       caller.marketplace.vote({
         submissionId: 'sub1',
         support: true,
-        weight: '100',
       })
     ).rejects.toThrow(TRPCError);
   });

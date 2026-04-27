@@ -3,20 +3,15 @@
  * wiki entries, storylines, and summaries for cinematic universe events.
  */
 import OpenAI from 'openai';
+import { resolveProviderKey } from '../lib/byok';
 
-let _openai: OpenAI | null = null;
-let _openaiChecked = false;
-
-function getOpenAI(): OpenAI | null {
-  if (!_openaiChecked) {
-    _openaiChecked = true;
-    if (process.env.OPENAI_API_KEY) {
-      _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    } else {
-      console.warn('OPENAI_API_KEY not set — wikia generation will be unavailable');
-    }
-  }
-  return _openai;
+// Resolves a per-user OpenAI client: BYOK key (from /settings/api-keys) takes
+// precedence, falling back to the platform OPENAI_API_KEY. Returns null when
+// neither is available so callers can degrade gracefully.
+async function getOpenAI(uid?: string | null): Promise<OpenAI | null> {
+  const apiKey = await resolveProviderKey(uid ?? null, 'openai');
+  if (!apiKey) return null;
+  return new OpenAI({ apiKey });
 }
 
 export interface WikiaEntry {
@@ -40,7 +35,8 @@ export async function generateWikiaEntry(
   description: string,
   videoUrl: string,
   previousNodes?: Array<{ title: string; plot: string }>,
-  nextNodes?: Array<{ title: string; plot: string }>
+  nextNodes?: Array<{ title: string; plot: string }>,
+  uid?: string | null
 ): Promise<WikiaEntry> {
   const context = buildContextFromConnectedNodes(previousNodes, nextNodes);
 
@@ -83,8 +79,11 @@ Generate a wikia entry with the following structure (respond in JSON format):
 IMPORTANT: The "plot" field should be the heart of this wikia - a complete, engaging storyline that tells readers exactly what happens in this event from beginning to end. Write it like you're narrating a movie scene.`;
 
   try {
-    const openai = getOpenAI();
-    if (!openai) throw new Error('OPENAI_API_KEY is required for wikia generation');
+    const openai = await getOpenAI(uid);
+    if (!openai)
+      throw new Error(
+        'OpenAI key required — paste one in /settings/api-keys or set OPENAI_API_KEY'
+      );
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
@@ -159,7 +158,8 @@ function buildContextFromConnectedNodes(
 export async function generateStorylineFromPrompt(
   userPrompt: string,
   characters: string[],
-  previousEvents?: Array<{ title: string; description: string }>
+  previousEvents?: Array<{ title: string; description: string }>,
+  uid?: string | null
 ): Promise<{ title: string; description: string }> {
   // Build context from previous events
   let context = '';
@@ -203,8 +203,11 @@ Respond in JSON format:
 }`;
 
   try {
-    const openai = getOpenAI();
-    if (!openai) throw new Error('OPENAI_API_KEY is required for wikia generation');
+    const openai = await getOpenAI(uid);
+    if (!openai)
+      throw new Error(
+        'OpenAI key required — paste one in /settings/api-keys or set OPENAI_API_KEY'
+      );
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
@@ -236,7 +239,11 @@ Respond in JSON format:
 /**
  * Generate a shorter summary for display in lists
  */
-export async function generateEventSummary(title: string, description: string): Promise<string> {
+export async function generateEventSummary(
+  title: string,
+  description: string,
+  uid?: string | null
+): Promise<string> {
   const systemPrompt = `You are a concise editor. Create brief, engaging summaries for story events.`;
 
   const userPrompt = `Create a single engaging sentence (max 20 words) that summarizes this event:
@@ -247,8 +254,11 @@ Description: ${description}
 Return only the summary sentence, no additional text.`;
 
   try {
-    const openai = getOpenAI();
-    if (!openai) throw new Error('OPENAI_API_KEY is required for wikia generation');
+    const openai = await getOpenAI(uid);
+    if (!openai)
+      throw new Error(
+        'OpenAI key required — paste one in /settings/api-keys or set OPENAI_API_KEY'
+      );
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [

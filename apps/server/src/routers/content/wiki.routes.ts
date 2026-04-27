@@ -104,7 +104,7 @@ export const wikiRouter = router({
         nextNodes: z.array(z.object({ title: z.string(), plot: z.string() })).optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       try {
         return await wikiaService.generateWikiaEntry(
           input.nodeId,
@@ -112,7 +112,8 @@ export const wikiRouter = router({
           input.description,
           input.videoUrl,
           input.previousNodes,
-          input.nextNodes
+          input.nextNodes,
+          ctx.user.uid
         );
       } catch (error) {
         throw wrapError(error, 'Could not generate wikia entry');
@@ -130,12 +131,13 @@ export const wikiRouter = router({
           .optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       try {
         return await wikiaService.generateStorylineFromPrompt(
           input.prompt,
           input.characters || [],
-          input.previousEvents
+          input.previousEvents,
+          ctx.user.uid
         );
       } catch (error) {
         throw wrapError(error, 'Could not generate storyline');
