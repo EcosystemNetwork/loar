@@ -309,10 +309,10 @@ export function IndexerBanner() {
  * ────────────────────────────────────────── */
 export function HeroSkeleton() {
   return (
-    <div className="relative h-[70vh] min-h-[400px] md:min-h-[500px] max-h-[800px] bg-gradient-to-b from-primary/5 via-background to-background flex items-end">
-      <div className="w-full px-4 md:px-12 pb-24 md:pb-32 max-w-3xl space-y-4 animate-pulse">
+    <div className="relative h-[70vh] min-h-[440px] md:min-h-[500px] max-h-[800px] bg-gradient-to-b from-primary/5 via-background to-background flex items-end">
+      <div className="w-full px-4 md:px-12 pb-32 md:pb-32 max-w-3xl space-y-4 animate-pulse">
         <div className="h-4 w-24 rounded bg-white/10" />
-        <div className="h-14 w-3/4 max-w-80 rounded bg-white/10" />
+        <div className="h-12 sm:h-14 w-3/4 max-w-80 rounded bg-white/10" />
         <div className="h-4 w-full max-w-96 rounded bg-white/10" />
         <div className="h-4 w-2/3 max-w-72 rounded bg-white/10" />
         <div className="flex gap-3 pt-2">
@@ -363,12 +363,12 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
 
   if (featured.length === 0) {
     return (
-      <div className="relative h-[70vh] min-h-[400px] md:min-h-[500px] max-h-[800px] flex items-center justify-center bg-gradient-to-b from-primary/10 via-background to-background">
+      <div className="relative h-[70vh] min-h-[440px] md:min-h-[500px] max-h-[800px] flex items-center justify-center bg-gradient-to-b from-primary/10 via-background to-background">
         <div className="text-center px-4">
-          <h1 className="text-4xl md:text-5xl lg:text-7xl font-display italic text-white mb-4 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-display italic text-white mb-4 tracking-tight">
             Your universe awaits
           </h1>
-          <p className="text-lg md:text-xl text-white/60 mb-8 max-w-lg mx-auto px-4 font-light">
+          <p className="text-base sm:text-lg md:text-xl text-white/60 mb-8 max-w-lg mx-auto px-4 font-light">
             Create, own, and trade narrative universes on-chain
           </p>
           <Button
@@ -388,7 +388,7 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
   if (!current) return null;
 
   return (
-    <div className="relative h-[70vh] min-h-[400px] md:min-h-[500px] max-h-[800px] overflow-hidden">
+    <div className="relative h-[70vh] min-h-[440px] md:min-h-[500px] max-h-[800px] overflow-hidden">
       {/* Background image with Ken Burns effect */}
       {featured.map((u, i) => (
         <div
@@ -418,9 +418,9 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
 
       {/* Content */}
       <div className="absolute inset-0 flex items-end">
-        <div className="w-full px-4 md:px-12 pb-24 md:pb-32 max-w-3xl">
+        <div className="w-full px-4 md:px-12 pb-32 md:pb-32 max-w-3xl">
           {/* Badges */}
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-3 md:mb-4 flex-wrap">
             <Badge className="bg-primary text-white border-0 text-xs">
               <Sparkles className="h-3 w-3 mr-1" />
               Featured
@@ -439,20 +439,20 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
           </div>
 
           {/* Title */}
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-display italic text-white mb-4 leading-[1.1]">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-display italic text-white mb-3 md:mb-4 leading-[1.1]">
             {current.name || current.tokenData?.name}
           </h1>
 
           {/* Description */}
-          <p className="text-base md:text-lg text-white/50 mb-6 max-w-xl line-clamp-3 leading-relaxed font-light">
+          <p className="text-sm sm:text-base md:text-lg text-white/50 mb-5 md:mb-6 max-w-xl line-clamp-2 sm:line-clamp-3 leading-relaxed font-light">
             {current.description || current.tokenData?.metadata}
           </p>
 
           {/* Actions */}
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <Button
               size="lg"
-              className="px-6 bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
+              className="px-5 sm:px-6 bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
               onClick={() => navigate({ to: '/universe/$id/watch', params: { id: current.id } })}
             >
               <Play className="h-4 w-4 mr-2 fill-current" />
@@ -461,7 +461,7 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
             <Button
               size="lg"
               variant="ghost"
-              className="px-6 text-white/80 hover:text-white hover:bg-white/10 font-medium"
+              className="px-5 sm:px-6 text-white/80 hover:text-white hover:bg-white/10 font-medium"
               onClick={() => navigate({ to: '/universe/$id/watch', params: { id: current.id } })}
             >
               <BookOpen className="h-4 w-4 mr-2" />
@@ -482,13 +482,14 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
         </div>
       </div>
 
-      {/* Dot indicators */}
+      {/* Dot indicators — sit above the mobile bottom nav */}
       {featured.length > 1 && (
-        <div className="absolute bottom-8 left-4 md:left-12 flex gap-2">
+        <div className="absolute bottom-20 md:bottom-8 left-4 md:left-12 flex gap-2 z-10">
           {featured.map((_, i) => (
             <button
               key={i}
               onClick={() => goTo(i)}
+              aria-label={`Show featured universe ${i + 1}`}
               className={`h-1 rounded-full transition-all duration-500 ${
                 i === currentIndex ? 'bg-white w-8' : 'bg-white/30 w-4 hover:bg-white/60'
               }`}
@@ -507,8 +508,6 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
  * Live Activity Ticker
  * ────────────────────────────────────────── */
 export function ActivityTicker() {
-  const scrollRef = useRef<HTMLDivElement>(null);
-
   const { data: nodesData } = useQuery({
     queryKey: ['ponder', 'nodes', 'recent-20'],
     queryFn: () =>
@@ -550,103 +549,47 @@ export function ActivityTicker() {
     const contentMap = new Map<string, NodeContent>();
     nodeContentData.forEach((c) => contentMap.set(c.id, c));
 
-    const universeMap = new Map<string, Universe>();
-    universesData.forEach((u) => universeMap.set(u.id.toLowerCase(), u));
+    // Mirror Top10Strip ranking so the ticker surfaces the same 10 universes:
+    // pin "space fleet" first, then sort by nodeCount + token presence.
+    const isPinned = (u: Universe) => u.name?.trim().toLowerCase() === 'space fleet';
+    const score = (u: Universe) =>
+      (u.nodeCount || 0) * 100 +
+      (u.tokenAddress && u.tokenAddress !== '0x0000000000000000000000000000000000000000' ? 50 : 0);
+    const pinned = universesData.filter(isPinned);
+    const rest = universesData.filter((u) => !isPinned(u)).sort((a, b) => score(b) - score(a));
+    const topTen = [...pinned, ...rest].slice(0, 10);
 
-    // Mix node mints with universe creations so a single bursty universe
-    // doesn't collapse the ticker. Cap each universe to 1 node entry; the
-    // overflow surfaces as a single "+N more episodes" tail so quieter
-    // universes still get screen time.
-    const PER_UNIVERSE_NODE_CAP = 1;
-    const perUniverseNodeCount = new Map<string, number>();
-    const items: Array<{
-      id: string;
-      universeName: string;
-      action: string;
-      universeId: string;
-      createdAt: number;
-    }> = [];
-    let overflow = 0;
-
+    // Latest node per universe — drives the action label so each top-10 entry
+    // reads with its most recent activity instead of a generic "trending".
+    const latestNodeByUniverse = new Map<string, Node>();
     for (const n of nodesData) {
       const key = n.universeAddress.toLowerCase();
-      const used = perUniverseNodeCount.get(key) ?? 0;
-      if (used >= PER_UNIVERSE_NODE_CAP) {
-        overflow += 1;
-        continue;
+      const existing = latestNodeByUniverse.get(key);
+      if (!existing || n.createdAt > existing.createdAt) {
+        latestNodeByUniverse.set(key, n);
       }
-      perUniverseNodeCount.set(key, used + 1);
-      const content = contentMap.get(`${key}:${n.nodeId}`);
-      const uni = universeMap.get(key);
-      items.push({
-        id: n.id,
-        universeName: uni?.name || `Universe ${n.universeAddress.slice(0, 8)}`,
-        action: content?.plot ? 'new episode' : 'minted a node',
-        universeId: n.universeAddress,
-        createdAt: n.createdAt,
-      });
     }
 
-    // Recent universe creations — gives the strip variety even when no new
-    // nodes have been minted. Sorted newest-first; capped at 8 so the merge
-    // doesn't drown out node activity.
-    const recentUniverses = [...universesData]
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, 8);
-    for (const u of recentUniverses) {
-      items.push({
-        id: `universe-${u.id}`,
+    return topTen.map((u) => {
+      const key = u.id.toLowerCase();
+      const recentNode = latestNodeByUniverse.get(key);
+      let action: string;
+      if (recentNode) {
+        const content = contentMap.get(`${key}:${recentNode.nodeId}`);
+        action = content?.plot ? 'new episode' : 'minted a node';
+      } else if ((u.nodeCount || 0) > 0) {
+        action = `${u.nodeCount} episodes`;
+      } else {
+        action = 'launched';
+      }
+      return {
+        id: u.id,
         universeName: u.name || `Universe ${u.id.slice(0, 8)}`,
-        action: 'launched',
+        action,
         universeId: u.id,
-        createdAt: u.createdAt,
-      });
-    }
-
-    items.sort((a, b) => b.createdAt - a.createdAt);
-
-    // Anti-bunching: when the timeline has a hot universe, consecutive
-    // entries collapse into "X · X · X" which reads like a stutter. Walk the
-    // list and pick the next item from a different universe than the one we
-    // just emitted. When only same-universe items remain, roll them into
-    // overflow rather than tail-flushing them back-to-back.
-    const interleaved: typeof items = [];
-    const queue = [...items];
-    let lastUniverse = '';
-    let safety = queue.length * 4;
-    while (queue.length > 0 && safety-- > 0) {
-      const idx = queue.findIndex((i) => i.universeId !== lastUniverse);
-      if (idx === -1) {
-        overflow += queue.length;
-        break;
-      }
-      const pick = queue.splice(idx, 1)[0];
-      interleaved.push(pick);
-      lastUniverse = pick.universeId;
-    }
-
-    // Marquee seam: the ticker renders two copies back-to-back, so the loop
-    // boundary visually joins interleaved[last] to interleaved[0]. If they
-    // share a universe, drop the tail until they don't.
-    while (
-      interleaved.length > 1 &&
-      interleaved[0].universeId === interleaved[interleaved.length - 1].universeId
-    ) {
-      interleaved.pop();
-      overflow += 1;
-    }
-
-    if (overflow > 0) {
-      interleaved.push({
-        id: `overflow-${overflow}`,
-        universeName: 'Multiverse',
-        action: `+${overflow} more episodes`,
-        universeId: interleaved[0]?.universeId ?? '',
-        createdAt: 0,
-      });
-    }
-
-    return interleaved.slice(0, 20);
+        createdAt: recentNode?.createdAt || u.createdAt,
+      };
+    });
   }, [nodesData, nodeContentData, universesData]);
 
   // Marquee math: the `ticker` keyframe translates from 0 to -50%, so we
@@ -696,6 +639,7 @@ type FeedEpisode = {
   description: string;
   clipCount: number;
   videoUrl: string | null;
+  thumbnailUrl: string | null;
   sourceCreator: string | null;
   createdAt: string | null;
   isCanon: boolean;
@@ -733,12 +677,23 @@ export function RecentEpisodes() {
                 {ep.videoUrl ? (
                   <>
                     <video
-                      src={resolveIpfsUrl(ep.videoUrl)}
+                      src={`${resolveIpfsUrl(ep.videoUrl)}#t=0.1`}
+                      poster={resolveIpfsUrl(ep.thumbnailUrl) || undefined}
                       className="w-full h-full object-cover"
                       muted
+                      loop
+                      playsInline
                       preload="metadata"
+                      onMouseEnter={(e) => {
+                        const p = e.currentTarget.play();
+                        if (p) p.catch(() => {});
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.pause();
+                        e.currentTarget.currentTime = 0;
+                      }}
                     />
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30 pointer-events-none">
                       <Play className="h-8 w-8 text-white fill-white" />
                     </div>
                   </>
@@ -1034,11 +989,21 @@ export function ContentCard({ item }: { item: any }) {
         {item.thumbnailUrl || item.mediaUrl ? (
           isVideo && item.mediaUrl ? (
             <video
-              src={resolveIpfsUrl(item.mediaUrl)}
+              src={`${resolveIpfsUrl(item.mediaUrl)}#t=0.1`}
               poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
               className="w-full h-full object-cover"
               muted
+              loop
+              playsInline
               preload="metadata"
+              onMouseEnter={(e) => {
+                const p = e.currentTarget.play();
+                if (p) p.catch(() => {});
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.pause();
+                e.currentTarget.currentTime = 0;
+              }}
             />
           ) : (
             <img

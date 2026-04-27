@@ -84,10 +84,10 @@ function MarketPage() {
   const listings = listingsData?.listings ?? [];
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-bottom-nav md:pb-12">
       {/* Hero */}
       <div className="bg-gradient-to-b from-primary/10 to-background px-4 pt-6 pb-4">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl lg:max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-2xl font-bold">LOAR Market</h1>
@@ -224,7 +224,7 @@ function MarketPage() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {listings.map((listing: any) => (
                 <ListingCard key={listing.id} listing={listing} />
               ))}

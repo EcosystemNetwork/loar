@@ -307,3 +307,19 @@
 .minimap-edges-hidden .react-flow__minimap .react-flow__edge {
   display: none;
 }
+
+/* ── Mobile / safe-area utilities ──────────────────────────────────── */
+
+/*
+ * Bottom-nav clearance. Pages that sit under the mobile bottom nav add
+ * `pb-bottom-nav` so their last row doesn't get covered. Pair with
+ * `md:pb-0` to reset on desktop where the nav doesn't render.
+ */
+@utility pb-bottom-nav {
+  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 12px);
+}
+
+/* Bottom-nav itself: positions content above the iOS home indicator. */
+@utility pb-safe-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

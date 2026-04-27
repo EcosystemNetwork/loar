@@ -11,6 +11,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import AdminToolbar from '@/components/admin-toolbar';
 import { CookieConsent } from '@/components/CookieConsent';
 import Header from '@/components/header';
+import MobileBottomNav from '@/components/MobileBottomNav';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { useWalletAuth } from '@/lib/wallet-auth';
@@ -178,7 +179,7 @@ function RootComponent() {
           <main className="flex-1">
             <Outlet />
           </main>
-          <footer className="border-t py-6 px-4">
+          <footer className="border-t py-6 px-4 pb-bottom-nav md:pb-6">
             <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
               <span>&copy; {new Date().getFullYear()} LOAR</span>
               <Link to="/terms" className="hover:text-foreground transition-colors">
@@ -198,6 +199,7 @@ function RootComponent() {
               </Link>
             </div>
           </footer>
+          <MobileBottomNav />
         </div>
         <Toaster richColors position="top-right" toastOptions={{ duration: 5000 }} />
         <AdminToolbar />
