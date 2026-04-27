@@ -62,27 +62,38 @@ function authedUrl(raw: string): string {
   return raw;
 }
 
+/**
+ * A URL is alive only if a GET returns a media content-type. HEAD is unreliable
+ * (some CDNs return 200 on HEAD but 403 on GET), and 401/403 with a JSON or
+ * text/html body almost always means an expired signed URL or a dropped CID
+ * (real example: volces.com signed URLs return 403 application/json after
+ * expiry; Pinata returns 403 text/plain for CIDs no longer pinned). So:
+ *   - GET (no Range, follow redirects)
+ *   - 2xx + content-type starts with video/, image/, audio/, application/octet-stream → alive
+ *   - any other status, or any HTML/JSON/text body → dead
+ */
 async function probe(rawUrl: string): Promise<Probe> {
   if (!rawUrl) return { alive: false, status: 'empty-url' };
   const url = authedUrl(rawUrl);
   try {
-    const head = await fetch(url, { method: 'HEAD', redirect: 'follow' });
-    if (head.ok) return { alive: true, status: head.status };
-    if (head.status === 405 || head.status === 403 || head.status === 401) {
-      const get = await fetch(url, {
-        method: 'GET',
-        redirect: 'follow',
-        headers: { Range: 'bytes=0-0' },
-      });
-      if (get.ok || get.status === 206) return { alive: true, status: get.status };
-      // Treat 401/403 as indeterminate — many CDNs (Bytedance volces, signed
-      // S3, etc.) gate HEAD/Range from script clients but serve the URL fine
-      // in-browser. Don't delete a node we can't conclusively prove is dead.
-      if (get.status === 401 || get.status === 403)
-        return { alive: true, status: `assumed-alive:${get.status}` };
-      return { alive: false, status: get.status };
+    const r = await fetch(url, { method: 'GET', redirect: 'follow' });
+    const ct = (r.headers.get('content-type') || '').toLowerCase();
+    const isMedia =
+      ct.startsWith('video/') ||
+      ct.startsWith('image/') ||
+      ct.startsWith('audio/') ||
+      ct.startsWith('application/octet-stream') ||
+      ct.startsWith('application/vnd.apple.mpegurl') ||
+      ct.startsWith('application/x-mpegurl');
+    if (r.ok && isMedia) {
+      // Drain to release the connection promptly without holding the body in
+      // memory longer than necessary.
+      try {
+        await r.arrayBuffer();
+      } catch {}
+      return { alive: true, status: r.status };
     }
-    return { alive: false, status: head.status };
+    return { alive: false, status: `${r.status}:${ct || 'no-ct'}` };
   } catch (e: any) {
     return { alive: false, status: `err:${e?.code || e?.message || 'unknown'}` };
   }
