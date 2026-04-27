@@ -20,7 +20,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { db } from '../lib/firebase';
 
-export type SecretProvider = 'bytedance';
+export type SecretProvider = 'bytedance' | 'zai';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
@@ -151,6 +151,7 @@ export async function listUserSecretSummary(
 ): Promise<Record<SecretProvider, { last4: string; updatedAt: number } | null>> {
   const summary: Record<SecretProvider, { last4: string; updatedAt: number } | null> = {
     bytedance: null,
+    zai: null,
   };
   if (!uid) return summary;
   const doc = await userSecretsCol().doc(uid).get();

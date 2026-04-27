@@ -274,6 +274,30 @@ export async function dispatchGeneration(
     return bytedanceService.generateVideo(bdInput);
   }
 
+  if (model.provider === 'zai') {
+    // Z.AI / Zhipu — CogVideoX-3 + Vidu Q1.
+    const { zaiService } = await import('../../services/zai');
+    const { getUserSecret } = await import('../../services/userSecrets');
+    const userKey = callerUid ? ((await getUserSecret(callerUid, 'zai')) ?? undefined) : undefined;
+    const result = await zaiService.generateVideo({
+      apiKey: userKey,
+      prompt: input.prompt,
+      model: model.zaiModelId || 'cogvideox-3',
+      imageUrl: input.imageUrl ?? (resolvedCastUrls && resolvedCastUrls[0]) ?? undefined,
+      duration: input.durationSec,
+      quality: input.resolution === '1080p' ? '1080p' : '720p',
+      aspectRatio: (input.aspectRatio as '16:9' | '9:16' | '1:1' | undefined) ?? '16:9',
+      withAudio: model.supportsAudio && input.audio,
+      userId: callerUid,
+    });
+    return {
+      id: result.id,
+      status: result.status,
+      videoUrl: result.videoUrl,
+      error: result.error,
+    };
+  }
+
   // Default: FAL
   const falInput = buildFalInput(model, input);
   return falService.generateVideo(falInput);

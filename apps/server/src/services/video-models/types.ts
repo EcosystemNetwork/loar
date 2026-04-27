@@ -16,6 +16,7 @@ export interface VideoModelConfig {
   shortDescription: string;
   falModelId: string; // FAL model ID (used when provider='fal')
   bytedanceModelId?: string; // ModelArk model ID (used when provider='bytedance')
+  zaiModelId?: string; // Z.AI model id (used when provider='zai'), e.g. 'cogvideox-3'
   mode: VideoGenerationMode[];
   qualityTier: QualityTier;
   speedTier: SpeedTier;

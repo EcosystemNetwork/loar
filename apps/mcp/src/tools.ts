@@ -529,9 +529,120 @@ const cancelGeneration: ToolDefinition = {
   },
 };
 
+// ── Z.AI (GLM / CogView / CogVideoX) Tools ────────────────────────────
+
+const zaiWorldbuild: ToolDefinition = {
+  name: 'loar_zai_worldbuild',
+  description:
+    'Generate a full LOAR universe bundle (universe + 6–12 entities) from a single prompt using Z.AI GLM-4.6. Auto-creates entities in Firestore unless persist=false.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      prompt: { type: 'string', description: 'High-level concept for the universe' },
+      universeAddress: {
+        type: 'string',
+        description: 'Universe contract address to attach entities to (optional)',
+      },
+      persist: {
+        type: 'string',
+        description: 'Set "false" to preview without writing entities. Default true.',
+      },
+    },
+    required: ['prompt'],
+  },
+  handler: async (client, args) => {
+    const persist = args.persist === 'false' ? false : true;
+    return client.mutate('zai.worldbuild', { ...args, persist });
+  },
+};
+
+const zaiSeedFromUrl: ToolDefinition = {
+  name: 'loar_zai_seed_from_url',
+  description:
+    'Fetch a real-world URL via Z.AI Web Reader and turn it into a LOAR universe with entities.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      url: { type: 'string', description: 'Public URL (Wikipedia, news article, etc.)' },
+      universeAddress: { type: 'string', description: 'Universe to attach entities to (optional)' },
+    },
+    required: ['url'],
+  },
+  handler: async (client, args) => client.mutate('zai.seedFromUrl', args),
+};
+
+const zaiGenerateVideo: ToolDefinition = {
+  name: 'loar_zai_generate_video',
+  description:
+    'Generate a video via Z.AI CogVideoX-3 (text-to-video or image-to-video). Output is rehosted on LOAR storage.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      prompt: { type: 'string', description: 'Motion prompt' },
+      imageUrl: { type: 'string', description: 'Reference frame for image-to-video (optional)' },
+      duration: { type: 'number', description: 'Duration in seconds (2–15)' },
+      aspectRatio: { type: 'string', description: '1:1 | 16:9 | 9:16 | 4:3 | 3:4 | 21:9' },
+      withAudio: { type: 'string', description: 'Set "true" for inline audio track' },
+    },
+    required: ['prompt'],
+  },
+  handler: async (client, args) =>
+    client.mutate('zai.generateVideo', {
+      ...args,
+      withAudio: args.withAudio === 'true' ? true : undefined,
+    }),
+};
+
+const zaiCanonCheck: ToolDefinition = {
+  name: 'loar_zai_canon_check',
+  description:
+    'Run a vision consistency check on one or more frames against a universe lore summary. Returns 0–100 score + flagged contradictions.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      imageUrls: {
+        type: 'string',
+        description: 'Comma-separated image URLs to evaluate',
+      },
+      universeName: { type: 'string', description: 'Universe display name' },
+      loreSummary: { type: 'string', description: 'Lore summary to score against' },
+    },
+    required: ['imageUrls', 'universeName', 'loreSummary'],
+  },
+  handler: async (client, args) => {
+    const urls = String(args.imageUrls ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return client.mutate('zai.canonCheck', { ...args, imageUrls: urls });
+  },
+};
+
+const zaiGovernanceAgent: ToolDefinition = {
+  name: 'loar_zai_governance_agent',
+  description:
+    'Summarize a DAO proposal against a universe charter and recommend a vote with rationale. Powered by GLM-4.6 with deep-thinking enabled.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      proposalTitle: { type: 'string', description: 'Proposal title' },
+      proposalBody: { type: 'string', description: 'Full proposal text' },
+      charter: { type: 'string', description: 'Universe charter / mission (optional)' },
+    },
+    required: ['proposalTitle', 'proposalBody'],
+  },
+  handler: async (client, args) => client.mutate('zai.governanceAgent', args),
+};
+
 // ── Export All Tools ───────────────────────────────────────────────────
 
 export const ALL_TOOLS: ToolDefinition[] = [
+  // Z.AI integrations
+  zaiWorldbuild,
+  zaiSeedFromUrl,
+  zaiGenerateVideo,
+  zaiCanonCheck,
+  zaiGovernanceAgent,
   // Entities
   createEntity,
   listEntities,

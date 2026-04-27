@@ -761,7 +761,10 @@ function EntityPage() {
   }
 
   const kindLabel = KIND_LABELS[entity.kind] ?? entity.kind;
-  const metadataEntries = Object.entries(entity.metadata ?? {}).filter(([, v]) => v);
+  const HIDDEN_METADATA_KEYS = new Set(['characterVariants', 'modelUrl']);
+  const metadataEntries = Object.entries(entity.metadata ?? {}).filter(
+    ([k, v]) => v && !HIDDEN_METADATA_KEYS.has(k)
+  );
   const isCreator = !!address && entity.creator?.toLowerCase() === address.toLowerCase();
   const isOwner = isCreator || isUniverseManager;
 
@@ -913,6 +916,63 @@ function EntityPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Character variants — outfits / alternate versions captured during creation. */}
+          {(() => {
+            const variants = (entity.metadata as any)?.characterVariants;
+            if (!Array.isArray(variants) || variants.length === 0) return null;
+            return (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                    Versions & Outfits
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-2">
+                  {variants.map((v: any, idx: number) => (
+                    <div
+                      key={`${v.generationId ?? v.label ?? idx}`}
+                      className={`relative rounded-lg border-2 overflow-hidden bg-muted/30 ${
+                        v.isMain ? 'border-primary' : 'border-muted'
+                      }`}
+                    >
+                      <div className="aspect-square w-full bg-muted/50">
+                        {v.imageUrl ? (
+                          <img
+                            src={resolveIpfsUrl(v.imageUrl)}
+                            alt={v.label ?? `Variant ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+                            {v.type === '3d' ? '3D' : 'No preview'}
+                          </div>
+                        )}
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 flex items-center justify-between gap-1">
+                        <span className="text-[11px] text-white font-medium truncate">
+                          {v.label ?? `Variant ${idx + 1}`}
+                        </span>
+                        <span className="text-[9px] uppercase tracking-wider text-white/70 shrink-0">
+                          {v.type ?? '2d'}
+                        </span>
+                      </div>
+                      {v.modelUrl && (
+                        <a
+                          href={v.modelUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="absolute top-1 left-1 rounded bg-violet-500/90 text-white text-[9px] px-1.5 py-0.5 font-medium hover:bg-violet-600"
+                        >
+                          GLB
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           <Card>
             <CardHeader>

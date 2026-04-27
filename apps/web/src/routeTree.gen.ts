@@ -64,6 +64,7 @@ import { Route as OrderIdRouteImport } from './routes/order/$id'
 import { Route as OauthSiweRouteImport } from './routes/oauth/siwe'
 import { Route as NotebookIdRouteImport } from './routes/notebook.$id'
 import { Route as LineageAssetIdRouteImport } from './routes/lineage.$assetId'
+import { Route as LabZaiRouteImport } from './routes/lab.zai'
 import { Route as GovernanceUniverseIdRouteImport } from './routes/governance/$universeId'
 import { Route as ExtractJobIdRouteImport } from './routes/extract.$jobId'
 import { Route as EpisodeIdRouteImport } from './routes/episode.$id'
@@ -92,7 +93,9 @@ import { Route as UniverseAddressPollsRouteImport } from './routes/universe.$add
 import { Route as UniverseAddressPhysicsRouteImport } from './routes/universe.$address.physics'
 import { Route as TokensCreatorAddressRouteImport } from './routes/tokens/creator.$address'
 import { Route as StudioEditAssetIdRouteImport } from './routes/studio.edit.$assetId'
+import { Route as LabZaiDiagnosticRouteImport } from './routes/lab.zai.diagnostic'
 import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
+import { Route as LabZaiVideoJobIdRouteImport } from './routes/lab.zai.video.$jobId'
 
 const VideosRoute = VideosRouteImport.update({
   id: '/videos',
@@ -369,6 +372,11 @@ const LineageAssetIdRoute = LineageAssetIdRouteImport.update({
   path: '/lineage/$assetId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LabZaiRoute = LabZaiRouteImport.update({
+  id: '/lab/zai',
+  path: '/lab/zai',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GovernanceUniverseIdRoute = GovernanceUniverseIdRouteImport.update({
   id: '/governance/$universeId',
   path: '/governance/$universeId',
@@ -509,10 +517,20 @@ const StudioEditAssetIdRoute = StudioEditAssetIdRouteImport.update({
   path: '/edit/$assetId',
   getParentRoute: () => StudioRoute,
 } as any)
+const LabZaiDiagnosticRoute = LabZaiDiagnosticRouteImport.update({
+  id: '/diagnostic',
+  path: '/diagnostic',
+  getParentRoute: () => LabZaiRoute,
+} as any)
 const EventUniverseEventRoute = EventUniverseEventRouteImport.update({
   id: '/event/$universe/$event',
   path: '/event/$universe/$event',
   getParentRoute: () => rootRouteImport,
+} as any)
+const LabZaiVideoJobIdRoute = LabZaiVideoJobIdRouteImport.update({
+  id: '/video/$jobId',
+  path: '/video/$jobId',
+  getParentRoute: () => LabZaiRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -564,6 +582,7 @@ export interface FileRoutesByFullPath {
   '/episode/$id': typeof EpisodeIdRoute
   '/extract/$jobId': typeof ExtractJobIdRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
+  '/lab/zai': typeof LabZaiRouteWithChildren
   '/lineage/$assetId': typeof LineageAssetIdRoute
   '/notebook/$id': typeof NotebookIdRoute
   '/oauth/siwe': typeof OauthSiweRoute
@@ -588,6 +607,7 @@ export interface FileRoutesByFullPath {
   '/tokens/': typeof TokensIndexRoute
   '/wiki/': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
+  '/lab/zai/diagnostic': typeof LabZaiDiagnosticRoute
   '/studio/edit/$assetId': typeof StudioEditAssetIdRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
   '/universe/$address/physics': typeof UniverseAddressPhysicsRoute
@@ -600,6 +620,7 @@ export interface FileRoutesByFullPath {
   '/universe/$id/watch': typeof UniverseIdWatchRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
+  '/lab/zai/video/$jobId': typeof LabZaiVideoJobIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -650,6 +671,7 @@ export interface FileRoutesByTo {
   '/episode/$id': typeof EpisodeIdRoute
   '/extract/$jobId': typeof ExtractJobIdRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
+  '/lab/zai': typeof LabZaiRouteWithChildren
   '/lineage/$assetId': typeof LineageAssetIdRoute
   '/notebook/$id': typeof NotebookIdRoute
   '/oauth/siwe': typeof OauthSiweRoute
@@ -674,6 +696,7 @@ export interface FileRoutesByTo {
   '/tokens': typeof TokensIndexRoute
   '/wiki': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
+  '/lab/zai/diagnostic': typeof LabZaiDiagnosticRoute
   '/studio/edit/$assetId': typeof StudioEditAssetIdRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
   '/universe/$address/physics': typeof UniverseAddressPhysicsRoute
@@ -686,6 +709,7 @@ export interface FileRoutesByTo {
   '/universe/$id/watch': typeof UniverseIdWatchRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
+  '/lab/zai/video/$jobId': typeof LabZaiVideoJobIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -737,6 +761,7 @@ export interface FileRoutesById {
   '/episode/$id': typeof EpisodeIdRoute
   '/extract/$jobId': typeof ExtractJobIdRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
+  '/lab/zai': typeof LabZaiRouteWithChildren
   '/lineage/$assetId': typeof LineageAssetIdRoute
   '/notebook/$id': typeof NotebookIdRoute
   '/oauth/siwe': typeof OauthSiweRoute
@@ -761,6 +786,7 @@ export interface FileRoutesById {
   '/tokens/': typeof TokensIndexRoute
   '/wiki/': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
+  '/lab/zai/diagnostic': typeof LabZaiDiagnosticRoute
   '/studio/edit/$assetId': typeof StudioEditAssetIdRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
   '/universe/$address/physics': typeof UniverseAddressPhysicsRoute
@@ -773,6 +799,7 @@ export interface FileRoutesById {
   '/universe/$id/watch': typeof UniverseIdWatchRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
+  '/lab/zai/video/$jobId': typeof LabZaiVideoJobIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -825,6 +852,7 @@ export interface FileRouteTypes {
     | '/episode/$id'
     | '/extract/$jobId'
     | '/governance/$universeId'
+    | '/lab/zai'
     | '/lineage/$assetId'
     | '/notebook/$id'
     | '/oauth/siwe'
@@ -849,6 +877,7 @@ export interface FileRouteTypes {
     | '/tokens/'
     | '/wiki/'
     | '/event/$universe/$event'
+    | '/lab/zai/diagnostic'
     | '/studio/edit/$assetId'
     | '/tokens/creator/$address'
     | '/universe/$address/physics'
@@ -861,6 +890,7 @@ export interface FileRouteTypes {
     | '/universe/$id/watch'
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
+    | '/lab/zai/video/$jobId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -911,6 +941,7 @@ export interface FileRouteTypes {
     | '/episode/$id'
     | '/extract/$jobId'
     | '/governance/$universeId'
+    | '/lab/zai'
     | '/lineage/$assetId'
     | '/notebook/$id'
     | '/oauth/siwe'
@@ -935,6 +966,7 @@ export interface FileRouteTypes {
     | '/tokens'
     | '/wiki'
     | '/event/$universe/$event'
+    | '/lab/zai/diagnostic'
     | '/studio/edit/$assetId'
     | '/tokens/creator/$address'
     | '/universe/$address/physics'
@@ -947,6 +979,7 @@ export interface FileRouteTypes {
     | '/universe/$id/watch'
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
+    | '/lab/zai/video/$jobId'
   id:
     | '__root__'
     | '/'
@@ -997,6 +1030,7 @@ export interface FileRouteTypes {
     | '/episode/$id'
     | '/extract/$jobId'
     | '/governance/$universeId'
+    | '/lab/zai'
     | '/lineage/$assetId'
     | '/notebook/$id'
     | '/oauth/siwe'
@@ -1021,6 +1055,7 @@ export interface FileRouteTypes {
     | '/tokens/'
     | '/wiki/'
     | '/event/$universe/$event'
+    | '/lab/zai/diagnostic'
     | '/studio/edit/$assetId'
     | '/tokens/creator/$address'
     | '/universe/$address/physics'
@@ -1033,6 +1068,7 @@ export interface FileRouteTypes {
     | '/universe/$id/watch'
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
+    | '/lab/zai/video/$jobId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1083,6 +1119,7 @@ export interface RootRouteChildren {
   EpisodeIdRoute: typeof EpisodeIdRoute
   ExtractJobIdRoute: typeof ExtractJobIdRoute
   GovernanceUniverseIdRoute: typeof GovernanceUniverseIdRoute
+  LabZaiRoute: typeof LabZaiRouteWithChildren
   LineageAssetIdRoute: typeof LineageAssetIdRoute
   OauthSiweRoute: typeof OauthSiweRoute
   OrderIdRoute: typeof OrderIdRoute
@@ -1500,6 +1537,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LineageAssetIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lab/zai': {
+      id: '/lab/zai'
+      path: '/lab/zai'
+      fullPath: '/lab/zai'
+      preLoaderRoute: typeof LabZaiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/governance/$universeId': {
       id: '/governance/$universeId'
       path: '/governance/$universeId'
@@ -1696,12 +1740,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioEditAssetIdRouteImport
       parentRoute: typeof StudioRoute
     }
+    '/lab/zai/diagnostic': {
+      id: '/lab/zai/diagnostic'
+      path: '/diagnostic'
+      fullPath: '/lab/zai/diagnostic'
+      preLoaderRoute: typeof LabZaiDiagnosticRouteImport
+      parentRoute: typeof LabZaiRoute
+    }
     '/event/$universe/$event': {
       id: '/event/$universe/$event'
       path: '/event/$universe/$event'
       fullPath: '/event/$universe/$event'
       preLoaderRoute: typeof EventUniverseEventRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/lab/zai/video/$jobId': {
+      id: '/lab/zai/video/$jobId'
+      path: '/video/$jobId'
+      fullPath: '/lab/zai/video/$jobId'
+      preLoaderRoute: typeof LabZaiVideoJobIdRouteImport
+      parentRoute: typeof LabZaiRoute
     }
   }
 }
@@ -1740,6 +1798,19 @@ const StudioRouteChildren: StudioRouteChildren = {
 
 const StudioRouteWithChildren =
   StudioRoute._addFileChildren(StudioRouteChildren)
+
+interface LabZaiRouteChildren {
+  LabZaiDiagnosticRoute: typeof LabZaiDiagnosticRoute
+  LabZaiVideoJobIdRoute: typeof LabZaiVideoJobIdRoute
+}
+
+const LabZaiRouteChildren: LabZaiRouteChildren = {
+  LabZaiDiagnosticRoute: LabZaiDiagnosticRoute,
+  LabZaiVideoJobIdRoute: LabZaiVideoJobIdRoute,
+}
+
+const LabZaiRouteWithChildren =
+  LabZaiRoute._addFileChildren(LabZaiRouteChildren)
 
 interface UniverseIdRouteChildren {
   UniverseIdDeployTokenRoute: typeof UniverseIdDeployTokenRoute
@@ -1811,6 +1882,7 @@ const rootRouteChildren: RootRouteChildren = {
   EpisodeIdRoute: EpisodeIdRoute,
   ExtractJobIdRoute: ExtractJobIdRoute,
   GovernanceUniverseIdRoute: GovernanceUniverseIdRoute,
+  LabZaiRoute: LabZaiRouteWithChildren,
   LineageAssetIdRoute: LineageAssetIdRoute,
   OauthSiweRoute: OauthSiweRoute,
   OrderIdRoute: OrderIdRoute,

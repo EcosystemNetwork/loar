@@ -30,6 +30,11 @@ import {
   Music,
   ChevronDown,
   ChevronUp,
+  Box,
+  Image as ImageIcon,
+  X,
+  Star,
+  Plus,
 } from 'lucide-react';
 import { ModelSelector } from '@/components/ModelSelector';
 import {
@@ -796,6 +801,195 @@ function EntityCreateForm() {
     DEFAULT_STYLE_CONTROLS_VALUE
   );
 
+  // ── Character generation (person kind) ──────────────────────────────
+  type CharacterGen = {
+    id: string;
+    type: '2d' | '3d';
+    label: string;
+    status: 'generating' | 'completed' | 'failed';
+    prompt: string;
+    imageUrl?: string;
+    modelUrl?: string;
+    generationId?: string;
+    error?: string;
+    isMain?: boolean;
+  };
+  const [characterPrompt, setCharacterPrompt] = useState('');
+  const [characterMode, setCharacterMode] = useState<'2d' | '3d'>('2d');
+  const [character3dStyle, setCharacter3dStyle] = useState<
+    'realistic' | 'cartoon' | 'low-poly' | 'sculpture' | 'pbr'
+  >('realistic');
+  const [character2dModel, setCharacter2dModel] = useState<string>('');
+  const [variantLabel, setVariantLabel] = useState('');
+  const [generatingCharacter, setGeneratingCharacter] = useState(false);
+  const [characterGens, setCharacterGens] = useState<CharacterGen[]>([]);
+
+  const isPerson = kind === 'person';
+  const anyGenInFlight = characterGens.some((g) => g.status === 'generating');
+
+  // Poll any in-flight 3D jobs every 5s until terminal.
+  useEffect(() => {
+    const pending = characterGens.filter(
+      (g) => g.type === '3d' && g.status === 'generating' && g.generationId
+    );
+    if (pending.length === 0) return;
+
+    const interval = setInterval(async () => {
+      for (const gen of pending) {
+        try {
+          const task: any = await trpcClient.threed.getTask.query({
+            generationId: gen.generationId!,
+          });
+          if (!task) continue;
+          const status = task.status as string | undefined;
+          if (status === 'completed') {
+            const modelUrl: string | undefined =
+              task.modelUrls?.glb ||
+              task.modelUrls?.fbx ||
+              task.modelUrls?.obj ||
+              task.modelUrls?.usdz;
+            const thumb: string | undefined = task.thumbnailUrl || task.videoUrl;
+            setCharacterGens((prev) =>
+              prev.map((g) =>
+                g.id === gen.id
+                  ? {
+                      ...g,
+                      status: 'completed',
+                      modelUrl: modelUrl ?? g.modelUrl,
+                      imageUrl: thumb ?? g.imageUrl,
+                    }
+                  : g
+              )
+            );
+          } else if (status === 'failed') {
+            setCharacterGens((prev) =>
+              prev.map((g) =>
+                g.id === gen.id
+                  ? { ...g, status: 'failed', error: task.failureReason || '3D generation failed' }
+                  : g
+              )
+            );
+          }
+        } catch (err) {
+          // Transient error — keep polling
+          // eslint-disable-next-line no-console
+          console.warn('3D poll error', err);
+        }
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [characterGens]);
+
+  const buildCharacterPrompt = (extra?: string) => {
+    const parts: string[] = [];
+    if (characterPrompt.trim()) parts.push(characterPrompt.trim());
+    if (extra?.trim()) parts.push(extra.trim());
+    if (parts.length === 0) {
+      // Auto-fill from name + description if nothing typed
+      const auto = `Character portrait of ${name || 'a person'}${
+        description ? `, ${description}` : ''
+      }${fieldValues.appearance ? `, ${fieldValues.appearance}` : ''}${
+        fieldValues.role ? `, ${fieldValues.role}` : ''
+      }, cinematic lighting, detailed`;
+      parts.push(auto.replace(/,\s*,/g, ',').replace(/,\s*$/, ''));
+    }
+    return parts.join(', ');
+  };
+
+  const handleGenerateCharacter = async (opts: { variant?: string } = {}) => {
+    const finalPrompt = buildCharacterPrompt(opts.variant);
+    if (!finalPrompt.trim()) {
+      toast.error('Add a name or describe the character first');
+      return;
+    }
+    const localId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const isFirst = characterGens.length === 0;
+    const label =
+      opts.variant?.trim() || (isFirst ? 'Main' : `Variant ${characterGens.length + 1}`);
+    const stub: CharacterGen = {
+      id: localId,
+      type: characterMode,
+      label,
+      status: 'generating',
+      prompt: finalPrompt,
+      isMain: isFirst,
+    };
+    setCharacterGens((prev) => [...prev, stub]);
+    setGeneratingCharacter(true);
+    try {
+      if (characterMode === '2d') {
+        const result = await trpcClient.image.generate.mutate({
+          prompt: finalPrompt,
+          task: 'text_to_image',
+          imageSize: 'square_hd',
+          numImages: 1,
+          routingMode: character2dModel ? 'manual' : 'auto',
+          ...(character2dModel ? { selectedModelId: character2dModel } : {}),
+          universeId: universeAddress || undefined,
+          stylePackEntityId: styleControls.stylePackEntityId ?? undefined,
+          moodboardEntityId: styleControls.moodboardEntityId ?? undefined,
+          styleStrength: styleControls.styleStrength,
+          retexture: styleControls.retexture,
+          respectCanonStyle: styleControls.respectCanonStyle,
+        });
+        if (result.status === 'completed' && result.imageUrls?.[0]) {
+          const newUrl = result.imageUrls[0];
+          setCharacterGens((prev) =>
+            prev.map((g) =>
+              g.id === localId ? { ...g, status: 'completed', imageUrl: newUrl } : g
+            )
+          );
+          if (isFirst) setImageUrl(newUrl);
+          toast.success('Character generated!');
+        } else {
+          throw new Error('Image generation did not complete');
+        }
+      } else {
+        const result: any = await trpcClient.threed.textTo3DPreview.mutate({
+          prompt: finalPrompt,
+          artStyle: character3dStyle,
+        });
+        const generationId: string | undefined = result?.generationId;
+        if (!generationId) throw new Error('3D job did not return a generation ID');
+        setCharacterGens((prev) =>
+          prev.map((g) => (g.id === localId ? { ...g, generationId } : g))
+        );
+        toast.success('3D job queued — Meshy will work on it for ~5 min.');
+      }
+    } catch (err: any) {
+      const msg = err?.message ?? 'Generation failed';
+      setCharacterGens((prev) =>
+        prev.map((g) => (g.id === localId ? { ...g, status: 'failed', error: msg } : g))
+      );
+      toast.error(msg);
+    } finally {
+      setGeneratingCharacter(false);
+      setVariantLabel('');
+    }
+  };
+
+  const setMainCharacter = (id: string) => {
+    setCharacterGens((prev) => {
+      const next = prev.map((g) => ({ ...g, isMain: g.id === id }));
+      const main = next.find((g) => g.id === id);
+      if (main?.imageUrl) setImageUrl(main.imageUrl);
+      return next;
+    });
+  };
+
+  const removeCharacter = (id: string) => {
+    setCharacterGens((prev) => {
+      const next = prev.filter((g) => g.id !== id);
+      // If we removed the main, promote the first remaining (if any).
+      if (!next.some((g) => g.isMain) && next.length > 0) {
+        next[0].isMain = true;
+        if (next[0].imageUrl) setImageUrl(next[0].imageUrl);
+      }
+      if (next.length === 0) setImageUrl('');
+      return next;
+    });
+  };
+
   const handleGenerateAI = async () => {
     if (!name.trim()) {
       toast.error('Enter a name first so AI knows what to generate');
@@ -906,11 +1100,31 @@ function EntityCreateForm() {
         return;
       }
 
+      // Persist character variants on the entity for the person kind.
+      let mainImageUrl = imageUrl || null;
+      if (typedKind === 'person' && characterGens.length > 0) {
+        const completed = characterGens.filter((g) => g.status === 'completed');
+        if (completed.length > 0) {
+          const main = completed.find((g) => g.isMain) ?? completed[0];
+          metadata.characterVariants = completed.map((g) => ({
+            type: g.type,
+            label: g.label,
+            imageUrl: g.imageUrl ?? null,
+            modelUrl: g.modelUrl ?? null,
+            prompt: g.prompt,
+            generationId: g.generationId ?? null,
+            isMain: g.id === main.id,
+          }));
+          if (main.modelUrl) metadata.modelUrl = main.modelUrl;
+          if (!mainImageUrl && main.imageUrl) mainImageUrl = main.imageUrl;
+        }
+      }
+
       const result = await trpcClient.entities.create.mutate({
         name,
         description,
         kind: typedKind,
-        imageUrl: imageUrl || null,
+        imageUrl: mainImageUrl,
         metadata,
         monetized,
         rightsDeclaration: monetized ? rightsDeclaration : null,
@@ -1016,6 +1230,236 @@ function EntityCreateForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Character generation (person only) — sits at the top so creators
+            can riff on visuals before committing to details. */}
+        {isPerson && (
+          <Card className="border-violet-500/30 bg-gradient-to-br from-violet-500/5 to-purple-500/5">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-violet-400" />
+                Character Generation
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Don't know what you want yet? Generate a 2D portrait or a 3D Meshy model for
+                inspiration, then add outfits or alternate versions to the same character.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCharacterMode('2d')}
+                  className={`flex items-center justify-center gap-2 rounded-lg border-2 p-3 text-sm font-medium transition-colors ${
+                    characterMode === '2d'
+                      ? 'border-primary bg-primary/5'
+                      : 'border-muted hover:border-muted-foreground/30'
+                  }`}
+                >
+                  <ImageIcon className="w-4 h-4" />
+                  2D Portrait
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCharacterMode('3d')}
+                  className={`flex items-center justify-center gap-2 rounded-lg border-2 p-3 text-sm font-medium transition-colors ${
+                    characterMode === '3d'
+                      ? 'border-primary bg-primary/5'
+                      : 'border-muted hover:border-muted-foreground/30'
+                  }`}
+                >
+                  <Box className="w-4 h-4" />
+                  3D Model (Meshy)
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="characterPrompt">Prompt</Label>
+                <Textarea
+                  id="characterPrompt"
+                  value={characterPrompt}
+                  onChange={(e) => setCharacterPrompt(e.target.value)}
+                  placeholder={
+                    characterMode === '2d'
+                      ? 'e.g. weathered space-pirate captain, scarred face, leather coat, cinematic lighting'
+                      : 'e.g. anime hero, full-body, blue hair, futuristic armor'
+                  }
+                  rows={3}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Leave blank to auto-fill from name + description.
+                </p>
+              </div>
+
+              {characterMode === '2d' ? (
+                <>
+                  <ModelSelector
+                    type="image"
+                    value={character2dModel}
+                    onChange={setCharacter2dModel}
+                    label="Image model"
+                    task="text_to_image"
+                  />
+                  <StyleControls
+                    value={styleControls}
+                    onChange={setStyleControls}
+                    universeAddress={universeAddress || null}
+                    creatorAddress={address ?? null}
+                    hasSourceImage={false}
+                  />
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="character3dStyle">Art style</Label>
+                  <select
+                    id="character3dStyle"
+                    value={character3dStyle}
+                    onChange={(e) => setCharacter3dStyle(e.target.value as typeof character3dStyle)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="realistic">Realistic</option>
+                    <option value="cartoon">Cartoon</option>
+                    <option value="low-poly">Low Poly</option>
+                    <option value="sculpture">Sculpture</option>
+                    <option value="pbr">PBR</option>
+                  </select>
+                  <p className="text-[11px] text-muted-foreground">
+                    Meshy preview takes ~5 minutes. You can keep filling out the form while it runs.
+                  </p>
+                </div>
+              )}
+
+              {characterGens.length === 0 ? (
+                <Button
+                  type="button"
+                  onClick={() => handleGenerateCharacter()}
+                  disabled={generatingCharacter}
+                  className="w-full"
+                >
+                  {generatingCharacter ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4 mr-2" />
+                  )}
+                  {generatingCharacter
+                    ? 'Starting...'
+                    : `Generate ${characterMode.toUpperCase()} Character`}
+                </Button>
+              ) : (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label className="text-sm">Generated</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {characterGens.map((g) => (
+                        <div
+                          key={g.id}
+                          className={`relative rounded-lg border-2 overflow-hidden bg-muted/30 ${
+                            g.isMain ? 'border-primary' : 'border-muted'
+                          }`}
+                        >
+                          <div className="aspect-square w-full flex items-center justify-center bg-muted/50">
+                            {g.status === 'generating' ? (
+                              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                <Loader2 className="w-6 h-6 animate-spin" />
+                                <span className="text-[10px]">
+                                  {g.type === '3d' ? 'Meshy working...' : 'Generating...'}
+                                </span>
+                              </div>
+                            ) : g.status === 'failed' ? (
+                              <div className="text-center px-2">
+                                <X className="w-6 h-6 mx-auto text-destructive" />
+                                <p className="text-[10px] text-destructive mt-1 truncate">
+                                  {g.error}
+                                </p>
+                              </div>
+                            ) : g.imageUrl ? (
+                              <img
+                                src={resolveIpfsUrl(g.imageUrl)}
+                                alt={g.label}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <Box className="w-8 h-8 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div className="absolute top-1 right-1 flex gap-1">
+                            {g.status === 'completed' && !g.isMain && (
+                              <button
+                                type="button"
+                                onClick={() => setMainCharacter(g.id)}
+                                className="rounded bg-background/80 backdrop-blur p-1 hover:bg-background"
+                                title="Set as main"
+                              >
+                                <Star className="w-3 h-3" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => removeCharacter(g.id)}
+                              className="rounded bg-background/80 backdrop-blur p-1 hover:bg-destructive hover:text-destructive-foreground"
+                              title="Remove"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 flex items-center justify-between">
+                            <span className="text-[11px] text-white font-medium truncate flex items-center gap-1">
+                              {g.isMain && <Star className="w-3 h-3 fill-current" />}
+                              {g.label}
+                            </span>
+                            <span className="text-[9px] uppercase tracking-wider text-white/70">
+                              {g.type}
+                            </span>
+                          </div>
+                          {g.modelUrl && (
+                            <a
+                              href={g.modelUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="absolute top-1 left-1 rounded bg-violet-500/90 text-white text-[9px] px-1.5 py-0.5 font-medium"
+                            >
+                              GLB
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 rounded-lg border border-dashed p-3">
+                    <Label htmlFor="variantLabel" className="text-xs">
+                      Add variant or outfit
+                    </Label>
+                    <Input
+                      id="variantLabel"
+                      value={variantLabel}
+                      onChange={(e) => setVariantLabel(e.target.value)}
+                      placeholder='e.g. "Battle armor", "Casual", "Side view"'
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleGenerateCharacter({ variant: variantLabel })}
+                      disabled={generatingCharacter}
+                      className="w-full"
+                    >
+                      {generatingCharacter ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Plus className="w-4 h-4 mr-2" />
+                      )}
+                      Generate variant
+                    </Button>
+                    <p className="text-[10px] text-muted-foreground">
+                      Variants reuse the prompt above; the label gets appended for steering.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Core fields */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -1232,79 +1676,82 @@ function EntityCreateForm() {
           </CardContent>
         </Card>
 
-        {/* Optional AI Artwork */}
-        <Card>
-          <CardHeader>
-            <button
-              type="button"
-              className="flex w-full items-center justify-between text-left"
-              onClick={() => setShowArtwork(!showArtwork)}
-            >
-              <div className="flex items-center gap-2">
-                <ImagePlus className="w-4 h-4" />
-                <CardTitle className="text-base">AI Artwork (Optional)</CardTitle>
-              </div>
-              {showArtwork ? (
-                <ChevronUp className="w-4 h-4 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              )}
-            </button>
-          </CardHeader>
-          {showArtwork && (
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Describe the artwork you want generated for this {label.toLowerCase()}. Leave empty
-                to skip. You can always generate artwork later.
-              </p>
-              <div className="space-y-2">
-                <Label htmlFor="artworkPrompt">Artwork Prompt</Label>
-                <Textarea
-                  id="artworkPrompt"
-                  value={artworkPrompt}
-                  onChange={(e) => setArtworkPrompt(e.target.value)}
-                  placeholder={`e.g. A cinematic portrait of ${name || `this ${label.toLowerCase()}`}, dramatic lighting, detailed digital art...`}
-                  rows={3}
+        {/* Optional AI Artwork — hidden for person kind, which has its own
+            Character Generation block at the top. */}
+        {!isPerson && (
+          <Card>
+            <CardHeader>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between text-left"
+                onClick={() => setShowArtwork(!showArtwork)}
+              >
+                <div className="flex items-center gap-2">
+                  <ImagePlus className="w-4 h-4" />
+                  <CardTitle className="text-base">AI Artwork (Optional)</CardTitle>
+                </div>
+                {showArtwork ? (
+                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                )}
+              </button>
+            </CardHeader>
+            {showArtwork && (
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Describe the artwork you want generated for this {label.toLowerCase()}. Leave
+                  empty to skip. You can always generate artwork later.
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="artworkPrompt">Artwork Prompt</Label>
+                  <Textarea
+                    id="artworkPrompt"
+                    value={artworkPrompt}
+                    onChange={(e) => setArtworkPrompt(e.target.value)}
+                    placeholder={`e.g. A cinematic portrait of ${name || `this ${label.toLowerCase()}`}, dramatic lighting, detailed digital art...`}
+                    rows={3}
+                  />
+                </div>
+                <ModelSelector
+                  type="image"
+                  value={artworkModel}
+                  onChange={setArtworkModel}
+                  label="Image model"
+                  task="text_to_image"
                 />
-              </div>
-              <ModelSelector
-                type="image"
-                value={artworkModel}
-                onChange={setArtworkModel}
-                label="Image model"
-                task="text_to_image"
-              />
-              <StyleControls
-                value={styleControls}
-                onChange={setStyleControls}
-                universeAddress={universeAddress || null}
-                creatorAddress={address ?? null}
-                hasSourceImage={false}
-              />
-              {name.trim() && !artworkPrompt.trim() && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const autoPrompt =
-                      typedKind === 'person'
-                        ? `Character portrait of ${name}, ${description || fieldValues.appearance || fieldValues.role || ''}, cinematic lighting, high quality digital art, detailed`
-                        : typedKind === 'place'
-                          ? `Landscape painting of ${name}, ${description || fieldValues.atmosphere || ''}, cinematic, detailed environment concept art`
-                          : typedKind === 'thing'
-                            ? `Detailed illustration of ${name}, ${description || fieldValues.powersAndUse || ''}, fantasy artifact, dramatic lighting`
-                            : `Concept art of ${name}, ${description || ''}, high quality digital art, cinematic`;
-                    setArtworkPrompt(autoPrompt.replace(/,\s*,/g, ',').replace(/,\s*$/, ''));
-                  }}
-                >
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Auto-fill prompt from details
-                </Button>
-              )}
-            </CardContent>
-          )}
-        </Card>
+                <StyleControls
+                  value={styleControls}
+                  onChange={setStyleControls}
+                  universeAddress={universeAddress || null}
+                  creatorAddress={address ?? null}
+                  hasSourceImage={false}
+                />
+                {name.trim() && !artworkPrompt.trim() && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const autoPrompt =
+                        typedKind === 'person'
+                          ? `Character portrait of ${name}, ${description || fieldValues.appearance || fieldValues.role || ''}, cinematic lighting, high quality digital art, detailed`
+                          : typedKind === 'place'
+                            ? `Landscape painting of ${name}, ${description || fieldValues.atmosphere || ''}, cinematic, detailed environment concept art`
+                            : typedKind === 'thing'
+                              ? `Detailed illustration of ${name}, ${description || fieldValues.powersAndUse || ''}, fantasy artifact, dramatic lighting`
+                              : `Concept art of ${name}, ${description || ''}, high quality digital art, cinematic`;
+                      setArtworkPrompt(autoPrompt.replace(/,\s*,/g, ',').replace(/,\s*$/, ''));
+                    }}
+                  >
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Auto-fill prompt from details
+                  </Button>
+                )}
+              </CardContent>
+            )}
+          </Card>
+        )}
 
         {/* Optional AI Theme Music */}
         <Card>
@@ -1375,6 +1822,7 @@ function EntityCreateForm() {
               saving ||
               generatingArt ||
               generatingMusic ||
+              anyGenInFlight ||
               !name.trim() ||
               (monetized && !rightsDeclaration)
             }
@@ -1388,7 +1836,9 @@ function EntityCreateForm() {
                 ? 'Generating Artwork...'
                 : saving
                   ? 'Creating...'
-                  : `Create ${label}`}
+                  : anyGenInFlight
+                    ? 'Waiting on character...'
+                    : `Create ${label}`}
           </Button>
           <Link to="/create">
             <Button type="button" variant="outline">
@@ -1396,6 +1846,12 @@ function EntityCreateForm() {
             </Button>
           </Link>
         </div>
+        {anyGenInFlight && (
+          <p className="text-xs text-muted-foreground -mt-2">
+            One or more character generations are still running. Wait or remove the in-flight ones
+            to submit.
+          </p>
+        )}
       </form>
     </div>
   );

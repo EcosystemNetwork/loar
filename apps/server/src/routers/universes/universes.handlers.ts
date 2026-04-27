@@ -7,6 +7,7 @@
  */
 import { db } from '../../lib/firebase';
 import { randomUUID } from 'crypto';
+import { getSafeInfo } from '../../lib/safe-admin';
 
 // ── Mint fee credit conversion (~$10 worth of generation credits) ─────────
 const UNIVERSE_MINT_CREDITS = parseInt(process.env.UNIVERSE_MINT_CREDITS ?? '333', 10);
@@ -345,6 +346,141 @@ export async function getUniversesByCreator(
     console.error('Error fetching universes by creator:', error);
     throw new Error('Failed to fetch universes by creator', { cause: error });
   }
+}
+
+/**
+ * Returns every universe the caller can author into — union of three roles:
+ *
+ *   - `creator`     : Firestore `creator == uid` (covers single-EOA universes
+ *                     AND multi-sig universes where `creator` is set to the
+ *                     Safe address but the caller's uid happens to match,
+ *                     which never occurs in practice)
+ *   - `safe_signer` : caller appears in the denormalized `multiSigOwners` array
+ *                     (populated on `setMultiSig`). Falls back to a live
+ *                     `getOwners()` check for legacy multi-sig docs that
+ *                     pre-date the denormalization.
+ *   - `team_member` : active row in `universeTeamMembers`
+ *
+ * Hidden universes (admin moderation) are excluded; private ones are kept
+ * because the caller is a collaborator on them by definition.
+ *
+ * Eventually consistent for multi-sig: Safe ownership changes made directly
+ * on the Safe contract (without re-calling `setMultiSig`) won't sync until
+ * a legacy fallback path runs or the universe is re-wired. The actual write
+ * path always re-checks ownership live via `isUniverseAdmin`, so this is a
+ * discovery-only staleness risk, not an authorization one.
+ */
+const LEGACY_MS_SCAN_LIMIT = 50;
+
+export async function getEditableUniversesForUser(uid: string) {
+  const u = uid.toLowerCase();
+  const col = collection();
+
+  // Platform-level admin override — addresses listed in ADMIN_ADDRESSES /
+  // ADMIN_WALLET get edit access to every universe so they can use the
+  // Create hub's universe picker on any project. The role label is
+  // "creator" so existing role-based UI doesn't get a special case.
+  const { isAdminAddress } = await import('../../lib/trpc');
+  if (isAdminAddress(u)) {
+    const allSnap = await col.get();
+    const docs = allSnap.docs
+      .filter((d) => !d.data().isHidden)
+      .map((d) => ({ id: d.id, ...d.data(), roles: ['creator' as const] }));
+    const sorted = docs.sort((a: any, b: any) => {
+      const at = a.created_at?.toMillis?.() ?? a.created_at ?? 0;
+      const bt = b.created_at?.toMillis?.() ?? b.created_at ?? 0;
+      return Number(bt) - Number(at);
+    });
+    return { success: true, data: sorted, total: sorted.length };
+  }
+
+  const [creatorSnap, prefilterSnap, teamSnap, legacyMsSnap] = await Promise.all([
+    col.where('creator', '==', u).get(),
+    col.where('multiSigOwners', 'array-contains', u).get(),
+    db
+      .collection('universeTeamMembers')
+      .where('memberUid', '==', u)
+      .where('status', '==', 'active')
+      .get(),
+    col.where('isMultiSig', '==', true).limit(LEGACY_MS_SCAN_LIMIT).get(),
+  ]);
+
+  const result = new Map<string, any>();
+  const mark = (id: string, data: any, role: 'creator' | 'safe_signer' | 'team_member') => {
+    if (data?.isHidden) return;
+    const existing = result.get(id);
+    if (existing) {
+      if (!existing.roles.includes(role)) existing.roles.push(role);
+      return;
+    }
+    result.set(id, { id, ...data, roles: [role] });
+  };
+
+  for (const d of creatorSnap.docs) mark(d.id, d.data(), 'creator');
+  for (const d of prefilterSnap.docs) mark(d.id, d.data(), 'safe_signer');
+
+  // Team membership → fetch universe metadata for each
+  if (!teamSnap.empty) {
+    const universeIds = Array.from(
+      new Set(
+        teamSnap.docs
+          .map((d) => (d.data() as any).universeId as string | undefined)
+          .filter((id): id is string => !!id)
+      )
+    );
+    const universeDocs = await Promise.all(universeIds.map((id) => col.doc(id).get()));
+    for (const d of universeDocs) {
+      if (!d.exists) continue;
+      mark(d.id, d.data(), 'team_member');
+    }
+  }
+
+  // Legacy fallback: multi-sig universes that pre-date `multiSigOwners`
+  // denormalization. Bounded scan + live `getOwners()` check; we backfill
+  // the field as a side effect so subsequent queries are cheap.
+  const legacyDocs = legacyMsSnap.docs.filter((d) => {
+    const data = d.data();
+    const owners = data.multiSigOwners;
+    const hasDenorm = Array.isArray(owners) && owners.length > 0;
+    return !hasDenorm && !!data.multiSigAddress;
+  });
+
+  if (legacyDocs.length > 0) {
+    await Promise.all(
+      legacyDocs.map(async (d) => {
+        const data = d.data();
+        try {
+          const safeInfo = await getSafeInfo(
+            data.multiSigAddress as string,
+            data.chainId as number | undefined
+          );
+          if (!safeInfo) return;
+          const ownersLower = safeInfo.owners.map((o) => o.toLowerCase());
+          // Best-effort backfill — don't block the response on it.
+          void col
+            .doc(d.id)
+            .update({ multiSigOwners: ownersLower, multiSigOwnersUpdatedAt: new Date() })
+            .catch((err) =>
+              console.error(`[getEditableUniversesForUser] Backfill failed for ${d.id}:`, err)
+            );
+          if (ownersLower.includes(u)) mark(d.id, data, 'safe_signer');
+        } catch (err) {
+          console.error(
+            `[getEditableUniversesForUser] Live Safe check failed for ${d.id}:`,
+            err instanceof Error ? err.message : err
+          );
+        }
+      })
+    );
+  }
+
+  const data = Array.from(result.values()).sort((a, b) => {
+    const aT = a.created_at?.toMillis?.() ?? a.created_at ?? 0;
+    const bT = b.created_at?.toMillis?.() ?? b.created_at ?? 0;
+    return bT - aT;
+  });
+
+  return { success: true, data, total: data.length };
 }
 
 // ── Internal: seed private section config for Creator's Room ─────────────

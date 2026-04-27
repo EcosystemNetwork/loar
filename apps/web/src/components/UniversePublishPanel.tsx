@@ -12,11 +12,22 @@
  *     (Universe.sol). Phase 2 will wire the setCanonForEpisode tx flow here;
  *     for now the server returns NOT_IMPLEMENTED and the button is disabled.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { X, Check, Film, Loader2, Lock, Globe, Sparkles, Info } from 'lucide-react';
+import {
+  X,
+  Check,
+  Film,
+  Loader2,
+  Lock,
+  Globe,
+  Sparkles,
+  Info,
+  ShieldCheck,
+  AlertTriangle,
+} from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -114,11 +125,53 @@ export function UniversePublishPanel({ universeId, onClose }: UniversePublishPan
 
   const { writeContractAsync } = useWriteContract();
 
+  // Z.AI canon-consistency advisory. Triggered on-demand from the confirm
+  // dialog ("Preview canon score") and again as a server-side soft gate
+  // inside publishAsCanon. The bypass flag below carries the creator's
+  // explicit override when the verdict is off-canon-high.
+  const [bypassCanon, setBypassCanon] = useState(false);
+  type CanonAdvisory =
+    | { skipped: true; reason: string }
+    | {
+        skipped: false;
+        score: number;
+        verdict: 'canonical' | 'borderline' | 'off-canon';
+        contradictions: Array<{ severity: 'low' | 'med' | 'high'; note: string }>;
+        summary: string;
+        thumbUrl: string;
+      };
+
+  const canonPreview = useMutation({
+    mutationFn: (episodeId: string) =>
+      trpcClient.zai.canonCheckEpisode.mutate({ episodeId }) as Promise<CanonAdvisory>,
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Canon preview failed'),
+  });
+
+  // Reset advisory + bypass each time the confirm dialog opens for a new episode.
+  useEffect(() => {
+    if (confirmingEpisodeId) {
+      setBypassCanon(false);
+      canonPreview.reset();
+    }
+    // canonPreview is intentionally omitted — its identity churns each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [confirmingEpisodeId]);
+
+  const advisory = canonPreview.data;
+  const advisoryBlocks =
+    advisory &&
+    !advisory.skipped &&
+    advisory.verdict === 'off-canon' &&
+    advisory.contradictions.some((c) => c.severity === 'high');
+
   const publishMutation = useMutation({
     mutationFn: async (episodeId: string) => {
       // Fun universes: straight Firestore flip.
       if (universeType === 'fun') {
-        return await trpcClient.episodes.publishAsCanon.mutate({ episodeId });
+        return await trpcClient.episodes.publishAsCanon.mutate({
+          episodeId,
+          bypassCanonCheck: bypassCanon,
+        });
       }
 
       // Monetized universes: sign setCanonForEpisode on-chain, then pass the
@@ -149,6 +202,7 @@ export function UniversePublishPanel({ universeId, onClose }: UniversePublishPan
         episodeId,
         txHash,
         canonTipNodeId: tipNodeId.toString(),
+        bypassCanonCheck: bypassCanon,
       });
     },
     onSuccess: (_res, episodeId) => {
@@ -365,6 +419,112 @@ export function UniversePublishPanel({ universeId, onClose }: UniversePublishPan
                   transaction. Gas is paid by your wallet.
                 </p>
               )}
+
+              {/* Z.AI canon advisory — preview the GLM-5V consistency score
+                  before committing. Always optional; the server runs the
+                  same check inline and soft-blocks only on off-canon-high. */}
+              <div className="mt-4 rounded-lg border border-zinc-700/60 bg-zinc-900/40 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs text-zinc-300">
+                    <ShieldCheck className="w-3.5 h-3.5 text-violet-400" />
+                    <span>Canon consistency advisory (Z.AI GLM-5V)</span>
+                  </div>
+                  {!advisory && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => canonPreview.mutate(confirmingEpisodeId)}
+                      disabled={canonPreview.isPending}
+                      className="h-7 text-xs"
+                    >
+                      {canonPreview.isPending ? (
+                        <>
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          Scoring…
+                        </>
+                      ) : (
+                        'Preview score'
+                      )}
+                    </Button>
+                  )}
+                </div>
+
+                {advisory?.skipped && (
+                  <p className="text-xs text-zinc-500 italic">{advisory.reason}</p>
+                )}
+
+                {advisory && !advisory.skipped && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl font-bold text-white">{advisory.score}</span>
+                      <span className="text-xs text-zinc-400">/100</span>
+                      <Badge
+                        className={
+                          advisory.verdict === 'canonical'
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                            : advisory.verdict === 'borderline'
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                              : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                        }
+                      >
+                        {advisory.verdict}
+                      </Badge>
+                      {advisory.thumbUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={advisory.thumbUrl}
+                          alt="frame analyzed"
+                          className="h-10 w-10 rounded object-cover border border-zinc-700 ml-auto"
+                        />
+                      )}
+                    </div>
+                    {advisory.summary && (
+                      <p className="text-xs text-zinc-400">{advisory.summary}</p>
+                    )}
+                    {advisory.contradictions.length > 0 && (
+                      <ul className="text-xs space-y-1">
+                        {advisory.contradictions.map((c, i) => (
+                          <li key={i} className="flex items-start gap-1.5">
+                            <Badge
+                              variant="secondary"
+                              className={`text-[9px] shrink-0 ${
+                                c.severity === 'high'
+                                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                                  : c.severity === 'med'
+                                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                    : 'bg-zinc-700/40 text-zinc-300'
+                              }`}
+                            >
+                              {c.severity}
+                            </Badge>
+                            <span className="text-zinc-300">{c.note}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {advisoryBlocks && (
+                      <label className="flex items-start gap-2 text-xs text-rose-300 bg-rose-500/5 border border-rose-500/30 rounded p-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={bypassCanon}
+                          onChange={(e) => setBypassCanon(e.target.checked)}
+                          className="mt-0.5"
+                        />
+                        <span className="flex-1">
+                          <strong className="inline-flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" />
+                            Override the advisory and publish anyway
+                          </strong>
+                          <br />
+                          The server soft-blocks off-canon publishes by default. Toggle this to
+                          override — recorded as <code>bypassed</code> in the audit log.
+                        </span>
+                      </label>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-2 justify-end mt-4">
                 <Button variant="ghost" onClick={() => setConfirmingEpisodeId(null)}>
                   Cancel
@@ -372,14 +532,14 @@ export function UniversePublishPanel({ universeId, onClose }: UniversePublishPan
                 <Button
                   className="bg-amber-600 hover:bg-amber-700"
                   onClick={() => publishMutation.mutate(confirmingEpisodeId)}
-                  disabled={publishMutation.isPending}
+                  disabled={publishMutation.isPending || (advisoryBlocks && !bypassCanon)}
                 >
                   {publishMutation.isPending ? (
                     <Loader2 className="w-4 h-4 animate-spin mr-2" />
                   ) : (
                     <Check className="w-4 h-4 mr-2" />
                   )}
-                  Publish as Canon
+                  {advisoryBlocks && bypassCanon ? 'Override & Publish' : 'Publish as Canon'}
                 </Button>
               </div>
             </div>

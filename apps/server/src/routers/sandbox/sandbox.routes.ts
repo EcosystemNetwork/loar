@@ -307,6 +307,26 @@ export const sandboxRouter = router({
     if (!address) return [];
 
     const col = db.collection('cinematicUniverses');
+    const { isAdminAddress } = await import('../../lib/trpc');
+    const isPlatformAdmin = isAdminAddress(address);
+
+    // Platform admins can promote into any universe — single fetch, no
+    // creator filter, no per-doc on-chain check needed.
+    if (isPlatformAdmin) {
+      const allSnap = await col.get();
+      return allSnap.docs
+        .filter((d) => !d.data().isHidden)
+        .map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            name: (data.name as string | null) ?? null,
+            image_url: (data.image_url as string | null) ?? null,
+            isMultiSig: Boolean(data.isMultiSig),
+          };
+        })
+        .sort((a, b) => (a.name ?? a.id).localeCompare(b.name ?? b.id));
+    }
 
     const [ownedSnap, multiSigSnap] = await Promise.all([
       col.where('creator', '==', address).get(),

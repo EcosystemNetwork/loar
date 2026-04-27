@@ -185,6 +185,25 @@ async function saveRecord(record: ImageGenerationRecord): Promise<void> {
 
 // ── Provider dispatch ───────────────────────────────────────────────
 
+/** Map our enum-style size preset to a Z.AI `WxH` string. */
+function imageSizeToPixelSize(size?: string): string {
+  switch (size) {
+    case 'portrait_4_3':
+      return '768x1024';
+    case 'landscape_4_3':
+      return '1024x768';
+    case 'portrait_16_9':
+      return '720x1280';
+    case 'landscape_16_9':
+      return '1280x720';
+    case 'square':
+      return '768x768';
+    case 'square_hd':
+    default:
+      return '1024x1024';
+  }
+}
+
 function imageSizeToAspectRatio(size?: string): '1:1' | '3:4' | '4:3' | '9:16' | '16:9' {
   switch (size) {
     case 'portrait_4_3':
@@ -284,6 +303,52 @@ async function dispatchImageGen(
       };
     }
     return { status: 'failed', error: result.error || 'ByteDance returned no images' };
+  }
+
+  if (model.provider === 'zai') {
+    // BYOK Z.AI — falls back to platform ZAI_API_KEY when no user key is set.
+    const { getUserSecret } = await import('../../services/userSecrets');
+    const { zaiService } = await import('../../services/zai');
+    const userKey = ctx.userId
+      ? ((await getUserSecret(ctx.userId, 'zai')) ?? undefined)
+      : undefined;
+    const size = imageSizeToPixelSize(input.imageSize);
+    const result = await zaiService.generateImage({
+      apiKey: userKey,
+      prompt: input.prompt,
+      model: model.zaiModelId || 'cogview-4',
+      size,
+      n: input.numImages ?? 1,
+      userId: ctx.userId,
+    });
+    if (result.status === 'completed' && result.images.length > 0) {
+      // Rehost on LOAR storage so URLs match every other image in the gallery.
+      const manager = getStorageManager();
+      const rehosted: Array<{ url: string }> = [];
+      for (let i = 0; i < result.images.length; i++) {
+        const img = result.images[i];
+        if (!img.url) continue;
+        try {
+          const fetched = await fetch(img.url);
+          if (!fetched.ok) {
+            rehosted.push({ url: img.url });
+            continue;
+          }
+          const buf = Buffer.from(await fetched.arrayBuffer());
+          const filename = `generation-${ctx.generationId}-${i}.png`;
+          const manifest = await manager.upload(buf, filename, 'image/png', ctx.userId);
+          rehosted.push({ url: manifest.uploads[0]?.url ?? img.url });
+        } catch (err) {
+          console.warn('[zai image rehost] falling back to provider URL', err);
+          rehosted.push({ url: img.url });
+        }
+      }
+      if (rehosted.length === 0) {
+        return { status: 'failed', error: 'Z.AI returned images but storage rehost failed' };
+      }
+      return { status: 'completed', images: rehosted };
+    }
+    return { status: 'failed', error: result.error || 'Z.AI returned no images' };
   }
 
   // FAL (default)

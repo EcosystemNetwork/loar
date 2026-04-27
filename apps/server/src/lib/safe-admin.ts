@@ -11,6 +11,7 @@
 import { createPublicClient, http } from 'viem';
 import { sepolia, baseSepolia } from 'viem/chains';
 import { db } from './firebase';
+import { isAdminAddress } from './trpc';
 
 // ── Chain clients (shared with privateSection.access.ts pattern) ──────
 const sepoliaClient = createPublicClient({
@@ -64,6 +65,12 @@ export async function isUniverseAdmin(
 ): Promise<boolean> {
   const id = universeId.toLowerCase();
   const caller = callerAddress.toLowerCase();
+
+  // Platform-level admin override — addresses listed in ADMIN_ADDRESSES /
+  // ADMIN_WALLET get edit access to every universe regardless of creator
+  // or Safe membership. Decisions are logged to contentAuditLog by the
+  // calling routes so admin actions are traceable.
+  if (isAdminAddress(caller)) return true;
 
   const doc = await universesCol().doc(id).get();
   if (!doc.exists) return false;

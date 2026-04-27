@@ -202,8 +202,8 @@ function CreateHub() {
     | undefined;
 
   const { data: myUniverses } = useQuery({
-    queryKey: ['create', 'my-universes', address],
-    queryFn: () => trpcClient.universes.getByCreator.query({ creator: address! }),
+    queryKey: ['create', 'editable-universes', address],
+    queryFn: () => trpcClient.universes.getEditableByMe.query(),
     enabled: !!address && !universeAddress,
     staleTime: 30_000,
   });
@@ -215,7 +215,16 @@ function CreateHub() {
     imageURL?: string;
     portrait_image_url?: string;
     isPrivate?: boolean;
+    roles?: Array<'creator' | 'safe_signer' | 'team_member'>;
   }>;
+
+  const roleLabel = (roles: string[] | undefined): string | null => {
+    if (!roles || roles.length === 0) return null;
+    if (roles.includes('creator')) return null; // implicit — no badge needed
+    if (roles.includes('safe_signer')) return 'Multi-sig';
+    if (roles.includes('team_member')) return 'Team';
+    return null;
+  };
 
   return (
     <div className="container mx-auto px-4 py-10 max-w-6xl">
@@ -237,13 +246,24 @@ function CreateHub() {
         </div>
       )}
 
-      <div className="mb-10">
-        <h1 className="text-4xl font-bold tracking-tight mb-3">Create</h1>
-        <p className="text-muted-foreground text-lg max-w-2xl">
-          {universeInfo
-            ? `Add people, places, factions, lore, and more to ${universeInfo.name}.`
-            : 'Anything in your universe is a first-class object. Build people, places, factions, and lore — or deploy a new universe on-chain.'}
-        </p>
+      <div className="mb-10 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight mb-3">Create</h1>
+          <p className="text-muted-foreground text-lg max-w-2xl">
+            {universeInfo
+              ? `Add people, places, factions, lore, and more to ${universeInfo.name}.`
+              : 'Anything in your universe is a first-class object. Build people, places, factions, and lore — or deploy a new universe on-chain.'}
+          </p>
+        </div>
+        {address && !universeAddress && (
+          <Link
+            to="/dashboard"
+            className="inline-flex items-center gap-2 rounded-lg border border-violet-500/30 bg-violet-500/10 px-4 py-2 text-sm font-medium text-violet-200 hover:bg-violet-500/20 hover:border-violet-500/50 transition-colors flex-shrink-0"
+          >
+            <Globe className="h-4 w-4" />
+            Manage Universes
+          </Link>
+        )}
       </div>
 
       {!universeAddress && address && myUniverseList.length > 0 && (
@@ -262,6 +282,7 @@ function CreateHub() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {myUniverseList.map((u) => {
               const img = u.image_url || u.imageURL || u.portrait_image_url || '';
+              const role = roleLabel(u.roles);
               return (
                 <Link
                   key={u.id}
@@ -285,6 +306,11 @@ function CreateHub() {
                       {u.isPrivate && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
                           Private
+                        </span>
+                      )}
+                      {role && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                          {role}
                         </span>
                       )}
                     </div>

@@ -205,7 +205,11 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
       chainId?: number;
     }) => trpcClient.credits.purchaseWithFiat.mutate(params),
     onSuccess: (data) => {
-      toast.success(`Added ${data.creditsAdded} credits!`);
+      if (data.idempotent) {
+        toast.success(`Credits already issued for this payment (${data.creditsAdded}).`);
+      } else {
+        toast.success(`Added ${data.creditsAdded} credits!`);
+      }
       queryClient.invalidateQueries({ queryKey: ['credit-balance'] });
       setSelectedPkg(null);
     },
@@ -219,12 +223,19 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
   const handleCardSuccess = async (paymentIntentId: string) => {
     const pkg = pkgs.find((p) => p.id === selectedPkg);
     if (!pkg) return;
+    // Close the form immediately so a stuck "Pay" button can't double-submit
+    // while we're awaiting the server. The mutation toast reports the outcome.
+    setSelectedPkg(null);
     toast.info('Payment confirmed! Issuing credits...');
-    await purchaseFiatMutation.mutateAsync({
-      packageId: pkg.id,
-      paymentMethod: 'card' as const,
-      paymentRef: paymentIntentId,
-    });
+    try {
+      await purchaseFiatMutation.mutateAsync({
+        packageId: pkg.id,
+        paymentMethod: 'card' as const,
+        paymentRef: paymentIntentId,
+      });
+    } catch {
+      // onError handler already toasts
+    }
   };
 
   return (

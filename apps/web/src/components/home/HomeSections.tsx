@@ -605,27 +605,43 @@ export function ActivityTicker() {
 
     items.sort((a, b) => b.createdAt - a.createdAt);
 
+    // Anti-bunching: when the timeline has a hot universe, three consecutive
+    // entries collapse into "X · X · X" which reads like a stutter. Walk the
+    // list and push a same-universe item further down whenever it would land
+    // back-to-back. Keeps relative order intact within each universe but
+    // separates them visually.
+    const interleaved: typeof items = [];
+    const queue = [...items];
+    let lastUniverse = '';
+    let safety = queue.length * 4;
+    while (queue.length > 0 && safety-- > 0) {
+      const idx = queue.findIndex((i) => i.universeId !== lastUniverse);
+      const pick = idx === -1 ? queue.shift()! : queue.splice(idx, 1)[0];
+      interleaved.push(pick);
+      lastUniverse = pick.universeId;
+    }
+
     if (overflow > 0) {
-      items.push({
+      interleaved.push({
         id: `overflow-${overflow}`,
         universeName: 'Multiverse',
         action: `+${overflow} more episodes`,
-        universeId: items[0]?.universeId ?? '',
+        universeId: interleaved[0]?.universeId ?? '',
         createdAt: 0,
       });
     }
 
-    return items.slice(0, 20);
+    return interleaved.slice(0, 20);
   }, [nodesData, nodeContentData, universesData]);
 
-  // Repeat the reel enough times that the marquee never shows a gap even when
-  // `activities` is short (1–2 distinct universes). Cap the repeat so we don't
-  // allocate hundreds of DOM nodes if activity is healthy.
+  // Marquee math: the `ticker` keyframe translates from 0 to -50%, so we
+  // render exactly 2 copies of the activity list side-by-side. As the first
+  // copy slides off the left, the second arrives in view — and since both
+  // halves are identical, the seam is invisible. If activity is too short
+  // for a full screen width the user sees the loop, but it still flows.
   const marqueeItems = useMemo(() => {
     if (activities.length === 0) return [];
-    const targetLength = Math.max(activities.length * 2, 12);
-    const repeats = Math.ceil(targetLength / activities.length);
-    return Array.from({ length: repeats }, () => activities).flat();
+    return [...activities, ...activities];
   }, [activities]);
 
   if (activities.length === 0) return null;

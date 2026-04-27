@@ -11,6 +11,7 @@ import {
   getUniverse,
   getAllUniverses,
   getUniversesByCreator,
+  getEditableUniversesForUser,
   setUniverseHidden,
   setUniversePrivate,
   deleteUniverse,
@@ -219,6 +220,15 @@ export const universesRouter = router({
     });
   }),
 
+  /**
+   * Returns every universe the authenticated wallet can edit — union of
+   * creator, Safe multi-sig signer, and active team member. Each item carries
+   * a `roles` array describing how the caller has access.
+   */
+  getEditableByMe: protectedProcedure.query(async ({ ctx }) => {
+    return await getEditableUniversesForUser(ctx.user.uid);
+  }),
+
   /** Update token and governance addresses after token deployment (Step 2). */
   finalizeTokenDeployment: protectedProcedure
     .input(
@@ -303,14 +313,19 @@ export const universesRouter = router({
       // ownership if the Safe wiring turns out to be wrong (typo, contract
       // not actually a Safe, lost owner key). Without a snapshot the
       // multi-sig conversion is irreversible.
-      await db.collection('cinematicUniverses').doc(universeId).update({
-        isMultiSig: true,
-        multiSigAddress: input.multiSigAddress.toLowerCase(),
-        creator: input.multiSigAddress.toLowerCase(),
-        previousCreatorEoa: callerUid,
-        multiSigEnabledAt: new Date(),
-        updated_at: new Date(),
-      });
+      await db
+        .collection('cinematicUniverses')
+        .doc(universeId)
+        .update({
+          isMultiSig: true,
+          multiSigAddress: input.multiSigAddress.toLowerCase(),
+          multiSigOwners: safeInfo.owners.map((o) => o.toLowerCase()),
+          multiSigOwnersUpdatedAt: new Date(),
+          creator: input.multiSigAddress.toLowerCase(),
+          previousCreatorEoa: callerUid,
+          multiSigEnabledAt: new Date(),
+          updated_at: new Date(),
+        });
 
       return {
         ok: true,
@@ -355,6 +370,8 @@ export const universesRouter = router({
       await db.collection('cinematicUniverses').doc(universeId).update({
         isMultiSig: false,
         multiSigAddress: null,
+        multiSigOwners: [],
+        multiSigOwnersUpdatedAt: new Date(),
         creator: previousCreator,
         multiSigDisabledAt: new Date(),
         updated_at: new Date(),

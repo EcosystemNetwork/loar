@@ -246,6 +246,18 @@
   }
 }
 
+/* Landing page activity ticker — infinite horizontal marquee.
+   Pairs with a marqueeItems array that contains exactly 2 copies of the
+   source list so translating -50% loops seamlessly. */
+@keyframes ticker {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
 .route-progress-bar {
   position: fixed;
   top: 0;

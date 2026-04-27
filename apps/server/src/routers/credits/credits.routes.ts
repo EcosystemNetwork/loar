@@ -476,12 +476,27 @@ export const creditsRouter = router({
 
       // Atomic: dedup + balance update + tx record in one Firestore transaction
       // Dedup key uses raw paymentRef only — tx hashes are globally unique across chains
+      //
+      // Idempotency: if the same authenticated user re-submits the same paymentRef
+      // (Stripe Elements double-confirm on an already-succeeded intent, page refresh
+      // after success, etc.) we return the originally-issued credits instead of
+      // throwing. A different uid hitting the same ref still gets rejected.
       const txDocId = `fiat-${input.paymentRef}`;
-      await db.runTransaction(async (tx) => {
+      const txResult = await db.runTransaction(async (tx) => {
         const dedupRef = creditTxCol().doc(txDocId);
         const dedupDoc = await tx.get(dedupRef);
         if (dedupDoc.exists) {
-          throw new Error('This payment reference has already been used');
+          const existing = dedupDoc.data() ?? {};
+          if (existing.uid !== ctx.user.uid) {
+            throw new Error('This payment reference has already been used');
+          }
+          return {
+            idempotent: true as const,
+            totalCredits: (existing.totalCredits as number) ?? totalCredits,
+            baseCredits: (existing.credits as number) ?? pkg.credits,
+            bonusCredits: (existing.bonusCredits as number) ?? pkg.bonusCredits,
+            pricePaid: (existing.pricePaidUsd as number) ?? pkg.fiatPriceUsd,
+          };
         }
 
         const userRef = creditsCol().doc(ctx.user.uid);
@@ -517,26 +532,37 @@ export const creditsRouter = router({
           amountPaid: input.amountPaid || null,
           createdAt: new Date(),
         });
+
+        return {
+          idempotent: false as const,
+          totalCredits,
+          baseCredits: pkg.credits,
+          bonusCredits: pkg.bonusCredits,
+          pricePaid: pkg.fiatPriceUsd,
+        };
       });
 
-      void import('../../lib/analytics').then(({ captureServerEvent }) =>
-        captureServerEvent('credits:purchase_completed', {
-          distinctId: ctx.user.uid,
-          paymentMethod: input.paymentMethod,
-          packageId: input.packageId,
-          credits: totalCredits,
-          pricePaidUsd: pkg.fiatPriceUsd,
-        })
-      );
+      if (!txResult.idempotent) {
+        void import('../../lib/analytics').then(({ captureServerEvent }) =>
+          captureServerEvent('credits:purchase_completed', {
+            distinctId: ctx.user.uid,
+            paymentMethod: input.paymentMethod,
+            packageId: input.packageId,
+            credits: txResult.totalCredits,
+            pricePaidUsd: txResult.pricePaid,
+          })
+        );
+      }
 
       return {
         ok: true,
-        creditsAdded: totalCredits,
-        baseCredits: pkg.credits,
-        bonusCredits: pkg.bonusCredits,
-        pricePaid: pkg.fiatPriceUsd,
+        creditsAdded: txResult.totalCredits,
+        baseCredits: txResult.baseCredits,
+        bonusCredits: txResult.bonusCredits,
+        pricePaid: txResult.pricePaid,
         paymentMethod: input.paymentMethod,
         margin: '35%',
+        idempotent: txResult.idempotent,
       };
     }),
 

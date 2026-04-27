@@ -22,7 +22,7 @@ export const Route = createFileRoute('/settings/api-keys')({
   component: ApiKeysPage,
 });
 
-type Provider = 'bytedance';
+type Provider = 'bytedance' | 'zai';
 
 const PROVIDER_META: Record<
   Provider,
@@ -42,6 +42,15 @@ const PROVIDER_META: Record<
     placeholder: 'Paste your ModelArk API key…',
     fallbackNote:
       'When no key is set, generation runs on the platform key (subject to shared quotas).',
+  },
+  zai: {
+    label: 'Z.AI (GLM)',
+    blurb:
+      'Powers GLM-4.6 / GLM-5.x reasoning, GLM-5V vision, CogView-4 image, CogVideoX-3 video, GLM-ASR transcription, and Web Search / Web Reader tools. Used by /lab/zai, the worldbuild planner, canon-consistency checks, and the governance agent.',
+    docsUrl: 'https://docs.z.ai/llms.txt',
+    placeholder: 'Paste your Z.AI API key…',
+    fallbackNote:
+      'When no key is set, Z.AI calls run on the platform key (ZAI_API_KEY). Plug in your own to spend your own quota.',
   },
 };
 
@@ -73,6 +82,7 @@ function ApiKeysPage() {
       </div>
 
       <ProviderCard provider="bytedance" />
+      <ProviderCard provider="zai" />
 
       <Card className="bg-zinc-950/40 border-white/5">
         <CardContent className="pt-6 text-xs text-muted-foreground space-y-2">
@@ -127,7 +137,10 @@ function ProviderCard({ provider }: { provider: Provider }) {
   });
 
   const testKey = useMutation({
-    mutationFn: (v: string) => trpcClient.userSecrets.testBytedance.mutate({ value: v }),
+    mutationFn: (v: string) => {
+      if (provider === 'zai') return trpcClient.userSecrets.testZai.mutate({ value: v });
+      return trpcClient.userSecrets.testBytedance.mutate({ value: v });
+    },
     onSuccess: (res) => {
       if (res.ok) {
         toast.success('Key verified — saving…', { description: res.sample });
@@ -142,13 +155,9 @@ function ProviderCard({ provider }: { provider: Provider }) {
   const handleSave = () => {
     const trimmed = value.trim();
     if (!trimmed) return;
-    if (provider === 'bytedance') {
-      // Test before saving — surfaces auth errors immediately on the user's
-      // own quota, so a bad paste doesn't silently end up encrypted at rest.
-      testKey.mutate(trimmed);
-    } else {
-      setKey.mutate(trimmed);
-    }
+    // Test before saving — surfaces auth errors immediately on the user's
+    // own quota, so a bad paste doesn't silently end up encrypted at rest.
+    testKey.mutate(trimmed);
   };
 
   return (

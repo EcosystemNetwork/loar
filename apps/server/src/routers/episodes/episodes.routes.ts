@@ -28,6 +28,7 @@ import { dispatchGeneration, saveGenerationRecord } from '../generation/generati
 import { publishToGallery } from '../../lib/gallery-publish';
 import { isUniverseCollaborator, isUniverseAdmin, getChainClient } from '../../lib/safe-admin';
 import { validateAgainstLaws } from '../physics/physics.handlers';
+import { runEpisodeCanonCheck, shouldBlockCanonPublish } from '../../services/canon-check';
 import { decodeEventLog, getAddress, keccak256, toBytes } from 'viem';
 
 /**
@@ -995,13 +996,22 @@ export const episodesRouter = router({
     .input(
       z.object({
         limit: z.number().min(1).max(50).default(20),
+        /** Cap how many episodes a single universe can occupy in the feed so a
+         *  bursty universe (e.g. one that just backfilled dozens of episodes)
+         *  doesn't drown out everyone else. Default 3. Set to 0 to disable. */
+        perUniverseCap: z.number().min(0).max(50).default(3),
       })
     )
     .query(async ({ input }) => {
+      // Overfetch generously so the per-universe cap still leaves us with
+      // enough material to fill `limit` slots when one universe dominates the
+      // newest tail. 12× plus a 200 floor keeps us well under Firestore's
+      // single-query budget while giving us room for ~20+ distinct universes.
+      const fetchLimit = Math.min(Math.max(input.limit * 12, 200), 500);
       const snap = await episodesCol()
         .where('isCanon', '==', true)
         .orderBy('createdAt', 'desc')
-        .limit(input.limit * 2) // overfetch — we filter hidden/private universes after join
+        .limit(fetchLimit)
         .get();
 
       const episodes = snap.docs.map((d) => d.data() as any);
@@ -1034,10 +1044,22 @@ export const episodesRouter = router({
         });
       }
 
-      return episodes
+      // Cap per-universe so a single bursty universe (Voidborn-style backfill)
+      // can't fill the entire rail. Episodes are already createdAt-desc, so
+      // each universe keeps its newest N. Falls back to the legacy uncapped
+      // behavior when perUniverseCap is 0.
+      const perUniverseCount = new Map<string, number>();
+      const cap = input.perUniverseCap;
+      const hydrated = episodes
         .map((ep) => {
-          const u = universeMap.get((ep.universeId as string)?.toLowerCase?.() ?? '');
+          const universeKey = (ep.universeId as string)?.toLowerCase?.() ?? '';
+          const u = universeMap.get(universeKey);
           if (!u) return null;
+          if (cap > 0) {
+            const used = perUniverseCount.get(universeKey) ?? 0;
+            if (used >= cap) return null;
+            perUniverseCount.set(universeKey, used + 1);
+          }
           const firstClip = Array.isArray(ep.clips) ? ep.clips[0] : null;
           return {
             id: ep.id as string,
@@ -1054,8 +1076,41 @@ export const episodesRouter = router({
             universe: u,
           };
         })
-        .filter((x): x is NonNullable<typeof x> => !!x)
-        .slice(0, input.limit);
+        .filter((x): x is NonNullable<typeof x> => !!x);
+
+      // If the cap left us short of `limit` (e.g., only 1–2 universes have
+      // canon episodes at all), top up with the dropped overflow rather than
+      // returning a near-empty rail.
+      if (hydrated.length < input.limit && cap > 0) {
+        const seen = new Set(hydrated.map((h) => h.id));
+        const overflow = episodes
+          .map((ep) => {
+            if (seen.has(ep.id)) return null;
+            const universeKey = (ep.universeId as string)?.toLowerCase?.() ?? '';
+            const u = universeMap.get(universeKey);
+            if (!u) return null;
+            const firstClip = Array.isArray(ep.clips) ? ep.clips[0] : null;
+            return {
+              id: ep.id as string,
+              universeId: ep.universeId as string,
+              title: (ep.title as string) || 'Untitled episode',
+              description: (ep.description as string) || '',
+              clipCount:
+                (ep.clipCount as number) ?? (Array.isArray(ep.clips) ? ep.clips.length : 0),
+              videoUrl: (firstClip?.videoUrl as string | undefined) ?? null,
+              thumbnailUrl: (ep.thumbnailUrl as string | undefined) ?? null,
+              exportUrl: (ep.exportUrl as string | undefined) ?? null,
+              sourceCreator: (ep.sourceCreator as string | null) ?? null,
+              createdAt: (ep.createdAt as string | null) ?? null,
+              isCanon: !!ep.isCanon,
+              universe: u,
+            };
+          })
+          .filter((x): x is NonNullable<typeof x> => !!x);
+        hydrated.push(...overflow);
+      }
+
+      return hydrated.slice(0, input.limit);
     }),
 
   /**
@@ -1101,6 +1156,10 @@ export const episodesRouter = router({
         /** On-chain canon tip node id at the moment of canonization. Recorded
          *  for forward-compat with a future multi-branch canon model. */
         canonTipNodeId: z.string().optional(),
+        /** Skip the Z.AI vision-based canon-consistency advisory. Use when
+         *  the creator has already reviewed the score from the preview
+         *  endpoint and wants to override an off-canon-high verdict. */
+        bypassCanonCheck: z.boolean().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -1165,6 +1224,25 @@ export const episodesRouter = router({
         }
       }
 
+      // Z.AI canon advisory — vision check on the first clip's frame against
+      // the universe lore. Soft-fails to null on infra issues (no key, no
+      // playable clip, ffmpeg failure) so it cannot DOS canon. Hard blocks
+      // only on verdict="off-canon" with at least one high-severity
+      // contradiction; the creator can override by re-calling with
+      // bypassCanonCheck=true after reviewing the preview.
+      const canonAdvisory = input.bypassCanonCheck
+        ? null
+        : await runEpisodeCanonCheck(input.episodeId, ctx.user.uid).catch((err) => {
+            console.warn('[publishAsCanon] canon advisory failed', err);
+            return null;
+          });
+      if (shouldBlockCanonPublish(canonAdvisory)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Canon blocked by Z.AI consistency review (score ${canonAdvisory?.score}/100): ${canonAdvisory?.summary}. Re-call with bypassCanonCheck=true to override.`,
+        });
+      }
+
       const now = new Date().toISOString();
 
       if (universeType === 'fun') {
@@ -1182,10 +1260,23 @@ export const episodesRouter = router({
           universeType,
           actorUid: ctx.user.uid,
           actorAddress: ctx.user.address ?? null,
+          canonAdvisory: canonAdvisory
+            ? {
+                score: canonAdvisory.score,
+                verdict: canonAdvisory.verdict,
+                contradictionCount: canonAdvisory.contradictions.length,
+                bypassed: !!input.bypassCanonCheck,
+              }
+            : null,
           createdAt: now,
         });
         await batch.commit();
-        return { ok: true, isCanon: true, universeType };
+        return {
+          ok: true,
+          isCanon: true,
+          universeType,
+          canonAdvisory: canonAdvisory ?? null,
+        };
       }
 
       // Monetized: on-chain canon required. The creator must have already
@@ -1282,11 +1373,25 @@ export const episodesRouter = router({
         canonizer,
         actorUid: ctx.user.uid,
         actorAddress: ctx.user.address ?? null,
+        canonAdvisory: canonAdvisory
+          ? {
+              score: canonAdvisory.score,
+              verdict: canonAdvisory.verdict,
+              contradictionCount: canonAdvisory.contradictions.length,
+              bypassed: !!input.bypassCanonCheck,
+            }
+          : null,
         createdAt: now,
       });
       await batch.commit();
 
-      return { ok: true, isCanon: true, universeType, txHash: input.txHash };
+      return {
+        ok: true,
+        isCanon: true,
+        universeType,
+        txHash: input.txHash,
+        canonAdvisory: canonAdvisory ?? null,
+      };
     }),
 
   /** Delete an episode */

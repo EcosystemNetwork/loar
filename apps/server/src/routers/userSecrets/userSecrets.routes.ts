@@ -22,8 +22,9 @@ import {
   type SecretProvider,
 } from '../../services/userSecrets';
 import { bytedanceService } from '../../services/bytedance';
+import { zaiService } from '../../services/zai';
 
-const PROVIDERS = ['bytedance'] as const;
+const PROVIDERS = ['bytedance', 'zai'] as const;
 const providerSchema = z.enum(PROVIDERS);
 
 export const userSecretsRouter = router({
@@ -66,6 +67,30 @@ export const userSecretsRouter = router({
       try {
         const reply = await bytedanceService.chat({
           apiKey: input.value,
+          messages: [{ role: 'user', content: 'ping' }],
+          maxTokens: 4,
+        });
+        return { ok: true as const, sample: reply.content.slice(0, 40) };
+      } catch (err) {
+        return {
+          ok: false as const,
+          error: err instanceof Error ? err.message : 'Unknown error',
+        };
+      }
+    }),
+
+  /**
+   * Validate a candidate Z.AI key (https://z.ai) without persisting it.
+   * Round-trip a single ~1-token chat call against GLM-4.5-Air on the user's
+   * own quota, so a bad paste surfaces an auth error before encryption.
+   */
+  testZai: protectedProcedure
+    .input(z.object({ value: z.string().min(8).max(2048) }))
+    .mutation(async ({ input }) => {
+      try {
+        const reply = await zaiService.chat({
+          apiKey: input.value,
+          model: 'glm-4.5-air',
           messages: [{ role: 'user', content: 'ping' }],
           maxTokens: 4,
         });

@@ -102,6 +102,7 @@ import { notebookRouter } from './notebook/notebook.index';
 import { physicsRouter } from './physics/physics.index';
 import { curationRouter } from './curation/curation.index';
 import { userSecretsRouter } from './userSecrets/userSecrets.routes';
+import { zaiRouter } from './zai/zai.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
@@ -221,6 +222,9 @@ export const appRouter = router({
   cutdown: cutdownRouter,
   sceneAudio: sceneAudioRouter,
   talkingScene: talkingSceneRouter,
+
+  // ── Z.AI (GLM / CogView / CogVideoX) integration ───────────────────
+  zai: zaiRouter,
 
   // ── Studio OS ────────────────────────────────────────────────────────
   studio: studioRouter,
