@@ -319,18 +319,48 @@ class ZaiServiceImpl {
       jsonMode: !opts.schema,
       responseSchema: opts.schema,
     });
-    let data: T;
-    try {
-      data = JSON.parse(result.content) as T;
-    } catch {
-      // Some models wrap JSON in code fences — strip them and retry.
-      const stripped = result.content
+
+    // Some GLM tiers stream the JSON into reasoning_content when thinking is on,
+    // or leave content empty when finish_reason==="length". Try both fields.
+    const candidates = [result.content, result.reasoningContent].filter(
+      (s): s is string => typeof s === 'string' && s.trim().length > 0
+    );
+    if (candidates.length === 0) {
+      throw new Error(
+        `Z.AI returned empty content (finish_reason=${result.finishReason ?? 'unknown'}). The model may have hit max_tokens before producing JSON.`
+      );
+    }
+
+    const tryParse = (raw: string): T | null => {
+      const stripped = raw
         .replace(/^```(?:json)?\s*/i, '')
         .replace(/\s*```\s*$/, '')
         .trim();
-      data = JSON.parse(stripped) as T;
+      try {
+        return JSON.parse(stripped) as T;
+      } catch {
+        // Last-resort: extract the first {...} or [...] block from mixed prose.
+        const match = stripped.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+        if (!match) return null;
+        try {
+          return JSON.parse(match[0]) as T;
+        } catch {
+          return null;
+        }
+      }
+    };
+
+    for (const raw of candidates) {
+      const parsed = tryParse(raw);
+      if (parsed !== null) {
+        return { data: parsed, usage: result.usage, reasoningContent: result.reasoningContent };
+      }
     }
-    return { data, usage: result.usage, reasoningContent: result.reasoningContent };
+
+    const sample = (candidates[0] ?? '').slice(0, 200);
+    throw new Error(
+      `Z.AI did not return valid JSON (finish_reason=${result.finishReason ?? 'unknown'}). Sample: ${sample}`
+    );
   }
 
   // ── Vision (GLM-5V / 4.6V) ──────────────────────────────────────────

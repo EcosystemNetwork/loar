@@ -1111,7 +1111,8 @@ Rules:
       }`;
 
       const t0 = Date.now();
-      const { data, usage } = await zaiService.chatJson<{
+      const model = input.model ?? 'glm-4.7';
+      let data: {
         title: string;
         logline: string;
         tone: string;
@@ -1123,16 +1124,29 @@ Rules:
           action: string;
           dialogue: Array<{ character: string; line: string; parenthetical?: string }>;
         }>;
-      }>({
-        apiKey,
-        model: input.model ?? 'glm-4.7',
-        temperature: 0.85,
-        maxTokens: 6000,
-        messages: [
-          { role: 'system', content: sys },
-          { role: 'user', content: input.prompt },
-        ],
-      });
+      };
+      let usage: Awaited<ReturnType<typeof zaiService.chatJson>>['usage'];
+      try {
+        const result = await zaiService.chatJson<typeof data>({
+          apiKey,
+          model,
+          temperature: 0.85,
+          maxTokens: 4000,
+          messages: [
+            { role: 'system', content: sys },
+            { role: 'user', content: input.prompt },
+          ],
+        });
+        data = result.data;
+        usage = result.usage;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('[zai.writeScript] failed', { model, message });
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `Script generation failed (${model}): ${message}`,
+        });
+      }
 
       // Defensive: clamp scene count and ensure dialogue arrays exist so
       // the UI doesn't crash on a malformed bundle.
@@ -1157,7 +1171,7 @@ Rules:
         characters: Array.isArray(data.characters) ? data.characters : [],
         scenes,
         meta: {
-          model: input.model ?? 'glm-4.7',
+          model,
           latencyMs: Date.now() - t0,
           usage,
         },
