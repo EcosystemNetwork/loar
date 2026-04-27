@@ -139,7 +139,7 @@ async function main() {
   // Build Firestore document
   const data = {
     address: getAddress(UNIVERSE_ADDRESS),
-    creator: (creator ?? '0x116c28e6dcabca363f83217c712d79dce168d90e').toLowerCase(),
+    creator: (creator ?? '0x80baf7fffc430cdaced4f1d673f4138d6d493077').toLowerCase(),
     name: UNIVERSE_NAME,
     tokenAddress: tokenAddress?.toLowerCase() ?? null,
     governanceAddress: governorAddress?.toLowerCase() ?? null,
