@@ -229,7 +229,7 @@ function CreateHub() {
   return (
     <div className="container mx-auto px-4 py-10 max-w-6xl">
       {universeInfo && (
-        <div className="mb-6 flex items-center gap-3 rounded-lg border border-violet-500/30 bg-gradient-to-r from-violet-500/10 to-purple-500/10 p-4">
+        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-violet-500/30 bg-gradient-to-r from-violet-500/10 to-purple-500/10 p-4">
           {universeInfo.image_url && (
             <img
               src={resolveIpfsUrl(universeInfo.image_url)}
@@ -237,11 +237,35 @@ function CreateHub() {
               className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
             />
           )}
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Building in
             </p>
             <p className="text-lg font-bold truncate">{universeInfo.name}</p>
+          </div>
+          <div className="flex flex-wrap gap-2 ml-auto">
+            <Link
+              to="/universe/$id"
+              params={{ id: universeInfo.id }}
+              className="inline-flex items-center gap-1.5 rounded-md border border-violet-500/40 bg-violet-500/15 px-3 py-1.5 text-sm font-medium text-violet-100 hover:bg-violet-500/25 hover:border-violet-500/60 transition-colors"
+            >
+              <GitBranch className="h-3.5 w-3.5" />
+              Open editor
+            </Link>
+            <Link
+              to="/universe/$id/watch"
+              params={{ id: universeInfo.id }}
+              className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm hover:bg-white/10 transition-colors"
+            >
+              Watch
+            </Link>
+            <Link
+              to="/universe/$id/gallery"
+              params={{ id: universeInfo.id }}
+              className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm hover:bg-white/10 transition-colors"
+            >
+              Gallery
+            </Link>
           </div>
         </div>
       )}
@@ -284,41 +308,70 @@ function CreateHub() {
               const img = u.image_url || u.imageURL || u.portrait_image_url || '';
               const role = roleLabel(u.roles);
               return (
-                <Link
+                <div
                   key={u.id}
-                  to="/create"
-                  search={{ universe: u.id }}
-                  className="group flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-violet-500/40 transition-all"
+                  className="group flex flex-col rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-violet-500/40 transition-all overflow-hidden"
                 >
-                  {img ? (
-                    <img
-                      src={resolveIpfsUrl(img)}
-                      alt=""
-                      loading="lazy"
-                      className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-violet-500/40 to-purple-500/40 flex-shrink-0" />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold truncate">{u.name || 'Untitled universe'}</p>
-                      {u.isPrivate && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                          Private
-                        </span>
-                      )}
-                      {role && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">
-                          {role}
-                        </span>
-                      )}
+                  <Link
+                    to="/create"
+                    search={{ universe: u.id }}
+                    className="flex items-center gap-3 p-3"
+                  >
+                    {img ? (
+                      <img
+                        src={resolveIpfsUrl(img)}
+                        alt=""
+                        loading="lazy"
+                        className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-violet-500/40 to-purple-500/40 flex-shrink-0" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold truncate">{u.name || 'Untitled universe'}</p>
+                        {u.isPrivate && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            Private
+                          </span>
+                        )}
+                        {role && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                            {role}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {u.description || `${u.id.slice(0, 6)}…${u.id.slice(-4)}`}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {u.description || `${u.id.slice(0, 6)}…${u.id.slice(-4)}`}
-                    </p>
+                  </Link>
+                  <div className="flex items-stretch gap-px bg-white/5 border-t border-white/5 text-xs">
+                    <Link
+                      to="/universe/$id"
+                      params={{ id: u.id }}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-2 bg-violet-500/10 text-violet-200 hover:bg-violet-500/20 transition-colors"
+                      title="Open the timeline / video-node editor"
+                    >
+                      <GitBranch className="h-3 w-3" />
+                      Editor
+                    </Link>
+                    <Link
+                      to="/universe/$id/watch"
+                      params={{ id: u.id }}
+                      className="flex-1 inline-flex items-center justify-center px-2 py-2 hover:bg-white/10 transition-colors"
+                    >
+                      Watch
+                    </Link>
+                    <Link
+                      to="/universe/$id/gallery"
+                      params={{ id: u.id }}
+                      className="flex-1 inline-flex items-center justify-center px-2 py-2 hover:bg-white/10 transition-colors"
+                    >
+                      Gallery
+                    </Link>
                   </div>
-                </Link>
+                </div>
               );
             })}
           </div>

@@ -6,7 +6,7 @@
  *   • Worldbuild from URL            (Web Reader → entities)
  *   • Web Search                     (research panel)
  *   • CogView-4 image generation
- *   • CogVideoX-3 video generation
+ *   • Vidu Q1 video generation
  *   • Talking-scene (image + line)
  *   • Canon consistency vision check
  *   • Governance agent
@@ -71,7 +71,7 @@ function ZaiLabPage() {
           </h1>
           <p className="text-muted-foreground text-sm mt-2 max-w-2xl">
             The full Z.AI devpack wired into LOAR — GLM-4.6 reasoning, GLM-5V vision, CogView-4
-            stills, CogVideoX-3 motion, GLM-ASR speech, and Web Search / Web Reader. BYOK from{' '}
+            stills, Vidu Q1 motion, GLM-ASR speech, and Web Search / Web Reader. BYOK from{' '}
             <a className="underline" href="/settings/api-keys">
               /settings/api-keys
             </a>
@@ -334,7 +334,7 @@ function ImageCard() {
     mutationFn: () =>
       trpcClient.zai.generateImage.mutate({
         prompt,
-        model: 'cogview-4',
+        model: 'glm-image',
         size: '1024x1024',
         rehost: true,
       }),
@@ -343,7 +343,7 @@ function ImageCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Image (CogView-4)</CardTitle>
+        <CardTitle>Image (GLM-Image)</CardTitle>
         <p className="text-sm text-muted-foreground">
           Generates and rehosts on the LOAR storage stack (Pinata / Lighthouse) for canonical URLs.
         </p>
@@ -365,7 +365,7 @@ function ImageCard() {
   );
 }
 
-// ── Video (CogVideoX-3) ───────────────────────────────────────────────
+// ── Video (Vidu Q1) ───────────────────────────────────────────────
 
 function VideoCard() {
   const navigate = useNavigate();
@@ -378,11 +378,12 @@ function VideoCard() {
     mutationFn: () =>
       trpcClient.zai.startVideo.mutate({
         prompt,
-        model: 'cogvideox-3',
+        // Smart pick: image-conditioned variant when an input frame is set,
+        // text variant otherwise. Both are the only ids Z.AI accepts.
+        model: imageUrl ? 'viduq1-image' : 'viduq1-text',
         imageUrl: imageUrl || undefined,
         aspectRatio: '16:9',
         duration: 5,
-        withAudio: true,
       }),
     onSuccess: (res) => {
       toast.success('Job submitted — watching for completion');
@@ -400,7 +401,7 @@ function VideoCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Video (CogVideoX-3)</CardTitle>
+        <CardTitle>Video (Vidu Q1)</CardTitle>
         <p className="text-sm text-muted-foreground">
           Long-running async render. Submit kicks off the job and routes to a poller page that
           survives refreshes — Firestore caches every state transition.

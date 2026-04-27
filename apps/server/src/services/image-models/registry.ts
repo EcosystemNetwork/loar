@@ -528,42 +528,14 @@ export const IMAGE_MODELS: ImageModelConfig[] = [
   },
 
   // ── Z.AI / Zhipu — GLM image stack ──────────────────────────────────
-  {
-    id: 'cogview-4',
-    provider: 'zai',
-    displayName: 'CogView-4',
-    shortDescription: 'Z.AI text-to-image — strong on cinematic + East-Asian aesthetics',
-    zaiModelId: 'cogview-4',
-    tasks: ['text_to_image'],
-    qualityTier: 'standard',
-    speedTier: 'medium',
-    priceTier: 'low',
-    maxImages: 1,
-    supportedSizes: [
-      'square_hd',
-      'square',
-      'portrait_4_3',
-      'portrait_16_9',
-      'landscape_4_3',
-      'landscape_16_9',
-    ],
-    supportsNegativePrompt: false,
-    supportsSeed: false,
-    creditCostPerImage: usdToLoar(withFiatMargin(0.012)),
-    providerCostUsd: 0.012,
-    fiatPriceUsd: withFiatMargin(0.012),
-    loarPriceUsd: withLoarMargin(0.012),
-    isEnabled: true,
-    isVisibleToUsers: true,
-    allowedPlans: [],
-    tags: ['standard', 'zai', 'cogview', 'cinematic'],
-    bestFor: 'Cinematic stills, East-Asian aesthetics, prompt-faithful renders',
-  },
+  // Live-confirmed against api.z.ai paas/v4 on 2026-04-26: only `glm-image`
+  // is exposed. `cogview-4`, `cogview-3*`, `cogview-flash`, `cogview-pro`
+  // all return code 1211 "Unknown Model".
   {
     id: 'glm-image',
     provider: 'zai',
-    displayName: 'GLM-Image',
-    shortDescription: 'Z.AI flagship image model — broad subject coverage',
+    displayName: 'GLM-Image (Z.AI)',
+    shortDescription: 'Z.AI flagship image model — strong prompt adherence, broad subject coverage',
     zaiModelId: 'glm-image',
     tasks: ['text_to_image'],
     qualityTier: 'standard',
@@ -587,8 +559,8 @@ export const IMAGE_MODELS: ImageModelConfig[] = [
     isEnabled: true,
     isVisibleToUsers: true,
     allowedPlans: [],
-    tags: ['standard', 'zai', 'glm', 'general'],
-    bestFor: 'General-purpose subjects with strong prompt adherence',
+    tags: ['standard', 'zai', 'glm', 'cinematic'],
+    bestFor: 'Cinematic stills, prompt-faithful renders, East-Asian aesthetics',
   },
 ];
 

@@ -82,7 +82,9 @@ export interface ZaiChatResult {
 
 export interface ZaiImageOptions extends ZaiCallOptions {
   prompt: string;
-  /** Defaults to 'cogview-4'. 'glm-image' also supported. */
+  /** Defaults to 'glm-image' — confirmed working against api.z.ai 2026-04-26.
+   *  Z.AI does not currently expose `cogview-*` ids on the paas/v4 surface;
+   *  attempting them returns code 1211 "Unknown Model". */
   model?: string;
   /** e.g. '1024x1024', '1280x720', '720x1280'. */
   size?: string;
@@ -104,7 +106,9 @@ export interface ZaiImageResult {
 
 export interface ZaiVideoOptions extends ZaiCallOptions {
   prompt: string;
-  /** Defaults to 'cogvideox-3'. 'vidu-q1' / 'vidu-2' also supported. */
+  /** Defaults pick automatically: `viduq1-image` when `imageUrl` is set,
+   *  else `viduq1-text`. These are the only video model ids exposed on
+   *  api.z.ai paas/v4 as of 2026-04-26 — `cogvideox-*` returns code 1211. */
   model?: string;
   /** Reference image for image-to-video. */
   imageUrl?: string;
@@ -357,7 +361,7 @@ class ZaiServiceImpl {
 
   async generateImage(opts: ZaiImageOptions): Promise<ZaiImageResult> {
     const body: Record<string, unknown> = {
-      model: opts.model ?? 'cogview-4',
+      model: opts.model ?? 'glm-image',
       prompt: opts.prompt,
       ...(opts.size ? { size: opts.size } : {}),
       ...(opts.n ? { n: opts.n } : {}),
@@ -398,8 +402,12 @@ class ZaiServiceImpl {
 
   /** Fire-and-forget submission — returns the Z.AI task id without polling. */
   async submitVideo(opts: ZaiVideoOptions): Promise<ZaiVideoResult> {
+    // Smart model default: viduq1-image when an input frame is supplied
+    // (image-to-video), otherwise viduq1-text. The API rejects `cogvideox-*`
+    // and bare `viduq1` — only the typed variants are accepted.
+    const defaultModel = opts.imageUrl ? 'viduq1-image' : 'viduq1-text';
     const body: Record<string, unknown> = {
-      model: opts.model ?? 'cogvideox-3',
+      model: opts.model ?? defaultModel,
       prompt: opts.prompt,
       ...(opts.imageUrl ? { image_url: opts.imageUrl } : {}),
       ...(opts.endImageUrl ? { end_image_url: opts.endImageUrl } : {}),
@@ -460,22 +468,70 @@ class ZaiServiceImpl {
     };
   }
 
-  // ── ASR ─────────────────────────────────────────────────────────────
+  // ── ASR (GLM-ASR-2512) ─────────────────────────────────────────────
+  // The transcriptions endpoint is multipart/form-data only. Mono audio
+  // is required — stereo input returns code 1214 "supports mono only".
 
   async transcribe(opts: ZaiTranscribeOptions): Promise<ZaiTranscribeResult> {
-    const body: Record<string, unknown> = {
-      model: opts.model ?? 'glm-asr',
-      ...(opts.language ? { language: opts.language } : {}),
-    };
-    if (opts.url) body.audio_url = opts.url;
-    else if (opts.base64) body.audio_base64 = opts.base64;
-    else throw new Error('zai.transcribe requires either url or base64 input');
+    if (!opts.url && !opts.base64) {
+      throw new Error('zai.transcribe requires either url or base64 input');
+    }
 
-    const raw = await this.request<{
+    // Resolve to a Buffer regardless of input form — multipart needs bytes.
+    let audioBytes: Buffer;
+    let contentType = opts.mimeType ?? 'audio/wav';
+    if (opts.base64) {
+      audioBytes = Buffer.from(opts.base64, 'base64');
+    } else {
+      const fetched = await fetch(opts.url!);
+      if (!fetched.ok) throw new Error(`Failed to fetch audio: HTTP ${fetched.status}`);
+      audioBytes = Buffer.from(await fetched.arrayBuffer());
+      contentType = fetched.headers.get('content-type') ?? contentType;
+    }
+
+    const ext = contentType.includes('mp3')
+      ? 'mp3'
+      : contentType.includes('webm')
+        ? 'webm'
+        : contentType.includes('ogg')
+          ? 'ogg'
+          : 'wav';
+
+    const form = new FormData();
+    // Live-confirmed against api.z.ai paas/v4 on 2026-04-26: the documented
+    // `glm-asr` alias is rejected; the date-versioned id `glm-asr-2512` is
+    // the only one accepted. Returns { text, created, id, request_id, usage }.
+    form.append('model', opts.model ?? 'glm-asr-2512');
+    if (opts.language) form.append('language', opts.language);
+    form.append(
+      'file',
+      new Blob([new Uint8Array(audioBytes)], { type: contentType }),
+      `audio.${ext}`
+    );
+
+    const apiKey = opts.apiKey?.trim() || this.ensureConfigured()[this.activeKeyIdx];
+    const response = await fetch(`${BASE_URL}/audio/transcriptions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      let detail = body;
+      try {
+        detail = JSON.parse(body)?.error?.message ?? body;
+      } catch {
+        // body is not JSON — keep raw
+      }
+      throw new Error(`Z.AI ASR error ${response.status}: ${detail}`.slice(0, 500));
+    }
+
+    const raw = (await response.json()) as {
       text?: string;
       language?: string;
       segments?: Array<{ start: number; end: number; text: string }>;
-    }>('/audio/transcriptions', { method: 'POST', body: JSON.stringify(body) }, opts.apiKey);
+    };
 
     return {
       text: raw.text ?? '',
@@ -493,13 +549,18 @@ class ZaiServiceImpl {
       search_engine: opts.searchEngine ?? 'search_std',
       count: opts.count ?? 10,
     };
+    // Live API returns each result as { title, link, content, publish_date,
+    // refer, icon, media }. There is no separate `snippet` field — `content`
+    // serves both the preview and full-snippet roles.
     const raw = await this.request<{
       search_result?: Array<{
         title?: string;
         link?: string;
-        snippet?: string;
         content?: string;
         publish_date?: string;
+        refer?: string;
+        icon?: string;
+        media?: string;
       }>;
     }>('/web_search', { method: 'POST', body: JSON.stringify(body) }, opts.apiKey);
 
@@ -507,7 +568,7 @@ class ZaiServiceImpl {
       results: (raw.search_result ?? []).map((r) => ({
         title: r.title ?? '',
         link: r.link ?? '',
-        snippet: r.snippet,
+        snippet: r.content,
         content: r.content,
         publishDate: r.publish_date,
       })),
@@ -515,24 +576,53 @@ class ZaiServiceImpl {
     };
   }
 
-  // ── Web Reader ──────────────────────────────────────────────────────
+  // ── Web Reader (local fallback) ────────────────────────────────────
+  // Z.AI's paas/v4 surface does NOT expose a standalone web reader endpoint
+  // — `/tools/web_reader`, `/web_reader`, and `/tools/web-reader` all 404.
+  // We do the readable-text extraction ourselves: fetch the page, strip
+  // <script> / <style>, collapse whitespace, return the first ~10KB. Honest
+  // about the limitation; preserves the API shape the router was built
+  // against so seedFromUrl keeps working.
 
   async webReader(opts: ZaiWebReaderOptions): Promise<ZaiWebReaderResult> {
-    const raw = await this.request<{
-      title?: string;
-      content?: string;
-      url?: string;
-    }>(
-      '/tools/web_reader',
-      { method: 'POST', body: JSON.stringify({ url: opts.url }) },
-      opts.apiKey
-    );
-    return {
-      title: raw.title,
-      content: raw.content ?? '',
-      url: raw.url ?? opts.url,
-      raw,
-    };
+    const response = await fetch(opts.url, {
+      headers: {
+        // Some sites refuse default fetch UA. Spoof a common one so we get
+        // the public page rather than a 403 / robot interstitial.
+        'User-Agent': 'Mozilla/5.0 (compatible; LOAR-WebReader/1.0; +https://loar.fun)',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+      redirect: 'follow',
+    });
+    if (!response.ok) {
+      throw new Error(`Web reader fetch failed: HTTP ${response.status}`);
+    }
+
+    const html = await response.text();
+
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const title = titleMatch?.[1]?.trim();
+
+    const cleaned = html
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<\/(p|div|section|article|h[1-6]|li|tr|br)>/gi, '$&\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    const content = cleaned.slice(0, 12000);
+
+    return { title, content, url: opts.url, raw: { html: html.length } };
   }
 }
 

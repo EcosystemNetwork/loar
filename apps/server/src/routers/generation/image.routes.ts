@@ -316,7 +316,7 @@ async function dispatchImageGen(
     const result = await zaiService.generateImage({
       apiKey: userKey,
       prompt: input.prompt,
-      model: model.zaiModelId || 'cogview-4',
+      model: model.zaiModelId || 'glm-image',
       size,
       n: input.numImages ?? 1,
       userId: ctx.userId,

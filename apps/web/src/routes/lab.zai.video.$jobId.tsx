@@ -1,5 +1,5 @@
 /**
- * /lab/zai/video/$jobId — async CogVideoX job poller.
+ * /lab/zai/video/$jobId — async Vidu Q1 job poller.
  *
  * Polls `zai.videoJob` every 4s until status flips to completed or failed.
  * The server caches the job row in Firestore (zaiVideoJobs/{taskId}), so
@@ -80,7 +80,7 @@ function VideoJobPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clapperboard className="h-5 w-5 text-violet-400" />
-            CogVideoX Job
+            Vidu Q1 Job
             <Badge
               className={
                 status === 'completed'
@@ -135,7 +135,7 @@ function VideoJobPage() {
           {!isTerminal && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground bg-zinc-900/40 border border-white/10 rounded-lg p-3">
               <Loader2 className="h-4 w-4 animate-spin text-violet-400" />
-              Rendering — CogVideoX-3 typically takes 1–3 minutes. Polling every 4s.
+              Rendering — Vidu Q1-3 typically takes 1–3 minutes. Polling every 4s.
             </div>
           )}
 

@@ -282,7 +282,12 @@ export async function dispatchGeneration(
     const result = await zaiService.generateVideo({
       apiKey: userKey,
       prompt: input.prompt,
-      model: model.zaiModelId || 'cogvideox-3',
+      // Fall back to the I2V variant when an input image is supplied (the
+      // service picks the same default, but we surface it explicitly here
+      // for traceability in the routing logs).
+      model:
+        model.zaiModelId ||
+        (input.imageUrl || resolvedCastUrls?.[0] ? 'viduq1-image' : 'viduq1-text'),
       imageUrl: input.imageUrl ?? (resolvedCastUrls && resolvedCastUrls[0]) ?? undefined,
       duration: input.durationSec,
       quality: input.resolution === '1080p' ? '1080p' : '720p',

@@ -221,15 +221,16 @@ export const zaiRouter = router({
       })
     );
 
-    // 4. Image generation — smallest reasonable size.
+    // 4. Image generation — `glm-image` is the only id Z.AI's paas/v4
+    //    surface accepts; `cogview-*` returns code 1211. Smallest size.
     await run(
-      'image (cogview-4)',
+      'image (glm-image)',
       () =>
         zaiService.generateImage({
           apiKey,
           prompt: 'a single red square on white background',
-          model: 'cogview-4',
-          size: '512x512',
+          model: 'glm-image',
+          size: '1024x1024',
         }),
       (r) => ({
         status: r.status,
@@ -239,16 +240,17 @@ export const zaiRouter = router({
       })
     );
 
-    // 5. Video submit — fire-and-forget, returns task id only. Doesn't
-    //    wait on the render so the diagnostic completes in seconds.
+    // 5. Video submit — fire-and-forget, returns task id only. Uses
+    //    `viduq1-text` (the only T2V model id Z.AI exposes; `cogvideox-*`
+    //    is rejected). 5s is the minimum supported duration.
     await run(
-      'video submit (cogvideox-3)',
+      'video submit (viduq1-text)',
       () =>
         zaiService.submitVideo({
           apiKey,
           prompt: 'a single dot pulsing on a black background',
-          model: 'cogvideox-3',
-          duration: 2,
+          model: 'viduq1-text',
+          duration: 5,
           aspectRatio: '1:1',
         }),
       (r) => ({ status: r.status, taskId: r.id, error: r.error ?? null })
@@ -507,7 +509,7 @@ export const zaiRouter = router({
     .input(
       z.object({
         prompt: z.string().min(2).max(2000),
-        model: z.enum(['cogview-4', 'glm-image']).default('cogview-4'),
+        model: z.enum(['glm-image']).default('glm-image'),
         size: z.string().optional(),
         n: z.number().int().min(1).max(4).optional(),
         imageUrl: z.string().url().optional(),
@@ -561,7 +563,7 @@ export const zaiRouter = router({
     .input(
       z.object({
         prompt: z.string().min(2).max(2000),
-        model: z.enum(['cogvideox-3', 'vidu-q1', 'vidu-2']).default('cogvideox-3'),
+        model: z.enum(['viduq1-text', 'viduq1-image']).default('viduq1-text'),
         imageUrl: z.string().url().optional(),
         endImageUrl: z.string().url().optional(),
         duration: z.number().int().min(2).max(15).optional(),
@@ -623,7 +625,7 @@ export const zaiRouter = router({
     .input(
       z.object({
         prompt: z.string().min(2).max(2000),
-        model: z.enum(['cogvideox-3', 'vidu-q1', 'vidu-2']).default('cogvideox-3'),
+        model: z.enum(['viduq1-text', 'viduq1-image']).default('viduq1-text'),
         imageUrl: z.string().url().optional(),
         endImageUrl: z.string().url().optional(),
         duration: z.number().int().min(2).max(15).optional(),
@@ -773,11 +775,13 @@ export const zaiRouter = router({
       const result = await zaiService.generateVideo({
         apiKey,
         prompt: motionPrompt,
-        model: 'cogvideox-3',
+        // viduq1-image is image-conditioned (we always pass actorImageUrl).
+        // viduq1 doesn't currently expose inline audio — talkingScene voice
+        // can be layered post-hoc via the existing lipsync/elevenlabs flow.
+        model: 'viduq1-image',
         imageUrl: input.actorImageUrl,
         duration: input.duration,
         aspectRatio: input.aspectRatio,
-        withAudio: true,
         userId: ctx.user.uid,
       });
 
