@@ -239,7 +239,6 @@ The `/metrics` endpoint emits Prometheus exposition-format text and is intended 
 | `PINATA_GATEWAY_URL`        | server | Pinata gateway URL for content retrieval                            |
 | `PINATA_GATEWAY_TOKEN`      | server | Access token for dedicated `*.mypinata.cloud` gateways (optional)   |
 | `VITE_PINATA_GATEWAY_URL`   | web    | Client-side gateway URL (mirrors `PINATA_GATEWAY_URL`)              |
-| `VITE_PINATA_GATEWAY_TOKEN` | web    | Client-side gateway access token                                    |
 | `LIGHTHOUSE_API_KEY`        | server | Lighthouse API key (Filecoin/IPFS permanent storage + token-gating) |
 | `STORAGE_PROVIDER_PRIORITY` | server | Comma-separated priority order (e.g. `pinata,lighthouse,firebase`)  |
 

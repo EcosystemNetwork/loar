@@ -34,11 +34,6 @@ const envSchema = z.object({
 
   // ── IPFS gateway (public) ─────────────────────────────────────────────────
   VITE_PINATA_GATEWAY_URL: optionalString,
-  // WEB-1: DEPRECATED. The gateway token now lives only on the server
-  // (`PINATA_GATEWAY_TOKEN`) and is attached by `/api/ipfs/resolve`. Keeping
-  // this env var here so legacy builds still validate — remove it from every
-  // production frontend config.
-  VITE_PINATA_GATEWAY_TOKEN: optionalString,
 
   // ── Blockchain (public addresses) ─────────────────────────────────────────
   // $LOAR token + faucet addresses come from `configs/addresses.ts` per-chain.

@@ -2,11 +2,6 @@ const PUBLIC_GATEWAY = 'https://gateway.pinata.cloud';
 const CONFIGURED_GATEWAY = (import.meta.env.VITE_PINATA_GATEWAY_URL || PUBLIC_GATEWAY)
   .trim()
   .replace(/\/$/, '');
-// WEB-1: `VITE_PINATA_GATEWAY_TOKEN` is deprecated. The token now lives on
-// the server and is attached by `/api/ipfs/resolve`. This constant is kept
-// only as a deprecation-warning source so legacy configs still work during
-// the rollout window. Remove the env var from every production frontend.
-const GATEWAY_TOKEN_LEGACY = (import.meta.env.VITE_PINATA_GATEWAY_TOKEN || '').trim();
 const PREFER_PUBLIC =
   String(import.meta.env.VITE_PINATA_PREFER_PUBLIC || '')
     .trim()
@@ -20,24 +15,17 @@ try {
 }
 
 const IS_DEDICATED_GATEWAY = CONFIGURED_HOST.endsWith('.mypinata.cloud');
-// Without a client-side token we can only use dedicated gateways via the
-// server resolver (see resolveIpfsUrlAsync). Fall back to the public gateway
-// for synchronous URL composition.
+// Dedicated `.mypinata.cloud` gateways require a server-signed URL (see
+// resolveIpfsUrlAsync). Fall back to the public gateway for synchronous
+// URL composition.
 const BYPASS_DEDICATED = PREFER_PUBLIC || IS_DEDICATED_GATEWAY;
 
 const ACTIVE_GATEWAY = BYPASS_DEDICATED ? PUBLIC_GATEWAY : CONFIGURED_GATEWAY;
 const ACTIVE_HOST = BYPASS_DEDICATED ? 'gateway.pinata.cloud' : CONFIGURED_HOST;
 
-if (GATEWAY_TOKEN_LEGACY && typeof console !== 'undefined') {
-  console.warn(
-    '[ipfs-url] VITE_PINATA_GATEWAY_TOKEN is deprecated (WEB-1). The token is now injected server-side by /api/ipfs/resolve. Remove VITE_PINATA_GATEWAY_TOKEN from the web env.'
-  );
-}
-
 function appendToken(url: string): string {
-  // With the token server-side the only thing left to normalize synchronously
-  // is stripping a stale `pinataGatewayToken` query param off URLs that have
-  // been routed to the public gateway.
+  // Strip any stale `pinataGatewayToken` query param off URLs routed to the
+  // public gateway (the token is server-side only).
   try {
     const parsed = new URL(url);
     if (!parsed.host.endsWith('.mypinata.cloud') && parsed.host !== ACTIVE_HOST) return url;
