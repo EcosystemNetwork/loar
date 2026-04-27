@@ -108,3 +108,48 @@ export async function assertChainBalanceAtLeast(params: {
     throw new Error(msg);
   }
 }
+
+const ABI_VOTES = [
+  {
+    type: 'function',
+    name: 'getVotes',
+    stateMutability: 'view',
+    inputs: [{ type: 'address' }],
+    outputs: [{ type: 'uint256' }],
+  },
+] as const;
+
+/**
+ * Read the current voting power of `holder` for an ERC20Votes governance
+ * token. Falls back to `balanceOf` when the token does not implement the
+ * IVotes interface (e.g. `getVotes` reverts).
+ *
+ * Use this when the server needs to derive a vote weight authoritatively
+ * — never accept a client-supplied weight, since the client can lie about
+ * its balance and stuff votes. Note: this is the *current* voting power,
+ * so it is still vulnerable to flash loans within the vote window. For
+ * flash-loan-resistant weight, mirror CanonMarketplace's snapshotBlock
+ * pattern with `getPastVotes(holder, snapshotBlock)`.
+ */
+export async function getChainVotingPower(params: {
+  chainId: number;
+  token: Address;
+  holder: Address;
+}): Promise<bigint> {
+  const client = clientFor(params.chainId);
+  try {
+    return (await client.readContract({
+      address: params.token,
+      abi: ABI_VOTES,
+      functionName: 'getVotes',
+      args: [params.holder],
+    })) as bigint;
+  } catch {
+    return (await client.readContract({
+      address: params.token,
+      abi: ABI_ERC20_BALANCEOF,
+      functionName: 'balanceOf',
+      args: [params.holder],
+    })) as bigint;
+  }
+}

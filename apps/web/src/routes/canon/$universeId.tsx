@@ -216,7 +216,9 @@ function SubmissionCard({
   const [voted, setVoted] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
 
-  // Read governance token balance for weighted voting
+  // Display the voter's current governance balance for transparency. The
+  // actual vote weight is derived server-side from on-chain getVotes; the
+  // value shown here is informational only.
   const { data: tokenBalance } = useReadContract({
     address: tokenAddress,
     abi: governanceErc20Abi,
@@ -224,8 +226,7 @@ function SubmissionCard({
     args: voterAddress ? [voterAddress as `0x${string}`] : undefined,
     query: { enabled: !!voterAddress && !!tokenAddress },
   });
-
-  const voteWeight = tokenBalance ? formatEther(tokenBalance) : '1';
+  const displayWeight = tokenBalance ? formatEther(tokenBalance) : null;
 
   const totalVotes = (submission.votesFor || 0) + (submission.votesAgainst || 0);
   const forPct = totalVotes > 0 ? Math.round((submission.votesFor / totalVotes) * 100) : 0;
@@ -246,10 +247,11 @@ function SubmissionCard({
     }
     if (voted) return;
     try {
+      // Server derives vote weight authoritatively from on-chain getVotes/
+      // balanceOf — client-supplied weight is no longer accepted.
       await vote.mutateAsync({
         submissionId: submission.id,
         support,
-        weight: voteWeight,
       });
       setVoted(true);
       toast.success(support ? 'Voted for!' : 'Voted against');
@@ -353,6 +355,11 @@ function SubmissionCard({
             Against ({submission.votesAgainst ?? 0})
           </Button>
         </div>
+        {displayWeight && (
+          <p className="text-[10px] text-muted-foreground mt-2">
+            Your voting power: {Number(displayWeight).toLocaleString()}
+          </p>
+        )}
 
         {/* Finalize — anyone can call once the voting deadline has passed.
             If the submission has an on-chain id, we call CanonMarketplace.finalize()

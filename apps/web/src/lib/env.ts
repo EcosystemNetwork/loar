@@ -31,6 +31,10 @@ const envSchema = z.object({
 
   // ── Optional endpoints ────────────────────────────────────────────────────
   VITE_PONDER_URL: optionalString,
+  // Comma-separated failover URLs. ponder-api.ts walks these on primary failure
+  // with per-host circuit-breaker cooldown. Required for HA — a single Ponder
+  // host is a single point of failure.
+  VITE_PONDER_URL_FALLBACK: optionalString,
 
   // ── IPFS gateway (public) ─────────────────────────────────────────────────
   VITE_PINATA_GATEWAY_URL: optionalString,

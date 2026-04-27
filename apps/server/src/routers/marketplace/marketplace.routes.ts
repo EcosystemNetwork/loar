@@ -10,6 +10,8 @@ import { getPlatformConfig, bpsToFraction } from '../../services/platformConfig'
 import { randomUUID } from 'crypto';
 import { getStorageManager } from '../../services/storage';
 import { assertContentOperable, assertCanonReadyForMonetization } from '../../lib/content-status';
+import { getChainVotingPower } from '../../lib/chain-verify';
+import type { Address } from 'viem';
 
 const submissionsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -88,18 +90,78 @@ export const marketplaceRouter = router({
       z.object({
         submissionId: z.string(),
         support: z.boolean(),
-        // TODO: verify vote weight on-chain via governance token balanceOf
-        weight: z.string().refine((w) => {
-          const num = parseFloat(w);
-          return !isNaN(num) && num > 0 && num <= 1e24;
-        }, 'Vote weight must be between 0 and 1e24'),
+        // Vote weight is derived server-side from on-chain getVotes/balanceOf
+        // — never accept a client-supplied weight. A previous version trusted
+        // the client and enabled vote-stuffing by anyone willing to lie about
+        // their balance.
         txHash: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       try {
-        const weightNum = parseFloat(input.weight);
-        if (isNaN(weightNum) || weightNum <= 0) throw new Error('Invalid vote weight');
+        if (!ctx.user.address) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Wallet address required to vote',
+          });
+        }
+
+        // Resolve the universe + chain ID + governance token address before
+        // hitting the chain. We trust the universe doc, not the submission's
+        // `universeToken` field (which originated from client input at submit).
+        const subPreRef = submissionsCol().doc(input.submissionId);
+        const subPreDoc = await subPreRef.get();
+        if (!subPreDoc.exists) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Submission not found' });
+        }
+        const subPre = subPreDoc.data()!;
+        const universeId = String(subPre.universeId || '').toLowerCase();
+        if (!universeId) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Submission has no universe association',
+          });
+        }
+        const uniDoc = await db.collection('cinematicUniverses').doc(universeId).get();
+        if (!uniDoc.exists) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Universe not found' });
+        }
+        const uniData = uniDoc.data()!;
+        const tokenAddress = String(uniData.tokenAddress || '');
+        const chainId = Number(uniData.chainId ?? 11155111); // default sepolia
+        if (!tokenAddress || !/^0x[0-9a-fA-F]{40}$/.test(tokenAddress)) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Universe has no governance token configured',
+          });
+        }
+
+        // Authoritative vote weight from chain. Falls back to balanceOf if
+        // the token does not implement IVotes (see chain-verify.ts).
+        const weightBig = await getChainVotingPower({
+          chainId,
+          token: tokenAddress as Address,
+          holder: ctx.user.address as Address,
+        });
+        if (weightBig <= 0n) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'No voting power — hold the universe governance token to vote',
+          });
+        }
+        // Aggregate counters are stored as JS numbers (pre-existing format).
+        // For a 18-decimal token this loses precision past ~9e6 whole tokens,
+        // but precision in the aggregate is unchanged from before — fixing the
+        // counter type is a separate refactor. We DO store the precise weight
+        // string on each individual vote doc.
+        const weightStr = weightBig.toString();
+        const weightNum = Number(weightBig);
+        if (!Number.isFinite(weightNum) || weightNum <= 0) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Vote weight overflow',
+          });
+        }
 
         // Use a deterministic doc ID to prevent duplicate votes atomically
         const voteDocId = `${input.submissionId}_${ctx.user.uid}`;
@@ -125,7 +187,7 @@ export const marketplaceRouter = router({
             voterUid: ctx.user.uid,
             voterAddress: ctx.user.address || null,
             support: input.support,
-            weight: input.weight,
+            weight: weightStr,
             txHash: input.txHash || null,
             votedAt: new Date(),
           };
