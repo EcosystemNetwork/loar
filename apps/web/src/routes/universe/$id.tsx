@@ -7,7 +7,14 @@
  * contract interactions, and governance sidebar.
  */
 
-import { createFileRoute, Link, useNavigate, useParams } from '@tanstack/react-router';
+import {
+  createFileRoute,
+  Link,
+  Outlet,
+  useNavigate,
+  useParams,
+  useRouterState,
+} from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import {
   Home,
@@ -3362,6 +3369,17 @@ function UniverseTimelineEditorInner() {
                     variant="outline"
                     size="sm"
                     asChild
+                    className="hover:bg-violet-500/10 hover:text-violet-400 transition-all duration-300"
+                  >
+                    <Link to="/universe/$id/profile" params={{ id }}>
+                      <Eye className="h-4 w-4 mr-2" />
+                      Profile
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    asChild
                     className="hover:bg-green-500/10 hover:text-green-400 transition-all duration-300"
                   >
                     <Link to="/upload" search={{ universeId: id }}>
@@ -4126,6 +4144,16 @@ function EditorAdminGate() {
 }
 
 function UniverseTimelineEditor() {
+  // /universe/$id/watch, /gallery, /style, /lineage, /gen-config are child
+  // routes — TanStack Router still mounts this parent component for them, so
+  // without an Outlet the child page never renders and the admin gate's
+  // redirect loops on "Redirecting…". Render Outlet for any nested path and
+  // only run the gate at the editor's exact path.
+  const { id } = useParams({ from: '/universe/$id' });
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const editorPath = `/universe/${id}`;
+  const isEditorRoute = pathname === editorPath || pathname === `${editorPath}/`;
+  if (!isEditorRoute) return <Outlet />;
   return <EditorAdminGate />;
 }
 

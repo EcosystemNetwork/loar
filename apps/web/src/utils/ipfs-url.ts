@@ -24,23 +24,22 @@ const ACTIVE_GATEWAY = BYPASS_DEDICATED ? PUBLIC_GATEWAY : CONFIGURED_GATEWAY;
 const ACTIVE_HOST = BYPASS_DEDICATED ? 'gateway.pinata.cloud' : CONFIGURED_HOST;
 
 function appendToken(url: string): string {
-  // Strip any stale `pinataGatewayToken` query param off URLs routed to the
-  // public gateway (the token is server-side only).
+  // The Pinata gateway token is server-side only, so strip any stale
+  // `pinataGatewayToken` query param off URLs reaching the client.
   try {
     const parsed = new URL(url);
     if (!parsed.host.endsWith('.mypinata.cloud') && parsed.host !== ACTIVE_HOST) return url;
-    if (BYPASS_DEDICATED) {
-      parsed.searchParams.delete('pinataGatewayToken');
-      return parsed.toString();
-    }
-    return url;
+    parsed.searchParams.delete('pinataGatewayToken');
+    return parsed.toString();
   } catch {
     return url;
   }
 }
 
 function rewriteBrokenDedicatedGatewayUrl(url: string): string {
-  if (!BYPASS_DEDICATED) return url;
+  // Dedicated `.mypinata.cloud` gateways require a server-side token that
+  // the client never has — always rewrite to the public gateway in sync
+  // resolution. Async/signed flows go through resolveIpfsUrlAsync.
   try {
     const parsed = new URL(url);
     if (!parsed.host.endsWith('.mypinata.cloud')) return url;

@@ -41,7 +41,12 @@ export function installGlobalIpfsFallback(): void {
       if (!target) return;
       const tag = target.tagName;
       if (tag !== 'IMG' && tag !== 'VIDEO' && tag !== 'SOURCE') return;
-      advance(target as HTMLImageElement | HTMLVideoElement | HTMLSourceElement);
+      const advanced = advance(target as HTMLImageElement | HTMLVideoElement | HTMLSourceElement);
+      // When we successfully rotate to the next gateway, stop the same error
+      // event from reaching the element's own onError (e.g. ContentCard's
+      // fallback to /placeholder.jpg) — otherwise React's handler clobbers
+      // the new src before the fallback gateway can even be tried.
+      if (advanced) event.stopImmediatePropagation();
     },
     true
   );

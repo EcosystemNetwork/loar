@@ -390,6 +390,17 @@ function WatchPage() {
                   <Share2 className="h-4 w-4 mr-2" />
                   Share
                 </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="lg"
+                  className="rounded-full border-white/20 bg-white/5 text-white hover:bg-white/15 backdrop-blur-sm"
+                >
+                  <Link to="/universe/$id/profile" params={{ id: idLower }}>
+                    <Info className="h-4 w-4 mr-2" />
+                    About
+                  </Link>
+                </Button>
                 {admin.isAdmin && !admin.isLoading && (
                   <Button
                     asChild

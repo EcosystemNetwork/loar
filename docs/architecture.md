@@ -392,6 +392,16 @@ PostHog docs: [docs/analytics.md](analytics.md). Event catalogue and privacy pos
 | `/dmca`                      | DMCA takedown form                                   |
 | `/event.$universe.$event`    | Event detail within universe                         |
 
+### IPFS Gateway Resolution & Fallback
+
+Gallery thumbnails, posters, and any other media stored on IPFS are routed through a small client-side resolver chain so a single 403 from a busy gateway doesn't surface as a broken thumbnail.
+
+- **`resolveIpfsUrl(url)`** ([`apps/web/src/utils/ipfs-url.ts`](../apps/web/src/utils/ipfs-url.ts)) — converts `ipfs://CID/path` and known gateway URLs to the configured Pinata gateway (`VITE_PINATA_GATEWAY_URL`). If the configured gateway is a dedicated `*.mypinata.cloud` host, the synchronous helper falls back to `gateway.pinata.cloud` (dedicated gateways need server-signed URLs — see `resolveIpfsUrlAsync` for that path).
+- **`getIpfsUrlCandidates(url)` / `getNextIpfsFallback(url)`** — produce the public fallback chain: `gateway.pinata.cloud` → `w3s.link` → `ipfs.io` → `dweb.link`.
+- **`installGlobalIpfsFallback()`** ([`apps/web/src/utils/install-ipfs-fallback.ts`](../apps/web/src/utils/install-ipfs-fallback.ts), called from `main.tsx`) — registers a capture-phase `error` listener on `document` for `<img>`, `<video>`, and `<source>`. On failure it rotates `src` to the next gateway (max 4 hops, tracked via `data-ipfs-hops`) and calls `event.stopImmediatePropagation()` so element-level `onError` handlers (e.g. `ContentCard`'s placeholder swap) only fire after the chain is exhausted. Without that stop, React's `onError` would clobber the new gateway URL on the same error event and the fallback would never get a chance to load.
+
+Components rendering media should call `resolveIpfsUrl()` on the source up front and rely on the global handler for retry — they don't need to subscribe to the fallback chain themselves.
+
 ### Environment Variable Loading
 
 The web app reads env vars from the root `.env` file via Vite's `envDir` config in `vite.config.ts`. Only variables prefixed with `VITE_` are exposed to the browser.

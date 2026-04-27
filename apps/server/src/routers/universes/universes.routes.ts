@@ -525,7 +525,12 @@ export const universesRouter = router({
       return { ok: true, accessModel: input.accessModel };
     }),
 
-  /** Update universe metadata (name, image, description). Admin only. */
+  /**
+   * Update off-chain universe profile metadata. Editable by the universe
+   * creator or any current Safe multi-sig signer (via `isUniverseAdmin`).
+   * Universes that have been hidden by platform moderation cannot be edited
+   * — the takedown queue must clear `isHidden` first (PRD 10).
+   */
   updateMetadata: protectedProcedure
     .input(
       z.object({
@@ -540,6 +545,12 @@ export const universesRouter = router({
       const universeId = input.universeId.toLowerCase();
       if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
         throw new Error('Only the universe admin can update metadata');
+      }
+
+      const doc = await db.collection('cinematicUniverses').doc(universeId).get();
+      if (!doc.exists) throw new Error('Universe not found');
+      if (doc.data()?.isHidden) {
+        throw new Error('This universe is under moderation review and cannot be edited');
       }
 
       const updates: Record<string, unknown> = { updated_at: new Date() };

@@ -85,6 +85,7 @@ import { Route as WikiEntityIdRouteImport } from './routes/wiki/entity/$id'
 import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
 import { Route as UniverseIdWatchRouteImport } from './routes/universe/$id/watch'
 import { Route as UniverseIdStyleRouteImport } from './routes/universe/$id/style'
+import { Route as UniverseIdProfileRouteImport } from './routes/universe/$id/profile'
 import { Route as UniverseIdLineageRouteImport } from './routes/universe/$id/lineage'
 import { Route as UniverseIdGenConfigRouteImport } from './routes/universe/$id/gen-config'
 import { Route as UniverseIdGalleryRouteImport } from './routes/universe/$id/gallery'
@@ -477,6 +478,11 @@ const UniverseIdStyleRoute = UniverseIdStyleRouteImport.update({
   path: '/style',
   getParentRoute: () => UniverseIdRoute,
 } as any)
+const UniverseIdProfileRoute = UniverseIdProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => UniverseIdRoute,
+} as any)
 const UniverseIdLineageRoute = UniverseIdLineageRouteImport.update({
   id: '/lineage',
   path: '/lineage',
@@ -616,6 +622,7 @@ export interface FileRoutesByFullPath {
   '/universe/$id/gallery': typeof UniverseIdGalleryRoute
   '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
   '/universe/$id/lineage': typeof UniverseIdLineageRoute
+  '/universe/$id/profile': typeof UniverseIdProfileRoute
   '/universe/$id/style': typeof UniverseIdStyleRoute
   '/universe/$id/watch': typeof UniverseIdWatchRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
@@ -705,6 +712,7 @@ export interface FileRoutesByTo {
   '/universe/$id/gallery': typeof UniverseIdGalleryRoute
   '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
   '/universe/$id/lineage': typeof UniverseIdLineageRoute
+  '/universe/$id/profile': typeof UniverseIdProfileRoute
   '/universe/$id/style': typeof UniverseIdStyleRoute
   '/universe/$id/watch': typeof UniverseIdWatchRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
@@ -795,6 +803,7 @@ export interface FileRoutesById {
   '/universe/$id/gallery': typeof UniverseIdGalleryRoute
   '/universe/$id/gen-config': typeof UniverseIdGenConfigRoute
   '/universe/$id/lineage': typeof UniverseIdLineageRoute
+  '/universe/$id/profile': typeof UniverseIdProfileRoute
   '/universe/$id/style': typeof UniverseIdStyleRoute
   '/universe/$id/watch': typeof UniverseIdWatchRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
@@ -886,6 +895,7 @@ export interface FileRouteTypes {
     | '/universe/$id/gallery'
     | '/universe/$id/gen-config'
     | '/universe/$id/lineage'
+    | '/universe/$id/profile'
     | '/universe/$id/style'
     | '/universe/$id/watch'
     | '/wiki/character/$id'
@@ -975,6 +985,7 @@ export interface FileRouteTypes {
     | '/universe/$id/gallery'
     | '/universe/$id/gen-config'
     | '/universe/$id/lineage'
+    | '/universe/$id/profile'
     | '/universe/$id/style'
     | '/universe/$id/watch'
     | '/wiki/character/$id'
@@ -1064,6 +1075,7 @@ export interface FileRouteTypes {
     | '/universe/$id/gallery'
     | '/universe/$id/gen-config'
     | '/universe/$id/lineage'
+    | '/universe/$id/profile'
     | '/universe/$id/style'
     | '/universe/$id/watch'
     | '/wiki/character/$id'
@@ -1684,6 +1696,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UniverseIdStyleRouteImport
       parentRoute: typeof UniverseIdRoute
     }
+    '/universe/$id/profile': {
+      id: '/universe/$id/profile'
+      path: '/profile'
+      fullPath: '/universe/$id/profile'
+      preLoaderRoute: typeof UniverseIdProfileRouteImport
+      parentRoute: typeof UniverseIdRoute
+    }
     '/universe/$id/lineage': {
       id: '/universe/$id/lineage'
       path: '/lineage'
@@ -1817,6 +1836,7 @@ interface UniverseIdRouteChildren {
   UniverseIdGalleryRoute: typeof UniverseIdGalleryRoute
   UniverseIdGenConfigRoute: typeof UniverseIdGenConfigRoute
   UniverseIdLineageRoute: typeof UniverseIdLineageRoute
+  UniverseIdProfileRoute: typeof UniverseIdProfileRoute
   UniverseIdStyleRoute: typeof UniverseIdStyleRoute
   UniverseIdWatchRoute: typeof UniverseIdWatchRoute
 }
@@ -1826,6 +1846,7 @@ const UniverseIdRouteChildren: UniverseIdRouteChildren = {
   UniverseIdGalleryRoute: UniverseIdGalleryRoute,
   UniverseIdGenConfigRoute: UniverseIdGenConfigRoute,
   UniverseIdLineageRoute: UniverseIdLineageRoute,
+  UniverseIdProfileRoute: UniverseIdProfileRoute,
   UniverseIdStyleRoute: UniverseIdStyleRoute,
   UniverseIdWatchRoute: UniverseIdWatchRoute,
 }

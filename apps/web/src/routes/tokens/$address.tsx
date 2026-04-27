@@ -14,9 +14,11 @@ import {
   ethPriceFromTick,
   formatTokenAmount,
   formatEth,
+  formatCompactEth,
   timeAgo,
+  computeAmountOut,
+  weiToNumber,
 } from '@/hooks/useTokens';
-import { getSwapUrl } from '@/hooks/useTokenSwap';
 import { useSwapExecution } from '@/hooks/useSwapExecution';
 import { CandlestickChart } from '@/components/tokens/CandlestickChart';
 import { TokenComments } from '@/components/tokens/TokenComments';
@@ -50,6 +52,7 @@ import {
   User,
 } from 'lucide-react';
 import { useChainId, useBalance } from 'wagmi';
+import { parseUnits, formatEther } from 'viem';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { getExplorerAddressUrl } from '@/configs/chains';
 import { openExternal } from '@/utils/open-external';
@@ -74,7 +77,9 @@ function TokenDetailPage() {
 
   const { data: tokenData, isLoading: tokenLoading } = useTokenDetail(tokenAddress);
   const token = tokenData?.token;
-  const holders = tokenData?.holders ?? [];
+  // Stable reference so dependent memos don't re-run on every render when the
+  // server returns no holders (would otherwise produce a fresh [] each time).
+  const holders = useMemo(() => tokenData?.holders ?? [], [tokenData?.holders]);
 
   const { data: pool } = usePoolData(token?.poolId);
   const { data: universe } = useUniverseForToken(token?.universeAddress);
@@ -144,11 +149,12 @@ function TokenDetailPage() {
       .reverse()
       .map((s) => {
         const ethAmountSigned = tokenIsCurrency0 ? BigInt(s.amount1) : BigInt(s.amount0);
+        const ethAbs = ethAmountSigned < 0n ? -ethAmountSigned : ethAmountSigned;
         return {
           timestamp: s.timestamp,
           price: ethPriceFromTick(s.tick, tokenIsCurrency0),
           isBuy: ethAmountSigned > 0n,
-          ethAmount: Math.abs(Number(ethAmountSigned)) / 1e18,
+          ethAmount: weiToNumber(ethAbs, 18),
         };
       });
   }, [swaps, tokenIsCurrency0]);
@@ -163,18 +169,48 @@ function TokenDetailPage() {
     return ((latest - oldPrice) / oldPrice) * 100;
   }, [chartData]);
 
-  // Holder stats
-  const holderStats = useMemo(() => {
-    if (!holders.length) return { total: 0, topHolderPct: 0 };
-    const totalSupply = 1_000_000_000n * 10n ** 18n;
-    const topBalance = BigInt(holders[0]?.balance ?? '0');
-    return {
-      total: holders.length,
-      topHolderPct: Number((topBalance * 10000n) / totalSupply) / 100,
-    };
-  }, [holders]);
+  // Filter the bonding-curve contract out of the holder list. The curve isn't
+  // a real holder — it's the smart contract holding the unsold portion of the
+  // mint until graduation, and counting it as a top holder produces a
+  // misleading >50% concentration warning for every fresh token.
+  const visibleHolders = useMemo(() => {
+    if (!holders.length) return holders;
+    const curveAddr = bondingCurve?.id?.toLowerCase();
+    if (!curveAddr) return holders;
+    return holders.filter((h) => h.holderAddress.toLowerCase() !== curveAddr);
+  }, [holders, bondingCurve]);
 
-  const marketCap = currentPrice != null ? currentPrice * 1_000_000_000 : null;
+  // Circulating supply: tokens currently in user wallets / LP. During bonding
+  // only `tokensSold` is in circulation; the unsold portion is escrowed in
+  // the curve. After graduation the full mint is distributed.
+  const circulatingSupplyWei = useMemo(() => {
+    const TOTAL_SUPPLY_WEI = 1_000_000_000n * 10n ** 18n;
+    if (!bondingCurve || bondingCurve.graduated) return TOTAL_SUPPLY_WEI;
+    return BigInt(bondingCurve.tokensSold || '0');
+  }, [bondingCurve]);
+
+  // Holder stats — % is taken against circulating supply so a wallet holding
+  // half of *what's been sold so far* shows correctly as 50%, not 5%.
+  const holderStats = useMemo(() => {
+    if (!visibleHolders.length || circulatingSupplyWei === 0n)
+      return { total: visibleHolders.length, topHolderPct: 0 };
+    const topBalance = BigInt(visibleHolders[0]?.balance ?? '0');
+    return {
+      total: visibleHolders.length,
+      topHolderPct: Number((topBalance * 10000n) / circulatingSupplyWei) / 100,
+    };
+  }, [visibleHolders, circulatingSupplyWei]);
+
+  // Whole-token circulating count for MCap math.
+  const circulatingSupply = useMemo(
+    () => Number(circulatingSupplyWei / 10n ** 12n) / 1e6,
+    [circulatingSupplyWei]
+  );
+
+  // True market cap (price * circulating). For the fully-diluted figure use
+  // `fdv` below.
+  const marketCap = currentPrice != null ? currentPrice * circulatingSupply : null;
+  const fdv = currentPrice != null ? currentPrice * 1_000_000_000 : null;
   const totalSwaps = swaps?.length ?? 0;
 
   // Maturity milestones
@@ -227,8 +263,6 @@ function TokenDetailPage() {
       </div>
     );
   }
-
-  const swapUrl = getSwapUrl(token.id, chainId);
 
   return (
     <div className="min-h-screen bg-background">
@@ -371,13 +405,14 @@ function TokenDetailPage() {
             <CardContent className="p-3 text-center">
               <p className="text-xs text-muted-foreground">Market Cap</p>
               <p className="text-lg font-bold tabular-nums">
-                {marketCap != null && marketCap > 0
-                  ? marketCap >= 1000
-                    ? `${(marketCap / 1000).toFixed(1)}K`
-                    : marketCap.toFixed(2)
-                  : '--'}
+                {marketCap != null && marketCap > 0 ? formatCompactEth(marketCap) : '--'}
               </p>
-              <p className="text-[10px] text-muted-foreground">ETH</p>
+              <p className="text-[10px] text-muted-foreground">
+                ETH
+                {fdv != null && fdv > 0 && bondingCurve && !bondingCurve.graduated && (
+                  <span className="ml-1 opacity-70">· FDV {formatCompactEth(fdv)}</span>
+                )}
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -524,8 +559,8 @@ function TokenDetailPage() {
               >
                 <CardContent className="p-4 space-y-3">
                   {(() => {
-                    const raised = Number(BigInt(bondingCurve.ethRaised)) / 1e18;
-                    const target = Number(BigInt(bondingCurve.graduationEth)) / 1e18;
+                    const raised = weiToNumber(bondingCurve.ethRaised, 18);
+                    const target = weiToNumber(bondingCurve.graduationEth, 18);
                     const pct = target > 0 ? Math.min((raised / target) * 100, 100) : 0;
                     const isHalted = bondingCurve.tradingStatus === 'halted';
                     const isGraduated = bondingCurve.graduated;
@@ -614,9 +649,11 @@ function TokenDetailPage() {
                 <SwapInterface
                   tokenAddress={token.id}
                   tokenSymbol={token.symbol}
-                  swapUrl={swapUrl}
                   currentPrice={currentPrice}
                   poolData={pool}
+                  tokenIsCurrency0={tokenIsCurrency0}
+                  latestSqrtPriceX96={swaps?.[0]?.sqrtPriceX96 ?? pool?.sqrtPriceX96 ?? null}
+                  latestLiquidity={swaps?.[0]?.liquidity ?? null}
                 />
               </CardContent>
             </Card>
@@ -795,15 +832,17 @@ function TokenDetailPage() {
                     {holderStats.total}
                   </Badge>
                 </div>
-                {holders.length === 0 ? (
+                {visibleHolders.length === 0 ? (
                   <p className="text-center py-4 text-xs text-muted-foreground">
                     No holders indexed yet
                   </p>
                 ) : (
                   <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
-                    {holders.slice(0, 20).map((holder, i) => {
-                      const totalSupply = 1_000_000_000n * 10n ** 18n;
-                      const pct = Number((BigInt(holder.balance) * 10000n) / totalSupply) / 100;
+                    {visibleHolders.slice(0, 20).map((holder, i) => {
+                      const pct =
+                        circulatingSupplyWei === 0n
+                          ? 0
+                          : Number((BigInt(holder.balance) * 10000n) / circulatingSupplyWei) / 100;
                       const isHighConcentration = pct > 30;
                       return (
                         <div key={holder.id} className="flex items-center gap-2 text-xs">
@@ -871,13 +910,14 @@ function TokenDetailPage() {
 function SwapInterface({
   tokenAddress,
   tokenSymbol,
-  swapUrl,
   currentPrice,
   poolData,
+  tokenIsCurrency0,
+  latestSqrtPriceX96,
+  latestLiquidity,
 }: {
   tokenAddress: string;
   tokenSymbol: string;
-  swapUrl: string;
   currentPrice: number | null;
   poolData?: {
     currency0: string;
@@ -885,7 +925,11 @@ function SwapInterface({
     fee: number;
     tickSpacing: number;
     hooks: string;
+    sqrtPriceX96: string | null;
   } | null;
+  tokenIsCurrency0: boolean;
+  latestSqrtPriceX96: string | null;
+  latestLiquidity: string | null;
 }) {
   const [mode, setMode] = useState<'buy' | 'sell'>('buy');
   const [amount, setAmount] = useState('');
@@ -893,15 +937,36 @@ function SwapInterface({
   const { data: ethBalance } = useBalance({ address });
   const { executeSwap, status, txHash, error, isNativeSwapAvailable, reset } = useSwapExecution();
 
-  const estimatedOutput = useMemo(() => {
-    if (!amount || !currentPrice || isNaN(Number(amount))) return null;
-    const val = Number(amount);
-    if (mode === 'buy') {
-      return currentPrice > 0 ? val / currentPrice : 0;
-    } else {
-      return val * currentPrice;
+  // Real Uniswap v4 single-tick simulation against the latest pool snapshot.
+  // Returns null if we have no liquidity to simulate against — the swap button
+  // refuses to enable in that case so we never ship an unbounded slippage tx.
+  const expectedOutWei = useMemo(() => {
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) return null;
+    if (!latestSqrtPriceX96 || !latestLiquidity) return null;
+
+    let amountInWei: bigint;
+    try {
+      amountInWei = parseUnits(Number(amount).toFixed(18), 18);
+    } catch {
+      return null;
     }
-  }, [amount, currentPrice, mode]);
+
+    // zeroForOne:
+    //  - buy:  input is WETH → zeroForOne iff WETH is currency0 (token is currency1)
+    //  - sell: input is the token → zeroForOne iff the token is currency0
+    const zeroForOne = mode === 'buy' ? !tokenIsCurrency0 : tokenIsCurrency0;
+    return computeAmountOut({
+      sqrtPriceX96: latestSqrtPriceX96,
+      liquidity: latestLiquidity,
+      amountInWei,
+      zeroForOne,
+    });
+  }, [amount, mode, tokenIsCurrency0, latestSqrtPriceX96, latestLiquidity]);
+
+  const estimatedOutput = useMemo(() => {
+    if (expectedOutWei == null) return null;
+    return Number(formatEther(expectedOutWei));
+  }, [expectedOutWei]);
 
   const handleSwap = async () => {
     const poolKey = poolData
@@ -914,11 +979,6 @@ function SwapInterface({
         }
       : null;
 
-    const expectedOutWei =
-      estimatedOutput !== null && estimatedOutput > 0
-        ? BigInt(Math.floor(estimatedOutput * 1e18))
-        : undefined;
-
     const result = await executeSwap({
       tokenAddress,
       tokenSymbol,
@@ -926,7 +986,7 @@ function SwapInterface({
       mode,
       amount,
       slippageBps: 100, // 1% default for inline widget
-      expectedOutWei,
+      expectedOutWei: expectedOutWei ?? undefined,
     });
 
     if (result && !result.fallback && result.txHash) {
@@ -1023,15 +1083,15 @@ function SwapInterface({
       </div>
 
       {/* Estimated Output */}
-      {estimatedOutput !== null && estimatedOutput > 0 && (
+      {expectedOutWei !== null && expectedOutWei > 0n && (
         <div className="p-3 bg-muted/50 rounded-lg space-y-1">
           <p className="text-xs text-muted-foreground">
             Estimated {mode === 'buy' ? 'tokens' : 'ETH'} received
           </p>
           <p className="text-sm font-bold font-mono">
             {mode === 'buy'
-              ? formatTokenAmount(String(BigInt(Math.floor(estimatedOutput * 1e18))))
-              : `${estimatedOutput.toFixed(6)} ETH`}
+              ? formatTokenAmount(expectedOutWei.toString())
+              : `${(estimatedOutput ?? 0).toFixed(6)} ETH`}
           </p>
           {currentPrice && (
             <p className="text-[10px] text-muted-foreground">
@@ -1041,6 +1101,17 @@ function SwapInterface({
           )}
         </div>
       )}
+      {/* Liquidity warning when we can't simulate the swap */}
+      {amount &&
+        Number(amount) > 0 &&
+        isNativeSwapAvailable &&
+        expectedOutWei === null &&
+        !!latestSqrtPriceX96 === false && (
+          <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-[11px] text-amber-700 dark:text-amber-300">
+            Pool has no recent trades — cannot quote on-chain. Wait for indexer or use a smaller
+            test trade.
+          </div>
+        )}
 
       {/* Quick amounts */}
       {mode === 'buy' && (
@@ -1087,6 +1158,9 @@ function SwapInterface({
         disabled={
           !amount ||
           Number(amount) <= 0 ||
+          // No fresh pool snapshot → can't enforce slippage; refuse to swap
+          // rather than fall through to an unbounded execution.
+          (isNativeSwapAvailable && expectedOutWei === null) ||
           status === 'confirming' ||
           status === 'pending' ||
           status === 'approving' ||

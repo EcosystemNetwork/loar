@@ -193,8 +193,9 @@ function StudioCard({ universe: u }: { universe: StudioUniverse }) {
 
   return (
     <Card className="overflow-hidden group bg-white/[0.02] border-white/5 hover:border-primary/40 transition-all">
-      {/* Art */}
-      <Link to="/universe/$id" params={{ id: u.id }} className="block">
+      {/* Art — clicking the cover opens the public profile so creators see
+          what fans see first. The "Edit" button below jumps into the editor. */}
+      <Link to="/universe/$id/profile" params={{ id: u.id }} className="block">
         <div className="relative aspect-video bg-muted overflow-hidden">
           {cover ? (
             <img

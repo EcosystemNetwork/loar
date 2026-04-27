@@ -31,6 +31,7 @@ import {
   Palette,
   Images,
   NotebookPen,
+  Wand2,
 } from 'lucide-react';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
 import { RandomUniverseBuilder } from '@/components/RandomUniverseBuilder';
@@ -44,6 +45,14 @@ interface EntityTypeCard {
 }
 
 const ENTITY_TYPES: EntityTypeCard[] = [
+  {
+    kind: 'sandbox',
+    label: 'Sandbox',
+    description:
+      'Friction-free image + video generation playground. Queue parallel runs and promote drafts.',
+    icon: Wand2,
+    color: 'from-cyan-500/20 to-sky-500/20 border-cyan-500/30',
+  },
   {
     kind: 'notebook',
     label: 'Notebook',
@@ -202,9 +211,18 @@ function CreateHub() {
     | { id: string; name?: string; image_url?: string }
     | undefined;
 
+  // Prefer getEditableByMe (creator + Safe-signer + team-member access). Fall
+  // back to getByCreator when the server doesn't yet have getEditableByMe (or
+  // any other failure) so the picker still shows the user's own universes.
   const { data: myUniverses } = useQuery({
     queryKey: ['create', 'editable-universes', address],
-    queryFn: () => trpcClient.universes.getEditableByMe.query(),
+    queryFn: async () => {
+      try {
+        return await trpcClient.universes.getEditableByMe.query();
+      } catch {
+        return await trpcClient.universes.getByCreator.query({ creator: address! });
+      }
+    },
     enabled: !!address && !universeAddress,
     staleTime: 30_000,
   });
@@ -396,9 +414,13 @@ function CreateHub() {
                 ? '/cinematicUniverseCreate'
                 : kind === 'notebook'
                   ? '/notebook'
-                  : `/create/${kind}`;
+                  : kind === 'sandbox'
+                    ? '/sandbox'
+                    : `/create/${kind}`;
+            // Sandbox + notebook are standalone routes that don't accept the
+            // universe context query param — only entity-form routes do.
             const search =
-              kind !== 'universe' && kind !== 'notebook' && universeAddress
+              kind !== 'universe' && kind !== 'notebook' && kind !== 'sandbox' && universeAddress
                 ? { universe: universeAddress }
                 : undefined;
             return (

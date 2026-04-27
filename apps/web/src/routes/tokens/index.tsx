@@ -12,7 +12,9 @@ import {
   type EnrichedToken,
   type TokenStage,
   formatEth,
+  formatCompactEth,
   timeAgo,
+  weiToNumber,
 } from '@/hooks/useTokens';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -52,6 +54,16 @@ export const Route = createFileRoute('/tokens/')({
 type SortMode = 'trending' | 'newest' | 'holders' | 'volume' | 'name';
 type StageFilter = 'all' | TokenStage;
 
+interface LiveActivityItem {
+  kind: 'swap' | 'bondingTrade';
+  id: string;
+  timestamp: number;
+  sender: string;
+  token: EnrichedToken;
+  isBuy: boolean;
+  ethAmountWei: string;
+}
+
 function TokenLaunchpad() {
   const chainId = useChainId();
   const [search, setSearch] = useState('');
@@ -63,26 +75,30 @@ function TokenLaunchpad() {
     isError,
     refetch,
     recentSwaps,
+    recentBondingTrades,
     totalMarketCap,
   } = useTokenListData();
 
-  const filteredTokens = useMemo(() => {
+  // Search filter applied independently of stage so the stage-filter tab counts
+  // can reflect the search input without double-filtering themselves.
+  const searchFilteredTokens = useMemo(() => {
     if (!tokens.length) return [];
-    let result = [...tokens];
+    if (!search) return tokens;
+    const q = search.toLowerCase();
+    return tokens.filter(
+      (t) =>
+        t.name.toLowerCase().includes(q) ||
+        t.symbol.toLowerCase().includes(q) ||
+        t.id.toLowerCase().includes(q)
+    );
+  }, [tokens, search]);
 
+  const filteredTokens = useMemo(() => {
+    let result = searchFilteredTokens;
     if (stageFilter !== 'all') {
       result = result.filter((t) => t.stage === stageFilter);
     }
-
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (t) =>
-          t.name.toLowerCase().includes(q) ||
-          t.symbol.toLowerCase().includes(q) ||
-          t.id.toLowerCase().includes(q)
-      );
-    }
+    result = [...result];
 
     switch (sortMode) {
       case 'trending':
@@ -103,28 +119,71 @@ function TokenLaunchpad() {
     }
 
     return result;
-  }, [tokens, search, sortMode, stageFilter]);
+  }, [searchFilteredTokens, sortMode, stageFilter]);
 
   const stageCounts = useMemo(() => {
-    const counts = { all: tokens.length, bonding: 0, graduating: 0, graduated: 0, halted: 0 };
-    for (const t of tokens) {
+    const counts = {
+      all: searchFilteredTokens.length,
+      bonding: 0,
+      graduating: 0,
+      graduated: 0,
+      halted: 0,
+    };
+    for (const t of searchFilteredTokens) {
       counts[t.stage]++;
     }
     return counts;
-  }, [tokens]);
+  }, [searchFilteredTokens]);
 
-  // Enrich swaps with token info for the activity feed
-  const enrichedSwaps = useMemo(() => {
-    if (!recentSwaps.length || !tokens.length) return [];
+  // Live activity: merge Uniswap pool swaps and bonding-curve trades for known
+  // launchpad tokens only. Anything we can't map to a launchpad token is
+  // dropped — without that filter the indexer's PoolManager Swap stream leaks
+  // unrelated pools into the feed (showing "0.00e+0 ETH" rows from random
+  // senders because the fallback reads the wrong pool side).
+  const liveActivity = useMemo((): LiveActivityItem[] => {
+    if (!tokens.length) return [];
     const poolToToken = new Map<string, EnrichedToken>();
+    const curveToToken = new Map<string, EnrichedToken>();
     for (const t of tokens) {
       poolToToken.set(t.poolId, t);
+      if (t.bondingCurve) curveToToken.set(t.bondingCurve.id.toLowerCase(), t);
     }
-    return recentSwaps.slice(0, 25).map((swap) => ({
-      ...swap,
-      token: poolToToken.get(swap.poolId),
-    }));
-  }, [recentSwaps, tokens]);
+
+    const items: LiveActivityItem[] = [];
+    for (const swap of recentSwaps) {
+      const token = poolToToken.get(swap.poolId);
+      if (!token) continue;
+      const ethAmountSigned = BigInt(token.tokenIsCurrency0 ? swap.amount1 : swap.amount0);
+      // Pool-perspective convention: positive ETH delta = pool received ETH = BUY.
+      const isBuy = ethAmountSigned > 0n;
+      const ethAbs = ethAmountSigned < 0n ? -ethAmountSigned : ethAmountSigned;
+      items.push({
+        kind: 'swap',
+        id: swap.id,
+        timestamp: swap.timestamp,
+        sender: swap.sender,
+        token,
+        isBuy,
+        ethAmountWei: ethAbs.toString(),
+      });
+    }
+    for (const trade of recentBondingTrades) {
+      const token = curveToToken.get(trade.bondingCurve.toLowerCase());
+      if (!token) continue;
+      items.push({
+        kind: 'bondingTrade',
+        id: trade.id,
+        timestamp: trade.timestamp,
+        sender: trade.trader,
+        token,
+        isBuy: trade.isBuy,
+        ethAmountWei: trade.ethAmount,
+      });
+    }
+
+    items.sort((a, b) => b.timestamp - a.timestamp);
+    return items.slice(0, 25);
+  }, [recentSwaps, recentBondingTrades, tokens]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -182,11 +241,7 @@ function TokenLaunchpad() {
               </div>
               <div>
                 <p className="text-2xl font-bold tabular-nums">
-                  {totalMarketCap > 0
-                    ? totalMarketCap >= 1000
-                      ? `${(totalMarketCap / 1000).toFixed(1)}K`
-                      : totalMarketCap.toFixed(2)
-                    : '--'}
+                  {totalMarketCap > 0 ? formatCompactEth(totalMarketCap) : '--'}
                 </p>
                 <p className="text-xs text-muted-foreground">Total MCap (ETH)</p>
               </div>
@@ -198,8 +253,8 @@ function TokenLaunchpad() {
                 <TrendingUp className="h-5 w-5 text-purple-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{recentSwaps.length}</p>
-                <p className="text-xs text-muted-foreground">Recent Swaps</p>
+                <p className="text-2xl font-bold">{liveActivity.length}</p>
+                <p className="text-xs text-muted-foreground">Recent Trades</p>
               </div>
             </CardContent>
           </Card>
@@ -343,62 +398,57 @@ function TokenLaunchpad() {
                   <div className="ml-auto h-2 w-2 rounded-full bg-green-500 animate-pulse" />
                 </div>
 
-                {enrichedSwaps.length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-8">No swaps yet</p>
+                {liveActivity.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-8">No trades yet</p>
                 ) : (
                   <div className="space-y-1.5 max-h-[600px] overflow-y-auto">
-                    {enrichedSwaps.map((swap) => {
-                      // ETH side of the swap depends on which side of the
-                      // pool our token sits on. Fall back to amount0 when we
-                      // couldn't match the swap to a known launchpad token.
-                      const ethAmountSigned = swap.token
-                        ? BigInt(swap.token.tokenIsCurrency0 ? swap.amount1 : swap.amount0)
-                        : BigInt(swap.amount0);
-                      const isBuy = ethAmountSigned > 0n;
-                      const ethAmountAbs =
-                        ethAmountSigned < 0n ? -ethAmountSigned : ethAmountSigned;
-                      return (
-                        <Link
-                          key={swap.id}
-                          to={swap.token ? '/tokens/$address' : '/tokens'}
-                          params={swap.token ? { address: swap.token.id } : undefined}
-                          className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 text-xs hover:bg-muted/80 transition-colors"
-                        >
-                          <div
-                            className={`w-1.5 h-8 rounded-full flex-shrink-0 ${isBuy ? 'bg-green-500' : 'bg-red-500'}`}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
+                    {liveActivity.map((item) => (
+                      <Link
+                        key={item.id}
+                        to="/tokens/$address"
+                        params={{ address: item.token.id }}
+                        className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 text-xs hover:bg-muted/80 transition-colors"
+                      >
+                        <div
+                          className={`w-1.5 h-8 rounded-full flex-shrink-0 ${item.isBuy ? 'bg-green-500' : 'bg-red-500'}`}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <Badge
+                              variant={item.isBuy ? 'default' : 'destructive'}
+                              className="text-[9px] px-1 py-0 h-4"
+                            >
+                              {item.isBuy ? 'BUY' : 'SELL'}
+                            </Badge>
+                            <span className="font-semibold truncate text-[11px]">
+                              ${item.token.symbol}
+                            </span>
+                            {item.kind === 'bondingTrade' && (
                               <Badge
-                                variant={isBuy ? 'default' : 'destructive'}
-                                className="text-[9px] px-1 py-0 h-4"
+                                variant="outline"
+                                className="text-[8px] px-1 py-0 h-3.5 border-amber-500/40 text-amber-500"
                               >
-                                {isBuy ? 'BUY' : 'SELL'}
+                                curve
                               </Badge>
-                              {swap.token && (
-                                <span className="font-semibold truncate text-[11px]">
-                                  ${swap.token.symbol}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center justify-between mt-0.5">
-                              <AddressDisplay
-                                address={swap.sender}
-                                className="text-[10px] text-muted-foreground"
-                              />
-                              <span className="text-[10px] text-muted-foreground">
-                                {timeAgo(swap.timestamp)}
-                              </span>
-                            </div>
+                            )}
                           </div>
-                          <div className="text-right flex-shrink-0">
-                            <p className="font-mono text-[11px] font-semibold">
-                              {formatEth(ethAmountAbs.toString())}
-                            </p>
+                          <div className="flex items-center justify-between mt-0.5">
+                            <AddressDisplay
+                              address={item.sender}
+                              className="text-[10px] text-muted-foreground"
+                            />
+                            <span className="text-[10px] text-muted-foreground">
+                              {timeAgo(item.timestamp)}
+                            </span>
                           </div>
-                        </Link>
-                      );
-                    })}
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="font-mono text-[11px] font-semibold">
+                            {formatEth(item.ethAmountWei)}
+                          </p>
+                        </div>
+                      </Link>
+                    ))}
                   </div>
                 )}
               </CardContent>
@@ -493,8 +543,8 @@ function StageBadge({ stage }: { stage: TokenStage }) {
 function GraduationProgress({ token }: { token: EnrichedToken }) {
   const curve = token.bondingCurve;
   if (!curve) return null;
-  const raised = Number(BigInt(curve.ethRaised)) / 1e18;
-  const target = Number(BigInt(curve.graduationEth)) / 1e18;
+  const raised = weiToNumber(curve.ethRaised, 18);
+  const target = weiToNumber(curve.graduationEth, 18);
   const pct = target > 0 ? Math.min((raised / target) * 100, 100) : 0;
   const isGraduating = token.stage === 'graduating';
   return (
@@ -670,14 +720,21 @@ const TokenCard = memo(function TokenCard({
               </div>
             </div>
 
-            {/* Market Cap */}
+            {/* Market Cap (circulating). FDV shown alongside while bonding so
+                users see both the live trading cap and the fully-diluted figure. */}
             {token.marketCap != null && token.marketCap > 0 && (
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">MCap</span>
                 <span className="font-mono font-medium tabular-nums">
-                  {token.marketCap >= 1000
-                    ? `${(token.marketCap / 1000).toFixed(1)}K ETH`
-                    : `${token.marketCap.toFixed(2)} ETH`}
+                  {formatCompactEth(token.marketCap)} ETH
+                  {token.fdv != null &&
+                    token.fdv !== token.marketCap &&
+                    token.bondingCurve &&
+                    !token.bondingCurve.graduated && (
+                      <span className="ml-1 text-[10px] text-muted-foreground">
+                        / {formatCompactEth(token.fdv)} FDV
+                      </span>
+                    )}
                 </span>
               </div>
             )}

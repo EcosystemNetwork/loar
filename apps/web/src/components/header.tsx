@@ -73,7 +73,7 @@ const moreGroupsBase: MoreGroup[] = [
   {
     label: 'More',
     links: [
-      { to: '/sandbox', label: 'Sandbox', beta: true },
+      // Sandbox is reachable from /create — no longer a standalone nav entry.
       { to: '/subscriptions', label: 'Subscriptions' },
       { to: '/faucet', label: 'Faucet' },
       { to: '/pricing', label: 'Pricing' },

@@ -21,6 +21,27 @@ const TRUSTED_CONNECT = [
   'https://rpc.sepolia.org',
   'https://sepolia.base.org',
   'https://*.meshy.ai',
+  'https://api.coingecko.com',
+].join(' ');
+
+/** Trusted domains for media-src (audio/video). */
+const TRUSTED_MEDIA = [
+  "'self'",
+  'blob:',
+  'https://storage.googleapis.com',
+  'https://*.firebasestorage.app',
+  'https://*.pinata.cloud',
+  'https://gateway.pinata.cloud',
+  'https://*.mypinata.cloud',
+  'https://*.lighthouse.storage',
+  'https://*.volces.com',
+  'https://*.fal.ai',
+  'https://*.fal.media',
+  'https://w3s.link',
+  'https://*.w3s.link',
+  'https://ipfs.io',
+  'https://dweb.link',
+  'https://*.dweb.link',
 ].join(' ');
 
 /** Trusted domains for img-src. */
@@ -60,7 +81,7 @@ export async function securityHeaders(c: Context, next: Next) {
       `connect-src ${TRUSTED_CONNECT}`,
       `img-src ${TRUSTED_IMG}`,
       "font-src 'self' https://fonts.gstatic.com",
-      "media-src 'self' blob: https://*.pinata.cloud https://gateway.pinata.cloud https://*.mypinata.cloud https://*.lighthouse.storage https://*.volces.com https://*.fal.ai https://*.fal.media https://w3s.link https://*.w3s.link https://ipfs.io https://dweb.link https://*.dweb.link",
+      `media-src ${TRUSTED_MEDIA}`,
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",

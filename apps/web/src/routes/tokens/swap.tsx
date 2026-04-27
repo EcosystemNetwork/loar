@@ -17,10 +17,9 @@ import {
   ethPricePerToken,
   formatTokenAmount,
   computePriceImpactBps,
-  type EnrichedToken,
+  computeAmountOut,
 } from '@/hooks/useTokens';
 import { useSwapExecution, type SwapConfig } from '@/hooks/useSwapExecution';
-import { getSwapUrl } from '@/hooks/useTokenSwap';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -107,22 +106,46 @@ function SwapPage() {
     return selectedToken?.price ?? null;
   }, [poolData, selectedToken, selectedTokenAddress]);
 
-  // Estimated output
-  const estimatedOutput = useMemo(() => {
-    if (!amount || !currentPrice || isNaN(Number(amount)) || Number(amount) <= 0) return null;
-    const val = Number(amount);
-    if (mode === 'buy') {
-      return currentPrice > 0 ? val / currentPrice : 0;
-    } else {
-      return val * currentPrice;
-    }
-  }, [amount, currentPrice, mode]);
+  // Expected output in wei using real Uniswap v4 single-tick math against the
+  // latest pool snapshot. Returns null when the pool has no liquidity (pre-
+  // graduation tokens or untraded pools) — the swap button is gated on this.
+  const expectedOutWei = useMemo(() => {
+    if (!amount || !selectedToken || isNaN(Number(amount)) || Number(amount) <= 0) return null;
+    const sqrtPriceX96 = selectedToken.latestSqrtPriceX96 ?? poolData?.sqrtPriceX96 ?? null;
+    const liquidity = selectedToken.latestLiquidity;
+    if (!sqrtPriceX96 || !liquidity) return null;
 
-  // Minimum output after slippage
+    let amountInWei: bigint;
+    try {
+      amountInWei = parseUnits(Number(amount).toFixed(18), 18);
+    } catch {
+      return null;
+    }
+
+    // zeroForOne mirrors the priceImpact derivation:
+    //  - buy: input is WETH → zeroForOne iff WETH is currency0 (token is currency1)
+    //  - sell: input is the token → zeroForOne iff the token is currency0
+    const zeroForOne = mode === 'buy' ? !tokenIsCurrency0 : tokenIsCurrency0;
+    return computeAmountOut({ sqrtPriceX96, liquidity, amountInWei, zeroForOne });
+  }, [amount, selectedToken, poolData, mode, tokenIsCurrency0]);
+
+  // Display estimate as a float for the "You receive" UI.
+  const estimatedOutput = useMemo(() => {
+    if (expectedOutWei == null) return null;
+    return Number(formatEther(expectedOutWei));
+  }, [expectedOutWei]);
+
+  // Minimum output after slippage, in wei (matches what the contract enforces).
+  const minimumOutWei = useMemo(() => {
+    if (expectedOutWei == null) return null;
+    const bps = BigInt(Math.round(slippage * 100));
+    return (expectedOutWei * (10_000n - bps)) / 10_000n;
+  }, [expectedOutWei, slippage]);
+
   const minimumOutput = useMemo(() => {
-    if (!estimatedOutput) return null;
-    return estimatedOutput * (1 - slippage / 100);
-  }, [estimatedOutput, slippage]);
+    if (minimumOutWei == null) return null;
+    return Number(formatEther(minimumOutWei));
+  }, [minimumOutWei]);
 
   // Price impact via constant-L Uniswap v4 math using latest pool state.
   // For bonding-curve tokens (no pool liquidity yet) we return null and hide the row.
@@ -192,16 +215,6 @@ function SwapPage() {
         }
       : null;
 
-    // Expected output in wei: tokens (18 decimals) for buy, ETH (18 decimals) for sell.
-    // `BigInt(Math.floor(x * 1e18))` silently overflows for low-priced tokens
-    // (a 0.5 ETH buy of a 1e-9-priced token is ~5e26 wei, far above MAX_SAFE_INTEGER).
-    // viem's `parseUnits` walks the decimal string in bigint and is the only
-    // safe path for arbitrary-magnitude swap output.
-    const expectedOutWei =
-      estimatedOutput !== null && estimatedOutput > 0
-        ? parseUnits(estimatedOutput.toFixed(18), 18)
-        : undefined;
-
     const result = await executeSwap({
       tokenAddress: selectedToken.id,
       tokenSymbol: selectedToken.symbol,
@@ -209,7 +222,7 @@ function SwapPage() {
       mode,
       amount,
       slippageBps: Math.round(slippage * 100),
-      expectedOutWei,
+      expectedOutWei: expectedOutWei ?? undefined,
     });
 
     // Record trade for PnL tracking if native swap succeeded
@@ -233,7 +246,17 @@ function SwapPage() {
         // PnL tracking is best-effort
       }
     }
-  }, [selectedToken, amount, mode, slippage, poolData, executeSwap, estimatedOutput, currentPrice]);
+  }, [
+    selectedToken,
+    amount,
+    mode,
+    slippage,
+    poolData,
+    executeSwap,
+    expectedOutWei,
+    estimatedOutput,
+    currentPrice,
+  ]);
 
   // Flip buy/sell
   const flipMode = useCallback(() => {
@@ -439,10 +462,10 @@ function SwapPage() {
               <div className="relative">
                 <div className="h-14 rounded-md border bg-muted/30 flex items-center px-4">
                   <span className="text-xl font-mono text-foreground/80">
-                    {estimatedOutput !== null && estimatedOutput > 0
+                    {expectedOutWei !== null && expectedOutWei > 0n
                       ? mode === 'buy'
-                        ? formatTokenAmount(String(parseUnits(estimatedOutput.toFixed(18), 18)))
-                        : estimatedOutput.toFixed(6)
+                        ? formatTokenAmount(expectedOutWei.toString())
+                        : (estimatedOutput ?? 0).toFixed(6)
                       : '0.0'}
                   </span>
                 </div>
@@ -525,13 +548,13 @@ function SwapPage() {
                 </div>
 
                 {/* Minimum received */}
-                {minimumOutput !== null && minimumOutput > 0 && (
+                {minimumOutWei !== null && minimumOutWei > 0n && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Minimum received</span>
                     <span className="font-mono">
                       {mode === 'buy'
-                        ? formatTokenAmount(String(parseUnits(minimumOutput.toFixed(18), 18)))
-                        : minimumOutput.toFixed(6)}{' '}
+                        ? formatTokenAmount(minimumOutWei.toString())
+                        : (minimumOutput ?? 0).toFixed(6)}{' '}
                       {mode === 'buy' ? `$${selectedToken.symbol}` : 'ETH'}
                     </span>
                   </div>
@@ -653,6 +676,9 @@ function SwapPage() {
                 disabled={
                   !amount ||
                   Number(amount) <= 0 ||
+                  // No fresh pool snapshot → can't enforce slippage; refuse to swap
+                  // rather than fall through to an unbounded execution.
+                  (isNativeSwapAvailable && expectedOutWei === null) ||
                   status === 'confirming' ||
                   status === 'pending' ||
                   status === 'approving' ||

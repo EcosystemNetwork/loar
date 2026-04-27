@@ -299,10 +299,25 @@ export function stageFromBondingCurve(curve: BondingCurveData | null | undefined
   if (!curve) return 'graduated'; // pools without bonding curve are post-graduation
   if (curve.tradingStatus === 'halted') return 'halted';
   if (curve.graduated || curve.tradingStatus === 'graduated') return 'graduated';
-  const raised = Number(BigInt(curve.ethRaised)) / 1e18;
-  const target = Number(BigInt(curve.graduationEth)) / 1e18;
-  if (target > 0 && raised / target >= 0.75) return 'graduating';
+  // Bigint compare keeps precision for large wei values: raised/target >= 0.75
+  // ↔ raised*100 >= target*75. Avoids the Number() truncation entirely.
+  const raised = BigInt(curve.ethRaised);
+  const target = BigInt(curve.graduationEth);
+  if (target > 0n && raised * 100n >= target * 75n) return 'graduating';
   return 'bonding';
+}
+
+// Raw bonding-curve trade row as returned by the indexer. Used by both the
+// per-user portfolio query and the launchpad live-activity feed.
+export interface BondingCurveTrade {
+  id: string;
+  bondingCurve: string;
+  trader: string;
+  isBuy: boolean;
+  ethAmount: string;
+  tokenAmount: string;
+  price: string;
+  timestamp: number;
 }
 
 // ─── User portfolio, derived from the indexer (not client-recorded) ────
@@ -511,8 +526,8 @@ export function useIndexerPortfolio(userAddress: string | undefined): {
       const addr = t.tokenAddress.toLowerCase();
       if (!addr) continue;
       ensure(addr);
-      const ethF = Number(BigInt(t.ethAmount)) / 1e18;
-      const tokF = Number(BigInt(t.tokenAmount)) / 1e18;
+      const ethF = weiToNumber(t.ethAmount, 18);
+      const tokF = weiToNumber(t.tokenAmount, 18);
       const a = agg.get(addr)!;
       if (t.isBuy) {
         a.totalBoughtEth += ethF;
@@ -536,8 +551,8 @@ export function useIndexerPortfolio(userAddress: string | undefined): {
       // For native-ETH pools, amount0 is ETH delta to the pool; amount1 is token delta.
       // Assumes currency0 = ETH. Non-ETH pools fall through but the amounts are
       // still meaningful as absolute ETH-equivalent via current pool price.
-      const ethAbs = Number(a0 < 0n ? -a0 : a0) / 1e18;
-      const tokAbs = Number(a1 < 0n ? -a1 : a1) / 1e18;
+      const ethAbs = weiToNumber(a0 < 0n ? -a0 : a0, 18);
+      const tokAbs = weiToNumber(a1 < 0n ? -a1 : a1, 18);
       const a = agg.get(addr)!;
       if (a0 > 0n) {
         a.totalBoughtEth += ethAbs;
@@ -553,7 +568,7 @@ export function useIndexerPortfolio(userAddress: string | undefined): {
     const balances = new Map<string, number>();
     for (const h of holdings.data ?? []) {
       const addr = h.tokenAddress.toLowerCase();
-      const bal = Number(BigInt(h.balance)) / 1e18;
+      const bal = weiToNumber(h.balance, 18);
       balances.set(addr, bal);
     }
 
@@ -743,6 +758,56 @@ export function computePriceImpactBps({
 }
 
 /**
+ * Compute the exact amount of output tokens for a single-tick Uniswap v4 swap
+ * (constant-L approximation). Returns the amount in wei (18-decimal units).
+ *
+ * Math derived from Uniswap V3 whitepaper §6.2.2:
+ *  - zeroForOne (in: token0, out: token1):
+ *      sqrtP_next = (L · Q96 · sqrtP) / (L · Q96 + amountIn · sqrtP)
+ *      amountOut  = L · (sqrtP − sqrtP_next) / Q96
+ *  - !zeroForOne (in: token1, out: token0):
+ *      sqrtP_next = sqrtP + (amountIn · Q96) / L
+ *      amountOut  = L · Q96 · (sqrtP_next − sqrtP) / (sqrtP_next · sqrtP)
+ *
+ * Accurate while the swap stays inside a single initialized tick range. For
+ * trades that cross ticks this overestimates output — user-set slippage
+ * tolerance covers the residual. Returns null when inputs are missing so
+ * callers can refuse the swap rather than fall through to naive math.
+ */
+export function computeAmountOut({
+  sqrtPriceX96,
+  liquidity,
+  amountInWei,
+  zeroForOne,
+}: {
+  sqrtPriceX96: string | null | undefined;
+  liquidity: string | null | undefined;
+  amountInWei: bigint;
+  zeroForOne: boolean;
+}): bigint | null {
+  if (!sqrtPriceX96 || !liquidity || amountInWei <= 0n) return null;
+  const sqrtP = BigInt(sqrtPriceX96);
+  const L = BigInt(liquidity);
+  if (sqrtP === 0n || L === 0n) return null;
+
+  const Q96 = 1n << 96n;
+
+  if (zeroForOne) {
+    const denom = L * Q96 + amountInWei * sqrtP;
+    if (denom === 0n) return null;
+    const sqrtPNext = (L * Q96 * sqrtP) / denom;
+    if (sqrtPNext >= sqrtP) return null;
+    return (L * (sqrtP - sqrtPNext)) / Q96;
+  } else {
+    const sqrtPNext = sqrtP + (amountInWei * Q96) / L;
+    if (sqrtPNext <= sqrtP) return null;
+    const denom = sqrtP * sqrtPNext;
+    if (denom === 0n) return null;
+    return (L * Q96 * (sqrtPNext - sqrtP)) / denom;
+  }
+}
+
+/**
  * Calculate price from tick
  * price = 1.0001^tick
  */
@@ -798,10 +863,28 @@ export function ethPriceFromTick(tick: number, tokenIsCurrency0: boolean): numbe
 }
 
 /**
+ * Bigint-safe wei → number conversion. Naive `Number(BigInt(raw)) / 10**d`
+ * silently truncates the integer part once `raw` exceeds Number.MAX_SAFE_INTEGER
+ * (~9.007e15 wei ≈ 0.009 ETH), so we divide on the bigint first and only cast
+ * the small whole-token quotient.
+ */
+export function weiToNumber(raw: string | bigint, decimals = 18): number {
+  const wei = typeof raw === 'bigint' ? raw : BigInt(raw);
+  if (wei === 0n) return 0;
+  const negative = wei < 0n;
+  const abs = negative ? -wei : wei;
+  const divisor = 10n ** BigInt(decimals);
+  const whole = abs / divisor;
+  const remainder = abs - whole * divisor;
+  const out = Number(whole) + Number(remainder) / Number(divisor);
+  return negative ? -out : out;
+}
+
+/**
  * Format token amount from raw bigint string (18 decimals)
  */
 export function formatTokenAmount(raw: string, decimals = 18): string {
-  const val = Number(BigInt(raw)) / 10 ** decimals;
+  const val = weiToNumber(raw, decimals);
   if (val >= 1_000_000_000) return `${(val / 1_000_000_000).toFixed(2)}B`;
   if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(2)}M`;
   if (val >= 1_000) return `${(val / 1_000).toFixed(2)}K`;
@@ -811,10 +894,23 @@ export function formatTokenAmount(raw: string, decimals = 18): string {
 }
 
 /**
+ * Compact ETH amount formatter with K/M/B suffixes for stats and market caps.
+ * Use `formatEth` for raw wei strings; this one takes a whole-ETH number.
+ */
+export function formatCompactEth(val: number): string {
+  const abs = Math.abs(val);
+  if (abs >= 1e9) return `${(val / 1e9).toFixed(2)}B`;
+  if (abs >= 1e6) return `${(val / 1e6).toFixed(2)}M`;
+  if (abs >= 1e3) return `${(val / 1e3).toFixed(1)}K`;
+  if (abs >= 1) return val.toFixed(2);
+  return val.toFixed(4);
+}
+
+/**
  * Format ETH amount
  */
 export function formatEth(raw: string): string {
-  const val = Number(BigInt(raw)) / 1e18;
+  const val = weiToNumber(raw, 18);
   if (Math.abs(val) >= 1000) return `${val.toFixed(1)} ETH`;
   if (Math.abs(val) >= 1) return `${val.toFixed(4)} ETH`;
   if (Math.abs(val) >= 0.001) return `${val.toFixed(6)} ETH`;
@@ -844,7 +940,15 @@ export interface EnrichedToken extends Token {
   totalSwaps: number;
   holderCount: number;
   sparkline: number[];
+  // Circulating-supply market cap: tokensSold during bonding, full supply
+  // post-graduation. This matches the standard crypto convention; for the
+  // fully-diluted figure (price * 1B) read `fdv` instead.
   marketCap: number | null;
+  fdv: number | null;
+  // Tokens currently in user wallets / LP, in whole-token units. During the
+  // bonding phase this is `tokensSold`; after graduation the full mint is
+  // distributed to the LP so the entire supply circulates.
+  circulatingSupply: number;
   bondingCurve: BondingCurveData | null;
   stage: TokenStage;
   graduationPct: number; // 0..100, 100 once graduated
@@ -858,7 +962,8 @@ export interface EnrichedToken extends Token {
   tokenIsCurrency0: boolean;
 }
 
-const TOTAL_SUPPLY = 1_000_000_000; // 1B tokens per universe
+const TOTAL_SUPPLY = 1_000_000_000; // 1B tokens per universe (whole-token units)
+const TOTAL_SUPPLY_WEI = 1_000_000_000n * 10n ** 18n;
 
 /**
  * Fetches tokens with enriched analytics: price, 24h change, volume,
@@ -941,6 +1046,25 @@ export function useTokenListData() {
     ...ponderQueryDefaults,
   });
 
+  // Fetch recent bonding-curve trades so the live feed can show pre-graduation
+  // activity. PoolManager Swap events only fire after graduation, so without
+  // these the feed is empty for tokens still on the curve.
+  const bondingTradesQuery = useQuery({
+    queryKey: ['all-recent-bonding-trades'],
+    queryFn: async () => {
+      const data = await ponderGql<{
+        bondingCurveTrades: { items: BondingCurveTrade[] };
+      }>(`query {
+        bondingCurveTrades(orderBy: "timestamp", orderDirection: "desc", limit: 100) {
+          items { id bondingCurve trader isBuy ethAmount tokenAmount price timestamp }
+        }
+      }`);
+      return data.bondingCurveTrades?.items ?? [];
+    },
+    ...ponderQueryDefaults,
+    refetchInterval: jitteredInterval(POLL_INTERVALS.MODERATE),
+  });
+
   const enrichedTokens = useMemo((): EnrichedToken[] => {
     if (!tokensQuery.data) return [];
 
@@ -1008,8 +1132,8 @@ export function useTokenListData() {
       // our token — amount1 when the token is currency0, else amount0.
       let volume24h = 0;
       for (const s of recentSwaps) {
-        const ethAmount = tokenIsCurrency0 ? s.amount1 : s.amount0;
-        volume24h += Math.abs(Number(BigInt(ethAmount))) / 1e18;
+        const ethAmount = BigInt(tokenIsCurrency0 ? s.amount1 : s.amount0);
+        volume24h += weiToNumber(ethAmount < 0n ? -ethAmount : ethAmount, 18);
       }
 
       // Sparkline: last 20 swap prices, oldest→newest, inverted to match the
@@ -1019,17 +1143,28 @@ export function useTokenListData() {
         .reverse()
         .map((s) => ethPriceFromTick(s.tick, tokenIsCurrency0));
 
-      // Market cap = price * total supply
-      const marketCap = price != null ? price * TOTAL_SUPPLY : null;
-
+      // Circulating supply: only `tokensSold` is in user wallets while the
+      // bonding curve is active — the curve itself is a contract holding the
+      // unsold portion plus the LP allocation. Once the curve graduates, the
+      // full mint is in circulation (LP tokens count toward circulating per
+      // standard convention).
       const stage = stageFromBondingCurve(bondingCurve);
+      const circulatingSupplyWei =
+        bondingCurve && !bondingCurve.graduated
+          ? BigInt(bondingCurve.tokensSold)
+          : TOTAL_SUPPLY_WEI;
+      const circulatingSupply = Number(circulatingSupplyWei / 10n ** 12n) / 1e6;
+
+      const marketCap = price != null ? price * circulatingSupply : null;
+      const fdv = price != null ? price * TOTAL_SUPPLY : null;
+
       let graduationPct = 0;
       if (bondingCurve) {
         if (bondingCurve.graduated) {
           graduationPct = 100;
         } else {
-          const raised = Number(BigInt(bondingCurve.ethRaised)) / 1e18;
-          const target = Number(BigInt(bondingCurve.graduationEth)) / 1e18;
+          const raised = weiToNumber(bondingCurve.ethRaised, 18);
+          const target = weiToNumber(bondingCurve.graduationEth, 18);
           graduationPct = target > 0 ? Math.min((raised / target) * 100, 100) : 0;
         }
       } else {
@@ -1051,6 +1186,8 @@ export function useTokenListData() {
         holderCount: holderCounts.get(token.id.toLowerCase()) ?? 0,
         sparkline,
         marketCap,
+        fdv,
+        circulatingSupply,
         bondingCurve,
         stage,
         graduationPct,
@@ -1072,6 +1209,7 @@ export function useTokenListData() {
     isError: tokensQuery.isError,
     refetch: tokensQuery.refetch,
     recentSwaps: swapsQuery.data ?? [],
+    recentBondingTrades: bondingTradesQuery.data ?? [],
     totalMarketCap,
   };
 }

@@ -10,13 +10,20 @@
  */
 import { useState, useMemo } from 'react';
 import { useTokenPool, getSwapUrl } from '@/hooks/useTokenSwap';
-import { usePoolData, ethPricePerToken, formatTokenAmount } from '@/hooks/useTokens';
+import {
+  usePoolData,
+  useSwapHistory,
+  ethPricePerToken,
+  formatTokenAmount,
+  computeAmountOut,
+} from '@/hooks/useTokens';
 import {
   useCurveState,
   useCurveProgress,
   useBondingCurveActions,
   usePreviewBuy,
 } from '@/hooks/useBondingCurve';
+import { useSwapExecution } from '@/hooks/useSwapExecution';
 import { useChainId, useBalance } from 'wagmi';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { formatEther, parseUnits, type Address } from 'viem';
@@ -29,6 +36,7 @@ import {
   Flame,
   Lock,
   Info,
+  CheckCircle2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,6 +63,9 @@ export function TokenSwapWidget({
   const { data: ethBalance } = useBalance({ address });
   const { data: pool, isLoading, isError } = useTokenPool(universeAddress);
   const { data: poolData } = usePoolData(pool?.poolId);
+  // One swap snapshot is enough to read latest sqrtPriceX96 + liquidity for
+  // the on-chain quote simulation.
+  const { data: latestSwaps } = useSwapHistory(pool?.poolId, 1);
   const [buyAmount, setBuyAmount] = useState('');
   const [showLpInfo, setShowLpInfo] = useState(false);
 
@@ -70,7 +81,26 @@ export function TokenSwapWidget({
     reset: curveReset,
   } = useBondingCurveActions(curveAddr);
 
+  // Native LP swap execution (post-graduation).
+  const {
+    executeSwap,
+    status: swapStatus,
+    error: swapError,
+    isNativeSwapAvailable,
+    reset: swapReset,
+  } = useSwapExecution();
+
   const isInBondingPhase = !!curveAddr && curveState != null && !curveState.graduated;
+
+  // Which side of the v4 pool holds the universe token. Defaults to currency0
+  // until the pool indexer catches up.
+  const tokenIsCurrency0 = useMemo(() => {
+    if (!poolData || !pool) return true;
+    return poolData.currency0.toLowerCase() === pool.tokenAddress.toLowerCase();
+  }, [poolData, pool]);
+
+  const latestSqrtPriceX96 = latestSwaps?.[0]?.sqrtPriceX96 ?? poolData?.sqrtPriceX96 ?? null;
+  const latestLiquidity = latestSwaps?.[0]?.liquidity ?? null;
 
   const mode = modeProp ?? (compact ? 'compact' : 'card');
 
@@ -85,13 +115,86 @@ export function TokenSwapWidget({
       ? ethPricePerToken(poolData, pool.tokenAddress)
       : null;
 
+  // Real expected output in wei for LP swaps via single-tick simulation.
+  const lpExpectedOutWei = useMemo(() => {
+    if (isInBondingPhase) return null;
+    if (!buyAmount || isNaN(Number(buyAmount)) || Number(buyAmount) <= 0) return null;
+    if (!latestSqrtPriceX96 || !latestLiquidity) return null;
+    let amountInWei: bigint;
+    try {
+      amountInWei = parseUnits(Number(buyAmount).toFixed(18), 18);
+    } catch {
+      return null;
+    }
+    // Buy direction: input is WETH → zeroForOne when WETH is currency0
+    // (i.e. token is currency1, so tokenIsCurrency0 = false).
+    const zeroForOne = !tokenIsCurrency0;
+    return computeAmountOut({
+      sqrtPriceX96: latestSqrtPriceX96,
+      liquidity: latestLiquidity,
+      amountInWei,
+      zeroForOne,
+    });
+  }, [isInBondingPhase, buyAmount, tokenIsCurrency0, latestSqrtPriceX96, latestLiquidity]);
+
   const estimatedTokens = useMemo(() => {
     if (isInBondingPhase) {
       return previewTokens > 0n ? Number(formatEther(previewTokens)) : null;
     }
-    if (!buyAmount || !currentPrice || isNaN(Number(buyAmount))) return null;
-    return currentPrice > 0 ? Number(buyAmount) / currentPrice : 0;
-  }, [isInBondingPhase, previewTokens, buyAmount, currentPrice]);
+    if (lpExpectedOutWei == null) return null;
+    return Number(formatEther(lpExpectedOutWei));
+  }, [isInBondingPhase, previewTokens, lpExpectedOutWei]);
+
+  // Single entry point for LP swap (quick buttons + form Buy). Uses the live
+  // simulation result above for slippage protection. Falls back to opening
+  // Uniswap only when no router is deployed for this chain.
+  const lpBuy = async (ethAmount: string) => {
+    if (!pool || !poolData) return;
+    swapReset();
+    if (!isNativeSwapAvailable) {
+      const url = `${getSwapUrl(pool.tokenAddress, chainId)}&exactAmount=${ethAmount}&exactField=input`;
+      openExternal(url);
+      return;
+    }
+    // Recompute expected-out for the requested amount (quick buttons may pass
+    // a different value than the form input).
+    let expectedOut: bigint | undefined = undefined;
+    try {
+      const amountInWei = parseUnits(Number(ethAmount).toFixed(18), 18);
+      const out = computeAmountOut({
+        sqrtPriceX96: latestSqrtPriceX96,
+        liquidity: latestLiquidity,
+        amountInWei,
+        zeroForOne: !tokenIsCurrency0,
+      });
+      if (out && out > 0n) expectedOut = out;
+    } catch {
+      // fall through with undefined → executeSwap will refuse with a clear error
+    }
+    await executeSwap({
+      tokenAddress: pool.tokenAddress,
+      tokenSymbol: pool.tokenSymbol,
+      poolKey: {
+        currency0: poolData.currency0 as Address,
+        currency1: poolData.currency1 as Address,
+        fee: poolData.fee,
+        tickSpacing: poolData.tickSpacing,
+        hooks: poolData.hooks as Address,
+      },
+      mode: 'buy',
+      amount: ethAmount,
+      slippageBps: 100, // 1% default for embedded widget
+      expectedOutWei: expectedOut,
+    });
+  };
+
+  const lpBusy =
+    swapStatus === 'confirming' ||
+    swapStatus === 'pending' ||
+    swapStatus === 'approving' ||
+    swapStatus === 'approval-pending';
+
+  const curveBusy = curveStatus === 'confirming';
 
   if (isLoading) {
     return mode === 'compact' ? null : (
@@ -104,7 +207,6 @@ export function TokenSwapWidget({
 
   if (!pool || isError) return null;
 
-  const swapUrl = getSwapUrl(pool.tokenAddress, chainId);
   const progressPct = progress ? Number(progress.percentBps) / 100 : 0;
 
   // ─── Compact mode ────────────────────────────────────────────────────
@@ -133,14 +235,15 @@ export function TokenSwapWidget({
             )}
           </Button>
         </Link>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 w-8 p-0 border-green-200 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/50 text-green-700 dark:text-green-300"
-          onClick={() => (isInBondingPhase ? undefined : openExternal(swapUrl))}
-        >
-          <ArrowUpDown className="h-3 w-3" />
-        </Button>
+        <Link to="/tokens/$address" params={{ address: pool.tokenAddress }}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 border-green-200 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/50 text-green-700 dark:text-green-300"
+          >
+            <ArrowUpDown className="h-3 w-3" />
+          </Button>
+        </Link>
       </div>
     );
   }
@@ -204,12 +307,12 @@ export function TokenSwapWidget({
               variant="outline"
               size="sm"
               className="text-[10px] h-7 border-amber-200 dark:border-amber-700"
+              disabled={isInBondingPhase ? curveBusy : lpBusy}
               onClick={() => {
                 if (isInBondingPhase) {
                   buy(val);
                 } else {
-                  const url = `${swapUrl}&exactAmount=${val}&exactField=input`;
-                  openExternal(url);
+                  void lpBuy(val);
                 }
               }}
             >
@@ -217,6 +320,27 @@ export function TokenSwapWidget({
             </Button>
           ))}
         </div>
+
+        {/* Tx feedback for in-app LP swaps */}
+        {!isInBondingPhase && lpBusy && (
+          <div className="flex items-center gap-1.5 text-[10px] text-blue-600 dark:text-blue-400">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            {swapStatus === 'approving'
+              ? 'Approve in wallet…'
+              : swapStatus === 'approval-pending'
+                ? 'Waiting for approval…'
+                : swapStatus === 'confirming'
+                  ? 'Confirm in wallet…'
+                  : 'Transaction pending…'}
+          </div>
+        )}
+        {!isInBondingPhase && swapStatus === 'success' && (
+          <div className="flex items-center gap-1.5 text-[10px] text-green-600 dark:text-green-400">
+            <CheckCircle2 className="h-3 w-3" />
+            Swap confirmed
+          </div>
+        )}
+        {!isInBondingPhase && swapError && <p className="text-[10px] text-red-500">{swapError}</p>}
 
         <div className="flex gap-2">
           <Link to="/tokens/$address" params={{ address: pool.tokenAddress }} className="flex-1">
@@ -228,9 +352,14 @@ export function TokenSwapWidget({
           <Button
             className="flex-1 bg-amber-600 hover:bg-amber-500 text-white text-xs"
             size="sm"
-            onClick={() => (isInBondingPhase ? buy('0.05') : openExternal(swapUrl))}
+            disabled={isInBondingPhase ? curveBusy : lpBusy}
+            onClick={() => (isInBondingPhase ? buy('0.05') : void lpBuy('0.05'))}
           >
-            <ArrowUpDown className="h-3 w-3 mr-1" />
+            {(isInBondingPhase ? curveBusy : lpBusy) ? (
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            ) : (
+              <ArrowUpDown className="h-3 w-3 mr-1" />
+            )}
             {isInBondingPhase ? 'Buy' : 'Swap'}
           </Button>
         </div>
@@ -377,6 +506,27 @@ export function TokenSwapWidget({
       </div>
 
       {curveError && <p className="text-xs text-red-500 text-center">{curveError}</p>}
+      {!isInBondingPhase && swapError && (
+        <p className="text-xs text-red-500 text-center">{swapError}</p>
+      )}
+      {!isInBondingPhase && lpBusy && (
+        <div className="flex items-center justify-center gap-1.5 text-[11px] text-blue-600 dark:text-blue-400">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          {swapStatus === 'approving'
+            ? 'Approve in wallet…'
+            : swapStatus === 'approval-pending'
+              ? 'Waiting for approval…'
+              : swapStatus === 'confirming'
+                ? 'Confirm in wallet…'
+                : 'Transaction pending…'}
+        </div>
+      )}
+      {!isInBondingPhase && swapStatus === 'success' && (
+        <div className="flex items-center justify-center gap-1.5 text-[11px] text-green-600 dark:text-green-400">
+          <CheckCircle2 className="h-3 w-3" />
+          Swap confirmed
+        </div>
+      )}
 
       <Button
         className="w-full h-11 bg-green-600 hover:bg-green-500 text-white font-bold"
@@ -384,21 +534,30 @@ export function TokenSwapWidget({
           if (isInBondingPhase) {
             buy(buyAmount);
           } else {
-            const url = buyAmount
-              ? `${swapUrl}&exactAmount=${buyAmount}&exactField=input`
-              : swapUrl;
-            openExternal(url);
+            void lpBuy(buyAmount);
           }
         }}
-        disabled={!buyAmount || Number(buyAmount) <= 0 || curveStatus === 'confirming'}
+        disabled={
+          !buyAmount ||
+          Number(buyAmount) <= 0 ||
+          (isInBondingPhase ? curveBusy : lpBusy) ||
+          // Native LP swap requires a fresh pool snapshot to enforce slippage.
+          (!isInBondingPhase && isNativeSwapAvailable && lpExpectedOutWei === null)
+        }
       >
-        {curveStatus === 'confirming' ? (
+        {(isInBondingPhase ? curveBusy : lpBusy) ? (
           <Loader2 className="h-4 w-4 animate-spin mr-2" />
         ) : (
           <ArrowUpDown className="h-4 w-4 mr-2" />
         )}
-        {isInBondingPhase ? `Buy $${pool.tokenSymbol}` : `Buy $${pool.tokenSymbol} on Uniswap`}
-        {!isInBondingPhase && <ExternalLink className="h-3 w-3 ml-2 opacity-50" />}
+        {isInBondingPhase
+          ? `Buy $${pool.tokenSymbol}`
+          : isNativeSwapAvailable
+            ? `Buy $${pool.tokenSymbol}`
+            : `Buy $${pool.tokenSymbol} on Uniswap`}
+        {!isInBondingPhase && !isNativeSwapAvailable && (
+          <ExternalLink className="h-3 w-3 ml-2 opacity-50" />
+        )}
       </Button>
 
       <div className="text-center">

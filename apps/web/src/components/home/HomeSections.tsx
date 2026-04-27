@@ -554,10 +554,10 @@ export function ActivityTicker() {
     universesData.forEach((u) => universeMap.set(u.id.toLowerCase(), u));
 
     // Mix node mints with universe creations so a single bursty universe
-    // doesn't collapse the ticker. Cap each universe to 3 node entries; the
+    // doesn't collapse the ticker. Cap each universe to 1 node entry; the
     // overflow surfaces as a single "+N more episodes" tail so quieter
     // universes still get screen time.
-    const PER_UNIVERSE_NODE_CAP = 3;
+    const PER_UNIVERSE_NODE_CAP = 1;
     const perUniverseNodeCount = new Map<string, number>();
     const items: Array<{
       id: string;
@@ -605,20 +605,35 @@ export function ActivityTicker() {
 
     items.sort((a, b) => b.createdAt - a.createdAt);
 
-    // Anti-bunching: when the timeline has a hot universe, three consecutive
+    // Anti-bunching: when the timeline has a hot universe, consecutive
     // entries collapse into "X · X · X" which reads like a stutter. Walk the
-    // list and push a same-universe item further down whenever it would land
-    // back-to-back. Keeps relative order intact within each universe but
-    // separates them visually.
+    // list and pick the next item from a different universe than the one we
+    // just emitted. When only same-universe items remain, roll them into
+    // overflow rather than tail-flushing them back-to-back.
     const interleaved: typeof items = [];
     const queue = [...items];
     let lastUniverse = '';
     let safety = queue.length * 4;
     while (queue.length > 0 && safety-- > 0) {
       const idx = queue.findIndex((i) => i.universeId !== lastUniverse);
-      const pick = idx === -1 ? queue.shift()! : queue.splice(idx, 1)[0];
+      if (idx === -1) {
+        overflow += queue.length;
+        break;
+      }
+      const pick = queue.splice(idx, 1)[0];
       interleaved.push(pick);
       lastUniverse = pick.universeId;
+    }
+
+    // Marquee seam: the ticker renders two copies back-to-back, so the loop
+    // boundary visually joins interleaved[last] to interleaved[0]. If they
+    // share a universe, drop the tail until they don't.
+    while (
+      interleaved.length > 1 &&
+      interleaved[0].universeId === interleaved[interleaved.length - 1].universeId
+    ) {
+      interleaved.pop();
+      overflow += 1;
     }
 
     if (overflow > 0) {
