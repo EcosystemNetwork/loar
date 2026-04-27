@@ -92,11 +92,8 @@ async function processGenerationBody(
 
       // Dispatch to provider
       if (model.provider === 'bytedance') {
-        // BYOK — look up the requesting user's stored ByteDance key, if any.
-        const { getUserSecret } = await import('../services/userSecrets');
-        const bdApiKey = data.userId
-          ? ((await getUserSecret(data.userId, 'bytedance')) ?? undefined)
-          : undefined;
+        const { resolveProviderKey: resolveBd } = await import('../lib/byok');
+        const bdApiKey = await resolveBd(data.userId, 'bytedance');
         return bytedanceService.generateVideo({
           prompt: input.prompt,
           model: model.bytedanceModelId || 'seedance-2.0',
@@ -121,6 +118,8 @@ async function processGenerationBody(
         });
       }
 
+      const { resolveProviderKey } = await import('../lib/byok');
+      const falApiKey = await resolveProviderKey(data.userId, 'fal');
       return falService.generateVideo({
         prompt: input.prompt,
         model: model.falModelId as any,
@@ -136,6 +135,7 @@ async function processGenerationBody(
         cfgScale: input.cfgScale,
         enablePromptExpansion: input.enablePromptExpansion,
         generateAudio: input.audio && model.supportsAudio ? true : undefined,
+        apiKey: falApiKey,
       });
     });
 

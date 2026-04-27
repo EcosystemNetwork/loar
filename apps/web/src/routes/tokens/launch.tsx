@@ -219,7 +219,13 @@ function LaunchTokenPage() {
               <Label className="text-sm font-medium">Token Image</Label>
               {imageURL ? (
                 <div className="flex items-center gap-3 p-3 rounded-md border bg-muted/30">
-                  <img src={imageURL} alt="Token" className="w-14 h-14 rounded-md object-cover" />
+                  <img
+                    src={imageURL}
+                    alt="Token"
+                    loading="lazy"
+                    decoding="async"
+                    className="w-14 h-14 rounded-md object-cover"
+                  />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium truncate">Uploaded</p>
                     <p className="text-[10px] text-muted-foreground truncate font-mono">

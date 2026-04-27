@@ -65,11 +65,15 @@ export interface TextTo3DPreviewOptions {
   aiModel?: 'meshy-4' | 'meshy-5' | 'meshy-6';
   topology?: 'quad' | 'triangle';
   targetPolycount?: number; // e.g. 30000
+  /** BYOK override — user-supplied Meshy key. Falls back to MESHY_API_KEY env. */
+  apiKey?: string;
 }
 
 export interface TextTo3DRefineOptions {
   previewTaskId: string;
   textureRichness?: 'high' | 'medium' | 'low';
+  /** BYOK override — user-supplied Meshy key. */
+  apiKey?: string;
 }
 
 export interface ImageTo3DOptions {
@@ -79,6 +83,8 @@ export interface ImageTo3DOptions {
   aiModel?: 'meshy-4' | 'meshy-5' | 'meshy-6';
   topology?: 'quad' | 'triangle';
   targetPolycount?: number;
+  /** BYOK override — user-supplied Meshy key. */
+  apiKey?: string;
 }
 
 export interface MultiImageTo3DOptions {
@@ -86,6 +92,8 @@ export interface MultiImageTo3DOptions {
   enablePbr?: boolean;
   topology?: 'quad' | 'triangle';
   targetPolycount?: number;
+  /** BYOK override — user-supplied Meshy key. */
+  apiKey?: string;
 }
 
 export interface TextToTextureOptions {
@@ -102,6 +110,8 @@ export interface TextToTextureOptions {
   enablePbr?: boolean;
   /** Painting style: texture or vertex-color */
   paintingStyle?: 'texture' | 'vertex-color';
+  /** BYOK override — user-supplied Meshy key. */
+  apiKey?: string;
 }
 
 export interface MeshyTextureTask extends MeshyTask {
@@ -117,10 +127,15 @@ class MeshyService {
     this.apiKey = process.env.MESHY_API_KEY;
   }
 
-  private get headers(): Record<string, string> {
-    if (!this.apiKey) throw new Error('MESHY_API_KEY is not configured');
+  private resolveKey(override?: string): string {
+    const key = override?.trim() || this.apiKey;
+    if (!key) throw new Error('MESHY_API_KEY is not configured');
+    return key;
+  }
+
+  private headersFor(apiKey: string): Record<string, string> {
     return {
-      Authorization: `Bearer ${this.apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     };
   }
@@ -128,11 +143,12 @@ class MeshyService {
   private async post<T>(
     path: string,
     body: Record<string, unknown>,
+    apiKey: string,
     baseUrl = BASE_URL
   ): Promise<T> {
     const response = await fetch(`${baseUrl}${path}`, {
       method: 'POST',
-      headers: this.headers,
+      headers: this.headersFor(apiKey),
       body: JSON.stringify(body),
     });
     if (!response.ok) {
@@ -142,8 +158,8 @@ class MeshyService {
     return response.json() as Promise<T>;
   }
 
-  private async get<T>(path: string, baseUrl = BASE_URL): Promise<T> {
-    const response = await fetch(`${baseUrl}${path}`, { headers: this.headers });
+  private async get<T>(path: string, apiKey: string, baseUrl = BASE_URL): Promise<T> {
+    const response = await fetch(`${baseUrl}${path}`, { headers: this.headersFor(apiKey) });
     if (!response.ok) {
       const text = await response.text().catch(() => response.statusText);
       throw new Error(`Meshy API error ${response.status}: ${text}`);
@@ -158,6 +174,7 @@ class MeshyService {
    * Returns immediately with a task ID — poll getTask() until SUCCEEDED.
    */
   async textTo3DPreview(options: TextTo3DPreviewOptions): Promise<{ taskId: string }> {
+    const apiKey = this.resolveKey(options.apiKey);
     const data = await this.post<{ result: string }>(
       '/text-to-3d',
       {
@@ -167,6 +184,7 @@ class MeshyService {
         topology: options.topology,
         target_polycount: options.targetPolycount,
       },
+      apiKey,
       TEXT_TO_3D_BASE
     );
     return { taskId: data.result };
@@ -177,6 +195,7 @@ class MeshyService {
    * Returns a new task ID for the refined result.
    */
   async textTo3DRefine(options: TextTo3DRefineOptions): Promise<{ taskId: string }> {
+    const apiKey = this.resolveKey(options.apiKey);
     const data = await this.post<{ result: string }>(
       '/text-to-3d',
       {
@@ -185,6 +204,7 @@ class MeshyService {
         enable_pbr: true,
         texture_prompt: options.textureRichness === 'high' ? '' : undefined,
       },
+      apiKey,
       TEXT_TO_3D_BASE
     );
     return { taskId: data.result };
@@ -193,6 +213,7 @@ class MeshyService {
   // ── Image-to-3D ───────────────────────────────────────────────────────
 
   async imageTo3D(options: ImageTo3DOptions): Promise<{ taskId: string }> {
+    const apiKey = this.resolveKey(options.apiKey);
     const body: Record<string, unknown> = {
       image_url: options.imageUrl,
       ai_model: options.aiModel || 'meshy-6',
@@ -204,7 +225,12 @@ class MeshyService {
     if (options.shouldRemountBackground !== undefined) {
       body.should_remount_background = options.shouldRemountBackground;
     }
-    const data = await this.post<{ result: string }>('/image-to-3d', body, IMAGE_TO_3D_BASE);
+    const data = await this.post<{ result: string }>(
+      '/image-to-3d',
+      body,
+      apiKey,
+      IMAGE_TO_3D_BASE
+    );
     return { taskId: data.result };
   }
 
@@ -214,6 +240,7 @@ class MeshyService {
     if (options.imageUrls.length < 2 || options.imageUrls.length > 4) {
       throw new Error('multiImageTo3D requires 2–4 images');
     }
+    const apiKey = this.resolveKey(options.apiKey);
     const data = await this.post<{ result: string }>(
       '/image-to-3d',
       {
@@ -224,6 +251,7 @@ class MeshyService {
         topology: options.topology || 'triangle',
         target_polycount: options.targetPolycount || 30000,
       },
+      apiKey,
       IMAGE_TO_3D_BASE
     );
     return { taskId: data.result };
@@ -236,6 +264,7 @@ class MeshyService {
    * Pass a GLB model URL and a text description of the desired texture.
    */
   async textToTexture(options: TextToTextureOptions): Promise<{ taskId: string }> {
+    const apiKey = this.resolveKey(options.apiKey);
     const data = await this.post<{ result: string }>(
       '/retexture',
       {
@@ -246,13 +275,15 @@ class MeshyService {
         enable_pbr: options.enablePbr ?? true,
         remove_lighting: true,
       },
+      apiKey,
       IMAGE_TO_3D_BASE
     );
     return { taskId: data.result };
   }
 
-  async getTextToTextureTask(taskId: string): Promise<MeshyTextureTask> {
-    const task = await this.get<MeshyTextureTask>(`/retexture/${taskId}`, IMAGE_TO_3D_BASE);
+  async getTextToTextureTask(taskId: string, apiKey?: string): Promise<MeshyTextureTask> {
+    const key = this.resolveKey(apiKey);
+    const task = await this.get<MeshyTextureTask>(`/retexture/${taskId}`, key, IMAGE_TO_3D_BASE);
     return this.normalizeTask(task) as MeshyTextureTask;
   }
 
@@ -262,11 +293,12 @@ class MeshyService {
   async waitForTextureTask(
     taskId: string,
     maxWaitMs = 10 * 60 * 1000,
-    pollIntervalMs = 5000
+    pollIntervalMs = 5000,
+    apiKey?: string
   ): Promise<MeshyTextureTask> {
     const deadline = Date.now() + maxWaitMs;
     while (Date.now() < deadline) {
-      const task = await this.getTextToTextureTask(taskId);
+      const task = await this.getTextToTextureTask(taskId, apiKey);
       if (task.status === 'SUCCEEDED') return task;
       if (task.status === 'FAILED') {
         throw new Error(
@@ -292,13 +324,15 @@ class MeshyService {
     return task;
   }
 
-  async getTextTo3DTask(taskId: string): Promise<MeshyTask> {
-    const task = await this.get<MeshyTask>(`/text-to-3d/${taskId}`, TEXT_TO_3D_BASE);
+  async getTextTo3DTask(taskId: string, apiKey?: string): Promise<MeshyTask> {
+    const key = this.resolveKey(apiKey);
+    const task = await this.get<MeshyTask>(`/text-to-3d/${taskId}`, key, TEXT_TO_3D_BASE);
     return this.normalizeTask(task);
   }
 
-  async getImageTo3DTask(taskId: string): Promise<MeshyTask> {
-    const task = await this.get<MeshyTask>(`/image-to-3d/${taskId}`, IMAGE_TO_3D_BASE);
+  async getImageTo3DTask(taskId: string, apiKey?: string): Promise<MeshyTask> {
+    const key = this.resolveKey(apiKey);
+    const task = await this.get<MeshyTask>(`/image-to-3d/${taskId}`, key, IMAGE_TO_3D_BASE);
     return this.normalizeTask(task);
   }
 
@@ -310,14 +344,15 @@ class MeshyService {
     taskId: string,
     type: 'text-to-3d' | 'image-to-3d',
     maxWaitMs = 5 * 60 * 1000,
-    pollIntervalMs = 5000
+    pollIntervalMs = 5000,
+    apiKey?: string
   ): Promise<MeshyTask> {
     const deadline = Date.now() + maxWaitMs;
     while (Date.now() < deadline) {
       const task =
         type === 'text-to-3d'
-          ? await this.getTextTo3DTask(taskId)
-          : await this.getImageTo3DTask(taskId);
+          ? await this.getTextTo3DTask(taskId, apiKey)
+          : await this.getImageTo3DTask(taskId, apiKey);
 
       if (task.status === 'SUCCEEDED') return task;
       if (task.status === 'FAILED') {

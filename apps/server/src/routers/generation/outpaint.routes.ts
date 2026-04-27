@@ -174,8 +174,14 @@ async function dispatchOutpaint(opts: {
   userId: string;
   jobId: string;
 }): Promise<DispatchResult> {
+  const { resolveProviderKey } = await import('../../lib/byok');
+  const [googleKey, falKey] = await Promise.all([
+    resolveProviderKey(opts.userId, 'google'),
+    resolveProviderKey(opts.userId, 'fal'),
+  ]);
+
   // Primary: nano-banana-pro-preview (Gemini endpoint supports inline image input)
-  if (googleImagenService.isConfigured()) {
+  if (googleKey) {
     try {
       const result = await googleImagenService.generate({
         prompt: opts.prompt,
@@ -183,6 +189,7 @@ async function dispatchOutpaint(opts: {
         numberOfImages: 1,
         model: 'nano-banana-pro-preview',
         inputImages: [opts.source],
+        apiKey: googleKey,
       });
 
       const img = result.images[0];
@@ -212,12 +219,13 @@ async function dispatchOutpaint(opts: {
   }
 
   // Fallback: FAL kontext (image-to-image that respects source composition)
-  if (process.env.FAL_KEY) {
+  if (falKey) {
     try {
       const result = await falService.imageToImage({
         prompt: opts.prompt,
         imageUrls: [opts.sourceUrl],
         numImages: 1,
+        apiKey: falKey,
       });
       const url = result.images?.[0]?.url || result.imageUrl;
       if (!url) return { status: 'error', error: result.error || 'FAL returned no image' };
@@ -230,7 +238,11 @@ async function dispatchOutpaint(opts: {
     }
   }
 
-  return { status: 'error', error: 'No image provider configured (GOOGLE_API_KEY or FAL_KEY)' };
+  return {
+    status: 'error',
+    error:
+      'No image provider configured — set GOOGLE_API_KEY/FAL_KEY env or add a key in /settings/api-keys',
+  };
 }
 
 // ── Firestore collection ──────────────────────────────────────────────

@@ -39,7 +39,15 @@ export function AddressWithAvatar({
 
   return (
     <span className={`inline-flex items-center gap-1 ${className}`} title={address}>
-      {avatar && <img src={avatar} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />}
+      {avatar && (
+        <img
+          src={avatar}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="w-3.5 h-3.5 rounded-full object-cover"
+        />
+      )}
       <span className="font-mono">{display}</span>
     </span>
   );

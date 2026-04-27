@@ -31,6 +31,8 @@ export interface FalImageGenerationOptions {
   numImages?: number;
   seed?: number;
   enableSafetyChecker?: boolean;
+  /** BYOK override — user-supplied FAL key. Falls back to FAL_KEY env. */
+  apiKey?: string;
 }
 
 export interface FalImageEditOptions {
@@ -43,6 +45,8 @@ export interface FalImageEditOptions {
   guidanceScale?: number;
   seed?: number;
   enableSafetyChecker?: boolean;
+  /** BYOK override — user-supplied FAL key. Falls back to FAL_KEY env. */
+  apiKey?: string;
 }
 
 export interface FalImageToImageOptions {
@@ -59,6 +63,8 @@ export interface FalImageToImageOptions {
     | { width: number; height: number };
   numImages?: number;
   seed?: number;
+  /** BYOK override — user-supplied FAL key. Falls back to FAL_KEY env. */
+  apiKey?: string;
 }
 
 export interface FalImageGenerationResult {
@@ -77,6 +83,8 @@ export interface FalAudioGenerationOptions {
   model?: 'fal-ai/stable-audio' | 'fal-ai/musicgen/large' | 'fal-ai/musicgen/stereo-large';
   durationSec?: number;
   steps?: number;
+  /** BYOK override — user-supplied FAL key. Falls back to FAL_KEY env. */
+  apiKey?: string;
 }
 
 export interface FalAudioGenerationResult {
@@ -136,6 +144,8 @@ export interface FalVideoGenerationOptions {
   enablePromptExpansion?: boolean;
   generateAudio?: boolean;
   seed?: number;
+  /** BYOK override — user-supplied FAL key. Falls back to FAL_KEY env. */
+  apiKey?: string;
 }
 
 export interface FalVideoGenerationResult {
@@ -146,24 +156,30 @@ export interface FalVideoGenerationResult {
 }
 
 export class FalService {
-  private configured = false;
-
   constructor() {
-    // Defer config check — env vars may not be loaded yet (ESM hoisting)
+    // Defer config — credentials are set per-call via configureCall() so BYOK
+    // users can run on their own quota.
   }
 
-  private ensureConfigured() {
-    if (!this.configured && process.env.FAL_KEY) {
-      fal.config({ credentials: process.env.FAL_KEY });
-      this.configured = true;
+  /**
+   * BYOK-aware configuration. The FAL serverless client uses a global
+   * `fal.config({ credentials })` — there is no per-request credential. We set
+   * it before each subscribe to scope the upcoming call to the right key.
+   * In a multi-user request burst this is racy at the millisecond level, which
+   * is acceptable for the demo and tracked as a known limitation.
+   */
+  private configureCall(apiKey?: string) {
+    const key = apiKey?.trim() || process.env.FAL_KEY;
+    if (!key) {
+      throw new Error(
+        'FAL_KEY is not configured — set the env var or supply a user key via /settings/api-keys'
+      );
     }
-    if (!this.configured) {
-      throw new Error('FAL_KEY environment variable is required for AI generation');
-    }
+    fal.config({ credentials: key });
   }
 
   async generateImage(options: FalImageGenerationOptions): Promise<FalImageGenerationResult> {
-    this.ensureConfigured();
+    this.configureCall(options.apiKey);
 
     try {
       const model = options.model || 'fal-ai/nano-banana';
@@ -222,7 +238,7 @@ export class FalService {
   }
 
   async editImage(options: FalImageEditOptions): Promise<FalImageGenerationResult> {
-    this.ensureConfigured();
+    this.configureCall(options.apiKey);
 
     try {
       const model = 'fal-ai/nano-banana/edit';
@@ -276,7 +292,7 @@ export class FalService {
   }
 
   async imageToImage(options: FalImageToImageOptions): Promise<FalImageGenerationResult> {
-    this.ensureConfigured();
+    this.configureCall(options.apiKey);
 
     try {
       const model = 'fal-ai/nano-banana/edit';
@@ -402,7 +418,7 @@ export class FalService {
   }
 
   async generateVideo(options: FalVideoGenerationOptions): Promise<FalVideoGenerationResult> {
-    this.ensureConfigured();
+    this.configureCall(options.apiKey);
     try {
       const model = options.model || 'fal-ai/ltx-video';
       const input: any = { prompt: options.prompt };
@@ -870,7 +886,7 @@ export class FalService {
   }
 
   async generateAudio(options: FalAudioGenerationOptions): Promise<FalAudioGenerationResult> {
-    this.ensureConfigured();
+    this.configureCall(options.apiKey);
     try {
       const model = options.model || 'fal-ai/stable-audio';
       const input: any = { prompt: options.prompt };
@@ -925,8 +941,8 @@ export class FalService {
     }
   }
 
-  async getGenerationStatus(id: string): Promise<FalVideoGenerationResult> {
-    this.ensureConfigured();
+  async getGenerationStatus(id: string, apiKey?: string): Promise<FalVideoGenerationResult> {
+    this.configureCall(apiKey);
     try {
       const result = await fal.queue.status(id, { requestId: id, logs: true });
 
@@ -954,8 +970,9 @@ export class FalService {
     model?: string;
     prompt?: string;
     scale?: number;
+    apiKey?: string;
   }): Promise<{ id: string; status: string; imageUrl?: string; error?: string }> {
-    this.ensureConfigured();
+    this.configureCall(options.apiKey);
     try {
       const model = options.model || 'fal-ai/real-esrgan';
       const input: any = { image_url: options.imageUrl };
@@ -990,8 +1007,9 @@ export class FalService {
     videoUrl: string;
     model?: string;
     multiplier?: number;
+    apiKey?: string;
   }): Promise<{ id: string; status: string; videoUrl?: string; error?: string }> {
-    this.ensureConfigured();
+    this.configureCall(options.apiKey);
     try {
       const model = options.model || 'fal-ai/frame-interpolation';
       const input: any = {
@@ -1024,8 +1042,9 @@ export class FalService {
     model?: string;
     strength?: number;
     negativePrompt?: string;
+    apiKey?: string;
   }): Promise<{ id: string; status: string; videoUrl?: string; error?: string }> {
-    this.ensureConfigured();
+    this.configureCall(options.apiKey);
     try {
       const model = options.model || 'fal-ai/wan/v2.1/video-to-video';
       const input: any = {
@@ -1065,6 +1084,7 @@ export class FalService {
     strength?: number;
     guidanceScale?: number;
     numInferenceSteps?: number;
+    apiKey?: string;
   }): Promise<{
     id: string;
     status: string;
@@ -1072,7 +1092,7 @@ export class FalService {
     seed?: number;
     error?: string;
   }> {
-    this.ensureConfigured();
+    this.configureCall(options.apiKey);
     try {
       const model = options.model || 'fal-ai/flux/dev/inpainting';
       const input: any = {
@@ -1109,14 +1129,19 @@ export class FalService {
   }
 
   /** Erase a masked region — prompt-free, fills with plausible surroundings (lama) */
-  async eraseRegion(options: { imageUrl: string; maskUrl: string; model?: string }): Promise<{
+  async eraseRegion(options: {
+    imageUrl: string;
+    maskUrl: string;
+    model?: string;
+    apiKey?: string;
+  }): Promise<{
     id: string;
     status: string;
     imageUrl?: string;
     seed?: number;
     error?: string;
   }> {
-    this.ensureConfigured();
+    this.configureCall(options.apiKey);
     try {
       const model = options.model || 'fal-ai/lama';
       const input = {
@@ -1146,8 +1171,9 @@ export class FalService {
   async removeBackground(options: {
     imageUrl: string;
     model?: string;
+    apiKey?: string;
   }): Promise<{ id: string; status: string; imageUrl?: string; error?: string }> {
-    this.ensureConfigured();
+    this.configureCall(options.apiKey);
     try {
       const model = options.model || 'fal-ai/birefnet';
       const input: any = { image_url: options.imageUrl };

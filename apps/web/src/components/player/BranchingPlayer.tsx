@@ -1,13 +1,14 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useUniverseBlockchain } from '../../hooks/useUniverseBlockchain';
 import { trpc } from '../../utils/trpc';
 import { ChoiceOverlay } from './ChoiceOverlay';
 import { PlayerControls } from './PlayerControls';
 import { BranchStats } from './BranchStats';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { getIpfsUrlCandidates, resolveIpfsUrl } from '@/utils/ipfs-url';
+import { useHlsVideo, isHlsUrl } from '@/hooks/useHlsVideo';
 
 interface NodeData {
   id: number;
@@ -27,6 +28,9 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
   const [progress, setProgress] = useState(0);
   const [showStats, setShowStats] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
+  const [srcIndex, setSrcIndex] = useState(0);
+  const [hasError, setHasError] = useState(false);
 
   // Get the full graph from the blockchain — universeId IS the contract address
   const { graphData: fullGraph } = useUniverseBlockchain({
@@ -104,6 +108,75 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
 
   const currentNode = nodeMap.get(currentNodeId);
   const hasBranches = currentNode && currentNode.nextIds.length > 1;
+
+  // Collect every node's contentHash (normalized to raw lowercase 64-hex) so
+  // we can ask the server which ones have a finished HLS rendition. Cap at
+  // 60 — the endpoint chunks Firestore `in` queries internally up to that.
+  const contentHashes = useMemo(() => {
+    const out = new Set<string>();
+    for (const node of nodeMap.values()) {
+      const stripped = String(node.contentHash || '')
+        .replace(/^0x/, '')
+        .toLowerCase();
+      if (/^[0-9a-f]{64}$/.test(stripped)) out.add(stripped);
+      if (out.size >= 60) break;
+    }
+    return Array.from(out);
+  }, [nodeMap]);
+
+  const { data: hlsLookup } = useQuery({
+    ...trpc.content.hlsByHashes.queryOptions({ contentHashes }),
+    enabled: contentHashes.length > 0,
+    staleTime: 60_000,
+  });
+
+  // Prefer the HLS master playlist when the transcoder has finished for this
+  // node; otherwise fall back to the progressive mediaUrl from the chain.
+  const sourceUrl = useMemo(() => {
+    const hash = String(currentNode?.contentHash || '')
+      .replace(/^0x/, '')
+      .toLowerCase();
+    const hlsUrl = hash && hlsLookup ? hlsLookup[hash]?.hlsUrl : null;
+    return hlsUrl || currentNode?.mediaUrl || '';
+  }, [currentNode?.contentHash, currentNode?.mediaUrl, hlsLookup]);
+
+  const srcCandidates = useMemo(() => getIpfsUrlCandidates(sourceUrl), [sourceUrl]);
+  const activeSrc = srcCandidates[srcIndex] || resolveIpfsUrl(sourceUrl);
+  const playingHls = isHlsUrl(activeSrc);
+
+  // hls.js attaches itself to the <video> element when src is .m3u8. For
+  // progressive sources this hook is a no-op and React's `src` prop wins.
+  useHlsVideo(videoRef, playingHls ? activeSrc : null);
+
+  // Reset src/error state whenever the source URL changes (branch switch
+  // OR HLS just became available for the current node).
+  useEffect(() => {
+    setSrcIndex(0);
+    setHasError(false);
+    setIsBuffering(false);
+  }, [sourceUrl]);
+
+  const handleVideoError = useCallback(() => {
+    if (srcIndex + 1 < srcCandidates.length) {
+      setSrcIndex(srcIndex + 1);
+      setIsBuffering(true);
+    } else {
+      setIsBuffering(false);
+      setHasError(true);
+    }
+  }, [srcIndex, srcCandidates.length]);
+
+  const retryPlayback = useCallback(() => {
+    setHasError(false);
+    setSrcIndex(0);
+    setIsBuffering(true);
+    // Force the <video> element to re-load the first candidate.
+    const v = videoRef.current;
+    if (v) {
+      v.load();
+      void v.play();
+    }
+  }, []);
 
   // Handle video time updates — show choices near end
   const handleTimeUpdate = useCallback(() => {
@@ -191,13 +264,18 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
       <Link
         to="/universe/$id/watch"
         params={{ id: universeId }}
-        className="absolute top-4 left-4 z-30 p-2 bg-black/50 rounded-full text-white/70 hover:text-white transition-colors"
+        aria-label="Back to universe"
+        className="absolute top-4 left-4 z-30 p-3 bg-black/60 rounded-full text-white/80 active:bg-black/80 transition-colors"
+        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
       >
         <ArrowLeft className="w-5 h-5" />
       </Link>
 
       {/* Node info */}
-      <div className="absolute top-4 right-4 z-30 px-3 py-1.5 bg-black/50 rounded-lg text-xs text-white/70">
+      <div
+        className="absolute top-4 right-4 z-30 px-3 py-1.5 bg-black/60 rounded-lg text-xs text-white/80"
+        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
+      >
         Node {currentNodeId} {currentNode?.canon && '(Canon)'}
       </div>
 
@@ -205,13 +283,49 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
       <video
         ref={videoRef}
         className="w-full h-full object-contain"
-        src={resolveIpfsUrl(currentNode?.mediaUrl || '')}
+        // For HLS, useHlsVideo manages the source via MSE / native attach,
+        // so we don't pass `src` here (would conflict with hls.js).
+        src={playingHls ? undefined : activeSrc}
         onTimeUpdate={handleTimeUpdate}
         onEnded={handleVideoEnd}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
+        onWaiting={() => setIsBuffering(true)}
+        onStalled={() => setIsBuffering(true)}
+        onCanPlay={() => setIsBuffering(false)}
+        onPlaying={() => setIsBuffering(false)}
+        onError={handleVideoError}
+        preload="metadata"
         playsInline
       />
+
+      {/* Buffering spinner — shown while the video is fetching/decoding. */}
+      {isBuffering && !hasError && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+          <div className="bg-black/40 rounded-full p-4 backdrop-blur-sm">
+            <Loader2 className="w-10 h-10 text-white animate-spin" />
+          </div>
+        </div>
+      )}
+
+      {/* Playback error — all gateway candidates exhausted. */}
+      {hasError && (
+        <div className="absolute inset-0 z-20 bg-black/80 flex items-center justify-center">
+          <div className="text-center max-w-sm px-6">
+            <AlertTriangle className="w-10 h-10 text-amber-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-white mb-1">Playback failed</h3>
+            <p className="text-sm text-zinc-400 mb-5">
+              Couldn't reach any IPFS gateway for this clip.
+            </p>
+            <button
+              onClick={retryPlayback}
+              className="px-5 py-2.5 bg-violet-600 hover:bg-violet-700 rounded-xl text-white font-medium transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Choice overlay */}
       {showChoices && hasBranches && !showStats && (

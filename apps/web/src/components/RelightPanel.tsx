@@ -175,7 +175,13 @@ export function RelightPanel({
         <CardContent>
           <div className="aspect-square overflow-hidden rounded-md border bg-muted">
             {imageUrl ? (
-              <img src={imageUrl} alt="Source" className="h-full w-full object-cover" />
+              <img
+                src={imageUrl}
+                alt="Source"
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover"
+              />
             ) : (
               <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                 No source image
@@ -194,7 +200,13 @@ export function RelightPanel({
                     rel="noreferrer"
                     className="block aspect-square overflow-hidden rounded-md border"
                   >
-                    <img src={url} alt="Relit" className="h-full w-full object-cover" />
+                    <img
+                      src={url}
+                      alt="Relit"
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-cover"
+                    />
                   </a>
                 ))}
               </div>

@@ -108,7 +108,13 @@ export function NotificationBell() {
                   >
                     <div className="flex items-start gap-3">
                       {notif.actorAvatarUrl ? (
-                        <img src={notif.actorAvatarUrl} alt="" className="w-8 h-8 rounded-full" />
+                        <img
+                          src={notif.actorAvatarUrl}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          className="w-8 h-8 rounded-full"
+                        />
                       ) : (
                         <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center text-xs text-zinc-400">
                           {notif.actorDisplayName?.[0] || '?'}

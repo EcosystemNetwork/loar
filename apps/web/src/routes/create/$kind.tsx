@@ -1158,7 +1158,7 @@ function EntityCreateForm() {
 
   if (!VALID_KINDS.includes(kind as EntityKind)) {
     return (
-      <div className="container mx-auto px-4 py-10 max-w-2xl">
+      <div className="container mx-auto px-4 py-6 sm:py-10 max-w-2xl pb-bottom-nav md:pb-12">
         <Link to="/create">
           <Button variant="outline" className="mb-6">
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -1321,7 +1321,7 @@ function EntityCreateForm() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-10 max-w-2xl">
+    <div className="container mx-auto px-4 py-6 sm:py-10 max-w-2xl pb-bottom-nav md:pb-12">
       <Link to="/create" search={universeAddress ? { universe: universeAddress } : {}}>
         <Button variant="outline" className="mb-6">
           <ArrowLeft className="w-4 h-4 mr-2" />

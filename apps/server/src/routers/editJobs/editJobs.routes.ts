@@ -586,6 +586,7 @@ async function runDispatcher(
         op,
         inputUrl: ctx.workingUrl,
         maskUrl: mask.url,
+        userId: ctx.userId,
         creditCost: ctx.creditCost,
       });
     }
@@ -617,6 +618,7 @@ async function runDispatcher(
       return dispatchRelight({
         op,
         inputUrl: ctx.workingUrl,
+        userId: ctx.userId,
         tonePack,
         creditCost: ctx.creditCost,
       });
@@ -625,6 +627,7 @@ async function runDispatcher(
       return dispatchRetexture({
         op,
         inputUrl: ctx.workingUrl,
+        userId: ctx.userId,
         creditCost: ctx.creditCost,
       });
   }

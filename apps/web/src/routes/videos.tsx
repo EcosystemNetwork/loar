@@ -24,6 +24,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 
 export const Route = createFileRoute('/videos')({
   component: VideosPage,
@@ -154,14 +155,14 @@ function VideosPage() {
     <div className="min-h-screen bg-background">
       {/* Hero */}
       <div className="relative overflow-hidden border-b bg-gradient-to-br from-background via-primary/5 to-purple-900/20">
-        <div className="container mx-auto px-6 py-14">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+        <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-14">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 md:gap-6">
             <div>
-              <div className="flex items-center gap-3 mb-3">
-                <Film className="h-8 w-8 text-primary" />
-                <h1 className="text-4xl font-bold tracking-tight">Videos</h1>
+              <div className="flex items-center gap-3 mb-2 sm:mb-3">
+                <Film className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
+                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Videos</h1>
               </div>
-              <p className="text-muted-foreground text-lg max-w-xl">
+              <p className="text-muted-foreground text-base sm:text-lg max-w-xl">
                 AI-generated cinematic universes — from quick shorts to feature-length epics.
               </p>
             </div>
@@ -178,7 +179,7 @@ function VideosPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-6 py-10 space-y-16">
+      <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-12 sm:space-y-16 pb-bottom-nav md:pb-12">
         {/* Short-Form Section */}
         <section>
           <SectionHeader
@@ -400,13 +401,11 @@ function ShortCard({ item }: { item: any }) {
             poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
           />
         ) : item.thumbnailUrl ? (
-          <img
-            src={resolveIpfsUrl(item.thumbnailUrl)}
+          <SmartImage
+            src={item.thumbnailUrl}
             alt={item.title}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = 'none';
-            }}
+            sizes="168px"
+            className="w-full h-full"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
@@ -505,10 +504,11 @@ function LongCard({ item }: { item: any }) {
             poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
           />
         ) : item.thumbnailUrl ? (
-          <img
-            src={resolveIpfsUrl(item.thumbnailUrl)}
+          <SmartImage
+            src={item.thumbnailUrl}
             alt={item.title}
-            className="w-full h-full object-cover"
+            sizes="(max-width: 768px) 100vw, 33vw"
+            className="w-full h-full"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">

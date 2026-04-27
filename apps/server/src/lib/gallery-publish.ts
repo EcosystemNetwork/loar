@@ -1,5 +1,6 @@
 import { db } from './firebase';
 import { triggerContentThumbnailAsync } from '../services/content-cover-image';
+import { triggerContentHlsAsync } from '../services/content-hls';
 import { recordAssetEventAsync } from '../services/lineage';
 import type { AssetOutputKind } from '../services/lineage/types';
 import { isEphemeralUrl as _isEphemeralUrl, rehostEphemeralUrl } from './rehost-ephemeral';
@@ -206,6 +207,15 @@ export async function publishToGallery(input: PublishGalleryInput): Promise<void
         creatorUid: resolvedInput.creatorUid,
       });
     }
+
+    // Fire-and-forget HLS transcode + thumbnail sprite. No-op for non-video.
+    // The progressive mediaUrl keeps working while this runs in background.
+    triggerContentHlsAsync({
+      id: ref.id,
+      mediaUrl: resolvedInput.mediaUrl,
+      mediaType: resolvedInput.mediaType,
+      creatorUid: resolvedInput.creatorUid,
+    });
 
     // PRD 10: lineage event for the publish step. Parent = the generation
     // (or another generation we were derived from) so the asset family tree

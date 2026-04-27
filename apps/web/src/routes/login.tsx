@@ -70,7 +70,10 @@ function LoginPage() {
         const sameOrigin = candidate.origin === window.location.origin;
         // Reject pseudo-protocols even if origin somehow matches.
         const safeProto = candidate.protocol === 'http:' || candidate.protocol === 'https:';
-        if (sameOrigin && safeProto) {
+        // Reject /login itself — bouncing back here just re-runs this effect
+        // and loops.
+        const notLogin = candidate.pathname !== '/login';
+        if (sameOrigin && safeProto && notLogin) {
           target = candidate.pathname + candidate.search + candidate.hash;
         }
       } catch {
@@ -87,6 +90,16 @@ function LoginPage() {
 
     try {
       const result = await requestEmailOTP(email);
+
+      // Server returns 200 { ok, throttled: true } when the per-email
+      // issuance cap is hit, so the response can't double as an account
+      // existence oracle. Surface it as a normal error to the user instead
+      // of silently advancing to the OTP form.
+      if (result.throttled) {
+        setError('Too many codes requested for this email. Try again in a few minutes.');
+        return;
+      }
+
       setStep('otp');
 
       // In dev mode, auto-fill the OTP for testing
@@ -112,8 +125,12 @@ function LoginPage() {
   };
 
   // ── Google Identity Services button ──────────────────────────────────────
+  // The host div is conditionally rendered (`step === 'email'`), so when the
+  // user goes email → otp → "use a different email", the original div is
+  // unmounted and a fresh one mounts. We need to re-render the GIS button
+  // into the new node — hence `step` in the dep array.
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID || !googleBtnRef.current) return;
+    if (!GOOGLE_CLIENT_ID || step !== 'email' || !googleBtnRef.current) return;
     let cancelled = false;
 
     loadScript('https://accounts.google.com/gsi/client', 'google-identity-services')
@@ -150,7 +167,7 @@ function LoginPage() {
     return () => {
       cancelled = true;
     };
-  }, [signInWithSocial]);
+  }, [signInWithSocial, step]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">

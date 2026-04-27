@@ -80,9 +80,11 @@ function RouteComponent() {
     staleTime: 60_000,
   });
 
+  // DEMO: show every universe under "Your Universes" so any wallet can browse the
+  // full catalog as if they owned it. Swap back to `getByCreator` for real ownership.
   const { data: myUniverses } = useQuery({
-    queryKey: ['my-universes', address],
-    queryFn: () => trpcClient.universes.getByCreator.query({ creator: address! }),
+    queryKey: ['my-universes', 'demo-all'],
+    queryFn: () => trpcClient.universes.getAll.query(),
     enabled: !!address,
   });
 
@@ -124,7 +126,9 @@ function RouteComponent() {
   const totalSpent = creditData?.totalSpent ?? 0;
   const revenue30d = (revenueData as any)?.totalEarned30d ?? 0;
   const revenueTxCount = (revenueData as any)?.transactionCount30d ?? 0;
-  const universesOwned = (portfolioData as any)?.universesOwned ?? myUniverseList.length;
+  // DEMO: reflect the full visible list (see myUniverses query above) instead of
+  // the wallet's real portfolio count, so the stat matches what's rendered below.
+  const universesOwned = myUniverseList.length;
   const activeSubscriptions = (portfolioData as any)?.activeSubscriptions ?? 0;
   const totalCollectibles = (portfolioData as any)?.totalCollectibles ?? 0;
   const episodesListed = myNfts?.createdEpisodes?.length ?? 0;
@@ -174,9 +178,9 @@ function RouteComponent() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex gap-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex gap-6 pb-bottom-nav md:pb-12">
         {/* ── Main Content ─────────────────────────────────────────── */}
-        <div className="flex-1 min-w-0 space-y-8">
+        <div className="flex-1 min-w-0 space-y-6 md:space-y-8">
           {/* ── Faucet prompt for empty wallets ─────────────────────── */}
           <FaucetBanner address={address} />
 
@@ -262,9 +266,12 @@ function RouteComponent() {
             <h2 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">
               Quick Actions
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
               <RouterLink to="/sandbox">
                 <QuickAction icon={<Sparkles className="h-4 w-4" />} label="Sandbox" />
+              </RouterLink>
+              <RouterLink to="/lab/zai">
+                <QuickAction icon={<Wand2 className="h-4 w-4" />} label="Z.AI Lab" />
               </RouterLink>
               <RouterLink to="/create">
                 <QuickAction icon={<Plus className="h-4 w-4" />} label="New Universe" />
@@ -976,8 +983,8 @@ function DashboardSkeleton() {
           </div>
         </div>
       </div>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex gap-6">
-        <div className="flex-1 min-w-0 space-y-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex gap-6 pb-bottom-nav md:pb-12">
+        <div className="flex-1 min-w-0 space-y-6 md:space-y-8">
           {/* Stats skeleton */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {Array.from({ length: 6 }).map((_, i) => (

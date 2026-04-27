@@ -84,7 +84,7 @@ enum DeploymentStep {
 }
 
 function CinematicUniverseCreate() {
-  const { address, isConnected, isAuthenticated, isAuthenticating, signIn } = useWalletAuth();
+  const { address, isConnected, isAuthenticated, isAuthenticating } = useWalletAuth();
   const navigate = useNavigate();
 
   const chainId = useChainId();
@@ -627,19 +627,13 @@ function CinematicUniverseCreate() {
   // since createUniverseWithToken() emits both events in a single receipt.
 
   const handleCreateUniverse = async () => {
-    if (!address) {
-      toast.error('Please connect your wallet first');
+    // Auth is now Circle DCW — there is no in-page sign-in flow. Send the
+    // user to /login if they're not signed in (or have no wallet) so they
+    // can complete email/social auth, then come back here.
+    if (!address || !isAuthenticated) {
+      toast.error('Please sign in to continue');
+      navigate({ to: '/login', search: { redirect: '/cinematicUniverseCreate' } });
       return;
-    }
-
-    // Trigger SIWE sign-in if wallet is connected but not authenticated
-    if (!isAuthenticated) {
-      try {
-        await signIn();
-      } catch {
-        toast.error('Please sign the message in your wallet to continue');
-        return;
-      }
     }
 
     if (!isSupportedChain(chainId)) {

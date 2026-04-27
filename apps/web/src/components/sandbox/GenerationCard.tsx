@@ -193,7 +193,13 @@ export function GenerationCard({
           gen.kind !== '3d-model' &&
           !gen.videoUrl &&
           gen.imageUrl && (
-            <img src={resolveIpfsUrl(gen.imageUrl)} alt="" className="w-full h-full object-cover" />
+            <img
+              src={resolveIpfsUrl(gen.imageUrl)}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="w-full h-full object-cover"
+            />
           )}
 
         <Button

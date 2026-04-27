@@ -135,6 +135,7 @@ import { NodeArcOverlay } from '@/components/flow/NodeArcOverlay';
 import { EpisodeBuilder } from '@/components/episodes/EpisodeBuilder';
 import { EpisodeList } from '@/components/episodes/EpisodeList';
 import { ScriptToEpisode } from '@/components/episodes/ScriptToEpisode';
+import { useIsMobile } from '@/hooks/useBreakpoint';
 import { useNodeArcs } from '@/hooks/useNodeArcs';
 import { useNodeFilter } from '@/hooks/useNodeFilter';
 import type { ContextMenuState } from '@/components/flow/types';
@@ -4087,10 +4088,55 @@ function UniverseTimelineEditorInner() {
   );
 }
 
+function MobileEditorFallback({ id }: { id: string }) {
+  const navigate = useNavigate();
+  const [proceed, setProceed] = useState(false);
+
+  if (proceed) return <ReactFlowProviderWithInner />;
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center px-6 py-10">
+      <div className="text-center space-y-5 max-w-sm">
+        <div className="mx-auto w-14 h-14 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center">
+          <LayoutGrid className="h-6 w-6 text-primary" />
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-xl font-semibold">Timeline editor needs more room</h1>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            The narrative graph, scene controls, and cast manager are designed for a wider screen.
+            Open this on a tablet or laptop for the full editor.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Button
+            onClick={() => navigate({ to: '/universe/$id/watch', params: { id }, replace: true })}
+            size="lg"
+          >
+            <Play className="h-4 w-4 mr-2" />
+            Watch this universe
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setProceed(true)}>
+            Open editor anyway
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReactFlowProviderWithInner() {
+  return (
+    <ReactFlowProvider>
+      <UniverseTimelineEditorInner />
+    </ReactFlowProvider>
+  );
+}
+
 function EditorAdminGate() {
   const { id } = useParams({ from: '/universe/$id' });
   const navigate = useNavigate();
   const admin = useIsUniverseAdmin(id as `0x${string}`);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (admin.isLoading || admin.isError) return;
@@ -4136,11 +4182,9 @@ function EditorAdminGate() {
     );
   }
 
-  return (
-    <ReactFlowProvider>
-      <UniverseTimelineEditorInner />
-    </ReactFlowProvider>
-  );
+  if (isMobile) return <MobileEditorFallback id={id} />;
+
+  return <ReactFlowProviderWithInner />;
 }
 
 function UniverseTimelineEditor() {

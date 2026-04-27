@@ -318,6 +318,8 @@ export const voiceRouter = router({
       try {
         await voiceGenerationsCol().doc(genId).update({ status: 'running' });
 
+        const { resolveProviderKey } = await import('../../lib/byok');
+        const apiKey = await resolveProviderKey(ctx.user.uid, 'elevenlabs');
         const result = await elevenLabsService.textToSpeech({
           text: input.text,
           voiceId: input.voiceId,
@@ -325,6 +327,7 @@ export const voiceRouter = router({
           stability: input.stability,
           similarityBoost: input.similarityBoost,
           style: input.style,
+          apiKey,
         });
 
         if (!result.audioBuffer || result.audioBuffer.length === 0) {
@@ -493,9 +496,12 @@ export const voiceRouter = router({
       try {
         await voiceGenerationsCol().doc(genId).update({ status: 'running' });
 
+        const { resolveProviderKey: resolveSfxKey } = await import('../../lib/byok');
+        const apiKey = await resolveSfxKey(ctx.user.uid, 'elevenlabs');
         const result = await elevenLabsService.soundEffect({
           text: input.text,
           durationSeconds: input.durationSeconds,
+          apiKey,
         });
 
         if (!result.audioBuffer || result.audioBuffer.length === 0) {
@@ -623,6 +629,8 @@ export const voiceRouter = router({
       try {
         await voiceGenerationsCol().doc(genId).update({ status: 'running' });
 
+        const { resolveProviderKey: resolveDesignKey } = await import('../../lib/byok');
+        const apiKey = await resolveDesignKey(ctx.user.uid, 'elevenlabs');
         const result = await elevenLabsService.designVoice({
           name: input.name,
           description: input.description,
@@ -631,6 +639,7 @@ export const voiceRouter = router({
           age: input.age,
           accent: input.accent,
           accentStrength: input.accentStrength,
+          apiKey,
         });
 
         if (!result.audioBuffer || result.audioBuffer.length === 0 || !result.voiceId) {
@@ -716,10 +725,13 @@ export const voiceRouter = router({
           })
         );
 
+        const { resolveProviderKey: resolveCloneKey } = await import('../../lib/byok');
+        const apiKey = await resolveCloneKey(ctx.user.uid, 'elevenlabs');
         const result = await elevenLabsService.instantCloneVoice({
           name: input.name,
           description: input.description,
           audioBuffers,
+          apiKey,
         });
 
         if (!result.voiceId) {
@@ -879,6 +891,8 @@ export const voiceRouter = router({
           throw new Error('Source audio exceeds 50MB');
         }
 
+        const { resolveProviderKey: resolveChangerKey } = await import('../../lib/byok');
+        const apiKey = await resolveChangerKey(ctx.user.uid, 'elevenlabs');
         const result = await elevenLabsService.voiceChanger({
           audioBuffer: sourceBuffer,
           voiceId: input.targetVoiceId,
@@ -887,6 +901,7 @@ export const voiceRouter = router({
           similarityBoost: input.similarityBoost,
           style: input.style,
           removeBackgroundNoise: input.removeBackgroundNoise,
+          apiKey,
         });
 
         if (!result.audioBuffer || result.audioBuffer.length === 0) {

@@ -22,7 +22,7 @@ export const Route = createFileRoute('/settings/api-keys')({
   component: ApiKeysPage,
 });
 
-type Provider = 'bytedance' | 'zai';
+type Provider = 'bytedance' | 'zai' | 'openai' | 'google' | 'fal' | 'elevenlabs' | 'meshy';
 
 const PROVIDER_META: Record<
   Provider,
@@ -52,7 +52,54 @@ const PROVIDER_META: Record<
     fallbackNote:
       'When no key is set, Z.AI calls run on the platform key (ZAI_API_KEY). Plug in your own to spend your own quota.',
   },
+  google: {
+    label: 'Google AI (Imagen + Gemini)',
+    blurb:
+      'Powers Imagen 4 / nano-banana-pro image generation, Gemini 2.5 Pro video analysis, character image analysis, and prompt enhancement. The default image model across the studio.',
+    docsUrl: 'https://ai.google.dev/gemini-api/docs/api-key',
+    placeholder: 'Paste your Google AI Studio key (AIza…)…',
+    fallbackNote:
+      'When no key is set, Google calls run on the platform key (GOOGLE_API_KEY). Plug in your own to spend your own quota.',
+  },
+  fal: {
+    label: 'fal.ai',
+    blurb:
+      "Powers FLUX, Veo3, Sora 2, Kling, Runway Gen-3, WAN, PixVerse, Stable Audio, MusicGen, LoRA training, inpainting/outpainting, upscaling, frame interpolation, and background removal. The studio's broadest provider.",
+    docsUrl: 'https://fal.ai/dashboard/keys',
+    placeholder: 'Paste your fal.ai key (uuid:secret)…',
+    fallbackNote:
+      'When no key is set, FAL calls run on the platform key (FAL_KEY). Plug in your own to spend your own quota.',
+  },
+  elevenlabs: {
+    label: 'ElevenLabs',
+    blurb:
+      'Powers text-to-speech, voice cloning, voice design, sound effects, and the talking-scene pipeline. Voice/audio backbone for narration and dialogue.',
+    docsUrl: 'https://elevenlabs.io/app/settings/api-keys',
+    placeholder: 'Paste your ElevenLabs API key…',
+    fallbackNote:
+      'When no key is set, ElevenLabs calls run on the platform key (ELEVENLABS_API_KEY). Plug in your own to spend your own quota.',
+  },
+  meshy: {
+    label: 'Meshy (3D)',
+    blurb:
+      'Powers text-to-3D, image-to-3D, multi-image-to-3D, and re-texturing in the character pipeline. Generates GLB / FBX / OBJ assets for the studio.',
+    docsUrl: 'https://www.meshy.ai/api',
+    placeholder: 'Paste your Meshy API key (msy_…)…',
+    fallbackNote:
+      'When no key is set, Meshy calls run on the platform key (MESHY_API_KEY). Plug in your own to spend your own quota.',
+  },
+  openai: {
+    label: 'OpenAI',
+    blurb:
+      'Used as a fallback LLM and for select OpenAI-only features (GPT-Image, embeddings, transcription).',
+    docsUrl: 'https://platform.openai.com/api-keys',
+    placeholder: 'Paste your OpenAI key (sk-…)…',
+    fallbackNote:
+      'When no key is set, OpenAI calls run on the platform key (OPENAI_API_KEY). Plug in your own to spend your own quota.',
+  },
 };
+
+const TESTABLE_PROVIDERS = new Set<Provider>(['bytedance', 'zai']);
 
 function ApiKeysPage() {
   const { address } = useWalletAuth();
@@ -83,6 +130,11 @@ function ApiKeysPage() {
 
       <ProviderCard provider="bytedance" />
       <ProviderCard provider="zai" />
+      <ProviderCard provider="google" />
+      <ProviderCard provider="fal" />
+      <ProviderCard provider="elevenlabs" />
+      <ProviderCard provider="meshy" />
+      <ProviderCard provider="openai" />
 
       <Card className="bg-zinc-950/40 border-white/5">
         <CardContent className="pt-6 text-xs text-muted-foreground space-y-2">
@@ -155,9 +207,14 @@ function ProviderCard({ provider }: { provider: Provider }) {
   const handleSave = () => {
     const trimmed = value.trim();
     if (!trimmed) return;
-    // Test before saving — surfaces auth errors immediately on the user's
-    // own quota, so a bad paste doesn't silently end up encrypted at rest.
-    testKey.mutate(trimmed);
+    if (TESTABLE_PROVIDERS.has(provider)) {
+      // Test before saving — surfaces auth errors immediately on the user's
+      // own quota, so a bad paste doesn't silently end up encrypted at rest.
+      testKey.mutate(trimmed);
+    } else {
+      // Providers without a server-side test endpoint save directly.
+      setKey.mutate(trimmed);
+    }
   };
 
   return (

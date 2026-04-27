@@ -222,132 +222,147 @@ function ProductDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <div
+      className="min-h-screen bg-background"
+      style={{ paddingBottom: 'calc(96px + var(--mobile-nav-h))' }}
+    >
       {/* Back nav */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b px-4 py-3 flex items-center gap-3">
-        <button onClick={() => history.back()}>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-        </button>
+      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b px-4 py-3 flex items-center gap-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          onClick={() => history.back()}
+          aria-label="Go back"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
         <span className="font-semibold truncate flex-1">{l.title}</span>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleShare}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          onClick={handleShare}
+          aria-label="Share"
+        >
           <Share2 className="w-4 h-4" />
         </Button>
       </div>
 
-      {/* Media */}
-      <div className="aspect-square max-h-80 w-full bg-muted flex items-center justify-center overflow-hidden">
-        {l.mediaUrl || l.thumbnailUrl ? (
-          l.mediaUrl?.endsWith('.mp4') || l.mediaUrl?.endsWith('.webm') ? (
-            <video
-              src={resolveIpfsUrl(l.mediaUrl)}
-              controls
-              className="w-full h-full object-contain"
-              poster={resolveIpfsUrl(l.thumbnailUrl) || undefined}
-            />
+      {/* Media + info — single column on mobile, side-by-side on desktop */}
+      <div className="md:max-w-6xl md:mx-auto md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:gap-8 md:px-6 md:pt-6">
+        <div className="aspect-square w-full max-h-80 md:max-h-none md:rounded-2xl bg-muted flex items-center justify-center overflow-hidden md:aspect-auto md:min-h-[420px]">
+          {l.mediaUrl || l.thumbnailUrl ? (
+            l.mediaUrl?.endsWith('.mp4') || l.mediaUrl?.endsWith('.webm') ? (
+              <video
+                src={resolveIpfsUrl(l.mediaUrl)}
+                controls
+                className="w-full h-full object-contain"
+                poster={resolveIpfsUrl(l.thumbnailUrl) || undefined}
+              />
+            ) : (
+              <img
+                src={resolveIpfsUrl(l.mediaUrl ?? l.thumbnailUrl)}
+                alt={l.title}
+                className="w-full h-full object-contain"
+              />
+            )
           ) : (
-            <img
-              src={resolveIpfsUrl(l.mediaUrl ?? l.thumbnailUrl)}
-              alt={l.title}
-              className="w-full h-full object-contain"
-            />
-          )
-        ) : (
-          <div className="text-muted-foreground opacity-20">
-            {PRODUCT_TYPE_ICONS[l.productType] ?? <Package className="w-16 h-16" />}
-          </div>
-        )}
-      </div>
-
-      <div className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
-        {/* Title + badges */}
-        <div>
-          <div className="flex items-start justify-between gap-3">
-            <h1 className="text-xl font-bold leading-tight">{l.title}</h1>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 shrink-0"
-              onClick={handleLike}
-              disabled={likeMutation.isPending || unlikeMutation.isPending}
-            >
-              <Heart className={`w-4 h-4 ${isLiked ? 'fill-red-500 text-red-500' : ''}`} />
-              {likeCount > 0 && (
-                <span className="text-xs text-muted-foreground ml-0.5">{likeCount}</span>
-              )}
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2 mt-2">
-            <Badge variant="secondary" className="gap-1">
-              {PRODUCT_TYPE_ICONS[l.productType]}
-              {l.productType?.replace(/_/g, ' ')}
-            </Badge>
-            <ContentLaneBadge
-              classification={l.rightsLane ?? 'original'}
-              reviewStatus="not_required"
-            />
-          </div>
+            <div className="text-muted-foreground opacity-20">
+              {PRODUCT_TYPE_ICONS[l.productType] ?? <Package className="w-16 h-16" />}
+            </div>
+          )}
         </div>
 
-        {/* Price card */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className="text-2xl font-bold text-primary">
-                  <ListingPrice amount={l.price} currency={l.currency} />
-                </p>
-                {l.royaltyBps > 0 && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {(l.royaltyBps / 100).toFixed(1)}% creator royalty
-                  </p>
-                )}
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-medium">{l.sold ?? 0} sold</p>
-                {!isUnlimited && (
-                  <p className="text-xs text-muted-foreground">
-                    {l.supply - l.sold} of {l.supply} remaining
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Supply bar */}
-            {!isUnlimited && l.supply > 0 && (
-              <div className="h-1.5 rounded-full bg-muted overflow-hidden mb-3">
-                <div
-                  className="h-full bg-primary rounded-full transition-all"
-                  style={{ width: `${supplyPct}%` }}
-                />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Description */}
-        {l.description && (
+        <div className="max-w-2xl mx-auto md:max-w-none px-4 md:px-0 pt-4 md:pt-0 space-y-4 w-full">
+          {/* Title + badges */}
           <div>
-            <h2 className="font-semibold mb-1.5">About</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">{l.description}</p>
-          </div>
-        )}
-
-        {/* Universe link */}
-        {l.universeId && (
-          <Link to="/shop/$universeId" params={{ universeId: l.universeId }}>
-            <div className="flex items-center gap-2 p-3 rounded-lg border hover:border-primary/50 transition-colors">
-              <Store className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm">View Universe Shop</span>
-              <ArrowLeft className="w-4 h-4 ml-auto rotate-180 text-muted-foreground" />
+            <div className="flex items-start justify-between gap-3">
+              <h1 className="text-xl font-bold leading-tight">{l.title}</h1>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={handleLike}
+                disabled={likeMutation.isPending || unlikeMutation.isPending}
+              >
+                <Heart className={`w-4 h-4 ${isLiked ? 'fill-red-500 text-red-500' : ''}`} />
+                {likeCount > 0 && (
+                  <span className="text-xs text-muted-foreground ml-0.5">{likeCount}</span>
+                )}
+              </Button>
             </div>
-          </Link>
-        )}
+            <div className="flex flex-wrap gap-2 mt-2">
+              <Badge variant="secondary" className="gap-1">
+                {PRODUCT_TYPE_ICONS[l.productType]}
+                {l.productType?.replace(/_/g, ' ')}
+              </Badge>
+              <ContentLaneBadge
+                classification={l.rightsLane ?? 'original'}
+                reviewStatus="not_required"
+              />
+            </div>
+          </div>
+
+          {/* Price card */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-2xl font-bold text-primary">
+                    <ListingPrice amount={l.price} currency={l.currency} />
+                  </p>
+                  {l.royaltyBps > 0 && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {(l.royaltyBps / 100).toFixed(1)}% creator royalty
+                    </p>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium">{l.sold ?? 0} sold</p>
+                  {!isUnlimited && (
+                    <p className="text-xs text-muted-foreground">
+                      {l.supply - l.sold} of {l.supply} remaining
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Supply bar */}
+              {!isUnlimited && l.supply > 0 && (
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden mb-3">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all"
+                    style={{ width: `${supplyPct}%` }}
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Description */}
+          {l.description && (
+            <div>
+              <h2 className="font-semibold mb-1.5">About</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">{l.description}</p>
+            </div>
+          )}
+
+          {/* Universe link */}
+          {l.universeId && (
+            <Link to="/shop/$universeId" params={{ universeId: l.universeId }}>
+              <div className="flex items-center gap-2 p-3 rounded-lg border hover:border-primary/50 transition-colors">
+                <Store className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm">View Universe Shop</span>
+                <ArrowLeft className="w-4 h-4 ml-auto rotate-180 text-muted-foreground" />
+              </div>
+            </Link>
+          )}
+        </div>
       </div>
 
-      {/* Sticky buy bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t p-4 safe-area-bottom">
+      {/* Sticky buy bar — sits above the mobile bottom nav on touch devices. */}
+      <div className="fixed bottom-mobile-nav left-0 right-0 bg-background/95 backdrop-blur-sm border-t p-4 z-30">
         <div className="max-w-2xl mx-auto">
           {soldOut ? (
             <Button disabled className="w-full" size="lg">

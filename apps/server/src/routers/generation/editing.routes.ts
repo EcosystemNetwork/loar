@@ -344,11 +344,14 @@ export const editingRouter = router({
       await deductCredits(ctx.user.uid, model.creditCost, 'upscale');
 
       const startTime = Date.now();
+      const { resolveProviderKey } = await import('../../lib/byok');
+      const apiKey = await resolveProviderKey(ctx.user.uid, 'fal');
       const result = await falService.upscaleImage({
         imageUrl: input.imageUrl,
         model: model.falModelId,
         prompt: input.prompt,
         scale: input.scale,
+        apiKey,
       });
 
       if (result.status === 'failed' || !result.imageUrl) {
@@ -422,10 +425,13 @@ export const editingRouter = router({
       await deductCredits(ctx.user.uid, model.creditCost, 'interpolate');
 
       const startTime = Date.now();
+      const { resolveProviderKey: resolveInterp } = await import('../../lib/byok');
+      const interpKey = await resolveInterp(ctx.user.uid, 'fal');
       const result = await falService.interpolateFrames({
         videoUrl: input.videoUrl,
         model: model.falModelId,
         multiplier: input.multiplier,
+        apiKey: interpKey,
       });
 
       if (result.status === 'failed' || !result.videoUrl) {
@@ -533,12 +539,15 @@ export const editingRouter = router({
       await deductCredits(ctx.user.uid, model.creditCost, 'restyle');
 
       const startTime = Date.now();
+      const { resolveProviderKey: resolveRestyle } = await import('../../lib/byok');
+      const restyleKey = await resolveRestyle(ctx.user.uid, 'fal');
       const result = await falService.restyleVideo({
         videoUrl: input.videoUrl,
         prompt: input.prompt,
         model: model.falModelId,
         strength: input.strength,
         negativePrompt: input.negativePrompt,
+        apiKey: restyleKey,
       });
 
       if (result.status === 'failed' || !result.videoUrl) {
@@ -708,11 +717,14 @@ export const editingRouter = router({
       await deductCredits(ctx.user.uid, model.creditCost, 'inpaint');
 
       const startTime = Date.now();
+      const { resolveProviderKey: resolveInpaintKey } = await import('../../lib/byok');
+      const inpaintKey = await resolveInpaintKey(ctx.user.uid, 'fal');
       const result = isEraser
         ? await falService.eraseRegion({
             imageUrl: input.imageUrl,
             maskUrl: input.maskUrl,
             model: model.falModelId,
+            apiKey: inpaintKey,
           })
         : await falService.inpaintImage({
             imageUrl: input.imageUrl,
@@ -723,6 +735,7 @@ export const editingRouter = router({
             seed: input.seed,
             strength: input.strength,
             guidanceScale: input.guidanceScale,
+            apiKey: inpaintKey,
           });
 
       if (result.status === 'failed' || !result.imageUrl) {
@@ -846,9 +859,12 @@ export const editingRouter = router({
       await deductCredits(ctx.user.uid, model.creditCost, 'remove_bg');
 
       const startTime = Date.now();
+      const { resolveProviderKey: resolveBgKey } = await import('../../lib/byok');
+      const bgKey = await resolveBgKey(ctx.user.uid, 'fal');
       const result = await falService.removeBackground({
         imageUrl: input.imageUrl,
         model: model.falModelId,
+        apiKey: bgKey,
       });
 
       if (result.status === 'failed' || !result.imageUrl) {
@@ -962,11 +978,14 @@ export const editingRouter = router({
       }
 
       // Use image-to-video generation with the last frame
+      const { resolveProviderKey: resolveExtendKey } = await import('../../lib/byok');
+      const extendKey = await resolveExtendKey(ctx.user.uid, 'fal');
       const result = await falService.generateVideo({
         prompt: input.prompt,
         model: model.falModelId as any,
         imageUrl: lastFrameUrl,
         duration: input.durationSec,
+        apiKey: extendKey,
       });
 
       if (result.status === 'failed' || !result.videoUrl) {
@@ -1094,11 +1113,14 @@ export const editingRouter = router({
       await deductCredits(ctx.user.uid, totalCost, 'relight');
 
       const startTime = Date.now();
+      const { resolveProviderKey: resolveRelightKey } = await import('../../lib/byok');
+      const relightKey = await resolveRelightKey(ctx.user.uid, 'fal');
       const result = await falService.editImage({
         prompt: composed.prompt,
         imageUrls: [input.imageUrl],
         numImages: input.numImages,
         negativePrompt: composed.negativePrompt || undefined,
+        apiKey: relightKey,
       });
 
       if (result.status === 'failed' || !result.imageUrl) {

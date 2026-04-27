@@ -13,7 +13,7 @@ export function ChoiceOverlay({
 }) {
   return (
     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent z-20 flex items-end justify-center pb-24">
-      <div className="flex gap-4 px-4 max-w-3xl w-full">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 px-4 max-w-3xl w-full">
         {choices.map((choice, i) => (
           <button
             key={choice.nodeId}

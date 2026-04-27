@@ -236,10 +236,14 @@ async function completeThreeDTask(opts: {
   sourceImageUrl?: string | null;
 }) {
   try {
+    const { resolveProviderKey } = await import('../../lib/byok');
+    const apiKey = await resolveProviderKey(opts.userId, 'meshy');
     const task = await meshyService.waitForTask(
       opts.meshyTaskId,
       opts.meshyTaskType,
-      opts.timeoutMs
+      opts.timeoutMs,
+      undefined,
+      apiKey
     );
 
     trackQuests(opts.userId, [{ questId: 'first_3d_generation' }]);
@@ -414,12 +418,15 @@ export const threedRouter = router({
       try {
         await threeDGenCol().doc(genId).update({ status: 'running' });
 
+        const { resolveProviderKey } = await import('../../lib/byok');
+        const apiKey = await resolveProviderKey(ctx.user.uid, 'meshy');
         const { taskId } = await meshyService.textTo3DPreview({
           prompt: input.prompt,
           negativePrompt: input.negativePrompt,
           artStyle: input.artStyle,
           seed: input.seed,
           targetPolycount: input.targetPolycount,
+          apiKey,
         });
 
         await threeDGenCol().doc(genId).update({ meshyTaskId: taskId });
@@ -525,9 +532,12 @@ export const threedRouter = router({
       try {
         await threeDGenCol().doc(genId).update({ status: 'running' });
 
+        const { resolveProviderKey } = await import('../../lib/byok');
+        const apiKey = await resolveProviderKey(ctx.user.uid, 'meshy');
         const { taskId } = await meshyService.textTo3DRefine({
           previewTaskId: previewData.meshyTaskId,
           textureRichness: input.textureRichness,
+          apiKey,
         });
 
         await threeDGenCol().doc(genId).update({ meshyTaskId: taskId });
@@ -647,12 +657,15 @@ export const threedRouter = router({
       try {
         await threeDGenCol().doc(genId).update({ status: 'running' });
 
+        const { resolveProviderKey } = await import('../../lib/byok');
+        const apiKey = await resolveProviderKey(ctx.user.uid, 'meshy');
         let taskId: string;
         if (isMulti) {
           const result = await meshyService.multiImageTo3D({
             imageUrls: input.imageUrls,
             enablePbr: input.enablePbr,
             targetPolycount: input.targetPolycount,
+            apiKey,
           });
           taskId = result.taskId;
         } else {
@@ -660,6 +673,7 @@ export const threedRouter = router({
             imageUrl: input.imageUrls[0],
             enablePbr: input.enablePbr,
             targetPolycount: input.targetPolycount,
+            apiKey,
           });
           taskId = result.taskId;
         }

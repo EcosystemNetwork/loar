@@ -879,7 +879,7 @@ function EntityPage() {
   const canMint = entity?.monetized && entity?.rightsDeclaration && entity?.imageUrl && isOwner;
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto px-4 py-6 md:py-8 max-w-4xl pb-bottom-nav md:pb-12">
       <Link to="/wiki">
         <Button variant="outline" className="mb-4">
           <ArrowLeft className="w-4 h-4 mr-2" />

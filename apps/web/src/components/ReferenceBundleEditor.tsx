@@ -293,7 +293,13 @@ export function ReferenceBundleEditor({ entityId, isOwner }: Props) {
           <div className="flex flex-wrap gap-2 mb-3">
             {(slots[activeSlot] ?? []).map((url) => (
               <div key={url} className="relative group">
-                <img src={url} alt="ref" className="h-20 w-20 object-cover rounded border" />
+                <img
+                  src={url}
+                  alt="ref"
+                  loading="lazy"
+                  decoding="async"
+                  className="h-20 w-20 object-cover rounded border"
+                />
                 <button
                   type="button"
                   onClick={() => removeUrlFromSlot(activeSlot, url)}

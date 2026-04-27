@@ -24,7 +24,7 @@ import {
 import { bytedanceService } from '../../services/bytedance';
 import { zaiService } from '../../services/zai';
 
-const PROVIDERS = ['bytedance', 'zai'] as const;
+const PROVIDERS = ['bytedance', 'zai', 'openai', 'google', 'fal', 'elevenlabs', 'meshy'] as const;
 const providerSchema = z.enum(PROVIDERS);
 
 export const userSecretsRouter = router({

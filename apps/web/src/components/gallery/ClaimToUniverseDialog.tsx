@@ -34,7 +34,8 @@ export function ClaimToUniverseDialog({ open, onOpenChange, contentId, contentTi
     enabled: !!address && open,
   });
 
-  const mine: any[] = (data as any)?.universes ?? (data as any) ?? [];
+  // Server returns `{ success, data, total }` — universes are on `.data`.
+  const mine: any[] = Array.isArray((data as any)?.data) ? (data as any).data : [];
 
   const claim = useMutation({
     mutationFn: (universeId: string) =>

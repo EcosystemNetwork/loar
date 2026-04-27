@@ -31,6 +31,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { MintContentDialog } from '@/components/MintContentDialog';
+import { WikiGridSkeleton } from '@/components/wiki/WikiGridSkeleton';
+import { SmartImage } from '@/components/SmartImage';
 import { useVocab } from '@/hooks/use-vocab';
 
 export const Route = createFileRoute('/my-works')({
@@ -126,11 +128,11 @@ function MyWorksPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-6 py-8">
+      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-bottom-nav md:pb-12">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
           <div>
-            <h1 className="text-2xl font-bold">My Works</h1>
+            <h1 className="text-xl sm:text-2xl font-bold">My Works</h1>
             <p className="text-muted-foreground text-sm mt-1">
               {allItems.length} item{allItems.length !== 1 ? 's' : ''} uploaded
             </p>
@@ -196,9 +198,11 @@ function MyWorksPage() {
 
         {/* Content */}
         {isLoading ? (
-          <div className="flex items-center justify-center py-24">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
+          <WikiGridSkeleton
+            count={8}
+            aspect="video"
+            layout={viewMode === 'list' ? 'row' : 'grid'}
+          />
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <Film className="h-12 w-12 text-muted-foreground mb-4" />
@@ -293,10 +297,11 @@ function ContentCard({
     <Card className="group overflow-hidden">
       <div className="aspect-video bg-muted relative">
         {item.thumbnailUrl ? (
-          <img
-            src={resolveIpfsUrl(item.thumbnailUrl)}
+          <SmartImage
+            src={item.thumbnailUrl}
             alt={item.title}
-            className="w-full h-full object-cover"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            className="w-full h-full"
           />
         ) : isVideo && item.mediaUrl ? (
           <video
@@ -304,6 +309,8 @@ function ContentCard({
             className="w-full h-full object-cover"
             muted
             loop
+            playsInline
+            preload="metadata"
             onMouseEnter={(e) => {
               const p = e.currentTarget.play();
               if (p) p.catch(() => {});
@@ -314,10 +321,11 @@ function ContentCard({
             }}
           />
         ) : item.mediaUrl ? (
-          <img
-            src={resolveIpfsUrl(item.mediaUrl)}
+          <SmartImage
+            src={item.mediaUrl}
             alt={item.title}
-            className="w-full h-full object-cover"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            className="w-full h-full"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
@@ -386,22 +394,26 @@ function ContentRow({
       <div className="flex gap-4 items-center">
         <div className="w-28 h-16 bg-muted rounded-md overflow-hidden flex-shrink-0">
           {item.thumbnailUrl ? (
-            <img
-              src={resolveIpfsUrl(item.thumbnailUrl)}
+            <SmartImage
+              src={item.thumbnailUrl}
               alt={item.title}
-              className="w-full h-full object-cover"
+              sizes="112px"
+              className="w-full h-full"
             />
           ) : isVideo && item.mediaUrl ? (
             <video
               src={resolveIpfsUrl(item.mediaUrl)}
               className="w-full h-full object-cover"
               muted
+              playsInline
+              preload="metadata"
             />
           ) : item.mediaUrl ? (
-            <img
-              src={resolveIpfsUrl(item.mediaUrl)}
+            <SmartImage
+              src={item.mediaUrl}
               alt={item.title}
-              className="w-full h-full object-cover"
+              sizes="112px"
+              className="w-full h-full"
             />
           ) : null}
         </div>

@@ -981,19 +981,19 @@ function WikiPage() {
   const activeTabDef = TABS.find((t) => t.id === activeTab)!;
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl pb-bottom-nav md:pb-12">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+      <div className="flex flex-col gap-4 mb-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">World Encyclopedia</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">World Encyclopedia</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
             {universeInfo
               ? `Everything in ${universeInfo.name ?? 'this universe'}.`
               : 'Everything known across all public universes.'}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative w-56">
+          <div className="relative w-full sm:w-56">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               value={globalSearch}

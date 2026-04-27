@@ -47,6 +47,11 @@ export interface ImagenGenerateOptions {
    * Gemini endpoint (nano-banana-pro-preview). Ignored by the predict endpoint.
    */
   inputImages?: ImagenInputImage[];
+  /**
+   * BYOK override — when provided, this user-supplied key is used instead of
+   * the platform GOOGLE_API_KEY. Pass `resolveProviderKey(uid, 'google')`.
+   */
+  apiKey?: string;
 }
 
 export interface ImagenImage {
@@ -75,6 +80,12 @@ class GoogleImagenService {
     return !!this.apiKey;
   }
 
+  private resolveKey(override?: string): string {
+    const key = override?.trim() || this.apiKey;
+    if (!key) throw new Error('GOOGLE_API_KEY is not configured');
+    return key;
+  }
+
   /**
    * Generate images via Google API.
    * Routes to the correct endpoint based on model type:
@@ -82,14 +93,14 @@ class GoogleImagenService {
    *   - imagen-* → predict (Imagen-style)
    */
   async generate(options: ImagenGenerateOptions): Promise<ImagenResult> {
-    if (!this.apiKey) throw new Error('GOOGLE_API_KEY is not configured');
+    const apiKey = this.resolveKey(options.apiKey);
 
     const model = options.model || 'nano-banana-pro-preview';
 
     if (PREDICT_MODELS.has(model)) {
-      return this.generateViaPredictEndpoint(model, options);
+      return this.generateViaPredictEndpoint(model, options, apiKey);
     }
-    return this.generateViaGeminiEndpoint(model, options);
+    return this.generateViaGeminiEndpoint(model, options, apiKey);
   }
 
   /**
@@ -98,9 +109,10 @@ class GoogleImagenService {
    */
   private async generateViaGeminiEndpoint(
     model: string,
-    options: ImagenGenerateOptions
+    options: ImagenGenerateOptions,
+    apiKey: string
   ): Promise<ImagenResult> {
-    const url = `${API_BASE}/models/${model}:generateContent?key=${this.apiKey}`;
+    const url = `${API_BASE}/models/${model}:generateContent?key=${apiKey}`;
 
     const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
     for (const img of options.inputImages ?? []) {
@@ -164,9 +176,10 @@ class GoogleImagenService {
    */
   private async generateViaPredictEndpoint(
     model: string,
-    options: ImagenGenerateOptions
+    options: ImagenGenerateOptions,
+    apiKey: string
   ): Promise<ImagenResult> {
-    const url = `${API_BASE}/models/${model}:predict?key=${this.apiKey}`;
+    const url = `${API_BASE}/models/${model}:predict?key=${apiKey}`;
 
     const requestBody = {
       instances: [
@@ -221,6 +234,7 @@ class GoogleImagenService {
     name: string;
     description: string;
     style?: 'realistic' | 'stylized' | 'anime' | 'fantasy' | 'sci-fi';
+    apiKey?: string;
   }): Promise<ImagenResult> {
     const styleMap: Record<string, string> = {
       realistic: 'photorealistic, cinematic lighting, detailed textures, studio portrait',
@@ -254,6 +268,7 @@ class GoogleImagenService {
       numberOfImages: 1,
       aspectRatio: '3:4', // portrait orientation for full-body
       personGeneration: 'ALLOW_ADULT',
+      apiKey: opts.apiKey,
     });
   }
 }

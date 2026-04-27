@@ -31,12 +31,16 @@ export interface TTSOptions {
   style?: number; // 0–1 (v3+ only), default 0
   useSpeakerBoost?: boolean;
   outputFormat?: 'mp3_44100_128' | 'mp3_44100_64' | 'pcm_16000' | 'pcm_22050' | 'pcm_24000';
+  /** BYOK override — user-supplied ElevenLabs key. Falls back to ELEVENLABS_API_KEY env. */
+  apiKey?: string;
 }
 
 export interface SoundEffectOptions {
   text: string; // Description of the sound
   durationSeconds?: number; // optional target duration (0.5–22)
   promptInfluence?: number; // 0–1, higher = more faithful to prompt
+  /** BYOK override — user-supplied ElevenLabs key. */
+  apiKey?: string;
 }
 
 export interface VoiceDesignOptions {
@@ -47,6 +51,8 @@ export interface VoiceDesignOptions {
   age?: 'young' | 'middle_aged' | 'old';
   accent?: string;
   accentStrength?: number; // 0.3–2.0
+  /** BYOK override — user-supplied ElevenLabs key. */
+  apiKey?: string;
 }
 
 export interface VoiceChangerOptions {
@@ -59,6 +65,8 @@ export interface VoiceChangerOptions {
   useSpeakerBoost?: boolean;
   removeBackgroundNoise?: boolean;
   outputFormat?: 'mp3_44100_128' | 'mp3_44100_64' | 'pcm_16000' | 'pcm_22050' | 'pcm_24000';
+  /** BYOK override — user-supplied ElevenLabs key. */
+  apiKey?: string;
 }
 
 export interface VoiceChangerResult {
@@ -71,6 +79,8 @@ export interface InstantCloneOptions {
   description?: string;
   audioBuffers: Buffer[]; // 1–25 audio samples, <10MB each
   labels?: Record<string, string>;
+  /** BYOK override — user-supplied ElevenLabs key. */
+  apiKey?: string;
 }
 
 export interface ElevenLabsVoice {
@@ -113,10 +123,15 @@ class ElevenLabsService {
     this.apiKey = process.env.ELEVENLABS_API_KEY;
   }
 
-  private get headers(): Record<string, string> {
-    if (!this.apiKey) throw new Error('ELEVENLABS_API_KEY is not configured');
+  private resolveKey(override?: string): string {
+    const key = override?.trim() || this.apiKey;
+    if (!key) throw new Error('ELEVENLABS_API_KEY is not configured');
+    return key;
+  }
+
+  private headersFor(apiKey: string): Record<string, string> {
     return {
-      'xi-api-key': this.apiKey,
+      'xi-api-key': apiKey,
       'Content-Type': 'application/json',
     };
   }
@@ -124,11 +139,12 @@ class ElevenLabsService {
   private async fetchBuffer(
     path: string,
     body: Record<string, unknown>,
+    apiKey: string,
     method = 'POST'
   ): Promise<{ buffer: Buffer; contentType: string }> {
     const response = await fetch(`${BASE_URL}${path}`, {
       method,
-      headers: this.headers,
+      headers: this.headersFor(apiKey),
       body: JSON.stringify(body),
     });
 
@@ -155,6 +171,7 @@ class ElevenLabsService {
       useSpeakerBoost = true,
       outputFormat = 'mp3_44100_128',
     } = options;
+    const apiKey = this.resolveKey(options.apiKey);
 
     const { buffer, contentType } = await this.fetchBuffer(
       `/text-to-speech/${voiceId}?output_format=${outputFormat}`,
@@ -167,7 +184,8 @@ class ElevenLabsService {
           style,
           use_speaker_boost: useSpeakerBoost,
         },
-      }
+      },
+      apiKey
     );
 
     return { audioBuffer: buffer, contentType, characterCount: text.length };
@@ -176,7 +194,7 @@ class ElevenLabsService {
   // ── Speech to Speech (Voice Changer) ──────────────────────────────────
 
   async voiceChanger(options: VoiceChangerOptions): Promise<VoiceChangerResult> {
-    if (!this.apiKey) throw new Error('ELEVENLABS_API_KEY is not configured');
+    const apiKey = this.resolveKey(options.apiKey);
 
     const {
       audioBuffer,
@@ -212,7 +230,7 @@ class ElevenLabsService {
       `${BASE_URL}/speech-to-speech/${voiceId}?output_format=${outputFormat}`,
       {
         method: 'POST',
-        headers: { 'xi-api-key': this.apiKey },
+        headers: { 'xi-api-key': apiKey },
         body: formData,
       }
     );
@@ -231,23 +249,24 @@ class ElevenLabsService {
 
   async soundEffect(options: SoundEffectOptions): Promise<SoundEffectResult> {
     const { text, durationSeconds, promptInfluence = 0.3 } = options;
+    const apiKey = this.resolveKey(options.apiKey);
 
     const body: Record<string, unknown> = { text, prompt_influence: promptInfluence };
     if (durationSeconds !== undefined) body.duration_seconds = durationSeconds;
 
-    const { buffer, contentType } = await this.fetchBuffer('/sound-generation', body);
+    const { buffer, contentType } = await this.fetchBuffer('/sound-generation', body, apiKey);
     return { audioBuffer: buffer, contentType };
   }
 
   // ── Voice Design ──────────────────────────────────────────────────────
 
   async designVoice(options: VoiceDesignOptions): Promise<VoiceDesignResult> {
-    if (!this.apiKey) throw new Error('ELEVENLABS_API_KEY is not configured');
+    const apiKey = this.resolveKey(options.apiKey);
 
     // Step 1: generate voice previews
     const genResponse = await fetch(`${BASE_URL}/voice-generation/generate-voice`, {
       method: 'POST',
-      headers: this.headers,
+      headers: this.headersFor(apiKey),
       body: JSON.stringify({
         gender: options.gender || 'neutral',
         age: options.age || 'middle_aged',
@@ -268,7 +287,7 @@ class ElevenLabsService {
     // Step 2: save the designed voice
     const saveResponse = await fetch(`${BASE_URL}/voice-generation/create-voice`, {
       method: 'POST',
-      headers: this.headers,
+      headers: this.headersFor(apiKey),
       body: JSON.stringify({
         voice_name: options.name,
         voice_description: options.description,
@@ -298,7 +317,7 @@ class ElevenLabsService {
   // ── Instant Voice Clone ───────────────────────────────────────────────
 
   async instantCloneVoice(options: InstantCloneOptions): Promise<CloneVoiceResult> {
-    if (!this.apiKey) throw new Error('ELEVENLABS_API_KEY is not configured');
+    const apiKey = this.resolveKey(options.apiKey);
 
     const formData = new FormData();
     formData.append('name', options.name);
@@ -312,7 +331,7 @@ class ElevenLabsService {
 
     const response = await fetch(`${BASE_URL}/voices/add`, {
       method: 'POST',
-      headers: { 'xi-api-key': this.apiKey },
+      headers: { 'xi-api-key': apiKey },
       body: formData,
     });
 
@@ -327,11 +346,11 @@ class ElevenLabsService {
 
   // ── Voice Library ─────────────────────────────────────────────────────
 
-  async listVoices(): Promise<ElevenLabsVoice[]> {
-    if (!this.apiKey) throw new Error('ELEVENLABS_API_KEY is not configured');
+  async listVoices(apiKey?: string): Promise<ElevenLabsVoice[]> {
+    const key = this.resolveKey(apiKey);
 
     const response = await fetch(`${BASE_URL}/voices`, {
-      headers: { 'xi-api-key': this.apiKey },
+      headers: { 'xi-api-key': key },
     });
 
     if (!response.ok) {

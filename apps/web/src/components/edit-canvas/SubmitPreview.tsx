@@ -35,13 +35,25 @@ export function SubmitPreview({
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
               Before
             </div>
-            <img src={beforeUrl} alt="before" className="w-full rounded border border-border/40" />
+            <img
+              src={beforeUrl}
+              alt="before"
+              loading="lazy"
+              decoding="async"
+              className="w-full rounded border border-border/40"
+            />
           </div>
           <div>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
               After
             </div>
-            <img src={afterUrl} alt="after" className="w-full rounded border border-border/40" />
+            <img
+              src={afterUrl}
+              alt="after"
+              loading="lazy"
+              decoding="async"
+              className="w-full rounded border border-border/40"
+            />
           </div>
         </div>
         <Input

@@ -133,10 +133,13 @@ async function runTts(opts: {
   modelId: ElevenLabsVoiceModel;
 }): Promise<{ ttsGenId: string; audioUrl: string }> {
   const ttsGenId = randomUUID();
+  const { resolveProviderKey } = await import('../../lib/byok');
+  const apiKey = await resolveProviderKey(opts.uid, 'elevenlabs');
   const result = await elevenLabsService.textToSpeech({
     text: opts.text,
     voiceId: opts.voiceId,
     modelId: opts.modelId,
+    apiKey,
   });
   if (!result.audioBuffer || result.audioBuffer.length === 0) {
     throw new Error('TTS returned empty audio');

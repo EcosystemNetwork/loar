@@ -22,7 +22,6 @@ import {
   Store,
   Plus,
   ArrowRight,
-  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,7 +37,8 @@ import {
 import { useListingsBrowse } from '@/hooks/useListings';
 import { useTrending, usePlatformStats } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { WikiGridSkeleton } from '@/components/wiki/WikiGridSkeleton';
+import { SmartImage } from '@/components/SmartImage';
 import { ListingPrice } from '@/components/Price';
 
 export const Route = createFileRoute('/market')({
@@ -118,9 +118,9 @@ function MarketPage() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4">
+      <div className="max-w-2xl lg:max-w-6xl mx-auto px-4 sm:px-6">
         {/* Category pills */}
-        <div className="flex gap-2 overflow-x-auto py-3 scrollbar-none -mx-4 px-4">
+        <div className="flex gap-2 overflow-x-auto py-3 scrollbar-none -mx-4 sm:-mx-6 px-4 sm:px-6">
           {Object.entries(PRODUCT_TYPE_LABELS).map(([type, { label, icon }]) => (
             <button
               key={type}
@@ -174,16 +174,17 @@ function MarketPage() {
                 Trending
               </h2>
             </div>
-            <div className="flex gap-3 overflow-x-auto scrollbar-none -mx-4 px-4">
+            <div className="flex gap-3 overflow-x-auto scrollbar-none -mx-4 sm:-mx-6 px-4 sm:px-6">
               {((trending as any)?.universes ?? []).slice(0, 6).map((u: any) => (
                 <Link key={u.id} to="/shop/$universeId" params={{ universeId: u.id }}>
                   <div className="shrink-0 w-28">
                     <div className="w-28 h-28 rounded-xl bg-muted flex items-center justify-center overflow-hidden mb-1.5">
                       {u.thumbnailUrl ? (
-                        <img
-                          src={resolveIpfsUrl(u.thumbnailUrl)}
+                        <SmartImage
+                          src={u.thumbnailUrl}
                           alt={u.name}
-                          className="w-full h-full object-cover"
+                          sizes="112px"
+                          className="w-full h-full"
                         />
                       ) : (
                         <Store className="w-8 h-8 text-muted-foreground" />
@@ -208,9 +209,7 @@ function MarketPage() {
           </div>
 
           {isLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
+            <WikiGridSkeleton count={8} aspect="square" />
           ) : listings.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Package className="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -244,10 +243,11 @@ function ListingCard({ listing }: { listing: any }) {
       <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer">
         <div className="aspect-square bg-muted flex items-center justify-center relative">
           {listing.thumbnailUrl ? (
-            <img
-              src={resolveIpfsUrl(listing.thumbnailUrl)}
+            <SmartImage
+              src={listing.thumbnailUrl}
               alt={listing.title}
-              className="w-full h-full object-cover"
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              className="w-full h-full"
             />
           ) : (
             <div className="text-muted-foreground opacity-30">{typeInfo.icon}</div>

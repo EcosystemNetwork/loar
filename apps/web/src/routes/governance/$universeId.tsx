@@ -57,21 +57,22 @@ function GovernancePage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8 pb-bottom-nav md:pb-12">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">Governance</h1>
-            <p className="text-zinc-400 mt-1">
+        <div className="flex items-start sm:items-center justify-between gap-3 mb-6 sm:mb-8 flex-wrap">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold">Governance</h1>
+            <p className="text-zinc-400 mt-1 text-sm sm:text-base">
               Propose and vote on changes to Universe #{universeId}
             </p>
           </div>
           {isAuthenticated && (
             <button
               onClick={() => setShowCreateDialog(true)}
-              className="px-4 py-2 bg-violet-600 hover:bg-violet-700 rounded-lg font-medium transition-colors"
+              className="px-3 sm:px-4 py-2 bg-violet-600 hover:bg-violet-700 rounded-lg font-medium transition-colors text-sm sm:text-base shrink-0"
             >
-              New Proposal
+              <span className="sm:hidden">+ Propose</span>
+              <span className="hidden sm:inline">New Proposal</span>
             </button>
           )}
         </div>

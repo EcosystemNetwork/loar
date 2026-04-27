@@ -58,6 +58,10 @@ const moreGroupsBase: MoreGroup[] = [
     ],
   },
   {
+    label: 'Tools',
+    links: [{ to: '/lab/zai', label: 'Z.AI Lab' }],
+  },
+  {
     label: 'My Stuff',
     links: [
       { to: '/my-works', label: 'My Works' },

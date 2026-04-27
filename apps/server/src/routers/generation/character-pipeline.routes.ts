@@ -161,6 +161,13 @@ async function executePipeline(opts: {
   } = opts;
 
   try {
+    // BYOK keys for the whole pipeline (user-supplied → env fallback)
+    const { resolveProviderKey } = await import('../../lib/byok');
+    const [googleKey, meshyKey] = await Promise.all([
+      resolveProviderKey(userId, 'google'),
+      resolveProviderKey(userId, 'meshy'),
+    ]);
+
     // ── Step 1: Generate 2D character art via Google Imagen ──────────
     console.log(`[pipeline ${pipelineId}] Step 1: Generating 2D art with Google Imagen...`);
     await updatePipeline(pipelineId, {
@@ -172,6 +179,7 @@ async function executePipeline(opts: {
       name: entityName,
       description: entityDescription,
       style: characterStyle as any,
+      apiKey: googleKey,
     });
 
     if (!imagenResult.images.length) {
@@ -238,6 +246,7 @@ async function executePipeline(opts: {
       aiModel: 'meshy-6',
       topology: 'triangle',
       targetPolycount: 15000,
+      apiKey: meshyKey,
     });
 
     await updatePipeline(pipelineId, {
@@ -246,7 +255,13 @@ async function executePipeline(opts: {
     });
 
     // Wait for 3D model to complete (up to 25 min)
-    const meshyTask = await meshyService.waitForTask(meshyTaskId, 'image-to-3d', 25 * 60 * 1000);
+    const meshyTask = await meshyService.waitForTask(
+      meshyTaskId,
+      'image-to-3d',
+      25 * 60 * 1000,
+      undefined,
+      meshyKey
+    );
 
     const glbUrl = meshyTask.modelUrls?.glb;
     if (!glbUrl) throw new Error('Meshy 3D conversion did not return a GLB model');
@@ -327,6 +342,7 @@ async function executePipeline(opts: {
       artStyle: (artStyle as any) || 'realistic',
       enablePbr: true,
       resolution: 2048,
+      apiKey: meshyKey,
     });
 
     await updatePipeline(pipelineId, {
@@ -335,7 +351,12 @@ async function executePipeline(opts: {
     });
 
     // Wait for texture task to complete (up to 20 min)
-    const textureTask = await meshyService.waitForTextureTask(textureTaskId, 20 * 60 * 1000);
+    const textureTask = await meshyService.waitForTextureTask(
+      textureTaskId,
+      20 * 60 * 1000,
+      undefined,
+      meshyKey
+    );
 
     // Attach textured model files
     const texturedFormats: [string, string | undefined][] = [

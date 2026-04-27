@@ -16,6 +16,7 @@ import { googleImagenService } from '../../services/google-imagen';
 import { getStorageManager } from '../../services/storage';
 import { signWithProvenance } from '../../services/provenance';
 import { getEditingModelById } from '../../services/editing-models';
+import { resolveProviderKey } from '../../lib/byok';
 import type { EditOp } from './editJobs.types';
 
 export interface DispatchSuccess {
@@ -45,9 +46,10 @@ export async function dispatchInpaint(args: {
   op: Extract<EditOp, { kind: 'inpaint' }>;
   inputUrl: string;
   maskUrl: string;
+  userId: string;
   creditCost: number;
 }): Promise<DispatchResult> {
-  const { op, inputUrl, maskUrl, creditCost } = args;
+  const { op, inputUrl, maskUrl, userId, creditCost } = args;
   const model = getEditingModelById(op.modelId);
   if (!model || model.operation !== 'inpaint') {
     return { status: 'error', error: 'Invalid inpaint model', creditsToRefund: creditCost };
@@ -57,6 +59,7 @@ export async function dispatchInpaint(args: {
     ? `${negativePrompt}, ${op.negativePrompt}`
     : negativePrompt;
 
+  const apiKey = await resolveProviderKey(userId, 'fal');
   const result = await falService.inpaintImage({
     imageUrl: inputUrl,
     maskUrl,
@@ -66,6 +69,7 @@ export async function dispatchInpaint(args: {
     seed: op.seed,
     strength: op.strength,
     guidanceScale: op.guidanceScale,
+    apiKey,
   });
 
   if (result.status === 'failed' || !result.imageUrl) {
@@ -115,8 +119,13 @@ export async function dispatchOutpaint(args: {
 
   const composed = buildOutpaintPrompt(op);
 
+  const [googleKey, falKey] = await Promise.all([
+    resolveProviderKey(userId, 'google'),
+    resolveProviderKey(userId, 'fal'),
+  ]);
+
   // Primary: Google Gemini (nano-banana-pro-preview) supports inline image
-  if (googleImagenService.isConfigured()) {
+  if (googleKey) {
     try {
       const result = await googleImagenService.generate({
         prompt: composed,
@@ -124,6 +133,7 @@ export async function dispatchOutpaint(args: {
         numberOfImages: 1,
         model: 'nano-banana-pro-preview',
         inputImages: [source],
+        apiKey: googleKey,
       });
       const img = result.images?.[0];
       if (img) {
@@ -163,11 +173,12 @@ export async function dispatchOutpaint(args: {
   }
 
   // Fallback: FAL nano-banana/edit (image-to-image)
-  if (process.env.FAL_KEY) {
+  if (falKey) {
     const result = await falService.imageToImage({
       prompt: composed,
       imageUrls: [inputUrl],
       numImages: 1,
+      apiKey: falKey,
     });
     const url = result.images?.[0]?.url || result.imageUrl;
     if (url) {
@@ -193,7 +204,8 @@ export async function dispatchOutpaint(args: {
 
   return {
     status: 'error',
-    error: 'No image provider configured (GOOGLE_API_KEY or FAL_KEY)',
+    error:
+      'No image provider configured — set GOOGLE_API_KEY/FAL_KEY env or add a key in /settings/api-keys',
     creditsToRefund: creditCost,
   };
 }
@@ -207,6 +219,7 @@ export function getOutpaintCreditCost(): number {
 export async function dispatchRelight(args: {
   op: Extract<EditOp, { kind: 'relight' }>;
   inputUrl: string;
+  userId: string;
   tonePack: {
     presetIds?: string[];
     customPromptFragment?: string;
@@ -214,7 +227,7 @@ export async function dispatchRelight(args: {
   } | null;
   creditCost: number;
 }): Promise<DispatchResult> {
-  const { op, inputUrl, tonePack, creditCost } = args;
+  const { op, inputUrl, userId, tonePack, creditCost } = args;
   const model = getEditingModelById(op.modelId);
   if (!model || model.operation !== 'relight') {
     return { status: 'error', error: 'Invalid relight model', creditsToRefund: creditCost };
@@ -235,11 +248,13 @@ export async function dispatchRelight(args: {
     };
   }
 
+  const apiKey = await resolveProviderKey(userId, 'fal');
   const result = await falService.editImage({
     prompt: composed.prompt,
     imageUrls: [inputUrl],
     numImages: 1,
     negativePrompt: composed.negativePrompt || undefined,
+    apiKey,
   });
 
   if (result.status === 'failed' || !result.imageUrl) {
@@ -269,9 +284,10 @@ export async function dispatchRelight(args: {
 export async function dispatchRetexture(args: {
   op: Extract<EditOp, { kind: 'retexture' }>;
   inputUrl: string;
+  userId: string;
   creditCost: number;
 }): Promise<DispatchResult> {
-  const { op, inputUrl, creditCost } = args;
+  const { op, inputUrl, userId, creditCost } = args;
   const model = getEditingModelById(op.modelId);
   if (!model || model.operation !== 'retexture') {
     return { status: 'error', error: 'Invalid retexture model', creditsToRefund: creditCost };
@@ -282,11 +298,13 @@ export async function dispatchRetexture(args: {
     ? `changed subject identity, different geometry, deformed anatomy, blurry, ${op.negativePrompt}`
     : 'changed subject identity, different geometry, deformed anatomy, blurry';
 
+  const apiKey = await resolveProviderKey(userId, 'fal');
   const result = await falService.editImage({
     prompt,
     imageUrls: [inputUrl],
     numImages: 1,
     negativePrompt: neg,
+    apiKey,
   });
 
   if (result.status === 'failed' || !result.imageUrl) {

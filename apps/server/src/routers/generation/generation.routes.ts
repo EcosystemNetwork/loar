@@ -305,7 +305,9 @@ export async function dispatchGeneration(
 
   // Default: FAL
   const falInput = buildFalInput(model, input);
-  return falService.generateVideo(falInput);
+  const { resolveProviderKey } = await import('../../lib/byok');
+  const apiKey = await resolveProviderKey(callerUid, 'fal');
+  return falService.generateVideo({ ...falInput, apiKey });
 }
 
 export async function saveGenerationRecord(record: VideoGenerationRecord): Promise<void> {
@@ -2007,11 +2009,14 @@ export const generationRouter = router({
           }
         }
 
-        // BYOK lookup — only matters when calling ByteDance
+        // BYOK lookup — bytedance for ByteDance, fal for FAL
         let bdApiKey: string | undefined;
+        let falApiKey: string | undefined;
+        const { resolveProviderKey } = await import('../../lib/byok');
         if (isByteDance) {
-          const { getUserSecret } = await import('../../services/userSecrets');
-          bdApiKey = (await getUserSecret(ctx.user.uid, 'bytedance')) ?? undefined;
+          bdApiKey = await resolveProviderKey(ctx.user.uid, 'bytedance');
+        } else {
+          falApiKey = await resolveProviderKey(ctx.user.uid, 'fal');
         }
 
         result = isByteDance
@@ -2036,7 +2041,7 @@ export const generationRouter = router({
               ...cameraParams,
               apiKey: bdApiKey,
             })
-          : await falService.generateVideo({ ...input, prompt });
+          : await falService.generateVideo({ ...input, prompt, apiKey: falApiKey });
       } catch (genError) {
         await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);
         throw genError;
@@ -2096,6 +2101,8 @@ export const generationRouter = router({
       input.prompt = sanitizePrompt(input.prompt);
       await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video_veo3');
       const startTime = Date.now();
+      const { resolveProviderKey: resolveVeo3Key } = await import('../../lib/byok');
+      const veo3Key = await resolveVeo3Key(ctx.user.uid, 'fal');
       let result;
       try {
         result = await falService.generateVideo({
@@ -2105,6 +2112,7 @@ export const generationRouter = router({
           duration: input.duration,
           aspectRatio: input.aspectRatio,
           motionStrength: input.motionStrength,
+          apiKey: veo3Key,
         });
       } catch (genError) {
         await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);
@@ -2166,6 +2174,8 @@ export const generationRouter = router({
       if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
       await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video_kling');
       const startTime = Date.now();
+      const { resolveProviderKey: resolveKlingKey } = await import('../../lib/byok');
+      const klingKey = await resolveKlingKey(ctx.user.uid, 'fal');
       let result;
       try {
         result = await falService.generateVideo({
@@ -2176,6 +2186,7 @@ export const generationRouter = router({
           aspectRatio: input.aspectRatio,
           negativePrompt: input.negativePrompt,
           cfgScale: input.cfgScale,
+          apiKey: klingKey,
         });
       } catch (genError) {
         await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);
@@ -2237,6 +2248,8 @@ export const generationRouter = router({
       if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
       await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video_wan25');
       const startTime = Date.now();
+      const { resolveProviderKey: resolveWanKey } = await import('../../lib/byok');
+      const wanKey = await resolveWanKey(ctx.user.uid, 'fal');
       let result;
       try {
         result = await falService.generateVideo({
@@ -2247,6 +2260,7 @@ export const generationRouter = router({
           resolution: input.resolution,
           negativePrompt: input.negativePrompt,
           enablePromptExpansion: input.enablePromptExpansion,
+          apiKey: wanKey,
         });
       } catch (genError) {
         await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);
@@ -2306,6 +2320,8 @@ export const generationRouter = router({
       input.prompt = sanitizePrompt(input.prompt);
       await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video_sora');
       const startTime = Date.now();
+      const { resolveProviderKey: resolveSoraKey } = await import('../../lib/byok');
+      const soraKey = await resolveSoraKey(ctx.user.uid, 'fal');
       let result;
       try {
         result = await falService.generateVideo({
@@ -2315,6 +2331,7 @@ export const generationRouter = router({
           duration: input.duration,
           aspectRatio: input.aspectRatio,
           resolution: input.resolution,
+          apiKey: soraKey,
         });
       } catch (genError) {
         await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);

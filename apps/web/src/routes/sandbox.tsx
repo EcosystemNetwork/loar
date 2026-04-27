@@ -1228,13 +1228,13 @@ function SandboxPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <div className="container mx-auto px-4 py-6 sm:py-8 max-w-6xl pb-bottom-nav md:pb-12">
         {/* Header */}
-        <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+        <div className="mb-6 sm:mb-8 flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0">
             <div className="flex items-center gap-3 mb-2 flex-wrap">
               <Sparkles className="h-6 w-6 text-primary" />
-              <h1 className="text-3xl font-bold">Sandbox</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold">Sandbox</h1>
               <Badge variant="secondary">Beta</Badge>
               {activeCount > 0 && (
                 <Badge className="bg-primary/20 text-primary border-primary/30">
@@ -1274,9 +1274,9 @@ function SandboxPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
             {/* Left: create + queue */}
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 min-w-0">
               <h2 className="text-lg font-semibold">Create</h2>
 
               {/* Mode tabs */}

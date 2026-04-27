@@ -574,6 +574,18 @@ export const galleryRouter = router({
         });
       }
 
+      // Only AI-generated outputs are swappable into a universe. Uploads
+      // belong to whoever uploaded them and should not be retargeted — we
+      // identify AI-gen by the `ai-` mediaType prefix written by every
+      // generation route (e.g. `ai-video`, `ai-image`).
+      const mediaType = data.mediaType as string | undefined;
+      if (!mediaType?.startsWith('ai-')) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only AI-generated content can be claimed to a universe',
+        });
+      }
+
       // Can't resurrect moderated content into a universe.
       if (!isVisible(data.contentStatus)) {
         throw new TRPCError({

@@ -133,6 +133,13 @@ const { ipfsRoutes } = await import('./routes/ipfs');
 app.use('/api/ipfs/*', rateLimiter({ windowMs: 60_000, max: 120 }));
 app.route('/api/ipfs', ipfsRoutes);
 
+// Image resize proxy (sharp). Powers SmartImage's srcset on the web app —
+// snaps requested widths to a fixed ladder, content-negotiates webp/avif,
+// LRU-caches in-process. Public, gateway-allowlisted, rate-limited.
+const { imgResizeRoutes } = await import('./routes/img-resize');
+app.use('/api/img/*', rateLimiter({ windowMs: 60_000, max: 240 }));
+app.route('/api/img', imgResizeRoutes);
+
 // Admin cost ledger CSV download (admin-address-gated). Lives outside tRPC
 // because tRPC batches JSON — CSV streaming is simpler as a plain REST route.
 const { adminCostRoutes } = await import('./routes/admin-cost');

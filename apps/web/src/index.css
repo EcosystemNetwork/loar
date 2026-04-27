@@ -311,15 +311,38 @@
 /* ── Mobile / safe-area utilities ──────────────────────────────────── */
 
 /*
+ * Mobile bottom-nav height. Routes that render fixed bottom-aligned
+ * elements (sticky CTAs, FABs) read this variable so they sit above
+ * the nav on mobile and snap to the viewport edge on desktop where
+ * the nav is hidden.
+ */
+:root {
+  --mobile-nav-h: calc(56px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 768px) {
+  :root {
+    --mobile-nav-h: 0px;
+  }
+}
+
+/*
  * Bottom-nav clearance. Pages that sit under the mobile bottom nav add
  * `pb-bottom-nav` so their last row doesn't get covered. Pair with
  * `md:pb-0` to reset on desktop where the nav doesn't render.
  */
 @utility pb-bottom-nav {
-  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 12px);
+  padding-bottom: calc(var(--mobile-nav-h) + 12px);
 }
 
 /* Bottom-nav itself: positions content above the iOS home indicator. */
 @utility pb-safe-nav {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/*
+ * Anchor a fixed element to the top of the mobile bottom nav. On md+
+ * this resolves to `bottom: 0` since --mobile-nav-h is 0px there.
+ */
+@utility bottom-mobile-nav {
+  bottom: var(--mobile-nav-h, 0px);
 }

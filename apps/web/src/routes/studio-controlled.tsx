@@ -465,7 +465,13 @@ function StudioControlledPage() {
                 >
                   {result.imageUrls.map((url, i) => (
                     <a key={i} href={url} target="_blank" rel="noreferrer">
-                      <img src={url} alt={`Result ${i + 1}`} className="w-full rounded border" />
+                      <img
+                        src={url}
+                        alt={`Result ${i + 1}`}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full rounded border"
+                      />
                     </a>
                   ))}
                 </div>

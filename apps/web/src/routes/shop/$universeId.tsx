@@ -62,11 +62,11 @@ function UniverseShopPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-bottom-nav md:pb-12">
       {/* Back nav */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b px-4 py-3 flex items-center gap-3">
+      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b px-4 py-3 flex items-center gap-3">
         <Link to="/market">
-          <Button variant="ghost" size="icon" className="h-8 w-8">
+          <Button variant="ghost" size="icon" className="h-9 w-9">
             <ArrowLeft className="w-4 h-4" />
           </Button>
         </Link>
@@ -75,7 +75,7 @@ function UniverseShopPage() {
 
       {/* Hero */}
       <div className="relative">
-        <div className="h-40 bg-gradient-to-br from-primary/20 via-primary/5 to-background flex items-center justify-center">
+        <div className="h-40 sm:h-52 md:h-64 bg-gradient-to-br from-primary/20 via-primary/5 to-background flex items-center justify-center overflow-hidden">
           {(universe as any)?.bannerUrl ? (
             <img
               src={resolveIpfsUrl((universe as any).bannerUrl)}
@@ -89,8 +89,8 @@ function UniverseShopPage() {
             <Store className="w-16 h-16 text-primary/20" />
           )}
         </div>
-        <div className="px-4 pb-4 -mt-8 relative">
-          <div className="w-16 h-16 rounded-2xl border-4 border-background bg-muted flex items-center justify-center overflow-hidden shadow-lg">
+        <div className="px-4 sm:px-6 pb-4 -mt-8 sm:-mt-10 relative max-w-4xl mx-auto">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-4 border-background bg-muted flex items-center justify-center overflow-hidden shadow-lg">
             {(universe as any)?.thumbnailUrl ? (
               <img
                 src={resolveIpfsUrl((universe as any).thumbnailUrl)}
@@ -98,12 +98,14 @@ function UniverseShopPage() {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <Store className="w-8 h-8 text-muted-foreground" />
+              <Store className="w-8 h-8 sm:w-10 sm:h-10 text-muted-foreground" />
             )}
           </div>
-          <div className="mt-2">
-            <h1 className="text-xl font-bold">{(universe as any)?.name ?? '—'}</h1>
-            <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
+          <div className="mt-2 sm:mt-3">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">
+              {(universe as any)?.name ?? '—'}
+            </h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-0.5 line-clamp-2">
               {(universe as any)?.description ?? ''}
             </p>
             <div className="flex gap-2 mt-2 flex-wrap">
@@ -125,7 +127,7 @@ function UniverseShopPage() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4">
+      <div className="max-w-2xl lg:max-w-5xl mx-auto px-4 sm:px-6">
         {isLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -156,7 +158,7 @@ function UniverseShopPage() {
                       {icon}
                       {label}
                     </h3>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                       {items.map((listing: any) => (
                         <ShopListingCard key={listing.id} listing={listing} />
                       ))}

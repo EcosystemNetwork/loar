@@ -1,4 +1,11 @@
-const PUBLIC_GATEWAY = 'https://gateway.pinata.cloud';
+// gateway.pinata.cloud is now Cloudflare-rate-limited per IP and 429s with a
+// long retry-after for unauthenticated traffic. We can't sign client URLs
+// (token is server-only after WEB-1), so the synchronous default is a public
+// IPFS gateway that actually serves anonymous range requests.
+const PUBLIC_GATEWAY = 'https://w3s.link';
+// Pinata's public gateway is kept in the fallback chain — it sometimes
+// recovers — but is not used as the sync default.
+const PINATA_PUBLIC_GATEWAY = 'https://gateway.pinata.cloud';
 const CONFIGURED_GATEWAY = (import.meta.env.VITE_PINATA_GATEWAY_URL || PUBLIC_GATEWAY)
   .trim()
   .replace(/\/$/, '');
@@ -21,7 +28,13 @@ const IS_DEDICATED_GATEWAY = CONFIGURED_HOST.endsWith('.mypinata.cloud');
 const BYPASS_DEDICATED = PREFER_PUBLIC || IS_DEDICATED_GATEWAY;
 
 const ACTIVE_GATEWAY = BYPASS_DEDICATED ? PUBLIC_GATEWAY : CONFIGURED_GATEWAY;
-const ACTIVE_HOST = BYPASS_DEDICATED ? 'gateway.pinata.cloud' : CONFIGURED_HOST;
+let PUBLIC_GATEWAY_HOST = '';
+try {
+  PUBLIC_GATEWAY_HOST = new URL(PUBLIC_GATEWAY).host;
+} catch {
+  PUBLIC_GATEWAY_HOST = '';
+}
+const ACTIVE_HOST = BYPASS_DEDICATED ? PUBLIC_GATEWAY_HOST : CONFIGURED_HOST;
 
 function appendToken(url: string): string {
   // The Pinata gateway token is server-side only, so strip any stale
@@ -38,13 +51,13 @@ function appendToken(url: string): string {
 
 function rewriteBrokenDedicatedGatewayUrl(url: string): string {
   // Dedicated `.mypinata.cloud` gateways require a server-side token that
-  // the client never has — always rewrite to the public gateway in sync
-  // resolution. Async/signed flows go through resolveIpfsUrlAsync.
+  // the client never has — always rewrite to the active public gateway in
+  // sync resolution. Async/signed flows go through resolveIpfsUrlAsync.
   try {
     const parsed = new URL(url);
     if (!parsed.host.endsWith('.mypinata.cloud')) return url;
     parsed.searchParams.delete('pinataGatewayToken');
-    return `${PUBLIC_GATEWAY}${parsed.pathname}${parsed.search ? parsed.search : ''}`;
+    return `${ACTIVE_GATEWAY}${parsed.pathname}${parsed.search ? parsed.search : ''}`;
   } catch {
     return url;
   }
@@ -59,10 +72,15 @@ export function resolveIpfsUrl(url?: string | null): string {
   return appendToken(rewriteBrokenDedicatedGatewayUrl(url));
 }
 
-// Public fallback chain for CIDs not pinned on our Pinata account.
-// Pinata dedicated gateways and gateway.pinata.cloud both 403 unpinned CIDs;
-// these resolve any CID that's live on the IPFS network.
-const PUBLIC_FALLBACK_GATEWAYS = ['https://w3s.link', 'https://ipfs.io', 'https://dweb.link'];
+// Public fallback chain. Pinata dedicated gateways and gateway.pinata.cloud
+// both 401/403/429 unauthenticated traffic; these resolve any CID that's live
+// on the IPFS network. We try multiple in case any single one is degraded.
+const PUBLIC_FALLBACK_GATEWAYS = [
+  'https://w3s.link',
+  'https://ipfs.io',
+  'https://dweb.link',
+  PINATA_PUBLIC_GATEWAY,
+];
 
 const KNOWN_GATEWAY_HOSTS = new Set<string>([
   'gateway.pinata.cloud',
@@ -157,6 +175,60 @@ export function getNextIpfsFallback(currentUrl?: string | null): string | null {
 export function isIpfsGatewayUrl(url?: string | null): boolean {
   if (!url) return false;
   return extractIpfsPath(url) !== null;
+}
+
+// Race the candidate gateways in parallel and resolve to whichever one
+// returns a 2xx HEAD response first. Used when we want to discover the
+// fastest live gateway without serially waiting for each to time out.
+// Falls back to the first candidate if every probe fails or the timeout
+// elapses, so callers can always proceed.
+export async function raceIpfsGateways(
+  url?: string | null,
+  opts: { signal?: AbortSignal; timeoutMs?: number } = {}
+): Promise<string | null> {
+  const candidates = getIpfsUrlCandidates(url);
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+
+  const timeoutMs = opts.timeoutMs ?? 4000;
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const controllers: AbortController[] = [];
+
+    const finish = (result: string) => {
+      if (settled) return;
+      settled = true;
+      for (const c of controllers) {
+        try {
+          c.abort();
+        } catch {
+          /* ignore */
+        }
+      }
+      resolve(result);
+    };
+
+    if (opts.signal) {
+      opts.signal.addEventListener('abort', () => finish(candidates[0]), { once: true });
+    }
+
+    let pending = candidates.length;
+    for (const candidate of candidates) {
+      const controller = new AbortController();
+      controllers.push(controller);
+      fetch(candidate, { method: 'HEAD', signal: controller.signal, mode: 'cors' })
+        .then((res) => {
+          if (res.ok) finish(candidate);
+          else if (--pending === 0) finish(candidates[0]);
+        })
+        .catch(() => {
+          if (--pending === 0) finish(candidates[0]);
+        });
+    }
+
+    setTimeout(() => finish(candidates[0]), timeoutMs);
+  });
 }
 
 // ── Server-signed gateway URL (WEB-1) ─────────────────────────────────────

@@ -138,6 +138,7 @@ function WatchPage() {
           sourceNodeId?: string;
           sourceNodeIds?: string[];
           sourceCreator?: string | null;
+          style?: 'realistic' | 'animated';
         }>
       >,
     staleTime: 15_000,
@@ -172,6 +173,7 @@ function WatchPage() {
         description?: string;
         isCanon?: boolean;
         clipCount: number;
+        style?: 'realistic' | 'animated';
       }
     >();
     for (const ep of fsEpisodes || []) {
@@ -185,6 +187,7 @@ function WatchPage() {
         description: ep.description,
         isCanon: ep.isCanon,
         clipCount: ep.clipCount ?? ep.clips?.length ?? ids.size,
+        style: ep.style,
       };
       for (const id of ids) fsByNodeId.set(id, slim);
     }
@@ -209,6 +212,7 @@ function WatchPage() {
             fsDescription: fs?.description,
             fsIsCanon: fs?.isCanon,
             fsClipCount: fs?.clipCount ?? 1,
+            fsStyle: fs?.style,
           };
         })
         .filter((n) => n.videoLink || n.plot);
@@ -232,6 +236,7 @@ function WatchPage() {
             fsDescription: fs?.description,
             fsIsCanon: fs?.isCanon,
             fsClipCount: fs?.clipCount ?? 1,
+            fsStyle: fs?.style,
           } satisfies EpisodeRailItem;
         })
         .filter((n) => n.videoLink || n.plot);
@@ -251,8 +256,11 @@ function WatchPage() {
       }
       collapsed.push(item);
     }
-    // Restore the original (descending) order so latest episodes lead.
-    return collapsed.sort((a, b) => b.nodeId - a.nodeId);
+    // Group by style (animated first, then everything else) so universes with
+    // a stylistic split — same story, different aesthetic — surface the
+    // animated cut up top. Within each group, latest episodes lead by nodeId.
+    const stylePriority = (it: EpisodeRailItem) => (it.fsStyle === 'animated' ? 0 : 1);
+    return collapsed.sort((a, b) => stylePriority(a) - stylePriority(b) || b.nodeId - a.nodeId);
   }, [isOnChain, nodes, nodeContents, offChainNodes, fsEpisodes, idLower]);
 
   // Nodes on-chain that have no matching Firestore episode yet — the count
@@ -342,17 +350,17 @@ function WatchPage() {
         <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-background/30" />
 
         <div className="relative h-full flex items-end">
-          <div className="w-full max-w-[1440px] mx-auto px-4 md:px-12 pb-20 md:pb-28">
-            <div className="max-w-2xl space-y-4">
+          <div className="w-full max-w-[1440px] mx-auto px-4 md:px-12 pb-28 sm:pb-24 md:pb-28">
+            <div className="max-w-2xl space-y-3 md:space-y-4">
               <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-primary/90">
                 <Film className="h-3 w-3" />
                 Universe
               </div>
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-display italic text-white tracking-tight drop-shadow-lg">
+              <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-display italic text-white tracking-tight drop-shadow-lg">
                 {title}
               </h1>
               {description && (
-                <p className="text-base md:text-lg text-white/80 leading-relaxed max-w-xl line-clamp-3">
+                <p className="text-sm sm:text-base md:text-lg text-white/80 leading-relaxed max-w-xl line-clamp-2 sm:line-clamp-3">
                   {description}
                 </p>
               )}
@@ -434,7 +442,7 @@ function WatchPage() {
       {episodes.length > 0 && <EpisodeRail universeId={idLower} episodes={episodes} />}
 
       {/* ── Secondary rows ──────────────────────────── */}
-      <div className="max-w-[1440px] mx-auto px-4 md:px-12 pb-20 space-y-12">
+      <div className="max-w-[1440px] mx-auto px-4 md:px-12 pb-bottom-nav md:pb-20 space-y-10 md:space-y-12">
         <QuickLinks
           universeId={idLower}
           tokenAddress={token?.id || universe.tokenAddress}
@@ -468,6 +476,7 @@ type EpisodeRailItem = PonderNode & {
   fsDescription?: string;
   fsIsCanon?: boolean;
   fsClipCount?: number;
+  fsStyle?: 'realistic' | 'animated';
 };
 
 function shortAddr(addr?: string): string {
@@ -602,6 +611,21 @@ function EpisodeCard({
           </div>
         )}
 
+        {/* Bottom-left: visual style — only when explicitly tagged. Lets a
+            universe split the same story into stylistic cuts (e.g. animated
+            vs realistic) and signal it to viewers at a glance. */}
+        {episode.fsStyle && (
+          <div
+            className={`absolute bottom-2 left-2 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded backdrop-blur-sm ${
+              episode.fsStyle === 'animated'
+                ? 'bg-fuchsia-500/90 text-white'
+                : 'bg-amber-500/90 text-black'
+            }`}
+          >
+            {episode.fsStyle === 'animated' ? 'Animated' : 'Realistic'}
+          </div>
+        )}
+
         {/* Bottom-right: duration pill */}
         {duration !== null && (
           <div className="absolute bottom-2 right-2 text-[10px] font-mono bg-black/70 text-white px-1.5 py-0.5 rounded backdrop-blur-sm">
@@ -659,8 +683,12 @@ function EpisodeRail({
 
   const scrollBy = (dx: number) => scrollRef.current?.scrollBy({ left: dx, behavior: 'smooth' });
 
-  // Show in chronological order (oldest first)
-  const ordered = [...episodes].sort((a, b) => a.nodeId - b.nodeId);
+  // Show in chronological order (oldest first) — but if a universe has split
+  // its episodes by visual style, surface the animated lane up top first.
+  const stylePriority = (e: EpisodeRailItem) => (e.fsStyle === 'animated' ? 0 : 1);
+  const ordered = [...episodes].sort(
+    (a, b) => stylePriority(a) - stylePriority(b) || a.nodeId - b.nodeId
+  );
   const curatedCount = ordered.filter((e) => e.fsEpisodeId).length;
 
   return (

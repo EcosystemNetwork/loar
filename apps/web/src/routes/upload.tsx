@@ -46,7 +46,7 @@ function UploadPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-6 py-8 max-w-3xl">
+      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 max-w-3xl pb-bottom-nav md:pb-12">
         <h1 className="text-2xl font-bold mb-2">Upload Content</h1>
         <p className="text-muted-foreground mb-8">Share your work with the community</p>
         <UploadForm

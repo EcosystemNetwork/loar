@@ -113,35 +113,26 @@ function RootNotFound() {
 }
 
 function AuthErrorWatcher() {
-  const { error, needsManualSignIn, signIn } = useWalletAuth();
+  const { error } = useWalletAuth();
+  // /login renders the same error inline beneath the form — toasting on top
+  // double-displays it, so we suppress here when the user is on that page.
+  const onLoginPage = useRouterState({
+    select: (s) => s.location.pathname === '/login',
+  });
   const prevError = useRef<string | null>(null);
-  const shownManualSignIn = useRef(false);
 
   useEffect(() => {
+    if (onLoginPage) {
+      prevError.current = error;
+      return;
+    }
     if (error && error !== prevError.current) {
       prevError.current = error;
       toast.error('Sign-in failed', { description: error, duration: 8000 });
     } else if (!error) {
       prevError.current = null;
     }
-  }, [error]);
-
-  // Surface when auto-sign-in exhausted — prompt user to sign manually
-  useEffect(() => {
-    if (needsManualSignIn && !shownManualSignIn.current) {
-      shownManualSignIn.current = true;
-      toast.info('Wallet connected but not signed in', {
-        description: 'Click below to complete sign-in.',
-        action: {
-          label: 'Sign In',
-          onClick: () => signIn(),
-        },
-        duration: 15000,
-      });
-    } else if (!needsManualSignIn) {
-      shownManualSignIn.current = false;
-    }
-  }, [needsManualSignIn, signIn]);
+  }, [error, onLoginPage]);
 
   return null;
 }

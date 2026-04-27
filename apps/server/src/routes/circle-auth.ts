@@ -23,7 +23,11 @@ export const circleAuthRoutes = new Hono();
 
 const IS_DEV_OR_TEST = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
 const IS_PRODUCTION = !IS_DEV_OR_TEST;
-const COOKIE_NAME = 'siwe-session'; // reuse same cookie name for session continuity
+// Cookie name predates the SIWE → Circle DCW migration. Keeping it as
+// `siwe-session` so existing live sessions don't get force-logged-out on
+// deploy; rename only via a dual-read transition (server reads both, client
+// writes new) if that becomes worth doing.
+const COOKIE_NAME = 'siwe-session';
 const COOKIE_MAX_AGE = 24 * 60 * 60;
 
 // ── OTP storage ─────────────────────────────────────────────────────────────

@@ -315,8 +315,9 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
           </div>
         )}
 
-        {/* Claim CTA — only for orphan content, only for authed users */}
-        {isOrphan && isAuthenticated && (
+        {/* Claim CTA — orphan AI-generated content only. Uploads stay where the
+            uploader filed them; only AI-gen output is swappable into a universe. */}
+        {isOrphan && isAIGenerated && isAuthenticated && (
           <Button
             variant="outline"
             size="sm"

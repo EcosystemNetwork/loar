@@ -237,8 +237,13 @@ async function dispatchImageGen(
   ctx: { userId: string; generationId: string }
 ): Promise<DispatchResult> {
   if (model.provider === 'google') {
-    if (!googleImagenService.isConfigured()) {
-      return { status: 'failed', error: 'GOOGLE_API_KEY is not configured' };
+    const { resolveProviderKey } = await import('../../lib/byok');
+    const googleKey = await resolveProviderKey(ctx.userId, 'google');
+    if (!googleKey) {
+      return {
+        status: 'failed',
+        error: 'GOOGLE_API_KEY is not configured — set one in /settings/api-keys',
+      };
     }
     try {
       const result = await googleImagenService.generate({
@@ -247,6 +252,7 @@ async function dispatchImageGen(
         numberOfImages: input.numImages,
         aspectRatio: imageSizeToAspectRatio(input.imageSize),
         model: (model.googleModelId as any) || 'nano-banana-pro-preview',
+        apiKey: googleKey,
       });
       const manager = getStorageManager();
       const images: Array<{ url: string }> = [];
@@ -352,8 +358,13 @@ async function dispatchImageGen(
   }
 
   // FAL (default)
-  if (!process.env.FAL_KEY) {
-    return { status: 'failed', error: 'FAL_KEY is not configured' };
+  const { resolveProviderKey: resolveFalKey } = await import('../../lib/byok');
+  const falKey = await resolveFalKey(ctx.userId, 'fal');
+  if (!falKey) {
+    return {
+      status: 'failed',
+      error: 'FAL_KEY is not configured — set one in /settings/api-keys',
+    };
   }
   const result = await falService.generateImage({
     prompt: input.prompt,
@@ -362,6 +373,7 @@ async function dispatchImageGen(
     imageSize: input.imageSize,
     numImages: input.numImages,
     seed: input.seed,
+    apiKey: falKey,
   });
   if (result.status === 'completed' && result.images?.length) {
     return {
@@ -1191,10 +1203,13 @@ export const imageRouter = router({
           message: 'Controlled generation model is not registered',
         });
       }
-      if (!googleImagenService.isConfigured()) {
+      const { resolveProviderKey: resolveCtrlGoogle } = await import('../../lib/byok');
+      const ctrlGoogleKey = await resolveCtrlGoogle(ctx.user.uid, 'google');
+      if (!ctrlGoogleKey) {
         throw new TRPCError({
           code: 'SERVICE_UNAVAILABLE',
-          message: 'GOOGLE_API_KEY is not configured',
+          message:
+            'GOOGLE_API_KEY is not configured — set the env var or add a key in /settings/api-keys',
         });
       }
 
@@ -1302,6 +1317,7 @@ export const imageRouter = router({
           aspectRatio: imageSizeToAspectRatio(input.imageSize),
           model: 'nano-banana-pro-preview',
           inputImages,
+          apiKey: ctrlGoogleKey,
         });
 
         // Persist images through storage manager
@@ -1628,9 +1644,11 @@ export const imageRouter = router({
       input.prompt = sanitizePrompt(input.prompt);
       if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
       const startTime = Date.now();
+      const { resolveProviderKey } = await import('../../lib/byok');
+      const apiKey = await resolveProviderKey(ctx.user.uid, 'fal');
       let result;
       try {
-        result = await falService.generateImage(input);
+        result = await falService.generateImage({ ...input, apiKey });
       } catch (genError) {
         // Refund credits on generation failure
         if (db) {
@@ -1702,9 +1720,11 @@ export const imageRouter = router({
       input.prompt = sanitizePrompt(input.prompt);
       if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
       const startTime = Date.now();
+      const { resolveProviderKey } = await import('../../lib/byok');
+      const apiKey = await resolveProviderKey(ctx.user.uid, 'fal');
       let result;
       try {
-        result = await falService.editImage(input);
+        result = await falService.editImage({ ...input, apiKey });
       } catch (genError) {
         // Refund credits on generation failure
         if (db) {
@@ -1784,9 +1804,11 @@ export const imageRouter = router({
       input.prompt = sanitizePrompt(input.prompt);
       if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
       const startTime = Date.now();
+      const { resolveProviderKey } = await import('../../lib/byok');
+      const apiKey = await resolveProviderKey(ctx.user.uid, 'fal');
       let result;
       try {
-        result = await falService.imageToImage(input);
+        result = await falService.imageToImage({ ...input, apiKey });
       } catch (genError) {
         // Refund credits on generation failure
         if (db) {
@@ -1871,6 +1893,8 @@ export const imageRouter = router({
       const safeDesc = input.description.replace(/[\n\r]/g, ' ').slice(0, 300);
       const fullPrompt = `Character portrait of ${safeName}, ${safeDesc}, ${stylePrompt}, high quality digital art, detailed character design, clean uniform background, no text, no letters, no words, simple background, character focus`;
 
+      const { resolveProviderKey } = await import('../../lib/byok');
+      const falKey = await resolveProviderKey(ctx.user.uid, 'fal');
       let imageResult;
       try {
         imageResult = await falService.generateImage({
@@ -1878,6 +1902,7 @@ export const imageRouter = router({
           model: 'fal-ai/nano-banana',
           imageSize: 'square_hd',
           numImages: 1,
+          apiKey: falKey,
         });
       } catch (genError) {
         if (db) {

@@ -96,7 +96,7 @@ function WikiKindPage() {
 
   if (!validKind) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
+      <div className="container mx-auto px-4 py-6 md:py-8 max-w-5xl pb-bottom-nav md:pb-12">
         <Link to="/wiki">
           <Button variant="outline" className="mb-6">
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -126,7 +126,7 @@ function WikiKindPage() {
         </Button>
       </Link>
 
-      <h1 className="text-3xl font-bold mb-6">{displayName}</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold mb-6">{displayName}</h1>
 
       {isLoading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

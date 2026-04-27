@@ -20,7 +20,24 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { db } from '../lib/firebase';
 
-export type SecretProvider = 'bytedance' | 'zai';
+export type SecretProvider =
+  | 'bytedance'
+  | 'zai'
+  | 'openai'
+  | 'google'
+  | 'fal'
+  | 'elevenlabs'
+  | 'meshy';
+
+const ALL_PROVIDERS: SecretProvider[] = [
+  'bytedance',
+  'zai',
+  'openai',
+  'google',
+  'fal',
+  'elevenlabs',
+  'meshy',
+];
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
@@ -149,15 +166,16 @@ export async function clearUserSecret(uid: string, provider: SecretProvider): Pr
 export async function listUserSecretSummary(
   uid: string
 ): Promise<Record<SecretProvider, { last4: string; updatedAt: number } | null>> {
-  const summary: Record<SecretProvider, { last4: string; updatedAt: number } | null> = {
-    bytedance: null,
-    zai: null,
-  };
+  const summary: Record<SecretProvider, { last4: string; updatedAt: number } | null> =
+    Object.fromEntries(ALL_PROVIDERS.map((p) => [p, null])) as Record<
+      SecretProvider,
+      { last4: string; updatedAt: number } | null
+    >;
   if (!uid) return summary;
   const doc = await userSecretsCol().doc(uid).get();
   if (!doc.exists) return summary;
   const data = doc.data() ?? {};
-  for (const provider of Object.keys(summary) as SecretProvider[]) {
+  for (const provider of ALL_PROVIDERS) {
     const field = data[provider] as EncryptedField | undefined;
     if (field?.ciphertext) {
       summary[provider] = {

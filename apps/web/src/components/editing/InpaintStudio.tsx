@@ -423,7 +423,13 @@ export function InpaintStudio({
                 </Button>
               </div>
             </div>
-            <img src={resultUrl} alt="Inpaint result" className="w-full rounded" />
+            <img
+              src={resultUrl}
+              alt="Inpaint result"
+              loading="lazy"
+              decoding="async"
+              className="w-full rounded"
+            />
           </Card>
         )}
       </div>

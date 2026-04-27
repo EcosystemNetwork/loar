@@ -198,7 +198,8 @@ async function runImageTask(
   capability: Capability,
   prompt: string,
   imageSize: 'square_hd' | 'landscape_16_9',
-  numImages: number
+  numImages: number,
+  apiKey?: string
 ): Promise<TaskResult> {
   const modality = 'image';
   const decision = routeImageModel({ task: 'text_to_image' });
@@ -211,6 +212,7 @@ async function runImageTask(
       model: model?.falModelId as any,
       imageSize,
       numImages,
+      apiKey,
     });
 
     if (result.status !== 'completed' || !result.images?.length) {
@@ -239,7 +241,8 @@ async function runImageTask(
 async function runVideoTask(
   capability: Capability,
   prompt: string,
-  imageUrl: string | undefined
+  imageUrl: string | undefined,
+  apiKey?: string
 ): Promise<TaskResult> {
   const modality = 'video';
   const mode = imageUrl ? 'image_to_video' : 'text_to_video';
@@ -254,6 +257,7 @@ async function runVideoTask(
       imageUrl,
       duration: 5,
       aspectRatio: '16:9',
+      apiKey,
     });
 
     if (result.status === 'failed' || !result.videoUrl) {
@@ -279,12 +283,20 @@ async function runVideoTask(
   }
 }
 
-async function runSoundTask(capability: Capability, prompt: string): Promise<TaskResult> {
+async function runSoundTask(
+  capability: Capability,
+  prompt: string,
+  apiKey?: string
+): Promise<TaskResult> {
   const modality = 'voice';
   const creditsUsed = toCredits(CAPABILITY_COST_USD[capability]);
 
   try {
-    const result = await elevenLabsService.soundEffect({ text: prompt, durationSeconds: 3 });
+    const result = await elevenLabsService.soundEffect({
+      text: prompt,
+      durationSeconds: 3,
+      apiKey,
+    });
     const key = await firebaseStorageService.upload(
       result.audioBuffer,
       `studio-sfx-${randomUUID()}.mp3`
@@ -306,13 +318,14 @@ async function runSoundTask(capability: Capability, prompt: string): Promise<Tas
 async function runVoiceTask(
   capability: Capability,
   text: string,
-  voiceId: string
+  voiceId: string,
+  apiKey?: string
 ): Promise<TaskResult> {
   const modality = 'voice';
   const creditsUsed = toCredits(CAPABILITY_COST_USD[capability]);
 
   try {
-    const result = await elevenLabsService.textToSpeech({ text, voiceId });
+    const result = await elevenLabsService.textToSpeech({ text, voiceId, apiKey });
     const key = await firebaseStorageService.upload(
       result.audioBuffer,
       `studio-tts-${randomUUID()}.mp3`
@@ -334,7 +347,8 @@ async function runVoiceTask(
 async function run3DTask(
   capability: Capability,
   imageUrl: string | undefined,
-  prompt: string | undefined
+  prompt: string | undefined,
+  apiKey?: string
 ): Promise<TaskResult> {
   const modality = '3d';
   const creditsUsed = toCredits(CAPABILITY_COST_USD[capability]);
@@ -342,10 +356,10 @@ async function run3DTask(
   try {
     let taskId: string;
     if (imageUrl) {
-      const result = await meshyService.imageTo3D({ imageUrl, enablePbr: true });
+      const result = await meshyService.imageTo3D({ imageUrl, enablePbr: true, apiKey });
       taskId = result.taskId;
     } else if (prompt) {
-      const result = await meshyService.textTo3DPreview({ prompt });
+      const result = await meshyService.textTo3DPreview({ prompt, apiKey });
       taskId = result.taskId;
     } else {
       throw new Error('3D generation requires either an imageUrl or a prompt');
@@ -354,7 +368,9 @@ async function run3DTask(
     const task = await meshyService.waitForTask(
       taskId,
       imageUrl ? 'image-to-3d' : 'text-to-3d',
-      15 * 60 * 1000
+      15 * 60 * 1000,
+      undefined,
+      apiKey
     );
 
     const urls = Object.values(task.modelUrls).filter(Boolean) as string[];
@@ -632,6 +648,14 @@ async function runPackJob(
   const results: TaskResult[] = [];
   let creditsActuallyUsed = 0;
 
+  // Resolve BYOK keys once for the whole job (user-supplied → env fallback)
+  const { resolveProviderKey } = await import('../../lib/byok');
+  const [falKey, elevenKey, meshyKey] = await Promise.all([
+    resolveProviderKey(userId, 'fal'),
+    resolveProviderKey(userId, 'elevenlabs'),
+    resolveProviderKey(userId, 'meshy'),
+  ]);
+
   // Image prompt used across image/video/3d tasks
   const imagePrompt =
     input.imagePromptOverride ||
@@ -647,7 +671,7 @@ async function runPackJob(
     switch (capability) {
       case 'portrait':
       case 'product_shot':
-        result = await runImageTask(capability, imagePrompt, 'square_hd', 4);
+        result = await runImageTask(capability, imagePrompt, 'square_hd', 4, falKey);
         if (result.status === 'completed' && result.urls?.length) {
           firstImageUrl = result.urls[0];
         }
@@ -655,7 +679,7 @@ async function runPackJob(
 
       case 'hero_image':
       case 'keyframe_image':
-        result = await runImageTask(capability, imagePrompt, 'landscape_16_9', 4);
+        result = await runImageTask(capability, imagePrompt, 'landscape_16_9', 4, falKey);
         if (result.status === 'completed' && result.urls?.length) {
           firstImageUrl = result.urls[0];
         }
@@ -665,7 +689,7 @@ async function runPackJob(
         const text =
           input.voiceText || `${input.entityName}. ${input.entityDescription.slice(0, 150)}`;
         const voiceId = input.voiceId || 'pNInz6obpgDQGcFmaJgB'; // default ElevenLabs Adam
-        result = await runVoiceTask(capability, text, voiceId);
+        result = await runVoiceTask(capability, text, voiceId, elevenKey);
         break;
       }
 
@@ -675,7 +699,7 @@ async function runPackJob(
         const soundPrompt =
           input.soundPromptOverride ||
           `${capability === 'ambience_sound' ? 'Ambient background soundscape for' : 'Sound effect for'} ${input.entityName}, ${input.entityDescription.slice(0, 100)}`;
-        result = await runSoundTask(capability, soundPrompt);
+        result = await runSoundTask(capability, soundPrompt, elevenKey);
         break;
       }
 
@@ -685,12 +709,12 @@ async function runPackJob(
         const videoPrompt =
           input.videoPromptOverride ||
           `Cinematic shot of ${input.entityName}, ${input.entityDescription.slice(0, 200)}, smooth camera movement, high quality`;
-        result = await runVideoTask(capability, videoPrompt, firstImageUrl);
+        result = await runVideoTask(capability, videoPrompt, firstImageUrl, falKey);
         break;
       }
 
       case '3d_model':
-        result = await run3DTask(capability, firstImageUrl, imagePrompt);
+        result = await run3DTask(capability, firstImageUrl, imagePrompt, meshyKey);
         break;
 
       case 'lore_card':

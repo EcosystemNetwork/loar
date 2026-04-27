@@ -22,6 +22,13 @@ type Tab = {
   fuzzy?: boolean;
 };
 
+/**
+ * Routes where the bottom nav should hide because the page is an
+ * immersive surface that owns the bottom of the viewport (video
+ * playback, fullscreen editors, modal-style flows).
+ */
+const HIDE_ON_ROUTES = [{ to: '/play/$universeId' as const }, { to: '/login' as const }] as const;
+
 const TABS: Tab[] = [
   { to: '/', label: 'Home', icon: Home },
   { to: '/discover', label: 'Discover', icon: Compass, fuzzy: true },
@@ -32,6 +39,11 @@ const TABS: Tab[] = [
 
 export default function MobileBottomNav() {
   const matchRoute = useMatchRoute();
+
+  // Hide on immersive routes (video player, fullscreen flows).
+  if (HIDE_ON_ROUTES.some((r) => matchRoute(r))) {
+    return null;
+  }
 
   return (
     <nav

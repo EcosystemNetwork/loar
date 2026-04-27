@@ -189,6 +189,8 @@ export const sceneAudioRouter = router({
       await deductCredits(ctx.user.uid, credits);
 
       const jobId = randomUUID();
+      const { resolveProviderKey: resolveElevenDesign } = await import('../../lib/byok');
+      const elevenDesignKey = await resolveElevenDesign(ctx.user.uid, 'elevenlabs');
       try {
         const result = await elevenLabsService.designVoice({
           name: `${input.characterName} - ${input.universeId}`,
@@ -198,6 +200,7 @@ export const sceneAudioRouter = router({
           accent: input.accent,
           accentStrength: input.accentStrength,
           text: input.previewText,
+          apiKey: elevenDesignKey,
         });
 
         // Upload preview audio
@@ -273,11 +276,13 @@ export const sceneAudioRouter = router({
         text: z.string().min(1).max(200),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const doc = await voiceProfilesCol().doc(input.profileId).get();
       if (!doc.exists) throw new Error('Voice profile not found');
       const profile = doc.data()!;
 
+      const { resolveProviderKey } = await import('../../lib/byok');
+      const apiKey = await resolveProviderKey(ctx.user.uid, 'elevenlabs');
       const result = await elevenLabsService.textToSpeech({
         text: sanitizePrompt(input.text),
         voiceId: profile.voiceId,
@@ -285,6 +290,7 @@ export const sceneAudioRouter = router({
         stability: profile.stability ?? 0.5,
         similarityBoost: 0.75,
         style: profile.style ?? 0.3,
+        apiKey,
       });
 
       const audioUrl = await uploadAudioBuffer(
@@ -327,6 +333,8 @@ export const sceneAudioRouter = router({
       await deductCredits(ctx.user.uid, credits);
 
       const jobId = randomUUID();
+      const { resolveProviderKey: resolveDialogueKey } = await import('../../lib/byok');
+      const dialogueKey = await resolveDialogueKey(ctx.user.uid, 'elevenlabs');
       try {
         const audioBuffers: Buffer[] = [];
 
@@ -344,6 +352,7 @@ export const sceneAudioRouter = router({
             similarityBoost: 0.75,
             style: profile.style ?? 0.3,
             useSpeakerBoost: true,
+            apiKey: dialogueKey,
           });
 
           audioBuffers.push(result.audioBuffer);
@@ -397,11 +406,14 @@ export const sceneAudioRouter = router({
       await deductCredits(ctx.user.uid, credits);
 
       const jobId = randomUUID();
+      const { resolveProviderKey: resolveSfxKey } = await import('../../lib/byok');
+      const sfxKey = await resolveSfxKey(ctx.user.uid, 'elevenlabs');
       try {
         const result = await elevenLabsService.soundEffect({
           text: sanitizePrompt(input.description),
           durationSeconds: input.durationSec,
           promptInfluence: 0.4,
+          apiKey: sfxKey,
         });
 
         const audioUrl = await uploadAudioBuffer(
@@ -450,11 +462,14 @@ export const sceneAudioRouter = router({
       await deductCredits(ctx.user.uid, credits);
 
       const jobId = randomUUID();
+      const { resolveProviderKey: resolveMusicKey } = await import('../../lib/byok');
+      const musicKey = await resolveMusicKey(ctx.user.uid, 'fal');
       try {
         const result = await falService.generateAudio({
           prompt: sanitizePrompt(input.prompt),
           model: input.model,
           durationSec: input.durationSec,
+          apiKey: musicKey,
         });
 
         if (result.status === 'failed' || !result.audioUrl) {
@@ -590,6 +605,12 @@ export const sceneAudioRouter = router({
 
       let creditsUsed = 0;
 
+      const { resolveProviderKey: resolveSceneKey } = await import('../../lib/byok');
+      const [sceneElevenKey, sceneFalKey] = await Promise.all([
+        resolveSceneKey(ctx.user.uid, 'elevenlabs'),
+        resolveSceneKey(ctx.user.uid, 'fal'),
+      ]);
+
       try {
         // ── 1. Generate dialogue TTS ──
         let dialogueUrl: string | undefined;
@@ -620,6 +641,7 @@ export const sceneAudioRouter = router({
               similarityBoost: 0.75,
               style: profile.style ?? 0.3,
               useSpeakerBoost: true,
+              apiKey: sceneElevenKey,
             });
             audioBuffers.push(ttsResult.audioBuffer);
             audioBuffers.push(Buffer.alloc(8820)); // gap
@@ -647,6 +669,7 @@ export const sceneAudioRouter = router({
             text: sanitizePrompt(scene.sfxDescription),
             durationSeconds: 10,
             promptInfluence: 0.4,
+            apiKey: sceneElevenKey,
           });
           sfxUrl = await uploadAudioBuffer(
             sfxResult.audioBuffer,
@@ -663,6 +686,7 @@ export const sceneAudioRouter = router({
             prompt: sanitizePrompt(scene.musicPrompt),
             model: 'fal-ai/stable-audio',
             durationSec: scene.musicDurationSec,
+            apiKey: sceneFalKey,
           });
           if (musicResult.status === 'completed' && musicResult.audioUrl) {
             musicUrl = musicResult.audioUrl;
@@ -752,6 +776,12 @@ export const sceneAudioRouter = router({
       const { universeId, scenes } = input;
       const timelineId = randomUUID();
 
+      const { resolveProviderKey: resolveTimelineKey } = await import('../../lib/byok');
+      const [timelineElevenKey, timelineFalKey] = await Promise.all([
+        resolveTimelineKey(ctx.user.uid, 'elevenlabs'),
+        resolveTimelineKey(ctx.user.uid, 'fal'),
+      ]);
+
       // Generate shared music if provided
       let sharedMusicUrl: string | undefined;
       if (input.sharedMusicPrompt) {
@@ -764,6 +794,7 @@ export const sceneAudioRouter = router({
             prompt: sanitizePrompt(input.sharedMusicPrompt),
             model: 'fal-ai/stable-audio',
             durationSec: input.sharedMusicDurationSec,
+            apiKey: timelineFalKey,
           });
           if (musicResult.status === 'completed' && musicResult.audioUrl) {
             sharedMusicUrl = musicResult.audioUrl;
@@ -828,6 +859,7 @@ export const sceneAudioRouter = router({
                 stability: profile.stability ?? 0.5,
                 similarityBoost: 0.75,
                 style: profile.style ?? 0.3,
+                apiKey: timelineElevenKey,
               });
               buffers.push(tts.audioBuffer);
               buffers.push(Buffer.alloc(8820));
@@ -848,6 +880,7 @@ export const sceneAudioRouter = router({
               text: sanitizePrompt(scene.sfxDescription),
               durationSeconds: 10,
               promptInfluence: 0.4,
+              apiKey: timelineElevenKey,
             });
             sceneResult.sfxUrl = await uploadAudioBuffer(
               sfx.audioBuffer,
@@ -861,6 +894,7 @@ export const sceneAudioRouter = router({
               prompt: sanitizePrompt(scene.musicPrompt),
               model: 'fal-ai/stable-audio',
               durationSec: scene.musicDurationSec,
+              apiKey: timelineFalKey,
             });
             if (music.status === 'completed' && music.audioUrl) {
               sceneResult.musicUrl = music.audioUrl;
@@ -1070,6 +1104,12 @@ export const sceneAudioRouter = router({
       const credits = toCredits(costUsd, fiatMargin);
       await deductCredits(ctx.user.uid, credits);
 
+      const { resolveProviderKey: resolveNodeKey } = await import('../../lib/byok');
+      const [nodeElevenKey, nodeFalKey] = await Promise.all([
+        resolveNodeKey(ctx.user.uid, 'elevenlabs'),
+        resolveNodeKey(ctx.user.uid, 'fal'),
+      ]);
+
       try {
         let audioUrl: string;
 
@@ -1080,6 +1120,7 @@ export const sceneAudioRouter = router({
               text: sanitizePrompt(input.prompt),
               durationSeconds: input.durationSec ? Math.min(input.durationSec, 22) : undefined,
               promptInfluence: 0.4,
+              apiKey: nodeElevenKey,
             });
             audioUrl = await uploadAudioBuffer(
               sfxResult.audioBuffer,
@@ -1092,6 +1133,7 @@ export const sceneAudioRouter = router({
               prompt: sanitizePrompt(input.prompt),
               model: input.musicModel,
               durationSec: input.durationSec || 30,
+              apiKey: nodeFalKey,
             });
             if (musicResult.status === 'failed' || !musicResult.audioUrl) {
               throw new Error(musicResult.error || 'Music generation failed');
@@ -1115,6 +1157,7 @@ export const sceneAudioRouter = router({
               stability: profile.stability ?? 0.5,
               similarityBoost: 0.75,
               style: profile.style ?? 0.3,
+              apiKey: nodeElevenKey,
             });
             audioUrl = await uploadAudioBuffer(
               ttsResult.audioBuffer,
@@ -1184,6 +1227,11 @@ export const sceneAudioRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const { fiatMargin } = await getMargins();
+      const { resolveProviderKey: resolveBatchKey } = await import('../../lib/byok');
+      const [batchElevenKey, batchFalKey] = await Promise.all([
+        resolveBatchKey(ctx.user.uid, 'elevenlabs'),
+        resolveBatchKey(ctx.user.uid, 'fal'),
+      ]);
       const results: Array<{
         id: string;
         kind: string;
@@ -1221,6 +1269,7 @@ export const sceneAudioRouter = router({
                 text: sanitizePrompt(spec.prompt),
                 durationSeconds: spec.durationSec ? Math.min(spec.durationSec, 22) : undefined,
                 promptInfluence: 0.4,
+                apiKey: batchElevenKey,
               });
               audioUrl = await uploadAudioBuffer(
                 sfx.audioBuffer,
@@ -1233,6 +1282,7 @@ export const sceneAudioRouter = router({
                 prompt: sanitizePrompt(spec.prompt),
                 model: 'fal-ai/stable-audio',
                 durationSec: spec.durationSec || 30,
+                apiKey: batchFalKey,
               });
               if (music.status === 'failed' || !music.audioUrl) {
                 throw new Error(music.error || 'Music generation failed');
@@ -1252,6 +1302,7 @@ export const sceneAudioRouter = router({
                 stability: p.stability ?? 0.5,
                 similarityBoost: 0.75,
                 style: p.style ?? 0.3,
+                apiKey: batchElevenKey,
               });
               audioUrl = await uploadAudioBuffer(
                 tts.audioBuffer,

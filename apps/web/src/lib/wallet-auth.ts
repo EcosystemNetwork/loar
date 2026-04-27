@@ -198,7 +198,11 @@ export { getSessionValidationDone as awaitSessionValidation };
 
 // ── Session refresh timer ───────────────────────────────────────
 
-const REFRESH_INTERVAL = 15 * 60 * 1000; // 15 minutes
+// JWT TTL is 24h server-side. Refreshing hourly keeps a session live during
+// long-running tabs without flooding /auth/refresh. Logout is the only thing
+// that needs sub-hour propagation, and that's an explicit action that revokes
+// the cookie immediately — no timer involved.
+const REFRESH_INTERVAL = 60 * 60 * 1000; // 1 hour
 let _refreshTimer: ReturnType<typeof setInterval> | null = null;
 
 function startRefreshTimer() {
@@ -219,7 +223,9 @@ startRefreshTimer();
 /**
  * Request an OTP code for email login.
  */
-export async function requestEmailOTP(email: string): Promise<{ ok: boolean; _devOtp?: string }> {
+export async function requestEmailOTP(
+  email: string
+): Promise<{ ok: boolean; throttled?: boolean; _devOtp?: string }> {
   const res = await fetch(`${SERVER_URL}/auth/circle/register`, {
     method: 'POST',
     credentials: 'include',
@@ -350,13 +356,6 @@ export function useWalletAuth() {
     clearSiweSession(true);
   }, []);
 
-  /** Legacy SIWE sign-in (no-op placeholder — kept for API compat). */
-  const signIn = useCallback(async () => {
-    // SIWE wallet-based sign-in is deprecated.
-    // Use signInWithEmail or signInWithSocial instead.
-    console.warn('[auth] Legacy SIWE signIn called — use signInWithEmail or signInWithSocial');
-  }, []);
-
   return {
     address,
     isConnected,
@@ -370,9 +369,7 @@ export function useWalletAuth() {
      */
     sessionReady: validated,
     isAuthenticating,
-    needsManualSignIn: false,
     error,
-    signIn,
     signInWithEmail,
     signInWithSocial,
     signOut,

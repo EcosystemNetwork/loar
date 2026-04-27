@@ -332,10 +332,13 @@ export const audioRouter = router({
         if (input.style) fullPrompt = `${input.style} style. ${fullPrompt}`;
 
         const falModelId = toFalModel(modelId);
+        const { resolveProviderKey } = await import('../../lib/byok');
+        const apiKey = await resolveProviderKey(ctx.user.uid, 'fal');
         const result = await falService.generateAudio({
           prompt: fullPrompt,
           model: falModelId as any,
           durationSec: input.durationSec,
+          apiKey,
         });
 
         if (result.status === 'failed' || !result.audioUrl) {

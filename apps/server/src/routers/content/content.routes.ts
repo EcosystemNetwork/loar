@@ -11,6 +11,7 @@ import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { FieldValue } from 'firebase-admin/firestore';
 import { triggerContentThumbnailAsync } from '../../services/content-cover-image';
+import { triggerContentHlsAsync } from '../../services/content-hls';
 import { recordAssetEventAsync } from '../../services/lineage';
 import type { AssetOutputKind } from '../../services/lineage/types';
 
@@ -129,6 +130,16 @@ export const contentRouter = router({
         creatorUid: ctx.user.uid,
       });
     }
+
+    // Fire-and-forget HLS transcode + thumbnail sprite for video content.
+    // Long-running (CPU-bound ffmpeg), so explicitly does not block the
+    // create response. Player falls back to mediaUrl until hlsUrl is set.
+    triggerContentHlsAsync({
+      id: ref.id,
+      mediaUrl: input.mediaUrl,
+      mediaType: input.mediaType,
+      creatorUid: ctx.user.uid,
+    });
 
     // PRD 10: publish lineage event.
     const outputKind: AssetOutputKind = input.mediaType.includes('image')
@@ -515,6 +526,55 @@ export const contentRouter = router({
         items: page.slice(0, input.limit),
         nextCursor: hasMore ? page[input.limit - 1]?.id : null,
       };
+    }),
+
+  /**
+   * Look up HLS playlist + WebVTT thumbnail URLs for a batch of contentHashes.
+   * Used by players (e.g. BranchingPlayer) that get on-chain `contentHash`
+   * values back from the indexer and want to opt in to adaptive streaming
+   * when the server-side transcoder has finished processing the asset.
+   *
+   * Hashes must be raw lowercase SHA-256 hex (no `0x` prefix). The endpoint
+   * is public — these URLs are derived from already-public content metadata.
+   */
+  hlsByHashes: publicProcedure
+    .input(
+      z.object({
+        contentHashes: z.array(z.string().regex(/^[0-9a-f]{64}$/i)).max(60),
+      })
+    )
+    .query(async ({ input }) => {
+      const result: Record<
+        string,
+        { hlsUrl: string | null; vttThumbnailsUrl: string | null; spriteSheetUrl: string | null }
+      > = {};
+      if (input.contentHashes.length === 0) return result;
+
+      const hashes = Array.from(new Set(input.contentHashes.map((h) => h.toLowerCase())));
+
+      // Firestore `in` queries are limited to 30 values per call. Chunk so
+      // callers can pass up to 60 hashes in one request.
+      const CHUNK = 30;
+      for (let i = 0; i < hashes.length; i += CHUNK) {
+        const chunk = hashes.slice(i, i + CHUNK);
+        const snap = await contentCol().where('storageContentHash', 'in', chunk).get();
+        for (const doc of snap.docs) {
+          const data = doc.data();
+          const hash = String(data.storageContentHash || '').toLowerCase();
+          if (!hash) continue;
+          // Skip non-active content (flagged/hidden/removed) — players
+          // shouldn't be served HLS for content that's been moderated.
+          const status = data.contentStatus || 'active';
+          if (status !== 'active' && status !== 'reinstated') continue;
+          result[hash] = {
+            hlsUrl: data.hlsUrl ?? null,
+            vttThumbnailsUrl: data.vttThumbnailsUrl ?? null,
+            spriteSheetUrl: data.spriteSheetUrl ?? null,
+          };
+        }
+      }
+
+      return result;
     }),
 });
 

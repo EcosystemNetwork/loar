@@ -66,7 +66,7 @@ function CharacterPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
+    <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 max-w-4xl pb-bottom-nav md:pb-12">
       <Link to="/wiki">
         <Button variant="outline" className="mb-6">
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -74,7 +74,7 @@ function CharacterPage() {
         </Button>
       </Link>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
         {/* Character Image */}
         <div className="space-y-4">
           <Card>

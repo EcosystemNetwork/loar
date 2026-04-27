@@ -32,9 +32,15 @@ import {
   Images,
   NotebookPen,
   Wand2,
+  Sparkles,
+  ScrollText,
+  GitCompareArrows,
+  ExternalLink,
 } from 'lucide-react';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
 import { RandomUniverseBuilder } from '@/components/RandomUniverseBuilder';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScriptCard, CompareCard } from '@/components/zai/script-compare';
 
 interface EntityTypeCard {
   kind: string;
@@ -44,7 +50,7 @@ interface EntityTypeCard {
   color: string;
 }
 
-const ENTITY_TYPES: EntityTypeCard[] = [
+const STUDIO_TOOLS: EntityTypeCard[] = [
   {
     kind: 'sandbox',
     label: 'Sandbox',
@@ -54,12 +60,23 @@ const ENTITY_TYPES: EntityTypeCard[] = [
     color: 'from-cyan-500/20 to-sky-500/20 border-cyan-500/30',
   },
   {
+    kind: 'lab',
+    label: 'Z.AI Lab',
+    description:
+      'A/B compare GLM-4.6 / 4.7 / 5.1 on the same logline. Worldbuild, write scripts, talking scenes.',
+    icon: Sparkles,
+    color: 'from-violet-500/20 to-fuchsia-500/20 border-violet-500/30',
+  },
+  {
     kind: 'notebook',
     label: 'Notebook',
     description: 'Private scratch for raw ideas. Promote drafts to canon when ready.',
     icon: NotebookPen,
     color: 'from-yellow-500/20 to-amber-500/20 border-yellow-500/30',
   },
+];
+
+const ENTITY_TYPES: EntityTypeCard[] = [
   {
     kind: 'universe',
     label: 'Universe',
@@ -246,7 +263,7 @@ function CreateHub() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-10 max-w-6xl">
+    <div className="container mx-auto px-4 py-6 sm:py-10 max-w-6xl pb-bottom-nav md:pb-12">
       {universeInfo && (
         <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-violet-500/30 bg-gradient-to-r from-violet-500/10 to-purple-500/10 p-4">
           {universeInfo.image_url && (
@@ -298,10 +315,10 @@ function CreateHub() {
         </div>
       )}
 
-      <div className="mb-10 flex items-start justify-between gap-4">
+      <div className="mb-8 sm:mb-10 flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight mb-3">Create</h1>
-          <p className="text-muted-foreground text-lg max-w-2xl">
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2 sm:mb-3">Create</h1>
+          <p className="text-muted-foreground text-base sm:text-lg max-w-2xl">
             {universeInfo
               ? `Add people, places, factions, lore, and more to ${universeInfo.name}.`
               : 'Anything in your universe is a first-class object. Build people, places, factions, and lore — or deploy a new universe on-chain.'}
@@ -315,6 +332,51 @@ function CreateHub() {
             <Globe className="h-4 w-4" />
             Manage Universes
           </Link>
+        )}
+      </div>
+
+      <div className="mb-10 rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/[0.06] to-fuchsia-500/[0.04] p-5 sm:p-6">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-violet-400" />
+              Z.AI Script Lab
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
+              Compare GLM-4.6, GLM-4.7, and GLM-5.1 side-by-side on the same logline. Worldbuild
+              prompt or full screenplay — pick the model that writes the way your universe sounds.
+            </p>
+          </div>
+          <a
+            href="/lab/zai"
+            className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 flex-shrink-0"
+          >
+            Full lab <ExternalLink className="h-3 w-3" />
+          </a>
+        </div>
+        {address ? (
+          <Tabs defaultValue="script" className="w-full">
+            <TabsList>
+              <TabsTrigger value="script">
+                <ScrollText className="h-3.5 w-3.5 mr-1.5" />
+                Script
+              </TabsTrigger>
+              <TabsTrigger value="compare">
+                <GitCompareArrows className="h-3.5 w-3.5 mr-1.5" />
+                Worldbuild compare
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="script" className="mt-4">
+              <ScriptCard />
+            </TabsContent>
+            <TabsContent value="compare" className="mt-4">
+              <CompareCard />
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <div className="rounded-lg border border-white/10 bg-black/20 px-4 py-6 text-sm text-muted-foreground">
+            Connect a wallet to run the A/B compare against the GLM models.
+          </div>
         )}
       </div>
 
@@ -406,23 +468,52 @@ function CreateHub() {
         </div>
       )}
 
+      <div className="mb-10">
+        <div className="mb-4 flex items-end justify-between">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight">Studio Tools</h2>
+            <p className="text-sm text-muted-foreground">
+              Playgrounds and notebooks — generate, A/B compare, draft.
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {STUDIO_TOOLS.map(({ kind, label, description, icon: Icon, color }) => {
+            const href =
+              kind === 'sandbox' ? '/sandbox' : kind === 'lab' ? '/lab/zai' : '/notebook';
+            return (
+              <Link
+                key={kind}
+                to={href as any}
+                className={`group relative flex flex-col gap-3 p-6 rounded-xl border bg-gradient-to-br ${color} hover:scale-[1.02] transition-all duration-200 hover:shadow-lg`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-background/50">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <h2 className="text-lg font-semibold">{label}</h2>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold tracking-tight">Build</h2>
+        <p className="text-sm text-muted-foreground">
+          Universes, characters, factions, lore — every object is first-class.
+        </p>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {ENTITY_TYPES.filter(({ kind }) => (universeAddress ? kind !== 'universe' : true)).map(
           ({ kind, label, description, icon: Icon, color }) => {
-            const href =
-              kind === 'universe'
-                ? '/cinematicUniverseCreate'
-                : kind === 'notebook'
-                  ? '/notebook'
-                  : kind === 'sandbox'
-                    ? '/sandbox'
-                    : `/create/${kind}`;
-            // Sandbox + notebook are standalone routes that don't accept the
-            // universe context query param — only entity-form routes do.
+            const href = kind === 'universe' ? '/cinematicUniverseCreate' : `/create/${kind}`;
+            // Standalone routes don't accept the universe context query param —
+            // only entity-form routes do.
             const search =
-              kind !== 'universe' && kind !== 'notebook' && kind !== 'sandbox' && universeAddress
-                ? { universe: universeAddress }
-                : undefined;
+              kind !== 'universe' && universeAddress ? { universe: universeAddress } : undefined;
             return (
               <Link
                 key={kind}
