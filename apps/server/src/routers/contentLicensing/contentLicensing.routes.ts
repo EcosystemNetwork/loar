@@ -250,18 +250,14 @@ export const contentLicensingRouter = router({
       })
     )
     .query(async ({ input }) => {
+      // Firestore requires the first orderBy to match any inequality filter.
+      // We can't combine `where(buyPrice != '0').orderBy(createdAt)` without a
+      // composite index per (price-field, sort-field) pair AND reordering the
+      // sort, so we apply the dealType filter client-side and overfetch to
+      // keep the page full.
       let query: FirebaseFirestore.Query = registrationsCol()
         .where('universeId', '==', input.universeId)
         .where('active', '==', true);
-
-      // Filter by deal type availability
-      if (input.dealType === 'BUY') {
-        query = query.where('buyPrice', '!=', '0');
-      } else if (input.dealType === 'RENT') {
-        query = query.where('rentPricePerDay', '!=', '0');
-      } else if (input.dealType === 'LICENSE') {
-        query = query.where('licenseFee', '!=', '0');
-      }
 
       if (input.sortBy === 'popular') {
         query = query.orderBy('totalSales', 'desc');
@@ -269,8 +265,19 @@ export const contentLicensingRouter = router({
         query = query.orderBy('createdAt', 'desc');
       }
 
-      const snapshot = await query.limit(input.limit).get();
-      return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const fetchSize = input.dealType ? Math.min(input.limit * 4, 100) : input.limit;
+      const snapshot = await query.limit(fetchSize).get();
+      let docs = snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) }));
+
+      if (input.dealType === 'BUY') {
+        docs = docs.filter((d) => d.buyPrice && String(d.buyPrice) !== '0');
+      } else if (input.dealType === 'RENT') {
+        docs = docs.filter((d) => d.rentPricePerDay && String(d.rentPricePerDay) !== '0');
+      } else if (input.dealType === 'LICENSE') {
+        docs = docs.filter((d) => d.licenseFee && String(d.licenseFee) !== '0');
+      }
+
+      return docs.slice(0, input.limit);
     }),
 
   /** Get all content registered by the current user */

@@ -112,9 +112,26 @@ export const queryClient = new QueryClient({
       if (httpStatus === 401 || error.message?.includes('UNAUTHORIZED')) {
         const address = localStorage.getItem('siwe-address');
         const expiry = localStorage.getItem('siwe-expiry');
-        const hadSession = !!(address && expiry && Date.now() < Number(expiry));
-        if (!hadSession) return;
 
+        // No address stored → no session to clear, just bail.
+        if (!address) return;
+
+        // Local expiry already past → clear immediately. Without this branch,
+        // expired-but-still-stored sessions cause polling queries (LoarBalance,
+        // notifications, etc.) to retry forever: enabled=isAuthenticated stays
+        // true because storedAddress is non-null, but every request 401s.
+        const expiryMs = expiry ? Number(expiry) : 0;
+        if (!expiryMs || Date.now() >= expiryMs) {
+          void import('../lib/wallet-auth').then(({ clearSiweSession }) => {
+            clearSiweSession();
+            toast.error('Session expired. Please sign in again.', {
+              id: 'session-expired',
+            });
+          });
+          return;
+        }
+
+        // Local session looks live — verify with /auth/me before clearing.
         void fetch(`${SERVER_URL}/auth/me`, {
           credentials: 'include',
         })
