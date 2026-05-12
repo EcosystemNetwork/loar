@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "programs/universe",
   "programs/episode",
+  "programs/payment",
 ]
 
 [profile.release]

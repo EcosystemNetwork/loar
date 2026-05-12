@@ -188,6 +188,9 @@ const envSchema = z.object({
   // Bubblegum merkle trees per cluster
   BUBBLEGUM_TREE_DEVNET: z.string().optional(),
   BUBBLEGUM_TREE_MAINNET: z.string().optional(),
+
+  // Solana Pay
+  SOLANA_PAY_RECIPIENT: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -242,6 +245,24 @@ export function validateEnv(): Env {
       prodErrors.push(
         'RPC_URL_BASE_SEPOLIA is required in production for multi-chain payment verification and Base multi-sig admin checks'
       );
+    }
+
+    // Solana — only required when Circle DCW is configured (i.e. Solana flows
+    // are reachable). If Circle isn't set up either, the Solana routes 503
+    // fail-fast at request time and don't need the RPC.
+    if (process.env.CIRCLE_API_KEY) {
+      if (!env.SOLANA_RPC_URL) {
+        prodErrors.push(
+          'SOLANA_RPC_URL is required in production when CIRCLE_API_KEY is set ' +
+            '(Solana wallet/tx routes need a Helius/Triton RPC — the public Solana RPC is unusable in prod)'
+        );
+      }
+      if (!env.HELIUS_API_KEY) {
+        // DAS API (cNFT reads) requires a separate API key from the RPC URL.
+        prodErrors.push(
+          'HELIUS_API_KEY is required in production when CIRCLE_API_KEY is set (DAS API for cNFT reads)'
+        );
+      }
     }
 
     if (!env.ADMIN_ADDRESSES && !env.ADMIN_WALLET) {

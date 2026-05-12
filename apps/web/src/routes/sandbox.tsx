@@ -60,6 +60,7 @@ import { GenerationCard } from '@/components/sandbox/GenerationCard';
 import { DraftCard, inferDraftKind } from '@/components/sandbox/DraftCard';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { WalletConnectButton } from '@/components/wallet-connect-button';
+import { SUPPORTED_CHAINS, type ChainSelection, DEFAULT_CHAIN_SELECTION } from '@/configs/chains';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -151,6 +152,7 @@ function SandboxPage() {
   const AUTO_SEND_KEY = 'sandbox.autoSendTarget';
   const AUTO_SEND_CLASSIFICATION_KEY = 'sandbox.autoSendClassification';
   const AUTO_SEND_VISIBILITY_KEY = 'sandbox.autoSendVisibility';
+  const TARGET_CHAIN_KEY = 'sandbox.targetChain';
 
   const readLocal = (key: string, fallback: string) => {
     if (typeof window === 'undefined') return fallback;
@@ -171,27 +173,42 @@ function SandboxPage() {
     () => readLocal(AUTO_SEND_VISIBILITY_KEY, 'unlisted') as 'public' | 'unlisted' | 'private'
   );
 
+  // Target chain — picks where generated items will eventually live (drafts get
+  // a `targetChain` stamp, propagated on promote into content/universe). Stored
+  // as a CAIP-2 ChainOption.id ("eip155:84532" | "solana:devnet").
+  const [targetChainId, setTargetChainId] = useState<string>(() => {
+    const stored = readLocal(TARGET_CHAIN_KEY, '');
+    if (stored && SUPPORTED_CHAINS.some((c) => c.id === stored)) return stored;
+    const def = SUPPORTED_CHAINS[0]?.id;
+    return def ?? '';
+  });
+  const targetChainSelection: ChainSelection =
+    SUPPORTED_CHAINS.find((c) => c.id === targetChainId)?.selection ?? DEFAULT_CHAIN_SELECTION;
+
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
       window.localStorage.setItem(AUTO_SEND_KEY, autoSendTarget);
       window.localStorage.setItem(AUTO_SEND_CLASSIFICATION_KEY, autoSendClassification);
       window.localStorage.setItem(AUTO_SEND_VISIBILITY_KEY, autoSendVisibility);
+      window.localStorage.setItem(TARGET_CHAIN_KEY, targetChainId);
     } catch {
       // localStorage may be unavailable (SSR, private mode) — settings won't persist this turn.
     }
-  }, [autoSendTarget, autoSendClassification, autoSendVisibility]);
+  }, [autoSendTarget, autoSendClassification, autoSendVisibility, targetChainId]);
 
   // Refs so autoSaveDraft reads the latest values without re-building every
   // run* callback (and their long dep chains) when settings change.
   const autoSendTargetRef = React.useRef(autoSendTarget);
   const autoSendClassificationRef = React.useRef(autoSendClassification);
   const autoSendVisibilityRef = React.useRef(autoSendVisibility);
+  const targetChainIdRef = React.useRef(targetChainId);
   React.useEffect(() => {
     autoSendTargetRef.current = autoSendTarget;
     autoSendClassificationRef.current = autoSendClassification;
     autoSendVisibilityRef.current = autoSendVisibility;
-  }, [autoSendTarget, autoSendClassification, autoSendVisibility]);
+    targetChainIdRef.current = targetChainId;
+  }, [autoSendTarget, autoSendClassification, autoSendVisibility, targetChainId]);
 
   // Only list universes the caller can actually promote into — server does the
   // creator-match + multi-sig owner check.
@@ -343,6 +360,9 @@ function SandboxPage() {
           thumbnailUrl: gen.thumbnailUrl,
           kind: draftKind,
           model: gen.kind === 'video' ? gen.videoModel : gen.imageModel || undefined,
+          // Stamp the user's currently-selected target chain so promote → content
+          // carries the chain forward without a second decision.
+          targetChain: targetChainIdRef.current || undefined,
         });
         updateGen(gen.id, { draftId: result.id, draftSaveError: undefined });
         queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] });
@@ -2173,6 +2193,35 @@ function SandboxPage() {
 
             {/* Right: drafts */}
             <div className="flex flex-col gap-4">
+              {/* Target chain — where items will live once promoted/minted */}
+              {SUPPORTED_CHAINS.length > 1 && (
+                <Card>
+                  <CardContent className="py-3 space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold">
+                      <Globe className="h-3 w-3" />
+                      Target chain
+                    </div>
+                    <Select value={targetChainId} onValueChange={setTargetChainId}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Select chain" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPORTED_CHAINS.map((opt) => (
+                          <SelectItem key={opt.id} value={opt.id} className="text-xs">
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">
+                      {targetChainSelection.kind === 'solana'
+                        ? 'Saved generations stamp this chain; minting lands on Solana.'
+                        : 'Saved generations stamp this chain; minting lands on EVM.'}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Auto-send setting: fire-and-forget promotion after each generation */}
               <Card>
                 <CardContent className="py-3 space-y-2">

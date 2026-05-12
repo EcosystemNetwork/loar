@@ -57,6 +57,16 @@ export const sandboxRouter = router({
         kind: z.enum(['image', 'video', 'audio', '3d']).optional(),
         model: z.string().optional(),
         tags: z.array(z.string()).max(10).default([]),
+        /**
+         * Target chain for this draft — CAIP-2 form ("eip155:84532" or
+         * "solana:devnet"). Determines which chain the asset lands on when
+         * the draft is promoted to a universe or minted. Optional for
+         * backwards compatibility with older clients.
+         */
+        targetChain: z
+          .string()
+          .regex(/^(eip155:\d+|solana:(devnet|mainnet-beta|testnet))$/)
+          .optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -88,6 +98,7 @@ export const sandboxRouter = router({
         model: input.model || null,
         tags: input.tags,
         status: 'draft',
+        targetChain: input.targetChain ?? null,
         createdAt: now,
         updatedAt: now,
       });
@@ -431,6 +442,7 @@ export const sandboxRouter = router({
             updatedAt: now,
           };
           if (input.universeId) updates.universeId = input.universeId;
+          if (draft.targetChain) updates.targetChain = draft.targetChain as string;
           tx.update(existingDoc.ref, updates);
           return { contentId: existingDoc.id, created: false };
         }
@@ -456,6 +468,7 @@ export const sandboxRouter = router({
           contentStatusUpdatedAt: now.toISOString(),
           promotedFromDraft: input.draftId,
           generationModel: draft.model || null,
+          targetChain: (draft.targetChain as string | undefined) ?? null,
         };
         if (input.universeId) contentData.universeId = input.universeId;
         tx.set(newRef, contentData);

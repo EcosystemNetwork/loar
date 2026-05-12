@@ -126,6 +126,24 @@ app.route('/auth/solana', siwsAuthRoutes);
 const { solanaRoutes } = await import('./routes/solana');
 app.route('/api/solana', solanaRoutes);
 
+// Solana Pay — payment intents + on-chain settlement detection.
+// Tighter rate limit: each /status hits Helius RPC (findReference can scan
+// many sigs), and /intent does a Firestore write. Public-but-paid surface.
+app.use('/api/solana-pay/*', rateLimiter({ windowMs: 60_000, max: 30 }));
+const { solanaPayRoutes } = await import('./routes/solana-pay');
+app.route('/api/solana-pay', solanaPayRoutes);
+
+// Squads multisig — Solana parity with Gnosis Safe for shared Universe ownership.
+app.use('/api/squads/*', rateLimiter({ windowMs: 60_000, max: 30 }));
+const { squadsRoutes } = await import('./routes/squads');
+app.route('/api/squads', squadsRoutes);
+
+// Wormhole NTT bridge — $LOAR cross-chain (EVM ↔ Solana). Returns 503
+// until NTT manager contracts are deployed on both chains.
+app.use('/api/bridge/*', rateLimiter({ windowMs: 60_000, max: 20 }));
+const { bridgeRoutes } = await import('./routes/bridge');
+app.route('/api/bridge', bridgeRoutes);
+
 // Circle transaction proxy — server-side contract execution via Circle KMS
 const { txProxyRoutes } = await import('./routes/tx-proxy');
 app.route('/api/tx', txProxyRoutes);

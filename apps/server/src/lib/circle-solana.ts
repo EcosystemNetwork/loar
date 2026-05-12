@@ -246,26 +246,41 @@ export interface SolanaTxResult {
 const TERMINAL_STATES = new Set(['COMPLETE', 'FAILED', 'CANCELLED', 'DENIED']);
 
 /**
- * Estimate priority fee via Helius. Falls back to 10_000 micro-lamports if the
- * RPC doesn't support `getPriorityFeeEstimate` (non-Helius providers).
+ * Estimate priority fee via Helius `getPriorityFeeEstimate`. Retries once on
+ * transient failures before falling back to a static 10_000 micro-lamports —
+ * during high congestion the static fallback often loses inclusion races, so
+ * the retry materially improves landing rate.
+ *
+ * Non-Helius RPCs respond with `method not found` and short-circuit straight
+ * to the fallback (no retry — the method is permanently unavailable).
  */
 async function estimatePriorityFee(connection: Connection): Promise<number> {
-  try {
-    const resp = await fetch(connection.rpcEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'getPriorityFeeEstimate',
-        params: [{ options: { priorityLevel: 'Medium' } }],
-      }),
-    });
-    const json = (await resp.json()) as { result?: { priorityFeeEstimate?: number } };
-    const estimate = json.result?.priorityFeeEstimate;
-    if (typeof estimate === 'number' && estimate > 0) return Math.ceil(estimate);
-  } catch {
-    // Non-Helius RPC — fall through to default.
+  const body = JSON.stringify({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'getPriorityFeeEstimate',
+    params: [{ options: { priorityLevel: 'Medium' } }],
+  });
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const resp = await fetch(connection.rpcEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      });
+      const json = (await resp.json()) as {
+        result?: { priorityFeeEstimate?: number };
+        error?: { code?: number; message?: string };
+      };
+      // -32601 = "Method not found" → non-Helius RPC, retry is pointless.
+      if (json.error?.code === -32601) break;
+      const estimate = json.result?.priorityFeeEstimate;
+      if (typeof estimate === 'number' && estimate > 0) return Math.ceil(estimate);
+    } catch {
+      // Network error — retry once after a short backoff.
+    }
+    if (attempt === 0) await new Promise((r) => setTimeout(r, 200));
   }
   return 10_000;
 }

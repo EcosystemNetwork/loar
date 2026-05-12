@@ -113,6 +113,10 @@ function authUserFromPayload(payload: {
   const ns = payload.ns ?? 'eip155';
   if (ns === 'solana') {
     // sub is base58 (case-sensitive) — never lowercase Solana pubkeys.
+    // `address` is populated from payload.evm when the user has linked an EVM
+    // wallet via POST /auth/evm/link (mirror of the Solana-side /auth/solana/link).
+    // That reverse-link route doesn't exist yet — see TODO in routes/siws-auth.ts.
+    // Until it does, payload.evm is always undefined for ns='solana' sessions.
     return {
       uid: payload.sub,
       address: payload.evm,
