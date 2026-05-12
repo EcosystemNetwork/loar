@@ -1,0 +1,44 @@
+# Fly.io deploy config for the LOAR Solana indexer.
+#
+# First-time setup (from the repo root):
+#   fly launch --no-deploy --copy-config --config apps/solana-indexer/fly.toml
+#   fly secrets set FIREBASE_SERVICE_ACCOUNT="..." \
+#                   HELIUS_WEBHOOK_SECRET="..." \
+#                   UNIVERSE_PROGRAM_ID="6YTQVSeauk4x5gycMM2wzkR8mdHEnHAYsz3Ygg26UPtD" \
+#                   EPISODE_PROGRAM_ID="voLiAXoYbq8go1CUS9UshQRZnNu9Y44qNBZ6czgn8Bs" \
+#                   SOLANA_CLUSTER="devnet" \
+#                   --config apps/solana-indexer/fly.toml
+#   fly deploy --config apps/solana-indexer/fly.toml --dockerfile apps/solana-indexer/Dockerfile
+#
+# The Dockerfile builds from the monorepo root, so deploy must be invoked
+# from the repo root with `--dockerfile` pointing at this app's Dockerfile.
+
+app = "loar-solana-indexer"
+primary_region = "iad"
+
+[build]
+  dockerfile = "apps/solana-indexer/Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  SOLANA_INDEXER_PORT = "42070"
+  LOG_LEVEL = "info"
+
+[http_service]
+  internal_port = 42070
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "10s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

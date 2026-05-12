@@ -112,6 +112,23 @@ const mintBody = z.object({
   contentHashHex: z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'expected 0x + 64 hex chars'),
   metadataUri: z.string().url().max(200),
   title: z.string().min(1).max(64),
+  /**
+   * Optional VLM / content lineage. Mirrored to a Firestore doc so off-chain
+   * UIs can join cNFT mints → LOAR content → VLM sceneIndex → wiki entities.
+   * None of these fields go on-chain; the cNFT URI is authoritative for that.
+   */
+  lineage: z
+    .object({
+      contentId: z.string().max(128).optional(),
+      extractionId: z.string().max(128).optional(),
+      sceneIndex: z.number().int().min(0).max(10_000).optional(),
+      evmUniverseAddress: z
+        .string()
+        .regex(/^0x[0-9a-fA-F]{40}$/, 'expected EVM 0x address')
+        .optional(),
+      entityId: z.string().max(128).optional(),
+    })
+    .optional(),
 });
 
 /**
@@ -139,6 +156,7 @@ solanaRoutes.post('/episode/mint', async (c) => {
       contentHash: Buffer.from(parsed.data.contentHashHex.slice(2), 'hex'),
       metadataUri: parsed.data.metadataUri,
       title: parsed.data.title,
+      lineage: parsed.data.lineage,
     });
     return c.json(result);
   } catch (err) {

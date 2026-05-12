@@ -220,9 +220,15 @@ authRoutes.get('/me', async (c) => {
     return c.json({ authenticated: false }, 200);
   }
 
+  // Surface the extended JWT claims so the wallet-settings page can render
+  // both EVM and Solana identities without a second request. Legacy tokens
+  // (no `ns`) default to eip155 — `evm` + `sol` will simply be undefined.
   return c.json({
     authenticated: true,
     address: payload.sub,
+    chainNamespace: payload.ns ?? 'eip155',
+    evm: payload.evm,
+    sol: payload.sol,
     expiresAt: payload.exp ? payload.exp * 1000 : null,
   });
 });

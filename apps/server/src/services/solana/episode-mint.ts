@@ -30,6 +30,28 @@ import {
 import { buildMintEpisodeIx } from '../../lib/anchor-ix';
 import { buildMintCnftIx, episodeMetadata } from '../../lib/bubblegum';
 import { EpisodeProgram, BubblegumTree, getSolanaAddress } from '@loar/abis/solana-addresses';
+import { db, firebaseAvailable } from '../../lib/firebase';
+
+/**
+ * Optional VLM / content-lineage fields. When supplied, the mint result is
+ * mirrored to a `solanaEpisodeLineage/{episodePda}` Firestore doc so off-chain
+ * UIs can join cNFT → LOAR content generation → VLM scene index → entities.
+ *
+ * On-chain we keep the metadata pointer minimal (just the caller's `uri`);
+ * the lineage doc is the off-chain joinable layer.
+ */
+export interface EpisodeLineage {
+  /** LOAR content ID (the generation that produced the image/video). */
+  contentId?: string;
+  /** VLM extraction job that processed the content (links to sceneIndex docs). */
+  extractionId?: string;
+  /** Scene index within the content (0-based). */
+  sceneIndex?: number;
+  /** EVM universe address (so judges + integrators can cross-chain reconcile). */
+  evmUniverseAddress?: string;
+  /** LOAR entity id (when minting on behalf of a wiki entity page). */
+  entityId?: string;
+}
 
 export interface MintEpisodeRequest {
   userId: string;
@@ -37,6 +59,8 @@ export interface MintEpisodeRequest {
   contentHash: Buffer; // 32 bytes
   metadataUri: string;
   title: string;
+  /** Optional off-chain lineage references for VLM / content joins. */
+  lineage?: EpisodeLineage;
 }
 
 export interface MintEpisodeResult {
@@ -100,6 +124,34 @@ export async function mintEpisodeCnft(req: MintEpisodeRequest): Promise<MintEpis
     // ixs gives 500k.
     computeUnitLimit: 500_000,
   });
+
+  // Off-chain lineage doc — written best-effort after the tx confirms.
+  // A failure here doesn't undo the mint; the lineage table is recoverable
+  // by re-running a reconciler against Firestore + the indexer.
+  if (req.lineage && firebaseAvailable) {
+    try {
+      await db
+        .collection('solanaEpisodeLineage')
+        .doc(episodePda.toBase58())
+        .set(
+          {
+            episodePda: episodePda.toBase58(),
+            universeAddress: req.universeAddress,
+            cluster,
+            txSignature: tx.signature ?? tx.txId,
+            mintedAt: new Date(),
+            mintedBy: req.userId,
+            ...req.lineage,
+          },
+          { merge: true }
+        );
+    } catch (err) {
+      console.warn(
+        `[episode-mint] lineage write failed for ${episodePda.toBase58()}:`,
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
 
   return {
     txSignature: tx.signature ?? tx.txId,

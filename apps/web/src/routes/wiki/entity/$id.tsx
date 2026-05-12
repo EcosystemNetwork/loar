@@ -1248,12 +1248,19 @@ function EntityPage() {
       )}
 
       {/* Solana cNFT mint dialog — uses VITE_SOLANA_DEMO_UNIVERSE for v1.
-          Metadata URI falls back to entity image or a platform default. */}
+          Metadata URI falls back to entity image or a platform default.
+          Lineage carries the wiki entity id + EVM universe address so the
+          server's solanaEpisodeLineage doc joins cNFT → LOAR entity → VLM
+          scene index off-chain. */}
       <SolanaMintDialog
         open={showSolanaMint}
         onClose={() => setShowSolanaMint(false)}
         entityName={entity.name}
         metadataUri={entity.imageUrl || 'https://loar.fun/og/entity.json'}
+        lineage={{
+          entityId: entity.id,
+          evmUniverseAddress: entity.universeAddress ?? undefined,
+        }}
       />
     </div>
   );

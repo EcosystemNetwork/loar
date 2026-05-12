@@ -34,6 +34,18 @@ export interface SolanaMintDialogProps {
   metadataUri: string;
   /** Optional override; defaults to VITE_SOLANA_DEMO_UNIVERSE. */
   universeAddress?: string;
+  /**
+   * Optional off-chain lineage. Persisted as solanaEpisodeLineage/{episodePda}
+   * server-side so UIs can join cNFT → LOAR entity → VLM scene index. None of
+   * these fields go on-chain; the cNFT's `uri` is the on-chain pointer.
+   */
+  lineage?: {
+    contentId?: string;
+    extractionId?: string;
+    sceneIndex?: number;
+    evmUniverseAddress?: string;
+    entityId?: string;
+  };
 }
 
 interface MintResult {
@@ -91,6 +103,7 @@ export function SolanaMintDialog(props: SolanaMintDialogProps) {
           contentHashHex,
           metadataUri: props.metadataUri,
           title,
+          ...(props.lineage ? { lineage: props.lineage } : {}),
         }),
       });
       if (!resp.ok) {
