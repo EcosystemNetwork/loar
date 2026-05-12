@@ -138,20 +138,20 @@ export default defineConfig({
       '@loar/abis/generated': path.resolve(__dirname, '../../packages/abis/src/generated.ts'),
       '@loar/shared/trpc': path.resolve(__dirname, '../../packages/shared/src/trpc.ts'),
     },
-    dedupe: ['wagmi', 'viem', 'thirdweb', '@tanstack/react-query', 'react', 'react-dom'],
+    dedupe: ['wagmi', 'viem', '@tanstack/react-query', 'react', 'react-dom'],
   },
   build: {
     // Main entry stays ~470KB gzip after splitting MetaMask/WalletConnect/viem.
-    // Further splitting (thirdweb, radix, wagmi) risks dual-React-instance
-    // crashes and is deferred to a post-testnet pass. Bumping the warn limit
-    // to 1700KB to silence the noisy warning on chunks we've audited.
+    // Further splitting (radix, wagmi) risks dual-React-instance crashes and
+    // is deferred to a post-testnet pass. Bumping the warn limit to 1700KB
+    // to silence the noisy warning on chunks we've audited.
     chunkSizeWarningLimit: 1700,
     rollupOptions: {
       output: {
         // Split large non-React deps into their own chunks to reduce initial
-        // bundle size. IMPORTANT: thirdweb, @radix-ui, and anything that calls
-        // React hooks at load time must stay in the default chunk with React
-        // to avoid dual-React-instance crashes (React error #310).
+        // bundle size. IMPORTANT: @radix-ui, and anything that calls React
+        // hooks at load time must stay in the default chunk with React to
+        // avoid dual-React-instance crashes (React error #310).
         manualChunks(id) {
           if (id.includes('node_modules')) {
             // Heavy crypto/wallet libs that don't import React directly

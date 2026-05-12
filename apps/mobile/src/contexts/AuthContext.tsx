@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           isLoading: false,
         }));
       } else {
-        // Drop any stale fragments from an older install (e.g. thirdweb token).
+        // Drop any stale fragments from an older install (e.g. legacy auth tokens).
         await clearSession().catch(() => undefined);
         setState((s) => ({ ...s, isLoading: false }));
       }

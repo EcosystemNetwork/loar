@@ -9,7 +9,7 @@
  */
 import { useState } from 'react';
 import { useWaitForTransactionReceipt, useChainId } from 'wagmi';
-import { useWriteContract } from '@/hooks/useThirdwebWrite';
+import { useWriteContract } from '@/hooks/useCircleWrite';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { parseEther, keccak256, toBytes } from 'viem';
 import { useMintContent, useRecordMint } from '@/hooks/useRevenue';

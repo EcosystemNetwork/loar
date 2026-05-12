@@ -161,6 +161,33 @@ const envSchema = z.object({
 
   // ── Auth domains ────────────────────────────────────────────────────────
   SIWE_ALLOWED_DOMAINS: z.string().optional(),
+
+  // ── Solana ──────────────────────────────────────────────────────────────
+  /** Active Solana cluster. Drives which mint/tree/programs the server uses. */
+  SOLANA_CLUSTER: z.enum(['devnet', 'mainnet-beta', 'testnet']).default('devnet'),
+  /** RPC endpoint for the active cluster. Helius/Triton paid tier in production. */
+  SOLANA_RPC_URL: z.string().url('SOLANA_RPC_URL must be a valid URL').optional(),
+  SOLANA_RPC_URL_DEVNET: z.string().url('SOLANA_RPC_URL_DEVNET must be a valid URL').optional(),
+  SOLANA_RPC_URL_MAINNET: z.string().url('SOLANA_RPC_URL_MAINNET must be a valid URL').optional(),
+  /** Helius API key (bare) for DAS API calls + webhook management. */
+  HELIUS_API_KEY: z.string().optional(),
+  /** HMAC secret for verifying incoming Helius webhook deliveries. */
+  HELIUS_WEBHOOK_SECRET: z.string().optional(),
+  /** Comma-separated SIWS-allowed clusters. Default: devnet,mainnet-beta */
+  SIWS_ALLOWED_CLUSTERS: z.string().optional(),
+
+  // Solana program IDs (base58, populated after `anchor deploy`)
+  UNIVERSE_PROGRAM_ID: z.string().optional(),
+  EPISODE_PROGRAM_ID: z.string().optional(),
+  PAYMENT_PROGRAM_ID: z.string().optional(),
+
+  // $LOAR SPL mint per cluster
+  LOAR_MINT_DEVNET: z.string().optional(),
+  LOAR_MINT_MAINNET: z.string().optional(),
+
+  // Bubblegum merkle trees per cluster
+  BUBBLEGUM_TREE_DEVNET: z.string().optional(),
+  BUBBLEGUM_TREE_MAINNET: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

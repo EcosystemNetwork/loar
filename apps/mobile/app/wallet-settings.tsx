@@ -3,8 +3,8 @@
  *
  * With Circle DCW the wallet is server-managed (KMS). There is no
  * per-device "connection" to toggle — showing up on this screen with a
- * live JWT is, by definition, being connected. The reconnect flow from
- * the thirdweb era is gone; signing out and back in is the equivalent.
+ * live JWT is, by definition, being connected. Signing out and back in
+ * is the equivalent of a reconnect.
  */
 import { useRouter } from 'expo-router';
 import React from 'react';

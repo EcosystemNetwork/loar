@@ -138,7 +138,7 @@ export const queryClient = new QueryClient({
           .then((r) => r.json())
           .then((data) => {
             if (data?.authenticated) return; // Cookie still valid — single-query 401, keep session
-            // Dynamic import avoids the wagmi/thirdweb TDZ from a synchronous
+            // Dynamic import avoids a wagmi TDZ from a synchronous
             // wallet-auth import at module init.
             return import('../lib/wallet-auth').then(({ clearSiweSession }) => {
               clearSiweSession();

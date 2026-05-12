@@ -61,7 +61,7 @@ import { TokenGateGuard } from '@/components/governance/TokenGateGuard';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useReadContract, useChainId, usePublicClient } from 'wagmi';
-import { useWriteContract } from '@/hooks/useThirdwebWrite';
+import { useWriteContract } from '@/hooks/useCircleWrite';
 import { canonMarketplaceAbi, governanceErc20Abi } from '@loar/abis/generated';
 import { CanonMarketplace } from '@loar/abis/addresses';
 import { formatEther, parseEther } from 'viem';

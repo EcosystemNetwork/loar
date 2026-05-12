@@ -1,174 +1,63 @@
 # Gas Abstraction
 
-Platform-sponsored gas for key user actions via thirdweb's ERC-4337 account abstraction.
+LOAR users never sign or pay gas from the browser. All EVM contract writes
+are server-signed via Circle's Developer-Controlled Wallets (KMS). For
+ERC-4337 smart-account flows we additionally proxy a paymaster RPC.
 
-## Overview
+## Server-Signed Writes (Primary Path)
 
-LOAR uses thirdweb's built-in paymaster to sponsor gas fees for high-value platform actions. This reduces friction for new users (no ETH needed to mint their first NFT) and encourages governance participation (free voting).
-
-Users with external wallets (MetaMask, Coinbase Wallet, etc.) retain their EOA and pay gas normally for non-sponsored actions. In-app wallet users get a smart account that routes all sponsored actions through the paymaster.
-
-## What's Sponsored
-
-| Action            | Function Names                                                         | Rationale                                  |
-| ----------------- | ---------------------------------------------------------------------- | ------------------------------------------ |
-| Minting           | `mint`, `safeMint`, `mintNode`, `mintEpisode`, `mintNFT`, `createNode` | Core creative loop must be frictionless    |
-| Voting            | `vote`, `castVote`, `submitVote`                                       | Encourage governance participation         |
-| Universe creation | `createUniverse`, `deployUniverse`                                     | Onboarding funnel — first universe is free |
-| Entity creation   | `createEntity`                                                         | Worldbuilding studio actions               |
-
-## What's NOT Sponsored
-
-| Action                                 | Reason                                   |
-| -------------------------------------- | ---------------------------------------- |
-| Token swaps (`swap`)                   | Financial action — user should bear cost |
-| Transfers (`transfer`, `transferFrom`) | Financial action                         |
-| Approvals (`approve`)                  | User-initiated token permission          |
-| Buy/Sell (`buy`, `sell`)               | Marketplace transactions                 |
-| Any unlisted function                  | Default is non-sponsored                 |
-
-## Configuration
-
-### 1. Get a thirdweb secret key
-
-1. Go to [thirdweb.com/dashboard](https://thirdweb.com/dashboard)
-2. Navigate to **API Keys** (or **Settings > API Keys**)
-3. Create a key or use an existing one
-4. Copy the **Secret Key** (not the Client ID)
-
-### 2. Set the environment variable
-
-```bash
-# In .env (root)
-VITE_THIRDWEB_SECRET_KEY=your-secret-key-here
-```
-
-### 3. Configure dashboard policies (production)
-
-In the thirdweb dashboard, configure allowlists to restrict which contracts and methods can be sponsored:
-
-- **Allowed contracts**: Only your deployed contract addresses
-- **Allowed chains**: Only Base (8453) for mainnet, Base Sepolia (84532) for testnet
-- **Spending limits**: Set daily/monthly gas credit caps
-
-### 4. Enable account abstraction on ConnectButton
-
-In `wallet-connect-button.tsx`, add the `accountAbstraction` prop:
-
-```tsx
-import { getConnectButtonAAConfig } from '@/lib/paymaster';
-
-<ConnectButton
-  client={thirdwebClient}
-  accountAbstraction={getConnectButtonAAConfig()}
-  // ... existing props
-/>;
-```
-
-This causes in-app wallet users to automatically get a smart account. External wallet users are unaffected.
-
-## Architecture
+The web client routes every write through `POST /api/tx/write` and gets back
+a transaction hash. The server signs and broadcasts using the user's
+Circle-custodied wallet — no private key ever touches the client, and the
+user never sees a gas prompt.
 
 ```
-User action (e.g., mint)
-    |
-    v
-useSponsoredTransaction hook
-    |
-    +-- Is paymaster configured? (VITE_THIRDWEB_SECRET_KEY set?)
-    |   |
-    |   No --> Normal transaction (user pays gas)
-    |   |
-    |   Yes
-    |   |
-    +-- Is this a sponsored action? (functionName in SPONSORED_ACTIONS?)
-    |   |
-    |   No --> Normal transaction (user pays gas)
-    |   |
-    |   Yes
-    |   |
-    +-- Attempt sponsored tx via thirdweb paymaster
-        |
-        +-- Success --> wasSponsored = true
-        |
-        +-- Failure --> Fall back to normal tx (user pays gas)
+User action (mint / vote / createUniverse)
+    │
+    ▼
+useWriteContract / useSendTransaction  (apps/web/src/hooks/useCircleWrite.ts)
+    │  POST /api/tx/write { address, abi, functionName, args, value }
+    ▼
+Server                                  (apps/server/src/routes/tx.ts)
+    │  Circle Developer-Controlled Wallet → KMS sign → broadcast
+    ▼
+Chain                                   { txHash }
 ```
 
-## Cost Implications
+Gas is paid from the wallet's own balance. The platform pre-funds creator
+wallets through the faucet path for onboarding actions.
 
-### Estimating spend
+## ERC-4337 Paymaster Proxy (Optional)
 
-Each sponsored transaction costs the platform the gas fee that the user would have paid. On Base L2, this is typically:
+For smart-account / UserOperation flows, the server exposes a paymaster
+proxy at `POST /api/paymaster/sponsor`. Provider is pluggable so we are not
+locked into one vendor — resolved in order:
 
-- **Minting**: ~0.0001-0.001 ETH ($0.20-$2.00 at $2000/ETH)
-- **Voting**: ~0.00005-0.0002 ETH ($0.10-$0.40)
-- **Universe creation**: ~0.001-0.005 ETH ($2.00-$10.00)
+1. `PIMLICO_API_KEY` → Pimlico v2 RPC
+2. `BICONOMY_API_KEY` → Biconomy v2 RPC
+3. (none) → 503 `NOT_CONFIGURED`
 
-### Controlling costs
+Per-user daily cap defaults to 50 sponsored ops, enforced through the shared
+rate limiter (Redis-backed). Configure with:
 
-1. **thirdweb dashboard limits**: Set daily/monthly spending caps
-2. **SPONSORED_ACTIONS set**: Remove actions from `paymaster.ts` to stop sponsoring them
-3. **Disable entirely**: Remove `VITE_THIRDWEB_SECRET_KEY` from env
-4. **Per-user limits**: Not yet implemented — would require server-side tracking
+| Variable                      | Purpose                                           |
+| ----------------------------- | ------------------------------------------------- |
+| `PIMLICO_API_KEY`             | Pimlico paymaster API key                         |
+| `BICONOMY_API_KEY`            | Biconomy paymaster API key                        |
+| `PAYMASTER_DAILY_LIMIT`       | Max sponsored ops per wallet per day (default 50) |
+| `PAYMASTER_DEFAULT_CHAIN_ID`  | Chain id when request omits one (default 84532)   |
+| `PAYMASTER_SPONSORED_ACTIONS` | Optional comma-separated function-name allowlist  |
 
-### Gas credits
+See [apps/server/src/routes/paymaster.ts](../apps/server/src/routes/paymaster.ts).
 
-thirdweb provides gas credits with their Growth plan. Monitor usage in the thirdweb dashboard under **Usage > Gas Credits**.
+## Safety Rails
 
-## Adding or Removing Sponsored Actions
-
-Edit `apps/web/src/lib/paymaster.ts`:
-
-```ts
-// To add a sponsored action:
-export const SPONSORED_ACTIONS = new Set<string>([
-  // ... existing actions
-  'myNewAction', // Add here
-]);
-
-// To remove:
-// Simply delete the entry from the Set
-```
-
-No other changes needed — `useSponsoredTransaction` reads from this set dynamically.
-
-## Using the Hook
-
-Replace `useWriteContract` from `useThirdwebWrite` with `useSponsoredTransaction`:
-
-```ts
-// Before
-import { useWriteContract } from '@/hooks/useThirdwebWrite';
-
-// After
-import { useSponsoredTransaction } from '@/hooks/useSponsoredTransaction';
-
-// Usage is identical
-const { writeContractAsync, data, isPending, error, wasSponsored } = useSponsoredTransaction();
-
-const hash = await writeContractAsync({
-  address: CONTRACT_ADDRESS,
-  abi: contractAbi,
-  functionName: 'mint',
-  args: [tokenId, uri],
-});
-
-// New: check if gas was sponsored
-if (wasSponsored) {
-  toast.success('Minted! Gas was covered by LOAR.');
-}
-```
-
-## Files
-
-| File                                            | Purpose                                                                |
-| ----------------------------------------------- | ---------------------------------------------------------------------- |
-| `apps/web/src/lib/paymaster.ts`                 | Paymaster config, sponsored action registry, AA config helpers         |
-| `apps/web/src/hooks/useSponsoredTransaction.ts` | React hook — drop-in replacement for useWriteContract with sponsorship |
-| `.env.example`                                  | `VITE_THIRDWEB_SECRET_KEY` variable                                    |
-
-## Limitations and TODOs
-
-- **EOA sponsorship**: Currently, gas sponsorship only works automatically for smart accounts (in-app wallet users). External wallet (EOA) users always pay their own gas. Thirdweb may expose a direct paymaster option for EOAs in a future SDK version.
-- **Per-user rate limiting**: No server-side tracking of sponsored tx per user yet. A malicious user could burn gas credits by spamming mints. Mitigate via thirdweb dashboard spending limits.
-- **SDK version sensitivity**: Built against thirdweb v5.119.x. The account abstraction API may change in future versions — check thirdweb migration guides when upgrading.
+- Allowed chain ids are pinned to Sepolia (11155111) + Base Sepolia (84532).
+  Calls on other chains are rejected so a caller cannot drain the paymaster
+  balance against unrelated networks.
+- Auth required — only signed-in users get sponsored gas.
+- Quota is anchored to the authenticated session uid, with a secondary
+  per-sender bucket so a compromised session cannot funnel all of its quota
+  into a single smart account.
+- Optional `PAYMASTER_SPONSORED_ACTIONS` allowlist rejects function names
+  outside the configured set — useful in prod to block arbitrary calls.

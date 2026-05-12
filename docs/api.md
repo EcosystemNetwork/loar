@@ -17,7 +17,7 @@
 | `POST` | `/auth/revoke`                            | Bearer | Revoke the current session token (server-side logout)                                        |
 | `POST` | `/api/upload`                             | Bearer | Direct file upload (multipart form, max 200MB)                                               |
 | `POST` | `/api/stripe/webhook`                     | Stripe | Stripe webhook for `payment_intent.succeeded` events                                         |
-| `POST` | `/api/paymaster/sponsorUserOp`            | Bearer | ERC-4337 sponsorship for a user operation (thirdweb/Pimlico/Biconomy).                       |
+| `POST` | `/api/paymaster/sponsorUserOp`            | Bearer | ERC-4337 sponsorship for a user operation (Pimlico/Biconomy).                                |
 | `POST` | `/api/paymaster/getUserOperationGasPrice` | Bearer | UserOp gas-price oracle used during sponsorship.                                             |
 | `POST` | `/api/paymaster/estimateUserOperationGas` | Bearer | UserOp gas estimation used during sponsorship.                                               |
 | `GET`  | `/api/admin/cost/export.csv`              | Admin  | CSV cost-attribution export for accounting. Admin wallet header required.                    |

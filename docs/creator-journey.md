@@ -4,19 +4,18 @@ Step-by-step from zero to a monetizable cinematic universe. Each step notes what
 
 ---
 
-## Step 1: Connect Your Wallet
+## Step 1: Sign In
 
 **Route:** `/login`
 **Status:** LIVE
 
-1. Click "Connect Wallet" — thirdweb wallet modal opens
-2. Choose wallet (MetaMask, WalletConnect, Coinbase, etc.)
-3. Sign the SIWE (Sign-In with Ethereum) message
-4. Server verifies signature, issues JWT session token
-5. You're authenticated — wallet address is your identity
+1. Click "Sign In" — the Circle DCW login screen opens
+2. Continue with email, Google, Apple, or passkey
+3. Server provisions a Circle-custodied EVM wallet for the account and issues a SIWE-style JWT session
+4. You're authenticated — the wallet address is your identity
 
-**What you need:** A browser wallet with Sepolia ETH for gas fees.
-**Time:** ~30 seconds
+**What you need:** Just an email. The wallet is server-managed; gas for sponsored actions is covered by the platform.
+**Time:** ~15 seconds
 
 ---
 

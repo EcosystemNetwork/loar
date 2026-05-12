@@ -7,7 +7,7 @@
  * - Provides write helpers for requestRewardRecipientChange, executeRewardRecipientChange, and collectRewards
  */
 import { useReadContract, useChainId } from 'wagmi';
-import { useWriteContract } from '@/hooks/useThirdwebWrite';
+import { useWriteContract } from '@/hooks/useCircleWrite';
 import { loarLpLockerMultipleAbi, loarFeeLockerAbi } from '@loar/abis/generated';
 import { LoarLpLockerMultiple, LoarFeeLocker } from '@loar/abis/addresses';
 import { formatEther, type Address } from 'viem';

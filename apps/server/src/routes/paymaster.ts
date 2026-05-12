@@ -5,11 +5,9 @@
  * gets back a sponsored paymasterAndData blob. Provider is pluggable — we
  * pick based on env so we're not locked into one vendor:
  *
- *   1. THIRDWEB_SECRET_KEY     → thirdweb's paymaster (default — uses the
- *                                same thirdweb account the web client is on)
- *   2. PIMLICO_API_KEY         → Pimlico v2 RPC
- *   3. BICONOMY_API_KEY        → Biconomy v2 RPC
- *   4. (none)                  → 503
+ *   1. PIMLICO_API_KEY         → Pimlico v2 RPC (default)
+ *   2. BICONOMY_API_KEY        → Biconomy v2 RPC
+ *   3. (none)                  → 503
  *
  * Per-user daily cap is enforced with the existing rate limiter module, so
  * horizontal replicas share counts via Redis. Cap defaults to 50/day/user.
@@ -30,7 +28,7 @@ const DAILY_SPONSOR_LIMIT = parseInt(process.env.PAYMASTER_DAILY_LIMIT || '50', 
 
 // Chains the app is actually deployed on. Reject anything else so a caller
 // cannot burn the paymaster balance sponsoring transactions on unrelated
-// networks that thirdweb/Pimlico/Biconomy happen to support.
+// networks that Pimlico/Biconomy happen to support.
 const ALLOWED_CHAIN_IDS = new Set<number>([
   11155111, // Sepolia
   84532, // Base Sepolia
@@ -46,7 +44,6 @@ const SPONSORED_ACTIONS = (process.env.PAYMASTER_SPONSORED_ACTIONS ?? '')
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
 type Provider =
-  | { kind: 'thirdweb'; secret: string }
   | { kind: 'pimlico'; key: string; chainId: number }
   | { kind: 'biconomy'; key: string; chainId: number }
   | { kind: 'none' };
@@ -55,9 +52,6 @@ function resolveProvider(): Provider {
   // Default chain id — can be overridden per request via body.chainId
   const chainId = parseInt(process.env.PAYMASTER_DEFAULT_CHAIN_ID || '84532', 10);
 
-  if (process.env.THIRDWEB_SECRET_KEY) {
-    return { kind: 'thirdweb', secret: process.env.THIRDWEB_SECRET_KEY };
-  }
   if (process.env.PIMLICO_API_KEY) {
     return { kind: 'pimlico', key: process.env.PIMLICO_API_KEY, chainId };
   }
@@ -88,8 +82,7 @@ paymasterRoutes.post('/sponsor', async (c) => {
     return c.json(
       {
         code: 'NOT_CONFIGURED',
-        message:
-          'Paymaster is not configured. Set THIRDWEB_SECRET_KEY, PIMLICO_API_KEY, or BICONOMY_API_KEY.',
+        message: 'Paymaster is not configured. Set PIMLICO_API_KEY or BICONOMY_API_KEY.',
       },
       503
     );
@@ -187,8 +180,6 @@ paymasterRoutes.post('/sponsor', async (c) => {
 
 async function dispatch(provider: Provider, body: SponsorBody) {
   switch (provider.kind) {
-    case 'thirdweb':
-      return sponsorWithThirdweb(provider.secret, body);
     case 'pimlico':
       return sponsorWithPimlico(provider.key, body);
     case 'biconomy':
@@ -196,30 +187,6 @@ async function dispatch(provider: Provider, body: SponsorBody) {
     default:
       throw new Error(`Unsupported provider: ${(provider as { kind: string }).kind}`);
   }
-}
-
-// ── Thirdweb ───────────────────────────────────────────────────────────
-
-async function sponsorWithThirdweb(secret: string, body: SponsorBody) {
-  const chainId = body.chainId ?? parseInt(process.env.PAYMASTER_DEFAULT_CHAIN_ID || '84532', 10);
-  // thirdweb's bundler RPC speaks standard pimlico-compatible methods.
-  const res = await fetch(`https://${chainId}.bundler.thirdweb.com`, {
-    method: 'POST',
-    headers: {
-      'x-secret-key': secret,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'pm_sponsorUserOperation',
-      params: [body.userOp, body.entryPoint],
-    }),
-  });
-  if (!res.ok) throw new Error(`thirdweb ${res.status}`);
-  const json = (await res.json()) as { result?: unknown; error?: { message: string } };
-  if (json.error) throw new Error(json.error.message);
-  return { paymasterAndData: json.result };
 }
 
 // ── Pimlico v2 ─────────────────────────────────────────────────────────

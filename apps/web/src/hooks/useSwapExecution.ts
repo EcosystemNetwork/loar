@@ -6,7 +6,7 @@
  */
 import { useState, useCallback } from 'react';
 import { useChainId, usePublicClient } from 'wagmi';
-import { useWriteContract } from '@/hooks/useThirdwebWrite';
+import { useWriteContract } from '@/hooks/useCircleWrite';
 import { useWalletAccount } from '@/hooks/useWalletAccount';
 import { parseEther, formatEther, type Address, maxUint256 } from 'viem';
 import { getSwapUrl } from '@/hooks/useTokenSwap';

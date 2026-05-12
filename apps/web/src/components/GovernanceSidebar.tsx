@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useReadContract, usePublicClient } from 'wagmi';
-import { useWriteContract } from '@/hooks/useThirdwebWrite';
+import { useWriteContract } from '@/hooks/useCircleWrite';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { universeGovernorAbi, governanceErc20Abi, universeAbi } from '@loar/abis/generated';
 import { type Address, formatUnits } from 'viem';

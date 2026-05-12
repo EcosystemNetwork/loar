@@ -32,7 +32,7 @@ import { trpcClient } from '@/utils/trpc';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { getAddress, keccak256, toBytes } from 'viem';
-import { useWriteContract } from '@/hooks/useThirdwebWrite';
+import { useWriteContract } from '@/hooks/useCircleWrite';
 
 /**
  * Minimal ABI for `setCanonForEpisode`. Kept inline so the UI doesn't block

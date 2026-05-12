@@ -316,9 +316,9 @@ export function useWalletAuth() {
     }
   }, [validated]);
 
-  // Circle auth: address comes from localStorage (set during login)
-  // There's no wallet "connection" in the thirdweb sense — the wallet
-  // is server-managed. isConnected is true whenever we have a session.
+  // Circle auth: address comes from localStorage (set during login).
+  // The wallet is server-managed (Circle KMS), so there is no client-side
+  // connection step — isConnected is true whenever we have a session.
   const address = storedAddress as `0x${string}` | undefined;
   const isConnected = validated && !!storedAddress;
   const isAuthenticated = validated && !!storedAddress;

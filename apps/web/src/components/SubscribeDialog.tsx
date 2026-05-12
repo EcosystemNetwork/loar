@@ -5,7 +5,7 @@
  */
 import { useState } from 'react';
 import { useWaitForTransactionReceipt } from 'wagmi';
-import { useSendTransaction } from '@/hooks/useThirdwebWrite';
+import { useSendTransaction } from '@/hooks/useCircleWrite';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { parseEther } from 'viem';
 import { Button } from '@/components/ui/button';

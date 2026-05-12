@@ -52,10 +52,13 @@ RIN 1545-BQ22). The definition is broad enough that:
   non-custodial DEXs pending further guidance
 - Running a creator payout system where we control the outbound wallet → broker
 
-**Our current posture**: LOAR does not custody creator wallets. Creators hold
-keys themselves (thirdweb in-app wallets are self-custodial from the user's
-perspective even though thirdweb stores the shards). **Counsel must confirm**
-whether thirdweb's custody model triggers broker status for us.
+**Our current posture**: creator wallets are provisioned through Circle's
+Developer-Controlled Wallet product. Circle's KMS holds the keys and signs on
+the platform's instructions, so this is a _developer-custodied_ model rather
+than self-custodial. **Counsel must confirm** whether the Circle DCW custody
+arrangement triggers broker status for us — the question is materially
+different from a self-custody / smart-wallet posture and likely lands closer
+to "managed custodial wallet" under the IRS broker definition.
 
 **If we are a broker**: 1099-DA includes gross proceeds, cost basis (as of
 2026), and counterparty info. Burden is substantial. Plan accordingly.
@@ -133,7 +136,7 @@ We will disclose in the Terms of Service:
 
 ## Decision checklist
 
-- [ ] CPA opinion on whether thirdweb custody triggers broker status for us
+- [ ] CPA opinion on whether Circle DCW custody triggers broker status for us
 - [ ] Vendor selected (Track1099 / Payable / Tax1099)
 - [ ] Stripe Connect 1099-K automation confirmed
 - [ ] KYC vendor integration includes W-9/W-8 collection

@@ -770,9 +770,9 @@ function CinematicUniverseCreate() {
 
   // Auth is now checked in beforeLoad — no useEffect redirect needed
 
-  // Wait for thirdweb to finish reconnecting the previously-connected wallet
-  // before showing the connect prompt (avoids a flash of "Connect Your Wallet"
-  // when the user is actually already connected).
+  // Wait for the Circle session to finish hydrating before showing the
+  // connect prompt (avoids a flash of "Connect Your Wallet" when the user
+  // is actually already signed in).
   if (isAuthenticating) {
     return (
       <div className="h-full flex items-center justify-center bg-background">

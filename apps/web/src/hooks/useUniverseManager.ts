@@ -1,6 +1,6 @@
 import { useReadContract, useChainId } from 'wagmi';
 import { useWalletAccount } from '@/hooks/useWalletAccount';
-import { useWriteContract } from '@/hooks/useThirdwebWrite';
+import { useWriteContract } from '@/hooks/useCircleWrite';
 import { universeManagerAbi } from '@loar/abis/generated';
 import { UniverseManager, LoarHookStaticFee, LoarLpLockerMultiple } from '@loar/abis/addresses';
 import { isSupportedChain } from '@/configs/chains';

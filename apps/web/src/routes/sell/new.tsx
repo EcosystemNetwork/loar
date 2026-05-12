@@ -120,7 +120,7 @@ const STEP_LABELS: Record<Step, string> = {
 function CreateListingPage() {
   const navigate = useNavigate();
   const { isConnected, isAuthenticated, isAuthenticating } = useWalletAuth();
-  const isAutoConnecting = false; // thirdweb removed — Circle DCW always instant
+  const isAutoConnecting = false; // Circle DCW session hydration is synchronous
   const v = useVocab();
   const create = useCreateListing();
   const [step, setStep] = useState<Step>('type');

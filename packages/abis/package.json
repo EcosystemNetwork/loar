@@ -16,12 +16,20 @@
       ],
       "generated": [
         "src/generated.ts"
+      ],
+      "chain": [
+        "src/chain.ts"
+      ],
+      "solana-addresses": [
+        "src/solana-addresses.ts"
       ]
     }
   },
   "exports": {
     "./addresses": "./dist/addresses.js",
-    "./generated": "./dist/generated.js"
+    "./generated": "./dist/generated.js",
+    "./chain": "./dist/chain.js",
+    "./solana-addresses": "./dist/solana-addresses.js"
   },
   "dependencies": {
     "wagmi": "^2.19.5"

@@ -47,9 +47,6 @@ const envSchema = z.object({
   // ── Admin (comma-separated public addresses) ───────────────────────────────
   VITE_ADMIN_ADDRESSES: optionalString,
 
-  // ── Thirdweb (client ID — public, not secret) ──────────────────────────────
-  VITE_THIRDWEB_CLIENT_ID: optionalString,
-
   // ── WalletConnect (project ID — public) ───────────────────────────────────
   VITE_WALLETCONNECT_PROJECT_ID: optionalString,
 

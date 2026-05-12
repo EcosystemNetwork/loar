@@ -25,11 +25,6 @@ test.describe('Login Page', () => {
     // Login page renders the LOAR logo SVG
     await expect(page.locator('img[alt="LOAR"]').first()).toBeVisible();
   });
-
-  test('shows "Powered by thirdweb" attribution', async ({ page }) => {
-    await page.goto('/login');
-    await expect(page.locator('body')).toContainText(/powered by thirdweb/i);
-  });
 });
 
 test.describe('Auth Guards — Unauthenticated Redirects', () => {

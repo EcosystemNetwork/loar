@@ -62,7 +62,6 @@ You need **either** `FIREBASE_SERVICE_ACCOUNT` (inline JSON) **or** `FIREBASE_SE
 | `VITE_PONDER_URL`               | No       | Indexer GraphQL URL                            | `http://localhost:42069` |
 | `VITE_CHAIN_ENV`                | No       | Chain environment (`testnet` or `mainnet`)     | `testnet`                |
 | `VITE_CHAIN_ID`                 | No       | Default chain ID                               | `11155111`               |
-| `VITE_THIRDWEB_CLIENT_ID`       | Yes      | thirdweb client ID for wallet connection       | —                        |
 | `VITE_WALLETCONNECT_PROJECT_ID` | No       | WalletConnect project ID                       | —                        |
 | `VITE_TREASURY_ADDRESS`         | No       | Treasury address (for frontend payment UI)     | —                        |
 | `VITE_UNIVERSE_MANAGER`         | No       | UniverseManager contract address               | —                        |
@@ -95,15 +94,14 @@ The server starts without these keys but AI features will throw errors when call
 
 ### ERC-4337 Paymaster / Gas Sponsorship (Optional)
 
-Server-side gas sponsorship for sponsored meta-transactions (mint, vote, universe creation). Provider is resolved in order: thirdweb → Pimlico → Biconomy. Configure exactly **one** — when none are set, `/api/paymaster` returns 501 and sponsored actions silently fall back to user-paid gas. See [apps/server/src/routes/paymaster.ts](../apps/server/src/routes/paymaster.ts).
+Server-side gas sponsorship for sponsored meta-transactions (mint, vote, universe creation). Provider is resolved in order: Pimlico → Biconomy. Configure exactly **one** — when none are set, `/api/paymaster` returns 501 and sponsored actions silently fall back to user-paid gas. See [apps/server/src/routes/paymaster.ts](../apps/server/src/routes/paymaster.ts).
 
-| Variable                     | App    | Description                                                                                             |
-| ---------------------------- | ------ | ------------------------------------------------------------------------------------------------------- |
-| `THIRDWEB_SECRET_KEY`        | server | thirdweb paymaster (uses the same project as `VITE_THIRDWEB_CLIENT_ID`). Default provider when present. |
-| `PIMLICO_API_KEY`            | server | Pimlico v2 bundler + paymaster RPC.                                                                     |
-| `BICONOMY_API_KEY`           | server | Biconomy v2 bundler + paymaster RPC.                                                                    |
-| `PAYMASTER_DAILY_LIMIT`      | server | Per-wallet sponsored operations per rolling 24h window. Default `50`.                                   |
-| `PAYMASTER_DEFAULT_CHAIN_ID` | server | Fallback chain when a sponsorship request omits `chainId`. Default `84532` (Base Sepolia).              |
+| Variable                     | App    | Description                                                                                |
+| ---------------------------- | ------ | ------------------------------------------------------------------------------------------ |
+| `PIMLICO_API_KEY`            | server | Pimlico v2 bundler + paymaster RPC.                                                        |
+| `BICONOMY_API_KEY`           | server | Biconomy v2 bundler + paymaster RPC.                                                       |
+| `PAYMASTER_DAILY_LIMIT`      | server | Per-wallet sponsored operations per rolling 24h window. Default `50`.                      |
+| `PAYMASTER_DEFAULT_CHAIN_ID` | server | Fallback chain when a sponsorship request omits `chainId`. Default `84532` (Base Sepolia). |
 
 ### CSAM / Hash-Matching Moderation
 
@@ -183,15 +181,14 @@ Automatically restores taken-down content when a counter-notice has been pending
 
 Everything prefixed with `EXPO_PUBLIC_` is bundled into the app binary — **no secrets**. Read at build time via `expo-env`.
 
-| Variable                         | App    | Description                                                              |
-| -------------------------------- | ------ | ------------------------------------------------------------------------ |
-| `EXPO_PUBLIC_SERVER_URL`         | mobile | LOAR API base URL.                                                       |
-| `EXPO_PUBLIC_THIRDWEB_CLIENT_ID` | mobile | thirdweb project client ID (mirrors web).                                |
-| `EXPO_PUBLIC_APP_ENV`            | mobile | `production` \| `staging` \| `development`.                              |
-| `EXPO_PUBLIC_SENTRY_DSN`         | mobile | Sentry DSN for JS-layer crashes.                                         |
-| `EXPO_PUBLIC_RELEASE`            | mobile | Git SHA injected by CI at `eas build` time.                              |
-| `EXPO_PUBLIC_POSTHOG_KEY`        | mobile | PostHog project API key.                                                 |
-| `EXPO_PUBLIC_POSTHOG_HOST`       | mobile | PostHog host (`https://us.i.posthog.com` or `https://eu.i.posthog.com`). |
+| Variable                   | App    | Description                                                              |
+| -------------------------- | ------ | ------------------------------------------------------------------------ |
+| `EXPO_PUBLIC_SERVER_URL`   | mobile | LOAR API base URL.                                                       |
+| `EXPO_PUBLIC_APP_ENV`      | mobile | `production` \| `staging` \| `development`.                              |
+| `EXPO_PUBLIC_SENTRY_DSN`   | mobile | Sentry DSN for JS-layer crashes.                                         |
+| `EXPO_PUBLIC_RELEASE`      | mobile | Git SHA injected by CI at `eas build` time.                              |
+| `EXPO_PUBLIC_POSTHOG_KEY`  | mobile | PostHog project API key.                                                 |
+| `EXPO_PUBLIC_POSTHOG_HOST` | mobile | PostHog host (`https://us.i.posthog.com` or `https://eu.i.posthog.com`). |
 
 ### Infrastructure (Optional)
 

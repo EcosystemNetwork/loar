@@ -104,7 +104,7 @@ import { TimelineEventNode } from '@/components/flow/TimelineNodes';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useChainId } from 'wagmi';
-import { useWriteContract } from '@/hooks/useThirdwebWrite';
+import { useWriteContract } from '@/hooks/useCircleWrite';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import { UniverseSidebar } from '@/components/UniverseSidebar';
 import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';

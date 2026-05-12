@@ -41,15 +41,17 @@ By using the Platform, you represent and warrant that you meet all eligibility r
 
 ### 3.1 Wallet-Based Authentication
 
-The Platform uses Sign-In with Ethereum (SIWE) for authentication. You connect a compatible Ethereum wallet (including in-app wallets provided by thirdweb and external wallets such as MetaMask, Coinbase Wallet, or WalletConnect-compatible wallets) and sign a message to prove ownership of your blockchain address.
+The Platform uses Sign-In with Ethereum (SIWE) for authentication. When you sign in with email, Google, Apple, or passkey, the Platform provisions a Developer-Controlled Wallet through our wallet-infrastructure provider (Circle). The Platform may also accept external wallets you connect yourself (such as MetaMask, Coinbase Wallet, or WalletConnect-compatible wallets) where supported.
 
-### 3.2 No Custodial Accounts
+### 3.2 Custody and Account Security
 
-LOAR does not hold, manage, or have access to your private keys, seed phrases, or wallet credentials. You are solely responsible for:
+For Developer-Controlled Wallets, private keys are generated and stored inside Circle's hardware-backed key management infrastructure and are never exposed to the Platform or to you. The Platform requests signatures on your behalf only when you initiate an authenticated action through your account. You are responsible for:
 
-- Maintaining the security of your wallet and private keys.
-- All activity conducted through your authenticated wallet address.
-- Any losses resulting from unauthorized access to your wallet.
+- Protecting the email address, social login, or passkey used to access your account.
+- All activity conducted through your authenticated session.
+- Any losses resulting from unauthorized access to the credentials that unlock your account.
+
+For external wallets you connect yourself, you remain solely responsible for the security of your private keys and seed phrase.
 
 ### 3.3 Session Tokens
 

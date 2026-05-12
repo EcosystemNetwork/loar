@@ -114,6 +114,18 @@ app.route('/auth', authRoutes);
 const { circleAuthRoutes } = await import('./routes/circle-auth');
 app.route('/auth/circle', circleAuthRoutes);
 
+// SIWS — Sign-In With Solana. Issues JWTs with ns='solana' for users
+// connecting via Phantom/Solflare/Backpack. Reuses /auth/nonce upstream.
+// Rate limiting: covered by the shared /auth/* 20/min bucket above. SIWS
+// verify cost (~ed25519 verify + Firestore nonce consume) is comparable to
+// SIWE verify, so the shared limit is appropriate.
+const { siwsAuthRoutes } = await import('./routes/siws-auth');
+app.route('/auth/solana', siwsAuthRoutes);
+
+// Solana wallet provisioning + tx status (Circle DCW Solana).
+const { solanaRoutes } = await import('./routes/solana');
+app.route('/api/solana', solanaRoutes);
+
 // Circle transaction proxy — server-side contract execution via Circle KMS
 const { txProxyRoutes } = await import('./routes/tx-proxy');
 app.route('/api/tx', txProxyRoutes);
@@ -151,8 +163,8 @@ const { mcpGatewayRoutes } = await import('./routes/mcp-gateway');
 app.route('/api', mcpGatewayRoutes);
 
 // Paymaster proxy (POST /api/paymaster/sponsor). Pluggable provider —
-// thirdweb / pimlico / biconomy based on env. Stricter rate limit because
-// each call translates to a vendor-side spend.
+// pimlico / biconomy based on env. Stricter rate limit because each call
+// translates to a vendor-side spend.
 app.use('/api/paymaster/*', rateLimiter({ windowMs: 60_000, max: 20 }));
 const { paymasterRoutes } = await import('./routes/paymaster');
 app.route('/api/paymaster', paymasterRoutes);

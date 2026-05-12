@@ -1,8 +1,7 @@
 /**
  * useWalletAccount — Wallet account hook backed by Circle auth session.
  *
- * Previously merged wagmi + thirdweb account state.
- * Now reads from localStorage (set during Circle login) and
+ * Reads the address from localStorage (set during Circle login) and
  * falls back to wagmi for read-only chain info.
  *
  * Usage: replace `import { useAccount } from 'wagmi'` with

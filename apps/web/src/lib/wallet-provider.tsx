@@ -1,15 +1,16 @@
 /**
  * Wallet Provider — Minimal auth context wrapper
  *
- * Previously wrapped ThirdwebProvider + WagmiProvider.
- * Now provides a lightweight context for Circle DCW auth state.
- * wagmi stays for read-only contract calls (useReadContract, useChainId). *
+ * Provides a lightweight context for Circle DCW auth state. wagmi stays
+ * for read-only contract calls (useReadContract, useChainId).
+ *
  * The QueryClient is owned by utils/trpc.ts — we accept it as a prop so the
  * tRPC react-query hooks share the same client as everything else in the tree.
  */
 import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { config } from '@/../config';
+import { SolanaProvider } from './solana-provider';
 import type { ReactNode } from 'react';
 
 export function WalletProvider({
@@ -21,7 +22,9 @@ export function WalletProvider({
 }) {
   return (
     <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <SolanaProvider>{children}</SolanaProvider>
+      </QueryClientProvider>
     </WagmiProvider>
   );
 }

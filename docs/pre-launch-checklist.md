@@ -26,7 +26,7 @@ Audit-driven checklist. Items are grouped by launch phase.
   - **Still recommended**: Have legal counsel do a final review before broad public launch
 
 - [x] **#19 Privacy Policy** — ~~Replace placeholder~~ Substantive legal text live at `/privacy` (dated April 10, 2026)
-  - Third-party service disclosures included (FAL, OpenAI, ElevenLabs, Meshy, Stripe, thirdweb, Firebase)
+  - Third-party service disclosures included (FAL, OpenAI, ElevenLabs, Meshy, Stripe, Circle, Firebase)
   - Data collection, blockchain persistence, retention, user rights all covered
   - **Still recommended**: Have legal counsel do a final review before broad public launch
 

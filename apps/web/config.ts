@@ -32,11 +32,10 @@ const transports = Object.fromEntries(chains.map((c) => [c.id, http(rpcFor(c.id)
   ReturnType<typeof http>
 >;
 
-// Connectors are intentionally omitted — thirdweb's ConnectButton manages
-// wallet connections (injected, WalletConnect, Coinbase, etc.) and syncs
-// state into wagmi automatically.  Declaring wagmi connectors here would
-// double-register them, causing each to probe/initialize on page load and
-// trigger browser popup-blocked warnings.
+// Connectors are intentionally omitted — auth is handled by Circle DCW
+// (server-managed wallet) and the optional Solana adapter. wagmi here is
+// used only for read-only contract calls against EVM chains, so registering
+// browser connectors would just add startup cost with nothing to connect to.
 export const config = createConfig({
   chains: chains as unknown as readonly [(typeof chains)[0], ...typeof chains],
   transports: transports as any,

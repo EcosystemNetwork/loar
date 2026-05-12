@@ -7,4 +7,6 @@ packages:
   - 'apps/mcp'
   - 'apps/mcp-gateway'
   - 'apps/mobile'
+  - 'apps/solana-indexer'
+  - 'apps/programs'
   - 'packages/*'

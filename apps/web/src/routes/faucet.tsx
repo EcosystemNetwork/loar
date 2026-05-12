@@ -4,7 +4,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useReadContract, useChainId } from 'wagmi';
-import { useWriteContract } from '@/hooks/useThirdwebWrite';
+import { useWriteContract } from '@/hooks/useCircleWrite';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { formatUnits } from 'viem';
 import { toast } from 'sonner';

@@ -224,9 +224,9 @@ function PrivacyPage() {
                 accordance with their own terms and privacy policies.
               </li>
               <li>
-                <strong>Wallet connection provider</strong> (thirdweb): Facilitates wallet
-                connection and SIWE authentication. Processes your wallet address and signature
-                data.
+                <strong>Wallet infrastructure provider</strong> (Circle): Provisions and custodies
+                server-managed developer-controlled wallets and signs transactions on your behalf.
+                Processes your wallet address, email, and authentication data.
               </li>
               <li>
                 <strong>Blockchain RPC providers</strong> (Alchemy and others): Relay your

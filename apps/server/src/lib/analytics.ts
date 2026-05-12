@@ -82,7 +82,13 @@ export async function captureServerEvent(
   if (!distinctId) return;
   try {
     const c = await getClient();
-    c?.capture({ distinctId: String(distinctId).toLowerCase(), event, properties: rest });
+    // EVM addresses are case-insensitive — lowercase for stable identity.
+    // Solana base58 addresses are case-sensitive — `Q` and `q` are distinct
+    // pubkeys, so lowercasing would collide unrelated users into one PostHog
+    // identity. Only normalize when the identifier looks like an EVM address.
+    const id = String(distinctId);
+    const normalized = id.startsWith('0x') ? id.toLowerCase() : id;
+    c?.capture({ distinctId: normalized, event, properties: rest });
   } catch {
     // Analytics must never impact the request path.
   }

@@ -7,7 +7,7 @@
  */
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { useReadContract, useChainId, usePublicClient } from 'wagmi';
-import { useWriteContract } from '@/hooks/useThirdwebWrite';
+import { useWriteContract } from '@/hooks/useCircleWrite';
 import { useWalletAccount } from '@/hooks/useWalletAccount';
 import { parseEther, formatEther, type Address } from 'viem';
 import { useVisibilityAwareInterval, POLL_INTERVALS } from './useSmartPolling';

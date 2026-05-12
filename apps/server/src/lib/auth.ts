@@ -16,6 +16,10 @@ const ETH_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 export interface AuthUser {
   uid: string;
   address?: string;
+  /** Base58 Solana pubkey, when the user has a linked or primary Solana wallet. */
+  solanaAddress?: string;
+  /** Chain namespace of the primary identity. Defaults to 'eip155' for legacy sessions. */
+  chainNamespace?: 'eip155' | 'solana';
   email?: string;
   /** Set when authenticated via API key */
   apiKeyId?: string;
@@ -80,10 +84,7 @@ export async function verifyAuth(headers: Headers, cookieToken?: string): Promis
   if (cookieToken) {
     const payload = await verifySessionToken(cookieToken);
     if (payload?.sub) {
-      return {
-        uid: payload.sub.toLowerCase(),
-        address: payload.sub,
-      };
+      return authUserFromPayload(payload);
     }
   }
 
@@ -92,12 +93,39 @@ export async function verifyAuth(headers: Headers, cookieToken?: string): Promis
   if (bearerRaw && !bearerIsApiKey) {
     const payload = await verifySessionToken(bearerRaw);
     if (payload?.sub) {
-      return {
-        uid: payload.sub.toLowerCase(),
-        address: payload.sub,
-      };
+      return authUserFromPayload(payload);
     }
   }
 
   return null;
+}
+
+/**
+ * Build an AuthUser from a verified JWT payload. Handles both EVM-only
+ * (legacy) tokens and tokens with extended Solana / chain-namespace claims.
+ */
+function authUserFromPayload(payload: {
+  sub: string;
+  ns?: 'eip155' | 'solana';
+  evm?: string;
+  sol?: string;
+}): AuthUser {
+  const ns = payload.ns ?? 'eip155';
+  if (ns === 'solana') {
+    // sub is base58 (case-sensitive) — never lowercase Solana pubkeys.
+    return {
+      uid: payload.sub,
+      address: payload.evm,
+      solanaAddress: payload.sub,
+      chainNamespace: 'solana',
+    };
+  }
+  // EVM path (legacy + dual-chain) — uid stays lowercased for back-compat
+  // with Firestore documents keyed by EVM-address-lowercased uids.
+  return {
+    uid: payload.sub.toLowerCase(),
+    address: payload.sub,
+    solanaAddress: payload.sol,
+    chainNamespace: 'eip155',
+  };
 }

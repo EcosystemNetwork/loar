@@ -123,7 +123,7 @@ This means **judges can demo on their own credits**, and any builder watching ca
 
 **Tech stack (relevant to Seed):** Seedance 2.0 (T2V/I2V/ref-to-video), Seedream 5.0, Seed 2.0 chat completions, Seed Speech, OmniHuman. All wired in [`apps/server/src/services/bytedance.ts`](apps/server/src/services/bytedance.ts) with key rotation, async polling, and per-call BYOK override.
 
-**Tech stack (rest of system):** React 18 + Vite + TanStack Router (web). Hono + tRPC + Bun (server). Ponder v0.15 (indexer). Foundry + Solidity ^0.8.30 (69 contracts on Sepolia + Base Sepolia). Firestore (off-chain metadata). Pinata + Lighthouse (decentralized storage). thirdweb + SIWE (auth). Circle DCW (server-signed transactions).
+**Tech stack (rest of system):** React 18 + Vite + TanStack Router (web). Hono + tRPC + Bun (server). Ponder v0.15 (indexer). Foundry + Solidity ^0.8.30 (69 contracts on Sepolia + Base Sepolia). Firestore (off-chain metadata). Pinata + Lighthouse (decentralized storage). Circle DCW + SIWE (auth + server-signed transactions).
 
 **What's novel:**
 
@@ -137,7 +137,7 @@ This means **judges can demo on their own credits**, and any builder watching ca
 
 - **BytePlus / ModelArk** — full Seed stack as primary video + planning + speech provider
 - **Base** — testnet on Base Sepolia, mainnet target Base L2
-- **thirdweb** — wallet auth, in-app wallets (email/social/passkey), gas sponsorship
+- **Circle** — Developer-Controlled Wallets (server-custodied), KMS signing, email/social/passkey onboarding
 - **Pinata** — IPFS pinning for all generated content
 - **Lighthouse** — Filecoin redundancy for permanence
 

@@ -31,7 +31,8 @@ graph TD
 
     WEB -->|tRPC over HTTP| SERVER
     WEB -->|GraphQL| INDEXER
-    WEB -->|wagmi + thirdweb| SEPOLIA
+    WEB -->|wagmi reads| SEPOLIA
+    SERVER -->|Circle KMS sign| SEPOLIA
 
     SERVER --> FIREBASE
     SERVER --> FAL
@@ -140,7 +141,7 @@ Hard cap behaviour: when today's platform spend reaches `COST_DAILY_PLATFORM_CAP
 
 Meta-transaction sponsorship for user actions (mint, vote, universe creation). Lets new users take on-chain actions without holding gas. See [apps/server/src/routes/paymaster.ts](../apps/server/src/routes/paymaster.ts).
 
-- **Provider resolution** (first match wins): `THIRDWEB_SECRET_KEY` → `PIMLICO_API_KEY` → `BICONOMY_API_KEY`. When none set, `/api/paymaster` returns 501.
+- **Provider resolution** (first match wins): `PIMLICO_API_KEY` → `BICONOMY_API_KEY`. When none set, `/api/paymaster` returns 501.
 - **Endpoints**: `POST /api/paymaster/sponsorUserOp`, `POST /api/paymaster/getUserOperationGasPrice`, `POST /api/paymaster/estimateUserOperationGas`.
 - **Quota**: `PAYMASTER_DAILY_LIMIT` sponsored ops per wallet per rolling 24h window.
 - **Frontend**: [apps/web/src/hooks/useSponsoredTransaction.ts](../apps/web/src/hooks/useSponsoredTransaction.ts) falls back to user-paid gas when sponsorship is unavailable.
@@ -168,15 +169,14 @@ At least one external provider (`PHOTODNA_*` or `HIVE_API_KEY`) is required in p
 
 LOAR ships a React Native client alongside the web SPA. It reuses the same server contract (tRPC + SIWE JWT) and the same on-chain address set, so all Firestore docs, credits, and wallet activity are shared between web and mobile.
 
-| Layer                | Choice                                                                                                                                                                                                                                                                                                                                |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Runtime**          | Expo 52 (iOS + Android), JS engine: Hermes                                                                                                                                                                                                                                                                                            |
-| **Bundle**           | Production Hermes bytecode builds end-to-end (~16.6MB `.hbc`, 7083 modules). Metro serializer rewrites `import.meta.<x>` → `(undefined)` because Hermes refuses `import.meta` and both `thirdweb` and `brotli_wasm` ship it in their published ESM                                                                                    |
-| **Wallet auth**      | thirdweb `inAppWallet` (google / apple / passkey / email) plus external wallet connectors; SIWE signature → server JWT, identical to the web flow (see [apps/mobile/src/lib/thirdweb.ts](../apps/mobile/src/lib/thirdweb.ts))                                                                                                         |
-| **Crypto polyfill**  | `react-native-get-random-values` imported at the top of [app/\_layout.tsx](../apps/mobile/app/_layout.tsx) before any crypto consumer loads                                                                                                                                                                                           |
-| **Stubbed adapters** | Unused wallet adapters (`@mobile-wallet-protocol/client`, `@coinbase/wallet-mobile-sdk`) resolved to [src/shims/empty.js](../apps/mobile/src/shims/empty.js) via Metro `resolveRequest` to keep the bundle clean                                                                                                                      |
-| **Observability**    | `@sentry/react-native` scaffold wired via side-effect import from [app/\_layout.tsx](../apps/mobile/app/_layout.tsx) → [src/lib/sentry.ts](../apps/mobile/src/lib/sentry.ts). Captures JS-layer crashes today; native (iOS/Android) crash capture requires `expo prebuild` + a native rebuild                                         |
-| **Peer deps**        | Required thirdweb RN peers all declared in [apps/mobile/package.json](../apps/mobile/package.json): `@aws-sdk/client-kms`, `@aws-sdk/client-lambda`, `@aws-sdk/credential-providers`, `amazon-cognito-identity-js`, `react-native-aes-gcm-crypto`, `react-native-passkey`, `react-native-quick-crypto`, `react-native-worklets@0.3.0` |
+| Layer                | Choice                                                                                                                                                                                                                                                                                        |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Runtime**          | Expo 52 (iOS + Android), JS engine: Hermes                                                                                                                                                                                                                                                    |
+| **Bundle**           | Production Hermes bytecode builds end-to-end (~16.6MB `.hbc`, 7083 modules). Metro serializer rewrites `import.meta.<x>` → `(undefined)` because Hermes refuses `import.meta` and `brotli_wasm` ships it in its published ESM                                                                 |
+| **Wallet auth**      | Server-provisioned Circle Developer-Controlled Wallet (email / google / apple / passkey); the client calls `/auth/login` and receives a SIWE-style JWT — no keys live on the device                                                                                                           |
+| **Crypto polyfill**  | `react-native-get-random-values` imported at the top of [app/\_layout.tsx](../apps/mobile/app/_layout.tsx) before any crypto consumer loads                                                                                                                                                   |
+| **Stubbed adapters** | Unused wallet adapters (`@mobile-wallet-protocol/client`, `@coinbase/wallet-mobile-sdk`) resolved to [src/shims/empty.js](../apps/mobile/src/shims/empty.js) via Metro `resolveRequest` to keep the bundle clean                                                                              |
+| **Observability**    | `@sentry/react-native` scaffold wired via side-effect import from [app/\_layout.tsx](../apps/mobile/app/_layout.tsx) → [src/lib/sentry.ts](../apps/mobile/src/lib/sentry.ts). Captures JS-layer crashes today; native (iOS/Android) crash capture requires `expo prebuild` + a native rebuild |
 
 Mobile workstreams (feed/create, portfolio/wallet, market/shop) are tracked in the `prd-mobile-*.md` docs.
 
@@ -186,16 +186,15 @@ Mobile workstreams (feed/create, portfolio/wallet, market/shop) are tracked in t
 sequenceDiagram
     participant User
     participant Web as Web App
-    participant Wallet as thirdweb Wallet
     participant Server as API Server
+    participant Circle as Circle DCW (KMS)
 
-    User->>Web: Connect wallet (MetaMask, WalletConnect, etc.)
-    Web->>Wallet: Connect via thirdweb
-    Wallet-->>Web: Wallet address (0x...)
-    Web->>Wallet: Sign SIWE message
-    Wallet-->>Web: Signature
-
-    Web->>Server: POST /auth/verify { message, signature }
+    User->>Web: Sign in (email / google / apple / passkey)
+    Web->>Server: POST /auth/login { email | provider }
+    Server->>Circle: Provision or fetch developer-controlled wallet
+    Circle-->>Server: Wallet address (0x...)
+    Server->>Circle: Request signature for SIWE message
+    Circle-->>Server: Signature
     Server->>Server: Verify SIWE signature, issue JWT
     Server-->>Web: { token (JWT), address, chain: "evm" }
     Web->>Web: Store token in localStorage
@@ -339,17 +338,17 @@ PostHog docs: [docs/analytics.md](analytics.md). Event catalogue and privacy pos
 
 **Entry point:** `apps/web/src/main.tsx`
 
-| Layer          | Technology               | Purpose                                                                                                                |
-| -------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| Bundler        | Vite                     | Dev server (port 3001), build                                                                                          |
-| Routing        | TanStack Router          | File-based routing (`src/routes/`)                                                                                     |
-| Data Fetching  | TanStack Query + tRPC    | Server state management                                                                                                |
-| Web3           | wagmi + thirdweb         | Wallet connection, contract interaction                                                                                |
-| Auth           | thirdweb + SIWE          | Wallet-based authentication                                                                                            |
-| UI             | Tailwind CSS + shadcn/ui | Component library                                                                                                      |
-| Flow Editor    | ReactFlow                | Narrative node visualization with MiniMap, search, undo/redo, auto-layout, keyboard shortcuts, fullscreen, edge labels |
-| Scene Controls | Custom panels            | Camera, style, VFX presets, cast assignment, motion brush, keyframe handoff                                            |
-| Audio/3D       | ElevenLabs + Meshy       | Voice, music, sound effects, 3D assets                                                                                 |
+| Layer          | Technology                           | Purpose                                                                                                                |
+| -------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| Bundler        | Vite                                 | Dev server (port 3001), build                                                                                          |
+| Routing        | TanStack Router                      | File-based routing (`src/routes/`)                                                                                     |
+| Data Fetching  | TanStack Query + tRPC                | Server state management                                                                                                |
+| Web3           | wagmi (read) + server-proxied writes | Read-only contract calls in the client; writes via `/api/tx/write` signed by Circle KMS                                |
+| Auth           | Circle DCW + SIWE                    | Server-custodied wallet, email/social/passkey onboarding, SIWE-style JWT session                                       |
+| UI             | Tailwind CSS + shadcn/ui             | Component library                                                                                                      |
+| Flow Editor    | ReactFlow                            | Narrative node visualization with MiniMap, search, undo/redo, auto-layout, keyboard shortcuts, fullscreen, edge labels |
+| Scene Controls | Custom panels                        | Camera, style, VFX presets, cast assignment, motion brush, keyframe handoff                                            |
+| Audio/3D       | ElevenLabs + Meshy                   | Voice, music, sound effects, 3D assets                                                                                 |
 
 ### Route Map
 

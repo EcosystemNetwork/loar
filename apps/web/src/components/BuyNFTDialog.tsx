@@ -7,7 +7,7 @@
  */
 import { useState, useMemo } from 'react';
 import { useWaitForTransactionReceipt, useBalance, useChainId } from 'wagmi';
-import { useWriteContract } from '@/hooks/useThirdwebWrite';
+import { useWriteContract } from '@/hooks/useCircleWrite';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { parseEther } from 'viem';
 import { useRecordMint } from '@/hooks/useRevenue';

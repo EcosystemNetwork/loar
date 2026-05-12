@@ -162,12 +162,12 @@ If we add photo upload for user avatars / universe covers:
 The app uses crypto wallets but **does not offer exchange / fiat on-ramp**.
 Add this to "App Review Information → Notes":
 
-> LOAR Vault is a self-custodial wallet + creator tool. Users sign in with
-> an existing wallet (or create one via thirdweb's in-app wallet). We do
-> not offer fiat on/off-ramps, do not custody user funds, and do not act
-> as a broker. All token transactions happen on Base L2; the app surfaces
-> them via read-only calls. Crypto purchase flows link out to third-party
-> on-ramp providers in Safari, not in-app.
+> LOAR Vault is a creator tool with an embedded Developer-Controlled
+> Wallet (provisioned via Circle) so users can sign in with email or
+> social login. We do not offer fiat on/off-ramps and do not act as a
+> broker. All token transactions happen on Base L2 and are signed by
+> Circle's KMS on the user's behalf. Crypto purchase flows link out to
+> third-party on-ramp providers in Safari, not in-app.
 
 Apple rejects crypto apps that obscure these boundaries. Spell it out.
 
@@ -209,7 +209,7 @@ Apple rejects crypto apps that obscure these boundaries. Spell it out.
 
 - [ ] `apps/mobile` builds clean on both platforms (`eas build --profile production`)
 - [ ] Production API endpoint (`loar.fun/server`) is reachable from device
-- [ ] thirdweb client ID used is the **production** project, not dev
+- [ ] Circle DCW credentials point at the **production** project, not dev
 - [ ] Sentry DSN for mobile (`apps/mobile/src/lib/sentry.ts` per memory) is set
 - [ ] Deep links work: `loarvault://open?u=<test-universe-address>`
 - [ ] Sign-in → universe view → back → sign-out → sign-in cycle works 10×

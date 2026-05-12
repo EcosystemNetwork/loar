@@ -47,7 +47,7 @@ By using the Platform, you acknowledge that you have read and understood this Pr
 | Source                                  | Data Received                                                       | Purpose                                            |
 | --------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------- |
 | Blockchain networks (Ethereum, Base L2) | Public transaction data, token balances, smart contract events      | Indexing on-chain activity related to your address |
-| thirdweb                                | Wallet connection metadata, in-app wallet session data              | Authentication and wallet management               |
+| Circle                                  | Server-custodied wallet metadata, KMS-signed transaction records    | Wallet provisioning and signing on your behalf     |
 | Stripe (if card payments enabled)       | Payment confirmation (we do not receive or store full card numbers) | Credit purchase fulfillment                        |
 
 [LEGAL REVIEW REQUIRED] Verify completeness of data inventory. Conduct formal data mapping exercise. Determine whether any collected data qualifies as "sensitive" under GDPR Article 9 or equivalent frameworks.
@@ -92,10 +92,10 @@ FAL AI processes your prompts to generate content. We recommend reviewing FAL AI
 
 ### 4.3 Authentication and Payments
 
-| Service      | Data Shared                                                                       | Purpose                                   |
-| ------------ | --------------------------------------------------------------------------------- | ----------------------------------------- |
-| **thirdweb** | Wallet address, connection metadata, session data for in-app wallets              | Wallet connection and SIWE authentication |
-| **Stripe**   | Email (if provided), payment amount, transaction metadata (not full card details) | Credit/debit card payment processing      |
+| Service    | Data Shared                                                                                  | Purpose                                                      |
+| ---------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Circle** | Wallet address, account email, session and signing metadata for Developer-Controlled Wallets | Wallet provisioning, KMS-backed signing, SIWE authentication |
+| **Stripe** | Email (if provided), payment amount, transaction metadata (not full card details)            | Credit/debit card payment processing                         |
 
 ### 4.4 Blockchain Networks
 

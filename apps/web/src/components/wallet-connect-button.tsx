@@ -1,7 +1,7 @@
 /**
  * Wallet Connect Button — Circle Auth Login
  *
- * Renders an email/social login button instead of thirdweb's ConnectButton.
+ * Renders an email/social login button for the Circle DCW flow.
  * When authenticated, shows the user's abbreviated wallet address.
  * Clicking opens a dropdown with sign-out option.
  */
@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useWalletAuth, getAuthEmail } from '@/lib/wallet-auth';
+import { useSolanaAuth } from '@/lib/solana-auth';
 import { useUnstoppableDomain, formatDisplayName } from '@/hooks/useUnstoppableDomain';
 
 interface WalletConnectButtonProps {
@@ -18,6 +19,7 @@ interface WalletConnectButtonProps {
 
 export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ className = '' }) => {
   const { address, isAuthenticated, signOut } = useWalletAuth();
+  const { address: solanaAddress, isAuthenticated: solanaAuthenticated } = useSolanaAuth();
   const { name: udName } = useUnstoppableDomain(address);
   const displayName = formatDisplayName(address, udName);
   const email = getAuthEmail();
@@ -63,9 +65,15 @@ export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ classN
                 </div>
               )}
               <div className="px-4 py-3 border-b border-white/10">
-                <p className="text-xs text-white/50">Wallet</p>
-                <p className="text-xs text-white/60 font-mono">{address}</p>
+                <p className="text-xs text-white/50">Wallet (EVM)</p>
+                <p className="text-xs text-white/60 font-mono break-all">{address}</p>
               </div>
+              {solanaAuthenticated && solanaAddress && (
+                <div className="px-4 py-3 border-b border-white/10">
+                  <p className="text-xs text-white/50">Solana</p>
+                  <p className="text-xs text-white/60 font-mono break-all">{solanaAddress}</p>
+                </div>
+              )}
               <button
                 onClick={() => {
                   setShowMenu(false);
