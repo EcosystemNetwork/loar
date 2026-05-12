@@ -21,7 +21,7 @@ import {
   activeCluster,
 } from '../lib/circle-solana';
 import { mintEpisodeCnft } from '../services/solana/episode-mint';
-import { canonizeEpisode } from '../services/solana/canon-promote';
+import { canonizeEpisode, CanonizePrecheckError } from '../services/solana/canon-promote';
 
 export const solanaRoutes = new Hono();
 
@@ -182,6 +182,11 @@ solanaRoutes.post('/episode/canonize', async (c) => {
     });
     return c.json(result);
   } catch (err) {
+    // Pre-flight failures map to deterministic client-side errors so the
+    // frontend can show a clear message instead of a generic 500.
+    if (err instanceof CanonizePrecheckError) {
+      return c.json({ error: err.message, code: err.code }, err.code === 'NOT_FOUND' ? 404 : 409);
+    }
     return c.json({ error: err instanceof Error ? err.message : 'Canonize failed' }, 500);
   }
 });

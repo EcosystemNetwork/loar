@@ -23,7 +23,8 @@
  *   1. episode::canonize     — Anchor flag flip + EpisodeCanonized event
  *   2. mpl_core::createV1    — mint Core asset, owner = episode creator
  */
-import { PublicKey, Keypair } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
+import type { Signer } from '@solana/web3.js';
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
 import { create as createCore, ruleSet } from '@metaplex-foundation/mpl-core';
 import {
@@ -37,9 +38,29 @@ import {
   activeCluster,
   executeSolanaTransaction,
   getOrCreateSolanaWallet,
+  getSolanaConnection,
 } from '../../lib/circle-solana';
 import { buildCanonizeEpisodeIx, deriveEpisodeRecordPda } from '../../lib/anchor-ix';
 import { EpisodeProgram, getSolanaAddress } from '@loar/abis/solana-addresses';
+
+/** Anchor `EpisodeRecord` borsh layout offsets (after the 8-byte discriminator):
+ *  universe (32) | creator (32) | content_hash (32) | is_canon (1) | bump (1)
+ *  Used by canonizePrecheck to peek at is_canon without pulling in the full IDL. */
+const EPISODE_RECORD_IS_CANON_OFFSET = 8 + 32 + 32 + 32;
+
+/**
+ * Domain error thrown by canon promotion when the user-supplied input is
+ * inconsistent with on-chain state. Route handlers map these to 404/409.
+ */
+export class CanonizePrecheckError extends Error {
+  constructor(
+    public readonly code: 'NOT_FOUND' | 'ALREADY_CANON',
+    message: string
+  ) {
+    super(message);
+    this.name = 'CanonizePrecheckError';
+  }
+}
 
 let _umi: Umi | null = null;
 function getUmi(): Umi {
@@ -86,6 +107,33 @@ export async function canonizeEpisode(req: CanonizeRequest): Promise<CanonizeRes
 
   const [episodePda] = deriveEpisodeRecordPda(episodeProgramId, universe, req.contentHash);
 
+  // Pre-flight: bail BEFORE building Core-asset keypair + ixs if the on-chain
+  // state would make the canonize ix fail. Without this the user pays for a
+  // tx that the Anchor program rejects mid-execution.
+  const conn = getSolanaConnection();
+  const acct = await conn.getAccountInfo(episodePda, 'confirmed');
+  if (!acct) {
+    throw new CanonizePrecheckError(
+      'NOT_FOUND',
+      `No EpisodeRecord at ${episodePda.toBase58()} — mint the episode first`
+    );
+  }
+  if (!acct.owner.equals(episodeProgramId)) {
+    throw new CanonizePrecheckError(
+      'NOT_FOUND',
+      `Account ${episodePda.toBase58()} is not owned by the episode program`
+    );
+  }
+  if (
+    acct.data.length > EPISODE_RECORD_IS_CANON_OFFSET &&
+    acct.data[EPISODE_RECORD_IS_CANON_OFFSET] !== 0
+  ) {
+    throw new CanonizePrecheckError(
+      'ALREADY_CANON',
+      `Episode ${episodePda.toBase58()} is already canon`
+    );
+  }
+
   // 1. Anchor canonize ix — flips is_canon and emits EpisodeCanonized event.
   const canonIx = buildCanonizeEpisodeIx({
     programId: episodeProgramId,
@@ -114,20 +162,36 @@ export async function canonizeEpisode(req: CanonizeRequest): Promise<CanonizeRes
     },
   } as const;
 
+  // Plugins. Always royalties; Attributes pins the cNFT assetId for off-chain
+  // linkage when the caller supplies it (so wallet/marketplace UIs can show
+  // "this Core asset was promoted from cNFT X"). The `as const` on `type`
+  // satisfies the V2 plugin discriminator.
+  const plugins: Parameters<typeof createCore>[1]['plugins'] = [
+    {
+      type: 'Royalties' as const,
+      basisPoints: 500, // 5%
+      creators: [{ address: toUmiPublicKey(signer.toBase58()), percentage: 100 }],
+      ruleSet: ruleSet('None'),
+    },
+  ];
+  if (req.cnftAssetId) {
+    plugins.push({
+      type: 'Attributes' as const,
+      attributeList: [
+        { key: 'cnftAssetId', value: req.cnftAssetId },
+        { key: 'episodePda', value: episodePda.toBase58() },
+        { key: 'contentHashHex', value: '0x' + req.contentHash.toString('hex') },
+      ],
+    });
+  }
+
   const builder = createCore(umi, {
     asset: coreAsset,
     name: req.name.slice(0, 64),
     uri: req.metadataUri,
     owner: toUmiPublicKey(signer.toBase58()),
     payer: dummySigner,
-    plugins: [
-      {
-        type: 'Royalties',
-        basisPoints: 500, // 5%
-        creators: [{ address: toUmiPublicKey(signer.toBase58()), percentage: 100 }],
-        ruleSet: ruleSet('None'),
-      },
-    ],
+    plugins,
   });
 
   const umiIxs = builder.getInstructions();
@@ -136,14 +200,14 @@ export async function canonizeEpisode(req: CanonizeRequest): Promise<CanonizeRes
   }
   const coreIxs = umiIxs.map((i) => toWeb3JsInstruction(i as UmiInstruction));
 
-  // The Core asset must sign as a fresh account during init. We pass its
-  // keypair as an additional signer to executeSolanaTransaction; the Circle
-  // wallet signs as fee payer.
-  const additionalSigners = [
+  // The Core asset must sign as a fresh account during init. The literal
+  // shape matches `Signer` (publicKey + secretKey) — no cast to Keypair
+  // needed; executeSolanaTransaction calls .sign on the secretKey directly.
+  const additionalSigners: Signer[] = [
     {
       publicKey: new PublicKey(coreAsset.publicKey),
       secretKey: coreAsset.secretKey,
-    } as unknown as Keypair, // Keypair-compatible shape; executeSolanaTransaction calls .sign on it
+    },
   ];
 
   const tx = await executeSolanaTransaction({
@@ -151,7 +215,10 @@ export async function canonizeEpisode(req: CanonizeRequest): Promise<CanonizeRes
     cluster,
     instructions: [canonIx, ...coreIxs],
     additionalSigners,
-    computeUnitLimit: 500_000,
+    // canonize ~30k CU, Core createV1 ~80k CU, ATA inits ~25k CU.
+    // 200k is enough headroom; tighter than the old 500k limit so priority
+    // fee math doesn't over-pay.
+    computeUnitLimit: 200_000,
   });
 
   return {

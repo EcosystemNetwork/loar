@@ -524,17 +524,27 @@ fn mul_bps(amount: u64, bps: u64) -> Result<u64> {
 /// destination. Solana disallows `system_program::transfer` from accounts
 /// owned by a non-system program, so we manipulate lamports directly.
 /// Safe because the vault PDA is owned by this program.
+///
+/// Enforces the rent-exempt floor on the vault — if a drain would push the
+/// vault below `Rent::minimum_balance(vault.data_len())` the runtime is free
+/// to garbage-collect the account, taking ALL pending accumulators with it.
+/// This protects against accidental drift (e.g. someone sends SOL directly to
+/// the vault outside `route()` and an off-by-one consumes the floor).
 fn transfer_lamports_from_vault(
     vault: &AccountInfo,
     to: &AccountInfo,
     amount: u64,
 ) -> Result<()> {
     let vault_balance = vault.lamports();
-    require!(vault_balance >= amount, PaymentError::InsufficientVault);
-
-    **vault.try_borrow_mut_lamports()? = vault_balance
+    let post_balance = vault_balance
         .checked_sub(amount)
-        .ok_or(PaymentError::MathOverflow)?;
+        .ok_or(PaymentError::InsufficientVault)?;
+
+    // Rent floor — the runtime may reap any account that falls below it.
+    let rent_min = Rent::get()?.minimum_balance(vault.data_len());
+    require!(post_balance >= rent_min, PaymentError::InsufficientVault);
+
+    **vault.try_borrow_mut_lamports()? = post_balance;
     **to.try_borrow_mut_lamports()? = to
         .lamports()
         .checked_add(amount)

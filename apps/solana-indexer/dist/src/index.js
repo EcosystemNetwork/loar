@@ -146,7 +146,15 @@ const BUBBLEGUM_PROGRAM_ID = 'BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY';
 // ── Handlers ────────────────────────────────────────────────────────────────
 /**
  * Decode Anchor events from a tx and write canonical entity docs.
- * Idempotent — keyed by signature + event index so webhook retries dedupe.
+ *
+ * Idempotency model:
+ *   - `solanaEvents/{signature}_{ix}` is the canonical "did we process this?" gate.
+ *     Inserted in a Firestore transaction; if it already exists, we skip the
+ *     downstream side-effects entirely. Helius retries webhook deliveries on
+ *     any 5xx — without this gate, non-commutative ops like
+ *     FieldValue.increment(canonCount) drift on every retry.
+ *   - Entity docs (solanaUniverses, solanaEpisodes) use `merge: true`; their
+ *     writes are intrinsically idempotent for same-value updates.
  */
 async function handleAnchorEvents(tx) {
     const known = new Set([UNIVERSE_PROGRAM_ID, EPISODE_PROGRAM_ID].filter(Boolean));
@@ -172,6 +180,17 @@ async function handleAnchorEvents(tx) {
     for (let i = 0; i < events.length; i++) {
         const event = events[i];
         const docId = `${tx.signature}_${i}`;
+        // Idempotency gate. Returns true on the FIRST handling of this event;
+        // false on retries. Only first-handlings run non-commutative side-effects
+        // (e.g. canonCount increment).
+        const eventRef = db.collection('solanaEvents').doc(docId);
+        const isFirstHandling = await db.runTransaction(async (t) => {
+            const existing = await t.get(eventRef);
+            if (existing.exists)
+                return false;
+            t.set(eventRef, { ...base, kind: event.kind, payload: event });
+            return true;
+        });
         if (event.kind === 'UniverseCreated') {
             await db
                 .collection('solanaUniverses')
@@ -183,7 +202,9 @@ async function handleAnchorEvents(tx) {
                 contentHashHex: event.contentHashHex,
                 plotHashHex: event.plotHashHex,
                 visibility: event.visibility,
-                canonCount: 0,
+                // Only set canonCount=0 on first handling — never overwrite a
+                // counter that an EpisodeCanonized event has already incremented.
+                ...(isFirstHandling ? { canonCount: 0 } : {}),
                 createdSig: tx.signature,
             }, { merge: true });
         }
@@ -214,22 +235,38 @@ async function handleAnchorEvents(tx) {
                 .collection('solanaEpisodes')
                 .doc(event.episode)
                 .set({ ...base, isCanon: true, canonizedSig: tx.signature }, { merge: true });
-            await db
-                .collection('solanaUniverses')
-                .doc(event.universe)
-                .set({ canonCount: FieldValue.increment(1) }, { merge: true });
+            // Counter increment ONLY on first handling — FieldValue.increment is
+            // not idempotent, and Helius retries deliveries on 5xx.
+            if (isFirstHandling) {
+                await db
+                    .collection('solanaUniverses')
+                    .doc(event.universe)
+                    .set({ canonCount: FieldValue.increment(1) }, { merge: true });
+            }
         }
-        // Append-only raw event log for ops / debugging / reconciliation.
-        await db
-            .collection('solanaEvents')
-            .doc(docId)
-            .set({ ...base, kind: event.kind, payload: event }, { merge: true });
     }
 }
+function extractMintFromCompressed(events) {
+    if (!events)
+        return null;
+    for (const raw of events) {
+        const ev = raw;
+        if (ev?.type === 'COMPRESSED_NFT_MINT' && ev.assetId)
+            return ev;
+    }
+    // Some Helius payloads send the mint without an explicit `type` — fall back
+    // to any entry that has an assetId.
+    for (const raw of events) {
+        const ev = raw;
+        if (ev?.assetId)
+            return ev;
+    }
+    return null;
+}
 async function handleBubblegumMint(tx) {
-    // cNFT mints — extract the assetId / tree + leaf from `events.compressed`
-    // (Helius surfaces this for Bubblegum). Mirror to a content-index doc that
-    // joins with the EpisodeRecord PDA later.
+    const mint = extractMintFromCompressed(tx.events?.compressed);
+    // Always mirror the raw payload — useful for debugging when Helius schema
+    // shifts. Keyed by signature so retries dedupe naturally (merge=true).
     await db
         .collection('solanaCnftMints')
         .doc(tx.signature)
@@ -238,9 +275,36 @@ async function handleBubblegumMint(tx) {
         slot: tx.slot,
         timestamp: tx.timestamp,
         feePayer: tx.feePayer,
+        // Extracted typed fields (null if not a mint event):
+        assetId: mint?.assetId ?? null,
+        tree: mint?.tree ?? null,
+        leafIndex: mint?.leafIndex ?? null,
+        leafOwner: mint?.newLeafOwner ?? null,
+        // Raw payload for forensics — Firestore stores up to 1MB per doc.
         compressed: tx.events?.compressed ?? null,
         processedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
+    // Side-index keyed by assetId so downstream UIs can look up cNFTs by their
+    // canonical Solana asset address without scanning by signature. Only
+    // written when we actually extracted an assetId — avoids polluting with
+    // null docs from non-mint Bubblegum txs (transfer, burn, decompress).
+    if (mint?.assetId) {
+        await db
+            .collection('solanaCnftAssets')
+            .doc(mint.assetId)
+            .set({
+            assetId: mint.assetId,
+            tree: mint.tree ?? null,
+            leafIndex: mint.leafIndex ?? null,
+            leafOwner: mint.newLeafOwner ?? null,
+            mintedSig: tx.signature,
+            mintedSlot: tx.slot,
+            mintedAt: tx.timestamp,
+            // joinedEpisode is populated by a follow-up reconciliation worker
+            // that matches (leafOwner, mintedAt) → solanaEpisodes.creator —
+            // for now leave null and let downstream consumers do the lookup.
+        }, { merge: true });
+    }
 }
 async function routeTx(tx) {
     const programs = new Set(tx.instructions?.map((i) => i.programId) ?? []);
