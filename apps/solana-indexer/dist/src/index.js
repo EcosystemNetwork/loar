@@ -173,7 +173,10 @@ async function handleAnchorEvents(tx) {
         const event = events[i];
         const docId = `${tx.signature}_${i}`;
         if (event.kind === 'UniverseCreated') {
-            await db.collection('solanaUniverses').doc(event.universe).set({
+            await db
+                .collection('solanaUniverses')
+                .doc(event.universe)
+                .set({
                 ...base,
                 universe: event.universe,
                 creator: event.creator,
@@ -191,7 +194,10 @@ async function handleAnchorEvents(tx) {
                 .set({ ...base, visibility: 'Public', publishedSig: tx.signature }, { merge: true });
         }
         else if (event.kind === 'EpisodeMinted') {
-            await db.collection('solanaEpisodes').doc(event.episode).set({
+            await db
+                .collection('solanaEpisodes')
+                .doc(event.episode)
+                .set({
                 ...base,
                 episode: event.episode,
                 universe: event.universe,

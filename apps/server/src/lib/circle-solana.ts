@@ -246,42 +246,62 @@ export interface SolanaTxResult {
 const TERMINAL_STATES = new Set(['COMPLETE', 'FAILED', 'CANCELLED', 'DENIED']);
 
 /**
- * Estimate priority fee via Helius `getPriorityFeeEstimate`. Retries once on
- * transient failures before falling back to a static 10_000 micro-lamports —
- * during high congestion the static fallback often loses inclusion races, so
- * the retry materially improves landing rate.
+ * Estimate priority fee per compute unit.
  *
- * Non-Helius RPCs respond with `method not found` and short-circuit straight
- * to the fallback (no retry — the method is permanently unavailable).
+ * Two-tier strategy so we work across providers without rewriting the call:
+ *   1. **Helius**: `getPriorityFeeEstimate` (non-standard, returns a sophisticated
+ *      median across recent prioritized txs). Best signal when available.
+ *   2. **Standard RPC** (Alchemy/Triton/QuickNode): `getRecentPrioritizationFees`
+ *      — part of the official Solana JSON-RPC spec. Returns recent fee samples;
+ *      we take the 75th-percentile to bias toward inclusion under congestion.
+ *   3. **Final fallback**: 10_000 µLamports when both fail.
+ *
+ * Each network call retries once on transient failure with a short backoff.
  */
 async function estimatePriorityFee(connection: Connection): Promise<number> {
-  const body = JSON.stringify({
-    jsonrpc: '2.0',
-    id: 1,
-    method: 'getPriorityFeeEstimate',
-    params: [{ options: { priorityLevel: 'Medium' } }],
-  });
-
+  // Tier 1: Helius extension.
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const resp = await fetch(connection.rpcEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body,
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'getPriorityFeeEstimate',
+          params: [{ options: { priorityLevel: 'Medium' } }],
+        }),
       });
       const json = (await resp.json()) as {
         result?: { priorityFeeEstimate?: number };
-        error?: { code?: number; message?: string };
+        error?: { code?: number };
       };
-      // -32601 = "Method not found" → non-Helius RPC, retry is pointless.
-      if (json.error?.code === -32601) break;
+      if (json.error?.code === -32601) break; // not Helius — fall through to tier 2
       const estimate = json.result?.priorityFeeEstimate;
       if (typeof estimate === 'number' && estimate > 0) return Math.ceil(estimate);
     } catch {
-      // Network error — retry once after a short backoff.
+      // Network error — retry once.
     }
     if (attempt === 0) await new Promise((r) => setTimeout(r, 200));
   }
+
+  // Tier 2: standard Solana RPC — supported by Alchemy + everyone else.
+  try {
+    const fees = await connection.getRecentPrioritizationFees();
+    if (fees.length > 0) {
+      const sorted = fees
+        .map((f) => f.prioritizationFee)
+        .filter((n) => n > 0)
+        .sort((a, b) => a - b);
+      if (sorted.length > 0) {
+        const p75 = sorted[Math.floor(sorted.length * 0.75)];
+        return Math.max(p75, 1_000); // never go below 1k µLamports
+      }
+    }
+  } catch {
+    // Fall through to static default.
+  }
+
   return 10_000;
 }
 

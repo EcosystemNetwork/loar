@@ -254,15 +254,13 @@ export function validateEnv(): Env {
       if (!env.SOLANA_RPC_URL) {
         prodErrors.push(
           'SOLANA_RPC_URL is required in production when CIRCLE_API_KEY is set ' +
-            '(Solana wallet/tx routes need a Helius/Triton RPC — the public Solana RPC is unusable in prod)'
+            '(Alchemy/Helius/Triton — the public Solana RPC is throttled and unusable in prod)'
         );
       }
-      if (!env.HELIUS_API_KEY) {
-        // DAS API (cNFT reads) requires a separate API key from the RPC URL.
-        prodErrors.push(
-          'HELIUS_API_KEY is required in production when CIRCLE_API_KEY is set (DAS API for cNFT reads)'
-        );
-      }
+      // HELIUS_API_KEY is only needed if we're using Helius enhanced webhooks
+      // for the indexer. Alchemy Solana works fine on its own for RPC + DAS.
+      // The indexer separately gates on HELIUS_WEBHOOK_SECRET so this can stay
+      // optional even when the RPC provider is Helius (you might use polling).
     }
 
     if (!env.ADMIN_ADDRESSES && !env.ADMIN_WALLET) {
