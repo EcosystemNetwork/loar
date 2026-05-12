@@ -8,6 +8,7 @@
 
 import { Link, useMatchRoute } from '@tanstack/react-router';
 import { WalletConnectButton } from '@/components/wallet-connect-button';
+import { SolanaConnectButton } from '@/components/SolanaConnectButton';
 import { LoarBalance } from './LoarBalance';
 import { Web3ModeToggle } from './web3-mode-toggle';
 import { ModeToggle } from './mode-toggle';
@@ -209,6 +210,11 @@ export default function Header() {
           <LoarBalance />
           <NotificationBell />
           <WalletConnectButton size="sm" />
+          {/* Solana wallet — independent of EVM. Hidden on small screens
+              to keep the mobile header clean; tap the menu to access it. */}
+          <span className="hidden md:inline-flex">
+            <SolanaConnectButton />
+          </span>
           <div className="hidden sm:flex items-center gap-1 ml-1 pl-1.5 border-l border-border/50">
             <Web3ModeToggle />
             <ModeToggle />
