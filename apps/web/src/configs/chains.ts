@@ -51,6 +51,31 @@ export function isSupportedSolanaCluster(cluster: string): cluster is SolanaClus
 }
 
 // ---------------------------------------------------------------------------
+// Block Explorers / Names
+// (Declared before SUPPORTED_CHAINS because evmOption() reads CHAIN_NAMES at
+// module init time — see https://github.com/EcosystemNetwork/loar — moving
+// these below would TDZ in production minified bundles.)
+// ---------------------------------------------------------------------------
+
+export const BLOCK_EXPLORER_URLS: Record<number, string> = {
+  [sepolia.id]: 'https://sepolia.etherscan.io',
+  [base.id]: 'https://basescan.org',
+  [baseSepolia.id]: 'https://sepolia.basescan.org',
+};
+
+export const CHAIN_NAMES: Record<number, string> = {
+  [sepolia.id]: 'Sepolia',
+  [base.id]: 'Base',
+  [baseSepolia.id]: 'Base Sepolia',
+};
+
+export const EXPLORER_NAMES: Record<number, string> = {
+  [sepolia.id]: 'Etherscan',
+  [base.id]: 'Basescan',
+  [baseSepolia.id]: 'Basescan',
+};
+
+// ---------------------------------------------------------------------------
 // Unified chain selector model
 // ---------------------------------------------------------------------------
 
@@ -100,28 +125,6 @@ export function evmChainIdToSelectionId(chainId: number): string {
 export const DEFAULT_CHAIN_SELECTION: ChainSelection = {
   kind: 'evm',
   chainId: SUPPORTED_EVM_CHAIN_IDS[0],
-};
-
-// ---------------------------------------------------------------------------
-// Block Explorers
-// ---------------------------------------------------------------------------
-
-export const BLOCK_EXPLORER_URLS: Record<number, string> = {
-  [sepolia.id]: 'https://sepolia.etherscan.io',
-  [base.id]: 'https://basescan.org',
-  [baseSepolia.id]: 'https://sepolia.basescan.org',
-};
-
-export const CHAIN_NAMES: Record<number, string> = {
-  [sepolia.id]: 'Sepolia',
-  [base.id]: 'Base',
-  [baseSepolia.id]: 'Base Sepolia',
-};
-
-export const EXPLORER_NAMES: Record<number, string> = {
-  [sepolia.id]: 'Etherscan',
-  [base.id]: 'Basescan',
-  [baseSepolia.id]: 'Basescan',
 };
 
 // ---------------------------------------------------------------------------
