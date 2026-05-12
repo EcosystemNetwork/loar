@@ -22,10 +22,22 @@ import {
 } from '../lib/circle-solana';
 import { mintEpisodeCnft } from '../services/solana/episode-mint';
 import { canonizeEpisode, CanonizePrecheckError } from '../services/solana/canon-promote';
+import { getAttestationPublicKey } from '../lib/attestation';
 
 export const solanaRoutes = new Hono();
 
+// Public read-only routes that don't depend on Circle DCW — the dashboard
+// activity feed should keep rendering even if signing creds aren't set up.
+// Path-prefix match (startsWith) so /attestation/<pda> and /attestation/key
+// both pass through.
+const PUBLIC_PATH_PREFIXES = ['/activity', '/config', '/attestation'];
+
 solanaRoutes.use('*', async (c, next) => {
+  const subpath = new URL(c.req.url).pathname.replace(/^.*\/api\/solana/, '');
+  if (PUBLIC_PATH_PREFIXES.some((p) => subpath === p || subpath.startsWith(p + '/'))) {
+    await next();
+    return;
+  }
   if (!isCircleSolanaConfigured()) {
     return c.json(
       { error: 'Solana DCW not configured (CIRCLE_* and SOLANA_RPC_URL required)' },
@@ -102,6 +114,166 @@ solanaRoutes.get('/config', (c) => {
     cluster: activeCluster(),
     configured: isCircleSolanaConfigured(),
   });
+});
+
+// ── Public activity feed ───────────────────────────────────────────────────
+//
+// Read-only endpoint that powers the /solana dashboard. Aggregates from the
+// Firestore mirrors written by apps/solana-indexer + a couple of live on-chain
+// reads. Public (no auth) so judges and external integrators can curl it.
+
+import { db, firebaseAvailable } from '../lib/firebase';
+import { getSolanaConnection } from '../lib/circle-solana';
+import { PublicKey } from '@solana/web3.js';
+
+interface ActivityResponse {
+  cluster: string;
+  totals: {
+    universes: number;
+    episodes: number;
+    canonEpisodes: number;
+    cnftMints: number;
+  };
+  recent: {
+    universes: Array<{ universe: string; creator: string; visibility: string; createdSig: string }>;
+    episodes: Array<{
+      episode: string;
+      universe: string;
+      title: string;
+      creator: string;
+      isCanon: boolean;
+      mintedSig: string;
+    }>;
+    cnftMints: Array<{ signature: string; assetId: string | null; leafOwner: string | null }>;
+  };
+  treasury: {
+    address: string | null;
+    solBalance: number | null;
+  };
+}
+
+solanaRoutes.get('/activity', async (c) => {
+  const cluster = activeCluster();
+  const empty: ActivityResponse = {
+    cluster,
+    totals: { universes: 0, episodes: 0, canonEpisodes: 0, cnftMints: 0 },
+    recent: { universes: [], episodes: [], cnftMints: [] },
+    treasury: { address: null, solBalance: null },
+  };
+
+  if (!firebaseAvailable) {
+    return c.json(empty);
+  }
+
+  // Totals + recent rows in parallel — bounded reads, no joins.
+  const [universesSnap, episodesSnap, canonSnap, cnftSnap, recentUniv, recentEp, recentCnft] =
+    await Promise.all([
+      db.collection('solanaUniverses').count().get(),
+      db.collection('solanaEpisodes').count().get(),
+      db.collection('solanaEpisodes').where('isCanon', '==', true).count().get(),
+      db.collection('solanaCnftAssets').count().get(),
+      db.collection('solanaUniverses').orderBy('timestamp', 'desc').limit(8).get(),
+      db.collection('solanaEpisodes').orderBy('timestamp', 'desc').limit(12).get(),
+      db.collection('solanaCnftAssets').orderBy('mintedAt', 'desc').limit(12).get(),
+    ]);
+
+  // Treasury balance — read live so the dashboard always reflects on-chain truth.
+  const treasury = process.env.SOLANA_PAY_RECIPIENT ?? null;
+  let solBalance: number | null = null;
+  if (treasury) {
+    try {
+      const lamports = await getSolanaConnection().getBalance(new PublicKey(treasury));
+      solBalance = lamports / 1e9;
+    } catch {
+      // Public-RPC throttling can null this out — UI will just hide the row.
+    }
+  }
+
+  const resp: ActivityResponse = {
+    cluster,
+    totals: {
+      universes: universesSnap.data().count,
+      episodes: episodesSnap.data().count,
+      canonEpisodes: canonSnap.data().count,
+      cnftMints: cnftSnap.data().count,
+    },
+    recent: {
+      universes: recentUniv.docs.map((d) => {
+        const data = d.data() as Record<string, unknown>;
+        return {
+          universe: (data.universe as string) ?? d.id,
+          creator: (data.creator as string) ?? '',
+          visibility: (data.visibility as string) ?? 'unknown',
+          createdSig: (data.createdSig as string) ?? '',
+        };
+      }),
+      episodes: recentEp.docs.map((d) => {
+        const data = d.data() as Record<string, unknown>;
+        return {
+          episode: (data.episode as string) ?? d.id,
+          universe: (data.universe as string) ?? '',
+          title: (data.title as string) ?? '',
+          creator: (data.creator as string) ?? '',
+          isCanon: Boolean(data.isCanon),
+          mintedSig: (data.mintedSig as string) ?? '',
+        };
+      }),
+      cnftMints: recentCnft.docs.map((d) => {
+        const data = d.data() as Record<string, unknown>;
+        return {
+          signature: (data.mintedSig as string) ?? d.id,
+          assetId: (data.assetId as string) ?? null,
+          leafOwner: (data.leafOwner as string) ?? null,
+        };
+      }),
+    },
+    treasury: { address: treasury, solBalance },
+  };
+
+  // Brief CDN cache — 5s is enough to absorb traffic spikes during demos
+  // while still feeling "live" (the indexer's webhook lag is ~2s anyway).
+  c.header('Cache-Control', 'public, max-age=5');
+  return c.json(resp);
+});
+
+// ── Cross-chain attestation receipts ───────────────────────────────────────
+
+/**
+ * Public signer pubkey. External verifiers fetch this once, then can validate
+ * any LOAR cross-chain receipt offline via Ed25519. Long-cache OK — rotations
+ * publish via a new key file under /api/solana/attestation/key.<version>.
+ */
+solanaRoutes.get('/attestation/key', async (c) => {
+  const pubKey = await getAttestationPublicKey();
+  c.header('Cache-Control', 'public, max-age=300');
+  return c.json({
+    schema: 'loar-cnft-cross-chain-v1',
+    pubKey,
+    curve: 'ed25519',
+    encoding: 'base58',
+    verify: 'standard ed25519 over canonical JSON of receipt minus { signer, sig }',
+  });
+});
+
+/**
+ * Fetch a published receipt by episode PDA. Returns 404 if the cNFT was
+ * minted before attestations were wired or in the rare case the post-mint
+ * signing failed (the mint still landed; the lineage doc may exist).
+ */
+solanaRoutes.get('/attestation/:episodePda', async (c) => {
+  const pda = c.req.param('episodePda');
+  if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(pda)) {
+    return c.json({ error: 'invalid Solana address' }, 400);
+  }
+  if (!firebaseAvailable) {
+    return c.json({ error: 'attestation store unavailable' }, 503);
+  }
+  const doc = await db.collection('solanaAttestations').doc(pda).get();
+  if (!doc.exists) {
+    return c.json({ error: 'no attestation for that PDA' }, 404);
+  }
+  c.header('Cache-Control', 'public, max-age=300');
+  return c.json(doc.data());
 });
 
 // ── Episode mint (Bubblegum cNFT) ──────────────────────────────────────────

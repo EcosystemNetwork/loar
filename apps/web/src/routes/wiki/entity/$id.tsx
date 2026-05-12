@@ -58,6 +58,7 @@ import { useMediaAttachments } from '@/hooks/useMediaAttachments';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
 import { MintContentDialog } from '@/components/MintContentDialog';
 import { SolanaMintDialog } from '@/components/SolanaMintDialog';
+import { PayAndMintButton } from '@/components/PayAndMintButton';
 import { CollaborativeEntityEditor } from '@/components/collaboration/CollaborativeEntityEditor';
 import { VoiceProfileCard } from '@/components/VoiceProfileCard';
 import { ReferenceBundleEditor } from '@/components/ReferenceBundleEditor';
@@ -1079,6 +1080,17 @@ function EntityPage() {
                     >
                       ◎ Mint on Solana
                     </Button>
+                    {/* Composed Solana Pay → cNFT mint pipeline — pays a small
+                        SOL amount and auto-mints; the cNFT's lineage references
+                        the payment tx for a verifiable cross-chain receipt. */}
+                    <PayAndMintButton
+                      entityName={entity.name}
+                      metadataUri={entity.imageUrl || 'https://loar.fun/og/entity.json'}
+                      lineage={{
+                        entityId: entity.id,
+                        evmUniverseAddress: entity.universeAddress ?? undefined,
+                      }}
+                    />
                     {isOwner && isPipelineEligible && !hasPipeline && (
                       <Button
                         variant="default"

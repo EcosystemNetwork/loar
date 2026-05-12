@@ -634,6 +634,152 @@ const zaiGovernanceAgent: ToolDefinition = {
   handler: async (client, args) => client.mutate('zai.governanceAgent', args),
 };
 
+// ── Solana tools ───────────────────────────────────────────────────────
+//
+// First-class MCP surface so AI agents can mint cNFTs, canonize episodes,
+// generate Solana Pay intents, and read on-chain activity directly. The
+// auth model matches the rest of the MCP layer (loar_<scope> API key);
+// agents acting on behalf of a wallet pass it via X-Loar-End-User-Address
+// (set on the LoarClient at construction).
+
+const solanaMintEpisode: ToolDefinition = {
+  name: 'loar_solana_mint_episode',
+  description:
+    'Mint a Bubblegum cNFT episode under a Solana Universe. Composes the Anchor episode record + Bubblegum mint_v1 ix in one Circle-signed tx. Returns the txSignature, episodePda, and (best-effort) cross-chain attestation receipt.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      universeAddress: { type: 'string', description: 'Solana Universe PDA (base58)' },
+      contentHashHex: {
+        type: 'string',
+        description: '32-byte content hash as 0x-prefixed hex (matches EVM bytes32 shape)',
+      },
+      metadataUri: {
+        type: 'string',
+        description: 'Off-chain metadata URI (IPFS / Arweave / HTTPS)',
+      },
+      title: { type: 'string', description: 'Episode title — Bubblegum metadata name (≤32 bytes)' },
+      contentId: {
+        type: 'string',
+        description: 'Optional LOAR content id for cross-chain lineage',
+      },
+      evmUniverseAddress: {
+        type: 'string',
+        description:
+          'Optional EVM universe 0x address — pinned into the cross-chain attestation receipt',
+      },
+    },
+    required: ['universeAddress', 'contentHashHex', 'metadataUri', 'title'],
+  },
+  handler: async (client, args) => {
+    const lineage: Record<string, unknown> = {};
+    if (args.contentId) lineage.contentId = args.contentId;
+    if (args.evmUniverseAddress) lineage.evmUniverseAddress = args.evmUniverseAddress;
+    return client.rawPost('/api/solana/episode/mint', {
+      universeAddress: args.universeAddress,
+      contentHashHex: args.contentHashHex,
+      metadataUri: args.metadataUri,
+      title: args.title,
+      ...(Object.keys(lineage).length > 0 ? { lineage } : {}),
+    });
+  },
+};
+
+const solanaCanonizeEpisode: ToolDefinition = {
+  name: 'loar_solana_canonize_episode',
+  description:
+    "Promote an Episode to canon: flips is_canon on the EpisodeRecord PDA and mints a Metaplex Core asset (5% creator royalty) in one atomic tx. The original cNFT stays as historical mint record. Pre-flight rejects if the episode doesn't exist (404) or is already canon (409).",
+  inputSchema: {
+    type: 'object',
+    properties: {
+      universeAddress: {
+        type: 'string',
+        description: 'Solana Universe PDA the episode lives under',
+      },
+      contentHashHex: { type: 'string', description: '32-byte content hash of the episode' },
+      metadataUri: { type: 'string', description: 'Off-chain metadata URI for the Core asset' },
+      name: { type: 'string', description: 'Display name of the canon Core asset (≤64 chars)' },
+      cnftAssetId: {
+        type: 'string',
+        description:
+          'Optional Bubblegum cNFT asset id — pinned into the Core asset Attributes plugin so wallets can link cNFT ↔ Core',
+      },
+    },
+    required: ['universeAddress', 'contentHashHex', 'metadataUri', 'name'],
+  },
+  handler: async (client, args) => client.rawPost('/api/solana/episode/canonize', args),
+};
+
+const solanaPayIntent: ToolDefinition = {
+  name: 'loar_solana_pay_intent',
+  description:
+    'Create a Solana Pay intent — returns a `solana:` URL the user can scan with Phantom/Solflare and a unique reference key for polling. Supports SOL (default) or any SPL token mint.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      amount: {
+        type: 'string',
+        description: 'Decimal amount (e.g. "0.05" for 0.05 SOL or 0.05 of an SPL token)',
+      },
+      splToken: {
+        type: 'string',
+        description: 'Optional SPL token mint (base58). Omit for native SOL.',
+      },
+      label: { type: 'string', description: 'Display label shown to the buyer in their wallet UI' },
+      memo: {
+        type: 'string',
+        description: 'Optional on-chain memo (indexed by Helius, useful for AI-gen receipts)',
+      },
+    },
+    required: ['amount'],
+  },
+  handler: async (client, args) => client.rawPost('/api/solana-pay/intent', args),
+};
+
+const solanaPayStatus: ToolDefinition = {
+  name: 'loar_solana_pay_status',
+  description:
+    'Check whether a Solana Pay intent has been settled on-chain. Returns one of pending / paid / expired / invalid. Validates the on-chain tx matches the requested recipient + amount.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      reference: {
+        type: 'string',
+        description: 'The reference key returned by loar_solana_pay_intent',
+      },
+    },
+    required: ['reference'],
+  },
+  handler: async (client, args) =>
+    client.rawGet('/api/solana-pay/status', { reference: String(args.reference) }),
+};
+
+const solanaActivity: ToolDefinition = {
+  name: 'loar_solana_activity',
+  description:
+    "Read-only snapshot of LOAR's on-chain Solana state: total universes / episodes / canon / cNFT mints, recent activity, treasury balance.",
+  inputSchema: {
+    type: 'object',
+    properties: {},
+  },
+  handler: async (client) => client.rawGet('/api/solana/activity'),
+};
+
+const solanaAttestation: ToolDefinition = {
+  name: 'loar_solana_get_attestation',
+  description:
+    'Fetch the cross-chain Ed25519 attestation receipt for a minted episode (proves Solana cNFT ↔ EVM Universe linkage). Verifiable offline with the public key at /api/solana/attestation/key.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      episodePda: { type: 'string', description: 'Solana Episode PDA (base58)' },
+    },
+    required: ['episodePda'],
+  },
+  handler: async (client, args) =>
+    client.rawGet(`/api/solana/attestation/${String(args.episodePda)}`),
+};
+
 // ── Export All Tools ───────────────────────────────────────────────────
 
 export const ALL_TOOLS: ToolDefinition[] = [
@@ -675,4 +821,11 @@ export const ALL_TOOLS: ToolDefinition[] = [
   // Job control (polling + cancellation)
   getJobStatus,
   cancelGeneration,
+  // Solana — first-class cross-chain surface for AI agents
+  solanaMintEpisode,
+  solanaCanonizeEpisode,
+  solanaPayIntent,
+  solanaPayStatus,
+  solanaActivity,
+  solanaAttestation,
 ];

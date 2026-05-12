@@ -31,6 +31,7 @@ import { buildMintEpisodeIx } from '../../lib/anchor-ix';
 import { buildMintCnftIx, episodeMetadata } from '../../lib/bubblegum';
 import { EpisodeProgram, BubblegumTree, getSolanaAddress } from '@loar/abis/solana-addresses';
 import { db, firebaseAvailable } from '../../lib/firebase';
+import { signAttestation } from '../../lib/attestation';
 
 /**
  * Optional VLM / content-lineage fields. When supplied, the mint result is
@@ -148,6 +149,47 @@ export async function mintEpisodeCnft(req: MintEpisodeRequest): Promise<MintEpis
     } catch (err) {
       console.warn(
         `[episode-mint] lineage write failed for ${episodePda.toBase58()}:`,
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+
+  // Cross-chain attestation — Ed25519 receipt that an external verifier can
+  // check offline to confirm "this cNFT corresponds to EVM universe X." Best-
+  // effort: signing failures (missing key, etc) don't undo the mint.
+  if (firebaseAvailable) {
+    try {
+      const signed = await signAttestation({
+        schema: 'loar-cnft-cross-chain-v1',
+        mintedAt: new Date().toISOString(),
+        solana: {
+          cluster,
+          episodePda: episodePda.toBase58(),
+          mintTxSignature: tx.signature ?? tx.txId,
+        },
+        evm: req.lineage?.evmUniverseAddress
+          ? {
+              chainId: 11155111, // Sepolia for v1; production reads from env
+              universeAddress: req.lineage.evmUniverseAddress,
+              contentHashHex: '0x' + req.contentHash.toString('hex'),
+            }
+          : undefined,
+        lineage: req.lineage
+          ? {
+              entityId: req.lineage.entityId,
+              contentId: req.lineage.contentId,
+              extractionId: req.lineage.extractionId,
+              sceneIndex: req.lineage.sceneIndex,
+            }
+          : undefined,
+      });
+      await db
+        .collection('solanaAttestations')
+        .doc(episodePda.toBase58())
+        .set(signed, { merge: true });
+    } catch (err) {
+      console.warn(
+        `[episode-mint] attestation write failed for ${episodePda.toBase58()}:`,
         err instanceof Error ? err.message : err
       );
     }

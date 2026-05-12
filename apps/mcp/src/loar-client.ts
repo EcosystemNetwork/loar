@@ -110,4 +110,40 @@ export class LoarClient {
     const json = await res.json();
     return json.result?.data as T;
   }
+
+  /**
+   * Raw GET against a non-tRPC HTTP route (e.g. /api/solana/activity).
+   * Used by tools that target Hono routes outside the tRPC router.
+   */
+  async rawGet<T = unknown>(path: string, query?: Record<string, string | number>): Promise<T> {
+    const url = new URL(`${this.serverUrl}${path.startsWith('/') ? path : '/' + path}`);
+    if (query) {
+      for (const [k, v] of Object.entries(query)) {
+        url.searchParams.set(k, String(v));
+      }
+    }
+    const res = await fetch(url.toString(), { headers: this.authHeaders() });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new LoarApiError(res.status, body, classifyHttpError(res.status, body));
+    }
+    return (await res.json()) as T;
+  }
+
+  /**
+   * Raw POST against a non-tRPC HTTP route (e.g. /api/solana/episode/mint).
+   */
+  async rawPost<T = unknown>(path: string, body: Record<string, unknown>): Promise<T> {
+    const url = `${this.serverUrl}${path.startsWith('/') ? path : '/' + path}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: this.authHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new LoarApiError(res.status, text, classifyHttpError(res.status, text));
+    }
+    return (await res.json()) as T;
+  }
 }

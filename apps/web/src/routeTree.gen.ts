@@ -17,6 +17,7 @@ import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
 import { Route as StudioControlledRouteImport } from './routes/studio-controlled'
 import { Route as StudioRouteImport } from './routes/studio'
 import { Route as StatusRouteImport } from './routes/status'
+import { Route as SolanaRouteImport } from './routes/solana'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SandboxRouteImport } from './routes/sandbox'
 import { Route as RelightRouteImport } from './routes/relight'
@@ -137,6 +138,11 @@ const StudioRoute = StudioRouteImport.update({
 const StatusRoute = StatusRouteImport.update({
   id: '/status',
   path: '/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SolanaRoute = SolanaRouteImport.update({
+  id: '/solana',
+  path: '/solana',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SearchRoute = SearchRouteImport.update({
@@ -570,6 +576,7 @@ export interface FileRoutesByFullPath {
   '/relight': typeof RelightRoute
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
+  '/solana': typeof SolanaRoute
   '/status': typeof StatusRoute
   '/studio': typeof StudioRouteWithChildren
   '/studio-controlled': typeof StudioControlledRoute
@@ -661,6 +668,7 @@ export interface FileRoutesByTo {
   '/relight': typeof RelightRoute
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
+  '/solana': typeof SolanaRoute
   '/status': typeof StatusRoute
   '/studio': typeof StudioRouteWithChildren
   '/studio-controlled': typeof StudioControlledRoute
@@ -753,6 +761,7 @@ export interface FileRoutesById {
   '/relight': typeof RelightRoute
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
+  '/solana': typeof SolanaRoute
   '/status': typeof StatusRoute
   '/studio': typeof StudioRouteWithChildren
   '/studio-controlled': typeof StudioControlledRoute
@@ -846,6 +855,7 @@ export interface FileRouteTypes {
     | '/relight'
     | '/sandbox'
     | '/search'
+    | '/solana'
     | '/status'
     | '/studio'
     | '/studio-controlled'
@@ -937,6 +947,7 @@ export interface FileRouteTypes {
     | '/relight'
     | '/sandbox'
     | '/search'
+    | '/solana'
     | '/status'
     | '/studio'
     | '/studio-controlled'
@@ -1028,6 +1039,7 @@ export interface FileRouteTypes {
     | '/relight'
     | '/sandbox'
     | '/search'
+    | '/solana'
     | '/status'
     | '/studio'
     | '/studio-controlled'
@@ -1120,6 +1132,7 @@ export interface RootRouteChildren {
   RelightRoute: typeof RelightRoute
   SandboxRoute: typeof SandboxRoute
   SearchRoute: typeof SearchRoute
+  SolanaRoute: typeof SolanaRoute
   StatusRoute: typeof StatusRoute
   StudioRoute: typeof StudioRouteWithChildren
   StudioControlledRoute: typeof StudioControlledRoute
@@ -1231,6 +1244,13 @@ declare module '@tanstack/react-router' {
       path: '/status'
       fullPath: '/status'
       preLoaderRoute: typeof StatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/solana': {
+      id: '/solana'
+      path: '/solana'
+      fullPath: '/solana'
+      preLoaderRoute: typeof SolanaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/search': {
@@ -1900,6 +1920,7 @@ const rootRouteChildren: RootRouteChildren = {
   RelightRoute: RelightRoute,
   SandboxRoute: SandboxRoute,
   SearchRoute: SearchRoute,
+  SolanaRoute: SolanaRoute,
   StatusRoute: StatusRoute,
   StudioRoute: StudioRouteWithChildren,
   StudioControlledRoute: StudioControlledRoute,
