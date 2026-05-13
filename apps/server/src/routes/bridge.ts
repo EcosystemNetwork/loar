@@ -16,6 +16,7 @@ import { verifyAuth } from '../lib/auth';
 import {
   getBridgeStatus,
   initiateBridgeTransfer,
+  isAnyBridgeAvailable,
   isBridgeConfigured,
   quoteBridge,
 } from '../lib/wormhole-bridge';
@@ -37,20 +38,30 @@ bridgeRoutes.post('/quote', async (c) => {
   if (!parsed.success) {
     return c.json({ error: 'invalid body', issues: parsed.error.issues }, 400);
   }
-  if (!isBridgeConfigured(parsed.data.from as Chain, parsed.data.to as Chain)) {
+  const from = parsed.data.from as Chain;
+  const to = parsed.data.to as Chain;
+  if (!isAnyBridgeAvailable(from, to)) {
     return c.json(
-      { error: 'Bridge not configured for this route — NTT managers not deployed yet' },
+      {
+        error:
+          'Bridge not configured for this route — set custodial vault env vars or deploy NTT managers',
+      },
       503
     );
   }
   try {
     const quote = await quoteBridge({
-      from: parsed.data.from as Chain,
-      to: parsed.data.to as Chain,
+      from,
+      to,
       amount: parsed.data.amount,
       recipient: parsed.data.recipient,
     });
-    return c.json(quote);
+    // Annotate which backend will service this pair so the UI can show a
+    // "custodial testnet" warning vs the trustless NTT path.
+    return c.json({
+      ...quote,
+      backend: isBridgeConfigured(from, to) ? 'wormhole_ntt' : 'custodial',
+    });
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : 'quote failed' }, 500);
   }
@@ -65,14 +76,16 @@ bridgeRoutes.post('/transfer', async (c) => {
   if (!parsed.success) {
     return c.json({ error: 'invalid body', issues: parsed.error.issues }, 400);
   }
-  if (!isBridgeConfigured(parsed.data.from as Chain, parsed.data.to as Chain)) {
+  const from = parsed.data.from as Chain;
+  const to = parsed.data.to as Chain;
+  if (!isAnyBridgeAvailable(from, to)) {
     return c.json({ error: 'Bridge not configured for this route' }, 503);
   }
   try {
     const result = await initiateBridgeTransfer({
       userId: user.uid,
-      from: parsed.data.from as Chain,
-      to: parsed.data.to as Chain,
+      from,
+      to,
       amount: parsed.data.amount,
       recipient: parsed.data.recipient,
     });

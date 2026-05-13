@@ -28,6 +28,14 @@
  * isCircleSolanaConfigured() pattern elsewhere.
  */
 import { wormhole, type Chain } from '@wormhole-foundation/sdk';
+import {
+  bridgeSolToEvm,
+  bridgeEvmToSol,
+  isCustodialBridgeConfigured,
+  parseAmountForDirection,
+  getIntent as getCustodialIntent,
+  type BridgeDirection,
+} from './bridge-custodial';
 
 // ── Configuration ───────────────────────────────────────────────────────────
 
@@ -68,6 +76,24 @@ export function getBridgeConfig(): BridgeConfig {
 export function isBridgeConfigured(from: Chain, to: Chain): boolean {
   const cfg = getBridgeConfig();
   return Boolean(cfg.managers[from] && cfg.managers[to] && cfg.tokens[from] && cfg.tokens[to]);
+}
+
+/**
+ * Whether ANY bridge backend (NTT or custodial) can serve this pair. Routes
+ * use this for their 503/200 decision so users see "bridge available"
+ * whenever either path is wired.
+ */
+export function isAnyBridgeAvailable(from: Chain, to: Chain): boolean {
+  if (isBridgeConfigured(from, to)) return true;
+  // Custodial path supports only Sepolia↔Solana for v1.
+  const isCustodialPair =
+    (from === 'Solana' && to === 'Sepolia') || (from === 'Sepolia' && to === 'Solana');
+  return isCustodialPair && isCustodialBridgeConfigured();
+}
+
+/** Fetch the canonical state of a bridge transfer by intent id. */
+export async function getBridgeIntentStatus(intentId: string) {
+  return getCustodialIntent(intentId);
 }
 
 // ── Quote ───────────────────────────────────────────────────────────────────
@@ -144,33 +170,59 @@ export interface BridgeTransferResult {
 }
 
 /**
- * Initiate a bridge transfer. The source-chain tx is built and signed via
- * the user's Circle DCW wallet on that chain (EVM Circle wallet for EVM
- * source, Solana Circle wallet for Solana source).
+ * Initiate a bridge transfer.
  *
- * The destination-chain redeem is handled by Wormhole's automatic relayer
- * in most cases. For manual redemption, see `redeemOnDestination` below.
+ * Two backends, picked automatically:
+ *   - **Wormhole NTT** when manager addresses are configured for both chains
+ *     (zero-trust, unified supply). Currently 503 until contracts deploy.
+ *   - **Custodial lock-and-mint** when `SOL_BRIDGE_VAULT_ATA` +
+ *     `EVM_BRIDGE_VAULT_ADDRESS` + token addresses are set. Server holds
+ *     mint authority on both chains and acts as the relayer. Acceptable
+ *     for testnet + closed beta; production migrates to NTT.
+ *
+ * Returns a uniform result shape so the frontend doesn't need to branch
+ * on backend choice.
  */
 export async function initiateBridgeTransfer(
   req: BridgeTransferRequest
 ): Promise<BridgeTransferResult> {
-  if (!isBridgeConfigured(req.from, req.to)) {
+  // Path 1: real Wormhole NTT (preferred — drops the custodial trust).
+  if (isBridgeConfigured(req.from, req.to)) {
+    // TODO: wire @wormhole-foundation/sdk-evm-ntt + sdk-solana-ntt once
+    // managers are deployed. For now this path is reserved.
+    throw new Error('NTT manager is set in env but the runtime wiring lands in v2.');
+  }
+
+  // Path 2: custodial lock-and-mint (testnet-grade).
+  if (!isCustodialBridgeConfigured()) {
     throw new Error(
-      `NTT manager not configured for ${req.from} → ${req.to}. Bridge currently disabled.`
+      `Bridge unavailable: neither Wormhole NTT (managers unset) nor custodial bridge ` +
+        `(SOL_BRIDGE_VAULT_ATA / EVM_BRIDGE_VAULT_ADDRESS unset) is configured for ` +
+        `${req.from} → ${req.to}.`
     );
   }
 
-  // The actual transfer wiring depends on chain-specific NTT SDK paths:
-  //   EVM source:    @wormhole-foundation/sdk-evm-ntt → call manager.transfer()
-  //   Solana source: @wormhole-foundation/sdk-solana-ntt → tx builder against
-  //                  the Anchor manager program; signed by Circle DCW Solana
-  //
-  // For this scaffold we expose the API shape. Wire the actual SDK once NTT
-  // managers are deployed (see setup checklist above). The frontend can call
-  // /api/bridge/transfer; until configured it returns 503 cleanly.
-  throw new Error(
-    'NTT transfer flow requires deployed manager contracts. See lib/wormhole-bridge.ts setup checklist.'
-  );
+  const direction: BridgeDirection = req.from === 'Solana' ? 'sol_to_evm' : 'evm_to_sol';
+  const amountBaseUnits = parseAmountForDirection(req.amount, direction).toString();
+
+  const intent =
+    direction === 'sol_to_evm'
+      ? await bridgeSolToEvm({
+          userId: req.userId,
+          amountBaseUnits,
+          recipient: req.recipient as `0x${string}`,
+        })
+      : await bridgeEvmToSol({
+          userId: req.userId,
+          amountBaseUnits,
+          recipient: req.recipient,
+        });
+
+  return {
+    sourceTxRef: intent.sourceTxRef ?? '',
+    sequence: intent.id,
+    state: intent.state === 'completed' ? 'completed' : 'submitted',
+  };
 }
 
 // ── Status ──────────────────────────────────────────────────────────────────
@@ -183,20 +235,39 @@ export interface BridgeStatus {
 }
 
 /**
- * Poll the status of a bridge transfer. Uses Wormhole's API to find the VAA
- * for the source-chain tx, then checks destination chain for the redeem.
+ * Poll the status of a bridge transfer. Two backends:
+ *
+ *   - If `sourceTxRef` starts with `bridge_` it's a custodial intent id —
+ *     look up the Firestore doc and surface state directly.
+ *   - Otherwise it's a chain tx hash; ask Wormhole for the VAA + destination
+ *     completion (NTT/Token Bridge path; reserved for v2 with manager deploy).
  */
 export async function getBridgeStatus(args: {
   from: Chain;
   sourceTxRef: string;
 }): Promise<BridgeStatus> {
+  // Custodial intent — Firestore-backed.
+  if (args.sourceTxRef.startsWith('bridge_')) {
+    const intent = await getCustodialIntent(args.sourceTxRef);
+    if (!intent) {
+      return { state: 'pending_source', sourceTxRef: args.sourceTxRef };
+    }
+    const stateMap: Record<string, BridgeStatus['state']> = {
+      pending_source: 'pending_source',
+      pending_destination: 'pending_destination',
+      completed: 'completed',
+      failed: 'failed',
+    };
+    return {
+      state: stateMap[intent.state] ?? 'pending_source',
+      sourceTxRef: intent.sourceTxRef ?? args.sourceTxRef,
+      destinationTxRef: intent.destinationTxRef,
+    };
+  }
+
+  // Wormhole NTT/Token Bridge — uses the SDK to find VAAs.
   const cfg = getBridgeConfig();
   const wh = await wormhole(cfg.network, []);
-
-  // Look up the VAA(s) emitted by this source tx. The Wormhole SDK exposes
-  // chain-context.parseTransaction(txRef) which decodes the source-chain tx
-  // and returns WormholeMessageId[] (chain + emitter + sequence) for each
-  // VAA emitted. Empty array = source tx not yet finalized.
   try {
     const ctx = wh.getChain(args.from);
     const messages = await ctx.parseTransaction(args.sourceTxRef);
@@ -204,8 +275,6 @@ export async function getBridgeStatus(args: {
       return { state: 'pending_vaa', sourceTxRef: args.sourceTxRef };
     }
     const [msg] = messages;
-    // VAA exists — destination redeem is now the gating step. Without the
-    // destination tx hash we can't confirm completion; return pending.
     return {
       state: 'pending_destination',
       sourceTxRef: args.sourceTxRef,
