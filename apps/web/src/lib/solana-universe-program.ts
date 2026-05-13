@@ -51,6 +51,11 @@ export function deriveUniversePda(
   );
 }
 
+/** Singleton config PDA used to gate all mutating ix via the pause flag. */
+export function deriveUniverseConfigPda(): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync([Buffer.from('universe_config')], UNIVERSE_PROGRAM_ID);
+}
+
 /** SHA-256 of an arbitrary string → 32-byte content hash. */
 export async function sha256Bytes(input: string): Promise<Uint8Array> {
   const data = new TextEncoder().encode(input);
@@ -77,6 +82,7 @@ export function buildInitializeUniverseIx(params: {
   if (params.plotHash.length !== 32) throw new Error('plotHash must be 32 bytes');
 
   const [universePda] = deriveUniversePda(params.creator, params.contentHash);
+  const [configPda] = deriveUniverseConfigPda();
 
   const data = Buffer.alloc(8 + 32 + 32 + 1);
   data.set(INITIALIZE_UNIVERSE_DISCRIMINATOR, 0);
@@ -89,6 +95,7 @@ export function buildInitializeUniverseIx(params: {
     keys: [
       { pubkey: params.creator, isSigner: true, isWritable: true },
       { pubkey: universePda, isSigner: false, isWritable: true },
+      { pubkey: configPda, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,

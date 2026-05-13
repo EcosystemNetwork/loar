@@ -186,6 +186,43 @@ export function isCustodialBridgeConfigured(): boolean {
 }
 
 /**
+ * Startup audit — logs each required bridge env var with a present/missing
+ * marker. Returns true iff *all* are set. Call once at boot so an operator
+ * who half-configures the bridge sees the gap in the logs instead of getting
+ * a silent 503 from /api/bridge/transfer.
+ *
+ * Does not throw. Pure observability.
+ */
+export function auditBridgeConfig(): { fullyConfigured: boolean; missing: string[] } {
+  const required = [
+    'SOL_BRIDGE_VAULT_ATA',
+    'EVM_BRIDGE_VAULT_ADDRESS',
+    'LOAR_TOKEN_ADDRESS',
+    'CIRCLE_BRIDGE_SIGNER_ID_EVM',
+    'CIRCLE_BRIDGE_SIGNER_ID_SOL',
+  ];
+  // Cluster-keyed mint var.
+  const mintVar = activeCluster() === 'mainnet-beta' ? 'LOAR_MINT_MAINNET' : 'LOAR_MINT_DEVNET';
+  required.push(mintVar);
+
+  const missing = required.filter((k) => !process.env[k]);
+  const presentCount = required.length - missing.length;
+  if (missing.length === 0) {
+    console.log(
+      `[bridge] custodial bridge fully configured (${required.length}/${required.length} env vars)`
+    );
+  } else if (presentCount === 0) {
+    console.log(`[bridge] custodial bridge disabled — all env vars unset (this is fine for dev)`);
+  } else {
+    // Partial config — likely a deploy error. Loud warning.
+    console.warn(
+      `[bridge] WARNING — partial config (${presentCount}/${required.length} env vars). Missing: ${missing.join(', ')}`
+    );
+  }
+  return { fullyConfigured: missing.length === 0, missing };
+}
+
+/**
  * Bootstrap helper: provisions the two Circle DCW signer wallets (one per chain)
  * and prints their addresses for the operator to set as mint authority. Idempotent
  * — re-running returns the same wallet ids. Run once via `pnpm tsx scripts/bridge-bootstrap.ts`.
@@ -253,11 +290,25 @@ function maxPerUserPerDayBaseUnits(direction: BridgeDirection): bigint {
     : dailyLoar * BigInt(10) ** BigInt(ERC20_DECIMALS);
 }
 
+/**
+ * Global daily cap (sum across ALL users in the last 24h). Defends against
+ * coordinated drains via many small accounts each under their own per-user
+ * cap. Default 20M LOAR/day — five users at the 5M/user/day max could still
+ * fit under this; six can't.
+ */
+function maxGlobalPerDayBaseUnits(direction: BridgeDirection): bigint {
+  const dailyLoar = BigInt(process.env.BRIDGE_MAX_GLOBAL_PER_DAY_LOAR ?? '20000000');
+  return direction === 'sol_to_evm'
+    ? dailyLoar * BigInt(10) ** BigInt(SPL_DECIMALS)
+    : dailyLoar * BigInt(10) ** BigInt(ERC20_DECIMALS);
+}
+
 export class BridgeLimitError extends Error {
   constructor(
     public readonly code:
       | 'PER_TX_EXCEEDED'
       | 'PER_DAY_EXCEEDED'
+      | 'GLOBAL_PER_DAY_EXCEEDED'
       | 'NON_POSITIVE'
       | 'INSUFFICIENT_BALANCE',
     message: string
@@ -396,6 +447,117 @@ async function enforceCaps(
       `daily bridge cap exceeded (used ${usedToday}, requested ${amount}, cap ${dailyMax})`
     );
   }
+
+  // Global circuit breaker — same direction, ALL users, last 24h.
+  const globalSnap = await col
+    .where('direction', '==', direction)
+    .where('createdAt', '>=', cutoff)
+    .get();
+  let globalUsedToday = 0n;
+  for (const doc of globalSnap.docs) {
+    const data = doc.data() as BridgeIntent;
+    if (data.state === 'failed') continue;
+    globalUsedToday += BigInt(data.amountBaseUnits);
+  }
+  const globalMax = maxGlobalPerDayBaseUnits(direction);
+  if (globalUsedToday + amount > globalMax) {
+    throw new BridgeLimitError(
+      'GLOBAL_PER_DAY_EXCEEDED',
+      `global daily bridge cap exceeded (used ${globalUsedToday}, requested ${amount}, cap ${globalMax})`
+    );
+  }
+}
+
+// ── Reconciliation ─────────────────────────────────────────────────────────
+
+export interface BridgeReconciliation {
+  direction: BridgeDirection;
+  /** Sum of source amounts that landed (pending_destination + completed). */
+  ledgerLockedBaseUnits: string;
+  /** Live vault balance from chain. */
+  vaultBalanceBaseUnits: string;
+  /** vault - ledger. Positive = chain holds more than ledger (donations or stuck). Negative = ledger says more was locked than chain shows (BUG). */
+  driftBaseUnits: string;
+  driftPositive: boolean;
+  intentCount: number;
+}
+
+/**
+ * Reconcile the ledger against on-chain vault state.
+ *
+ * The invariant we expect to hold:
+ *   sum(intent.amount where state in [pending_destination, completed])
+ *     == vault.balance
+ *
+ * Anything else needs investigation:
+ *   - drift > 0 (vault > ledger): unexpected deposits, or someone bypassed the
+ *     bridge endpoint. Usually benign; tag manually.
+ *   - drift < 0 (ledger > vault): the bridge moved funds OUT of the vault
+ *     without a corresponding ledger entry. ALERT — possible compromise.
+ */
+export async function reconcileBridge(): Promise<BridgeReconciliation[]> {
+  const cfg = getConfig();
+  if (!cfg) throw new Error('Custodial bridge not configured');
+  const col = getCol();
+  if (!col) throw new Error('Firestore unavailable — cannot reconcile');
+
+  const results: BridgeReconciliation[] = [];
+
+  for (const direction of ['sol_to_evm', 'evm_to_sol'] as const) {
+    const snap = await col.where('direction', '==', direction).get();
+    let ledger = 0n;
+    let count = 0;
+    for (const doc of snap.docs) {
+      const data = doc.data() as BridgeIntent;
+      if (data.state === 'pending_destination' || data.state === 'completed') {
+        ledger += BigInt(data.amountBaseUnits);
+        count++;
+      }
+    }
+
+    let vaultBalance = 0n;
+    if (direction === 'sol_to_evm') {
+      const conn = getSolanaConnection();
+      try {
+        const bal = await conn.getTokenAccountBalance(new PublicKey(cfg.solVaultAta), 'confirmed');
+        vaultBalance = BigInt(bal.value.amount);
+      } catch (err) {
+        // ATA missing → 0. Reconciliation will then surface ledger > 0 as drift.
+        vaultBalance = 0n;
+      }
+    } else {
+      const rpcUrl = process.env.RPC_URL || process.env.PONDER_RPC_URL_2;
+      if (rpcUrl) {
+        const client = createPublicClient({ transport: http(rpcUrl) });
+        vaultBalance = (await client.readContract({
+          address: cfg.loarTokenAddress,
+          abi: [
+            {
+              name: 'balanceOf',
+              type: 'function',
+              stateMutability: 'view',
+              inputs: [{ name: 'owner', type: 'address' }],
+              outputs: [{ name: '', type: 'uint256' }],
+            },
+          ] as const,
+          functionName: 'balanceOf',
+          args: [cfg.evmVaultAddress],
+        })) as bigint;
+      }
+    }
+
+    const drift = vaultBalance - ledger;
+    results.push({
+      direction,
+      ledgerLockedBaseUnits: ledger.toString(),
+      vaultBalanceBaseUnits: vaultBalance.toString(),
+      driftBaseUnits: drift.toString(),
+      driftPositive: drift >= 0n,
+      intentCount: count,
+    });
+  }
+
+  return results;
 }
 
 /**

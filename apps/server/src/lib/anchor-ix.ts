@@ -62,6 +62,11 @@ export function deriveUniversePda(
   );
 }
 
+/** Derive the Universe singleton Config PDA. */
+export function deriveUniverseConfigPda(programId: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync([Buffer.from('universe_config')], programId);
+}
+
 export interface InitializeUniverseArgs {
   programId: PublicKey;
   creator: PublicKey;
@@ -72,6 +77,7 @@ export interface InitializeUniverseArgs {
 
 export function buildInitializeUniverseIx(args: InitializeUniverseArgs): TransactionInstruction {
   const [universePda] = deriveUniversePda(args.programId, args.creator, args.contentHash);
+  const [configPda] = deriveUniverseConfigPda(args.programId);
 
   const data = Buffer.concat([
     anchorDiscriminator('initialize_universe'),
@@ -85,9 +91,30 @@ export function buildInitializeUniverseIx(args: InitializeUniverseArgs): Transac
     keys: [
       { pubkey: args.creator, isSigner: true, isWritable: true },
       { pubkey: universePda, isSigner: false, isWritable: true },
+      { pubkey: configPda, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
+  });
+}
+
+export interface InitializeUniverseConfigArgs {
+  programId: PublicKey;
+  admin: PublicKey;
+}
+
+export function buildInitializeUniverseConfigIx(
+  args: InitializeUniverseConfigArgs
+): TransactionInstruction {
+  const [configPda] = deriveUniverseConfigPda(args.programId);
+  return new TransactionInstruction({
+    programId: args.programId,
+    keys: [
+      { pubkey: args.admin, isSigner: true, isWritable: true },
+      { pubkey: configPda, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: anchorDiscriminator('initialize_config'),
   });
 }
 
@@ -105,6 +132,11 @@ export function deriveEpisodeRecordPda(
   );
 }
 
+/** Derive the Episode singleton Config PDA. */
+export function deriveEpisodeConfigPda(programId: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync([Buffer.from('episode_config')], programId);
+}
+
 export interface CanonizeEpisodeArgs {
   programId: PublicKey;
   signer: PublicKey;
@@ -114,11 +146,13 @@ export interface CanonizeEpisodeArgs {
 export function buildCanonizeEpisodeIx(args: CanonizeEpisodeArgs): TransactionInstruction {
   // `canonize` takes no args — just the discriminator.
   const data = anchorDiscriminator('canonize');
+  const [configPda] = deriveEpisodeConfigPda(args.programId);
   return new TransactionInstruction({
     programId: args.programId,
     keys: [
       { pubkey: args.signer, isSigner: true, isWritable: false },
       { pubkey: args.episodeRecord, isSigner: false, isWritable: true },
+      { pubkey: configPda, isSigner: false, isWritable: false },
     ],
     data,
   });
@@ -146,6 +180,7 @@ export function buildMintEpisodeIx(args: MintEpisodeArgs): TransactionInstructio
     args.universe,
     args.contentHash
   );
+  const [configPda] = deriveEpisodeConfigPda(args.programId);
 
   const data = Buffer.concat([
     anchorDiscriminator('mint_episode'),
@@ -160,8 +195,29 @@ export function buildMintEpisodeIx(args: MintEpisodeArgs): TransactionInstructio
       { pubkey: args.creator, isSigner: true, isWritable: true },
       { pubkey: args.universe, isSigner: false, isWritable: false },
       { pubkey: episodeRecordPda, isSigner: false, isWritable: true },
+      { pubkey: configPda, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
+  });
+}
+
+export interface InitializeEpisodeConfigArgs {
+  programId: PublicKey;
+  admin: PublicKey;
+}
+
+export function buildInitializeEpisodeConfigIx(
+  args: InitializeEpisodeConfigArgs
+): TransactionInstruction {
+  const [configPda] = deriveEpisodeConfigPda(args.programId);
+  return new TransactionInstruction({
+    programId: args.programId,
+    keys: [
+      { pubkey: args.admin, isSigner: true, isWritable: true },
+      { pubkey: configPda, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: anchorDiscriminator('initialize_config'),
   });
 }

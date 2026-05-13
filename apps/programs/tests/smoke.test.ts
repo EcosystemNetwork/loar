@@ -2,15 +2,17 @@
  * LOAR Anchor programs — smoke test.
  *
  * Validates the demo-critical execution path against a local solana-test-validator:
- *   1. universe::initialize_universe   — creates Universe PDA, emits UniverseCreated
- *   2. universe::publish_universe      — flips visibility, emits UniversePublished
- *   3. episode::mint_episode           — creates EpisodeRecord (no Bubblegum CPI yet)
- *   4. episode::canonize               — flips is_canon, emits EpisodeCanonized
+ *   1. universe::initialize_config     — bootstraps singleton pause/admin state
+ *   2. universe::initialize_universe   — creates Universe PDA, emits UniverseCreated
+ *   3. universe::publish_universe      — flips visibility, emits UniversePublished
+ *   4. episode::initialize_config      — bootstraps singleton pause/admin state
+ *   5. episode::mint_episode           — creates EpisodeRecord (no Bubblegum CPI yet)
+ *   6. episode::canonize               — flips is_canon, emits EpisodeCanonized
  *
  * Skipped here (covered by apps/programs/scripts/demo-mint.ts on real devnet):
  *   - Bubblegum mint_v1 CPI (needs a deployed merkle tree + tree-authority delegation)
  *   - Metaplex Core canon-promotion mint (mpl-core SDK quirks under local validator)
- *   - Payment program flow (covered separately in payment.test.ts when written)
+ *   - Payment program flow (covered separately in payment.ts)
  *
  * Run via:
  *   cd apps/programs && anchor test
@@ -41,8 +43,10 @@ describe('LOAR — universe + episode smoke', () => {
 
   let universePda: PublicKey;
   let episodePda: PublicKey;
+  let universeConfigPda: PublicKey;
+  let episodeConfigPda: PublicKey;
 
-  before(() => {
+  before(async () => {
     [universePda] = PublicKey.findProgramAddressSync(
       [Buffer.from('universe'), creator.publicKey.toBuffer(), Buffer.from(contentHash)],
       universeProgram.programId
@@ -51,6 +55,38 @@ describe('LOAR — universe + episode smoke', () => {
       [Buffer.from('episode'), universePda.toBuffer(), Buffer.from(contentHash)],
       episodeProgram.programId
     );
+    [universeConfigPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from('universe_config')],
+      universeProgram.programId
+    );
+    [episodeConfigPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from('episode_config')],
+      episodeProgram.programId
+    );
+
+    // Idempotent — anchor-test spins a fresh validator so this almost always runs.
+    const uCfg = await provider.connection.getAccountInfo(universeConfigPda);
+    if (!uCfg) {
+      await universeProgram.methods
+        .initializeConfig()
+        .accounts({
+          admin: creator.publicKey,
+          config: universeConfigPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+    }
+    const eCfg = await provider.connection.getAccountInfo(episodeConfigPda);
+    if (!eCfg) {
+      await episodeProgram.methods
+        .initializeConfig()
+        .accounts({
+          admin: creator.publicKey,
+          config: episodeConfigPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+    }
   });
 
   it('initializes a Universe', async () => {
@@ -59,6 +95,7 @@ describe('LOAR — universe + episode smoke', () => {
       .accounts({
         creator: creator.publicKey,
         universe: universePda,
+        config: universeConfigPda,
         systemProgram: SystemProgram.programId,
       })
       .rpc();
@@ -76,7 +113,7 @@ describe('LOAR — universe + episode smoke', () => {
   it('publishes the Universe (private → public)', async () => {
     await universeProgram.methods
       .publishUniverse()
-      .accounts({ signer: creator.publicKey, universe: universePda })
+      .accounts({ signer: creator.publicKey, universe: universePda, config: universeConfigPda })
       .rpc();
 
     const acct = (await universeProgram.account.universe.fetch(universePda)) as {
@@ -87,7 +124,6 @@ describe('LOAR — universe + episode smoke', () => {
 
   it('rejects a publish from a non-creator', async () => {
     const intruder = Keypair.generate();
-    // fund the intruder so its signature is acceptable.
     const sig = await provider.connection.requestAirdrop(intruder.publicKey, 1e9);
     await provider.connection.confirmTransaction(sig, 'confirmed');
 
@@ -95,7 +131,7 @@ describe('LOAR — universe + episode smoke', () => {
     try {
       await universeProgram.methods
         .publishUniverse()
-        .accounts({ signer: intruder.publicKey, universe: universePda })
+        .accounts({ signer: intruder.publicKey, universe: universePda, config: universeConfigPda })
         .signers([intruder])
         .rpc();
     } catch (err) {
@@ -113,6 +149,7 @@ describe('LOAR — universe + episode smoke', () => {
         creator: creator.publicKey,
         universe: universePda,
         episodeRecord: episodePda,
+        config: episodeConfigPda,
         systemProgram: SystemProgram.programId,
       })
       .rpc();
@@ -130,7 +167,7 @@ describe('LOAR — universe + episode smoke', () => {
   it('canonizes the Episode (one-way flag flip)', async () => {
     await episodeProgram.methods
       .canonize()
-      .accounts({ signer: creator.publicKey, episodeRecord: episodePda })
+      .accounts({ signer: creator.publicKey, episodeRecord: episodePda, config: episodeConfigPda })
       .rpc();
 
     const acct = (await episodeProgram.account.episodeRecord.fetch(episodePda)) as {
@@ -144,7 +181,11 @@ describe('LOAR — universe + episode smoke', () => {
     try {
       await episodeProgram.methods
         .canonize()
-        .accounts({ signer: creator.publicKey, episodeRecord: episodePda })
+        .accounts({
+          signer: creator.publicKey,
+          episodeRecord: episodePda,
+          config: episodeConfigPda,
+        })
         .rpc();
     } catch (err) {
       threw = true;

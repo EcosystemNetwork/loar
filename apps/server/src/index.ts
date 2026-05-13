@@ -143,6 +143,9 @@ app.route('/api/squads', squadsRoutes);
 app.use('/api/bridge/*', rateLimiter({ windowMs: 60_000, max: 20 }));
 const { bridgeRoutes } = await import('./routes/bridge');
 app.route('/api/bridge', bridgeRoutes);
+// Boot-time audit: prints a warning if bridge env vars are partially set.
+const { auditBridgeConfig } = await import('./lib/bridge-custodial');
+auditBridgeConfig();
 
 // Circle transaction proxy — server-side contract execution via Circle KMS
 const { txProxyRoutes } = await import('./routes/tx-proxy');

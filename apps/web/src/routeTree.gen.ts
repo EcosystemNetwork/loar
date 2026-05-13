@@ -18,6 +18,7 @@ import { Route as StudioControlledRouteImport } from './routes/studio-controlled
 import { Route as StudioRouteImport } from './routes/studio'
 import { Route as StatusRouteImport } from './routes/status'
 import { Route as SolanaRouteImport } from './routes/solana'
+import { Route as BridgeRouteImport } from './routes/bridge'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SandboxRouteImport } from './routes/sandbox'
 import { Route as RelightRouteImport } from './routes/relight'
@@ -143,6 +144,11 @@ const StatusRoute = StatusRouteImport.update({
 const SolanaRoute = SolanaRouteImport.update({
   id: '/solana',
   path: '/solana',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BridgeRoute = BridgeRouteImport.update({
+  id: '/bridge',
+  path: '/bridge',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SearchRoute = SearchRouteImport.update({
@@ -576,6 +582,7 @@ export interface FileRoutesByFullPath {
   '/relight': typeof RelightRoute
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
+  '/bridge': typeof BridgeRoute
   '/solana': typeof SolanaRoute
   '/status': typeof StatusRoute
   '/studio': typeof StudioRouteWithChildren
@@ -668,6 +675,7 @@ export interface FileRoutesByTo {
   '/relight': typeof RelightRoute
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
+  '/bridge': typeof BridgeRoute
   '/solana': typeof SolanaRoute
   '/status': typeof StatusRoute
   '/studio': typeof StudioRouteWithChildren
@@ -761,6 +769,7 @@ export interface FileRoutesById {
   '/relight': typeof RelightRoute
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
+  '/bridge': typeof BridgeRoute
   '/solana': typeof SolanaRoute
   '/status': typeof StatusRoute
   '/studio': typeof StudioRouteWithChildren
@@ -1132,6 +1141,7 @@ export interface RootRouteChildren {
   RelightRoute: typeof RelightRoute
   SandboxRoute: typeof SandboxRoute
   SearchRoute: typeof SearchRoute
+  BridgeRoute: typeof BridgeRoute
   SolanaRoute: typeof SolanaRoute
   StatusRoute: typeof StatusRoute
   StudioRoute: typeof StudioRouteWithChildren
@@ -1244,6 +1254,13 @@ declare module '@tanstack/react-router' {
       path: '/status'
       fullPath: '/status'
       preLoaderRoute: typeof StatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bridge': {
+      id: '/bridge'
+      path: '/bridge'
+      fullPath: '/bridge'
+      preLoaderRoute: typeof BridgeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/solana': {
@@ -1920,6 +1937,7 @@ const rootRouteChildren: RootRouteChildren = {
   RelightRoute: RelightRoute,
   SandboxRoute: SandboxRoute,
   SearchRoute: SearchRoute,
+  BridgeRoute: BridgeRoute,
   SolanaRoute: SolanaRoute,
   StatusRoute: StatusRoute,
   StudioRoute: StudioRouteWithChildren,

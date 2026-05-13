@@ -90,7 +90,27 @@ async function main() {
     [Buffer.from('universe'), deployerKp.publicKey.toBuffer(), universeContentHash],
     universeProgram.programId
   );
-  console.log(`Universe PDA: ${universePda.toBase58()}`);
+  const [universeConfigPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from('universe_config')],
+    universeProgram.programId
+  );
+  console.log(`Universe PDA:    ${universePda.toBase58()}`);
+  console.log(`Universe config: ${universeConfigPda.toBase58()}`);
+
+  // Idempotent: initialize the singleton Config if missing.
+  const cfgAcct = await connection.getAccountInfo(universeConfigPda, 'confirmed');
+  if (!cfgAcct) {
+    console.log('• universe.initialize_config() — bootstrapping admin/pause state…');
+    const sig = await universeProgram.methods
+      .initializeConfig()
+      .accounts({
+        admin: deployerKp.publicKey,
+        config: universeConfigPda,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+    console.log(`  ✓ ${explorerTx(sig)}`);
+  }
 
   const universeAcct = await connection.getAccountInfo(universePda, 'confirmed');
   if (!universeAcct) {
@@ -104,6 +124,7 @@ async function main() {
       .accounts({
         creator: deployerKp.publicKey,
         universe: universePda,
+        config: universeConfigPda,
         systemProgram: SystemProgram.programId,
       })
       .rpc();
@@ -127,7 +148,26 @@ async function main() {
     [Buffer.from('episode'), universePda.toBuffer(), episodeContentHash],
     episodeProgram.programId
   );
-  console.log(`Episode PDA: ${episodePda.toBase58()}`);
+  const [episodeConfigPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from('episode_config')],
+    episodeProgram.programId
+  );
+  console.log(`Episode PDA:     ${episodePda.toBase58()}`);
+  console.log(`Episode config: ${episodeConfigPda.toBase58()}`);
+
+  const epCfgAcct = await connection.getAccountInfo(episodeConfigPda, 'confirmed');
+  if (!epCfgAcct) {
+    console.log('• episode.initialize_config() — bootstrapping admin/pause state…');
+    const sig = await episodeProgram.methods
+      .initializeConfig()
+      .accounts({
+        admin: deployerKp.publicKey,
+        config: episodeConfigPda,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+    console.log(`  ✓ ${explorerTx(sig)}`);
+  }
 
   console.log('• mint_episode() — recording episode under universe…');
   const mintEpisodeSig = await episodeProgram.methods
@@ -136,6 +176,7 @@ async function main() {
       creator: deployerKp.publicKey,
       universe: universePda,
       episodeRecord: episodePda,
+      config: episodeConfigPda,
       systemProgram: SystemProgram.programId,
     })
     .rpc();

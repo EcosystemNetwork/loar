@@ -5,18 +5,33 @@
 //! URI. When an episode is promoted to canon, the cNFT is "decompressed" into
 //! a Metaplex Core NFT for marketplace + DeFi compatibility.
 //!
-//! This scaffold establishes the program ID, account shapes, and instruction
-//! signatures. The Bubblegum CPI wiring lives behind a feature flag while the
-//! mpl-bubblegum dependency is added — see TODO comments in `mint_episode`.
+//! Audit-relevant invariants:
+//! - `Config` PDA gates all mutating ix via a `paused` flag (admin-only).
+//! - Two-step admin transfer (propose → accept) mirrors `payment` + `universe`.
 
 use anchor_lang::prelude::*;
 use universe::Universe;
 
 declare_id!("voLiAXoYbq8go1CUS9UshQRZnNu9Y44qNBZ6czgn8Bs");
 
+pub const CONFIG_SEED: &[u8] = b"episode_config";
+
 #[program]
 pub mod episode {
     use super::*;
+
+    /// Initialize the singleton config. Callable exactly once per program.
+    pub fn initialize_config(ctx: Context<InitializeConfig>) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        config.admin = ctx.accounts.admin.key();
+        config.pending_admin = Pubkey::default();
+        config.paused = false;
+        config.bump = ctx.bumps.config;
+        emit!(ConfigInitialized {
+            admin: config.admin,
+        });
+        Ok(())
+    }
 
     /// Mint a new Episode cNFT under a Universe. Caller is the creator;
     /// fee payer is the Circle DCW wallet (delegated signer).
@@ -26,6 +41,7 @@ pub mod episode {
         metadata_uri: String,
         title: String,
     ) -> Result<()> {
+        require!(!ctx.accounts.config.paused, EpisodeError::Paused);
         require!(metadata_uri.len() <= 200, EpisodeError::UriTooLong);
         require!(title.len() <= 64, EpisodeError::TitleTooLong);
 
@@ -35,13 +51,6 @@ pub mod episode {
         record.content_hash = content_hash;
         record.is_canon = false;
         record.bump = ctx.bumps.episode_record;
-
-        // TODO: Bubblegum CPI to mint the actual cNFT into the merkle tree.
-        //   mpl_bubblegum::cpi::mint_v1(cpi_ctx, MetadataArgs { ... })
-        // Wired via apps/server when calling executeSolanaTransaction — the
-        // server builds the full instruction set (this ix + Bubblegum mint ix)
-        // so we don't take the mpl-bubblegum dep here yet (keeps the BPF binary
-        // small until canon-promotion paths land).
 
         emit!(EpisodeMinted {
             episode: record.key(),
@@ -58,6 +67,7 @@ pub mod episode {
     /// This flips `is_canon`; the server-side flow follows up with a
     /// Bubblegum decompress + Metaplex Core mint via the same tx.
     pub fn canonize(ctx: Context<UpdateEpisode>) -> Result<()> {
+        require!(!ctx.accounts.config.paused, EpisodeError::Paused);
         require!(
             ctx.accounts.episode_record.creator == ctx.accounts.signer.key(),
             EpisodeError::Unauthorized
@@ -73,6 +83,62 @@ pub mod episode {
         });
         Ok(())
     }
+
+    // ─── Admin ────────────────────────────────────────────────────────────
+
+    pub fn pause(ctx: Context<AdminOnly>) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        require!(!config.paused, EpisodeError::AlreadyPaused);
+        config.paused = true;
+        emit!(Paused {});
+        Ok(())
+    }
+
+    pub fn unpause(ctx: Context<AdminOnly>) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        require!(config.paused, EpisodeError::NotPaused);
+        config.paused = false;
+        emit!(Unpaused {});
+        Ok(())
+    }
+
+    pub fn transfer_admin(ctx: Context<AdminOnly>, new_admin: Pubkey) -> Result<()> {
+        require!(new_admin != Pubkey::default(), EpisodeError::ZeroAddress);
+        ctx.accounts.config.pending_admin = new_admin;
+        emit!(AdminTransferProposed { new_admin });
+        Ok(())
+    }
+
+    pub fn accept_admin(ctx: Context<AcceptAdmin>) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        require!(
+            config.pending_admin == ctx.accounts.new_admin.key(),
+            EpisodeError::Unauthorized
+        );
+        let old = config.admin;
+        config.admin = config.pending_admin;
+        config.pending_admin = Pubkey::default();
+        emit!(AdminTransferred {
+            old_admin: old,
+            new_admin: config.admin,
+        });
+        Ok(())
+    }
+}
+
+#[derive(Accounts)]
+pub struct InitializeConfig<'info> {
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    #[account(
+        init,
+        payer = admin,
+        space = 8 + Config::INIT_SPACE,
+        seeds = [CONFIG_SEED],
+        bump
+    )]
+    pub config: Account<'info, Config>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -98,6 +164,8 @@ pub struct MintEpisode<'info> {
         bump
     )]
     pub episode_record: Account<'info, EpisodeRecord>,
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
     pub system_program: Program<'info, System>,
 }
 
@@ -106,6 +174,32 @@ pub struct UpdateEpisode<'info> {
     pub signer: Signer<'info>,
     #[account(mut)]
     pub episode_record: Account<'info, EpisodeRecord>,
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
+}
+
+#[derive(Accounts)]
+pub struct AdminOnly<'info> {
+    #[account(address = config.admin @ EpisodeError::Unauthorized)]
+    pub admin: Signer<'info>,
+    #[account(mut, seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
+}
+
+#[derive(Accounts)]
+pub struct AcceptAdmin<'info> {
+    pub new_admin: Signer<'info>,
+    #[account(mut, seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct Config {
+    pub admin: Pubkey,
+    pub pending_admin: Pubkey,
+    pub paused: bool,
+    pub bump: u8,
 }
 
 #[account]
@@ -116,6 +210,11 @@ pub struct EpisodeRecord {
     pub content_hash: [u8; 32],
     pub is_canon: bool,
     pub bump: u8,
+}
+
+#[event]
+pub struct ConfigInitialized {
+    pub admin: Pubkey,
 }
 
 #[event]
@@ -134,9 +233,26 @@ pub struct EpisodeCanonized {
     pub universe: Pubkey,
 }
 
+#[event]
+pub struct Paused {}
+
+#[event]
+pub struct Unpaused {}
+
+#[event]
+pub struct AdminTransferProposed {
+    pub new_admin: Pubkey,
+}
+
+#[event]
+pub struct AdminTransferred {
+    pub old_admin: Pubkey,
+    pub new_admin: Pubkey,
+}
+
 #[error_code]
 pub enum EpisodeError {
-    #[msg("Only the episode creator may perform this action")]
+    #[msg("Only the episode creator or admin may perform this action")]
     Unauthorized,
     #[msg("Episode is already canon")]
     AlreadyCanon,
@@ -144,4 +260,12 @@ pub enum EpisodeError {
     UriTooLong,
     #[msg("Title exceeds 64 chars")]
     TitleTooLong,
+    #[msg("Program is paused")]
+    Paused,
+    #[msg("Cannot pause: already paused")]
+    AlreadyPaused,
+    #[msg("Cannot unpause: not paused")]
+    NotPaused,
+    #[msg("Address cannot be the zero pubkey")]
+    ZeroAddress,
 }

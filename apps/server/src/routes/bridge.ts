@@ -21,7 +21,8 @@ import {
   isBridgeConfigured,
   quoteBridge,
 } from '../lib/wormhole-bridge';
-import { getIntent } from '../lib/bridge-custodial';
+import { getIntent, reconcileBridge, isCustodialBridgeConfigured } from '../lib/bridge-custodial';
+import { db, firebaseAvailable } from '../lib/firebase';
 import { consumeRateLimit } from '../middleware/rate-limit';
 import { hasScope } from '../lib/apiKeys';
 import type { Chain } from '@wormhole-foundation/sdk';
@@ -150,6 +151,67 @@ bridgeRoutes.post('/transfer', async (c) => {
       return c.json({ error: msg, code: 'NTT_UNWIRED' }, 503);
     }
     return c.json({ error: msg }, 500);
+  }
+});
+
+/**
+ * Per-user transfer history. Returns the most recent bridge intents owned by
+ * the authenticated wallet, newest first. Bounded so a chatty caller can't
+ * exfiltrate the entire collection.
+ */
+bridgeRoutes.get('/history', async (c) => {
+  const token = getCookie(c, 'siwe-session');
+  const user = await verifyAuth(c.req.raw.headers, token);
+  if (!user) return c.json({ error: 'Unauthorized' }, 401);
+  if (!firebaseAvailable) return c.json({ items: [] });
+
+  const limit = Math.min(Number(c.req.query('limit') ?? '20'), 100);
+  const snap = await db
+    .collection('bridgeIntents')
+    .where('userId', '==', user.uid)
+    .orderBy('createdAt', 'desc')
+    .limit(limit)
+    .get();
+
+  const items = snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: data.id,
+      direction: data.direction,
+      amountBaseUnits: data.amountBaseUnits,
+      recipient: data.recipient,
+      state: data.state,
+      sourceTxRef: data.sourceTxRef ?? null,
+      destinationTxRef: data.destinationTxRef ?? null,
+      error: data.error ?? null,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+    };
+  });
+  return c.json({ items });
+});
+
+/**
+ * Reconciliation snapshot — confirms ledger == on-chain vault for each
+ * direction. Public so anyone can verify the bridge's solvency from the UI;
+ * details are derivable from on-chain reads anyway. Cached for 30s to avoid
+ * hammering the RPC.
+ */
+let _reconCache: { at: number; data: unknown } | null = null;
+bridgeRoutes.get('/reconcile', async (c) => {
+  if (!isCustodialBridgeConfigured()) {
+    return c.json({ error: 'Custodial bridge not configured' }, 503);
+  }
+  const now = Date.now();
+  if (_reconCache && now - _reconCache.at < 30_000) {
+    return c.json({ cached: true, at: _reconCache.at, results: _reconCache.data });
+  }
+  try {
+    const results = await reconcileBridge();
+    _reconCache = { at: now, data: results };
+    return c.json({ cached: false, at: now, results });
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : 'reconcile failed' }, 500);
   }
 });
 

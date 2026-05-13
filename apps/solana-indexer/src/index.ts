@@ -378,13 +378,86 @@ async function routeTx(tx: HeliusTx) {
 
 const app = new Hono();
 
-app.get('/healthz', (c) => c.json({ ok: true }));
+// In-memory health metrics — process-local, reset on restart. Good enough for
+// the "is anything getting through?" question that prompts most pages.
+const health = {
+  startedAt: Date.now(),
+  webhookDeliveries: 0,
+  txsProcessed: 0,
+  txsFailed: 0,
+  /** Sliding-window of recent failures so /healthz can surface the rate. */
+  recentFailures: [] as number[],
+  lastWebhookAt: 0,
+  lastSuccessSig: '' as string,
+  lastSuccessAt: 0,
+};
+
+function recordFailure() {
+  health.txsFailed++;
+  const now = Date.now();
+  health.recentFailures.push(now);
+  // Trim anything older than 1h.
+  const cutoff = now - 60 * 60 * 1000;
+  while (health.recentFailures.length > 0 && health.recentFailures[0] < cutoff) {
+    health.recentFailures.shift();
+  }
+}
+
+app.get('/healthz', async (c) => {
+  // Quick Firestore reachability probe — bounded so a 30s timeout never blocks
+  // health response. Cached at the load-balancer level normally.
+  let firestoreReachable: boolean | null = null;
+  try {
+    if (db) {
+      await Promise.race([
+        db.collection('_health').limit(1).get(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 1500)),
+      ]);
+      firestoreReachable = true;
+    }
+  } catch {
+    firestoreReachable = false;
+  }
+
+  const now = Date.now();
+  const recentFailuresLastHour = health.recentFailures.length;
+  // Stale signal: no webhook in 30min while service has been up > 1h.
+  // Helius docs guarantee continuous delivery while the program is active, so
+  // a long gap usually means the webhook registration drifted.
+  const upMs = now - health.startedAt;
+  const lastWebhookAgeMs = health.lastWebhookAt ? now - health.lastWebhookAt : null;
+  const isStale =
+    upMs > 60 * 60 * 1000 && (lastWebhookAgeMs === null || lastWebhookAgeMs > 30 * 60 * 1000);
+  const ok = firestoreReachable !== false && !isStale && recentFailuresLastHour < 100;
+
+  return c.json(
+    {
+      ok,
+      stale: isStale,
+      firestoreReachable,
+      uptimeSeconds: Math.floor(upMs / 1000),
+      webhookDeliveries: health.webhookDeliveries,
+      txsProcessed: health.txsProcessed,
+      txsFailed: health.txsFailed,
+      recentFailuresLastHour,
+      lastWebhookAgeSeconds: lastWebhookAgeMs === null ? null : Math.floor(lastWebhookAgeMs / 1000),
+      lastSuccessSig: health.lastSuccessSig || null,
+      lastSuccessAgeSeconds: health.lastSuccessAt
+        ? Math.floor((now - health.lastSuccessAt) / 1000)
+        : null,
+    },
+    ok ? 200 : 503
+  );
+});
 
 app.post('/webhooks/helius', async (c) => {
   if (!verifyHeliusAuth(c.req.header('Authorization'))) {
     log.warn('Rejected Helius webhook with missing/mismatched auth header');
     return c.json({ error: 'unauthorized' }, 401);
   }
+  health.webhookDeliveries++;
+  health.lastWebhookAt = Date.now();
+
   const raw = await c.req.text();
 
   let payload: unknown;
@@ -408,7 +481,19 @@ app.post('/webhooks/helius', async (c) => {
 
   // Process in parallel but bound concurrency to 10 to avoid Firestore burst limits.
   for (let i = 0; i < parsed.length; i += 10) {
-    await Promise.all(parsed.slice(i, i + 10).map(routeTx));
+    const batch = parsed.slice(i, i + 10);
+    const results = await Promise.allSettled(batch.map(routeTx));
+    for (let j = 0; j < results.length; j++) {
+      const r = results[j];
+      if (r.status === 'fulfilled') {
+        health.txsProcessed++;
+        health.lastSuccessSig = batch[j].signature;
+        health.lastSuccessAt = Date.now();
+      } else {
+        recordFailure();
+        log.error({ err: r.reason, sig: batch[j].signature }, 'tx route failed');
+      }
+    }
   }
 
   return c.json({ processed: parsed.length });
