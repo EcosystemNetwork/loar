@@ -16,19 +16,50 @@ banner.
 
 ### Setup
 
-1. **Mint authority** — the deployer wallet that created the SPL $LOAR mint
-   must keep mint authority (not yet transferred to Squads). On EVM, the
-   server's Circle DCW wallet must hold mint authority on the LoarToken ERC20.
-2. **Vaults** — pick two addresses to receive locked tokens:
-   - Solana: create a Token-2022 ATA owned by a server keypair (or any
-     deterministic owner). `SOL_BRIDGE_VAULT_ATA = <ATA>`.
+1. **Provision bridge signers** (one-time):
+
+   ```sh
+   pnpm tsx apps/server/scripts/bridge-bootstrap.ts
+   ```
+
+   Prints two Circle DCW wallet ids + addresses (one per chain). Idempotent
+   — re-running returns the same wallets.
+
+2. **Transfer mint authority** to the printed addresses:
+   - EVM: `cast send $LOAR_TOKEN_ADDRESS "transferOwnership(address)" <evmAddress>`
+     (or whatever pattern your $LOAR contract uses for minter role).
+   - Solana: `spl-token authorize $LOAR_MINT mint <solAddress> --url devnet`
+
+3. **Vaults** — pick two addresses to receive locked tokens:
+   - Solana: create a Token-2022 ATA — `SOL_BRIDGE_VAULT_ATA = <ATA>`.
    - EVM: an EOA or contract — `EVM_BRIDGE_VAULT_ADDRESS = 0x...`.
-3. **Env vars**:
+
+4. **Env vars** in `.env`:
+
    ```
    SOL_BRIDGE_VAULT_ATA=...
    EVM_BRIDGE_VAULT_ADDRESS=0x...
-   LOAR_EVM_CHAIN_ID=11155111   # Sepolia
+   LOAR_EVM_CHAIN_ID=11155111
+   CIRCLE_BRIDGE_SIGNER_ID_EVM=<from step 1>
+   CIRCLE_BRIDGE_SIGNER_ID_SOL=<from step 1>
+
+   # Optional caps (defaults: 1M per tx, 5M per user/day)
+   BRIDGE_MAX_PER_TX_LOAR=1000000
+   BRIDGE_MAX_PER_USER_PER_DAY_LOAR=5000000
    ```
+
+5. **Restart server**. `isCustodialBridgeConfigured()` returns true only
+   when ALL of these vars are set, so a partial setup keeps the route at
+   503 instead of failing mid-flight.
+
+### Replay protection
+
+Pass an opaque `idempotencyKey` (UUID, 8-128 chars) on every `/transfer`
+request. The server hashes `(userId, idempotencyKey)` against the
+`bridgeIntents` collection and returns the existing intent if it already
+exists — same-request retries land on the same intent instead of double-
+spending. UI must use a fresh key per logical transfer; reusing one across
+different amounts will mis-replay the original.
 
 ### Flow (Solana → EVM)
 

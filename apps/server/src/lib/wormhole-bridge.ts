@@ -36,6 +36,7 @@ import {
   getIntent as getCustodialIntent,
   type BridgeDirection,
 } from './bridge-custodial';
+export { BridgeLimitError } from './bridge-custodial';
 
 // ── Configuration ───────────────────────────────────────────────────────────
 
@@ -157,6 +158,8 @@ export interface BridgeTransferRequest {
   to: Chain;
   amount: string;
   recipient: string;
+  /** Opaque client key for replay protection. Same (userId, key) → same intent. */
+  idempotencyKey?: string;
 }
 
 export interface BridgeTransferResult {
@@ -211,11 +214,13 @@ export async function initiateBridgeTransfer(
           userId: req.userId,
           amountBaseUnits,
           recipient: req.recipient as `0x${string}`,
+          idempotencyKey: req.idempotencyKey,
         })
       : await bridgeEvmToSol({
           userId: req.userId,
           amountBaseUnits,
           recipient: req.recipient,
+          idempotencyKey: req.idempotencyKey,
         });
 
   return {
