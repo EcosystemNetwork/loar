@@ -105,10 +105,15 @@ siwsAuthRoutes.post('/verify', async (c) => {
       })
     );
 
+    // Native mobile clients have no cookie jar — echo the bearer token in
+    // the body when the client identifies itself via x-mobile-client: 1.
+    // Web clients omit the header and continue to rely on the httpOnly cookie.
+    const isMobile = c.req.header('x-mobile-client') === '1';
     return c.json({
       address,
       chain: 'solana',
       expiresAt: payload.exp * 1000,
+      ...(isMobile ? { token } : {}),
     });
   } catch (err) {
     recordAuthEvent('verify', 'failure');

@@ -22,6 +22,7 @@ import {
 } from '../lib/circle-solana';
 import { mintEpisodeCnft } from '../services/solana/episode-mint';
 import { canonizeEpisode, CanonizePrecheckError } from '../services/solana/canon-promote';
+import { decompressCnft, CnftDecompressError } from '../services/solana/cnft-decompress';
 import { getAttestationPublicKey } from '../lib/attestation';
 
 export const solanaRoutes = new Hono();
@@ -352,6 +353,51 @@ const canonizeBody = z.object({
  * becomes the marketplace-tradable canon artifact while the cNFT stays as
  * historical mint record.
  */
+// ── cNFT decompression ─────────────────────────────────────────────────────
+
+const decompressBody = z.object({
+  cnftAssetId: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, 'invalid Solana address'),
+});
+
+/**
+ * Decompress a Bubblegum cNFT into a standard SPL Token Metadata NFT.
+ *
+ * Use this when you want a single, marketplace-grade asset (Tensor /
+ * MagicEden / DeFi) instead of the dual-asset Core path. Cost: ~0.012 SOL
+ * for the mint + metadata rent. Permission: only the leaf owner can
+ * decompress, so this route checks caller's Circle wallet against the cNFT.
+ *
+ * Returns 404 NOT_FOUND if the asset doesn't exist, 403 NOT_OWNER if the
+ * caller doesn't own the leaf, 409 if the cNFT is already decompressed.
+ */
+solanaRoutes.post('/cnft/decompress', async (c) => {
+  const auth = await requireAuth(c);
+  if (!auth.user) return auth.res;
+  const parsed = decompressBody.safeParse(await c.req.json());
+  if (!parsed.success) {
+    return c.json({ error: 'invalid body', issues: parsed.error.issues }, 400);
+  }
+  try {
+    const result = await decompressCnft({
+      userId: auth.user.uid,
+      cnftAssetId: parsed.data.cnftAssetId,
+    });
+    return c.json(result);
+  } catch (err) {
+    if (err instanceof CnftDecompressError) {
+      const status = err.code === 'NOT_OWNER' ? 403 : err.code === 'NOT_FOUND' ? 404 : 409;
+      return c.json({ error: err.message, code: err.code }, status);
+    }
+    // Bubblegum's "LeafAlreadyDecompressed" surfaces as a custom program error
+    // in the tx logs; surface it as 409 with a clear message.
+    const msg = err instanceof Error ? err.message : 'decompress failed';
+    if (/already.*decompress/i.test(msg)) {
+      return c.json({ error: 'cNFT already decompressed', code: 'ALREADY_DECOMPRESSED' }, 409);
+    }
+    return c.json({ error: msg }, 500);
+  }
+});
+
 solanaRoutes.post('/episode/canonize', async (c) => {
   const auth = await requireAuth(c);
   if (!auth.user) return auth.res;
