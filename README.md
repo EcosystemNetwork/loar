@@ -35,6 +35,47 @@ See **[HACKATHON.md](HACKATHON.md)** for the 2-min demo script, architecture dia
 
 ---
 
+## ◎ Solana integration
+
+LOAR runs natively on Solana alongside the existing EVM stack. **EVM for IP &
+governance, Solana for distribution and micro-payments** — one LOAR identity
+(linked via SIWS), one $LOAR token bridged across chains, server-signed via
+Circle Developer Controlled Wallets so users keep email/social/wallet auth on
+either side.
+
+| Feature                          | What it is                                                                                                                    |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Compressed-NFT episode mints** | Bubblegum cNFTs (~$0.0001/mint) via the `episode` Anchor program — atomic with the on-chain episode record                    |
+| **Canon promotion**              | Flips `is_canon` + mints a parallel Metaplex Core asset (marketplace-tradable, 5% royalty)                                    |
+| **$LOAR Token-2022**             | 1B supply, Pausable + Metadata extensions, mint **permanently locked** via one-way `lock_loar_mint`                           |
+| **Payment program**              | Solana sister of `PaymentRouter.sol` — pull-style accumulators per creator, two-step ownership, `transfer_checked` everywhere |
+| **Solana Pay → cNFT auto-mint**  | One button: scan QR → pay 0.01 SOL → cNFT lands in wallet, payment tx pinned into lineage                                     |
+| **Cross-chain bridge**           | Custodial lock-and-mint today (per-tx + per-user caps, idempotency keys, balance prechecks), Wormhole NTT for production      |
+| **Cross-chain attestation**      | Ed25519 receipt per mint linking Solana cNFT ↔ EVM Universe — verifiable offline via `/api/solana/attestation/key`            |
+| **Squads multisig**              | Solana parity with Gnosis Safe for shared Universe ownership — `create` / `propose` / `approve` / `execute`                   |
+| **SIWS auth**                    | Sign-In With Solana via Phantom/Solflare; JWT carries both `evm` and `sol` claims so one session represents both chains       |
+| **Mobile (Android MWA)**         | Mobile Wallet Adapter for Phantom/Solflare/Backpack on-device                                                                 |
+| **MCP tools for AI agents**      | 6 Solana tools (`mint_episode`, `canonize`, `pay_intent`, `pay_status`, `activity`, `get_attestation`) — scope-gated          |
+| **Public activity dashboard**    | [`/solana`](apps/web/src/routes/solana.tsx) — auto-refreshing KPIs, recent activity, treasury balance                         |
+
+**Live devnet deployments:**
+
+| Component             | Address                                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `universe` program    | [`6YTQVSeauk4x5gycMM2wzkR8mdHEnHAYsz3Ygg26UPtD`](https://explorer.solana.com/address/6YTQVSeauk4x5gycMM2wzkR8mdHEnHAYsz3Ygg26UPtD?cluster=devnet) |
+| `episode` program     | [`voLiAXoYbq8go1CUS9UshQRZnNu9Y44qNBZ6czgn8Bs`](https://explorer.solana.com/address/voLiAXoYbq8go1CUS9UshQRZnNu9Y44qNBZ6czgn8Bs?cluster=devnet)   |
+| `payment` program     | [`9xWo4djcHmGFkJnLQF9phdpsUhj6BQFW6yR8sHUsKVbj`](https://explorer.solana.com/address/9xWo4djcHmGFkJnLQF9phdpsUhj6BQFW6yR8sHUsKVbj?cluster=devnet) |
+| $LOAR Token-2022 mint | [`482ScJ9EffmyWRWhVsysrPBw3LPDdUXuRL1rXoAx1tez`](https://explorer.solana.com/address/482ScJ9EffmyWRWhVsysrPBw3LPDdUXuRL1rXoAx1tez?cluster=devnet) |
+| Bubblegum merkle tree | [`Dmn6X8ToDwG6VcawQ6prpm6rV3KYBdoV31RQQFrx1Tu2`](https://explorer.solana.com/address/Dmn6X8ToDwG6VcawQ6prpm6rV3KYBdoV31RQQFrx1Tu2?cluster=devnet) |
+
+**Docs:** [`docs/solana-overview.md`](docs/solana-overview.md) (umbrella),
+[`docs/solana-bridge.md`](docs/solana-bridge.md) (bridge),
+[`docs/solana-mainnet-runbook.md`](docs/solana-mainnet-runbook.md) (devnet → mainnet),
+[`apps/mobile/SOLANA.md`](apps/mobile/SOLANA.md) (mobile MWA),
+[`apps/programs/README.md`](apps/programs/README.md) (Anchor workspace).
+
+---
+
 ## What is LOAR?
 
 LOAR is a platform where creators deploy cinematic universes as smart contracts, generate AI video/image content, build branching narratives, and set up multiple revenue streams — all governed by token holders.
