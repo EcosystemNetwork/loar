@@ -5,6 +5,44 @@ Devnet program IDs + addresses are committed in
 [packages/abis/src/solana-addresses.ts](../packages/abis/src/solana-addresses.ts);
 mainnet entries are currently empty and get filled in by following this doc.
 
+## Pre-mainnet blockers
+
+These need real time and/or money to clear — they are not code changes and
+must be resolved **before** flipping any production switch.
+
+### 🚫 Hard blockers (do not deploy until cleared)
+
+| Item                                                                           | Status                                                | What it takes                                                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| External audit of the three Anchor programs (`universe`, `episode`, `payment`) | not started                                           | Engage a Solana-native firm (OtterSec, Neodyme, Sec3, Halborn). 2-4 week lead time + report. The contracts have an audit tracker with 111 findings; the Solana programs have had zero external eyes.                                    |
+| Move program upgrade authority off deployer EOA → Squads multisig              | devnet still on `7pawxCZ8...`                         | Create Squads v4 multisig on mainnet, derive vault PDA, run `apps/programs/scripts/transfer-upgrade-authority.ts <vault>` then `--verify`. Also covered in step 6.                                                                      |
+| $LOAR mint authority off deployer EOA → Squads                                 | devnet still on `7pawxCZ8...` (freeze already nulled) | `spl-token --program-id <Token2022> authorize $LOAR_MINT mint <squads-vault>`. Verify with `apps/server/scripts/solana/check-loar-mint.ts`.                                                                                             |
+| Custodial bridge → Wormhole NTT migration                                      | code path exists, contracts not deployed              | Deploy NTT manager + transceiver on Solana and Sepolia/Base. ~3-5 days of on-chain setup + integration. Bridge `wormhole-bridge.ts` auto-picks the new backend when manager addresses land. Custodial v1 stays available as a fallback. |
+
+### ⚠️ Soft blockers (deploy without, but expect operational pain)
+
+| Item                                                        | Status                                      | Why it matters                                                                                                                                                                                        |
+| ----------------------------------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| End-to-end dry-run of this runbook on a fresh devnet wallet | never done                                  | Catches missing scripts, env vars, ordering bugs before they hit mainnet. Steps 1-9 have only ever been executed piecemeal.                                                                           |
+| Bridge round-trip e2e test (real EVM ↔ Solana with real $)  | never done                                  | Custodial bridge ran one-direction tests on devnet. Round-trip + the failure-recovery `/retry` path are untested.                                                                                     |
+| Bridge reconciliation cron in production                    | script exists, not wired                    | Schedule `apps/server/scripts/bridge-reconcile.ts` hourly via cron / fly machine schedule. Exits 2 on drift — pipe to pagerduty.                                                                      |
+| Firestore TTL on `bridgeIntents.expiresAt`                  | unconfigured                                | Without it, intent docs accumulate forever. Configure once via Firebase console → Firestore → TTL → field `expiresAt`.                                                                                |
+| Program `.so` + `*-keypair.json` backups                    | not standardized                            | Lose the keypair → lose the program ID forever. Step 2 mentions a backup dir; need an actual offline copy (encrypted USB, paper wallet).                                                              |
+| Web app `iOS Solana wallet UX`                              | falls back to Solana Pay QR                 | MWA is Android-only. iOS users can mint via Phantom deeplink + QR, but Solflare/Backpack iOS aren't first-class. Real fix needs each wallet's iOS universal-link support.                             |
+| `apps/programs/scripts/transfer-payment-ownership.ts`       | referenced in step 6, **doesn't exist yet** | Need to write before step 6 can run. Should call `payment::transfer_ownership(new_owner)` then prompt the Squads vault to `accept_ownership`.                                                         |
+| `scripts/solana/create-loar-mint.ts`                        | referenced in step 3, **doesn't exist yet** | Devnet mint was created via ad-hoc CLI. Need a reproducible script for mainnet.                                                                                                                       |
+| Solana programs in CI                                       | not running                                 | `anchor test` only runs locally. Add a CI job that spins solana-test-validator + runs the smoke + payment + universe + episode suites on every PR touching `apps/programs/`.                          |
+| Bridge config UI gate                                       | none                                        | Server boot logs partial config now (✓), but the `/bridge` UI happily renders against a half-configured backend. Add a `configured: false` flag in `/api/bridge/quote` response and surface a banner. |
+
+### ℹ️ Recommended before public launch
+
+- Run `npx slither` + `mythril` on `apps/contracts/` (EVM side — separate from Solana audit).
+- Tighten the bridge daily caps from the defaults (`BRIDGE_MAX_PER_USER_PER_DAY_LOAR=5000000`, `BRIDGE_MAX_GLOBAL_PER_DAY_LOAR=20000000`) to whatever the audit/insurance partner is comfortable with.
+- Wire `/api/bridge/reconcile` drift detection into the same alerting that pages on indexer staleness.
+- Re-run `auditBridgeConfig()` after every Railway/Fly env update — partial-config is the most common foot-gun.
+
+---
+
 ## Prerequisites
 
 | Item                                              | Cost                                     | Source                                               |
