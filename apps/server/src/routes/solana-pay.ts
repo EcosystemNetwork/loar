@@ -14,6 +14,7 @@ import { getCookie } from 'hono/cookie';
 import { z } from 'zod';
 import { verifyAuth } from '../lib/auth';
 import { createPaymentIntent, getPaymentStatus } from '../lib/solana-pay';
+import { hasScope } from '../lib/apiKeys';
 
 export const solanaPayRoutes = new Hono();
 
@@ -37,6 +38,11 @@ solanaPayRoutes.post('/intent', async (c) => {
   const cookieToken = getCookie(c, 'siwe-session');
   const user = await verifyAuth(c.req.raw.headers, cookieToken);
   if (!user) return c.json({ error: 'Unauthorized' }, 401);
+  // API-key callers (MCP relays etc) need explicit Solana Pay permission;
+  // JWT/session users (apiKeyPermissions undefined) always pass.
+  if (!hasScope(user.apiKeyPermissions, 'solana.pay')) {
+    return c.json({ error: 'API key missing required scope: solana.pay' }, 403);
+  }
 
   const parsed = intentBody.safeParse(await c.req.json());
   if (!parsed.success) {

@@ -40,6 +40,7 @@
  * monorepo dep chain into the bridge worker).
  */
 import { PublicKey } from '@solana/web3.js';
+import { randomBytes } from 'node:crypto';
 import {
   createTransferCheckedInstruction,
   createMintToCheckedInstruction,
@@ -48,8 +49,13 @@ import {
   TOKEN_2022_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
-import { encodeFunctionData, parseUnits } from 'viem';
-import { activeCluster, executeSolanaTransaction, getOrCreateSolanaWallet } from './circle-solana';
+import { createPublicClient, encodeFunctionData, getAddress, http, parseUnits } from 'viem';
+import {
+  activeCluster,
+  executeSolanaTransaction,
+  getOrCreateSolanaWallet,
+  getSolanaConnection,
+} from './circle-solana';
 import { executeTransaction, getOrCreateWallet } from './circle-wallets';
 import { db, firebaseAvailable } from './firebase';
 import {
@@ -81,6 +87,22 @@ async function resolveCircleAddress(walletId: string): Promise<string> {
 
 // ── ABIs (minimal, hand-pinned) ─────────────────────────────────────────────
 
+// Decimal pinning. These values match the currently-deployed $LOAR mints:
+//   ERC20 $LOAR: 18 decimals (OpenZeppelin default)
+//   SPL  $LOAR: 9 decimals (Token-2022, matches SOL's 9)
+//
+// For a second token where the decimals differ (e.g. USDC: 6 on both
+// chains), this bridge would silently truncate or pad amounts. Production
+// extension path:
+//   1. Read mint decimals on Solana side via `getMint(mintPk)` from
+//      @solana/spl-token (one call per startup, cached).
+//   2. Read EVM decimals via `decimals()` ERC20 call on `loarTokenAddress`
+//      (also cacheable).
+//   3. Compute SCALE_DIFF dynamically per token pair, keyed by canonical
+//      token address.
+// Skipping for v1 because we control both $LOAR mints and the decimals
+// are pinned; the call sites below would all need to become async-aware
+// of the per-token cache.
 const ERC20_DECIMALS = 18;
 const SPL_DECIMALS = 9;
 const SCALE_DIFF = BigInt(10) ** BigInt(ERC20_DECIMALS - SPL_DECIMALS); // 10^9
@@ -206,6 +228,8 @@ export interface BridgeIntent {
   idempotencyKey?: string;
   createdAt: number;
   updatedAt: number;
+  /** Firestore TTL trigger field — configure a TTL policy on this. */
+  expiresAt: number;
 }
 
 // ── Caps & idempotency ─────────────────────────────────────────────────────
@@ -231,12 +255,107 @@ function maxPerUserPerDayBaseUnits(direction: BridgeDirection): bigint {
 
 export class BridgeLimitError extends Error {
   constructor(
-    public readonly code: 'PER_TX_EXCEEDED' | 'PER_DAY_EXCEEDED' | 'NON_POSITIVE',
+    public readonly code:
+      | 'PER_TX_EXCEEDED'
+      | 'PER_DAY_EXCEEDED'
+      | 'NON_POSITIVE'
+      | 'INSUFFICIENT_BALANCE',
     message: string
   ) {
     super(message);
     this.name = 'BridgeLimitError';
   }
+}
+
+/**
+ * Pre-flight balance check — fails fast with a clear error before any
+ * on-chain side-effect if the caller doesn't have the funds. Without this,
+ * the source-side tx reverts mid-flight and the operator gets a cryptic
+ * "execution reverted" without context.
+ *
+ * Solana side: read SPL ATA balance via getTokenAccountBalance. Returns
+ *   0 if the ATA doesn't exist (which is itself a sufficient failure
+ *   signal — we don't auto-create it on source side).
+ * EVM side: ERC20 balanceOf via viem public client.
+ */
+async function precheckBalance(args: {
+  direction: BridgeDirection;
+  ownerAddress: string;
+  amountBaseUnits: bigint;
+  cfg: BridgeConfig;
+}): Promise<void> {
+  if (args.direction === 'sol_to_evm') {
+    const conn = getSolanaConnection();
+    const fromAta = getAssociatedTokenAddressSync(
+      new PublicKey(args.cfg.loarMint),
+      new PublicKey(args.ownerAddress),
+      false,
+      TOKEN_2022_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    try {
+      const bal = await conn.getTokenAccountBalance(fromAta, 'confirmed');
+      const available = BigInt(bal.value.amount);
+      if (available < args.amountBaseUnits) {
+        throw new BridgeLimitError(
+          'INSUFFICIENT_BALANCE',
+          `Solana SPL balance ${available} < ${args.amountBaseUnits}`
+        );
+      }
+    } catch (err) {
+      if (err instanceof BridgeLimitError) throw err;
+      // ATA doesn't exist → balance is 0.
+      throw new BridgeLimitError(
+        'INSUFFICIENT_BALANCE',
+        `No SPL $LOAR balance on ${args.ownerAddress} (ATA not initialized or empty)`
+      );
+    }
+    return;
+  }
+  // EVM source.
+  const rpcUrl = process.env.RPC_URL || process.env.PONDER_RPC_URL_2;
+  if (!rpcUrl) {
+    // No RPC available — skip the check rather than fail (chain-level revert
+    // is the backstop). Logged so the operator knows to set it.
+    console.warn('[bridge] RPC_URL not set — skipping EVM balance precheck');
+    return;
+  }
+  const client = createPublicClient({ transport: http(rpcUrl) });
+  const balance = await client.readContract({
+    address: args.cfg.loarTokenAddress,
+    abi: [
+      {
+        name: 'balanceOf',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [{ name: 'owner', type: 'address' }],
+        outputs: [{ name: '', type: 'uint256' }],
+      },
+    ] as const,
+    functionName: 'balanceOf',
+    args: [args.ownerAddress as `0x${string}`],
+  });
+  if ((balance as bigint) < args.amountBaseUnits) {
+    throw new BridgeLimitError(
+      'INSUFFICIENT_BALANCE',
+      `EVM $LOAR balance ${balance} < ${args.amountBaseUnits}`
+    );
+  }
+}
+
+/** Crypto-grade unique id for bridge intents — replaces Math.random(). */
+function newIntentId(): string {
+  return `bridge_${Date.now()}_${randomBytes(8).toString('hex')}`;
+}
+
+/**
+ * Intent TTL (Firestore-side). Set as an `expiresAt` field; configure a
+ * Firestore TTL policy on `bridgeIntents.expiresAt` to auto-purge stale
+ * records.  Default: 90 days. Operator can override via env.
+ */
+function intentExpiresAt(): number {
+  const days = Number(process.env.BRIDGE_INTENT_TTL_DAYS ?? '90');
+  return Date.now() + days * 24 * 60 * 60 * 1000;
 }
 
 async function enforceCaps(
@@ -334,7 +453,8 @@ export async function bridgeSolToEvm(args: BridgeSolToEvmArgs): Promise<BridgeIn
     const existing = await findExistingByIdempotencyKey(args.userId, args.idempotencyKey);
     if (existing) return existing;
   }
-  // Cap enforcement before any on-chain side-effect.
+  // Caps enforced BEFORE balance precheck so attackers can't probe vault state
+  // via the bridge endpoint with oversized requests.
   await enforceCaps(args.userId, 'sol_to_evm', BigInt(args.amountBaseUnits));
 
   const cluster = activeCluster();
@@ -342,6 +462,18 @@ export async function bridgeSolToEvm(args: BridgeSolToEvmArgs): Promise<BridgeIn
   const solPubkey = new PublicKey(solWallet.address);
   const mintPk = new PublicKey(cfg.loarMint);
   const vaultPk = new PublicKey(cfg.solVaultAta);
+
+  // Balance precheck — fail fast with a typed error before touching the chain.
+  await precheckBalance({
+    direction: 'sol_to_evm',
+    ownerAddress: solWallet.address,
+    amountBaseUnits: BigInt(args.amountBaseUnits),
+    cfg,
+  });
+
+  // Checksum the EVM recipient on the way in. Same address with different
+  // case otherwise stores as distinct strings in Firestore.
+  const checksummedRecipient = getAddress(args.recipient);
 
   // Caller's Token-2022 ATA for $LOAR (source).
   const fromAta = getAssociatedTokenAddressSync(
@@ -368,15 +500,16 @@ export async function bridgeSolToEvm(args: BridgeSolToEvmArgs): Promise<BridgeIn
   // Bridge intent — persisted before we touch the chain so a server crash
   // mid-flight leaves a trail.
   const intent: BridgeIntent = {
-    id: `bridge_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    id: newIntentId(),
     userId: args.userId,
     direction: 'sol_to_evm',
     amountBaseUnits: args.amountBaseUnits,
-    recipient: args.recipient,
+    recipient: checksummedRecipient,
     state: 'pending_source',
     idempotencyKey: args.idempotencyKey,
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    expiresAt: intentExpiresAt(),
   };
   await saveIntent(intent);
 
@@ -407,7 +540,7 @@ export async function bridgeSolToEvm(args: BridgeSolToEvmArgs): Promise<BridgeIn
   const calldata = encodeFunctionData({
     abi: erc20MintAbi,
     functionName: 'mint',
-    args: [args.recipient, evmAmount],
+    args: [checksummedRecipient, evmAmount],
   });
 
   // Pinned bridge signer (must have been granted mint authority on the
@@ -457,6 +590,13 @@ export async function bridgeEvmToSol(args: BridgeEvmToSolArgs): Promise<BridgeIn
   // 1. EVM transfer to vault — caller's Circle EVM wallet signs.
   const evmWallet = await getOrCreateWallet(args.userId, cfg.evmChainId);
 
+  await precheckBalance({
+    direction: 'evm_to_sol',
+    ownerAddress: evmWallet.address,
+    amountBaseUnits: BigInt(args.amountBaseUnits),
+    cfg,
+  });
+
   const calldata = encodeFunctionData({
     abi: erc20TransferAbi,
     functionName: 'transfer',
@@ -464,7 +604,7 @@ export async function bridgeEvmToSol(args: BridgeEvmToSolArgs): Promise<BridgeIn
   });
 
   const intent: BridgeIntent = {
-    id: `bridge_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    id: newIntentId(),
     userId: args.userId,
     direction: 'evm_to_sol',
     amountBaseUnits: args.amountBaseUnits,
@@ -473,6 +613,7 @@ export async function bridgeEvmToSol(args: BridgeEvmToSolArgs): Promise<BridgeIn
     idempotencyKey: args.idempotencyKey,
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    expiresAt: intentExpiresAt(),
   };
   await saveIntent(intent);
 

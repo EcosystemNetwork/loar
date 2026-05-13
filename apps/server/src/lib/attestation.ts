@@ -35,34 +35,38 @@ interface AttestationKey {
 }
 
 let _key: AttestationKey | null = null;
+let _previousPubKeys: string[] | null = null;
 
-function loadKeyFromEnv(): AttestationKey | null {
-  const raw = process.env.ATTESTATION_PRIVATE_KEY;
+function loadKeyFromEnvVar(envVarName: string): AttestationKey | null {
+  const raw = process.env[envVarName];
   if (!raw) return null;
   try {
     const privBytes = bs58.decode(raw);
     if (privBytes.length !== 32) {
-      throw new Error(`ATTESTATION_PRIVATE_KEY must decode to 32 bytes (got ${privBytes.length})`);
+      throw new Error(`${envVarName} must decode to 32 bytes (got ${privBytes.length})`);
     }
-    // Derive public key from private via a Node crypto round-trip.
     const privKey = createPrivateKey({
       key: Buffer.concat([ED25519_PKCS8_PREFIX, Buffer.from(privBytes)]),
       format: 'der',
       type: 'pkcs8',
     });
     const pubDer = createPublicKey(privKey).export({ format: 'der', type: 'spki' });
-    const pubBytes = (pubDer as Buffer).subarray(12); // strip SPKI prefix
+    const pubBytes = (pubDer as Buffer).subarray(12);
     return {
       privKeyB58: bs58.encode(privBytes),
       pubKeyB58: bs58.encode(pubBytes),
     };
   } catch (err) {
     console.warn(
-      '[attestation] ATTESTATION_PRIVATE_KEY is set but invalid — ignoring:',
+      `[attestation] ${envVarName} is set but invalid — ignoring:`,
       err instanceof Error ? err.message : err
     );
     return null;
   }
+}
+
+function loadKeyFromEnv(): AttestationKey | null {
+  return loadKeyFromEnvVar('ATTESTATION_PRIVATE_KEY');
 }
 
 /**
@@ -126,6 +130,32 @@ async function getKey(): Promise<AttestationKey> {
 
 export async function getAttestationPublicKey(): Promise<string> {
   return (await getKey()).pubKeyB58;
+}
+
+/**
+ * All currently-trusted attestation signer pubkeys, in order of preference:
+ *   1. Active signer (env or generated).
+ *   2. ATTESTATION_PRIVATE_KEY_PREVIOUS — the prior signer during rotation.
+ *
+ * External verifiers use this list to validate receipts emitted before a
+ * rotation. Rotation procedure:
+ *
+ *   1. ATTESTATION_PRIVATE_KEY_PREVIOUS = <current ATTESTATION_PRIVATE_KEY>
+ *   2. ATTESTATION_PRIVATE_KEY          = <new from `openssl rand 32 | base58`>
+ *   3. Deploy.
+ *   4. After 90 days, drop ATTESTATION_PRIVATE_KEY_PREVIOUS — receipts
+ *      older than that age out of the bridgeIntents TTL window anyway.
+ */
+export async function getTrustedAttestationKeys(): Promise<{
+  active: string;
+  previous: string[];
+}> {
+  const active = (await getKey()).pubKeyB58;
+  if (_previousPubKeys === null) {
+    const prev = loadKeyFromEnvVar('ATTESTATION_PRIVATE_KEY_PREVIOUS');
+    _previousPubKeys = prev ? [prev.pubKeyB58] : [];
+  }
+  return { active, previous: _previousPubKeys };
 }
 
 // ── Receipt payload ─────────────────────────────────────────────────────────

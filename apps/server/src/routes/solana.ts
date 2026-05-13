@@ -23,7 +23,8 @@ import {
 import { mintEpisodeCnft } from '../services/solana/episode-mint';
 import { canonizeEpisode, CanonizePrecheckError } from '../services/solana/canon-promote';
 import { decompressCnft, CnftDecompressError } from '../services/solana/cnft-decompress';
-import { getAttestationPublicKey } from '../lib/attestation';
+import { getAttestationPublicKey, getTrustedAttestationKeys } from '../lib/attestation';
+import { hasScope } from '../lib/apiKeys';
 
 export const solanaRoutes = new Hono();
 
@@ -59,6 +60,23 @@ async function requireAuth(c: any): Promise<AuthGate> {
     return { user: null, res: c.json({ error: 'Unauthorized' }, 401) };
   }
   return { user, res: null };
+}
+
+/**
+ * Scope check for API-key callers. JWT/session callers (no apiKeyPermissions)
+ * always pass — they're real users acting on their own behalf. API keys
+ * (e.g. MCP relays) must hold the named Solana scope.
+ */
+function requireScope(
+  user: NonNullable<Awaited<ReturnType<typeof verifyAuth>>>,
+  scope: 'solana.mint' | 'solana.canonize' | 'solana.pay' | 'solana.bridge'
+): boolean {
+  // No permissions array means JWT-authed user, not an API key — allowed.
+  return hasScope(user.apiKeyPermissions, scope);
+}
+
+function denyScope(c: any, scope: string) {
+  return c.json({ error: `API key missing required scope: ${scope}` }, 403);
 }
 
 /**
@@ -240,16 +258,19 @@ solanaRoutes.get('/activity', async (c) => {
 // ── Cross-chain attestation receipts ───────────────────────────────────────
 
 /**
- * Public signer pubkey. External verifiers fetch this once, then can validate
- * any LOAR cross-chain receipt offline via Ed25519. Long-cache OK — rotations
- * publish via a new key file under /api/solana/attestation/key.<version>.
+ * Public signer pubkey. External verifiers fetch this once and verify any
+ * LOAR cross-chain receipt offline via Ed25519. Now returns both the active
+ * signer AND any prior signers from a rotation, so receipts emitted under
+ * the previous key still verify cleanly.
  */
 solanaRoutes.get('/attestation/key', async (c) => {
-  const pubKey = await getAttestationPublicKey();
+  const { active, previous } = await getTrustedAttestationKeys();
   c.header('Cache-Control', 'public, max-age=300');
   return c.json({
     schema: 'loar-cnft-cross-chain-v1',
-    pubKey,
+    pubKey: active, // back-compat alias for the active signer
+    activePubKey: active,
+    previousPubKeys: previous,
     curve: 'ed25519',
     encoding: 'base58',
     verify: 'standard ed25519 over canonical JSON of receipt minus { signer, sig }',
@@ -260,6 +281,12 @@ solanaRoutes.get('/attestation/key', async (c) => {
  * Fetch a published receipt by episode PDA. Returns 404 if the cNFT was
  * minted before attestations were wired or in the rare case the post-mint
  * signing failed (the mint still landed; the lineage doc may exist).
+ *
+ * Public by design — the entire point of attestation receipts is that
+ * third parties can verify the cross-chain claim without trusting LOAR.
+ * The receipt itself contains only on-chain references (PDA, tx sig,
+ * universe address) — no PII, no balance, no auth state. Gating this
+ * would defeat the verifiability use case.
  */
 solanaRoutes.get('/attestation/:episodePda', async (c) => {
   const pda = c.req.param('episodePda');
@@ -316,6 +343,7 @@ const mintBody = z.object({
 solanaRoutes.post('/episode/mint', async (c) => {
   const auth = await requireAuth(c);
   if (!auth.user) return auth.res;
+  if (!requireScope(auth.user, 'solana.mint')) return denyScope(c, 'solana.mint');
 
   const parsed = mintBody.safeParse(await c.req.json());
   if (!parsed.success) {
@@ -373,6 +401,10 @@ const decompressBody = z.object({
 solanaRoutes.post('/cnft/decompress', async (c) => {
   const auth = await requireAuth(c);
   if (!auth.user) return auth.res;
+  // Reuse the canonize scope — decompress is a similar high-value op
+  // (irreversibly retires a leaf), so anyone permitted to canonize is
+  // also permitted to decompress.
+  if (!requireScope(auth.user, 'solana.canonize')) return denyScope(c, 'solana.canonize');
   const parsed = decompressBody.safeParse(await c.req.json());
   if (!parsed.success) {
     return c.json({ error: 'invalid body', issues: parsed.error.issues }, 400);
@@ -401,6 +433,7 @@ solanaRoutes.post('/cnft/decompress', async (c) => {
 solanaRoutes.post('/episode/canonize', async (c) => {
   const auth = await requireAuth(c);
   if (!auth.user) return auth.res;
+  if (!requireScope(auth.user, 'solana.canonize')) return denyScope(c, 'solana.canonize');
 
   const parsed = canonizeBody.safeParse(await c.req.json());
   if (!parsed.success) {

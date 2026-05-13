@@ -29,10 +29,12 @@ const SOLANA_GENESIS = {
 } as const;
 
 const APP_IDENTITY = {
-  // MWA shows this to the user when they authorize. Keep concise.
+  // MWA shows this to the user when they authorize. The icon MUST be a
+  // fetchable URL (spec: data: or http(s)://). A bare 'favicon.ico' would
+  // make Phantom/Solflare reject the authorize call or show a placeholder.
   name: 'LOAR',
   uri: 'https://loar.fun',
-  icon: 'favicon.ico',
+  icon: 'https://loar.fun/favicon.ico',
 };
 
 export interface SolanaAuthResult {

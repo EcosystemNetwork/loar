@@ -22,6 +22,8 @@ import {
   quoteBridge,
 } from '../lib/wormhole-bridge';
 import { getIntent } from '../lib/bridge-custodial';
+import { consumeRateLimit } from '../middleware/rate-limit';
+import { hasScope } from '../lib/apiKeys';
 import type { Chain } from '@wormhole-foundation/sdk';
 
 export const bridgeRoutes = new Hono();
@@ -101,6 +103,18 @@ bridgeRoutes.post('/transfer', async (c) => {
   const token = getCookie(c, 'siwe-session');
   const user = await verifyAuth(c.req.raw.headers, token);
   if (!user) return c.json({ error: 'Unauthorized' }, 401);
+  if (!hasScope(user.apiKeyPermissions, 'solana.bridge')) {
+    return c.json({ error: 'API key missing required scope: solana.bridge' }, 403);
+  }
+
+  // Per-user rate limit — separate bucket from the /api/bridge/* IP limit.
+  // 5/min keeps reasonable users unblocked while preventing a single
+  // authenticated wallet from spamming the platform's gas budget.
+  const rl = await consumeRateLimit(`bridge:transfer:${user.uid}`, 60_000, 5);
+  if (rl.blocked) {
+    c.header('Retry-After', '60');
+    return c.json({ error: 'rate limit: 5 bridge transfers/min per user' }, 429);
+  }
 
   const parsed = quoteBody.safeParse(await c.req.json());
   if (!parsed.success) {
@@ -122,11 +136,20 @@ bridgeRoutes.post('/transfer', async (c) => {
     });
     return c.json(result);
   } catch (err) {
-    // Cap violations are user-actionable → 400; pass through the structured code.
+    // Cap violations + balance shortfalls are user-actionable → 400.
     if (err instanceof BridgeLimitError) {
       return c.json({ error: err.message, code: err.code }, 400);
     }
-    return c.json({ error: err instanceof Error ? err.message : 'transfer failed' }, 500);
+    const msg = err instanceof Error ? err.message : 'transfer failed';
+    // parseUnits throws InvalidDecimalNumberError for malformed amounts.
+    if (/invalid.*decimal|too.*many.*decimals/i.test(msg)) {
+      return c.json({ error: msg, code: 'INVALID_AMOUNT' }, 400);
+    }
+    // NTT-only path reachable when manager addrs are set but SDK not wired.
+    if (/NTT wiring lands in v2/i.test(msg)) {
+      return c.json({ error: msg, code: 'NTT_UNWIRED' }, 503);
+    }
+    return c.json({ error: msg }, 500);
   }
 });
 

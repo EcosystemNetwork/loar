@@ -193,7 +193,8 @@ export async function initiateBridgeTransfer(
   if (isBridgeConfigured(req.from, req.to)) {
     // TODO: wire @wormhole-foundation/sdk-evm-ntt + sdk-solana-ntt once
     // managers are deployed. For now this path is reserved.
-    throw new Error('NTT manager is set in env but the runtime wiring lands in v2.');
+    // Route catches this message and returns 503 NTT_UNWIRED.
+    throw new Error('NTT wiring lands in v2 — manager addresses set but SDK not wired.');
   }
 
   // Path 2: custodial lock-and-mint (testnet-grade).

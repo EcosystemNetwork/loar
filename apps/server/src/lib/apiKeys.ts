@@ -43,6 +43,14 @@ export const API_KEY_SCOPES = {
   // Write — collaboration
   'collab.propose': 'Propose collaborations',
 
+  // Solana — cross-chain ops via Circle DCW. Distinct from EVM scopes
+  // because the trust model is different (Solana cNFT mints are gas-paid
+  // by the platform, EVM mints aren't).
+  'solana.mint': 'Mint Bubblegum cNFT episodes on Solana',
+  'solana.canonize': 'Promote a Solana cNFT to canon (mints a Core asset)',
+  'solana.pay': 'Create Solana Pay payment intents',
+  'solana.bridge': 'Initiate $LOAR cross-chain transfers (custodial bridge)',
+
   // MCP relay meta-scope — inherits all non-admin scopes. Keys with this
   // scope are treated as MCP servers relaying on behalf of an end-user.
   // See docs/prd-mcp-integration.md §1.
