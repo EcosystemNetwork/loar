@@ -1,0 +1,81 @@
+name: Anchor tests
+
+# Runs the Solana program test suite on every PR that touches the Anchor
+# workspace. Spins up solana-test-validator inside the runner, deploys the
+# programs, runs the universe + episode + payment + smoke test suites.
+#
+# Gated to paths that affect the programs so unrelated PRs don't pay the
+# ~5-minute warm-up cost of building Anchor + Solana CLI.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/programs/**'
+      - '.github/workflows/anchor-tests.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/programs/**'
+      - '.github/workflows/anchor-tests.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  anchor-test:
+    name: anchor test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install repo dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Rust toolchain + cargo artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/programs
+
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Install Anchor CLI
+        run: cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+        env:
+          CARGO_TERM_COLOR: always
+
+      - name: Pin Anchor version
+        working-directory: apps/programs
+        run: |
+          avm install 0.31.1
+          avm use 0.31.1
+          anchor --version
+
+      - name: Generate program keypairs (if missing)
+        working-directory: apps/programs
+        run: |
+          mkdir -p target/deploy
+          for prog in universe episode payment; do
+            kp="target/deploy/${prog}-keypair.json"
+            if [ ! -f "$kp" ]; then
+              solana-keygen new --no-bip39-passphrase --silent --outfile "$kp"
+            fi
+          done
+
+      - name: Anchor test
+        working-directory: apps/programs
+        run: anchor test --skip-lint

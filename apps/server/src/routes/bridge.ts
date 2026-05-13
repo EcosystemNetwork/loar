@@ -21,7 +21,12 @@ import {
   isBridgeConfigured,
   quoteBridge,
 } from '../lib/wormhole-bridge';
-import { getIntent, reconcileBridge, isCustodialBridgeConfigured } from '../lib/bridge-custodial';
+import {
+  getIntent,
+  reconcileBridge,
+  isCustodialBridgeConfigured,
+  auditBridgeConfig,
+} from '../lib/bridge-custodial';
 import { db, firebaseAvailable } from '../lib/firebase';
 import { consumeRateLimit } from '../middleware/rate-limit';
 import { hasScope } from '../lib/apiKeys';
@@ -65,6 +70,21 @@ const quoteBody = z
       });
     }
   });
+
+/**
+ * Public health probe — tells the UI whether the bridge is fully configured,
+ * which backend services each direction, and what env vars are missing. Used
+ * by /bridge to surface a "partial config" banner before the user tries to
+ * submit a transfer that would 503.
+ */
+bridgeRoutes.get('/health', (c) => {
+  const audit = auditBridgeConfig();
+  return c.json({
+    custodialConfigured: isCustodialBridgeConfigured(),
+    fullyConfigured: audit.fullyConfigured,
+    missing: audit.missing,
+  });
+});
 
 bridgeRoutes.post('/quote', async (c) => {
   const parsed = quoteBody.safeParse(await c.req.json());

@@ -106,6 +106,32 @@ same Circle DCW key. v2 adds a retry endpoint + background worker.
 - Squads multisig handover before mainnet is non-negotiable —
   [solana-mainnet-runbook.md](./solana-mainnet-runbook.md) step 6.
 
+### Operational setup
+
+- **Reconciliation cron** — schedule
+  [`apps/server/scripts/bridge-reconcile.ts`](../apps/server/scripts/bridge-reconcile.ts)
+  hourly. Exits 0 on parity, 2 on drift. Pipe to pagerduty:
+
+  ```sh
+  # Crontab
+  0 * * * * cd /app && pnpm tsx apps/server/scripts/bridge-reconcile.ts || pd-trigger "bridge drift"
+  ```
+
+  Or via the `/api/bridge/reconcile` endpoint hit from a scheduled GitHub Action.
+
+- **Firestore TTL** — bridge intents accumulate forever without auto-purge.
+  In the Firebase console:
+  1. Firestore → **TTL** tab → **Add Policy**
+  2. Collection: `bridgeIntents`
+  3. Field: `expiresAt` (milliseconds-since-epoch, written automatically on every intent)
+  4. Save. Documents are deleted within 24h of their `expiresAt` time.
+
+  Default TTL is 90 days, overridable via `BRIDGE_INTENT_TTL_DAYS`.
+
+- **Boot audit** — `auditBridgeConfig()` runs at server startup and logs each
+  missing env var. The `/api/bridge/health` endpoint exposes the same data so
+  the `/bridge` UI can show a "partial config" banner.
+
 ## NTT backend (v2)
 
 When the NTT manager contracts are deployed and `WORMHOLE_NTT_MANAGER_*` env

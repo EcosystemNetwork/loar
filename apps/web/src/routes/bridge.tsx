@@ -83,15 +83,33 @@ function explorerEvmTx(hash: string): string {
   return `https://sepolia.etherscan.io/tx/${hash}`;
 }
 
+interface BridgeHealth {
+  custodialConfigured: boolean;
+  fullyConfigured: boolean;
+  missing: string[];
+}
+
 function BridgePage() {
   const [recon, setRecon] = useState<ReconRow[] | null>(null);
   const [reconError, setReconError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[] | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [health, setHealth] = useState<BridgeHealth | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      // Health — cheap probe, fires first so the banner can render.
+      try {
+        const h = await fetch(`${SERVER_URL}/api/bridge/health`);
+        if (h.ok) {
+          const j = (await h.json()) as BridgeHealth;
+          if (!cancelled) setHealth(j);
+        }
+      } catch {
+        // Health endpoint missing → fall through; banner stays hidden.
+      }
+
       // Reconciliation — public; renders even without a session.
       try {
         const r = await fetch(`${SERVER_URL}/api/bridge/reconcile`);
@@ -145,6 +163,22 @@ function BridgePage() {
       <p className="text-sm text-muted-foreground">
         Custodial lock-and-mint between Solana and Sepolia. Wormhole NTT path is the v2 target.
       </p>
+
+      {/* Config gate banner — only renders when something's actually wrong. */}
+      {health && !health.fullyConfigured && (
+        <div className="flex items-start gap-3 rounded-md border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-700" />
+          <div>
+            <p className="font-medium text-yellow-800">
+              Bridge is not fully configured on this server.
+            </p>
+            <p className="mt-1 text-xs text-yellow-700">
+              Missing env vars: {health.missing.length > 0 ? health.missing.join(', ') : 'none'}.
+              Transfers will return 503 until an operator completes the setup.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Reconciliation */}
       <Card>
