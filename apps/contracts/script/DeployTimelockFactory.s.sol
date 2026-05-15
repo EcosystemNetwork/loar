@@ -65,7 +65,7 @@ contract DeployTimelockFactoryScript is Script {
         address utdOwner = IUniverseTokenDeployerV3(universeDeployer).owner();
         require(
             utdOwner == deployer,
-            "Deployer key does not own UniverseTokenDeployerV3 — run from the owner wallet"
+            "Deployer key does not own UniverseTokenDeployerV3 - run from the owner wallet"
         );
 
         console.log("=== Deploy TimelockFactory ===");
