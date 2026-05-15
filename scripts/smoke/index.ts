@@ -46,6 +46,7 @@ import { runIndexerLayer } from './layers/indexer.ts';
 import { runAdminLayer } from './layers/admin.ts';
 import { runEditingLayer } from './layers/editing.ts';
 import { runLaunchpadLayer } from './layers/launchpad.ts';
+import { runVoiceStudioLayer } from './layers/voice-studio.ts';
 
 async function main() {
   const cfg = loadConfig();
@@ -181,6 +182,18 @@ async function main() {
     reporter.recordLayer({
       layer: 'launchpad',
       title: 'LaunchpadStaking + BondingCurve',
+      checks: result.checks,
+      skipped: false,
+    });
+  }
+
+  // ── Layer 11: voice-studio (voiceLibrary, dubbing, multilingualDub) ────────
+  if (!only || only === 'voice' || only === 'voice-studio') {
+    reporter.beginLayer('voice-studio', 'voiceLibrary + dubbing + multilingualDub');
+    const result = await runVoiceStudioLayer(cfg, jwt);
+    reporter.recordLayer({
+      layer: 'voice-studio',
+      title: 'voiceLibrary + dubbing + multilingualDub',
       checks: result.checks,
       skipped: false,
     });
