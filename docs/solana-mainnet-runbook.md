@@ -135,8 +135,11 @@ SOLANA_RPC_URL=$HELIUS_MAINNET_RPC \
   pnpm tsx apps/server/scripts/solana/create-merkle-tree.ts
 ```
 
-(The script's `maxDepth` / `maxBufferSize` constants currently hardcode
-devnet sizing — bump them for production.)
+Defaults are cluster-aware: devnet → depth=14/buffer=64/canopy=0; mainnet →
+depth=17/buffer=64/canopy=8 (~5 SOL, 131K slots). To go bigger, set
+`BUBBLEGUM_MAX_DEPTH=20 BUBBLEGUM_CANOPY_DEPTH=12` (~240 SOL, 1M slots) —
+the script enforces canopy≥12 when depth≥20 so mint txs fit under the
+1232-byte limit.
 
 Copy the tree address into:
 

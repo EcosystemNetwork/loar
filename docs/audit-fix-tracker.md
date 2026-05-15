@@ -675,17 +675,88 @@ Independent fresh pass after the sixth-pass sign-off surfaced six new issues. Al
 
 ---
 
-## Stats (2026-04-18, seventh pass)
+## Eighth Pass — 2026-05-13 Solana Hardening + Bridge Audit
 
-| Severity           |   Total |  Fixed | Partial | Operational | Not Started |
-| ------------------ | ------: | -----: | ------: | ----------: | ----------: |
-| P0 — Critical      |      15 |     14 |       0 |           1 |           0 |
-| P1 — High          |      31 |     27 |       1 |           1 |           2 |
-| P2 — Significant   |      25 |     24 |       0 |           0 |           1 |
-| P3 — Operational   |      26 |     20 |       0 |           3 |           3 |
-| P4 — Informational |      20 |     14 |       0 |           0 |           6 |
-| **Total**          | **117** | **99** |   **1** |       **5** |      **12** |
+The Solana surface (Anchor programs + custodial bridge + indexer) wasn't covered by the prior seven passes (EVM-only). This pass closes a dedicated bridge audit and a Solana-side gap audit.
 
-**Verdict**: Seventh pass surfaced and fixed 6 new contract findings (RIGHTS-03, SUB-04, AD-03, CREDIT-06, CANON-07, GOV-08) plus 4 server hardening items (gallery orphan authz, universe-hidden audit log, episode job DoS caps, indexer RPC fallback). P4 cleanup pass (2026-04-19) closed 6 informational items: SPDX normalization across `test/*.sol`, BondingCurve refund-rationale doc, AnalyticsRegistry export-event doc, trust-model admin-table completeness, CreditsPurchasedWithLoar event/state alignment verification, token-revocation persistence verification. Remaining items: BURN-01 rename upgrade, legal text (LEGAL-01/02/03), INFRA-02 rotation, AD-02 oracle, and the external audit passes.
+### Bridge — CRITICAL findings ([6f156498](https://github.com/EcosystemNetwork/loar) `fix(bridge)`)
 
-_Last updated: 2026-04-18 (seventh pass — operator pre-claim block, tier-upgrade prorate, grief-bid lockout fix, cumulative grant cap, snapshot underflow clamp, canonical symbol enforcement, server DoS caps)_
+- **[x] B1 — Pinned bridge signer wallets.** Pre-fix `getOrCreateWallet('platform_bridge_signer')` minted a fresh signer that didn't hold mint authority on either chain — first bridge mint would fail. Now requires `CIRCLE_BRIDGE_SIGNER_ID_EVM` + `CIRCLE_BRIDGE_SIGNER_ID_SOL` env vars; partial setup keeps `/api/bridge/*` at 503. Bootstrap script: `apps/server/scripts/bridge-bootstrap.ts`.
+- **[x] B2 — Per-tx + per-user-per-day amount caps.** Without these, signer mint authority could be abused to mint arbitrary destination supply. Defaults: 1M per tx / 5M per user/day. `enforceCaps()` runs **before** any chain side-effect. Daily window sums same-direction non-failed intents over last 24h.
+- **[x] B3 — Auth on `/status`.** Anyone with an intent id could read `intent.userId` (PII). Now non-owners get a stripped view (on-chain refs only).
+- **[x] B4 — Idempotency keys.** Same-request retry created two intents → two source txs → user double-spent. `BridgeTransferRequest.idempotencyKey` (8-128 chars) lets the server replay the same intent without touching the chain.
+
+### Bridge — HIGH/MEDIUM/LOW findings ([4555b6a5](https://github.com/EcosystemNetwork/loar) `fix(bridge)`)
+
+- **[x] B5** Per-user bridge rate limit (`bridge:transfer:{uid}` 5/min in addition to IP bucket).
+- **[x] B6** MCP scope enforcement (`solana.mint`/`canonize`/`pay`/`bridge` scopes; API-key callers without scope get 403; JWT/session callers always pass).
+- **[x] B7** Per-direction recipient validation (EVM `/^0x[0-9a-fA-F]{40}$/`, Solana base58 regex) before any custody/encoding step.
+- **[x] B8** Source-balance precheck via `connection.getTokenAccountBalance` (Solana) / `viem.balanceOf` (EVM); throws `INSUFFICIENT_BALANCE` → 400.
+- **[x] B9** Mobile MWA `APP_IDENTITY.icon` switched from relative `favicon.ico` → absolute `https://loar.fun/favicon.ico` (Phantom/Solflare reject relative paths).
+- **[x] B10** Checksum EVM recipient via `viem.getAddress()` before persistence + calldata encoding.
+- **[x] B11** Attestation key rotation (`ATTESTATION_PRIVATE_KEY_PREVIOUS`); `/attestation/key` returns `{ activePubKey, previousPubKeys[] }`.
+- **[x] B12** `parseUnits` errors map to 400 `INVALID_AMOUNT` (was 500).
+- **[x] B13** NTT-unwired path returns 503 `NTT_UNWIRED` (was generic 500).
+- **[x] B14** Crypto-random intent ids (`randomBytes(8).toString('hex')`, was `Math.random()`).
+- **[x] B16** Attestation reads stay public BY DESIGN — comment documents that gating defeats third-party verifiability.
+- **[x] B17** `bridgeIntents.expiresAt` field for Firestore TTL auto-purge (default 90d, configurable via `BRIDGE_INTENT_TTL_DAYS`).
+- **[x] B20** `SCALE_DIFF` generalization documented; extension path for non-9-vs-18 decimal pairs (USDC) via cached `getMint().decimals` + ERC20 `decimals()`.
+
+### Solana programs ([47321458](https://github.com/EcosystemNetwork/loar) `fix(solana)`)
+
+- **[x] SOL-PROG-01** Pause + two-step admin transfer added to `universe` + `episode` programs (mirrors `payment`). Singleton `Config` PDA gates every mutating ix. Programs upgraded on devnet, configs initialized, live mint verified.
+- **[x] SOL-PROG-02** Negative-path coverage for pause/non-admin on both programs (`apps/programs/tests/`).
+
+### Solana ops ([47321458](https://github.com/EcosystemNetwork/loar) + [c9a16819](https://github.com/EcosystemNetwork/loar))
+
+- **[x] SOL-OPS-01** Bridge global daily cap circuit breaker (`BRIDGE_MAX_GLOBAL_PER_DAY_LOAR`, default 20M).
+- **[x] SOL-OPS-02** Bridge reconciliation endpoint + script (`apps/server/scripts/bridge-reconcile.ts`) — ledger vs vault parity check, exit 2 on drift.
+- **[x] SOL-OPS-03** `$LOAR` freeze authority nulled on devnet.
+- **[x] SOL-OPS-04** `transfer-upgrade-authority.ts` print-and-verify script for moving program ownership to Squads.
+- **[x] SOL-OPS-05** `transfer-payment-ownership.ts` two-step propose/accept ownership script with `--verify` flag.
+- **[x] SOL-OPS-06** `create-loar-mint.ts` reproducible Token-2022 mint setup with `MetadataPointer` + initial supply.
+- **[x] SOL-OPS-07** `init-configs.ts` idempotent bootstrap.
+- **[x] SOL-OPS-08** Indexer `/healthz` reports webhook recency, Firestore reachability, recent failure rate; per-tx failures recorded via `allSettled`.
+- **[x] SOL-OPS-09** `/api/bridge/health` endpoint + UI banner: surfaces `fullyConfigured` + `missing[]` env vars; partial deploy shows yellow warning instead of silent 503.
+- **[x] SOL-OPS-10** `.github/workflows/anchor-tests.yml` spins `solana-test-validator` + runs anchor test suite on every PR touching `apps/programs/`.
+- **[x] SOL-OPS-11** Fail-loud env audit at boot.
+- **[x] SOL-OPS-12** Idempotent indexer + canon pre-check + rent floor + Squads persistence ([cbb4cb72](https://github.com/EcosystemNetwork/loar)).
+
+### Remaining Solana mainnet blockers (unchanged from runbook)
+
+- [ ] **SOL-AUDIT-01** External audit of the three Anchor programs (universe / episode / payment). Engage OtterSec / Neodyme / Sec3 / Halborn. 2-4 wk lead.
+- [ ] **SOL-MULTISIG-01** Squads v4 mainnet multisig — transfer program upgrade authorities off deployer EOA `7pawxCZ8…`.
+- [ ] **SOL-MULTISIG-02** Squads v4 mainnet multisig — `$LOAR` mint authority off deployer EOA.
+- [ ] **SOL-NTT-01** Wormhole NTT migration — deploy NTT manager + transceiver on Solana + Sepolia/Base. Custodial v1 stays as fallback (`wormhole-bridge.ts` auto-switches when manager addresses land).
+- [ ] **SOL-RUNBOOK-01** End-to-end runbook dry-run on a fresh devnet wallet (steps 1-9 only ever run piecemeal).
+- [ ] **SOL-RUNBOOK-02** Bridge round-trip e2e with real $ on devnet (custodial only ran one-way; `/retry` path untested).
+- [op] **SOL-OPS-13** Bridge reconciliation cron in prod — `.github/workflows/bridge-reconcile.yml` polls hourly; needs `BRIDGE_RECONCILE_URL` (+ optional `SLACK_WEBHOOK_URL`) repo secrets and workflow enabled.
+- [op] **SOL-OPS-14** Firestore TTL on `bridgeIntents.expiresAt` (one-time console setup).
+- [op] **SOL-OPS-15** Offline encrypted backup of program `.so` + `*-keypair.json` — `apps/programs/scripts/backup-keypairs.sh <gpg-recipient> [out-dir]` produces GPG tarball + SHA256; needs to be run after every mainnet `anchor build`.
+- [x] **SOL-OPS-16** iOS Solana wallet UX — `SolanaPayButton` now uses Phantom/Solflare/Backpack universal-link buttons + copy-link fallback.
+- [x] **SOL-OPS-17** `init-payment.ts` cluster branching — script reads `LOAR_MINT_MAINNET` + `SOLANA_RPC_URL_MAINNET` when `SOLANA_CLUSTER=mainnet-beta` (no more `LOAR_MINT_DEVNET=$LOAR_MINT_MAINNET` workaround).
+- [x] **SOL-OPS-18** `create-merkle-tree.ts` cluster sizing — defaults to depth=17/buffer=64/canopy=8 on mainnet (was hardcoded depth=14/canopy=0); explicit override via `BUBBLEGUM_MAX_DEPTH/BUFFER/CANOPY_DEPTH`; enforces canopy≥12 when depth≥20.
+
+---
+
+## Stats (2026-05-13, eighth pass)
+
+| Severity                 |   Total |   Fixed | Partial | Operational | Not Started |
+| ------------------------ | ------: | ------: | ------: | ----------: | ----------: |
+| P0 — Critical (EVM)      |      15 |      14 |       0 |           1 |           0 |
+| P1 — High (EVM)          |      31 |      27 |       1 |           1 |           2 |
+| P2 — Significant (EVM)   |      25 |      24 |       0 |           0 |           1 |
+| P3 — Operational (EVM)   |      26 |      20 |       0 |           3 |           3 |
+| P4 — Informational (EVM) |      20 |      14 |       0 |           0 |           6 |
+| Bridge CRIT (B1–B4)      |       4 |       4 |       0 |           0 |           0 |
+| Bridge HIGH/MED/LOW      |      13 |      13 |       0 |           0 |           0 |
+| Solana programs          |       2 |       2 |       0 |           0 |           0 |
+| Solana ops               |      15 |      12 |       0 |           3 |           0 |
+| Solana mainnet blockers  |       6 |       0 |       0 |           0 |           6 |
+| **Total**                | **157** | **130** |   **1** |       **8** |      **18** |
+
+**Verdict**: Eighth pass closed a full Solana surface that wasn't covered by passes 1–7 — bridge had four CRITICAL findings (signer-not-funded, unbounded mint, PII leak on `/status`, replay double-spend), all fixed. Universe + Episode programs now match Payment's pause+admin pattern. Indexer health surface in place. Remaining work is **operational** (Squads handoff, NTT deploy, devnet dry-run) and **external** (audit firm, EVM Pass 1+2, public contest).
+
+EVM-side blockers are unchanged from the seventh pass: BURN-01 doc rename, LEGAL-01/02/03, INFRA-02 rotation, AD-02 oracle, GOV-01 multisig handoff, TIMELOCK-01 mainnet wiring.
+
+_Last updated: 2026-05-13 (eighth pass — Solana hardening: bridge CRIT/HIGH/MED/LOW closed, universe+episode pause+admin, indexer health surface, mainnet helper scripts)_

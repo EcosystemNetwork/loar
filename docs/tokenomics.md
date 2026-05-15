@@ -2,7 +2,7 @@
 
 > **Status**: Draft scaffold for legal and economic review. All percentages marked TBD require finalization before mainnet launch.
 >
-> **Last updated**: 2026-04-17
+> **Last updated**: 2026-05-15
 >
 > **Network**: Currently deployed on Sepolia / Base Sepolia testnet. Target mainnet is **Base L2** (chain 8453).
 
@@ -17,7 +17,7 @@ $LOAR is the native utility and governance token for the LOAR platform -- a dece
 3. **Staking rewards**: Stake $LOAR globally for platform-wide fee discounts and priority access, or per-universe for pro-rata revenue share.
 4. **Premium actions**: Spend $LOAR on platform features such as priority generation queue, permanent canon entries, premium creator profiles, and remix boosts.
 
-The token is implemented as an ERC-20 with ERC-20 Permit (gasless approvals) and `ERC20Burnable` support (any holder — including the DAO treasury — can voluntarily destroy their own supply via `burn()` / `burnFrom()`). There is **no protocol-level auto-burn**: protocol fees (transfer fee, premium actions, staking penalties) route to LP + treasury, not to `address(0)`. Any supply-reducing burn is a deliberate DAO governance action on treasury holdings, not a passive side-effect of usage. See `apps/contracts/src/LoarToken.sol`.
+The token is implemented as an ERC-20 with ERC-20 Permit (gasless approvals) and `ERC20Burnable` support (any holder — including the DAO treasury — can voluntarily destroy their own supply via `burn()` / `burnFrom()`). There is **no protocol-level auto-burn** and **no fee on transfer** (the original fee-on-transfer mechanism was removed in audit fix TOKEN-02 to keep `LoarToken` compatible with downstream consumers that assume exact-amount transfers — see `apps/contracts/src/LoarToken.sol:131-135`). Protocol fees (premium actions, staking penalties) route to LP + treasury, never to `address(0)`. Any supply-reducing burn is a deliberate DAO governance action on treasury holdings, not a passive side-effect of usage.
 
 ---
 
@@ -156,14 +156,15 @@ Additionally, purchases made with $LOAR receive a 10% bonus credit on top of pac
 
 ### Transfer Fee
 
-Every $LOAR transfer (excluding mints, burns, and fee-exempt addresses) incurs a small transfer fee routed to the liquidity pool:
+> **Removed (TOKEN-02)**: The original fee-on-transfer mechanism on `LoarToken` was removed during the contract audit pass. Earlier drafts of this doc described a per-transfer LP fee — that no longer exists. `LoarToken._update` now only enforces the protocol-level `whenNotPaused` guard; transfers move the exact `amount` requested with no skim. Downstream contracts (PaymentRouter, LaunchpadStaking, LoarBurner) all assume exact-amount transfers, so reintroducing fee-on-transfer would silently break revenue routing.
 
-- **Default fee**: 0.01% (1 bps)
-- **Hard cap**: 5% (500 bps / MAX_TRANSFER_FEE_BPS)
-- **Rate limit on increases**: Maximum +0.1% per change, with 1-day cooldown between changes
-- **Exempt addresses**: Treasury, liquidity pool, minters, and any address marked `feeExempt` by the owner
+Liquidity is grown via:
 
-This fee deepens protocol-owned liquidity over time without destroying supply.
+- The 50% LP routing on premium actions (see §7 LoarBurner).
+- The 50% LP routing on early-unstake penalties (see §8 LaunchpadStaking).
+- Protocol-owned liquidity from the per-universe bonding-curve graduations.
+
+There is **no skim on $LOAR transfers**.
 
 ### Revenue Streams Summary
 
@@ -211,7 +212,9 @@ $LOAR is distributed as rewards for platform engagement:
 
 ## 7. LoarBurner: Premium Action Fees
 
-The `LoarBurner` contract (`apps/contracts/src/revenue/LoarBurner.sol`) collects $LOAR for premium platform actions. Despite the name, **no tokens are destroyed** -- all collected $LOAR is redistributed within the ecosystem.
+> **Naming caveat (BURN-01)**: The contract is called `LoarBurner` for legacy reasons, but it is **not** a burner. **No tokens are destroyed.** All collected $LOAR is split between the LP and the treasury (see Revenue Split below) — this is a fee-collection contract, not a deflationary mechanism. A rename to `PremiumActions` is planned for the post-launch UUPS upgrade. Until then, treat marketing/communications language carefully: do not describe `LoarBurner` activity as a burn or as deflationary.
+
+The `LoarBurner` contract (`apps/contracts/src/revenue/LoarBurner.sol`) collects $LOAR for premium platform actions. All collected $LOAR is redistributed within the ecosystem; see `LoarBurner.sol:12-19` for the in-contract WARNING header.
 
 ### Premium Actions
 
@@ -273,16 +276,15 @@ Revenue share is proportional to your stake relative to total universe stake.
 
 ## 9. Token Utility Summary
 
-| Utility                   | Mechanism                                                                   | Contract                                 |
-| ------------------------- | --------------------------------------------------------------------------- | ---------------------------------------- |
-| AI generation credits     | Pay with $LOAR at 25% margin (vs 35% for fiat/ETH) + 10% bonus credits      | CreditManager                            |
-| Governance voting         | Universe token holders vote on canon, content direction                     | GovernorFactory-deployed governors       |
-| Platform fee discount     | $LOAR payments receive configurable bps discount on PaymentRouter fees      | PaymentRouter                            |
-| Staking: global tiers     | Stake $LOAR for fee discounts, priority queue, weight multipliers           | LaunchpadStaking                         |
-| Staking: universe revenue | Stake into specific universes for pro-rata revenue share                    | LaunchpadStaking                         |
-| Premium actions           | Spend $LOAR on priority generation, permanent canon, profiles, boosts       | LoarBurner                               |
-| LP yield                  | Provide liquidity in Uniswap v4 pools, earn trading fees via hook mechanism | LoarHookStaticFee + LoarLpLockerMultiple |
-| Transfer fee to LP        | 0.01% of all non-exempt transfers routed to liquidity pool                  | LoarToken                                |
+| Utility                   | Mechanism                                                                                     | Contract                                 |
+| ------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| AI generation credits     | Pay with $LOAR at 25% margin (vs 35% for fiat/ETH) + 10% bonus credits                        | CreditManager                            |
+| Governance voting         | Universe token holders vote on canon, content direction                                       | GovernorFactory-deployed governors       |
+| Platform fee discount     | $LOAR payments receive configurable bps discount on PaymentRouter fees                        | PaymentRouter                            |
+| Staking: global tiers     | Stake $LOAR for fee discounts, priority queue, weight multipliers                             | LaunchpadStaking                         |
+| Staking: universe revenue | Stake into specific universes for pro-rata revenue share                                      | LaunchpadStaking                         |
+| Premium actions           | Spend $LOAR on priority generation, permanent canon, profiles, boosts (collected, not burned) | LoarBurner                               |
+| LP yield                  | Provide liquidity in Uniswap v4 pools, earn trading fees via hook mechanism                   | LoarHookStaticFee + LoarLpLockerMultiple |
 
 ---
 
@@ -293,7 +295,7 @@ Revenue share is proportional to your stake relative to total universe stake.
 - $LOAR is deployed on **Sepolia** and **Base Sepolia** testnets
 - All token amounts are test tokens with no monetary value
 - Contract addresses are listed in `docs/security.md`
-- Smart contract test coverage is at 3.65% (see launch audit findings)
+- Smart contract test coverage has expanded considerably since the original 3.65% launch-audit baseline (130/157 audit findings closed across 8 passes; see `docs/audit-fix-tracker.md`). Refresh the exact coverage number with `forge coverage --report summary` before publishing.
 
 ### Mainnet Migration (Base L2)
 
@@ -313,12 +315,12 @@ Before mainnet deployment:
 
 ## Appendix: Contract References
 
-| Contract                | Path                                              | Role                                       |
-| ----------------------- | ------------------------------------------------- | ------------------------------------------ |
-| LoarToken               | `apps/contracts/src/LoarToken.sol`                | $LOAR ERC-20 token                         |
-| PaymentRouter           | `apps/contracts/src/PaymentRouter.sol`            | Revenue routing and fee splits             |
-| CreditManager           | `apps/contracts/src/revenue/CreditManager.sol`    | AI generation credit system                |
-| LoarBurner              | `apps/contracts/src/revenue/LoarBurner.sol`       | Premium action fee collection              |
-| LaunchpadStaking        | `apps/contracts/src/revenue/LaunchpadStaking.sol` | Dual staking (global + per-universe)       |
-| TokenVesting            | `apps/contracts/src/TokenVesting.sol`             | Linear vesting with cliff                  |
-| UniverseTokenDeployerV3 | `apps/contracts/src/UniverseTokenDeployerV3.sol`  | Per-universe token + governance deployment |
+| Contract                | Path                                              | Role                                                               |
+| ----------------------- | ------------------------------------------------- | ------------------------------------------------------------------ |
+| LoarToken               | `apps/contracts/src/LoarToken.sol`                | $LOAR ERC-20 token                                                 |
+| PaymentRouter           | `apps/contracts/src/PaymentRouter.sol`            | Revenue routing and fee splits                                     |
+| CreditManager           | `apps/contracts/src/revenue/CreditManager.sol`    | AI generation credit system                                        |
+| LoarBurner              | `apps/contracts/src/revenue/LoarBurner.sol`       | Premium action fee collection (NOT a burn — see §7 BURN-01 caveat) |
+| LaunchpadStaking        | `apps/contracts/src/revenue/LaunchpadStaking.sol` | Dual staking (global + per-universe)                               |
+| TokenVesting            | `apps/contracts/src/TokenVesting.sol`             | Linear vesting with cliff                                          |
+| UniverseTokenDeployerV3 | `apps/contracts/src/UniverseTokenDeployerV3.sol`  | Per-universe token + governance deployment                         |

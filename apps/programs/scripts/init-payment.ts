@@ -12,8 +12,12 @@
  *   pnpm tsx apps/programs/scripts/init-payment.ts [--no-lock]
  *
  * Env:
- *   SOLANA_RPC_URL_DEVNET        Helius/Alchemy/etc devnet RPC
- *   LOAR_MINT_DEVNET             $LOAR Token-2022 mint
+ *   SOLANA_CLUSTER               'mainnet-beta' | 'devnet' (default: 'devnet')
+ *   SOLANA_RPC_URL_DEVNET        devnet RPC (used when SOLANA_CLUSTER=devnet)
+ *   SOLANA_RPC_URL_MAINNET       mainnet RPC (used when SOLANA_CLUSTER=mainnet-beta)
+ *   SOLANA_RPC_URL               fallback for either cluster
+ *   LOAR_MINT_DEVNET             $LOAR mint (used when SOLANA_CLUSTER=devnet)
+ *   LOAR_MINT_MAINNET            $LOAR mint (used when SOLANA_CLUSTER=mainnet-beta)
  *   PAYMENT_TREASURY             treasury wallet (defaults to deployer keypair)
  *   DEFAULT_FEE_BPS              optional, defaults to 500 (5%)
  *   ANCHOR_WALLET                path to deployer keypair JSON
@@ -38,11 +42,28 @@ function loadKeypair(path: string): Keypair {
 }
 
 async function main() {
-  const rpcUrl = process.env.SOLANA_RPC_URL_DEVNET || process.env.SOLANA_RPC_URL;
-  if (!rpcUrl) throw new Error('SOLANA_RPC_URL_DEVNET or SOLANA_RPC_URL is required');
+  const cluster = process.env.SOLANA_CLUSTER ?? 'devnet';
+  const isMainnet = cluster === 'mainnet-beta';
 
-  const loarMint = process.env.LOAR_MINT_DEVNET;
-  if (!loarMint) throw new Error('LOAR_MINT_DEVNET is required');
+  const rpcUrl = isMainnet
+    ? process.env.SOLANA_RPC_URL_MAINNET || process.env.SOLANA_RPC_URL
+    : process.env.SOLANA_RPC_URL_DEVNET || process.env.SOLANA_RPC_URL;
+  if (!rpcUrl) {
+    throw new Error(
+      isMainnet
+        ? 'SOLANA_RPC_URL_MAINNET or SOLANA_RPC_URL is required'
+        : 'SOLANA_RPC_URL_DEVNET or SOLANA_RPC_URL is required'
+    );
+  }
+
+  const loarMint = isMainnet ? process.env.LOAR_MINT_MAINNET : process.env.LOAR_MINT_DEVNET;
+  if (!loarMint) {
+    throw new Error(
+      isMainnet
+        ? 'LOAR_MINT_MAINNET is required when SOLANA_CLUSTER=mainnet-beta'
+        : 'LOAR_MINT_DEVNET is required'
+    );
+  }
 
   const walletPath = process.env.ANCHOR_WALLET ?? '~/.config/solana/id.json';
   const deployerKp = loadKeypair(walletPath);
@@ -67,6 +88,7 @@ async function main() {
   const [solVaultPda] = PublicKey.findProgramAddressSync([Buffer.from('sol_vault')], programId);
   const [loarVaultPda] = PublicKey.findProgramAddressSync([Buffer.from('loar_vault')], programId);
 
+  console.log(`Cluster:    ${cluster}`);
   console.log(`RPC:        ${rpcUrl}`);
   console.log(`Program:    ${programId.toBase58()}`);
   console.log(`Deployer:   ${deployerKp.publicKey.toBase58()}`);
