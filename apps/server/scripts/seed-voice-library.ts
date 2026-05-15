@@ -24,20 +24,35 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
-if (!process.env.ELEVENLABS_API_KEY) {
+const DRY_RUN = process.argv.includes('--dry-run');
+const FORCE = process.argv.includes('--force'); // re-mint even entries that already have voiceId
+
+// Live runs hit the ElevenLabs API; dry runs do not. We still load creds for
+// dry runs when present, but missing creds in dry-run mode is fine — it's the
+// "what would happen" preview useful in CI / pre-deploy validation.
+if (!DRY_RUN && !process.env.ELEVENLABS_API_KEY) {
   console.error('ELEVENLABS_API_KEY not set in env. Aborting.');
   process.exit(1);
 }
 
+const { initFirebase } = await import('../src/lib/firebase.js');
+initFirebase();
+// Re-import after init so the module-level `db` reflects the initialized
+// Firestore instance (the export is mutated by initFirebase).
 const { db } = await import('../src/lib/firebase.js');
 const { elevenLabsService } = await import('../src/services/elevenlabs.js');
 const { firebaseStorageService } = await import('../src/services/firebase-storage.js');
 const { VOICE_LIBRARY_SEED } = await import('../src/data/voice-library-seed.js');
 
-const DRY_RUN = process.argv.includes('--dry-run');
-const FORCE = process.argv.includes('--force'); // re-mint even entries that already have voiceId
+if (!db) {
+  if (!DRY_RUN) {
+    console.error('Firebase not configured (no service account). Aborting.');
+    process.exit(1);
+  }
+  console.warn('Firebase not configured — running dry-run in offline mode (no existence checks).');
+}
 
-const col = db.collection('voiceLibrary');
+const col = db ? db.collection('voiceLibrary') : null;
 
 let minted = 0;
 let skipped = 0;
@@ -49,14 +64,19 @@ console.log(
 
 for (const entry of VOICE_LIBRARY_SEED) {
   try {
-    const docRef = col.doc(entry.slug);
-    const existing = await docRef.get();
-    if (!FORCE && existing.exists && (existing.data() as { voiceId?: string }).voiceId) {
-      console.log(
-        `  ✓ skip ${entry.slug} (already minted: ${(existing.data() as { voiceId: string }).voiceId})`
-      );
-      skipped++;
-      continue;
+    // Existence check is only possible when Firestore is reachable. Offline
+    // dry-runs treat every entry as "would mint" — fine since we're not
+    // actually writing anything.
+    const docRef = col ? col.doc(entry.slug) : null;
+    if (docRef) {
+      const existing = await docRef.get();
+      if (!FORCE && existing.exists && (existing.data() as { voiceId?: string }).voiceId) {
+        console.log(
+          `  ✓ skip ${entry.slug} (already minted: ${(existing.data() as { voiceId: string }).voiceId})`
+        );
+        skipped++;
+        continue;
+      }
     }
 
     console.log(`  → mint ${entry.slug} (${entry.category}/${entry.gender}/${entry.age})`);
@@ -64,6 +84,11 @@ for (const entry of VOICE_LIBRARY_SEED) {
     if (DRY_RUN) {
       minted++;
       continue;
+    }
+    if (!docRef) {
+      // Unreachable: we hard-exit above when !db && !DRY_RUN, but TS doesn't
+      // know that. Keep the guard so a future code edit doesn't silently NPE.
+      throw new Error('Firestore unavailable for live seed');
     }
 
     const result = await elevenLabsService.designVoice({
