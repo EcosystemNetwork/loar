@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { trpcClient } from '@/utils/trpc';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, CheckCircle2, Film, Play } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, Film, Play, Mic2 } from 'lucide-react';
 
 export const Route = createFileRoute('/episode/$id')({
   component: EpisodePlayer,
@@ -200,6 +200,25 @@ function EpisodePlayer() {
                 {episode.description}
               </p>
             )}
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link
+                to="/lab/voice-studio"
+                search={{ episodeId: id, tab: 'script' as const }}
+                className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium hover:bg-white/10"
+              >
+                <Mic2 className="h-3.5 w-3.5" />
+                Open in Voice Studio
+              </Link>
+              <Link
+                to="/lab/voice-studio"
+                search={{ episodeId: id, tab: 'multilingual' as const }}
+                className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium hover:bg-white/10"
+              >
+                <Film className="h-3.5 w-3.5" />
+                Dub to other languages
+              </Link>
+            </div>
           </div>
 
           {/* Clip list */}
