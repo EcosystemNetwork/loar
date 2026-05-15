@@ -18,7 +18,6 @@ import { Route as StudioControlledRouteImport } from './routes/studio-controlled
 import { Route as StudioRouteImport } from './routes/studio'
 import { Route as StatusRouteImport } from './routes/status'
 import { Route as SolanaRouteImport } from './routes/solana'
-import { Route as BridgeRouteImport } from './routes/bridge'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SandboxRouteImport } from './routes/sandbox'
 import { Route as RelightRouteImport } from './routes/relight'
@@ -41,6 +40,7 @@ import { Route as CounterNoticeRouteImport } from './routes/counter-notice'
 import { Route as ComingSoonRouteImport } from './routes/coming-soon'
 import { Route as CinematicUniverseCreateRouteImport } from './routes/cinematicUniverseCreate'
 import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as BridgeRouteImport } from './routes/bridge'
 import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WikiIndexRouteImport } from './routes/wiki/index'
@@ -68,6 +68,7 @@ import { Route as OauthSiweRouteImport } from './routes/oauth/siwe'
 import { Route as NotebookIdRouteImport } from './routes/notebook.$id'
 import { Route as LineageAssetIdRouteImport } from './routes/lineage.$assetId'
 import { Route as LabZaiRouteImport } from './routes/lab.zai'
+import { Route as LabVoiceStudioRouteImport } from './routes/lab.voice-studio'
 import { Route as GovernanceUniverseIdRouteImport } from './routes/governance/$universeId'
 import { Route as ExtractJobIdRouteImport } from './routes/extract.$jobId'
 import { Route as EpisodeIdRouteImport } from './routes/episode.$id'
@@ -144,11 +145,6 @@ const StatusRoute = StatusRouteImport.update({
 const SolanaRoute = SolanaRouteImport.update({
   id: '/solana',
   path: '/solana',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BridgeRoute = BridgeRouteImport.update({
-  id: '/bridge',
-  path: '/bridge',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SearchRoute = SearchRouteImport.update({
@@ -259,6 +255,11 @@ const CinematicUniverseCreateRoute = CinematicUniverseCreateRouteImport.update({
 const CheckoutRoute = CheckoutRouteImport.update({
   id: '/checkout',
   path: '/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BridgeRoute = BridgeRouteImport.update({
+  id: '/bridge',
+  path: '/bridge',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ActivityRoute = ActivityRouteImport.update({
@@ -394,6 +395,11 @@ const LineageAssetIdRoute = LineageAssetIdRouteImport.update({
 const LabZaiRoute = LabZaiRouteImport.update({
   id: '/lab/zai',
   path: '/lab/zai',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LabVoiceStudioRoute = LabVoiceStudioRouteImport.update({
+  id: '/lab/voice-studio',
+  path: '/lab/voice-studio',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GovernanceUniverseIdRoute = GovernanceUniverseIdRouteImport.update({
@@ -560,6 +566,7 @@ const LabZaiVideoJobIdRoute = LabZaiVideoJobIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/bridge': typeof BridgeRoute
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/coming-soon': typeof ComingSoonRoute
@@ -582,7 +589,6 @@ export interface FileRoutesByFullPath {
   '/relight': typeof RelightRoute
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
-  '/bridge': typeof BridgeRoute
   '/solana': typeof SolanaRoute
   '/status': typeof StatusRoute
   '/studio': typeof StudioRouteWithChildren
@@ -608,6 +614,7 @@ export interface FileRoutesByFullPath {
   '/episode/$id': typeof EpisodeIdRoute
   '/extract/$jobId': typeof ExtractJobIdRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
+  '/lab/voice-studio': typeof LabVoiceStudioRoute
   '/lab/zai': typeof LabZaiRouteWithChildren
   '/lineage/$assetId': typeof LineageAssetIdRoute
   '/notebook/$id': typeof NotebookIdRoute
@@ -653,6 +660,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/bridge': typeof BridgeRoute
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/coming-soon': typeof ComingSoonRoute
@@ -675,7 +683,6 @@ export interface FileRoutesByTo {
   '/relight': typeof RelightRoute
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
-  '/bridge': typeof BridgeRoute
   '/solana': typeof SolanaRoute
   '/status': typeof StatusRoute
   '/studio': typeof StudioRouteWithChildren
@@ -701,6 +708,7 @@ export interface FileRoutesByTo {
   '/episode/$id': typeof EpisodeIdRoute
   '/extract/$jobId': typeof ExtractJobIdRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
+  '/lab/voice-studio': typeof LabVoiceStudioRoute
   '/lab/zai': typeof LabZaiRouteWithChildren
   '/lineage/$assetId': typeof LineageAssetIdRoute
   '/notebook/$id': typeof NotebookIdRoute
@@ -747,6 +755,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/bridge': typeof BridgeRoute
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/coming-soon': typeof ComingSoonRoute
@@ -769,7 +778,6 @@ export interface FileRoutesById {
   '/relight': typeof RelightRoute
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
-  '/bridge': typeof BridgeRoute
   '/solana': typeof SolanaRoute
   '/status': typeof StatusRoute
   '/studio': typeof StudioRouteWithChildren
@@ -795,6 +803,7 @@ export interface FileRoutesById {
   '/episode/$id': typeof EpisodeIdRoute
   '/extract/$jobId': typeof ExtractJobIdRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
+  '/lab/voice-studio': typeof LabVoiceStudioRoute
   '/lab/zai': typeof LabZaiRouteWithChildren
   '/lineage/$assetId': typeof LineageAssetIdRoute
   '/notebook/$id': typeof NotebookIdRoute
@@ -842,6 +851,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/activity'
+    | '/bridge'
     | '/checkout'
     | '/cinematicUniverseCreate'
     | '/coming-soon'
@@ -889,6 +899,7 @@ export interface FileRouteTypes {
     | '/episode/$id'
     | '/extract/$jobId'
     | '/governance/$universeId'
+    | '/lab/voice-studio'
     | '/lab/zai'
     | '/lineage/$assetId'
     | '/notebook/$id'
@@ -934,6 +945,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/activity'
+    | '/bridge'
     | '/checkout'
     | '/cinematicUniverseCreate'
     | '/coming-soon'
@@ -981,6 +993,7 @@ export interface FileRouteTypes {
     | '/episode/$id'
     | '/extract/$jobId'
     | '/governance/$universeId'
+    | '/lab/voice-studio'
     | '/lab/zai'
     | '/lineage/$assetId'
     | '/notebook/$id'
@@ -1026,6 +1039,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/activity'
+    | '/bridge'
     | '/checkout'
     | '/cinematicUniverseCreate'
     | '/coming-soon'
@@ -1073,6 +1087,7 @@ export interface FileRouteTypes {
     | '/episode/$id'
     | '/extract/$jobId'
     | '/governance/$universeId'
+    | '/lab/voice-studio'
     | '/lab/zai'
     | '/lineage/$assetId'
     | '/notebook/$id'
@@ -1119,6 +1134,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActivityRoute: typeof ActivityRoute
+  BridgeRoute: typeof BridgeRoute
   CheckoutRoute: typeof CheckoutRoute
   CinematicUniverseCreateRoute: typeof CinematicUniverseCreateRoute
   ComingSoonRoute: typeof ComingSoonRoute
@@ -1141,7 +1157,6 @@ export interface RootRouteChildren {
   RelightRoute: typeof RelightRoute
   SandboxRoute: typeof SandboxRoute
   SearchRoute: typeof SearchRoute
-  BridgeRoute: typeof BridgeRoute
   SolanaRoute: typeof SolanaRoute
   StatusRoute: typeof StatusRoute
   StudioRoute: typeof StudioRouteWithChildren
@@ -1166,6 +1181,7 @@ export interface RootRouteChildren {
   EpisodeIdRoute: typeof EpisodeIdRoute
   ExtractJobIdRoute: typeof ExtractJobIdRoute
   GovernanceUniverseIdRoute: typeof GovernanceUniverseIdRoute
+  LabVoiceStudioRoute: typeof LabVoiceStudioRoute
   LabZaiRoute: typeof LabZaiRouteWithChildren
   LineageAssetIdRoute: typeof LineageAssetIdRoute
   OauthSiweRoute: typeof OauthSiweRoute
@@ -1254,13 +1270,6 @@ declare module '@tanstack/react-router' {
       path: '/status'
       fullPath: '/status'
       preLoaderRoute: typeof StatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/bridge': {
-      id: '/bridge'
-      path: '/bridge'
-      fullPath: '/bridge'
-      preLoaderRoute: typeof BridgeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/solana': {
@@ -1422,6 +1431,13 @@ declare module '@tanstack/react-router' {
       path: '/checkout'
       fullPath: '/checkout'
       preLoaderRoute: typeof CheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bridge': {
+      id: '/bridge'
+      path: '/bridge'
+      fullPath: '/bridge'
+      preLoaderRoute: typeof BridgeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/activity': {
@@ -1611,6 +1627,13 @@ declare module '@tanstack/react-router' {
       path: '/lab/zai'
       fullPath: '/lab/zai'
       preLoaderRoute: typeof LabZaiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lab/voice-studio': {
+      id: '/lab/voice-studio'
+      path: '/lab/voice-studio'
+      fullPath: '/lab/voice-studio'
+      preLoaderRoute: typeof LabVoiceStudioRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/governance/$universeId': {
@@ -1915,6 +1938,7 @@ const UniverseIdRouteWithChildren = UniverseIdRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivityRoute: ActivityRoute,
+  BridgeRoute: BridgeRoute,
   CheckoutRoute: CheckoutRoute,
   CinematicUniverseCreateRoute: CinematicUniverseCreateRoute,
   ComingSoonRoute: ComingSoonRoute,
@@ -1937,7 +1961,6 @@ const rootRouteChildren: RootRouteChildren = {
   RelightRoute: RelightRoute,
   SandboxRoute: SandboxRoute,
   SearchRoute: SearchRoute,
-  BridgeRoute: BridgeRoute,
   SolanaRoute: SolanaRoute,
   StatusRoute: StatusRoute,
   StudioRoute: StudioRouteWithChildren,
@@ -1962,6 +1985,7 @@ const rootRouteChildren: RootRouteChildren = {
   EpisodeIdRoute: EpisodeIdRoute,
   ExtractJobIdRoute: ExtractJobIdRoute,
   GovernanceUniverseIdRoute: GovernanceUniverseIdRoute,
+  LabVoiceStudioRoute: LabVoiceStudioRoute,
   LabZaiRoute: LabZaiRouteWithChildren,
   LineageAssetIdRoute: LineageAssetIdRoute,
   OauthSiweRoute: OauthSiweRoute,

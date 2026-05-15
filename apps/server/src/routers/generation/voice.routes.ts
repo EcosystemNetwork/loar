@@ -688,6 +688,13 @@ export const voiceRouter = router({
         name: z.string().min(1).max(100),
         description: z.string().optional(),
         audioUrls: z.array(z.string().url()).min(1).max(25),
+        // Voice Studio: when true, the cloned voice is registered into
+        // `userVoices/{uid}/voices` so it shows up in My Voices. Default true
+        // — existing callers (pre-Voice-Studio) get the better behavior for free.
+        saveToMyVoices: z.boolean().default(true),
+        // Optional: render a short TTS preview using the new clone and
+        // attach the URL to the user-voices entry.
+        previewText: z.string().max(280).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -744,12 +751,57 @@ export const voiceRouter = router({
           completedAt: new Date(),
         });
 
+        // ── Voice Studio: register clone in userVoices + render preview ─────
+        // Best-effort — failures here MUST NOT fail the clone (credits are
+        // already charged and the ElevenLabs voice already exists).
+        let myVoiceId: string | undefined;
+        let previewUrl: string | undefined;
+        if (input.saveToMyVoices) {
+          try {
+            if (input.previewText) {
+              const tts = await elevenLabsService.textToSpeech({
+                text: input.previewText,
+                voiceId: result.voiceId,
+                modelId: 'eleven_flash_v2_5',
+              });
+              previewUrl = await uploadAudio(
+                tts.audioBuffer,
+                tts.contentType,
+                `voice-previews/${ctx.user.uid}/${genId}.mp3`
+              );
+            }
+            myVoiceId = randomUUID();
+            await db
+              .collection('userVoices')
+              .doc(ctx.user.uid)
+              .collection('voices')
+              .doc(myVoiceId)
+              .set({
+                id: myVoiceId,
+                userId: ctx.user.uid,
+                source: 'clone',
+                voiceId: result.voiceId,
+                name: input.name,
+                description: input.description ?? null,
+                tags: [],
+                previewUrl: previewUrl ?? null,
+                sourceSampleUrls: input.audioUrls,
+                cloneGenerationId: genId,
+                createdAt: new Date(),
+              });
+          } catch (regErr) {
+            console.error('cloneVoice: userVoices registration failed:', regErr);
+          }
+        }
+
         return {
           generationId: genId,
           status: 'completed' as const,
           voiceId: result.voiceId,
           name: result.name,
           creditsCharged: credits,
+          myVoiceId,
+          previewUrl,
         };
       } catch (error) {
         await refundCredits(ctx.user.uid, credits, genId);

@@ -93,6 +93,81 @@ export interface ElevenLabsVoice {
   available_for_tiers?: string[];
 }
 
+export interface DubbingCreateOptions {
+  /** Public URL of the source audio/video. ElevenLabs fetches it server-side. */
+  sourceUrl?: string;
+  /** Inline file upload (mutually exclusive with sourceUrl). */
+  file?: { buffer: Buffer; filename: string; contentType: string };
+  /** ISO 639-1 source language code. If omitted, ElevenLabs detects. */
+  sourceLang?: string;
+  /** ISO 639-1 target language code (e.g., "es", "ja"). */
+  targetLang: string;
+  /** Display name for the dubbing project. */
+  name?: string;
+  /** Number of distinct speakers in the source (improves diarization). */
+  numSpeakers?: number;
+  /** Whether to watermark output (free tier may force true). */
+  watermark?: boolean;
+  /** Start time in seconds (clip a region of the source). */
+  startTime?: number;
+  /** End time in seconds. */
+  endTime?: number;
+  /** Render output as video (true) or audio-only (false). */
+  highestResolution?: boolean;
+  /** BYOK override. */
+  apiKey?: string;
+}
+
+export interface DubbingCreateResult {
+  dubbingId: string;
+  expectedDurationSec?: number;
+}
+
+export interface DubbingStatus {
+  dubbingId: string;
+  status: 'dubbing' | 'dubbed' | 'failed';
+  targetLanguages?: string[];
+  error?: string;
+}
+
+export interface ForcedAlignmentWord {
+  word: string;
+  start: number; // seconds
+  end: number; // seconds
+}
+
+export interface ForcedAlignmentResult {
+  words: ForcedAlignmentWord[];
+  characters?: Array<{ char: string; start: number; end: number }>;
+  loss?: number;
+}
+
+export interface ScribeOptions {
+  audioBuffer: Buffer;
+  contentType?: string; // e.g., 'audio/mpeg', 'audio/wav'
+  modelId?: 'scribe_v1';
+  languageCode?: string; // ISO 639-1 hint
+  diarize?: boolean;
+  numSpeakers?: number;
+  tagAudioEvents?: boolean;
+  apiKey?: string;
+}
+
+export interface ScribeWord {
+  text: string;
+  start: number;
+  end: number;
+  type?: 'word' | 'spacing' | 'audio_event';
+  speakerId?: string;
+}
+
+export interface ScribeResult {
+  text: string;
+  languageCode?: string;
+  languageProbability?: number;
+  words: ScribeWord[];
+}
+
 export interface TTSResult {
   audioBuffer: Buffer;
   contentType: string;
@@ -342,6 +417,217 @@ class ElevenLabsService {
 
     const data = await response.json();
     return { voiceId: data.voice_id, name: options.name };
+  }
+
+  // ── Dubbing (multilingual translation of audio/video) ────────────────
+
+  async dubbing(options: DubbingCreateOptions): Promise<DubbingCreateResult> {
+    const apiKey = this.resolveKey(options.apiKey);
+
+    if (!options.sourceUrl && !options.file) {
+      throw new Error('dubbing requires either sourceUrl or file');
+    }
+
+    const formData = new FormData();
+    if (options.sourceUrl) formData.append('source_url', options.sourceUrl);
+    if (options.file) {
+      formData.append(
+        'file',
+        new Blob([new Uint8Array(options.file.buffer)], { type: options.file.contentType }),
+        options.file.filename
+      );
+    }
+    formData.append('target_lang', options.targetLang);
+    if (options.sourceLang) formData.append('source_lang', options.sourceLang);
+    if (options.name) formData.append('name', options.name);
+    if (options.numSpeakers !== undefined)
+      formData.append('num_speakers', String(options.numSpeakers));
+    if (options.watermark !== undefined) formData.append('watermark', String(options.watermark));
+    if (options.startTime !== undefined) formData.append('start_time', String(options.startTime));
+    if (options.endTime !== undefined) formData.append('end_time', String(options.endTime));
+    if (options.highestResolution !== undefined)
+      formData.append('highest_resolution', String(options.highestResolution));
+
+    const response = await fetch(`${BASE_URL}/dubbing`, {
+      method: 'POST',
+      headers: { 'xi-api-key': apiKey },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => response.statusText);
+      throw new Error(`ElevenLabs dubbing create error ${response.status}: ${text}`);
+    }
+
+    const data = await response.json();
+    return {
+      dubbingId: data.dubbing_id,
+      expectedDurationSec: data.expected_duration_sec,
+    };
+  }
+
+  async getDubbingStatus(dubbingId: string, apiKey?: string): Promise<DubbingStatus> {
+    const key = this.resolveKey(apiKey);
+    const response = await fetch(`${BASE_URL}/dubbing/${dubbingId}`, {
+      headers: { 'xi-api-key': key },
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => response.statusText);
+      throw new Error(`ElevenLabs dubbing status error ${response.status}: ${text}`);
+    }
+
+    const data = await response.json();
+    return {
+      dubbingId: data.dubbing_id,
+      status: data.status,
+      targetLanguages: data.target_languages,
+      error: data.error,
+    };
+  }
+
+  async getDubbingAudio(
+    dubbingId: string,
+    langCode: string,
+    apiKey?: string
+  ): Promise<{ buffer: Buffer; contentType: string }> {
+    const key = this.resolveKey(apiKey);
+    const response = await fetch(`${BASE_URL}/dubbing/${dubbingId}/audio/${langCode}`, {
+      headers: { 'xi-api-key': key },
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => response.statusText);
+      throw new Error(`ElevenLabs dubbing audio fetch error ${response.status}: ${text}`);
+    }
+
+    const contentType = response.headers.get('content-type') || 'audio/mpeg';
+    const arrayBuffer = await response.arrayBuffer();
+    return { buffer: Buffer.from(arrayBuffer), contentType };
+  }
+
+  async getDubbingVideo(
+    dubbingId: string,
+    langCode: string,
+    apiKey?: string
+  ): Promise<{ buffer: Buffer; contentType: string }> {
+    const key = this.resolveKey(apiKey);
+    const response = await fetch(`${BASE_URL}/dubbing/${dubbingId}/video/${langCode}`, {
+      headers: { 'xi-api-key': key },
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => response.statusText);
+      throw new Error(`ElevenLabs dubbing video fetch error ${response.status}: ${text}`);
+    }
+
+    const contentType = response.headers.get('content-type') || 'video/mp4';
+    const arrayBuffer = await response.arrayBuffer();
+    return { buffer: Buffer.from(arrayBuffer), contentType };
+  }
+
+  // ── Forced Alignment (per-word/char timestamps for a known transcript) ─
+
+  async forcedAlignment(
+    audioBuffer: Buffer,
+    text: string,
+    options: { contentType?: string; apiKey?: string } = {}
+  ): Promise<ForcedAlignmentResult> {
+    const apiKey = this.resolveKey(options.apiKey);
+    const contentType = options.contentType || 'audio/mpeg';
+
+    const formData = new FormData();
+    formData.append(
+      'file',
+      new Blob([new Uint8Array(audioBuffer)], { type: contentType }),
+      'audio'
+    );
+    formData.append('text', text);
+
+    const response = await fetch(`${BASE_URL}/forced-alignment`, {
+      method: 'POST',
+      headers: { 'xi-api-key': apiKey },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => response.statusText);
+      throw new Error(`ElevenLabs forced alignment error ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json();
+    return {
+      words: (data.words || []).map(
+        (w: { text?: string; word?: string; start: number; end: number }) => ({
+          word: w.text ?? w.word ?? '',
+          start: w.start,
+          end: w.end,
+        })
+      ),
+      characters: data.characters,
+      loss: data.loss,
+    };
+  }
+
+  // ── Scribe (Speech-to-Text) — v1.1 video-first dub source ─────────────
+
+  async scribe(options: ScribeOptions): Promise<ScribeResult> {
+    const apiKey = this.resolveKey(options.apiKey);
+    const {
+      audioBuffer,
+      contentType = 'audio/mpeg',
+      modelId = 'scribe_v1',
+      languageCode,
+      diarize = false,
+      numSpeakers,
+      tagAudioEvents = false,
+    } = options;
+
+    const formData = new FormData();
+    formData.append(
+      'file',
+      new Blob([new Uint8Array(audioBuffer)], { type: contentType }),
+      'audio'
+    );
+    formData.append('model_id', modelId);
+    if (languageCode) formData.append('language_code', languageCode);
+    formData.append('diarize', String(diarize));
+    if (numSpeakers !== undefined) formData.append('num_speakers', String(numSpeakers));
+    formData.append('tag_audio_events', String(tagAudioEvents));
+
+    const response = await fetch(`${BASE_URL}/speech-to-text`, {
+      method: 'POST',
+      headers: { 'xi-api-key': apiKey },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => response.statusText);
+      throw new Error(`ElevenLabs scribe error ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json();
+    return {
+      text: data.text || '',
+      languageCode: data.language_code,
+      languageProbability: data.language_probability,
+      words: (data.words || []).map(
+        (w: {
+          text?: string;
+          word?: string;
+          start: number;
+          end: number;
+          type?: 'word' | 'spacing' | 'audio_event';
+          speaker_id?: string;
+        }) => ({
+          text: w.text ?? w.word ?? '',
+          start: w.start,
+          end: w.end,
+          type: w.type,
+          speakerId: w.speaker_id,
+        })
+      ),
+    };
   }
 
   // ── Voice Library ─────────────────────────────────────────────────────

@@ -60,7 +60,10 @@ const moreGroupsBase: MoreGroup[] = [
   },
   {
     label: 'Tools',
-    links: [{ to: '/lab/zai', label: 'Z.AI Lab' }],
+    links: [
+      { to: '/lab/zai', label: 'Z.AI Lab' },
+      { to: '/lab/voice-studio', label: 'Voice Studio' },
+    ],
   },
   {
     label: 'My Stuff',

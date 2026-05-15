@@ -59,6 +59,7 @@
     "tailwind-merge": "^3.3.1",
     "viem": "~2.47.6",
     "wagmi": "^2.19.5",
+    "wavesurfer.js": "^7.10.1",
     "zod": "^4.0.2"
   },
   "devDependencies": {

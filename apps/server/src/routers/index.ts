@@ -88,6 +88,9 @@ import { lipsyncRouter } from './generation/lipsync.routes';
 import { cutdownRouter } from './generation/cutdown.routes';
 import { sceneAudioRouter } from './generation/sceneAudio.routes';
 import { talkingSceneRouter } from './generation/talking-scene.routes';
+import { voiceLibraryRouter } from './generation/voiceLibrary.routes';
+import { dubbingRouter } from './generation/dubbing.routes';
+import { multilingualDubRouter } from './generation/multilingualDub.routes';
 import { universeStyleRouter } from './universeStyle/universeStyle.routes';
 import { universeTonePacksRouter } from './universeStyle/tonePacks.routes';
 import { revenueDashboardRouter } from './revenueDashboard/revenueDashboard.routes';
@@ -222,6 +225,11 @@ export const appRouter = router({
   cutdown: cutdownRouter,
   sceneAudio: sceneAudioRouter,
   talkingScene: talkingSceneRouter,
+
+  // ── Voice Studio (PRD: Voice 2.0 — pro voice pipeline) ──────────────
+  voiceLibrary: voiceLibraryRouter,
+  dubbing: dubbingRouter,
+  multilingualDub: multilingualDubRouter,
 
   // ── Z.AI (GLM / CogView / CogVideoX) integration ───────────────────
   zai: zaiRouter,

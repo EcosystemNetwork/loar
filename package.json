@@ -23,6 +23,7 @@
     "sync:addresses": "tsx scripts/rebuild-deployments.ts --apply",
     "check:addresses": "tsx scripts/check-addresses.ts",
     "smoke": "tsx scripts/smoke/index.ts",
+    "seed:voices": "pnpm -F server tsx scripts/seed-voice-library.ts",
     "smoke:chain": "SMOKE_LAYER=chain tsx scripts/smoke/index.ts",
     "smoke:server": "SMOKE_LAYER=server tsx scripts/smoke/index.ts",
     "smoke:launchpad": "SMOKE_LAYER=launchpad tsx scripts/smoke/index.ts",
