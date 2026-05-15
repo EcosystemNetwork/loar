@@ -1427,7 +1427,7 @@ const { universes } = await ponderGql(\`{
                 [
                   'Burning',
                   'Not implemented',
-                  'Standard ERC20 — tokens sent to address(0) are effectively burned',
+                  'No platform burn mechanism. Standard ERC20 transfers to address(0) are technically possible for any holder, but the protocol never destroys supply.',
                 ],
               ]}
             />

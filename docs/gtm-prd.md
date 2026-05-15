@@ -1,14 +1,13 @@
 # LOAR — Go-to-Market PRD
 
-## The Core Problem
+**Last refreshed:** 2026-05-15 — reconciled against actual shipped state.
+**Canonical "what's left" page:** [docs/launch-readiness.md](./launch-readiness.md).
 
-The stack is production-grade. The public story isn't. The domain shows a "BedTime Stories" page. The README describes a narrative-control suite. The app is a cinematic universe studio. These describe three different products. Until they describe one product, every demo, investor pitch, and press mention will confuse the audience before they see a single feature.
-
-The secondary problem: the revenue loop is broken at the last step. Backend APIs, smart contracts, and IP classification all exist. No frontend lets a wallet actually pay for anything. That is a wiring problem, not an architecture problem — it takes days, not months.
+> **Status note.** This document was originally written 2026-03-27 when the home page was a "BedTime Stories" placeholder and the Episode NFT mint loop had four missing UI wires. Almost all of that shipped. The phase tables below are kept for historical record, but anything marked **SHIPPED** has moved to the [Launch Readiness Scorecard](./launch-readiness.md); the remaining real work is operational + legal handoffs, not feature implementation.
 
 ---
 
-## Positioning
+## Positioning (still canonical)
 
 **What LOAR is:**
 
@@ -21,136 +20,119 @@ The secondary problem: the revenue loop is broken at the last step. Backend APIs
 **Why this framing wins:**
 
 - Original IP is the legally clean lane. No rights negotiations, no DMCA exposure at launch.
-- The stack already does this — universe deployment, AI generation, NFT minting, token governance are all working end-to-end except the payment buttons.
+- The stack does this end-to-end — universe deployment, AI generation, NFT minting, token governance, rights classification, on-chain governance.
 - "Original IP studio" maps cleanly to a creator audience that understands IP ownership because they care about owning their own work.
-- Fan/parody content can exist as a free sandbox lane without being the lead product story.
+- Fan/parody content exists as a free sandbox lane via the `fan` rights enum, not the lead product story.
 
 ---
 
-## Public Narrative Alignment (Do First)
+## Phase 0: Public narrative alignment — **SHIPPED**
 
-These four surfaces need to describe the same product before any other work:
-
-| Surface                       | Current state                  | Required state                                                                     |
-| ----------------------------- | ------------------------------ | ---------------------------------------------------------------------------------- |
-| Domain / landing page         | "BedTime Stories" placeholder  | LOAR cinematic universe studio — original IP creator pitch, demo universe showcase |
-| README                        | Technical monorepo description | Product description first, then technical stack                                    |
-| In-app home                   | Generic page                   | Universe gallery + "Create Universe" CTA as primary action                         |
-| Any deck / external materials | Unknown                        | Must match the above before sharing                                                |
-
-This is not a marketing task. This is a prerequisite for any user arriving from any source.
+| Surface               | Then (Mar 2026)                | Now (May 2026)                                                                                                                                                                                    |
+| --------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Domain / landing page | "BedTime Stories" placeholder  | Netflix × Webtoons hybrid universe gallery at [apps/web/src/routes/index.tsx](../apps/web/src/routes/index.tsx) — hero billboard, trending row, recent episodes, all universes, token-powered row |
+| README                | Technical monorepo description | Product description leads; honest LIVE / PARTIAL / PLANNED status table; live testnet demo link                                                                                                   |
+| In-app home           | Generic page                   | Universe gallery + "Create Universe" CTA primary                                                                                                                                                  |
 
 ---
 
-## Phase 1: Close One Transaction Loop
+## Phase 1: Episode NFT transaction loop — **SHIPPED**
 
-**Target loop:** Creator lists an Episode NFT → fan discovers it → fan mints it with ETH.
+Original gap (four UI elements). Current state:
 
-This is the loop the MVP doc already identifies as broken at Step 7. It requires no new backend work. The `nft.createEpisodeListing` and `nft.recordMint` procedures exist. The `Universe.sol` contract is deployed on Sepolia. The gap is four UI elements:
+| Element                                   | Then          | Now                                                                                              |
+| ----------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------ |
+| "List as NFT" button on node detail       | Missing       | `MintContentDialog` wired in node detail panel and `RevenuePanel`                                |
+| Episode NFT card with mint price + supply | Missing       | Renders in marketplace tab, sourced from `nft.getEpisodesByUniverse`                             |
+| Mint button with wallet tx                | Missing       | `BuyNFTDialog` invokes `writeContract` + records via `nft.recordMint` with revenue splits        |
+| Creator earnings summary                  | Missing       | Dashboard surfaces `analytics.getUniverseMetrics` (views / mints / subs / votes / revenue chips) |
+| Atomic batch listing                      | Not specified | `BatchMintEpisodesDialog` up to 50 per batch                                                     |
 
-| Missing element                              | Location                               | Wire to                                  |
-| -------------------------------------------- | -------------------------------------- | ---------------------------------------- |
-| "List as NFT" button on timeline node detail | `SceneEditor.tsx` or node detail panel | `nft.createEpisodeListing` mutation      |
-| Episode NFT card with mint price + supply    | Universe marketplace tab               | `nft.getEpisodesByUniverse` query        |
-| "Mint" button with wallet transaction        | Episode card                           | wagmi `writeContract` → `nft.recordMint` |
-| Creator earnings summary                     | Creator dashboard                      | `nft.getMyNFTs` query                    |
-
-**Why this loop and not another:**
-
-- Episode NFT is the cleanest atomic transaction: one creator action, one fan action, one on-chain event, verifiable result.
-- Credit purchase is also close (1-2 days per `docs/mvp.md`) but requires a creator to already have a universe to spend credits on, making it step two.
-- Subscription requires recurring infrastructure that doesn't yet exist in the frontend.
-- Canon voting requires social dynamics that need users first.
-
-**Definition of done for Phase 1:**
-
-1. A creator on Sepolia can generate an AI video, attach it to a timeline node, and list it as an NFT with a price.
-2. A different wallet can find that listing in the discovery feed and mint it.
-3. The mint transaction confirms on Sepolia and appears in the creator's earnings summary.
-4. The IP classification badge is visible on the listing (see Rights Classification UI Spec).
+The loop runs end-to-end on Sepolia + Base Sepolia today.
 
 ---
 
-## Phase 2: Make the Product Legible to Outsiders
+## Phase 2: Make the product legible to outsiders — **MOSTLY SHIPPED**
 
-After Phase 1 closes the loop, the product needs to be legible to three audiences: early creators, fans, and investors. Each needs different evidence.
+| Audience       | Need                                                                 | State                                                                                            |
+| -------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Early creators | Guided first universe (connect → name → generate → publish), <10 min | Universe create + atomic `createUniverseWithToken()`, chain selector UI, multi-step deploy flow  |
+| Early creators | Creator dashboard with real data                                     | `analytics.getUniverseMetrics`, LP yield manager, quests panel, monetization overview — all live |
+| Early creators | Rights classification on own content                                 | Live — `fan` / `original` / `licensed` enum + `<ContentLaneBadge />`                             |
+| Fans           | Discovery feed sorted by activity                                    | `/discover` queries `content.feed` with rights filter, activity sort                             |
+| Fans           | Wallet not required to browse                                        | Browse anonymous; auth-gated only at transact                                                    |
+| Investors      | One working testnet tx they can complete                             | Sepolia mint loop is operational                                                                 |
+| Investors      | Admin metrics                                                        | `/admin` panels for cost, moderation, activity. `/admin/cost` has per-provider margin gauges     |
+| Investors      | Rights classification as IP hygiene evidence                         | Visible per content card; review queue for `licensed` lane                                       |
 
-**For early creators:**
-
-- Onboarding flow: guided first universe (connect wallet → name universe → generate first clip → publish → share link). Target: under 10 minutes.
-- Creator dashboard with real data (replace hardcoded placeholders with `cinematicUniverses.getByCreator()` and `analytics.getUniverseMetrics()`).
-- Rights classification clearly shown on their own content.
-
-**For fans:**
-
-- Discovery feed sorted by activity, not creation date.
-- Universe detail page with playable clips, character roster, and mint/subscribe actions.
-- Wallet not required to browse; required only to transact.
-
-**For investors:**
-
-- One working transaction on testnet they can complete themselves.
-- Metrics visible in the admin panel (total universes, total mints, credit purchases, active wallets).
-- Rights classification system as evidence of IP hygiene.
+Open items in this phase are minor (subscription renewal reminders, push notifications to mobile) — see PARTIAL rows in README.
 
 ---
 
-## Phase 3: Pre-Mainnet Gates (Do Not Skip)
+## Phase 3: Pre-mainnet gates — **MOSTLY SHIPPED, OPS + LEGAL REMAIN**
 
-These are not optional. None of them should block Sepolia testing but all of them block real money:
+The original GTM PRD listed six gates. Updated status:
 
-| Requirement                                          | Status      | Blocker if missing                                         |
-| ---------------------------------------------------- | ----------- | ---------------------------------------------------------- |
-| Smart contract audit (third-party)                   | Not started | Cannot hold real ETH in contracts                          |
-| DMCA agent registration + notice/counter-notice flow | Not built   | No Section 512 safe harbor                                 |
-| Content flagging + review queue                      | Not built   | No mechanism to respond to infringement complaints         |
-| Real-person consent/likeness policy                  | Draft only  | California statutory damages exposure on public UGC        |
-| Fiat on-ramp                                         | Not built   | Limits addressable market to crypto-native users           |
-| Proactive similarity scanning                        | Not built   | Reduces but doesn't eliminate infringing monetized content |
+| Original gate                                        | State                                                                                                                                                                                               |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Smart contract audit (third-party)                   | Internal: 8 review passes, 130/157 findings fixed. External Pass 1 + Pass 2 still required — see X5/X6/X7 in [scorecard](./launch-readiness.md)                                                     |
+| DMCA agent registration + notice/counter-notice flow | **Counter-notice loop SHIPPED** (§ 512(g) full implementation, business-day arithmetic, three statutory email templates). Agent-of-record registration ($6 filing) still external — X2 in scorecard |
+| Content flagging + review queue                      | SHIPPED — `/admin/moderation`, immutable `contentAuditLog`                                                                                                                                          |
+| Real-person consent / likeness policy                | Counsel needed — X4 in scorecard                                                                                                                                                                    |
+| Fiat on-ramp                                         | Stripe integrated; broader on-ramp deferred — X10 in scorecard                                                                                                                                      |
+| Proactive similarity scanning                        | **CSAM SHIPPED** — pHash + PhotoDNA + Hive AI gate every upload. Broader similarity (non-CSAM) deferred post-launch                                                                                 |
 
-**Minimum viable compliance for mainnet:**
+**Total remaining for mainnet** (per [scorecard](./launch-readiness.md)):
 
-1. DMCA designated agent registered with US Copyright Office.
-2. Takedown request form with 72-hour acknowledgment SLA.
-3. Counter-notice flow documented in ToS.
-4. Real-person and likeness policy in ToS with creator attestation checkbox at universe creation.
-5. Manual review queue for flagged content (can be email-based at launch).
+- 11 operational handoffs (you trigger — multisig deploy, env flags, signer onboarding)
+- 13 external dependencies (legal counsel, audit firms, BD partners, app store review)
+- 4 small internal code items (docs, design calls)
 
----
-
-## What Not to Do at Launch
-
-- **Do not lead with ten revenue streams.** One working loop is more credible than ten described ones. Add revenue streams after Phase 1 validates the first.
-- **Do not tell creators "AI output belongs to you."** The correct language is: "LOAR treats you as the rights claimant for content you generate on this platform, subject to applicable law and third-party rights." The distinction matters when challenged.
-- **Do not present the fan/parody lane as legally cleared.** Fair use is a case-by-case defense. The platform can permit non-commercial fan work, but it cannot promise fair use protection.
-- **Do not accept monetized third-party franchise content on the claim that it's "transformative."** That determination belongs to courts. The licensed IP lane (Phase 4+) requires documentary proof, not checkbox attestation.
-- **Do not open public UGC monetization before DMCA infrastructure is live.** The safe harbor only protects you if you have the process in place.
+None of these block testnet beta or current Sepolia + Base Sepolia operations.
 
 ---
 
-## Lane Structure (Connects to Rights Classification UI)
+## What not to do at launch
 
-Three content lanes are the backbone of every product decision from here forward:
+- **Do not lead with ten revenue streams.** One working loop is more credible than ten described ones. The Episode NFT loop is that working loop today.
+- **Do not tell creators "AI output belongs to you."** Correct language: "LOAR treats you as the rights claimant for content you generate on this platform, subject to applicable law and third-party rights." The distinction matters when challenged. Captured in `/terms`.
+- **Do not present the fan/parody lane as legally cleared.** Fair use is a case-by-case defense. The platform permits non-commercial fan work, doesn't promise fair use protection.
+- **Do not accept monetized third-party franchise content on a "transformative" claim.** That determination belongs to courts. The `licensed` lane requires documentary proof + manual review queue, not checkbox attestation.
+- **Do not deploy to Base mainnet before** the external audit Pass 1 + Pass 2, multisig handoff (GOV-01), DMCA agent registration, and TimelockFactory wiring (TIMELOCK-01). See [scorecard](./launch-readiness.md).
+
+---
+
+## Lane structure (still canonical)
 
 | Lane                    | Classification value | Monetization                         | IP requirement                                       |
 | ----------------------- | -------------------- | ------------------------------------ | ---------------------------------------------------- |
 | Personal / Fan / Parody | `fan`                | None                                 | None — platform permits, does not guarantee fair use |
 | Creator-Owned           | `original`           | All (NFT, subscribe, license, merch) | Originality attestation + provenance log             |
-| Rights-Cleared          | `licensed`           | All (with documented scope)          | Uploaded license agreement, manual review            |
+| Rights-Cleared          | `licensed`           | All (with documented scope)          | Uploaded `licensingProof` + `reviewStatus` queue     |
 
-The existing binary (`fun` / `monetized`) maps to the first two lanes. The third lane (`licensed`) is deferred until manual review infrastructure is in place. For launch, `licensed` content is treated as `original` with an additional `licensingProof` field that triggers a review queue.
-
-See `docs/rights-classification-ui.md` for the complete UI spec.
+All three are wired in [apps/web/src/routes/discover.tsx](../apps/web/src/routes/discover.tsx) with `<ContentLaneBadge />`.
 
 ---
 
-## Success Metrics for Phase 1
+## Success metrics for the first public beta cohort
 
-| Metric                                                        | Target                     |
-| ------------------------------------------------------------- | -------------------------- |
-| First creator who is not the team deploys a universe          | Week 1 of public beta      |
-| First mint transaction by a wallet that is not the creator    | Week 2                     |
-| Total mints in first 30 days                                  | 100                        |
-| Creator conversion rate (wallet connected → universe created) | >30%                       |
-| Mint conversion rate (universe viewed → mint transaction)     | >5%                        |
-| DMCA complaints received with no resolution process           | 0 (ship the process first) |
+Original Phase 1 metrics still applicable as KPIs for the public beta:
+
+| Metric                                                        | Target                                                 |
+| ------------------------------------------------------------- | ------------------------------------------------------ |
+| First creator who is not the team deploys a universe          | Week 1 of public beta                                  |
+| First mint transaction by a wallet that is not the creator    | Week 2                                                 |
+| Total mints in first 30 days                                  | 100                                                    |
+| Creator conversion rate (wallet connected → universe created) | >30%                                                   |
+| Mint conversion rate (universe viewed → mint transaction)     | >5%                                                    |
+| DMCA complaints received with no resolution process           | 0 (process is shipped, runbook in `/admin/moderation`) |
+
+---
+
+## Where to look next
+
+- **For what's left** → [docs/launch-readiness.md](./launch-readiness.md)
+- **For per-finding audit status** → [docs/audit-fix-tracker.md](./audit-fix-tracker.md)
+- **For the Phase 1 / Phase 2 split with current code citations** → [docs/pre-launch-checklist.md](./pre-launch-checklist.md)
+- **For Solana mainnet sequencing** → [docs/solana-mainnet-runbook.md](./solana-mainnet-runbook.md)
+- **For rights classification UI** → [docs/rights-classification-ui.md](./rights-classification-ui.md)
