@@ -21,18 +21,18 @@ must be resolved **before** flipping any production switch.
 
 ### ⚠️ Soft blockers (deploy without, but expect operational pain)
 
-| Item                                                        | Status                                       | Why it matters                                                                                                                                              |
-| ----------------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| End-to-end dry-run of this runbook on a fresh devnet wallet | never done                                   | Catches missing scripts, env vars, ordering bugs before they hit mainnet. Steps 1-9 have only ever been executed piecemeal.                                 |
-| Bridge round-trip e2e test (real EVM ↔ Solana with real $)  | never done                                   | Custodial bridge ran one-direction tests on devnet. Round-trip + the failure-recovery `/retry` path are untested.                                           |
-| Bridge reconciliation cron in production                    | ✅ GH Actions workflow ready                 | `.github/workflows/bridge-reconcile.yml` polls hourly. Set `BRIDGE_RECONCILE_URL` (+ optional `SLACK_WEBHOOK_URL`) repo secrets and enable the workflow.    |
-| Firestore TTL on `bridgeIntents.expiresAt`                  | configure in console once                    | Setup in [docs/solana-bridge.md → Operational setup](./solana-bridge.md#operational-setup). Without it, intent docs accumulate forever.                     |
-| Program `.so` + `*-keypair.json` backups                    | ✅ script written, run before deploy         | `apps/programs/scripts/backup-keypairs.sh <gpg-recipient> [out-dir]` produces a GPG-encrypted tarball + SHA256. Run after every `anchor build` for mainnet. |
-| Web app `iOS Solana wallet UX`                              | ✅ Phantom/Solflare/Backpack universal links | `SolanaPayButton` now uses universal-link buttons on iOS + a copy-link fallback. Still doesn't cover every wallet, but the three majors route cleanly.      |
-| `apps/programs/scripts/transfer-payment-ownership.ts`       | ✅ written — needs Squads run                | Two-step propose/accept ownership transfer. Run once mainnet Squads vault is live.                                                                          |
-| `scripts/solana/create-loar-mint.ts`                        | ✅ written — needs mainnet run               | Token-2022 mint creation with MetadataPointer + supply mint to authority. Run once on mainnet with `TOKEN_AUTHORITY_KEYPAIR` set.                           |
-| Solana programs in CI                                       | ✅ workflow added                            | `.github/workflows/anchor-tests.yml` spins solana-test-validator + runs all suites on every PR touching `apps/programs/`. First run on next PR.             |
-| Bridge config UI gate                                       | ✅ done                                      | `/api/bridge/health` returns `fullyConfigured` + `missing[]`; `/bridge` shows a yellow banner when partial.                                                 |
+| Item                                                        | Status                                       | Why it matters                                                                                                                                                           |
+| ----------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| End-to-end dry-run of this runbook on a fresh devnet wallet | ✅ harness written — run before mainnet      | `pnpm tsx apps/programs/scripts/mainnet-runbook-dryrun.ts` walks every step read-only and exits non-zero on any FAIL. See "Pre-flight harnesses" below.                  |
+| Bridge round-trip e2e test (real EVM ↔ Solana with real $)  | ✅ harness written — run before mainnet      | `BRIDGE_E2E_OK=1 pnpm tsx apps/server/scripts/bridge-roundtrip-e2e.ts` does EVM→Sol→EVM + idempotency replay against a running server. See "Pre-flight harnesses" below. |
+| Bridge reconciliation cron in production                    | ✅ GH Actions workflow ready                 | `.github/workflows/bridge-reconcile.yml` polls hourly. Set `BRIDGE_RECONCILE_URL` (+ optional `SLACK_WEBHOOK_URL`) repo secrets and enable the workflow.                 |
+| Firestore TTL on `bridgeIntents.expiresAt`                  | configure in console once                    | Setup in [docs/solana-bridge.md → Operational setup](./solana-bridge.md#operational-setup). Without it, intent docs accumulate forever.                                  |
+| Program `.so` + `*-keypair.json` backups                    | ✅ script written, run before deploy         | `apps/programs/scripts/backup-keypairs.sh <gpg-recipient> [out-dir]` produces a GPG-encrypted tarball + SHA256. Run after every `anchor build` for mainnet.              |
+| Web app `iOS Solana wallet UX`                              | ✅ Phantom/Solflare/Backpack universal links | `SolanaPayButton` now uses universal-link buttons on iOS + a copy-link fallback. Still doesn't cover every wallet, but the three majors route cleanly.                   |
+| `apps/programs/scripts/transfer-payment-ownership.ts`       | ✅ written — needs Squads run                | Two-step propose/accept ownership transfer. Run once mainnet Squads vault is live.                                                                                       |
+| `scripts/solana/create-loar-mint.ts`                        | ✅ written — needs mainnet run               | Token-2022 mint creation with MetadataPointer + supply mint to authority. Run once on mainnet with `TOKEN_AUTHORITY_KEYPAIR` set.                                        |
+| Solana programs in CI                                       | ✅ workflow added                            | `.github/workflows/anchor-tests.yml` spins solana-test-validator + runs all suites on every PR touching `apps/programs/`. First run on next PR.                          |
+| Bridge config UI gate                                       | ✅ done                                      | `/api/bridge/health` returns `fullyConfigured` + `missing[]`; `/bridge` shows a yellow banner when partial.                                                              |
 
 ### ℹ️ Recommended before public launch
 
@@ -40,6 +40,72 @@ must be resolved **before** flipping any production switch.
 - Tighten the bridge daily caps from the defaults (`BRIDGE_MAX_PER_USER_PER_DAY_LOAR=5000000`, `BRIDGE_MAX_GLOBAL_PER_DAY_LOAR=20000000`) to whatever the audit/insurance partner is comfortable with.
 - Wire `/api/bridge/reconcile` drift detection into the same alerting that pages on indexer staleness.
 - Re-run `auditBridgeConfig()` after every Railway/Fly env update — partial-config is the most common foot-gun.
+
+---
+
+## Pre-flight harnesses
+
+Two harnesses exist to flush ordering / env / config bugs **before** you spend mainnet SOL. Run both on devnet first and then read-only against mainnet.
+
+### 1. `mainnet-runbook-dryrun.ts` — read-only audit of every step
+
+```sh
+# Devnet (default)
+pnpm tsx apps/programs/scripts/mainnet-runbook-dryrun.ts
+
+# Mainnet — runs READ-ONLY, no on-chain mutations
+SOLANA_CLUSTER=mainnet-beta pnpm tsx apps/programs/scripts/mainnet-runbook-dryrun.ts
+
+# Env-only audit (no RPC calls)
+pnpm tsx apps/programs/scripts/mainnet-runbook-dryrun.ts --skip-rpc
+```
+
+What it checks (PASS / WARN / FAIL / SKIP per item):
+
+- **Step 1**: `solana` CLI installed, cluster matches `SOLANA_CLUSTER`, deployer balance ≥ 12 SOL on mainnet, `solana address` readable.
+- **Step 2**: `target/deploy/{universe,episode,payment}.so` + matching `*-keypair.json` exist; mainnet also requires an offline backup at `~/loar-mainnet-program-keypairs*` (run `apps/programs/scripts/backup-keypairs.sh` first).
+- **Step 3**: `LOAR_MINT_{cluster}` set, mint exists on-chain (Token-2022 program), `freezeAuthority == null`, mainnet `mintAuthority` is NOT the deployer EOA.
+- **Step 4**: `BUBBLEGUM_TREE_{cluster}` set + the tree account exists.
+- **Step 5**: `PAYMENT_PROGRAM_ID` set + the `Config` PDA is initialized (`init-payment.ts` ran).
+- **Step 6**: program upgrade authorities readable; mainnet must not be the deployer EOA. If you set `SQUADS_VAULT_MAINNET`, the script asserts each program's authority equals the Squads vault.
+- **Step 7**: `SOLANA_CLUSTER`, program IDs, mint var, tree var, RPC URL var, `HELIUS_API_KEY`, `HELIUS_WEBHOOK_SECRET` all present. Bridge env enforced as **all-or-nothing** (partial config is the most common production foot-gun). `VITE_*` vars must mirror their server counterparts.
+- **Step 8**: indexer `/healthz` responds `200`.
+- **Step 9**: `auditBridgeConfig()` returns `fullyConfigured`; `/api/bridge/reconcile` reports zero drift.
+
+Exit codes: `0` = clean, `1` = usage error, `2` = at least one FAIL (NOT mainnet ready).
+
+What it does NOT do (it is advisory): no `anchor deploy`, no authority transfer, no `Config` initialization, no tree creation. Each FAIL points to the runbook step that owns the fix.
+
+### 2. `bridge-roundtrip-e2e.ts` — real-money round-trip + idempotency replay
+
+```sh
+BRIDGE_E2E_OK=1 \
+BRIDGE_E2E_JWT=eyJhbGc... \
+BRIDGE_E2E_EVM_ADDRESS=0xabc... \
+BRIDGE_E2E_SOLANA_ADDRESS=Abc... \
+BRIDGE_E2E_AMOUNT_LOAR=1 \
+BRIDGE_E2E_SERVER_URL=https://api.loar.fun \
+  pnpm tsx apps/server/scripts/bridge-roundtrip-e2e.ts
+```
+
+Phases (each prints PASS / WARN / FAIL):
+
+1. **Preflight** — `GET /api/bridge/health` must return `fullyConfigured: true`. Exits `3` if not (no funds spent).
+2. **Balances before** — reads EVM `balanceOf(LOAR_TOKEN_ADDRESS)` + Solana ATA for the configured user.
+3. **EVM → Solana leg** — `POST /api/bridge/quote` → `POST /api/bridge/transfer` with a fresh `idempotencyKey` → poll `GET /api/bridge/status?from=…&txRef=…` until `state ∈ {completed, failed}` or `BRIDGE_E2E_TIMEOUT_MS` (default 10min).
+4. **Solana → EVM leg** — same flow in reverse.
+5. **Idempotency replay** — re-submits the phase 3 `idempotencyKey`, asserts the response intent id matches the original (no double-spend). This is the only "retry" path the bridge exposes today; there is **no `/retry` endpoint** despite earlier runbook drafts mentioning one.
+6. **Balances after** — round-trip should leave EVM Δ ≈ 0 and Solana Δ ≈ 0 (within ±1% tolerance for fees + decimal scaling).
+
+Safety latches:
+
+- Refuses to run unless `BRIDGE_E2E_OK=1` (acknowledges real test funds will be spent).
+- On `SOLANA_CLUSTER=mainnet-beta`, additionally requires `BRIDGE_E2E_MAINNET_ACK=yes-i-know`.
+- Env-driven amount (`BRIDGE_E2E_AMOUNT_LOAR`, default `1`) so you can dial from 0.01 → 1 → 10 as confidence grows.
+
+Exit codes: `0` = round-trip + replay all PASS, `2` = at least one phase FAIL (run `apps/server/scripts/bridge-reconcile.ts` to confirm whether on-chain vs ledger drifted), `3` = bridge unconfigured (no funds spent).
+
+The JWT comes from `localStorage["siwe:token"]` in a logged-in browser session. EVM + Solana addresses must be the wallet pair authenticated under that JWT.
 
 ---
 
