@@ -21,18 +21,18 @@ must be resolved **before** flipping any production switch.
 
 ### ⚠️ Soft blockers (deploy without, but expect operational pain)
 
-| Item                                                        | Status                         | Why it matters                                                                                                                                                                 |
-| ----------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| End-to-end dry-run of this runbook on a fresh devnet wallet | never done                     | Catches missing scripts, env vars, ordering bugs before they hit mainnet. Steps 1-9 have only ever been executed piecemeal.                                                    |
-| Bridge round-trip e2e test (real EVM ↔ Solana with real $)  | never done                     | Custodial bridge ran one-direction tests on devnet. Round-trip + the failure-recovery `/retry` path are untested.                                                              |
-| Bridge reconciliation cron in production                    | script ready, schedule it      | Schedule [`apps/server/scripts/bridge-reconcile.ts`](../apps/server/scripts/bridge-reconcile.ts) hourly via cron / fly machine schedule. Exits 2 on drift — pipe to pagerduty. |
-| Firestore TTL on `bridgeIntents.expiresAt`                  | configure in console once      | Setup in [docs/solana-bridge.md → Operational setup](./solana-bridge.md#operational-setup). Without it, intent docs accumulate forever.                                        |
-| Program `.so` + `*-keypair.json` backups                    | not standardized               | Lose the keypair → lose the program ID forever. Step 2 mentions a backup dir; need an actual offline copy (encrypted USB, paper wallet).                                       |
-| Web app `iOS Solana wallet UX`                              | falls back to Solana Pay QR    | MWA is Android-only. iOS users can mint via Phantom deeplink + QR, but Solflare/Backpack iOS aren't first-class. Real fix needs each wallet's iOS universal-link support.      |
-| `apps/programs/scripts/transfer-payment-ownership.ts`       | ✅ written — needs Squads run  | Two-step propose/accept ownership transfer. Run once mainnet Squads vault is live.                                                                                             |
-| `scripts/solana/create-loar-mint.ts`                        | ✅ written — needs mainnet run | Token-2022 mint creation with MetadataPointer + supply mint to authority. Run once on mainnet with `TOKEN_AUTHORITY_KEYPAIR` set.                                              |
-| Solana programs in CI                                       | ✅ workflow added              | `.github/workflows/anchor-tests.yml` spins solana-test-validator + runs all suites on every PR touching `apps/programs/`. First run on next PR.                                |
-| Bridge config UI gate                                       | ✅ done                        | `/api/bridge/health` returns `fullyConfigured` + `missing[]`; `/bridge` shows a yellow banner when partial.                                                                    |
+| Item                                                        | Status                                       | Why it matters                                                                                                                                              |
+| ----------------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| End-to-end dry-run of this runbook on a fresh devnet wallet | never done                                   | Catches missing scripts, env vars, ordering bugs before they hit mainnet. Steps 1-9 have only ever been executed piecemeal.                                 |
+| Bridge round-trip e2e test (real EVM ↔ Solana with real $)  | never done                                   | Custodial bridge ran one-direction tests on devnet. Round-trip + the failure-recovery `/retry` path are untested.                                           |
+| Bridge reconciliation cron in production                    | ✅ GH Actions workflow ready                 | `.github/workflows/bridge-reconcile.yml` polls hourly. Set `BRIDGE_RECONCILE_URL` (+ optional `SLACK_WEBHOOK_URL`) repo secrets and enable the workflow.    |
+| Firestore TTL on `bridgeIntents.expiresAt`                  | configure in console once                    | Setup in [docs/solana-bridge.md → Operational setup](./solana-bridge.md#operational-setup). Without it, intent docs accumulate forever.                     |
+| Program `.so` + `*-keypair.json` backups                    | ✅ script written, run before deploy         | `apps/programs/scripts/backup-keypairs.sh <gpg-recipient> [out-dir]` produces a GPG-encrypted tarball + SHA256. Run after every `anchor build` for mainnet. |
+| Web app `iOS Solana wallet UX`                              | ✅ Phantom/Solflare/Backpack universal links | `SolanaPayButton` now uses universal-link buttons on iOS + a copy-link fallback. Still doesn't cover every wallet, but the three majors route cleanly.      |
+| `apps/programs/scripts/transfer-payment-ownership.ts`       | ✅ written — needs Squads run                | Two-step propose/accept ownership transfer. Run once mainnet Squads vault is live.                                                                          |
+| `scripts/solana/create-loar-mint.ts`                        | ✅ written — needs mainnet run               | Token-2022 mint creation with MetadataPointer + supply mint to authority. Run once on mainnet with `TOKEN_AUTHORITY_KEYPAIR` set.                           |
+| Solana programs in CI                                       | ✅ workflow added                            | `.github/workflows/anchor-tests.yml` spins solana-test-validator + runs all suites on every PR touching `apps/programs/`. First run on next PR.             |
+| Bridge config UI gate                                       | ✅ done                                      | `/api/bridge/health` returns `fullyConfigured` + `missing[]`; `/bridge` shows a yellow banner when partial.                                                 |
 
 ### ℹ️ Recommended before public launch
 
@@ -147,16 +147,18 @@ Copy the tree address into:
 
 ```sh
 SOLANA_CLUSTER=mainnet-beta \
-SOLANA_RPC_URL=$HELIUS_MAINNET_RPC \
-LOAR_MINT_DEVNET=$LOAR_MINT_MAINNET \
+SOLANA_RPC_URL_MAINNET=$HELIUS_MAINNET_RPC \
+LOAR_MINT_MAINNET=$LOAR_MINT_MAINNET \
 PAYMENT_TREASURY=$MAINNET_TREASURY_PUBKEY \
 DEFAULT_FEE_BPS=250 \
   pnpm tsx apps/programs/scripts/init-payment.ts
 ```
 
-Variable note: the script reads `LOAR_MINT_DEVNET` regardless of cluster —
-ensure the env var holds the mainnet mint when running for mainnet, or
-update the script to branch on `SOLANA_CLUSTER`.
+The script branches on `SOLANA_CLUSTER`:
+
+- `mainnet-beta` → reads `LOAR_MINT_MAINNET` + `SOLANA_RPC_URL_MAINNET`
+- `devnet` (default) → reads `LOAR_MINT_DEVNET` + `SOLANA_RPC_URL_DEVNET`
+- `SOLANA_RPC_URL` is the cross-cluster fallback for either.
 
 Once verified, leave the mint locked (the script does this by default).
 

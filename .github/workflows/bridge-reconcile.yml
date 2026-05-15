@@ -1,0 +1,65 @@
+name: Bridge reconcile
+
+# Hourly poll of /api/bridge/reconcile against production. Surfaces drift
+# between ledger (sum of intent amounts) and on-chain vault balance. The
+# server-side script (apps/server/scripts/bridge-reconcile.ts) exits 2 on
+# drift; this workflow does the same and lets GitHub email/Slack on failure.
+#
+# Setup:
+#   1. Set BRIDGE_RECONCILE_URL secret to the prod reconcile endpoint,
+#      e.g. https://api.loar.fun/api/bridge/reconcile
+#   2. (Optional) Set SLACK_WEBHOOK_URL secret for explicit alerts.
+#
+# Disabled by default. To enable: in the GitHub Actions UI, click the
+# workflow and "Enable workflow." The cron only fires for the default branch.
+
+on:
+  schedule:
+    - cron: '17 * * * *' # hourly, offset 17m to avoid round-hour stampede
+  workflow_dispatch: {} # manual trigger from the Actions tab
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe /api/bridge/reconcile
+        id: probe
+        env:
+          URL: ${{ secrets.BRIDGE_RECONCILE_URL }}
+        run: |
+          if [ -z "$URL" ]; then
+            echo "::warning::BRIDGE_RECONCILE_URL secret not set — skipping"
+            exit 0
+          fi
+          response=$(curl --fail --silent --max-time 30 "$URL")
+          echo "$response" | tee response.json
+
+          # Drift detected if any direction has driftBaseUnits != 0
+          drift=$(jq -r '[.results[].driftBaseUnits | tonumber] | map(select(. != 0)) | length' response.json)
+          neg_drift=$(jq -r '[.results[].driftBaseUnits | tonumber] | map(select(. < 0)) | length' response.json)
+          echo "drift_count=$drift" >> "$GITHUB_OUTPUT"
+          echo "neg_drift_count=$neg_drift" >> "$GITHUB_OUTPUT"
+          echo "summary=$(jq -c '.results | map({direction, drift: .driftBaseUnits})' response.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Slack (negative drift only — possible compromise)
+        if: steps.probe.outputs.neg_drift_count != '' && steps.probe.outputs.neg_drift_count != '0' && secrets.SLACK_WEBHOOK_URL != ''
+        env:
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\":rotating_light: LOAR bridge negative drift detected — ${{ steps.probe.outputs.summary }}\"}" \
+            "$WEBHOOK"
+
+      - name: Fail on negative drift
+        if: steps.probe.outputs.neg_drift_count != '' && steps.probe.outputs.neg_drift_count != '0'
+        run: |
+          echo "::error::Bridge has negative drift (ledger > vault). Possible compromise."
+          echo "Details: ${{ steps.probe.outputs.summary }}"
+          exit 2
+
+      - name: Warn on positive drift
+        if: steps.probe.outputs.drift_count != '' && steps.probe.outputs.drift_count != '0'
+        run: |
+          echo "::warning::Bridge has drift (likely benign — unexpected deposit)"
+          echo "Details: ${{ steps.probe.outputs.summary }}"
