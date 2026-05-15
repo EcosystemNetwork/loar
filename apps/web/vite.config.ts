@@ -149,17 +149,40 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // Split large non-React deps into their own chunks to reduce initial
-        // bundle size. IMPORTANT: @radix-ui, and anything that calls React
-        // hooks at load time must stay in the default chunk with React to
-        // avoid dual-React-instance crashes (React error #310).
+        // bundle size. IMPORTANT: @radix-ui, wagmi, @tanstack/* and anything
+        // that calls React hooks at load time must stay in the default chunk
+        // with React to avoid dual-React-instance crashes (React error #310).
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            // Heavy crypto/wallet libs that don't import React directly
-            if (id.includes('@metamask') || id.includes('@walletconnect')) {
+            // Heavy crypto/wallet libs that don't import React directly.
+            // @walletconnect powers BOTH EVM and Solana wallet adapters, so
+            // it must live with the Solana SDK to avoid a circular chunk
+            // (wallet-adapters → solana → wallet-adapters).
+            if (
+              id.includes('@metamask') ||
+              id.includes('@walletconnect') ||
+              id.includes('@solana/web3.js') ||
+              id.includes('@solana/wallet-adapter') ||
+              id.includes('/bs58/') ||
+              id.includes('/qrcode.react/')
+            ) {
               return 'wallet-adapters';
             }
             if (id.includes('viem') || id.includes('@noble') || id.includes('abitype')) {
               return 'viem';
+            }
+            // Safe (Gnosis multisig) SDK — only used by admin/safe pages.
+            if (id.includes('@safe-global')) {
+              return 'safe';
+            }
+            // Media libs — pure non-React, used only on viewer routes.
+            if (id.includes('/hls.js/') || id.includes('/wavesurfer.js/')) {
+              return 'media';
+            }
+            // Sentry — initialized once at boot but shouldn't bloat the
+            // landing-page render path.
+            if (id.includes('@sentry/')) {
+              return 'sentry';
             }
           }
         },

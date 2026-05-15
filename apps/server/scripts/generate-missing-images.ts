@@ -358,7 +358,7 @@ async function main() {
 
     const imgRes = await fetch(imageUrl);
     if (!imgRes.ok) throw new Error(`Failed to download image: ${imgRes.status}`);
-    const buffer = Buffer.from(await imgRes.arrayBuffer());
+    const buffer = new Uint8Array(await imgRes.arrayBuffer());
 
     const formData = new FormData();
     formData.append('file', new Blob([buffer], { type: 'image/png' }), 'cover.png');

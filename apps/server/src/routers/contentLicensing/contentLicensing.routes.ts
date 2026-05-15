@@ -267,7 +267,10 @@ export const contentLicensingRouter = router({
 
       const fetchSize = input.dealType ? Math.min(input.limit * 4, 100) : input.limit;
       const snapshot = await query.limit(fetchSize).get();
-      let docs = snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) }));
+      let docs: Array<{ id: string; [k: string]: any }> = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Record<string, any>),
+      }));
 
       if (input.dealType === 'BUY') {
         docs = docs.filter((d) => d.buyPrice && String(d.buyPrice) !== '0');

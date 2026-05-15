@@ -36,6 +36,10 @@ import {
   CheckCircle2,
   TrendingUp,
   Gift,
+  Lock,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import type { Address } from 'viem';
 
@@ -72,6 +76,7 @@ export function LPYieldManager({
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [newRecipient, setNewRecipient] = useState('');
   const [distributeAmount, setDistributeAmount] = useState('');
+  const [showLockTerms, setShowLockTerms] = useState(false);
 
   // Universe staking pool data (for distribute rewards)
   const { pool: universePool } = useUniversePool(onChainUniverseId);
@@ -161,6 +166,61 @@ export function LPYieldManager({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* LP Lock Terms — disclosure (#12) */}
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5">
+          <button
+            type="button"
+            onClick={() => setShowLockTerms((v) => !v)}
+            className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+              <span className="text-xs font-medium">
+                LP lock terms — read before accepting fees
+              </span>
+            </div>
+            {showLockTerms ? (
+              <ChevronUp className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            )}
+          </button>
+          {showLockTerms && (
+            <div className="px-3 pb-3 space-y-2 text-xs text-muted-foreground border-t border-amber-500/10">
+              <p className="pt-2">
+                <span className="font-medium text-foreground">Permanent lock:</span> the universe LP
+                position is held by <code className="text-[10px]">LoarLpLockerMultiple</code> with{' '}
+                <span className="font-semibold">no time-based unlock</span>. Once liquidity is in,
+                it cannot be withdrawn through normal flow — only swap fees can be harvested via the
+                Collect button above.
+              </p>
+              <p>
+                <span className="font-medium text-foreground">
+                  <AlertTriangle className="inline h-3 w-3 mr-0.5 text-amber-600" />
+                  Owner emergency withdraw:
+                </span>{' '}
+                the locker contract retains <code className="text-[10px]">
+                  withdrawETH()
+                </code> / <code className="text-[10px]">withdrawERC20()</code> functions gated by{' '}
+                <code className="text-[10px]">onlyOwner</code>. On testnet today the owner is a
+                single deployer EOA. Pre-mainnet (audit fix GOV-01) ownership transfers to a Safe
+                multisig behind a 48h TimelockController, so any emergency withdraw becomes a public
+                48h-delayed proposal subject to multisig consent.
+              </p>
+              <p>
+                <span className="font-medium text-foreground">Recipient changes:</span> updates to
+                this list go through a <span className="font-semibold">2-day delay</span> (audit fix
+                LOCKER-02). Request now, execute after 48h. Same delay applies to reward-admin
+                rotation.
+              </p>
+              <p className="text-[10px]">
+                Full details: <code>LoarLpLockerMultiple.sol</code> + audit-fix-tracker LOCKER-01,
+                LOCKER-02, GOV-01.
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Claimable Fees */}
         {isRecipient && (
           <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10 border border-green-500/20">
