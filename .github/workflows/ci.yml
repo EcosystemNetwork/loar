@@ -213,6 +213,9 @@ jobs:
       - name: Forge fmt
         run: forge fmt --check
 
+      - name: Install Soldeer dependencies
+        run: forge soldeer install
+
       - name: Forge build
         run: forge build --sizes
 
