@@ -154,10 +154,11 @@ describe('storage router', () => {
     expect(result).toBeDefined();
   });
 
-  it('uploadStatus is public', async () => {
+  it('uploadStatus rejects unauthenticated callers', async () => {
+    // protectedProcedure + IDOR guard: jobIds leak via logs/Sentry, so the
+    // status endpoint must verify caller owns the job.
     const caller = createPublicCaller();
-    const result = await caller.storage.uploadStatus({ jobId: 'test-job' });
-    expect(result).toBeDefined();
+    await expect(caller.storage.uploadStatus({ jobId: 'test-job' })).rejects.toThrow(TRPCError);
   });
 });
 

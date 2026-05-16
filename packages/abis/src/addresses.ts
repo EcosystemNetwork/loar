@@ -2,22 +2,22 @@
 // To update: pnpm tsx scripts/rebuild-deployments.ts --apply
 
 export const AdPlacement = {
-  '84532': '0x751ed220B082aE763446Fe1Fd583f3962EeBe6a3',
-  '11155111': '0x07c8962AB19469E48c814783664574156556B4be',
+  '84532': '0x89c4b520319FDb6Cd23CB8DC5E6B023b110F23fc',
+  '11155111': '0x972bD30323B0Fb5f2466E39593cCdE1e8ae3F8C1',
 } as const;
 
 export type AdPlacementChainId = keyof typeof AdPlacement;
 
 export const AnalyticsRegistry = {
-  '84532': '0xB18db49DFAB0d8B05916260D457574348893601d',
-  '11155111': '0x908Db578775aA2391244d57A87b156f54964aF8e',
+  '84532': '0xa6c4bd0256DA30780529bf3cF6D78BfEdACbcBB9',
+  '11155111': '0xB86539C4bf30036B6bd1513320cF38Bc839c7922',
 } as const;
 
 export type AnalyticsRegistryChainId = keyof typeof AnalyticsRegistry;
 
 export const CanonMarketplace = {
-  '84532': '0x222604e2185802046692293fD31dCb4Bde249Bc3',
-  '11155111': '0x2Bb4750B79C48e5D39c29b5e88DE05DB94A6AB1f',
+  '84532': '0x152AdC8350ee69162989c0C52F5FFb2f8A09E17B',
+  '11155111': '0xDc5998C5e334345Ac3Aa9a9c6e141f471e929c81',
 } as const;
 
 export type CanonMarketplaceChainId = keyof typeof CanonMarketplace;
@@ -30,15 +30,22 @@ export const CharacterNFT = {
 export type CharacterNFTChainId = keyof typeof CharacterNFT;
 
 export const CollabManager = {
-  '84532': '0x7bB6cDdd392Bf8a6a6E58fd8600B87c8455E8240',
-  '11155111': '0x43883B2BE785FCC2C098401F07a17a3BbBDAf7d7',
+  '84532': '0x5BaAd71adD73E7748F1c1C2B67a2eB4040DcEB1c',
+  '11155111': '0xE981454B4149BEA3a9018fa2ab77482F388ba01f',
 } as const;
 
 export type CollabManagerChainId = keyof typeof CollabManager;
 
+export const ContentLicensing = {
+  '84532': '0x73A7b082e484fc1274185a62C63054256A043365',
+  '11155111': '0xC9fb591fC6a8a259fADF1242DF3ca434CF022216',
+} as const;
+
+export type ContentLicensingChainId = keyof typeof ContentLicensing;
+
 export const CreditManager = {
-  '84532': '0x6077Ce7CB99Bfe1eC3c67f8635a597a76e3FbB71',
-  '11155111': '0x42d5F92F550D42B36a119949d26a34Ca1F6b2d1E',
+  '84532': '0x7E62116b9A889150e6d07830a179f3cf803C2908',
+  '11155111': '0x5110FCCaf50316D8F874F22428dC1a832F591639',
 } as const;
 
 export type CreditManagerChainId = keyof typeof CreditManager;
@@ -86,8 +93,8 @@ export const LaunchpadStaking = {
 export type LaunchpadStakingChainId = keyof typeof LaunchpadStaking;
 
 export const LicensingRegistry = {
-  '84532': '0x8e6c09198267B07E3FC8C66F0343759111D63016',
-  '11155111': '0x60F419E0f37dD661AF43e5326872733e89911DA9',
+  '84532': '0x4Ce3d82B3ab99ECF404f43aa5167C1E6BF52A3cF',
+  '11155111': '0xbF0Fed6125b1e05aA3Dc52B72B5cd7703990627C',
 } as const;
 
 export type LicensingRegistryChainId = keyof typeof LicensingRegistry;
@@ -107,7 +114,6 @@ export type LoarFeeLockerChainId = keyof typeof LoarFeeLocker;
 
 export const LoarHookStaticFee = {
   '84532': '0xe35adBBc6da1000BE4DCbf49ccBE3B9B70c9a8cC',
-  '11155111': '0xF5b2676E0fbc7551ae3E38f25D87C941C5a968CC',
 } as const;
 
 export type LoarHookStaticFeeChainId = keyof typeof LoarHookStaticFee;
@@ -134,8 +140,8 @@ export const LoarToken = {
 export type LoarTokenChainId = keyof typeof LoarToken;
 
 export const PaymentRouter = {
-  '84532': '0x3a6C6Bc90F34839a4792c107d9597a92fBCCA984',
-  '11155111': '0x0fF81B57D5B47AC5bF2A84EeA69cCf4Aa6eb0C7C',
+  '84532': '0x99DE0BCAEFA1ce760856a13A74De631c4b6695F4',
+  '11155111': '0x920e9A9bac991554AEE2AB7c76c521e5FB3113b6',
 } as const;
 
 export type PaymentRouterChainId = keyof typeof PaymentRouter;
@@ -154,27 +160,28 @@ export const RevenueModuleFactory = {
 export type RevenueModuleFactoryChainId = keyof typeof RevenueModuleFactory;
 
 export const RightsRegistry = {
-  '84532': '0x3EF8d96cf4336E46cc7091A2325B19f53b65b109',
-  '11155111': '0x82b4Fe50cE07a64CbF5f97E9d70F2cEb8af63EA3',
+  '84532': '0x982c153e41b8B78ca48D7A13e6766Ce85F039558',
+  '11155111': '0x3A14A746990498d5a4eCe867db10a197f91856Bc',
 } as const;
 
 export type RightsRegistryChainId = keyof typeof RightsRegistry;
 
 export const SplitRouter = {
   '84532': '0x8370F54A01Fc035f89293272C597bCE3B1289FC4',
+  '11155111': '0x08081f6b215D0c34D081BfeB8163455CDb1E0Bdc',
 } as const;
 
 export type SplitRouterChainId = keyof typeof SplitRouter;
 
 export const StoryBounties = {
-  '84532': '0x43C48c9b0d2A7B408E19fB7825b924F9e1CF4901',
+  '84532': '0x66BDfFebBa8e61D0A809eEbadD74f923A61aDB7d',
 } as const;
 
 export type StoryBountiesChainId = keyof typeof StoryBounties;
 
 export const SubscriptionManager = {
-  '84532': '0x056dDe6c068cE3FE17C2E6eE6cfA8F76eB5A5264',
-  '11155111': '0xdce691E3743Ad757D079E14D9C7BDf888eBFa395',
+  '84532': '0x4C617Ca52De2D2cA8bB0414F7F1Dd0A90a915031',
+  '11155111': '0x53542bA1e3445804D9a225C967E2677F017D1d47',
 } as const;
 
 export type SubscriptionManagerChainId = keyof typeof SubscriptionManager;
