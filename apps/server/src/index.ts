@@ -203,6 +203,7 @@ function sanitizeUploadFilename(raw: string): string {
   // Strip any path components the browser sent (IE does this, some mobile
   // browsers do too) and null/control chars.
   const basename = raw.split(/[\\/]/).pop() ?? '';
+  // eslint-disable-next-line no-control-regex -- intentional: strip null + control chars from uploaded filenames
   const stripped = basename.replace(/[\x00-\x1f\x7f]/g, '').trim();
   if (!stripped) return fallback;
 

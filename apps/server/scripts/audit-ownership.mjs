@@ -25,17 +25,12 @@ const REPO_ROOT = resolve(__dirname, '../../..');
 dotenv.config({ path: resolve(REPO_ROOT, '.env') });
 
 const RPC =
-  process.env.RPC_84532 ??
-  process.env.RPC_URL ??
-  'https://base-sepolia-rpc.publicnode.com';
+  process.env.RPC_84532 ?? process.env.RPC_URL ?? 'https://base-sepolia-rpc.publicnode.com';
 
 const client = createPublicClient({ chain: baseSepolia, transport: http(RPC) });
 
 // Pull addresses from packages/abis/src/addresses.ts
-const src = readFileSync(
-  resolve(REPO_ROOT, 'packages/abis/src/addresses.ts'),
-  'utf-8',
-);
+const src = readFileSync(resolve(REPO_ROOT, 'packages/abis/src/addresses.ts'), 'utf-8');
 
 // Parse exported const blocks: `export const Name = { '84532': '0x...', ... }`
 const re = /export const (\w+) = \{[^}]*'84532':\s*'(0x[a-fA-F0-9]{40})'/g;
@@ -44,7 +39,13 @@ let m;
 while ((m = re.exec(src))) contracts.push({ name: m[1], addr: m[2] });
 
 const OWNER_ABI = [
-  { type: 'function', name: 'owner', inputs: [], outputs: [{ type: 'address' }], stateMutability: 'view' },
+  {
+    type: 'function',
+    name: 'owner',
+    inputs: [],
+    outputs: [{ type: 'address' }],
+    stateMutability: 'view',
+  },
 ];
 
 console.log(`Probing ${contracts.length} contracts on Base Sepolia via ${RPC.split('?')[0]}`);

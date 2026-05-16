@@ -378,7 +378,9 @@ async function idempotencyReplay(
         };
         originalIntentId = body.items.find((i) => i.idempotencyKey === evmToSolKey)?.id ?? null;
       }
-    } catch {}
+    } catch {
+      // best-effort history lookup; replay just gets skipped if it fails
+    }
   }
 
   const solToEvmKey = `e2e_${Date.now()}_${randomBytes(4).toString('hex')}`;

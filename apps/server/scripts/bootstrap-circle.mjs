@@ -28,10 +28,7 @@ if (!apiKey) {
 }
 
 // Recovery lives outside the repo so we can't accidentally commit it.
-const recoveryDir = path.resolve(
-  process.env.HOME || '/tmp',
-  '.loar-circle-recovery'
-);
+const recoveryDir = path.resolve(process.env.HOME || '/tmp', '.loar-circle-recovery');
 fs.mkdirSync(recoveryDir, { recursive: true, mode: 0o700 });
 
 async function registerEntity() {
