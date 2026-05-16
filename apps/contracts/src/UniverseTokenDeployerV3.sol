@@ -255,8 +255,7 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
         //   back into protocol-controlled addresses.
         if (_communityRecipient != address(0)) {
             if (
-                _communityRecipient == address(this)
-                    || _communityRecipient == universeManager
+                _communityRecipient == address(this) || _communityRecipient == universeManager
                     || _communityRecipient == address(0xdead)
             ) revert InvalidCommunityRecipient();
         }
@@ -393,10 +392,7 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
         // Legacy shared `timelock` is the fallback for testnet continuity.
         address governorTimelock;
         if (address(timelockFactory) != address(0)) {
-            governorTimelock = timelockFactory.deployTimelock(
-                universeId,
-                perUniverseTimelockDelay
-            );
+            governorTimelock = timelockFactory.deployTimelock(universeId, perUniverseTimelockDelay);
         } else {
             require(timelock != address(0), "Timelock not set");
             governorTimelock = timelock;

@@ -81,8 +81,12 @@ contract TimelockFactoryTest is Test {
         factory.wireProposer(tl, universeGovernor);
 
         TimelockController controller = TimelockController(payable(tl));
-        assertTrue(controller.hasRole(PROPOSER_ROLE, universeGovernor), "governor missing PROPOSER_ROLE");
-        assertTrue(controller.hasRole(CANCELLER_ROLE, universeGovernor), "governor missing CANCELLER_ROLE");
+        assertTrue(
+            controller.hasRole(PROPOSER_ROLE, universeGovernor), "governor missing PROPOSER_ROLE"
+        );
+        assertTrue(
+            controller.hasRole(CANCELLER_ROLE, universeGovernor), "governor missing CANCELLER_ROLE"
+        );
     }
 
     function test_wireProposer_postRenounce_governorIsLockedIn() public {
@@ -239,7 +243,9 @@ contract TimelockFactoryTest is Test {
         // only the indexed universeId + deployer + the data field minDelay.
         vm.prank(authorizedDeployer);
         vm.expectEmit(false, true, true, true);
-        emit TimelockFactory.TimelockDeployed(address(0), 40, factory.DEFAULT_MIN_DELAY(), authorizedDeployer);
+        emit TimelockFactory.TimelockDeployed(
+            address(0), 40, factory.DEFAULT_MIN_DELAY(), authorizedDeployer
+        );
         factory.deployTimelock(40, 0);
     }
 

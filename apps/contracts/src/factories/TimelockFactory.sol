@@ -119,7 +119,9 @@ contract TimelockFactory is Ownable {
         onlyAuthorized
         returns (address)
     {
-        if (timelockByUniverse[universeId] != address(0)) revert UniverseAlreadyHasTimelock();
+        if (timelockByUniverse[universeId] != address(0)) {
+            revert UniverseAlreadyHasTimelock();
+        }
 
         uint256 delay = minDelay == 0 ? DEFAULT_MIN_DELAY : minDelay;
         if (delay < MIN_DELAY_FLOOR) revert DelayTooLow();
