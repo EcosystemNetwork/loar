@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useWalletAuth, getAuthEmail } from '@/lib/wallet-auth';
-import { useSolanaAuth } from '@/lib/solana-auth';
+import { useCircleSolanaAddress } from '@/hooks/useCircleSolanaAddress';
 import { useUnstoppableDomain, formatDisplayName } from '@/hooks/useUnstoppableDomain';
 
 interface WalletConnectButtonProps {
@@ -19,7 +19,7 @@ interface WalletConnectButtonProps {
 
 export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ className = '' }) => {
   const { address, isAuthenticated, signOut } = useWalletAuth();
-  const { address: solanaAddress, isAuthenticated: solanaAuthenticated } = useSolanaAuth();
+  const { address: solanaAddress } = useCircleSolanaAddress(isAuthenticated);
   const { name: udName } = useUnstoppableDomain(address);
   const displayName = formatDisplayName(address, udName);
   const email = getAuthEmail();
@@ -68,7 +68,7 @@ export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ classN
                 <p className="text-xs text-white/50">Wallet (EVM)</p>
                 <p className="text-xs text-white/60 font-mono break-all">{address}</p>
               </div>
-              {solanaAuthenticated && solanaAddress && (
+              {solanaAddress && (
                 <div className="px-4 py-3 border-b border-white/10">
                   <p className="text-xs text-white/50">Solana</p>
                   <p className="text-xs text-white/60 font-mono break-all">{solanaAddress}</p>

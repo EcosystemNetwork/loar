@@ -58,7 +58,7 @@ function ZaiDiagnosticPage() {
           to="/lab/zai"
           className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
         >
-          <ArrowLeft className="h-3.5 w-3.5" /> Back to Z.AI Lab
+          <ArrowLeft className="h-3.5 w-3.5" /> Back to Model Lab
         </Link>
       </div>
 

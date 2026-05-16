@@ -577,6 +577,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "credit_manager"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+]
+
+[[package]]
 name = "crunchy"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -985,6 +993,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "licensing"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "rights",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1325,6 +1341,13 @@ name = "regex-syntax"
 version = "0.8.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
+
+[[package]]
+name = "rights"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+]
 
 [[package]]
 name = "rustc_version"
@@ -2689,6 +2712,21 @@ dependencies = [
  "spl-discriminator",
  "spl-pod",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "split_router"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+]
+
+[[package]]
+name = "staking"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
 ]
 
 [[package]]

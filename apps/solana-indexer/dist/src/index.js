@@ -25,6 +25,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pino from 'pino';
 import { decodeEventsFromTx } from './anchor-events';
+import { KNOWN_PROGRAM_IDS, PROGRAMS } from './program-registry';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const log = pino({
     level: process.env.LOG_LEVEL ?? 'info',
@@ -140,8 +141,13 @@ const HeliusEnhancedTxSchema = z.object({
         .optional(),
 });
 // ── Program ID routing ──────────────────────────────────────────────────────
-const UNIVERSE_PROGRAM_ID = process.env.UNIVERSE_PROGRAM_ID ?? '';
-const EPISODE_PROGRAM_ID = process.env.EPISODE_PROGRAM_ID ?? '';
+//
+// Sourced from program-registry.ts — adding a new Anchor program (rights,
+// licensing, marketplace, …) auto-extends routing the moment its IDL is
+// registered. PROGRAM_IDS_FOR_HANDLER preserves the per-program lookup used by
+// the typed Universe/Episode handler; everything else flows through the
+// generic event mirror so new programs index without code changes here.
+const ANCHOR_PROGRAM_IDS = KNOWN_PROGRAM_IDS;
 const BUBBLEGUM_PROGRAM_ID = 'BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY';
 // ── Handlers ────────────────────────────────────────────────────────────────
 /**
@@ -157,8 +163,7 @@ const BUBBLEGUM_PROGRAM_ID = 'BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY';
  *     writes are intrinsically idempotent for same-value updates.
  */
 async function handleAnchorEvents(tx) {
-    const known = new Set([UNIVERSE_PROGRAM_ID, EPISODE_PROGRAM_ID].filter(Boolean));
-    if (known.size === 0)
+    if (ANCHOR_PROGRAM_IDS.size === 0)
         return;
     const events = decodeEventsFromTx({
         instructions: (tx.instructions ?? []).map((ix) => ({
@@ -166,7 +171,7 @@ async function handleAnchorEvents(tx) {
             data: ix.data,
             innerInstructions: (ix.innerInstructions ?? []),
         })),
-        knownProgramIds: known,
+        knownProgramIds: ANCHOR_PROGRAM_IDS,
     });
     if (events.length === 0)
         return;
@@ -182,13 +187,22 @@ async function handleAnchorEvents(tx) {
         const docId = `${tx.signature}_${i}`;
         // Idempotency gate. Returns true on the FIRST handling of this event;
         // false on retries. Only first-handlings run non-commutative side-effects
-        // (e.g. canonCount increment).
+        // (e.g. canonCount increment). The doc stores the raw IDL-decoded event
+        // unconditionally so new programs added to the registry start indexing
+        // immediately, even before dedicated typed handlers exist.
         const eventRef = db.collection('solanaEvents').doc(docId);
         const isFirstHandling = await db.runTransaction(async (t) => {
             const existing = await t.get(eventRef);
             if (existing.exists)
                 return false;
-            t.set(eventRef, { ...base, kind: event.kind, payload: event });
+            t.set(eventRef, {
+                ...base,
+                kind: event.kind,
+                program: event.raw.program,
+                programId: event.raw.programId,
+                eventName: event.raw.name,
+                payload: event.raw.data,
+            });
             return true;
         });
         if (event.kind === 'UniverseCreated') {
@@ -309,9 +323,17 @@ async function handleBubblegumMint(tx) {
 async function routeTx(tx) {
     const programs = new Set(tx.instructions?.map((i) => i.programId) ?? []);
     const tasks = [];
-    // Anchor program calls — decoded into typed entity docs.
-    if ((UNIVERSE_PROGRAM_ID && programs.has(UNIVERSE_PROGRAM_ID)) ||
-        (EPISODE_PROGRAM_ID && programs.has(EPISODE_PROGRAM_ID))) {
+    // Anchor program calls — decoded into typed entity docs (Universe/Episode)
+    // and mirrored as generic event docs for every registered LOAR program.
+    // Fires when ANY registered program is touched in this tx.
+    let hitAnchorProgram = false;
+    for (const id of ANCHOR_PROGRAM_IDS) {
+        if (programs.has(id)) {
+            hitAnchorProgram = true;
+            break;
+        }
+    }
+    if (hitAnchorProgram) {
         tasks.push(handleAnchorEvents(tx));
     }
     // Bubblegum cNFT mints — separate handler so cNFT asset lookups by leaf
@@ -326,12 +348,77 @@ async function routeTx(tx) {
 }
 // ── HTTP entrypoint ─────────────────────────────────────────────────────────
 const app = new Hono();
-app.get('/healthz', (c) => c.json({ ok: true }));
+// In-memory health metrics — process-local, reset on restart. Good enough for
+// the "is anything getting through?" question that prompts most pages.
+const health = {
+    startedAt: Date.now(),
+    webhookDeliveries: 0,
+    txsProcessed: 0,
+    txsFailed: 0,
+    /** Sliding-window of recent failures so /healthz can surface the rate. */
+    recentFailures: [],
+    lastWebhookAt: 0,
+    lastSuccessSig: '',
+    lastSuccessAt: 0,
+};
+function recordFailure() {
+    health.txsFailed++;
+    const now = Date.now();
+    health.recentFailures.push(now);
+    // Trim anything older than 1h.
+    const cutoff = now - 60 * 60 * 1000;
+    while (health.recentFailures.length > 0 && health.recentFailures[0] < cutoff) {
+        health.recentFailures.shift();
+    }
+}
+app.get('/healthz', async (c) => {
+    // Quick Firestore reachability probe — bounded so a 30s timeout never blocks
+    // health response. Cached at the load-balancer level normally.
+    let firestoreReachable = null;
+    try {
+        if (db) {
+            await Promise.race([
+                db.collection('_health').limit(1).get(),
+                new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 1500)),
+            ]);
+            firestoreReachable = true;
+        }
+    }
+    catch {
+        firestoreReachable = false;
+    }
+    const now = Date.now();
+    const recentFailuresLastHour = health.recentFailures.length;
+    // Stale signal: no webhook in 30min while service has been up > 1h.
+    // Helius docs guarantee continuous delivery while the program is active, so
+    // a long gap usually means the webhook registration drifted.
+    const upMs = now - health.startedAt;
+    const lastWebhookAgeMs = health.lastWebhookAt ? now - health.lastWebhookAt : null;
+    const isStale = upMs > 60 * 60 * 1000 && (lastWebhookAgeMs === null || lastWebhookAgeMs > 30 * 60 * 1000);
+    const ok = firestoreReachable !== false && !isStale && recentFailuresLastHour < 100;
+    return c.json({
+        ok,
+        stale: isStale,
+        firestoreReachable,
+        uptimeSeconds: Math.floor(upMs / 1000),
+        webhookDeliveries: health.webhookDeliveries,
+        txsProcessed: health.txsProcessed,
+        txsFailed: health.txsFailed,
+        recentFailuresLastHour,
+        lastWebhookAgeSeconds: lastWebhookAgeMs === null ? null : Math.floor(lastWebhookAgeMs / 1000),
+        lastSuccessSig: health.lastSuccessSig || null,
+        lastSuccessAgeSeconds: health.lastSuccessAt
+            ? Math.floor((now - health.lastSuccessAt) / 1000)
+            : null,
+    }, ok ? 200 : 503);
+});
 app.post('/webhooks/helius', async (c) => {
     if (!verifyHeliusAuth(c.req.header('Authorization'))) {
         log.warn('Rejected Helius webhook with missing/mismatched auth header');
         return c.json({ error: 'unauthorized' }, 401);
     }
+    health.webhookDeliveries++;
+    health.lastWebhookAt = Date.now();
     const raw = await c.req.text();
     let payload;
     try {
@@ -354,13 +441,26 @@ app.post('/webhooks/helius', async (c) => {
     }
     // Process in parallel but bound concurrency to 10 to avoid Firestore burst limits.
     for (let i = 0; i < parsed.length; i += 10) {
-        await Promise.all(parsed.slice(i, i + 10).map(routeTx));
+        const batch = parsed.slice(i, i + 10);
+        const results = await Promise.allSettled(batch.map(routeTx));
+        for (let j = 0; j < results.length; j++) {
+            const r = results[j];
+            if (r.status === 'fulfilled') {
+                health.txsProcessed++;
+                health.lastSuccessSig = batch[j].signature;
+                health.lastSuccessAt = Date.now();
+            }
+            else {
+                recordFailure();
+                log.error({ err: r.reason, sig: batch[j].signature }, 'tx route failed');
+            }
+        }
     }
     return c.json({ processed: parsed.length });
 });
 // ── Boot ────────────────────────────────────────────────────────────────────
 const port = Number(process.env.SOLANA_INDEXER_PORT ?? 42070);
 serve({ fetch: app.fetch, port }, (info) => {
-    log.info(`solana-indexer listening on :${info.port}`);
+    log.info({ programs: PROGRAMS.map((p) => ({ name: p.name, programId: p.programId })) }, `solana-indexer listening on :${info.port}`);
 });
 //# sourceMappingURL=index.js.map

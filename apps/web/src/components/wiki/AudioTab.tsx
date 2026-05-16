@@ -81,10 +81,10 @@ export function AudioTab({ universeAddress }: AudioTabProps) {
           <Music className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
           <p className="mb-2">No audio yet.</p>
           <p className="text-xs mb-4">
-            Generate music, dialogue, or SFX in the sandbox — they'll appear here.
+            Generate music, dialogue, or SFX in the Lab — they'll appear here.
           </p>
           <Link to="/sandbox">
-            <Button variant="outline">Open Sandbox</Button>
+            <Button variant="outline">Open Lab</Button>
           </Link>
         </div>
       )}

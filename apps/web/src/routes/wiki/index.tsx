@@ -407,7 +407,7 @@ function GalleryTab({ universeAddress }: { universeAddress?: string }) {
         <Link to="/sandbox">
           <Button size="sm" variant="outline">
             <Plus className="h-4 w-4 mr-1" />
-            Create in Sandbox
+            Create in Lab
           </Button>
         </Link>
       </div>

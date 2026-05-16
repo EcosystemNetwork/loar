@@ -30,6 +30,12 @@ export const ENTITY_KINDS = [
   // Visual-language kinds — PRD 5 (Retexture, Moodboards, House Style Packs)
   'moodboard',
   'style_pack',
+  // Real-person likeness kinds (PRD 8: Verified Likeness Marketplace).
+  // Separate from `person` (which is a fictional character in a universe) —
+  // these represent a real creator's own biometric likeness, listed for
+  // sale / lease / license through likenessMarketplace.
+  'voice',
+  'likeness',
   // Structural/ontology kinds
   'timeline',
   'reality',
@@ -56,6 +62,14 @@ export const CREATOR_KINDS: EntityKind[] = [
   'moodboard',
   'style_pack',
 ];
+
+/**
+ * Real-person likeness kinds — kept separate from CREATOR_KINDS so the wiki /
+ * universe surfaces (which expect fictional content) don't accidentally render
+ * a creator's real biometric assets alongside their stories. Likeness entities
+ * surface exclusively in the Likeness Marketplace.
+ */
+export const LIKENESS_KINDS: EntityKind[] = ['voice', 'likeness'];
 
 /** Advanced structural kinds for universe ontology. */
 export const STRUCTURAL_KINDS: EntityKind[] = [
@@ -91,6 +105,9 @@ export const VALID_PARENTS: Record<EntityKind, (EntityKind | null)[]> = {
   // Visual-language kinds — live at the universe level, no structural parent
   moodboard: [null],
   style_pack: [null],
+  // Likeness kinds — owned directly by the creator, no universe relationship
+  voice: [null],
+  likeness: [null],
   // Structural kinds — follow ontology hierarchy
   timeline: [null],
   reality: [null, 'timeline'],
@@ -114,6 +131,8 @@ export const KIND_LABELS: Record<EntityKind, string> = {
   organization: 'Organization',
   moodboard: 'Moodboard',
   style_pack: 'Style Pack',
+  voice: 'Voice',
+  likeness: 'Likeness',
   timeline: 'Timeline',
   reality: 'Reality',
   dimension: 'Dimension',
@@ -136,6 +155,8 @@ export const KIND_PLURAL_LABELS: Record<EntityKind, string> = {
   organization: 'Organizations',
   moodboard: 'Moodboards',
   style_pack: 'Style Packs',
+  voice: 'Voices',
+  likeness: 'Likenesses',
   timeline: 'Timelines',
   reality: 'Realities',
   dimension: 'Dimensions',
@@ -395,6 +416,214 @@ export interface MoodboardMetadata {
   tags?: string[];
   /** Short paragraph describing the intended feel. */
   notes?: string;
+}
+
+// ── Likeness Marketplace (PRD 8: Verified Likeness Marketplace) ───────────
+
+/**
+ * Modalities a `likeness` entity can include. A multimodal likeness lists
+ * multiple values; a voice-only listing uses the `voice` kind instead so the
+ * marketplace browse can filter quickly without inspecting metadata.
+ */
+export const LIKENESS_MODALITIES = ['face', 'body', 'video', '3d', 'full'] as const;
+export type LikenessModality = (typeof LIKENESS_MODALITIES)[number];
+
+/** Metadata shape for a `voice` entity. */
+export interface VoiceEntityMetadata {
+  /** ElevenLabs voice_id this entity wraps. */
+  elevenLabsVoiceId: string;
+  /** How the underlying voice was created. */
+  source: 'clone' | 'design';
+  /** Auto-rendered preview (rehosted to Pinata). */
+  previewUrl?: string;
+  /** Original audio uploads that produced the clone. */
+  sourceSampleUrls?: string[];
+  gender?: 'male' | 'female' | 'neutral';
+  age?: 'young' | 'middle_aged' | 'old';
+  accent?: string;
+  /** BCP-47 locale tag, e.g. "en-US". */
+  locale?: string;
+  /** Free-form descriptor tags. */
+  tags?: string[];
+}
+
+/** Metadata shape for a `likeness` entity (face / body / video / 3d / full). */
+export interface LikenessEntityMetadata {
+  modalities: LikenessModality[];
+  /** Reference images of the face. */
+  faceImageUrls?: string[];
+  /** Reference images of the body / pose. */
+  bodyImageUrls?: string[];
+  /** Idle / expression video clips. */
+  videoUrls?: string[];
+  /** Optional 3D scan asset. */
+  threeDAssetUrl?: string;
+  /** Optional companion voice entity (so a full likeness bundles voice). */
+  linkedVoiceEntityId?: string;
+  /** Self-reported subject demographics — surfaced as filters. */
+  gender?: string;
+  ethnicity?: string;
+  approximateAge?: number;
+  /** True for a real human; false for an AI persona / fictional digital twin. */
+  realPerson: boolean;
+}
+
+// ── Consent attestation ───────────────────────────────────────────────────
+
+/**
+ * Allowed use cases a creator can opt their likeness into. The marketplace
+ * surfaces each as a separate license-scope toggle so buyers can only request
+ * uses the rights holder explicitly authorized.
+ */
+export const LIKENESS_USE_CASES = [
+  'narrative_film',
+  'advertising',
+  'gaming',
+  'education',
+  'documentary',
+  'social_media',
+  'music_video',
+  'audiobook',
+  'voice_assistant',
+  'dubbing',
+] as const;
+export type LikenessUseCase = (typeof LIKENESS_USE_CASES)[number];
+
+/** Hard prohibitions enforced server-side regardless of buyer license terms. */
+export const LIKENESS_PROHIBITIONS = [
+  'political',
+  'adult',
+  'hate_speech',
+  'defamatory',
+  'misleading_endorsement',
+  'illegal_activity',
+] as const;
+export type LikenessProhibition = (typeof LIKENESS_PROHIBITIONS)[number];
+
+/**
+ * Consent attestation captured before an entity can be listed for sale /
+ * lease / license. Persisted to `likenessConsents/{entityId}/{revisionId}`.
+ *
+ * For Phase 1 we accept a click-through attestation (the creator's
+ * authenticated wallet + a literal acknowledgement string) — Phase 4 will
+ * add KYC, liveness verification, and a signed message of the attestation
+ * hash to upgrade `verified` to true.
+ */
+export interface LikenessConsent {
+  /** UUID for this consent revision. */
+  id: string;
+  /** Entity this consent is attached to. */
+  entityId: string;
+  /** Wallet address of the rights holder (the creator). */
+  rightsHolderAddress: string;
+  /** Server uid of the rights holder. */
+  rightsHolderUid: string;
+  /** Modalities this consent authorizes. */
+  modalities: LikenessModality[];
+  /** Use cases the rights holder opts in to. */
+  allowedUseCases: LikenessUseCase[];
+  /** Hard "never these uses" overrides — defaults to the full prohibition set. */
+  prohibitions: LikenessProhibition[];
+  /** Buy / lease / license each toggled independently. */
+  permitSale: boolean;
+  permitLease: boolean;
+  permitLicense: boolean;
+  /** Subject is a real living person (default true). False for AI personas. */
+  realPerson: boolean;
+  /** True only after KYC + liveness + biometric match (Phase 4). */
+  verified: boolean;
+  /** Literal acknowledgement text the user clicked through. */
+  attestationText: string;
+  /** Optional EIP-191 signature of `attestationText` for stronger non-repudiation. */
+  attestationSignature?: string;
+  /** Marketplace status — `frozen` blocks new deals; `revoked` is irreversible. */
+  status: 'active' | 'frozen' | 'revoked';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** The canonical attestation text v1 — copy in lockstep with `submitConsent`. */
+export const LIKENESS_ATTESTATION_TEXT_V1 =
+  'I confirm that the biometric likeness (voice, face, body, or other identifying features) ' +
+  'represented by this asset is either my own or that I hold all rights necessary to commercialize ' +
+  'it. I authorize LOAR to make this asset available on the Likeness Marketplace under the ' +
+  'modalities, use cases, and deal types I have selected, and I understand that buyers may use the ' +
+  'asset only within those terms. I acknowledge that on-chain hashes cannot be deleted, and that ' +
+  'revoking consent affects future deals only — existing licenses remain valid until expiry. ' +
+  'I understand that LOAR may freeze or remove this listing if it is found to be unauthorized, ' +
+  'and that misuse may carry legal liability.';
+
+// ── Listings + Deals ──────────────────────────────────────────────────────
+
+export const LIKENESS_DEAL_TYPES = ['BUY', 'LEASE', 'LICENSE'] as const;
+export type LikenessDealType = (typeof LIKENESS_DEAL_TYPES)[number];
+
+/** Firestore shape for a marketplace listing. */
+export interface LikenessListing {
+  id: string;
+  entityId: string;
+  entityKind: 'voice' | 'likeness';
+  /** Snapshot of the consent that authorized the listing (immutable per revision). */
+  consentId: string;
+  sellerUid: string;
+  sellerAddress: string;
+  /** Display fields copied from the entity at create time so browse is cheap. */
+  title: string;
+  description: string;
+  thumbnailUrl: string | null;
+  previewUrl: string | null;
+  modalities: LikenessModality[];
+  /** Wei-as-string for big-money safety. "0" means "deal type disabled". */
+  buyPriceWei: string;
+  leasePricePerDayWei: string;
+  licenseFeeWei: string;
+  /** Ongoing royalty bps for LICENSE deals (0-5000). */
+  licenseRoyaltyBps: number;
+  /** Maximum days a single lease/license can run. Capped at 365 (matches contract). */
+  maxDurationDays: number;
+  /** Listing is hidden from browse when false. */
+  active: boolean;
+  totalSales: number;
+  totalRevenueWei: string;
+  // ── Phase 1.5: on-chain ContentLicensing.sol mirror ────────────────────
+  /** bytes32 contentHash registered with ContentLicensing.sol. Null until publishOnChain. */
+  onChainContentHash: string | null;
+  /** Chain ID the registration lives on (11155111 = Sepolia, 84532 = Base Sepolia). */
+  onChainChainId: number | null;
+  /** ContentLicensing contract address on `onChainChainId`. */
+  onChainContentLicensingAddress: string | null;
+  /** Hash of the registerContent transaction (proves the listing is live on-chain). */
+  onChainRegisterTxHash: string | null;
+  /** Hash of the setRightsWithCreatorSig transaction submitted by the operator. */
+  onChainRightsTxHash: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Firestore shape for an executed deal. */
+export interface LikenessDeal {
+  id: string;
+  listingId: string;
+  entityId: string;
+  dealType: LikenessDealType;
+  sellerUid: string;
+  sellerAddress: string;
+  buyerUid: string;
+  buyerAddress: string;
+  pricePaidWei: string;
+  durationDays: number | null;
+  /** Lease/License expiry. Null for BUY. */
+  endTime: Date | null;
+  txHash: string;
+  /** ACTIVE → EXPIRED via checkAccess or off-chain sweep. */
+  status: 'ACTIVE' | 'EXPIRED' | 'REVOKED';
+  /** Buyer's use-case declaration at deal time. Must be within the listing's allowed set. */
+  declaredUseCase: LikenessUseCase;
+  startTime: Date;
+  /** True when the tx was routed through ContentLicensing.sol (vs. direct transfer). */
+  onChain: boolean;
+  /** On-chain dealId from ContentLicensing.sol — used for hasAccessFast queries. */
+  onChainDealId: string | null;
 }
 
 /** Expected metadata shape for a style_pack entity. */

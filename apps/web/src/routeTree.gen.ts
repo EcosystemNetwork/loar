@@ -66,6 +66,7 @@ import { Route as PlayUniverseIdRouteImport } from './routes/play/$universeId'
 import { Route as OrderIdRouteImport } from './routes/order/$id'
 import { Route as OauthSiweRouteImport } from './routes/oauth/siwe'
 import { Route as NotebookIdRouteImport } from './routes/notebook.$id'
+import { Route as MarketplaceLikenessRouteImport } from './routes/marketplace.likeness'
 import { Route as LineageAssetIdRouteImport } from './routes/lineage.$assetId'
 import { Route as LabZaiRouteImport } from './routes/lab.zai'
 import { Route as LabVoiceStudioRouteImport } from './routes/lab.voice-studio'
@@ -75,6 +76,7 @@ import { Route as EpisodeIdRouteImport } from './routes/episode.$id'
 import { Route as EditOutpaintRouteImport } from './routes/edit.outpaint'
 import { Route as EditInpaintRouteImport } from './routes/edit.inpaint'
 import { Route as DashboardRevenueRouteImport } from './routes/dashboard.revenue'
+import { Route as CreateLikenessRouteImport } from './routes/create.likeness'
 import { Route as CreateKindRouteImport } from './routes/create/$kind'
 import { Route as CharactersUniverseIdRouteImport } from './routes/characters.$universeId'
 import { Route as CanonUniverseIdRouteImport } from './routes/canon/$universeId'
@@ -98,6 +100,7 @@ import { Route as UniverseAddressPollsRouteImport } from './routes/universe.$add
 import { Route as UniverseAddressPhysicsRouteImport } from './routes/universe.$address.physics'
 import { Route as TokensCreatorAddressRouteImport } from './routes/tokens/creator.$address'
 import { Route as StudioEditAssetIdRouteImport } from './routes/studio.edit.$assetId'
+import { Route as MarketplaceLikenessListingIdRouteImport } from './routes/marketplace.likeness.$listingId'
 import { Route as LabZaiDiagnosticRouteImport } from './routes/lab.zai.diagnostic'
 import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
 import { Route as LabZaiVideoJobIdRouteImport } from './routes/lab.zai.video.$jobId'
@@ -387,6 +390,11 @@ const NotebookIdRoute = NotebookIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => NotebookRoute,
 } as any)
+const MarketplaceLikenessRoute = MarketplaceLikenessRouteImport.update({
+  id: '/marketplace/likeness',
+  path: '/marketplace/likeness',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LineageAssetIdRoute = LineageAssetIdRouteImport.update({
   id: '/lineage/$assetId',
   path: '/lineage/$assetId',
@@ -431,6 +439,11 @@ const DashboardRevenueRoute = DashboardRevenueRouteImport.update({
   id: '/revenue',
   path: '/revenue',
   getParentRoute: () => DashboardRoute,
+} as any)
+const CreateLikenessRoute = CreateLikenessRouteImport.update({
+  id: '/create/likeness',
+  path: '/create/likeness',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const CreateKindRoute = CreateKindRouteImport.update({
   id: '/create/$kind',
@@ -547,6 +560,12 @@ const StudioEditAssetIdRoute = StudioEditAssetIdRouteImport.update({
   path: '/edit/$assetId',
   getParentRoute: () => StudioRoute,
 } as any)
+const MarketplaceLikenessListingIdRoute =
+  MarketplaceLikenessListingIdRouteImport.update({
+    id: '/$listingId',
+    path: '/$listingId',
+    getParentRoute: () => MarketplaceLikenessRoute,
+  } as any)
 const LabZaiDiagnosticRoute = LabZaiDiagnosticRouteImport.update({
   id: '/diagnostic',
   path: '/diagnostic',
@@ -608,6 +627,7 @@ export interface FileRoutesByFullPath {
   '/canon/$universeId': typeof CanonUniverseIdRoute
   '/characters/$universeId': typeof CharactersUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
+  '/create/likeness': typeof CreateLikenessRoute
   '/dashboard/revenue': typeof DashboardRevenueRoute
   '/edit/inpaint': typeof EditInpaintRoute
   '/edit/outpaint': typeof EditOutpaintRoute
@@ -617,6 +637,7 @@ export interface FileRoutesByFullPath {
   '/lab/voice-studio': typeof LabVoiceStudioRoute
   '/lab/zai': typeof LabZaiRouteWithChildren
   '/lineage/$assetId': typeof LineageAssetIdRoute
+  '/marketplace/likeness': typeof MarketplaceLikenessRouteWithChildren
   '/notebook/$id': typeof NotebookIdRoute
   '/oauth/siwe': typeof OauthSiweRoute
   '/order/$id': typeof OrderIdRoute
@@ -642,6 +663,7 @@ export interface FileRoutesByFullPath {
   '/wiki/': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/lab/zai/diagnostic': typeof LabZaiDiagnosticRoute
+  '/marketplace/likeness/$listingId': typeof MarketplaceLikenessListingIdRoute
   '/studio/edit/$assetId': typeof StudioEditAssetIdRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
   '/universe/$address/physics': typeof UniverseAddressPhysicsRoute
@@ -702,6 +724,7 @@ export interface FileRoutesByTo {
   '/canon/$universeId': typeof CanonUniverseIdRoute
   '/characters/$universeId': typeof CharactersUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
+  '/create/likeness': typeof CreateLikenessRoute
   '/dashboard/revenue': typeof DashboardRevenueRoute
   '/edit/inpaint': typeof EditInpaintRoute
   '/edit/outpaint': typeof EditOutpaintRoute
@@ -711,6 +734,7 @@ export interface FileRoutesByTo {
   '/lab/voice-studio': typeof LabVoiceStudioRoute
   '/lab/zai': typeof LabZaiRouteWithChildren
   '/lineage/$assetId': typeof LineageAssetIdRoute
+  '/marketplace/likeness': typeof MarketplaceLikenessRouteWithChildren
   '/notebook/$id': typeof NotebookIdRoute
   '/oauth/siwe': typeof OauthSiweRoute
   '/order/$id': typeof OrderIdRoute
@@ -736,6 +760,7 @@ export interface FileRoutesByTo {
   '/wiki': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/lab/zai/diagnostic': typeof LabZaiDiagnosticRoute
+  '/marketplace/likeness/$listingId': typeof MarketplaceLikenessListingIdRoute
   '/studio/edit/$assetId': typeof StudioEditAssetIdRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
   '/universe/$address/physics': typeof UniverseAddressPhysicsRoute
@@ -797,6 +822,7 @@ export interface FileRoutesById {
   '/canon/$universeId': typeof CanonUniverseIdRoute
   '/characters/$universeId': typeof CharactersUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
+  '/create/likeness': typeof CreateLikenessRoute
   '/dashboard/revenue': typeof DashboardRevenueRoute
   '/edit/inpaint': typeof EditInpaintRoute
   '/edit/outpaint': typeof EditOutpaintRoute
@@ -806,6 +832,7 @@ export interface FileRoutesById {
   '/lab/voice-studio': typeof LabVoiceStudioRoute
   '/lab/zai': typeof LabZaiRouteWithChildren
   '/lineage/$assetId': typeof LineageAssetIdRoute
+  '/marketplace/likeness': typeof MarketplaceLikenessRouteWithChildren
   '/notebook/$id': typeof NotebookIdRoute
   '/oauth/siwe': typeof OauthSiweRoute
   '/order/$id': typeof OrderIdRoute
@@ -831,6 +858,7 @@ export interface FileRoutesById {
   '/wiki/': typeof WikiIndexRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/lab/zai/diagnostic': typeof LabZaiDiagnosticRoute
+  '/marketplace/likeness/$listingId': typeof MarketplaceLikenessListingIdRoute
   '/studio/edit/$assetId': typeof StudioEditAssetIdRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
   '/universe/$address/physics': typeof UniverseAddressPhysicsRoute
@@ -893,6 +921,7 @@ export interface FileRouteTypes {
     | '/canon/$universeId'
     | '/characters/$universeId'
     | '/create/$kind'
+    | '/create/likeness'
     | '/dashboard/revenue'
     | '/edit/inpaint'
     | '/edit/outpaint'
@@ -902,6 +931,7 @@ export interface FileRouteTypes {
     | '/lab/voice-studio'
     | '/lab/zai'
     | '/lineage/$assetId'
+    | '/marketplace/likeness'
     | '/notebook/$id'
     | '/oauth/siwe'
     | '/order/$id'
@@ -927,6 +957,7 @@ export interface FileRouteTypes {
     | '/wiki/'
     | '/event/$universe/$event'
     | '/lab/zai/diagnostic'
+    | '/marketplace/likeness/$listingId'
     | '/studio/edit/$assetId'
     | '/tokens/creator/$address'
     | '/universe/$address/physics'
@@ -987,6 +1018,7 @@ export interface FileRouteTypes {
     | '/canon/$universeId'
     | '/characters/$universeId'
     | '/create/$kind'
+    | '/create/likeness'
     | '/dashboard/revenue'
     | '/edit/inpaint'
     | '/edit/outpaint'
@@ -996,6 +1028,7 @@ export interface FileRouteTypes {
     | '/lab/voice-studio'
     | '/lab/zai'
     | '/lineage/$assetId'
+    | '/marketplace/likeness'
     | '/notebook/$id'
     | '/oauth/siwe'
     | '/order/$id'
@@ -1021,6 +1054,7 @@ export interface FileRouteTypes {
     | '/wiki'
     | '/event/$universe/$event'
     | '/lab/zai/diagnostic'
+    | '/marketplace/likeness/$listingId'
     | '/studio/edit/$assetId'
     | '/tokens/creator/$address'
     | '/universe/$address/physics'
@@ -1081,6 +1115,7 @@ export interface FileRouteTypes {
     | '/canon/$universeId'
     | '/characters/$universeId'
     | '/create/$kind'
+    | '/create/likeness'
     | '/dashboard/revenue'
     | '/edit/inpaint'
     | '/edit/outpaint'
@@ -1090,6 +1125,7 @@ export interface FileRouteTypes {
     | '/lab/voice-studio'
     | '/lab/zai'
     | '/lineage/$assetId'
+    | '/marketplace/likeness'
     | '/notebook/$id'
     | '/oauth/siwe'
     | '/order/$id'
@@ -1115,6 +1151,7 @@ export interface FileRouteTypes {
     | '/wiki/'
     | '/event/$universe/$event'
     | '/lab/zai/diagnostic'
+    | '/marketplace/likeness/$listingId'
     | '/studio/edit/$assetId'
     | '/tokens/creator/$address'
     | '/universe/$address/physics'
@@ -1176,6 +1213,7 @@ export interface RootRouteChildren {
   CanonUniverseIdRoute: typeof CanonUniverseIdRoute
   CharactersUniverseIdRoute: typeof CharactersUniverseIdRoute
   CreateKindRoute: typeof CreateKindRoute
+  CreateLikenessRoute: typeof CreateLikenessRoute
   EditInpaintRoute: typeof EditInpaintRoute
   EditOutpaintRoute: typeof EditOutpaintRoute
   EpisodeIdRoute: typeof EpisodeIdRoute
@@ -1184,6 +1222,7 @@ export interface RootRouteChildren {
   LabVoiceStudioRoute: typeof LabVoiceStudioRoute
   LabZaiRoute: typeof LabZaiRouteWithChildren
   LineageAssetIdRoute: typeof LineageAssetIdRoute
+  MarketplaceLikenessRoute: typeof MarketplaceLikenessRouteWithChildren
   OauthSiweRoute: typeof OauthSiweRoute
   OrderIdRoute: typeof OrderIdRoute
   PlayUniverseIdRoute: typeof PlayUniverseIdRoute
@@ -1615,6 +1654,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NotebookIdRouteImport
       parentRoute: typeof NotebookRoute
     }
+    '/marketplace/likeness': {
+      id: '/marketplace/likeness'
+      path: '/marketplace/likeness'
+      fullPath: '/marketplace/likeness'
+      preLoaderRoute: typeof MarketplaceLikenessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/lineage/$assetId': {
       id: '/lineage/$assetId'
       path: '/lineage/$assetId'
@@ -1677,6 +1723,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/revenue'
       preLoaderRoute: typeof DashboardRevenueRouteImport
       parentRoute: typeof DashboardRoute
+    }
+    '/create/likeness': {
+      id: '/create/likeness'
+      path: '/create/likeness'
+      fullPath: '/create/likeness'
+      preLoaderRoute: typeof CreateLikenessRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/create/$kind': {
       id: '/create/$kind'
@@ -1839,6 +1892,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioEditAssetIdRouteImport
       parentRoute: typeof StudioRoute
     }
+    '/marketplace/likeness/$listingId': {
+      id: '/marketplace/likeness/$listingId'
+      path: '/$listingId'
+      fullPath: '/marketplace/likeness/$listingId'
+      preLoaderRoute: typeof MarketplaceLikenessListingIdRouteImport
+      parentRoute: typeof MarketplaceLikenessRoute
+    }
     '/lab/zai/diagnostic': {
       id: '/lab/zai/diagnostic'
       path: '/diagnostic'
@@ -1911,6 +1971,17 @@ const LabZaiRouteChildren: LabZaiRouteChildren = {
 const LabZaiRouteWithChildren =
   LabZaiRoute._addFileChildren(LabZaiRouteChildren)
 
+interface MarketplaceLikenessRouteChildren {
+  MarketplaceLikenessListingIdRoute: typeof MarketplaceLikenessListingIdRoute
+}
+
+const MarketplaceLikenessRouteChildren: MarketplaceLikenessRouteChildren = {
+  MarketplaceLikenessListingIdRoute: MarketplaceLikenessListingIdRoute,
+}
+
+const MarketplaceLikenessRouteWithChildren =
+  MarketplaceLikenessRoute._addFileChildren(MarketplaceLikenessRouteChildren)
+
 interface UniverseIdRouteChildren {
   UniverseIdDeployTokenRoute: typeof UniverseIdDeployTokenRoute
   UniverseIdGalleryRoute: typeof UniverseIdGalleryRoute
@@ -1980,6 +2051,7 @@ const rootRouteChildren: RootRouteChildren = {
   CanonUniverseIdRoute: CanonUniverseIdRoute,
   CharactersUniverseIdRoute: CharactersUniverseIdRoute,
   CreateKindRoute: CreateKindRoute,
+  CreateLikenessRoute: CreateLikenessRoute,
   EditInpaintRoute: EditInpaintRoute,
   EditOutpaintRoute: EditOutpaintRoute,
   EpisodeIdRoute: EpisodeIdRoute,
@@ -1988,6 +2060,7 @@ const rootRouteChildren: RootRouteChildren = {
   LabVoiceStudioRoute: LabVoiceStudioRoute,
   LabZaiRoute: LabZaiRouteWithChildren,
   LineageAssetIdRoute: LineageAssetIdRoute,
+  MarketplaceLikenessRoute: MarketplaceLikenessRouteWithChildren,
   OauthSiweRoute: OauthSiweRoute,
   OrderIdRoute: OrderIdRoute,
   PlayUniverseIdRoute: PlayUniverseIdRoute,

@@ -164,7 +164,7 @@ function RouteComponent() {
               <RouterLink to="/sandbox">
                 <Button variant="outline" size="sm" className="gap-1.5">
                   <Sparkles className="h-3.5 w-3.5" />
-                  Sandbox
+                  Lab
                 </Button>
               </RouterLink>
               <RouterLink to="/create">
@@ -194,7 +194,7 @@ function RouteComponent() {
                 <div>
                   <h2 className="text-xl font-bold mb-1">Start creating</h2>
                   <p className="text-sm text-muted-foreground max-w-md">
-                    Generate images and videos in the Sandbox, or create a Universe to build a full
+                    Generate images and videos in the Lab, or create a Universe to build a full
                     narrative world with characters, episodes, and governance.
                   </p>
                 </div>
@@ -202,7 +202,7 @@ function RouteComponent() {
                   <RouterLink to="/sandbox">
                     <Button variant="outline" className="gap-2">
                       <Sparkles className="h-4 w-4" />
-                      Open Sandbox
+                      Open Lab
                     </Button>
                   </RouterLink>
                   <RouterLink to="/create">
@@ -268,10 +268,10 @@ function RouteComponent() {
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
               <RouterLink to="/sandbox">
-                <QuickAction icon={<Sparkles className="h-4 w-4" />} label="Sandbox" />
+                <QuickAction icon={<Sparkles className="h-4 w-4" />} label="Lab" />
               </RouterLink>
               <RouterLink to="/lab/zai">
-                <QuickAction icon={<Wand2 className="h-4 w-4" />} label="Z.AI Lab" />
+                <QuickAction icon={<Wand2 className="h-4 w-4" />} label="Model Lab" />
               </RouterLink>
               <RouterLink to="/create">
                 <QuickAction icon={<Plus className="h-4 w-4" />} label="New Universe" />

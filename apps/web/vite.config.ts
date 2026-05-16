@@ -155,15 +155,9 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes('node_modules')) {
             // Heavy crypto/wallet libs that don't import React directly.
-            // @walletconnect powers BOTH EVM and Solana wallet adapters, so
-            // it must live with the Solana SDK to avoid a circular chunk
-            // (wallet-adapters → solana → wallet-adapters).
             if (
               id.includes('@metamask') ||
               id.includes('@walletconnect') ||
-              id.includes('@solana/web3.js') ||
-              id.includes('@solana/wallet-adapter') ||
-              id.includes('/bs58/') ||
               id.includes('/qrcode.react/')
             ) {
               return 'wallet-adapters';

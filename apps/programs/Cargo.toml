@@ -4,6 +4,11 @@ members = [
   "programs/universe",
   "programs/episode",
   "programs/payment",
+  "programs/rights",
+  "programs/licensing",
+  "programs/split_router",
+  "programs/staking",
+  "programs/credit_manager",
 ]
 
 [profile.release]

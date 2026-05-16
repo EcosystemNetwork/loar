@@ -53,7 +53,7 @@ interface EntityTypeCard {
 const STUDIO_TOOLS: EntityTypeCard[] = [
   {
     kind: 'sandbox',
-    label: 'Sandbox',
+    label: 'Lab',
     description:
       'Friction-free image + video generation playground. Queue parallel runs and promote drafts.',
     icon: Wand2,
@@ -61,7 +61,7 @@ const STUDIO_TOOLS: EntityTypeCard[] = [
   },
   {
     kind: 'lab',
-    label: 'Z.AI Lab',
+    label: 'Model Lab',
     description:
       'A/B compare GLM-4.6 / 4.7 / 5.1 on the same logline. Worldbuild, write scripts, talking scenes.',
     icon: Sparkles,
@@ -153,6 +153,23 @@ const ENTITY_TYPES: EntityTypeCard[] = [
     description: 'Inventions, magical systems, devices, artifacts of power.',
     icon: Cpu,
     color: 'from-sky-500/20 to-blue-500/20 border-sky-500/30',
+  },
+  // Real-person likeness kinds — PRD 8 (Verified Likeness Marketplace)
+  {
+    kind: 'voice',
+    label: 'Your Voice',
+    description:
+      'Clone your voice in the Voice Studio, then list it on the Likeness Marketplace for sale, lease, or license.',
+    icon: Sparkles,
+    color: 'from-emerald-500/30 to-teal-500/30 border-emerald-500/40',
+  },
+  {
+    kind: 'likeness',
+    label: 'Your Likeness',
+    description:
+      'Upload reference photos + optional video / 3D, generate stylized renders, and license your likeness under your own terms.',
+    icon: Crown,
+    color: 'from-emerald-500/30 to-cyan-500/30 border-emerald-500/40',
   },
   // Visual-language kinds — PRD 5 (Retexture, Moodboards, House Style Packs)
   {
@@ -509,7 +526,12 @@ function CreateHub() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {ENTITY_TYPES.filter(({ kind }) => (universeAddress ? kind !== 'universe' : true)).map(
           ({ kind, label, description, icon: Icon, color }) => {
-            const href = kind === 'universe' ? '/cinematicUniverseCreate' : `/create/${kind}`;
+            const href =
+              kind === 'universe'
+                ? '/cinematicUniverseCreate'
+                : kind === 'voice'
+                  ? '/lab/voice-studio'
+                  : `/create/${kind}`;
             // Standalone routes don't accept the universe context query param —
             // only entity-form routes do.
             const search =

@@ -25,6 +25,8 @@ type EntityKind =
   | 'organization'
   | 'moodboard'
   | 'style_pack'
+  | 'voice'
+  | 'likeness'
   | 'timeline'
   | 'reality'
   | 'dimension'

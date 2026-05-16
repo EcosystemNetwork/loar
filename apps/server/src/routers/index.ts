@@ -74,6 +74,7 @@ import { privateSectionRouter } from './privateSection/privateSection.routes';
 import { splitsRouter } from './splits/splits.routes';
 import { universeGenConfigRouter } from './universeGenConfig/universeGenConfig.routes';
 import { contentLicensingRouter } from './contentLicensing/contentLicensing.routes';
+import { likenessMarketplaceRouter } from './likenessMarketplace/likenessMarketplace.routes';
 import { galleryRouter } from './gallery/gallery.routes';
 import { moderationRouter } from './moderation/moderation.routes';
 import { stripeRouter } from './credits/stripe.routes';
@@ -294,6 +295,8 @@ export const appRouter = router({
   splits: splitsRouter,
   universeGenConfig: universeGenConfigRouter,
   contentLicensing: contentLicensingRouter,
+  // Verified Likeness Marketplace — voice/likeness sale/lease/license (PRD 8)
+  likenessMarketplace: likenessMarketplaceRouter,
   gallery: galleryRouter,
 
   // ── Platform Subscriptions ──────────────────────────────────────────

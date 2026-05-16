@@ -7,11 +7,22 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Play, Pause, Trash2, BookOpen, UserCircle, Wand2, Mic, ArrowRight } from 'lucide-react';
+import {
+  Play,
+  Pause,
+  Trash2,
+  BookOpen,
+  UserCircle,
+  Wand2,
+  Mic,
+  ArrowRight,
+  Tag,
+} from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ListVoiceForSaleDialog } from '@/components/likeness-marketplace/ListVoiceForSaleDialog';
 import type { MyVoice } from './voice-studio.types';
 
 interface MyVoicesProps {
@@ -28,6 +39,7 @@ export function MyVoices({ onCast }: MyVoicesProps) {
   const queryClient = useQueryClient();
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
+  const [listingVoice, setListingVoice] = useState<MyVoice | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['voiceLibrary', 'myVoices'],
@@ -119,6 +131,17 @@ export function MyVoices({ onCast }: MyVoicesProps) {
                 <Badge variant="outline" className="text-[10px] capitalize">
                   {voice.source}
                 </Badge>
+                <Badge
+                  variant={voice.rightsClass === 'owned' ? 'default' : 'secondary'}
+                  className="text-[10px] capitalize"
+                  title={
+                    voice.rightsClass === 'owned'
+                      ? 'You own this voice — full creative + commercial rights'
+                      : 'Platform-licensed — usable in your work under LOAR catalog terms'
+                  }
+                >
+                  {voice.rightsClass}
+                </Badge>
                 {(voice.tags ?? []).slice(0, 3).map((t) => (
                   <Badge key={t} variant="secondary" className="text-[10px]">
                     {t}
@@ -132,6 +155,17 @@ export function MyVoices({ onCast }: MyVoicesProps) {
                     Cast
                   </Button>
                 ) : null}
+                {voice.source !== 'library' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setListingVoice(voice)}
+                    title="List on the Likeness Marketplace"
+                  >
+                    <Tag className="size-3.5 mr-1" />
+                    Sell
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -145,6 +179,9 @@ export function MyVoices({ onCast }: MyVoicesProps) {
           </Card>
         );
       })}
+      {listingVoice && (
+        <ListVoiceForSaleDialog voice={listingVoice} onClose={() => setListingVoice(null)} />
+      )}
     </div>
   );
 }

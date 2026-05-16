@@ -46,27 +46,6 @@ const createUniverseSchema = z.object({
   universeType: z.enum(['fun', 'monetized']).default('monetized'),
 });
 
-const SOLANA_ADDR_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-const SOLANA_SIG_RE = /^[1-9A-HJ-NP-Za-km-z]{64,88}$/;
-
-const createSolanaUniverseSchema = z.object({
-  /** Universe PDA (base58, case-sensitive). */
-  address: z.string().regex(SOLANA_ADDR_RE, 'Invalid Solana address'),
-  /** Creator wallet (base58). */
-  creator: z.string().regex(SOLANA_ADDR_RE, 'Invalid Solana creator address'),
-  name: z.string().min(1).max(200).optional(),
-  imageUrl: z.string().url('Invalid image URL'),
-  portraitImageUrl: z.string().url('Invalid portrait image URL').optional(),
-  description: z.string().min(1, 'Description is required').max(1000, 'Description too long'),
-  /** Solana tx signature for the initialize_universe instruction. */
-  txSignature: z.string().regex(SOLANA_SIG_RE, 'Invalid Solana signature'),
-  /** Cluster the universe lives on — must match the server's allow-list. */
-  cluster: z.enum(['devnet', 'mainnet-beta', 'testnet']).default('devnet'),
-  /** 'fun' starts private (owner must Launch Publicly); 'monetized' is public from mint. */
-  universeType: z.enum(['fun', 'monetized']).default('fun'),
-  unstoppableDomain: z.string().max(100).nullish(),
-});
-
 const getUniverseSchema = z.object({
   id: z.string().min(1, 'ID is required'),
 });
@@ -81,56 +60,6 @@ export const universesRouter = router({
     const nonce = await generateNonce();
     return { nonce };
   }),
-
-  /**
-   * Register a Universe deployed on Solana. The on-chain `initialize_universe`
-   * instruction already proves ownership (PDA seeded by + signed with creator
-   * key), so the server only needs to verify the authenticated user owns the
-   * Solana wallet that claims to be the creator.
-   */
-  createSolana: protectedProcedure
-    .input(createSolanaUniverseSchema)
-    .mutation(async ({ input, ctx }) => {
-      // The caller must be authenticated against this Solana wallet — either
-      // via a pure SIWS session or an EVM session that has linked this Solana
-      // address. Pure-EVM users cannot register Solana universes.
-      const callerSol = ctx.user.solanaAddress ?? (ctx.user.uid as string);
-      const isSolanaCaller = SOLANA_ADDR_RE.test(callerSol);
-      if (!isSolanaCaller || callerSol !== input.creator) {
-        throw new Error('Creator must match authenticated Solana wallet');
-      }
-
-      const result = await createUniverse({
-        address: input.address,
-        creator: input.creator,
-        name: input.name,
-        // Solana universes use the same PDA for token/governance until the
-        // launchpad lands on SVM — set them to the universe address so the
-        // schema invariant (presence + format) is satisfied.
-        tokenAddress: input.address,
-        governanceAddress: input.address,
-        imageUrl: input.imageUrl,
-        portraitImageUrl: input.portraitImageUrl,
-        description: input.description,
-        mintTxHash: input.txSignature,
-        unstoppableDomain: input.unstoppableDomain ?? null,
-        chainNamespace: 'solana',
-        solanaCluster: input.cluster,
-        universeType: input.universeType,
-      });
-
-      void import('../../lib/analytics').then(({ captureServerEvent }) =>
-        captureServerEvent('universe:created', {
-          distinctId: input.creator,
-          universeAddress: input.address,
-          name: input.name,
-          chainNamespace: 'solana',
-          solanaCluster: input.cluster,
-        })
-      );
-
-      return result;
-    }),
 
   /** Create a new universe (wallet-based auth via signature + server nonce). */
   create: protectedProcedure.input(createUniverseSchema).mutation(async ({ input, ctx }) => {

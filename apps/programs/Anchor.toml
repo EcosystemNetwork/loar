@@ -9,11 +9,17 @@ skip-lint = false
 episode = "voLiAXoYbq8go1CUS9UshQRZnNu9Y44qNBZ6czgn8Bs"
 payment = "9xWo4djcHmGFkJnLQF9phdpsUhj6BQFW6yR8sHUsKVbj"
 universe = "6YTQVSeauk4x5gycMM2wzkR8mdHEnHAYsz3Ygg26UPtD"
+rights = "NDpYpB49e3yzEcsPK1o34h9Zgrw9CPnVTnZLvDowL4m"
+licensing = "HTQhzknwF5mnnhHVSaF5ckRbeviwX2UuwayPNjiQybTp"
+split_router = "7hcFnt2Tgzi1Sc3PDWqAQRFb6BoRmEtmoizBSLaYCGkr"
 
 [programs.localnet]
 episode = "voLiAXoYbq8go1CUS9UshQRZnNu9Y44qNBZ6czgn8Bs"
 payment = "9xWo4djcHmGFkJnLQF9phdpsUhj6BQFW6yR8sHUsKVbj"
 universe = "6YTQVSeauk4x5gycMM2wzkR8mdHEnHAYsz3Ygg26UPtD"
+rights = "NDpYpB49e3yzEcsPK1o34h9Zgrw9CPnVTnZLvDowL4m"
+licensing = "HTQhzknwF5mnnhHVSaF5ckRbeviwX2UuwayPNjiQybTp"
+split_router = "7hcFnt2Tgzi1Sc3PDWqAQRFb6BoRmEtmoizBSLaYCGkr"
 
 [registry]
 url = "https://api.apr.dev"
@@ -23,7 +29,7 @@ cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [workspace]
-members = ["programs/universe", "programs/episode", "programs/payment"]
+members = ["programs/universe", "programs/episode", "programs/payment", "programs/rights", "programs/licensing", "programs/split_router"]
 
 [scripts]
 test = "pnpm exec mocha --require tsx/cjs -t 1000000 tests/**/*.ts"

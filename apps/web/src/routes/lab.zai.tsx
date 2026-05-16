@@ -78,8 +78,8 @@ function ZaiLabPage() {
   if (!address) {
     return (
       <div className="container mx-auto max-w-2xl px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold">Z.AI Lab</h1>
-        <p className="text-muted-foreground mt-2">Connect a wallet to use the Z.AI sandbox.</p>
+        <h1 className="text-2xl font-bold">Model Lab</h1>
+        <p className="text-muted-foreground mt-2">Connect a wallet to use the Model Lab.</p>
       </div>
     );
   }
@@ -90,7 +90,7 @@ function ZaiLabPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <Sparkles className="h-7 w-7 text-violet-400" />
-            Z.AI Lab
+            Model Lab
           </h1>
           <p className="text-muted-foreground text-sm mt-2 max-w-2xl">
             The full Z.AI devpack wired into LOAR — GLM-4.7 reasoning (with live chain-of-thought),

@@ -24,7 +24,8 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pino from 'pino';
-import { decodeEventsFromTx, type DecodedEvent } from './anchor-events';
+import { decodeEventsFromTx } from './anchor-events';
+import { KNOWN_PROGRAM_IDS, PROGRAMS } from './program-registry';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -150,9 +151,13 @@ const HeliusEnhancedTxSchema = z.object({
 type HeliusTx = z.infer<typeof HeliusEnhancedTxSchema>;
 
 // ── Program ID routing ──────────────────────────────────────────────────────
-
-const UNIVERSE_PROGRAM_ID = process.env.UNIVERSE_PROGRAM_ID ?? '';
-const EPISODE_PROGRAM_ID = process.env.EPISODE_PROGRAM_ID ?? '';
+//
+// Sourced from program-registry.ts — adding a new Anchor program (rights,
+// licensing, marketplace, …) auto-extends routing the moment its IDL is
+// registered. PROGRAM_IDS_FOR_HANDLER preserves the per-program lookup used by
+// the typed Universe/Episode handler; everything else flows through the
+// generic event mirror so new programs index without code changes here.
+const ANCHOR_PROGRAM_IDS = KNOWN_PROGRAM_IDS;
 const BUBBLEGUM_PROGRAM_ID = 'BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY';
 
 // ── Handlers ────────────────────────────────────────────────────────────────
@@ -170,8 +175,7 @@ const BUBBLEGUM_PROGRAM_ID = 'BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY';
  *     writes are intrinsically idempotent for same-value updates.
  */
 async function handleAnchorEvents(tx: HeliusTx) {
-  const known = new Set<string>([UNIVERSE_PROGRAM_ID, EPISODE_PROGRAM_ID].filter(Boolean));
-  if (known.size === 0) return;
+  if (ANCHOR_PROGRAM_IDS.size === 0) return;
 
   const events = decodeEventsFromTx({
     instructions: (tx.instructions ?? []).map((ix) => ({
@@ -182,7 +186,7 @@ async function handleAnchorEvents(tx: HeliusTx) {
         data?: string;
       }>,
     })),
-    knownProgramIds: known,
+    knownProgramIds: ANCHOR_PROGRAM_IDS,
   });
   if (events.length === 0) return;
 
@@ -200,12 +204,21 @@ async function handleAnchorEvents(tx: HeliusTx) {
 
     // Idempotency gate. Returns true on the FIRST handling of this event;
     // false on retries. Only first-handlings run non-commutative side-effects
-    // (e.g. canonCount increment).
+    // (e.g. canonCount increment). The doc stores the raw IDL-decoded event
+    // unconditionally so new programs added to the registry start indexing
+    // immediately, even before dedicated typed handlers exist.
     const eventRef = db.collection('solanaEvents').doc(docId);
     const isFirstHandling = await db.runTransaction(async (t) => {
       const existing = await t.get(eventRef);
       if (existing.exists) return false;
-      t.set(eventRef, { ...base, kind: event.kind, payload: event });
+      t.set(eventRef, {
+        ...base,
+        kind: event.kind,
+        program: event.raw.program,
+        programId: event.raw.programId,
+        eventName: event.raw.name,
+        payload: event.raw.data,
+      });
       return true;
     });
 
@@ -356,11 +369,17 @@ async function routeTx(tx: HeliusTx) {
   const programs = new Set(tx.instructions?.map((i) => i.programId) ?? []);
   const tasks: Promise<unknown>[] = [];
 
-  // Anchor program calls — decoded into typed entity docs.
-  if (
-    (UNIVERSE_PROGRAM_ID && programs.has(UNIVERSE_PROGRAM_ID)) ||
-    (EPISODE_PROGRAM_ID && programs.has(EPISODE_PROGRAM_ID))
-  ) {
+  // Anchor program calls — decoded into typed entity docs (Universe/Episode)
+  // and mirrored as generic event docs for every registered LOAR program.
+  // Fires when ANY registered program is touched in this tx.
+  let hitAnchorProgram = false;
+  for (const id of ANCHOR_PROGRAM_IDS) {
+    if (programs.has(id)) {
+      hitAnchorProgram = true;
+      break;
+    }
+  }
+  if (hitAnchorProgram) {
     tasks.push(handleAnchorEvents(tx));
   }
   // Bubblegum cNFT mints — separate handler so cNFT asset lookups by leaf
@@ -503,5 +522,8 @@ app.post('/webhooks/helius', async (c) => {
 
 const port = Number(process.env.SOLANA_INDEXER_PORT ?? 42070);
 serve({ fetch: app.fetch, port }, (info) => {
-  log.info(`solana-indexer listening on :${info.port}`);
+  log.info(
+    { programs: PROGRAMS.map((p) => ({ name: p.name, programId: p.programId })) },
+    `solana-indexer listening on :${info.port}`
+  );
 });

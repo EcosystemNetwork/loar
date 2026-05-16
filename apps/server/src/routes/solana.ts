@@ -23,6 +23,7 @@ import {
 import { mintEpisodeCnft } from '../services/solana/episode-mint';
 import { canonizeEpisode, CanonizePrecheckError } from '../services/solana/canon-promote';
 import { decompressCnft, CnftDecompressError } from '../services/solana/cnft-decompress';
+import { initializeSolanaUniverse } from '../services/solana/universe-init';
 import { getAttestationPublicKey, getTrustedAttestationKeys } from '../lib/attestation';
 import { hasScope } from '../lib/apiKeys';
 
@@ -427,6 +428,51 @@ solanaRoutes.post('/cnft/decompress', async (c) => {
       return c.json({ error: 'cNFT already decompressed', code: 'ALREADY_DECOMPRESSED' }, 409);
     }
     return c.json({ error: msg }, 500);
+  }
+});
+
+// ── Universe initialization (Anchor `initialize_universe`) ─────────────────
+
+const universeInitBody = z.object({
+  contentHashHex: z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'expected 0x + 64 hex chars'),
+  plotHashHex: z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'expected 0x + 64 hex chars'),
+  visibility: z.enum(['Private', 'Public']),
+  name: z.string().min(1).max(200),
+  imageUrl: z.string().url().max(2048),
+  portraitImageUrl: z.string().url().max(2048).optional(),
+  description: z.string().min(1).max(1000),
+  universeType: z.enum(['fun', 'monetized']).default('fun'),
+});
+
+/**
+ * Deploy a new Universe PDA via Circle DCW + persist its Firestore mirror.
+ * The caller's uid maps to a server-custodied Solana wallet (auto-provisioned),
+ * which signs the `initialize_universe` ix. No browser wallet adapter required.
+ */
+solanaRoutes.post('/universe/initialize', async (c) => {
+  const auth = await requireAuth(c);
+  if (!auth.user) return auth.res;
+
+  const parsed = universeInitBody.safeParse(await c.req.json());
+  if (!parsed.success) {
+    return c.json({ error: 'invalid body', issues: parsed.error.issues }, 400);
+  }
+
+  try {
+    const result = await initializeSolanaUniverse({
+      userId: auth.user.uid,
+      contentHash: Buffer.from(parsed.data.contentHashHex.slice(2), 'hex'),
+      plotHash: Buffer.from(parsed.data.plotHashHex.slice(2), 'hex'),
+      visibility: parsed.data.visibility,
+      name: parsed.data.name,
+      imageUrl: parsed.data.imageUrl,
+      portraitImageUrl: parsed.data.portraitImageUrl,
+      description: parsed.data.description,
+      universeType: parsed.data.universeType,
+    });
+    return c.json(result);
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : 'Universe init failed' }, 500);
   }
 });
 

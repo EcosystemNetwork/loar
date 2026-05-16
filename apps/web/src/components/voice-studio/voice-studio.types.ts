@@ -36,10 +36,19 @@ export interface LibraryVoice {
   accent?: string;
 }
 
+/**
+ * Rights lane for a user-owned voice — gates what the Voice Mixer (and any
+ * future commercial flows) can use as a source.
+ *   owned    — user cloned or designed it; full creative & commercial rights
+ *   licensed — platform-licensed catalog voice the user saved from Library
+ */
+export type VoiceRightsClass = 'owned' | 'licensed';
+
 export interface MyVoice {
   id: string;
   userId: string;
   source: 'library' | 'clone' | 'design';
+  rightsClass: VoiceRightsClass;
   voiceId: string;
   name: string;
   description?: string;
@@ -48,6 +57,7 @@ export interface MyVoice {
   previewUrl?: string;
   libraryEntryId?: string;
   sourceSampleUrls?: string[];
+  designGenerationId?: string;
   createdAt: Date | string;
 }
 

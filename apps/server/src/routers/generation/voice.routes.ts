@@ -38,6 +38,7 @@ import { trackQuests } from '../../services/quest-tracker';
 import { FieldValue } from 'firebase-admin/firestore';
 import { validateUploadUrl } from '../../lib/url-validator';
 import { createAttachment } from '../media/media.handlers';
+import { assertVoiceUsageAllowed } from '../../lib/likeness-access';
 import { logFailedRefund } from '../../lib/refund-audit';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { reserveClientToken } from '../../lib/jobIdempotency';
@@ -283,6 +284,15 @@ export const voiceRouter = router({
       }
 
       const startTime = Date.now();
+
+      // Likeness Marketplace gate — if the caller is trying to synthesize with
+      // a marketplace-listed voice they don't own, they must hold an active
+      // deal. Fired BEFORE any billing so the user isn't charged on denial.
+      await assertVoiceUsageAllowed({
+        elevenLabsVoiceId: input.voiceId,
+        callerUid: ctx.user.uid,
+        callerAddress: ctx.user.address ?? null,
+      });
 
       const { fiatMargin, loarMargin } = await getMargins();
       const charCost = CHAR_COST[input.modelId];
@@ -780,6 +790,7 @@ export const voiceRouter = router({
                 id: myVoiceId,
                 userId: ctx.user.uid,
                 source: 'clone',
+                rightsClass: 'owned',
                 voiceId: result.voiceId,
                 name: input.name,
                 description: input.description ?? null,

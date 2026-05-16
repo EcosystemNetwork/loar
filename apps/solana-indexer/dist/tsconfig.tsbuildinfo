@@ -1,1 +1,1 @@
-{"root":["../src/anchor-events.ts","../src/index.ts","../scripts/register-webhook.ts"],"version":"5.9.3"}
+{"root":["../src/anchor-events.ts","../src/index.ts","../src/program-registry.ts","../scripts/register-webhook.ts","../scripts/smoke-decoder.ts"],"version":"5.9.3"}

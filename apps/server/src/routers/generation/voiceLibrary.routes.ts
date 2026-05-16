@@ -68,11 +68,21 @@ const voiceLibraryEntrySchema = z.object({
 
 export type VoiceLibraryEntry = z.infer<typeof voiceLibraryEntrySchema>;
 
+/**
+ * Rights classification for a user-owned voice entry. Drives what the Voice
+ * Mixer (and any future commercial flows) can use as a source.
+ *   owned    — user cloned it from their own samples or designed it from scratch
+ *   licensed — platform-licensed catalog voice the user saved from Library
+ */
+export type VoiceRightsClass = 'owned' | 'licensed';
+
 // User-voice doc shape — either a `saved` curated copy or a `cloned` upload.
 export interface UserVoiceDoc {
   id: string;
   userId: string;
   source: 'library' | 'clone' | 'design';
+  /** Authorization lane for downstream commercial use (mix, license, mint). */
+  rightsClass: VoiceRightsClass;
   voiceId: string;
   name: string;
   description?: string;
@@ -83,7 +93,14 @@ export interface UserVoiceDoc {
   libraryEntryId?: string;
   // For `clone` source — the original sample URLs the user uploaded.
   sourceSampleUrls?: string[];
+  // For `design` source — the parametric design generation that produced it.
+  designGenerationId?: string;
   createdAt: Date;
+}
+
+/** Map a voice source to its default rights class. */
+function defaultRightsClass(source: UserVoiceDoc['source']): VoiceRightsClass {
+  return source === 'library' ? 'licensed' : 'owned';
 }
 
 // ── Preview rate limit (in-memory, per-process) ─────────────────────
@@ -234,6 +251,7 @@ export const voiceLibraryRouter = router({
         id,
         userId: ctx.user.uid,
         source: 'library',
+        rightsClass: defaultRightsClass('library'),
         voiceId: entry.voiceId,
         name: input.rename || entry.name,
         description: entry.description,
@@ -248,13 +266,17 @@ export const voiceLibraryRouter = router({
     }),
 
   /**
-   * List the user's saved + cloned + designed voices.
+   * List the user's saved + cloned + designed voices. Optional `rightsClass`
+   * filter is the canonical way to drive the Voice Mixer source picker — pass
+   * `['owned', 'licensed']` (default) to include everything the user can legally
+   * remix; pass `['owned']` to restrict to user-IP-only.
    */
   myVoices: protectedProcedure
     .input(
       z
         .object({
           source: z.enum(['library', 'clone', 'design']).optional(),
+          rightsClass: z.array(z.enum(['owned', 'licensed'])).optional(),
         })
         .optional()
     )
@@ -262,7 +284,21 @@ export const voiceLibraryRouter = router({
       let query = userVoicesCol(ctx.user.uid) as FirebaseFirestore.Query;
       if (input?.source) query = query.where('source', '==', input.source);
       const snap = await query.orderBy('createdAt', 'desc').limit(200).get();
-      return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Record<string, unknown>) }));
+      const rows = snap.docs.map((d) => {
+        const data = d.data() as Record<string, unknown>;
+        // Backfill for legacy docs written before rightsClass existed.
+        if (!data.rightsClass && typeof data.source === 'string') {
+          data.rightsClass = defaultRightsClass(data.source as UserVoiceDoc['source']);
+        }
+        return { id: d.id, ...data };
+      });
+      if (input?.rightsClass && input.rightsClass.length > 0) {
+        const allowed = new Set(input.rightsClass);
+        return rows.filter((r) =>
+          allowed.has((r as unknown as { rightsClass: VoiceRightsClass }).rightsClass)
+        );
+      }
+      return rows;
     }),
 
   deleteMyVoice: protectedProcedure
@@ -303,12 +339,61 @@ export const voiceLibraryRouter = router({
         id,
         userId: ctx.user.uid,
         source: 'clone',
+        rightsClass: defaultRightsClass('clone'),
         voiceId: input.voiceId,
         name: input.name,
         description: input.description,
         tags: input.tags,
         previewUrl: input.previewUrl,
         sourceSampleUrls: input.sourceSampleUrls,
+        createdAt: new Date(),
+      };
+      await userVoicesCol(ctx.user.uid).doc(id).set(doc);
+      return doc;
+    }),
+
+  /**
+   * Register a parametrically-designed voice into the user's collection.
+   * Called by the Voice Creator UI after `voice.designVoice` succeeds — the
+   * design call already charges credits and returns a voiceId + preview URL,
+   * this just persists it into My Voices with `source='design'`.
+   */
+  registerDesign: protectedProcedure
+    .input(
+      z.object({
+        voiceId: z.string().min(10).max(64),
+        name: z.string().min(1).max(80),
+        description: z.string().max(500).optional(),
+        previewUrl: z.string().url().optional(),
+        tags: z.array(z.string()).optional(),
+        designGenerationId: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Idempotent on (uid, designGenerationId) — re-clicking "Save" must not
+      // create duplicate entries.
+      if (input.designGenerationId) {
+        const existing = await userVoicesCol(ctx.user.uid)
+          .where('designGenerationId', '==', input.designGenerationId)
+          .limit(1)
+          .get();
+        if (!existing.empty) {
+          const doc = existing.docs[0];
+          return { id: doc.id, ...(doc.data() as Record<string, unknown>) };
+        }
+      }
+      const id = randomUUID();
+      const doc: UserVoiceDoc = {
+        id,
+        userId: ctx.user.uid,
+        source: 'design',
+        rightsClass: defaultRightsClass('design'),
+        voiceId: input.voiceId,
+        name: input.name,
+        description: input.description,
+        tags: input.tags,
+        previewUrl: input.previewUrl,
+        designGenerationId: input.designGenerationId,
         createdAt: new Date(),
       };
       await userVoicesCol(ctx.user.uid).doc(id).set(doc);

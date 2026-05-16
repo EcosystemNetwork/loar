@@ -4,7 +4,9 @@
  * Pro voice editing pipeline:
  *   Library     — curated catalog of signature LOAR voices (~50)
  *   My Voices   — user's saved/cloned/designed voices
+ *   Create      — design a brand-new voice from a prompt (parametric synthesis)
  *   Clone       — drag-drop audio samples → ElevenLabs instant clone
+ *   Mix         — cross-cast a performance from one owned/licensed voice into another's timbre
  *   Script      — script-first episode dubbing (cast + generate + composite)
  *   Multi-track — pro waveform editor (wavesurfer.js)
  *   Multilingual — episode dubbing across N languages via ElevenLabs Dubbing API
@@ -16,19 +18,33 @@
 import { useEffect, useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
-import { Mic2, Library, UserCircle, Upload, FileText, Layers, Globe } from 'lucide-react';
+import {
+  Mic2,
+  Library,
+  UserCircle,
+  Upload,
+  FileText,
+  Layers,
+  Globe,
+  Wand2,
+  Shuffle,
+} from 'lucide-react';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { VoiceLibrary } from '@/components/voice-studio/VoiceLibrary';
 import { MyVoices } from '@/components/voice-studio/MyVoices';
+import { VoiceDesigner } from '@/components/voice-studio/VoiceDesigner';
 import { VoiceCloneUpload } from '@/components/voice-studio/VoiceCloneUpload';
+import { VoiceMixer } from '@/components/voice-studio/VoiceMixer';
 import { ScriptEditor } from '@/components/voice-studio/ScriptEditor';
 import { MultiTrackEditor } from '@/components/voice-studio/MultiTrackEditor';
 import { MultilingualPanel } from '@/components/voice-studio/MultilingualPanel';
 
 const searchSchema = z.object({
   episodeId: z.string().optional(),
-  tab: z.enum(['library', 'mine', 'clone', 'script', 'multitrack', 'multilingual']).optional(),
+  tab: z
+    .enum(['library', 'mine', 'create', 'clone', 'mix', 'script', 'multitrack', 'multilingual'])
+    .optional(),
   projectId: z.string().optional(),
 });
 
@@ -72,15 +88,21 @@ function VoiceStudioPage() {
       </header>
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="grid grid-cols-3 lg:grid-cols-6">
+        <TabsList className="grid grid-cols-4 lg:grid-cols-8">
           <TabsTrigger value="library">
             <Library className="mr-1 size-3.5" /> Library
           </TabsTrigger>
           <TabsTrigger value="mine">
             <UserCircle className="mr-1 size-3.5" /> My Voices
           </TabsTrigger>
+          <TabsTrigger value="create">
+            <Wand2 className="mr-1 size-3.5" /> Create
+          </TabsTrigger>
           <TabsTrigger value="clone">
             <Upload className="mr-1 size-3.5" /> Clone
+          </TabsTrigger>
+          <TabsTrigger value="mix">
+            <Shuffle className="mr-1 size-3.5" /> Mix
           </TabsTrigger>
           <TabsTrigger value="script">
             <FileText className="mr-1 size-3.5" /> Script
@@ -99,8 +121,14 @@ function VoiceStudioPage() {
         <TabsContent value="mine" className="mt-4">
           <MyVoices />
         </TabsContent>
+        <TabsContent value="create" className="mt-4">
+          <VoiceDesigner />
+        </TabsContent>
         <TabsContent value="clone" className="mt-4">
           <VoiceCloneUpload />
+        </TabsContent>
+        <TabsContent value="mix" className="mt-4">
+          <VoiceMixer />
         </TabsContent>
         <TabsContent value="script" className="mt-4">
           <ScriptEditor episodeId={episodeId} initialProjectId={projectId} />

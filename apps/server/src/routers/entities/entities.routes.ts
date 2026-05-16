@@ -101,8 +101,12 @@ export const entitiesRouter = router({
         ctx.user.address
       );
 
-      // Auto-generate cover image if none was provided (fire-and-forget)
-      if (!input.imageUrl && result.id) {
+      // Auto-generate cover image if none was provided (fire-and-forget).
+      // Skip for `voice` and `likeness` kinds — those represent real-person
+      // biometric assets where a generated stock-photo cover would
+      // mis-portray the rights holder.
+      const skipCover = input.kind === 'voice' || input.kind === 'likeness';
+      if (!input.imageUrl && result.id && !skipCover) {
         triggerCoverImageGenerationAsync({
           id: result.id,
           name: input.name,

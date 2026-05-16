@@ -63,8 +63,13 @@ import {
   DEFAULT_CHAIN_SELECTION,
   type ChainSelection,
 } from '@/configs/chains';
-import { useSolanaUniverseProgram } from '@/hooks/useSolanaUniverseProgram';
-import { useSolanaAuth } from '@/lib/solana-auth';
+import { useCircleSolanaAddress } from '@/hooks/useCircleSolanaAddress';
+
+async function sha256Bytes(input: string): Promise<Uint8Array> {
+  const data = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return new Uint8Array(hash);
+}
 import { Price, usePriceText } from '@/components/Price';
 import { ModelSelector } from '@/components/ModelSelector';
 
@@ -115,9 +120,9 @@ function CinematicUniverseCreate() {
   });
   const isSolanaSelected = chainSelection.kind === 'solana';
 
-  // Solana wallet + auth hooks (no-ops when EVM is selected).
-  const solanaProgram = useSolanaUniverseProgram();
-  const solanaAuth = useSolanaAuth();
+  // Solana wallet — provisioned via Circle DCW; no browser wallet adapter.
+  const { address: solanaAddress } = useCircleSolanaAddress(isAuthenticated);
+  const [isSolanaPending, setIsSolanaPending] = useState(false);
 
   // Form state
   const [universeName, setUniverseName] = useState('');
@@ -675,39 +680,17 @@ function CinematicUniverseCreate() {
   // since createUniverseWithToken() emits both events in a single receipt.
 
   /**
-   * Solana deploy path. Talks to the Universe Anchor program directly via
-   * @solana/wallet-adapter, then registers the resulting PDA with the server
-   * over `universes.createSolana`. The launchpad / token deploy is EVM-only
-   * for now — Solana universes always land as 'fun' (Visibility::Private)
-   * regardless of the universeMode toggle.
+   * Solana deploy path. POSTs to /api/solana/universe/initialize — the server
+   * derives the PDA, signs `initialize_universe` with the caller's Circle DCW
+   * Solana wallet, and persists the Firestore mirror. The launchpad / token
+   * deploy is EVM-only for now — Solana universes always land as 'fun'
+   * (Visibility::Private) regardless of the universeMode toggle.
    */
   const handleCreateUniverseSolana = async () => {
     if (chainSelection.kind !== 'solana') return;
-    if (!solanaProgram.isConnected || !solanaProgram.address) {
-      toast.error('Connect a Solana wallet (Phantom or Solflare) to continue.');
-      return;
-    }
-
-    // Make sure we have a SIWS session so the server-side createSolana check
-    // (ctx.user.solanaAddress === input.creator) passes.
-    let solanaAddress = solanaAuth.address;
-    if (!solanaAuth.isAuthenticated || solanaAddress !== solanaProgram.address) {
-      const signed = isAuthenticated
-        ? await solanaAuth.linkToEvmSession()
-        : await solanaAuth.signIn();
-      if (!signed) {
-        toast.error(solanaAuth.error ?? 'Solana sign-in failed.');
-        return;
-      }
-      solanaAddress =
-        'address' in signed
-          ? signed.address
-          : 'solanaAddress' in signed
-            ? signed.solanaAddress
-            : null;
-    }
-    if (!solanaAddress) {
-      toast.error('Could not resolve Solana wallet address.');
+    if (!isAuthenticated) {
+      toast.error('Please sign in to continue');
+      navigate({ to: '/login', search: { redirect: '/cinematicUniverseCreate' } });
       return;
     }
 
@@ -720,42 +703,56 @@ function CinematicUniverseCreate() {
       return;
     }
 
+    setIsSolanaPending(true);
     setDeploymentStep(DeploymentStep.CREATING_UNIVERSE);
     try {
       // Hash the *off-chain* fields the user controls so the PDA is unique per
       // universe but stable per (creator, name+description).
       const contentSeed = `${universeName}\n${description}\n${imageUrl}\n${Date.now()}`;
       const plotSeed = `${universeName}:plot:${Date.now()}`;
+      const contentHash = await sha256Bytes(contentSeed);
+      const plotHash = await sha256Bytes(plotSeed);
 
-      const result = await solanaProgram.initializeUniverse({
-        cluster: chainSelection.cluster,
-        // Solana monetized launchpad is not on SVM yet — every Solana universe
-        // ships as private/fun and the owner can launch later when the SVM
-        // launchpad lands.
-        visibility: 'private',
-        contentSeed,
-        plotSeed,
+      const toHex = (bytes: Uint8Array) =>
+        '0x' +
+        Array.from(bytes)
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('');
+
+      const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+      const resp = await fetch(`${serverUrl}/api/solana/universe/initialize`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentHashHex: toHex(contentHash),
+          plotHashHex: toHex(plotHash),
+          // Solana monetized launchpad is not on SVM yet — every Solana universe
+          // ships as private/fun until the SVM launchpad lands.
+          visibility: 'Private',
+          name: universeName,
+          imageUrl,
+          portraitImageUrl: portraitImageUrl || undefined,
+          description,
+          universeType: 'fun' as const,
+        }),
       });
+      if (!resp.ok) {
+        const err = (await resp.json().catch(() => ({}))) as { error?: string };
+        throw new Error(err.error ?? `Server returned ${resp.status}`);
+      }
+      const result = (await resp.json()) as {
+        txSignature: string;
+        universePda: string;
+        cluster: string;
+      };
 
       setDeploymentStep(DeploymentStep.REGISTERING);
-      await trpcClient.universes.createSolana.mutate({
-        address: result.universePda,
-        creator: solanaAddress,
-        name: universeName,
-        imageUrl,
-        portraitImageUrl: portraitImageUrl || undefined,
-        description,
-        txSignature: result.signature,
-        cluster: result.cluster,
-        // Solana universes are always 'fun' until the SVM launchpad ships.
-        universeType: 'fun',
-      });
-
       // Stash the Solana PDA + signature so the success view can show explorer links.
       // We reuse the universeAddress slot — downstream "View on Explorer" logic
       // branches on chainSelection.
       setUniverseAddress(result.universePda as unknown as `0x${string}`);
-      setSolanaTxSignature(result.signature);
+      setSolanaTxSignature(result.txSignature);
       setDeploymentStep(DeploymentStep.COMPLETED);
     } catch (err) {
       console.error('[solana] universe creation failed:', err);
@@ -763,6 +760,8 @@ function CinematicUniverseCreate() {
         `Solana universe creation failed: ${err instanceof Error ? err.message : 'Unknown error'}`
       );
       setDeploymentStep(DeploymentStep.IDLE);
+    } finally {
+      setIsSolanaPending(false);
     }
   };
 
@@ -928,7 +927,7 @@ function CinematicUniverseCreate() {
 
   // Not connected state — need *some* wallet (EVM via wagmi OR Solana via wallet adapter).
   // The user can still switch chains inside the form once at least one wallet is present.
-  if (!isConnected && !solanaProgram.isConnected) {
+  if (!isConnected && !(isSolanaSelected && isAuthenticated)) {
     return (
       <div className="h-full flex items-center justify-center bg-background">
         <Card className="w-full max-w-md">
@@ -1868,13 +1867,13 @@ function CinematicUniverseCreate() {
                         // EVM tx pending flags (wagmi) — irrelevant on Solana
                         (!isSolanaSelected && (isPending || isConfirming)) ||
                         // Solana branch — block until wallet adapter is busy/connected check fires
-                        (isSolanaSelected && solanaProgram.isPending) ||
+                        (isSolanaSelected && isSolanaPending) ||
                         isGeneratingCover
                       }
                       className="w-full h-12 text-base font-bold"
                       size="lg"
                     >
-                      {(isSolanaSelected && solanaProgram.isPending) ||
+                      {(isSolanaSelected && isSolanaPending) ||
                       (!isSolanaSelected && (isPending || isConfirming)) ? (
                         <>
                           <Loader2 className="h-5 w-5 mr-2 animate-spin" />
