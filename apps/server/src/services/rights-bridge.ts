@@ -144,7 +144,7 @@ export async function syncRightsHashToSolana(opts: {
     contentHash: Buffer.from(hexToBytes(opts.contentHash)),
     rightsType: solanaRightsType,
     creator: opts.solanaCreator ?? PublicKey.default,
-    evmCreator: Buffer.from(hexToBytes(evmCreator)),
+    evmCreator: Buffer.from(hexToBytes(evmCreator as `0x${string}`)),
     version,
     evmTxHash: opts.evmTxHash ? Buffer.from(hexToBytes(opts.evmTxHash)) : Buffer.alloc(32, 0),
     evmBlockNumber: opts.evmBlock ?? 0n,
