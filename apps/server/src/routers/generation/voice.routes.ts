@@ -35,17 +35,16 @@ import { db } from '../../lib/firebase';
 import { elevenLabsService, type ElevenLabsVoiceModel } from '../../services/elevenlabs';
 import { firebaseStorageService } from '../../services/firebase-storage';
 import { trackQuests } from '../../services/quest-tracker';
-import { FieldValue } from 'firebase-admin/firestore';
 import { validateUploadUrl } from '../../lib/url-validator';
 import { createAttachment } from '../media/media.handlers';
 import { assertVoiceUsageAllowed } from '../../lib/likeness-access';
-import { logFailedRefund } from '../../lib/refund-audit';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 import { publishToGallery } from '../../lib/gallery-publish';
 import { TRPCError } from '@trpc/server';
 import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
+import { withReservation } from '../../services/credits';
 
 // Idempotency token regex shared across voice procedures.
 const clientTokenSchema = z
@@ -94,59 +93,6 @@ const voiceGenerationsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('voiceGenerations');
 };
-
-// ── Credit deduction helper ───────────────────────────────────────────
-
-const userCreditsCol = () => {
-  if (!db) throw new Error('Firebase is not configured');
-  return db.collection('userCredits');
-};
-
-async function deductCredits(userId: string, credits: number): Promise<void> {
-  if (!db) throw new Error('Firebase is not configured');
-  const { assertGenerationAllowed } = await import('../../lib/generation-guards');
-  await assertGenerationAllowed(userId, credits);
-  const ref = userCreditsCol().doc(userId);
-  await db.runTransaction(async (tx) => {
-    const doc = await tx.get(ref);
-    const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-    if (balance < credits) {
-      throw new Error(
-        `Insufficient credits. Need ${credits}, have ${balance}. Purchase more to continue.`
-      );
-    }
-    tx.update(ref, {
-      balance: balance - credits,
-      totalSpent: (doc.data()?.totalSpent || 0) + credits,
-      updatedAt: new Date(),
-    });
-  });
-}
-
-async function refundCredits(userId: string, credits: number, genId?: string): Promise<void> {
-  const ref = userCreditsCol().doc(userId);
-  const { recordCreditsTx, recordAiGeneration } = await import('../../lib/metrics');
-  try {
-    await ref.update({
-      balance: FieldValue.increment(credits),
-      totalSpent: FieldValue.increment(-credits),
-      updatedAt: new Date(),
-    });
-    recordCreditsTx('refund', 'success');
-  } catch (err) {
-    recordCreditsTx('refund', 'failure');
-    console.error(`CRITICAL: Voice credit refund failed for ${userId}:`, err);
-    logFailedRefund({
-      userId,
-      credits,
-      source: 'voice',
-      generationId: genId ?? 'unknown',
-      error: err instanceof Error ? err.message : 'Unknown',
-    });
-  }
-  // Refund always pairs with a failed generation — record it for Grafana.
-  recordAiGeneration('elevenlabs', 'voice', 'failure');
-}
 
 // ── Storage upload helper ─────────────────────────────────────────────
 
@@ -324,89 +270,104 @@ export const voiceRouter = router({
           ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         });
 
-      await deductCredits(ctx.user.uid, credits);
-
       try {
-        await voiceGenerationsCol().doc(genId).update({ status: 'running' });
-
-        const { resolveProviderKey } = await import('../../lib/byok');
-        const apiKey = await resolveProviderKey(ctx.user.uid, 'elevenlabs');
-        const result = await elevenLabsService.textToSpeech({
-          text: input.text,
-          voiceId: input.voiceId,
-          modelId: input.modelId,
-          stability: input.stability,
-          similarityBoost: input.similarityBoost,
-          style: input.style,
-          apiKey,
-        });
-
-        if (!result.audioBuffer || result.audioBuffer.length === 0) {
-          throw new Error('Provider returned empty audio — generation failed silently');
-        }
-
-        const filename = `voice-tts-${genId}.mp3`;
-        const audioUrl = await uploadAudio(result.audioBuffer, result.contentType, filename);
-        const latencyMs = Date.now() - startTime;
-
-        trackQuests(ctx.user.uid, [{ questId: 'first_voice_generation' }]);
-
-        await voiceGenerationsCol().doc(genId).update({
-          status: 'completed',
-          audioUrl,
-          latencyMs,
-          completedAt: new Date(),
-        });
-
-        // Auto-attach TTS audio to entity
-        autoAttachAudio({
-          creator: ctx.user.uid,
-          entityId: input.entityId,
-          generationId: genId,
-          audioUrl,
-          label: `TTS — ${input.text.slice(0, 60)}`,
-          category: 'sound',
-        });
-
-        void publishToGallery({
-          creatorUid: ctx.user.uid,
-          mediaUrl: audioUrl,
-          mediaType: 'audio',
-          title: input.text.slice(0, 100) || 'Generated Voice',
-          description: input.text,
-          universeId: input.universeId || null,
-          generationId: genId,
-          generationModel: `elevenlabs:${input.modelId}`,
-        });
-
-        fireJobWebhook({
-          ownerUid: ctx.user.uid,
-          webhookUrl: validatedWebhookUrl,
-          clientToken: input.clientToken,
-          event: 'job.completed',
-          jobId: genId,
-          kind: 'voice',
-          payload: {
-            status: 'completed',
-            audioUrl,
+        return await withReservation(
+          {
+            userId: ctx.user.uid,
             modelId: input.modelId,
-            characterCount: input.text.length,
-            creditsCharged: credits,
+            provider: 'elevenlabs',
+            estimatedCredits: credits,
+            byok: false,
+            meta: {
+              generationId: genId,
+              entityId: input.entityId ?? null,
+              universeId: input.universeId ?? null,
+            },
           },
-        });
+          async () => {
+            await voiceGenerationsCol().doc(genId).update({ status: 'running' });
 
-        return {
-          generationId: genId,
-          status: 'completed' as const,
-          audioUrl: audioUrl as string | null,
-          modelId: input.modelId as string,
-          characterCount: input.text.length,
-          creditsCharged: credits,
-          fiatPriceUsd: fiatPrice,
-          idempotentReplay: false as const,
-        };
+            const { resolveProviderKey } = await import('../../lib/byok');
+            const apiKey = await resolveProviderKey(ctx.user.uid, 'elevenlabs');
+            const result = await elevenLabsService.textToSpeech({
+              text: input.text,
+              voiceId: input.voiceId,
+              modelId: input.modelId,
+              stability: input.stability,
+              similarityBoost: input.similarityBoost,
+              style: input.style,
+              apiKey,
+            });
+
+            if (!result.audioBuffer || result.audioBuffer.length === 0) {
+              throw new Error('Provider returned empty audio — generation failed silently');
+            }
+
+            const filename = `voice-tts-${genId}.mp3`;
+            const audioUrl = await uploadAudio(result.audioBuffer, result.contentType, filename);
+            const latencyMs = Date.now() - startTime;
+
+            trackQuests(ctx.user.uid, [{ questId: 'first_voice_generation' }]);
+
+            await voiceGenerationsCol().doc(genId).update({
+              status: 'completed',
+              audioUrl,
+              latencyMs,
+              completedAt: new Date(),
+            });
+
+            // Auto-attach TTS audio to entity
+            autoAttachAudio({
+              creator: ctx.user.uid,
+              entityId: input.entityId,
+              generationId: genId,
+              audioUrl,
+              label: `TTS — ${input.text.slice(0, 60)}`,
+              category: 'sound',
+            });
+
+            void publishToGallery({
+              creatorUid: ctx.user.uid,
+              mediaUrl: audioUrl,
+              mediaType: 'audio',
+              title: input.text.slice(0, 100) || 'Generated Voice',
+              description: input.text,
+              universeId: input.universeId || null,
+              generationId: genId,
+              generationModel: `elevenlabs:${input.modelId}`,
+            });
+
+            fireJobWebhook({
+              ownerUid: ctx.user.uid,
+              webhookUrl: validatedWebhookUrl,
+              clientToken: input.clientToken,
+              event: 'job.completed',
+              jobId: genId,
+              kind: 'voice',
+              payload: {
+                status: 'completed',
+                audioUrl,
+                modelId: input.modelId,
+                characterCount: input.text.length,
+                creditsCharged: credits,
+              },
+            });
+
+            return {
+              result: {
+                generationId: genId,
+                status: 'completed' as const,
+                audioUrl: audioUrl as string | null,
+                modelId: input.modelId as string,
+                characterCount: input.text.length,
+                creditsCharged: credits,
+                fiatPriceUsd: fiatPrice,
+                idempotentReplay: false as const,
+              },
+            };
+          }
+        );
       } catch (error) {
-        await refundCredits(ctx.user.uid, credits, genId);
         await voiceGenerationsCol()
           .doc(genId)
           .update({
@@ -502,79 +463,90 @@ export const voiceRouter = router({
           ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         });
 
-      await deductCredits(ctx.user.uid, credits);
-
       try {
-        await voiceGenerationsCol().doc(genId).update({ status: 'running' });
-
-        const { resolveProviderKey: resolveSfxKey } = await import('../../lib/byok');
-        const apiKey = await resolveSfxKey(ctx.user.uid, 'elevenlabs');
-        const result = await elevenLabsService.soundEffect({
-          text: input.text,
-          durationSeconds: input.durationSeconds,
-          apiKey,
-        });
-
-        if (!result.audioBuffer || result.audioBuffer.length === 0) {
-          throw new Error(
-            'Provider returned empty audio — sound effect generation failed silently'
-          );
-        }
-
-        const filename = `voice-sfx-${genId}.mp3`;
-        const audioUrl = await uploadAudio(result.audioBuffer, result.contentType, filename);
-
-        await voiceGenerationsCol().doc(genId).update({
-          status: 'completed',
-          audioUrl,
-          completedAt: new Date(),
-        });
-
-        // Auto-attach sound effect to entity
-        autoAttachAudio({
-          creator: ctx.user.uid,
-          entityId: input.entityId,
-          generationId: genId,
-          audioUrl,
-          label: `SFX — ${input.text.slice(0, 60)}`,
-          category: 'sound',
-        });
-
-        void publishToGallery({
-          creatorUid: ctx.user.uid,
-          mediaUrl: audioUrl,
-          mediaType: 'audio',
-          title: input.text.slice(0, 100) || 'Generated SFX',
-          description: input.text,
-          generationId: genId,
-          generationModel: 'elevenlabs:sound_effect',
-          tags: ['sfx'],
-        });
-
-        fireJobWebhook({
-          ownerUid: ctx.user.uid,
-          webhookUrl: validatedWebhookUrl,
-          clientToken: input.clientToken,
-          event: 'job.completed',
-          jobId: genId,
-          kind: 'voice',
-          payload: {
-            status: 'completed',
-            audioUrl,
-            creditsCharged: credits,
+        return await withReservation(
+          {
+            userId: ctx.user.uid,
+            modelId: 'elevenlabs-sound-effect',
+            provider: 'elevenlabs',
+            estimatedCredits: credits,
+            byok: false,
+            meta: { generationId: genId, entityId: input.entityId ?? null },
           },
-        });
+          async () => {
+            await voiceGenerationsCol().doc(genId).update({ status: 'running' });
 
-        return {
-          generationId: genId,
-          status: 'completed' as const,
-          audioUrl: audioUrl as string | null,
-          creditsCharged: credits,
-          fiatPriceUsd: withFiat(SOUND_EFFECT_COST_USD, fiatMargin),
-          idempotentReplay: false as const,
-        };
+            const { resolveProviderKey: resolveSfxKey } = await import('../../lib/byok');
+            const apiKey = await resolveSfxKey(ctx.user.uid, 'elevenlabs');
+            const result = await elevenLabsService.soundEffect({
+              text: input.text,
+              durationSeconds: input.durationSeconds,
+              apiKey,
+            });
+
+            if (!result.audioBuffer || result.audioBuffer.length === 0) {
+              throw new Error(
+                'Provider returned empty audio — sound effect generation failed silently'
+              );
+            }
+
+            const filename = `voice-sfx-${genId}.mp3`;
+            const audioUrl = await uploadAudio(result.audioBuffer, result.contentType, filename);
+
+            await voiceGenerationsCol().doc(genId).update({
+              status: 'completed',
+              audioUrl,
+              completedAt: new Date(),
+            });
+
+            // Auto-attach sound effect to entity
+            autoAttachAudio({
+              creator: ctx.user.uid,
+              entityId: input.entityId,
+              generationId: genId,
+              audioUrl,
+              label: `SFX — ${input.text.slice(0, 60)}`,
+              category: 'sound',
+            });
+
+            void publishToGallery({
+              creatorUid: ctx.user.uid,
+              mediaUrl: audioUrl,
+              mediaType: 'audio',
+              title: input.text.slice(0, 100) || 'Generated SFX',
+              description: input.text,
+              generationId: genId,
+              generationModel: 'elevenlabs:sound_effect',
+              tags: ['sfx'],
+            });
+
+            fireJobWebhook({
+              ownerUid: ctx.user.uid,
+              webhookUrl: validatedWebhookUrl,
+              clientToken: input.clientToken,
+              event: 'job.completed',
+              jobId: genId,
+              kind: 'voice',
+              payload: {
+                status: 'completed',
+                audioUrl,
+                creditsCharged: credits,
+              },
+            });
+
+            return {
+              result: {
+                generationId: genId,
+                status: 'completed' as const,
+                audioUrl: audioUrl as string | null,
+                creditsCharged: credits,
+                fiatPriceUsd: withFiat(SOUND_EFFECT_COST_USD, fiatMargin),
+                idempotentReplay: false as const,
+              },
+            };
+          }
+        );
       } catch (error) {
-        await refundCredits(ctx.user.uid, credits, genId);
         await voiceGenerationsCol()
           .doc(genId)
           .update({
@@ -635,49 +607,60 @@ export const voiceRouter = router({
           createdAt: new Date(),
         });
 
-      await deductCredits(ctx.user.uid, credits);
-
       try {
-        await voiceGenerationsCol().doc(genId).update({ status: 'running' });
+        return await withReservation(
+          {
+            userId: ctx.user.uid,
+            modelId: 'elevenlabs-voice-design',
+            provider: 'elevenlabs',
+            estimatedCredits: credits,
+            byok: false,
+            meta: { generationId: genId },
+          },
+          async () => {
+            await voiceGenerationsCol().doc(genId).update({ status: 'running' });
 
-        const { resolveProviderKey: resolveDesignKey } = await import('../../lib/byok');
-        const apiKey = await resolveDesignKey(ctx.user.uid, 'elevenlabs');
-        const result = await elevenLabsService.designVoice({
-          name: input.name,
-          description: input.description,
-          text: input.previewText,
-          gender: input.gender,
-          age: input.age,
-          accent: input.accent,
-          accentStrength: input.accentStrength,
-          apiKey,
-        });
+            const { resolveProviderKey: resolveDesignKey } = await import('../../lib/byok');
+            const apiKey = await resolveDesignKey(ctx.user.uid, 'elevenlabs');
+            const result = await elevenLabsService.designVoice({
+              name: input.name,
+              description: input.description,
+              text: input.previewText,
+              gender: input.gender,
+              age: input.age,
+              accent: input.accent,
+              accentStrength: input.accentStrength,
+              apiKey,
+            });
 
-        if (!result.audioBuffer || result.audioBuffer.length === 0 || !result.voiceId) {
-          throw new Error('Provider returned empty response — voice design failed silently');
-        }
+            if (!result.audioBuffer || result.audioBuffer.length === 0 || !result.voiceId) {
+              throw new Error('Provider returned empty response — voice design failed silently');
+            }
 
-        const filename = `voice-design-preview-${genId}.mp3`;
-        const audioUrl = await uploadAudio(result.audioBuffer, result.contentType, filename);
+            const filename = `voice-design-preview-${genId}.mp3`;
+            const audioUrl = await uploadAudio(result.audioBuffer, result.contentType, filename);
 
-        await voiceGenerationsCol().doc(genId).update({
-          status: 'completed',
-          voiceId: result.voiceId,
-          audioUrl,
-          completedAt: new Date(),
-        });
+            await voiceGenerationsCol().doc(genId).update({
+              status: 'completed',
+              voiceId: result.voiceId,
+              audioUrl,
+              completedAt: new Date(),
+            });
 
-        return {
-          generationId: genId,
-          status: 'completed' as const,
-          voiceId: result.voiceId,
-          audioUrl,
-          name: input.name,
-          creditsCharged: credits,
-          fiatPriceUsd: withFiat(VOICE_DESIGN_COST_USD, fiatMargin),
-        };
+            return {
+              result: {
+                generationId: genId,
+                status: 'completed' as const,
+                voiceId: result.voiceId,
+                audioUrl,
+                name: input.name,
+                creditsCharged: credits,
+                fiatPriceUsd: withFiat(VOICE_DESIGN_COST_USD, fiatMargin),
+              },
+            };
+          }
+        );
       } catch (error) {
-        await refundCredits(ctx.user.uid, credits, genId);
         await voiceGenerationsCol()
           .doc(genId)
           .update({
@@ -728,95 +711,106 @@ export const voiceRouter = router({
           createdAt: new Date(),
         });
 
-      await deductCredits(ctx.user.uid, credits);
-
       try {
-        await voiceGenerationsCol().doc(genId).update({ status: 'running' });
+        return await withReservation(
+          {
+            userId: ctx.user.uid,
+            modelId: 'elevenlabs-instant-clone',
+            provider: 'elevenlabs',
+            estimatedCredits: credits,
+            byok: false,
+            meta: { generationId: genId },
+          },
+          async () => {
+            await voiceGenerationsCol().doc(genId).update({ status: 'running' });
 
-        // Fetch audio buffers from URLs (validate SSRF + enforce 30s timeout per URL)
-        const audioBuffers = await Promise.all(
-          input.audioUrls.map(async (url) => {
-            await validateUploadUrl(url);
-            const res = await fetchWithTimeout(url);
-            if (!res.ok) throw new Error(`Failed to fetch audio from ${url}`);
-            return Buffer.from(await res.arrayBuffer());
-          })
-        );
+            // Fetch audio buffers from URLs (validate SSRF + enforce 30s timeout per URL)
+            const audioBuffers = await Promise.all(
+              input.audioUrls.map(async (url) => {
+                await validateUploadUrl(url);
+                const res = await fetchWithTimeout(url);
+                if (!res.ok) throw new Error(`Failed to fetch audio from ${url}`);
+                return Buffer.from(await res.arrayBuffer());
+              })
+            );
 
-        const { resolveProviderKey: resolveCloneKey } = await import('../../lib/byok');
-        const apiKey = await resolveCloneKey(ctx.user.uid, 'elevenlabs');
-        const result = await elevenLabsService.instantCloneVoice({
-          name: input.name,
-          description: input.description,
-          audioBuffers,
-          apiKey,
-        });
+            const { resolveProviderKey: resolveCloneKey } = await import('../../lib/byok');
+            const apiKey = await resolveCloneKey(ctx.user.uid, 'elevenlabs');
+            const result = await elevenLabsService.instantCloneVoice({
+              name: input.name,
+              description: input.description,
+              audioBuffers,
+              apiKey,
+            });
 
-        if (!result.voiceId) {
-          throw new Error('Provider returned empty response — voice clone failed silently');
-        }
-
-        await voiceGenerationsCol().doc(genId).update({
-          status: 'completed',
-          voiceId: result.voiceId,
-          completedAt: new Date(),
-        });
-
-        // ── Voice Studio: register clone in userVoices + render preview ─────
-        // Best-effort — failures here MUST NOT fail the clone (credits are
-        // already charged and the ElevenLabs voice already exists).
-        let myVoiceId: string | undefined;
-        let previewUrl: string | undefined;
-        if (input.saveToMyVoices) {
-          try {
-            if (input.previewText) {
-              const tts = await elevenLabsService.textToSpeech({
-                text: input.previewText,
-                voiceId: result.voiceId,
-                modelId: 'eleven_flash_v2_5',
-              });
-              previewUrl = await uploadAudio(
-                tts.audioBuffer,
-                tts.contentType,
-                `voice-previews/${ctx.user.uid}/${genId}.mp3`
-              );
+            if (!result.voiceId) {
+              throw new Error('Provider returned empty response — voice clone failed silently');
             }
-            myVoiceId = randomUUID();
-            await db
-              .collection('userVoices')
-              .doc(ctx.user.uid)
-              .collection('voices')
-              .doc(myVoiceId)
-              .set({
-                id: myVoiceId,
-                userId: ctx.user.uid,
-                source: 'clone',
-                rightsClass: 'owned',
-                voiceId: result.voiceId,
-                name: input.name,
-                description: input.description ?? null,
-                tags: [],
-                previewUrl: previewUrl ?? null,
-                sourceSampleUrls: input.audioUrls,
-                cloneGenerationId: genId,
-                createdAt: new Date(),
-              });
-          } catch (regErr) {
-            console.error('cloneVoice: userVoices registration failed:', regErr);
-          }
-        }
 
-        return {
-          generationId: genId,
-          status: 'completed' as const,
-          voiceId: result.voiceId,
-          name: result.name,
-          creditsCharged: credits,
-          myVoiceId,
-          previewUrl,
-        };
+            await voiceGenerationsCol().doc(genId).update({
+              status: 'completed',
+              voiceId: result.voiceId,
+              completedAt: new Date(),
+            });
+
+            // ── Voice Studio: register clone in userVoices + render preview ─────
+            // Best-effort — failures here MUST NOT fail the clone (credits are
+            // already charged and the ElevenLabs voice already exists).
+            let myVoiceId: string | undefined;
+            let previewUrl: string | undefined;
+            if (input.saveToMyVoices) {
+              try {
+                if (input.previewText) {
+                  const tts = await elevenLabsService.textToSpeech({
+                    text: input.previewText,
+                    voiceId: result.voiceId,
+                    modelId: 'eleven_flash_v2_5',
+                  });
+                  previewUrl = await uploadAudio(
+                    tts.audioBuffer,
+                    tts.contentType,
+                    `voice-previews/${ctx.user.uid}/${genId}.mp3`
+                  );
+                }
+                myVoiceId = randomUUID();
+                await db
+                  .collection('userVoices')
+                  .doc(ctx.user.uid)
+                  .collection('voices')
+                  .doc(myVoiceId)
+                  .set({
+                    id: myVoiceId,
+                    userId: ctx.user.uid,
+                    source: 'clone',
+                    rightsClass: 'owned',
+                    voiceId: result.voiceId,
+                    name: input.name,
+                    description: input.description ?? null,
+                    tags: [],
+                    previewUrl: previewUrl ?? null,
+                    sourceSampleUrls: input.audioUrls,
+                    cloneGenerationId: genId,
+                    createdAt: new Date(),
+                  });
+              } catch (regErr) {
+                console.error('cloneVoice: userVoices registration failed:', regErr);
+              }
+            }
+
+            return {
+              result: {
+                generationId: genId,
+                status: 'completed' as const,
+                voiceId: result.voiceId,
+                name: result.name,
+                creditsCharged: credits,
+                myVoiceId,
+                previewUrl,
+              },
+            };
+          }
+        );
       } catch (error) {
-        await refundCredits(ctx.user.uid, credits, genId);
         await voiceGenerationsCol()
           .doc(genId)
           .update({
@@ -933,111 +927,126 @@ export const voiceRouter = router({
           ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         });
 
-      await deductCredits(ctx.user.uid, credits);
-
       try {
-        await voiceGenerationsCol().doc(genId).update({ status: 'running' });
-
-        // Fetch source audio (SSRF-validated + timed out)
-        await validateUploadUrl(input.audioUrl);
-        const sourceRes = await fetchWithTimeout(input.audioUrl);
-        if (!sourceRes.ok) {
-          throw new Error('Failed to fetch source audio');
-        }
-        // H8: verify the fetched resource is actually audio before we forward
-        // it to the voice-changer. Rejecting here prevents us paying for a
-        // provider call that'll 4xx on obviously-wrong payloads (JSON, HTML,
-        // binary garbage) and avoids arbitrary-MIME smuggling.
-        const sourceContentType =
-          sourceRes.headers.get('content-type')?.split(';')[0]?.trim() ?? '';
-        if (!sourceContentType || !sourceContentType.startsWith('audio/')) {
-          throw new Error('Source URL did not return an audio content-type');
-        }
-        const sourceBuffer = Buffer.from(await sourceRes.arrayBuffer());
-        if (sourceBuffer.length === 0) {
-          throw new Error('Source audio is empty');
-        }
-        // Cap the pulled payload at 50 MB — longer clips have never been a
-        // legitimate input to voice-modify and bloat ElevenLabs cost.
-        if (sourceBuffer.length > 50 * 1024 * 1024) {
-          throw new Error('Source audio exceeds 50MB');
-        }
-
-        const { resolveProviderKey: resolveChangerKey } = await import('../../lib/byok');
-        const apiKey = await resolveChangerKey(ctx.user.uid, 'elevenlabs');
-        const result = await elevenLabsService.voiceChanger({
-          audioBuffer: sourceBuffer,
-          voiceId: input.targetVoiceId,
-          modelId: input.modelId,
-          stability: input.stability,
-          similarityBoost: input.similarityBoost,
-          style: input.style,
-          removeBackgroundNoise: input.removeBackgroundNoise,
-          apiKey,
-        });
-
-        if (!result.audioBuffer || result.audioBuffer.length === 0) {
-          throw new Error('Provider returned empty audio — voice modify failed silently');
-        }
-
-        const filename = `voice-modify-${genId}.mp3`;
-        const audioUrl = await uploadAudio(result.audioBuffer, result.contentType, filename);
-        const latencyMs = Date.now() - startTime;
-
-        await voiceGenerationsCol().doc(genId).update({
-          status: 'completed',
-          audioUrl,
-          latencyMs,
-          completedAt: new Date(),
-        });
-
-        autoAttachAudio({
-          creator: ctx.user.uid,
-          entityId: input.entityId,
-          generationId: genId,
-          audioUrl,
-          label: `Voice modify — ${input.presetId || input.targetVoiceId.slice(0, 8)}`,
-          category: 'sound',
-        });
-
-        void publishToGallery({
-          creatorUid: ctx.user.uid,
-          mediaUrl: audioUrl,
-          mediaType: 'audio',
-          title: input.presetId ? `Voice: ${input.presetId}` : `Voice modify`,
-          description: input.presetId || '',
-          universeId: input.universeId || null,
-          generationId: genId,
-          generationModel: `elevenlabs:${input.modelId}`,
-          tags: ['voice-modify', ...(input.presetId ? [input.presetId] : [])],
-        });
-
-        fireJobWebhook({
-          ownerUid: ctx.user.uid,
-          webhookUrl: validatedWebhookUrl,
-          clientToken: input.clientToken,
-          event: 'job.completed',
-          jobId: genId,
-          kind: 'voice',
-          payload: {
-            status: 'completed',
-            audioUrl,
+        return await withReservation(
+          {
+            userId: ctx.user.uid,
             modelId: input.modelId,
-            creditsCharged: credits,
+            provider: 'elevenlabs',
+            estimatedCredits: credits,
+            byok: false,
+            meta: {
+              generationId: genId,
+              entityId: input.entityId ?? null,
+              universeId: input.universeId ?? null,
+            },
           },
-        });
+          async () => {
+            await voiceGenerationsCol().doc(genId).update({ status: 'running' });
 
-        return {
-          generationId: genId,
-          status: 'completed' as const,
-          audioUrl: audioUrl as string | null,
-          modelId: input.modelId as string,
-          creditsCharged: credits,
-          fiatPriceUsd: withFiat(VOICE_MODIFY_COST_USD, fiatMargin),
-          idempotentReplay: false as const,
-        };
+            // Fetch source audio (SSRF-validated + timed out)
+            await validateUploadUrl(input.audioUrl);
+            const sourceRes = await fetchWithTimeout(input.audioUrl);
+            if (!sourceRes.ok) {
+              throw new Error('Failed to fetch source audio');
+            }
+            // H8: verify the fetched resource is actually audio before we forward
+            // it to the voice-changer. Rejecting here prevents us paying for a
+            // provider call that'll 4xx on obviously-wrong payloads (JSON, HTML,
+            // binary garbage) and avoids arbitrary-MIME smuggling.
+            const sourceContentType =
+              sourceRes.headers.get('content-type')?.split(';')[0]?.trim() ?? '';
+            if (!sourceContentType || !sourceContentType.startsWith('audio/')) {
+              throw new Error('Source URL did not return an audio content-type');
+            }
+            const sourceBuffer = Buffer.from(await sourceRes.arrayBuffer());
+            if (sourceBuffer.length === 0) {
+              throw new Error('Source audio is empty');
+            }
+            // Cap the pulled payload at 50 MB — longer clips have never been a
+            // legitimate input to voice-modify and bloat ElevenLabs cost.
+            if (sourceBuffer.length > 50 * 1024 * 1024) {
+              throw new Error('Source audio exceeds 50MB');
+            }
+
+            const { resolveProviderKey: resolveChangerKey } = await import('../../lib/byok');
+            const apiKey = await resolveChangerKey(ctx.user.uid, 'elevenlabs');
+            const result = await elevenLabsService.voiceChanger({
+              audioBuffer: sourceBuffer,
+              voiceId: input.targetVoiceId,
+              modelId: input.modelId,
+              stability: input.stability,
+              similarityBoost: input.similarityBoost,
+              style: input.style,
+              removeBackgroundNoise: input.removeBackgroundNoise,
+              apiKey,
+            });
+
+            if (!result.audioBuffer || result.audioBuffer.length === 0) {
+              throw new Error('Provider returned empty audio — voice modify failed silently');
+            }
+
+            const filename = `voice-modify-${genId}.mp3`;
+            const audioUrl = await uploadAudio(result.audioBuffer, result.contentType, filename);
+            const latencyMs = Date.now() - startTime;
+
+            await voiceGenerationsCol().doc(genId).update({
+              status: 'completed',
+              audioUrl,
+              latencyMs,
+              completedAt: new Date(),
+            });
+
+            autoAttachAudio({
+              creator: ctx.user.uid,
+              entityId: input.entityId,
+              generationId: genId,
+              audioUrl,
+              label: `Voice modify — ${input.presetId || input.targetVoiceId.slice(0, 8)}`,
+              category: 'sound',
+            });
+
+            void publishToGallery({
+              creatorUid: ctx.user.uid,
+              mediaUrl: audioUrl,
+              mediaType: 'audio',
+              title: input.presetId ? `Voice: ${input.presetId}` : `Voice modify`,
+              description: input.presetId || '',
+              universeId: input.universeId || null,
+              generationId: genId,
+              generationModel: `elevenlabs:${input.modelId}`,
+              tags: ['voice-modify', ...(input.presetId ? [input.presetId] : [])],
+            });
+
+            fireJobWebhook({
+              ownerUid: ctx.user.uid,
+              webhookUrl: validatedWebhookUrl,
+              clientToken: input.clientToken,
+              event: 'job.completed',
+              jobId: genId,
+              kind: 'voice',
+              payload: {
+                status: 'completed',
+                audioUrl,
+                modelId: input.modelId,
+                creditsCharged: credits,
+              },
+            });
+
+            return {
+              result: {
+                generationId: genId,
+                status: 'completed' as const,
+                audioUrl: audioUrl as string | null,
+                modelId: input.modelId as string,
+                creditsCharged: credits,
+                fiatPriceUsd: withFiat(VOICE_MODIFY_COST_USD, fiatMargin),
+                idempotentReplay: false as const,
+              },
+            };
+          }
+        );
       } catch (error) {
-        await refundCredits(ctx.user.uid, credits, genId);
         await voiceGenerationsCol()
           .doc(genId)
           .update({

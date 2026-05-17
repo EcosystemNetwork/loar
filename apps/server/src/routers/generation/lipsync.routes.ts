@@ -18,13 +18,11 @@ import { router, protectedProcedure, requirePermission, expensiveProcedure } fro
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
-import { FieldValue } from 'firebase-admin/firestore';
 import { lipSyncService } from '../../services/lipsync';
 import { transcriptionService } from '../../services/transcription';
 import { firebaseStorageService } from '../../services/firebase-storage';
 import { trackQuests } from '../../services/quest-tracker';
 import { emitActivity } from '../../services/activity';
-import { logFailedRefund } from '../../lib/refund-audit';
 import { publishToGallery } from '../../lib/gallery-publish';
 import { extractVideoThumbnail } from '../../services/video-thumbnail';
 import { reserveClientToken } from '../../lib/jobIdempotency';
@@ -32,6 +30,7 @@ import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/
 import { segmentsToSRT, segmentsToVTT } from '../../lib/captions-format';
 import { TRPCError } from '@trpc/server';
 import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
+import { withReservation } from '../../services/credits';
 
 const clientTokenSchema = z
   .string()
@@ -62,58 +61,6 @@ const captionsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('captions');
 };
-
-// ── Credit helpers ──────────────────────────────────────────────────
-
-const userCreditsCol = () => {
-  if (!db) throw new Error('Firebase is not configured');
-  return db.collection('userCredits');
-};
-
-async function deductCredits(userId: string, credits: number): Promise<void> {
-  if (!db) throw new Error('Firebase is not configured');
-  const { assertGenerationAllowed } = await import('../../lib/generation-guards');
-  await assertGenerationAllowed(userId, credits);
-  const ref = userCreditsCol().doc(userId);
-  await db.runTransaction(async (tx) => {
-    const doc = await tx.get(ref);
-    const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-    if (balance < credits) {
-      throw new Error(
-        `Insufficient credits. Need ${credits}, have ${balance}. Purchase more to continue.`
-      );
-    }
-    tx.update(ref, {
-      balance: balance - credits,
-      totalSpent: (doc.data()?.totalSpent || 0) + credits,
-      updatedAt: new Date(),
-    });
-  });
-}
-
-async function refundCredits(userId: string, credits: number, genId?: string): Promise<void> {
-  const ref = userCreditsCol().doc(userId);
-  const { recordCreditsTx, recordAiGeneration } = await import('../../lib/metrics');
-  try {
-    await ref.update({
-      balance: FieldValue.increment(credits),
-      totalSpent: FieldValue.increment(-credits),
-      updatedAt: new Date(),
-    });
-    recordCreditsTx('refund', 'success');
-  } catch (err) {
-    recordCreditsTx('refund', 'failure');
-    console.error(`CRITICAL: Lipsync credit refund failed for ${userId}:`, err);
-    logFailedRefund({
-      userId,
-      credits,
-      source: 'lipsync',
-      generationId: genId ?? 'unknown',
-      error: err instanceof Error ? err.message : 'Unknown',
-    });
-  }
-  recordAiGeneration('fal', 'lipsync', 'failure');
-}
 
 // ── Storage upload helper ───────────────────────────────────────────
 
@@ -211,94 +158,106 @@ export const lipsyncRouter = router({
           ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         });
 
-      await deductCredits(ctx.user.uid, credits);
-
       try {
-        await lipsyncGenerationsCol().doc(genId).update({ status: 'running' });
-
-        const result = await lipSyncService.sync({
-          videoUrl: input.videoUrl,
-          audioUrl: input.audioUrl,
-          model: input.model,
-        });
-
-        if (result.status === 'failed' || !result.videoUrl) {
-          throw new Error(result.error || 'Lip-sync failed — no video returned');
-        }
-
-        // Download and re-upload to Firebase Storage for permanence
-        const videoRes = await fetch(result.videoUrl);
-        if (!videoRes.ok) throw new Error('Failed to download synced video from provider');
-        const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
-        const filename = `lipsync-${genId}.mp4`;
-        const permanentUrl = await uploadVideo(videoBuffer, filename);
-
-        const latencyMs = Date.now() - startTime;
-
-        trackQuests(ctx.user.uid, [{ questId: 'first_lipsync' }]);
-
-        emitActivity({
-          actorUid: ctx.user.uid,
-          eventType: 'ai_pipeline_completed',
-          targetType: 'lipsync',
-          targetId: genId,
-          metadata: { model: input.model || 'fal-ai/lipsync' },
-        });
-
-        await lipsyncGenerationsCol().doc(genId).update({
-          status: 'completed',
-          resultVideoUrl: permanentUrl,
-          latencyMs,
-          completedAt: new Date(),
-        });
-
-        // Auto-publish to gallery — every clip auto-appears (per project policy)
-        if (input.autoPublish) {
-          try {
-            const thumbnailUrl = await extractVideoThumbnail(permanentUrl, genId);
-            await publishToGallery({
-              creatorUid: ctx.user.uid,
-              mediaUrl: permanentUrl,
-              thumbnailUrl,
-              mediaType: 'ai-video',
-              title: 'Lip-Synced Clip',
-              description: 'AI lip-sync of source video with synthesized audio',
-              generationId: genId,
-              generationModel: input.model || 'fal-ai/lipsync',
-              parentGenerationId: input.sourceVideoGenerationId || null,
-              sourceVideoGenerationId: input.sourceVideoGenerationId || null,
-              sourceAudioGenerationId: input.sourceAudioGenerationId || null,
-            });
-          } catch (err) {
-            console.error('[lipsync] gallery publish failed:', err);
-          }
-        }
-
-        fireJobWebhook({
-          ownerUid: ctx.user.uid,
-          webhookUrl: validatedWebhookUrl,
-          clientToken: input.clientToken,
-          event: 'job.completed',
-          jobId: genId,
-          kind: 'video',
-          payload: {
-            operation: 'lipsync',
-            status: 'completed',
-            resultUrl: permanentUrl,
-            modelUsed: input.model || 'fal-ai/lipsync',
-            creditsCharged: credits,
+        return await withReservation(
+          {
+            userId: ctx.user.uid,
+            modelId: input.model || 'fal-ai/lipsync',
+            provider: 'fal',
+            estimatedCredits: credits,
+            byok: false,
+            meta: { generationId: genId, entityId: input.entityId ?? null },
           },
-        });
+          async () => {
+            await lipsyncGenerationsCol().doc(genId).update({ status: 'running' });
 
-        return {
-          generationId: genId,
-          status: 'completed' as const,
-          videoUrl: permanentUrl as string | null,
-          creditsCharged: credits,
-          idempotentReplay: false as const,
-        };
+            const result = await lipSyncService.sync({
+              videoUrl: input.videoUrl,
+              audioUrl: input.audioUrl,
+              model: input.model,
+            });
+
+            if (result.status === 'failed' || !result.videoUrl) {
+              throw new Error(result.error || 'Lip-sync failed — no video returned');
+            }
+
+            // Download and re-upload to Firebase Storage for permanence
+            const videoRes = await fetch(result.videoUrl);
+            if (!videoRes.ok) throw new Error('Failed to download synced video from provider');
+            const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+            const filename = `lipsync-${genId}.mp4`;
+            const permanentUrl = await uploadVideo(videoBuffer, filename);
+
+            const latencyMs = Date.now() - startTime;
+
+            trackQuests(ctx.user.uid, [{ questId: 'first_lipsync' }]);
+
+            emitActivity({
+              actorUid: ctx.user.uid,
+              eventType: 'ai_pipeline_completed',
+              targetType: 'lipsync',
+              targetId: genId,
+              metadata: { model: input.model || 'fal-ai/lipsync' },
+            });
+
+            await lipsyncGenerationsCol().doc(genId).update({
+              status: 'completed',
+              resultVideoUrl: permanentUrl,
+              latencyMs,
+              completedAt: new Date(),
+            });
+
+            // Auto-publish to gallery — every clip auto-appears (per project policy)
+            if (input.autoPublish) {
+              try {
+                const thumbnailUrl = await extractVideoThumbnail(permanentUrl, genId);
+                await publishToGallery({
+                  creatorUid: ctx.user.uid,
+                  mediaUrl: permanentUrl,
+                  thumbnailUrl,
+                  mediaType: 'ai-video',
+                  title: 'Lip-Synced Clip',
+                  description: 'AI lip-sync of source video with synthesized audio',
+                  generationId: genId,
+                  generationModel: input.model || 'fal-ai/lipsync',
+                  parentGenerationId: input.sourceVideoGenerationId || null,
+                  sourceVideoGenerationId: input.sourceVideoGenerationId || null,
+                  sourceAudioGenerationId: input.sourceAudioGenerationId || null,
+                });
+              } catch (err) {
+                console.error('[lipsync] gallery publish failed:', err);
+              }
+            }
+
+            fireJobWebhook({
+              ownerUid: ctx.user.uid,
+              webhookUrl: validatedWebhookUrl,
+              clientToken: input.clientToken,
+              event: 'job.completed',
+              jobId: genId,
+              kind: 'video',
+              payload: {
+                operation: 'lipsync',
+                status: 'completed',
+                resultUrl: permanentUrl,
+                modelUsed: input.model || 'fal-ai/lipsync',
+                creditsCharged: credits,
+              },
+            });
+
+            return {
+              result: {
+                generationId: genId,
+                status: 'completed' as const,
+                videoUrl: permanentUrl as string | null,
+                creditsCharged: credits,
+                idempotentReplay: false as const,
+              },
+            };
+          }
+        );
       } catch (error) {
-        await refundCredits(ctx.user.uid, credits, genId);
+        // withReservation already cancelled the reservation (full refund).
         await lipsyncGenerationsCol()
           .doc(genId)
           .update({
@@ -363,44 +322,55 @@ export const lipsyncRouter = router({
           createdAt: new Date(),
         });
 
-      await deductCredits(ctx.user.uid, credits);
-
       try {
-        await transcriptionsCol().doc(transcriptionId).update({ status: 'running' });
+        return await withReservation(
+          {
+            userId: ctx.user.uid,
+            modelId: 'fal-transcribe',
+            provider: 'fal',
+            estimatedCredits: credits,
+            byok: false,
+            meta: { generationId: transcriptionId, entityId: input.entityId ?? null },
+          },
+          async () => {
+            await transcriptionsCol().doc(transcriptionId).update({ status: 'running' });
 
-        const result = await transcriptionService.transcribe({
-          audioUrl: input.audioUrl,
-          language: input.language,
-        });
+            const result = await transcriptionService.transcribe({
+              audioUrl: input.audioUrl,
+              language: input.language,
+            });
 
-        if (result.status === 'failed' || (!result.text && !result.segments)) {
-          throw new Error(result.error || 'Transcription failed — no text returned');
-        }
+            if (result.status === 'failed' || (!result.text && !result.segments)) {
+              throw new Error(result.error || 'Transcription failed — no text returned');
+            }
 
-        const latencyMs = Date.now() - startTime;
+            const latencyMs = Date.now() - startTime;
 
-        trackQuests(ctx.user.uid, [{ questId: 'first_transcription' }]);
+            trackQuests(ctx.user.uid, [{ questId: 'first_transcription' }]);
 
-        await transcriptionsCol()
-          .doc(transcriptionId)
-          .update({
-            status: 'completed',
-            text: result.text || null,
-            segments: result.segments || [],
-            detectedLanguage: result.language || null,
-            latencyMs,
-            completedAt: new Date(),
-          });
+            await transcriptionsCol()
+              .doc(transcriptionId)
+              .update({
+                status: 'completed',
+                text: result.text || null,
+                segments: result.segments || [],
+                detectedLanguage: result.language || null,
+                latencyMs,
+                completedAt: new Date(),
+              });
 
-        return {
-          transcriptionId,
-          status: 'completed' as const,
-          text: result.text,
-          segments: result.segments,
-          creditsCharged: credits,
-        };
+            return {
+              result: {
+                transcriptionId,
+                status: 'completed' as const,
+                text: result.text,
+                segments: result.segments,
+                creditsCharged: credits,
+              },
+            };
+          }
+        );
       } catch (error) {
-        await refundCredits(ctx.user.uid, credits, transcriptionId);
         await transcriptionsCol()
           .doc(transcriptionId)
           .update({
@@ -451,68 +421,79 @@ export const lipsyncRouter = router({
           createdAt: new Date(),
         });
 
-      await deductCredits(ctx.user.uid, credits);
-
       try {
-        await captionsCol().doc(captionId).update({ status: 'running' });
+        return await withReservation(
+          {
+            userId: ctx.user.uid,
+            modelId: 'fal-captions',
+            provider: 'fal',
+            estimatedCredits: credits,
+            byok: false,
+            meta: { generationId: captionId, format: input.format },
+          },
+          async () => {
+            await captionsCol().doc(captionId).update({ status: 'running' });
 
-        // Transcribe the video's audio (FAL Whisper accepts video URLs too)
-        const result = await transcriptionService.transcribe({
-          audioUrl: input.videoUrl,
-          language: input.language,
-        });
+            // Transcribe the video's audio (FAL Whisper accepts video URLs too)
+            const result = await transcriptionService.transcribe({
+              audioUrl: input.videoUrl,
+              language: input.language,
+            });
 
-        if (result.status === 'failed' || !result.segments || result.segments.length === 0) {
-          throw new Error(result.error || 'Caption generation failed — no segments returned');
-        }
+            if (result.status === 'failed' || !result.segments || result.segments.length === 0) {
+              throw new Error(result.error || 'Caption generation failed — no segments returned');
+            }
 
-        // Format segments into requested caption format
-        let captions: string;
-        switch (input.format) {
-          case 'vtt':
-            captions = segmentsToVTT(result.segments);
-            break;
-          case 'json':
-            captions = JSON.stringify(result.segments, null, 2);
-            break;
-          case 'srt':
-          default:
-            captions = segmentsToSRT(result.segments);
-            break;
-        }
+            // Format segments into requested caption format
+            let captions: string;
+            switch (input.format) {
+              case 'vtt':
+                captions = segmentsToVTT(result.segments);
+                break;
+              case 'json':
+                captions = JSON.stringify(result.segments, null, 2);
+                break;
+              case 'srt':
+              default:
+                captions = segmentsToSRT(result.segments);
+                break;
+            }
 
-        const latencyMs = Date.now() - startTime;
+            const latencyMs = Date.now() - startTime;
 
-        trackQuests(ctx.user.uid, [{ questId: 'first_captions' }]);
+            trackQuests(ctx.user.uid, [{ questId: 'first_captions' }]);
 
-        emitActivity({
-          actorUid: ctx.user.uid,
-          eventType: 'ai_pipeline_completed',
-          targetType: 'caption',
-          targetId: captionId,
-          metadata: { format: input.format },
-        });
+            emitActivity({
+              actorUid: ctx.user.uid,
+              eventType: 'ai_pipeline_completed',
+              targetType: 'caption',
+              targetId: captionId,
+              metadata: { format: input.format },
+            });
 
-        await captionsCol()
-          .doc(captionId)
-          .update({
-            status: 'completed',
-            captions,
-            segments: result.segments,
-            detectedLanguage: result.language || null,
-            latencyMs,
-            completedAt: new Date(),
-          });
+            await captionsCol()
+              .doc(captionId)
+              .update({
+                status: 'completed',
+                captions,
+                segments: result.segments,
+                detectedLanguage: result.language || null,
+                latencyMs,
+                completedAt: new Date(),
+              });
 
-        return {
-          captionId,
-          status: 'completed' as const,
-          captions,
-          format: input.format,
-          creditsCharged: credits,
-        };
+            return {
+              result: {
+                captionId,
+                status: 'completed' as const,
+                captions,
+                format: input.format,
+                creditsCharged: credits,
+              },
+            };
+          }
+        );
       } catch (error) {
-        await refundCredits(ctx.user.uid, credits, captionId);
         await captionsCol()
           .doc(captionId)
           .update({

@@ -9,7 +9,7 @@
  * Universe scoping is preserved via the ?universe= search param.
  */
 import { createFileRoute, Link, useSearch, useNavigate } from '@tanstack/react-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useVideoLoad } from '@/hooks/useVideoLoad';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
@@ -162,61 +162,60 @@ function EntityTab({ kind, universeAddress }: { kind: EntityKind; universeAddres
   const [sort, setSort] = useState<WikiSort>('newest');
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
-  // Per-universe view: single query — entity counts inside one universe are
-  // small enough that paginating here would just add round-trips.
-  const scopedQuery = useQuery({
-    queryKey: ['entities', 'list', universeAddress, kind],
-    queryFn: () => trpcClient.entities.list.query({ universeAddress: universeAddress!, kind }),
-    enabled: !!universeAddress,
-    staleTime: WIKI_LIST_STALE_TIME,
-  });
-
-  // Global view: cursor-paginated. The first ~40 are visible immediately;
-  // an IntersectionObserver-driven sentinel auto-loads the next page when
-  // the user scrolls near the bottom.
-  const globalQuery = useInfiniteQuery({
-    queryKey: ['entities', 'listByKind', kind],
+  // Single pagination model for both views so a 5-entity and a 500-entity
+  // universe render at the same speed and with the same load-more behavior.
+  const query = useInfiniteQuery({
+    queryKey: universeAddress
+      ? ['entities', 'list', universeAddress, kind]
+      : ['entities', 'listByKind', kind],
     queryFn: ({ pageParam }) =>
-      trpcClient.entities.listByKind.query({
-        kind,
-        limit: 40,
-        cursor: pageParam ?? undefined,
-      }),
+      universeAddress
+        ? trpcClient.entities.list.query({
+            universeAddress,
+            kind,
+            limit: 40,
+            cursor: pageParam ?? undefined,
+          })
+        : trpcClient.entities.listByKind.query({
+            kind,
+            limit: 40,
+            cursor: pageParam ?? undefined,
+          }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
-    enabled: !universeAddress,
     staleTime: WIKI_LIST_STALE_TIME,
   });
 
-  const entities: WikiEntity[] = universeAddress
-    ? ((scopedQuery.data?.entities ?? []) as WikiEntity[])
-    : ((globalQuery.data?.pages.flatMap((p) => p.entities) ?? []) as WikiEntity[]);
-  const isLoading = universeAddress ? scopedQuery.isLoading : globalQuery.isLoading;
-  const error = universeAddress ? scopedQuery.error : globalQuery.error;
-  const hasMore = !universeAddress && (globalQuery.hasNextPage ?? false);
-  const isFetchingNextPage = !universeAddress && globalQuery.isFetchingNextPage;
+  const entities: WikiEntity[] = (query.data?.pages.flatMap((p) => p.entities) ??
+    []) as WikiEntity[];
+  const isLoading = query.isLoading;
+  const error = query.error;
+  const hasMore = query.hasNextPage ?? false;
+  const isFetchingNextPage = query.isFetchingNextPage;
 
-  const filtered = search.trim()
-    ? entities.filter((e) => e.name.toLowerCase().includes(search.toLowerCase()))
-    : entities;
+  const deferredSearch = useDeferredValue(search);
+  const filtered = useMemo(() => {
+    const q = deferredSearch.trim().toLowerCase();
+    if (!q) return entities;
+    return entities.filter((e) => e.name.toLowerCase().includes(q));
+  }, [entities, deferredSearch]);
   const sorted = useMemo(() => sortEntities(filtered, sort), [filtered, sort]);
 
   useEffect(() => {
-    if (universeAddress) return;
     if (!hasMore) return;
     const node = loadMoreRef.current;
     if (!node) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting && !isFetchingNextPage) {
-          globalQuery.fetchNextPage();
+          query.fetchNextPage();
         }
       },
       { rootMargin: '200px' }
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [hasMore, isFetchingNextPage, universeAddress, globalQuery]);
+  }, [hasMore, isFetchingNextPage, query]);
 
   return (
     <div className="space-y-4">
@@ -231,16 +230,16 @@ function EntityTab({ kind, universeAddress }: { kind: EntityKind; universeAddres
           />
         </div>
         <SortMenu value={sort} onChange={setSort} />
-        <Link
-          to="/create/$kind"
-          params={{ kind }}
-          search={universeAddress ? { universe: universeAddress } : undefined}
-        >
-          <Button size="sm" variant="outline">
+        <Button asChild size="sm" variant="outline">
+          <Link
+            to="/create/$kind"
+            params={{ kind }}
+            search={universeAddress ? { universe: universeAddress } : undefined}
+          >
             <Plus className="h-4 w-4 mr-1" />
             New
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </div>
 
       {isLoading && <WikiGridSkeleton count={8} aspect="video" />}
@@ -271,7 +270,7 @@ function EntityTab({ kind, universeAddress }: { kind: EntityKind; universeAddres
               {isFetchingNextPage ? (
                 <span className="text-xs text-muted-foreground">Loading more…</span>
               ) : (
-                <Button variant="ghost" size="sm" onClick={() => globalQuery.fetchNextPage()}>
+                <Button variant="ghost" size="sm" onClick={() => query.fetchNextPage()}>
                   Load more
                 </Button>
               )}
@@ -423,12 +422,12 @@ function GalleryTab({ universeAddress }: { universeAddress?: string }) {
       />
 
       <div className="flex justify-end">
-        <Link to="/sandbox">
-          <Button size="sm" variant="outline">
+        <Button asChild size="sm" variant="outline">
+          <Link to="/sandbox">
             <Plus className="h-4 w-4 mr-1" />
             Create in Lab
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </div>
 
       <GalleryGrid
@@ -548,28 +547,61 @@ function CollectionTab() {
 
 function CharacterProfilesTab({ universeAddress }: { universeAddress?: string }) {
   const [search, setSearch] = useState('');
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const query = useInfiniteQuery({
     queryKey: universeAddress
       ? ['entities', 'list', universeAddress, 'person']
       : ['entities', 'listByKind', 'person'],
-    queryFn: () =>
+    queryFn: ({ pageParam }) =>
       universeAddress
-        ? trpcClient.entities.list.query({ universeAddress, kind: 'person' })
-        : trpcClient.entities.listByKind.query({ kind: 'person' }),
+        ? trpcClient.entities.list.query({
+            universeAddress,
+            kind: 'person',
+            limit: 40,
+            cursor: pageParam ?? undefined,
+          })
+        : trpcClient.entities.listByKind.query({
+            kind: 'person',
+            limit: 40,
+            cursor: pageParam ?? undefined,
+          }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
     staleTime: WIKI_LIST_STALE_TIME,
   });
 
-  const entities = ((data?.entities ?? []) as WikiEntity[]).filter(
+  const isLoading = query.isLoading;
+  const hasMore = query.hasNextPage ?? false;
+  const isFetchingNextPage = query.isFetchingNextPage;
+  const allEntities = (query.data?.pages.flatMap((p) => p.entities) ?? []) as WikiEntity[];
+  const entities = allEntities.filter(
     (e) => e.description || e.imageUrl || Object.keys(e.metadata ?? {}).length > 0
   );
-  const filtered = search.trim()
-    ? entities.filter(
-        (e) =>
-          e.name.toLowerCase().includes(search.toLowerCase()) ||
-          e.description?.toLowerCase().includes(search.toLowerCase())
-      )
-    : entities;
+
+  useEffect(() => {
+    if (!hasMore) return;
+    const node = loadMoreRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !isFetchingNextPage) {
+          query.fetchNextPage();
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, isFetchingNextPage, query]);
+  const deferredSearch = useDeferredValue(search);
+  const filtered = useMemo(() => {
+    const q = deferredSearch.trim().toLowerCase();
+    if (!q) return entities;
+    return entities.filter(
+      (e) => e.name.toLowerCase().includes(q) || e.description?.toLowerCase().includes(q)
+    );
+  }, [entities, deferredSearch]);
 
   return (
     <div className="space-y-4">
@@ -583,16 +615,16 @@ function CharacterProfilesTab({ universeAddress }: { universeAddress?: string })
             className="pl-9"
           />
         </div>
-        <Link
-          to="/create/$kind"
-          params={{ kind: 'person' }}
-          search={universeAddress ? { universe: universeAddress } : undefined}
-        >
-          <Button size="sm" variant="outline">
+        <Button asChild size="sm" variant="outline">
+          <Link
+            to="/create/$kind"
+            params={{ kind: 'person' }}
+            search={universeAddress ? { universe: universeAddress } : undefined}
+          >
             <Plus className="h-4 w-4 mr-1" />
             New Character
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </div>
 
       {isLoading && <WikiGridSkeleton count={6} layout="row" />}
@@ -664,6 +696,17 @@ function CharacterProfilesTab({ universeAddress }: { universeAddress?: string })
           </Link>
         ))}
       </div>
+      {hasMore && (
+        <div ref={loadMoreRef} className="flex justify-center py-4">
+          {isFetchingNextPage ? (
+            <span className="text-xs text-muted-foreground">Loading more…</span>
+          ) : (
+            <Button variant="ghost" size="sm" onClick={() => query.fetchNextPage()}>
+              Load more
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -671,20 +714,27 @@ function CharacterProfilesTab({ universeAddress }: { universeAddress?: string })
 function ThreeDModelsTab({ universeAddress }: { universeAddress?: string }) {
   const [search, setSearch] = useState('');
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
-  const { data: galleryData, isLoading: galleryLoading } = useQuery({
+  const galleryQuery = useInfiniteQuery({
     queryKey: ['wiki', '3d-gallery', universeAddress],
-    queryFn: () =>
+    queryFn: ({ pageParam }) =>
       trpcClient.gallery.browse.query({
         universeId: universeAddress,
         mediaType: '3d',
         sortBy: 'newest',
-        limit: 50,
+        limit: 40,
+        cursor: pageParam ?? undefined,
       }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
     staleTime: WIKI_LIST_STALE_TIME,
   });
 
-  const galleryItems = galleryData?.items ?? [];
+  const galleryLoading = galleryQuery.isLoading;
+  const hasMore = galleryQuery.hasNextPage ?? false;
+  const isFetchingNextPage = galleryQuery.isFetchingNextPage;
+  const galleryItems = galleryQuery.data?.pages.flatMap((p) => p.items) ?? [];
   // Hide legacy untextured intermediates — the pipeline now publishes only
   // the final textured model, but old records remain in the collection.
   const texturedOnly = galleryItems.filter(
@@ -697,6 +747,22 @@ function ThreeDModelsTab({ universeAddress }: { universeAddress?: string }) {
           item.description?.toLowerCase().includes(search.toLowerCase())
       )
     : texturedOnly;
+
+  useEffect(() => {
+    if (!hasMore) return;
+    const node = loadMoreRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !isFetchingNextPage) {
+          galleryQuery.fetchNextPage();
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, isFetchingNextPage, galleryQuery]);
 
   return (
     <div className="space-y-4">
@@ -770,6 +836,17 @@ function ThreeDModelsTab({ universeAddress }: { universeAddress?: string }) {
           </button>
         ))}
       </div>
+      {hasMore && (
+        <div ref={loadMoreRef} className="flex justify-center py-4">
+          {isFetchingNextPage ? (
+            <span className="text-xs text-muted-foreground">Loading more…</span>
+          ) : (
+            <Button variant="ghost" size="sm" onClick={() => galleryQuery.fetchNextPage()}>
+              Load more
+            </Button>
+          )}
+        </div>
+      )}
 
       <Dialog open={!!selectedItem} onOpenChange={(open) => !open && setSelectedItem(null)}>
         <DialogContent className="max-w-4xl">
@@ -856,6 +933,13 @@ function WikiPage() {
   // click feels instant. We only prefetch tabs whose queries live in this file
   // — sub-tab components (episodes/audio/graph/etc.) manage their own fetching.
   const prefetchTab = (tab: WikiTab) => {
+    const runInfinite = (key: readonly unknown[], fn: () => Promise<unknown>) =>
+      queryClient.prefetchInfiniteQuery({
+        queryKey: key as unknown[],
+        queryFn: fn,
+        initialPageParam: undefined,
+        staleTime: WIKI_LIST_STALE_TIME,
+      });
     const run = (key: readonly unknown[], fn: () => Promise<unknown>) =>
       queryClient.prefetchQuery({
         queryKey: key as unknown[],
@@ -867,35 +951,35 @@ function WikiPage() {
     if (tabDef?.kind) {
       const kind = tabDef.kind;
       if (universeAddress) {
-        void run(['entities', 'list', universeAddress, kind], () =>
-          trpcClient.entities.list.query({ universeAddress, kind })
+        void runInfinite(['entities', 'list', universeAddress, kind], () =>
+          trpcClient.entities.list.query({ universeAddress, kind, limit: 40 })
         );
       } else {
-        void run(['entities', 'listByKind', kind], () =>
-          trpcClient.entities.listByKind.query({ kind })
+        void runInfinite(['entities', 'listByKind', kind], () =>
+          trpcClient.entities.listByKind.query({ kind, limit: 40 })
         );
       }
       return;
     }
     if (tab === 'character-profiles') {
       if (universeAddress) {
-        void run(['entities', 'list', universeAddress, 'person'], () =>
-          trpcClient.entities.list.query({ universeAddress, kind: 'person' })
+        void runInfinite(['entities', 'list', universeAddress, 'person'], () =>
+          trpcClient.entities.list.query({ universeAddress, kind: 'person', limit: 40 })
         );
       } else {
-        void run(['entities', 'listByKind', 'person'], () =>
-          trpcClient.entities.listByKind.query({ kind: 'person' })
+        void runInfinite(['entities', 'listByKind', 'person'], () =>
+          trpcClient.entities.listByKind.query({ kind: 'person', limit: 40 })
         );
       }
       return;
     }
     if (tab === '3d-models') {
-      void run(['wiki', '3d-gallery', universeAddress], () =>
+      void runInfinite(['wiki', '3d-gallery', universeAddress], () =>
         trpcClient.gallery.browse.query({
           universeId: universeAddress,
           mediaType: '3d',
           sortBy: 'newest',
-          limit: 50,
+          limit: 40,
         })
       );
       return;
@@ -922,9 +1006,11 @@ function WikiPage() {
   // or when another surface (e.g. the /gallery redirect) changes ?tab=.
   // Missing ?tab= means the default tab ('gallery') — the wiki's discovery surface.
   const expectedTab = ((urlTab as WikiTab) ?? 'gallery') as WikiTab;
-  if (expectedTab !== activeTab) {
-    setActiveTab(expectedTab);
-  }
+  useEffect(() => {
+    if (expectedTab !== activeTab) {
+      setActiveTab(expectedTab);
+    }
+  }, [expectedTab, activeTab]);
 
   // Build a /wiki search object. 'gallery' is the default, so it's omitted from
   // the URL to keep the no-tab case clean.
@@ -997,7 +1083,7 @@ function WikiPage() {
     return sections;
   }, []);
 
-  const activeTabDef = TABS.find((t) => t.id === activeTab)!;
+  const activeTabDef = TABS.find((t) => t.id === activeTab) ?? TABS[0];
 
   return (
     <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl pb-bottom-nav md:pb-12">
@@ -1022,12 +1108,12 @@ function WikiPage() {
             />
           </div>
           <RandomEntityButton universeAddress={universeAddress} />
-          <Link to="/create" search={universeAddress ? { universe: universeAddress } : undefined}>
-            <Button size="sm">
+          <Button asChild size="sm">
+            <Link to="/create" search={universeAddress ? { universe: universeAddress } : undefined}>
               <Plus className="h-4 w-4 mr-1" />
               Create
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </div>
 

@@ -141,21 +141,33 @@ export const entitiesRouter = router({
       return entity;
     }),
 
-  /** List all entities for a universe, optionally filtered by kind. */
+  /**
+   * List entities for a universe, optionally filtered by kind. Cursor-paginated
+   * so a 5-entity universe and a 500-entity universe load the same way: first
+   * page returns fast, subsequent pages stream in on scroll. Omitting `limit`
+   * preserves legacy unbounded behavior for any caller that still wants it.
+   */
   list: publicProcedure
     .input(
       z.object({
         universeAddress: ethereumAddress,
         kind: entityKindSchema.optional(),
+        limit: z.number().int().positive().max(200).optional(),
+        cursor: z.string().optional(),
       })
     )
     .query(async ({ input, ctx }) => {
       const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
       if (excluded.has(input.universeAddress.toLowerCase())) {
-        return { entities: [], total: 0 };
+        return { entities: [], total: 0, nextCursor: null };
       }
-      const entities = await getEntitiesByUniverse(input.universeAddress, input.kind);
-      return { entities, total: entities.length };
+      const { entities, nextCursorId } = await getEntitiesByUniverse(
+        input.universeAddress,
+        input.kind,
+        input.limit,
+        input.cursor
+      );
+      return { entities, total: entities.length, nextCursor: nextCursorId };
     }),
 
   /**

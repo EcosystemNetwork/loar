@@ -13,13 +13,13 @@ import { protectedProcedure, publicProcedure, router, requirePermission } from '
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
-import { FieldValue } from 'firebase-admin/firestore';
 import { trackQuests } from '../../services/quest-tracker';
 import { emitActivity } from '../../services/activity';
 import { TRPCError } from '@trpc/server';
 import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
+import { withReservation } from '../../services/credits';
 
 const clientTokenSchema = z
   .string()
@@ -35,55 +35,9 @@ const cutdownsCol = () => {
   return db.collection('cutdowns');
 };
 
-const userCreditsCol = () => {
-  if (!db) throw new Error('Firebase is not configured');
-  return db.collection('userCredits');
-};
-
-// ── Credit helpers ───────────────────────────────────────────────────────
+// ── Credit pricing ───────────────────────────────────────────────────────
 
 const CUTDOWN_COST = 8; // credits per cutdown generation
-
-async function deductCredits(userId: string, credits: number): Promise<void> {
-  if (!db) throw new Error('Firebase is not configured');
-  const { assertGenerationAllowed } = await import('../../lib/generation-guards');
-  await assertGenerationAllowed(userId, credits);
-  const ref = userCreditsCol().doc(userId);
-  await db.runTransaction(async (tx) => {
-    const doc = await tx.get(ref);
-    const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-    if (balance < credits) {
-      throw new Error(
-        `Insufficient credits. Need ${credits}, have ${balance}. Purchase more to continue.`
-      );
-    }
-    tx.update(ref, {
-      balance: balance - credits,
-      totalSpent: (doc.data()?.totalSpent || 0) + credits,
-      updatedAt: new Date(),
-    });
-  });
-}
-
-async function refundCredits(userId: string, credits: number, cutdownId?: string): Promise<void> {
-  const ref = userCreditsCol().doc(userId);
-  const { recordCreditsTx, recordAiGeneration } = await import('../../lib/metrics');
-  try {
-    await ref.update({
-      balance: FieldValue.increment(credits),
-      totalSpent: FieldValue.increment(-credits),
-      updatedAt: new Date(),
-    });
-    recordCreditsTx('refund', 'success');
-  } catch (err) {
-    recordCreditsTx('refund', 'failure');
-    console.error(
-      `[cutdown] Failed to refund ${credits} credits for ${userId} (${cutdownId}):`,
-      err
-    );
-  }
-  recordAiGeneration('fal', 'cutdown', 'failure');
-}
 
 // ── Aspect ratio helpers ─────────────────────────────────────────────────
 
@@ -335,107 +289,114 @@ export const cutdownRouter = router({
           ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         });
 
-      // 2. Deduct credits
-      try {
-        await deductCredits(userId, CUTDOWN_COST);
-      } catch (err) {
-        await cutdownsCol()
-          .doc(cutdownId)
-          .update({ status: 'failed', error: (err as Error).message, updatedAt: new Date() });
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: (err as Error).message,
-        });
-      }
-
-      // 3. Update status to processing
+      // 2. Update status to processing
       await cutdownsCol().doc(cutdownId).update({ status: 'processing', updatedAt: new Date() });
 
       try {
-        // 4. Transcribe audio
-        const transcription = await transcribeVideo(input.sourceVideoUrl);
+        return await withReservation(
+          {
+            userId,
+            modelId: 'fal-cutdown',
+            provider: 'fal',
+            estimatedCredits: CUTDOWN_COST,
+            byok: false,
+            meta: {
+              generationId: cutdownId,
+              universeAddress: input.universeAddress ?? null,
+            },
+          },
+          async () => {
+            // 3. Transcribe audio
+            const transcription = await transcribeVideo(input.sourceVideoUrl);
 
-        // 5. Pick highlight segments
-        const segments = pickHighlightSegments(transcription, input.maxDurationSec, input.mode);
+            // 4. Pick highlight segments
+            const segments = pickHighlightSegments(transcription, input.maxDurationSec, input.mode);
 
-        // 6. Compute crop parameters (assume 1920x1080 source — standard 16:9)
-        const cropParams = computeCropParams(1920, 1080, input.targetAspectRatio);
+            // 5. Compute crop parameters (assume 1920x1080 source — standard 16:9)
+            const cropParams = computeCropParams(1920, 1080, input.targetAspectRatio);
 
-        // 7. Generate captions if requested
-        let captions: Array<{ start: number; end: number; text: string }> | undefined;
-        if (input.addCaptions && transcription.length > 0) {
-          // Filter transcription to only include segments within the selected time ranges
-          captions = transcription.filter((t) =>
-            segments.some((s) => t.start >= s.startSec && t.end <= s.endSec)
-          );
-          // If strict filtering yields nothing, include all transcription within the time window
-          if (captions.length === 0) {
-            const minStart = segments[0]?.startSec ?? 0;
-            const maxEnd = segments[segments.length - 1]?.endSec ?? input.maxDurationSec;
-            captions = transcription.filter((t) => t.start >= minStart && t.end <= maxEnd);
+            // 6. Generate captions if requested
+            let captions: Array<{ start: number; end: number; text: string }> | undefined;
+            if (input.addCaptions && transcription.length > 0) {
+              // Filter transcription to only include segments within the selected time ranges
+              captions = transcription.filter((t) =>
+                segments.some((s) => t.start >= s.startSec && t.end <= s.endSec)
+              );
+              // If strict filtering yields nothing, include all transcription within the time window
+              if (captions.length === 0) {
+                const minStart = segments[0]?.startSec ?? 0;
+                const maxEnd = segments[segments.length - 1]?.endSec ?? input.maxDurationSec;
+                captions = transcription.filter((t) => t.start >= minStart && t.end <= maxEnd);
+              }
+            }
+
+            // 7. Compute total duration of selected segments
+            const totalDurationSec = segments.reduce((sum, s) => sum + (s.endSec - s.startSec), 0);
+
+            // 8. Save completed record
+            const completedData = {
+              status: 'completed' as const,
+              segments,
+              cropParams,
+              captions: captions ?? null,
+              captionStyle: input.captionStyle,
+              totalDurationSec,
+              updatedAt: new Date(),
+            };
+            await cutdownsCol().doc(cutdownId).update(completedData);
+
+            // Fire-and-forget: track quests and emit activity
+            trackQuests(userId, [
+              { questId: 'create_cutdown' },
+              { questId: 'create_short_content' },
+            ]);
+
+            emitActivity({
+              eventType: 'created_content',
+              actorUid: userId,
+              targetType: 'cutdown',
+              targetId: cutdownId,
+              targetTitle: input.title || `${input.targetAspectRatio} cutdown`,
+              metadata: {
+                universeAddress: input.universeAddress ?? '',
+              },
+            }).catch(() => {}); // swallow
+
+            fireJobWebhook({
+              ownerUid: userId,
+              webhookUrl: validatedWebhookUrl,
+              clientToken: input.clientToken,
+              event: 'job.completed',
+              jobId: cutdownId,
+              kind: 'video',
+              payload: {
+                operation: 'cutdown',
+                status: 'completed',
+                sourceVideoUrl: input.sourceVideoUrl,
+                totalDurationSec,
+                segmentCount: segments.length,
+                creditsCharged: CUTDOWN_COST,
+              },
+            });
+
+            return {
+              result: {
+                cutdownId,
+                status: 'completed' as const,
+                sourceVideoUrl: input.sourceVideoUrl,
+                segments,
+                cropParams,
+                captions: captions ?? undefined,
+                totalDurationSec,
+                creditsCharged: CUTDOWN_COST,
+                idempotentReplay: false as const,
+              },
+            };
           }
-        }
-
-        // 8. Compute total duration of selected segments
-        const totalDurationSec = segments.reduce((sum, s) => sum + (s.endSec - s.startSec), 0);
-
-        // 9. Save completed record
-        const completedData = {
-          status: 'completed' as const,
-          segments,
-          cropParams,
-          captions: captions ?? null,
-          captionStyle: input.captionStyle,
-          totalDurationSec,
-          updatedAt: new Date(),
-        };
-        await cutdownsCol().doc(cutdownId).update(completedData);
-
-        // Fire-and-forget: track quests and emit activity
-        trackQuests(userId, [{ questId: 'create_cutdown' }, { questId: 'create_short_content' }]);
-
-        emitActivity({
-          eventType: 'created_content',
-          actorUid: userId,
-          targetType: 'cutdown',
-          targetId: cutdownId,
-          targetTitle: input.title || `${input.targetAspectRatio} cutdown`,
-          metadata: {
-            universeAddress: input.universeAddress ?? '',
-          },
-        }).catch(() => {}); // swallow
-
-        fireJobWebhook({
-          ownerUid: userId,
-          webhookUrl: validatedWebhookUrl,
-          clientToken: input.clientToken,
-          event: 'job.completed',
-          jobId: cutdownId,
-          kind: 'video',
-          payload: {
-            operation: 'cutdown',
-            status: 'completed',
-            sourceVideoUrl: input.sourceVideoUrl,
-            totalDurationSec,
-            segmentCount: segments.length,
-            creditsCharged: CUTDOWN_COST,
-          },
-        });
-
-        return {
-          cutdownId,
-          status: 'completed' as const,
-          sourceVideoUrl: input.sourceVideoUrl,
-          segments,
-          cropParams,
-          captions: captions ?? undefined,
-          totalDurationSec,
-          creditsCharged: CUTDOWN_COST,
-          idempotentReplay: false as const,
-        };
+        );
       } catch (err) {
-        // Pipeline failed — refund credits and mark failed
-        await refundCredits(userId, CUTDOWN_COST, cutdownId);
+        // withReservation already cancelled the reservation (full refund).
+        // We still need to update the Firestore record + emit the webhook.
         await cutdownsCol()
           .doc(cutdownId)
           .update({

@@ -21,7 +21,6 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
-import { FieldValue } from 'firebase-admin/firestore';
 import { elevenLabsService, type ElevenLabsVoiceModel } from '../../services/elevenlabs';
 import { firebaseStorageService } from '../../services/firebase-storage';
 import { lipSyncService } from '../../services/lipsync';
@@ -29,12 +28,12 @@ import { dispatchGeneration, generateInputSchema } from './generation.routes';
 import { getModelById } from '../../services/video-models';
 import { publishToGallery } from '../../lib/gallery-publish';
 import { extractVideoThumbnail } from '../../services/video-thumbnail';
-import { logFailedRefund } from '../../lib/refund-audit';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 import { assertEditSourceAuthorized } from '../../lib/edit-source-authz';
 import { assertVoiceIdAllowed } from '../../lib/voice-authz';
+import { withReservation } from '../../services/credits';
 
 const clientTokenSchema = z
   .string()
@@ -64,11 +63,6 @@ const talkingScenesCol = () => {
   return db.collection('talkingScenes');
 };
 
-const userCreditsCol = () => {
-  if (!db) throw new Error('Firebase is not configured');
-  return db.collection('userCredits');
-};
-
 const voiceGenerationsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('voiceGenerations');
@@ -78,51 +72,6 @@ const videoGenerationsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('videoGenerations');
 };
-
-// ── Credit helpers ──────────────────────────────────────────────────────
-
-async function deductCredits(uid: string, credits: number): Promise<void> {
-  if (!db) throw new Error('Firebase is not configured');
-  const { assertGenerationAllowed } = await import('../../lib/generation-guards');
-  await assertGenerationAllowed(uid, credits);
-  const ref = userCreditsCol().doc(uid);
-  await db.runTransaction(async (tx) => {
-    const doc = await tx.get(ref);
-    const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-    if (balance < credits) {
-      throw new TRPCError({
-        code: 'PRECONDITION_FAILED',
-        message: `Insufficient credits. Need ${credits}, have ${balance}.`,
-      });
-    }
-    tx.update(ref, {
-      balance: balance - credits,
-      totalSpent: (doc.data()?.totalSpent || 0) + credits,
-      updatedAt: new Date(),
-    });
-  });
-}
-
-async function refundCredits(uid: string, credits: number, sceneId: string): Promise<void> {
-  try {
-    await userCreditsCol()
-      .doc(uid)
-      .update({
-        balance: FieldValue.increment(credits),
-        totalSpent: FieldValue.increment(-credits),
-        updatedAt: new Date(),
-      });
-  } catch (err) {
-    console.error(`CRITICAL: talking-scene refund failed for ${uid}:`, err);
-    logFailedRefund({
-      userId: uid,
-      credits,
-      source: 'talking-scene',
-      generationId: sceneId,
-      error: err instanceof Error ? err.message : 'Unknown',
-    });
-  }
-}
 
 // ── Stage helpers ───────────────────────────────────────────────────────
 
@@ -333,114 +282,131 @@ export const talkingSceneRouter = router({
           ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         });
 
-      await deductCredits(ctx.user.uid, totalCredits);
-
       try {
-        // 1. TTS
-        await talkingScenesCol().doc(sceneId).update({ status: 'tts' });
-        const { ttsGenId, audioUrl } = await runTts({
-          uid: ctx.user.uid,
-          text: dialogue,
-          voiceId: input.voiceId,
-          modelId: input.voiceModelId,
-        });
-
-        // 2. Image → Video (animated portrait)
-        await talkingScenesCol().doc(sceneId).update({ status: 'animating' });
-        const portraitPrompt =
-          motionPrompt ||
-          'Talking head portrait, subtle natural facial movement, character speaking with mouth movement and blinks';
-        const {
-          i2vGenId,
-          videoUrl,
-          modelId: i2vModelId,
-        } = await runImageToVideo({
-          uid: ctx.user.uid,
-          imageUrl: input.imageUrl,
-          prompt: portraitPrompt,
-          durationSec: input.durationSec,
-        });
-
-        // 3. Lip-sync (autoPublish=false — we publish below with full lineage)
-        await talkingScenesCol().doc(sceneId).update({ status: 'lipsyncing' });
-        const lipsyncResult = await lipSyncService.sync({
-          videoUrl,
-          audioUrl,
-          model: 'fal-ai/lipsync',
-        });
-        if (lipsyncResult.status !== 'completed' || !lipsyncResult.videoUrl) {
-          throw new Error(lipsyncResult.error || 'Lip-sync stage failed');
-        }
-
-        // Permanent re-host of the synced video
-        const videoRes = await fetch(lipsyncResult.videoUrl);
-        if (!videoRes.ok) throw new Error('Failed to fetch synced video');
-        const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
-        const filename = `talking-scene-${sceneId}.mp4`;
-        const finalKey = await firebaseStorageService.upload(videoBuffer, filename);
-        const finalUrl = firebaseStorageService.getPublicUrl(finalKey);
-
-        // 4. Publish to gallery with full source-ref lineage
-        const thumbnailUrl = await extractVideoThumbnail(finalUrl, sceneId).catch(() => undefined);
-        await publishToGallery({
-          creatorUid: ctx.user.uid,
-          mediaUrl: finalUrl,
-          thumbnailUrl,
-          mediaType: 'ai-video',
-          title: dialogue.slice(0, 80) || 'Talking Scene',
-          description: dialogue,
-          universeId: input.universeId ?? null,
-          generationId: sceneId,
-          generationModel: 'talking-scene',
-          parentGenerationId: i2vGenId,
-          sourceImageUrl: input.imageUrl,
-          sourceVideoGenerationId: i2vGenId,
-          sourceAudioGenerationId: ttsGenId,
-        });
-
-        const latencyMs = Date.now() - startTime;
-        await talkingScenesCol().doc(sceneId).update({
-          status: 'completed',
-          ttsGenerationId: ttsGenId,
-          audioUrl,
-          imageToVideoGenerationId: i2vGenId,
-          intermediateVideoUrl: videoUrl,
-          imageToVideoModelId: i2vModelId,
-          finalVideoUrl: finalUrl,
-          latencyMs,
-          completedAt: new Date(),
-        });
-
-        fireJobWebhook({
-          ownerUid: ctx.user.uid,
-          webhookUrl: validatedWebhookUrl,
-          clientToken: input.clientToken,
-          event: 'job.completed',
-          jobId: sceneId,
-          kind: 'video',
-          payload: {
-            operation: 'talkingScene',
-            status: 'completed',
-            resultUrl: finalUrl,
-            ttsGenerationId: ttsGenId,
-            imageToVideoGenerationId: i2vGenId,
-            creditsCharged: totalCredits,
-            latencyMs,
+        return await withReservation(
+          {
+            userId: ctx.user.uid,
+            modelId: 'talking-scene',
+            provider: 'fal',
+            estimatedCredits: totalCredits,
+            byok: false,
+            meta: {
+              generationId: sceneId,
+              entityId: input.entityId ?? null,
+              universeId: input.universeId ?? null,
+            },
           },
-        });
+          async () => {
+            // 1. TTS
+            await talkingScenesCol().doc(sceneId).update({ status: 'tts' });
+            const { ttsGenId, audioUrl } = await runTts({
+              uid: ctx.user.uid,
+              text: dialogue,
+              voiceId: input.voiceId,
+              modelId: input.voiceModelId,
+            });
 
-        return {
-          sceneId,
-          status: 'completed' as const,
-          videoUrl: finalUrl as string | null,
-          ttsGenerationId: ttsGenId as string | null,
-          imageToVideoGenerationId: i2vGenId as string | null,
-          creditsCharged: totalCredits,
-          latencyMs,
-          idempotentReplay: false as const,
-        };
+            // 2. Image → Video (animated portrait)
+            await talkingScenesCol().doc(sceneId).update({ status: 'animating' });
+            const portraitPrompt =
+              motionPrompt ||
+              'Talking head portrait, subtle natural facial movement, character speaking with mouth movement and blinks';
+            const {
+              i2vGenId,
+              videoUrl,
+              modelId: i2vModelId,
+            } = await runImageToVideo({
+              uid: ctx.user.uid,
+              imageUrl: input.imageUrl,
+              prompt: portraitPrompt,
+              durationSec: input.durationSec,
+            });
+
+            // 3. Lip-sync (autoPublish=false — we publish below with full lineage)
+            await talkingScenesCol().doc(sceneId).update({ status: 'lipsyncing' });
+            const lipsyncResult = await lipSyncService.sync({
+              videoUrl,
+              audioUrl,
+              model: 'fal-ai/lipsync',
+            });
+            if (lipsyncResult.status !== 'completed' || !lipsyncResult.videoUrl) {
+              throw new Error(lipsyncResult.error || 'Lip-sync stage failed');
+            }
+
+            // Permanent re-host of the synced video
+            const videoRes = await fetch(lipsyncResult.videoUrl);
+            if (!videoRes.ok) throw new Error('Failed to fetch synced video');
+            const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+            const filename = `talking-scene-${sceneId}.mp4`;
+            const finalKey = await firebaseStorageService.upload(videoBuffer, filename);
+            const finalUrl = firebaseStorageService.getPublicUrl(finalKey);
+
+            // 4. Publish to gallery with full source-ref lineage
+            const thumbnailUrl = await extractVideoThumbnail(finalUrl, sceneId).catch(
+              () => undefined
+            );
+            await publishToGallery({
+              creatorUid: ctx.user.uid,
+              mediaUrl: finalUrl,
+              thumbnailUrl,
+              mediaType: 'ai-video',
+              title: dialogue.slice(0, 80) || 'Talking Scene',
+              description: dialogue,
+              universeId: input.universeId ?? null,
+              generationId: sceneId,
+              generationModel: 'talking-scene',
+              parentGenerationId: i2vGenId,
+              sourceImageUrl: input.imageUrl,
+              sourceVideoGenerationId: i2vGenId,
+              sourceAudioGenerationId: ttsGenId,
+            });
+
+            const latencyMs = Date.now() - startTime;
+            await talkingScenesCol().doc(sceneId).update({
+              status: 'completed',
+              ttsGenerationId: ttsGenId,
+              audioUrl,
+              imageToVideoGenerationId: i2vGenId,
+              intermediateVideoUrl: videoUrl,
+              imageToVideoModelId: i2vModelId,
+              finalVideoUrl: finalUrl,
+              latencyMs,
+              completedAt: new Date(),
+            });
+
+            fireJobWebhook({
+              ownerUid: ctx.user.uid,
+              webhookUrl: validatedWebhookUrl,
+              clientToken: input.clientToken,
+              event: 'job.completed',
+              jobId: sceneId,
+              kind: 'video',
+              payload: {
+                operation: 'talkingScene',
+                status: 'completed',
+                resultUrl: finalUrl,
+                ttsGenerationId: ttsGenId,
+                imageToVideoGenerationId: i2vGenId,
+                creditsCharged: totalCredits,
+                latencyMs,
+              },
+            });
+
+            return {
+              result: {
+                sceneId,
+                status: 'completed' as const,
+                videoUrl: finalUrl as string | null,
+                ttsGenerationId: ttsGenId as string | null,
+                imageToVideoGenerationId: i2vGenId as string | null,
+                creditsCharged: totalCredits,
+                latencyMs,
+                idempotentReplay: false as const,
+              },
+            };
+          }
+        );
       } catch (error) {
-        await refundCredits(ctx.user.uid, totalCredits, sceneId);
         await talkingScenesCol()
           .doc(sceneId)
           .update({

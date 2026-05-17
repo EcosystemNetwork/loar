@@ -28,11 +28,10 @@ import { elevenLabsService, type ElevenLabsVoiceModel } from '../../services/ele
 import { firebaseStorageService } from '../../services/firebase-storage';
 import { lipSyncService } from '../../services/lipsync';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
-import { logFailedRefund } from '../../lib/refund-audit';
 import { assertVoiceUsageAllowed } from '../../lib/likeness-access';
-import { FieldValue } from 'firebase-admin/firestore';
 import { TRPCError } from '@trpc/server';
 import { getPlatformConfig } from '../../services/platformConfig';
+import { withReservation } from '../../services/credits';
 
 // ── Pricing ──────────────────────────────────────────────────────────
 
@@ -60,11 +59,6 @@ function toCredits(usd: number, m: number) {
 const dubbingJobsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('dubbingJobs');
-};
-
-const userCreditsCol = () => {
-  if (!db) throw new Error('Firebase is not configured');
-  return db.collection('userCredits');
 };
 
 // ── Schemas ──────────────────────────────────────────────────────────
@@ -96,50 +90,6 @@ const scriptLineSchema = z.object({
 type ScriptLine = z.infer<typeof scriptLineSchema>;
 
 const castMapSchema = z.record(z.string(), z.string()); // characterId -> voiceId
-
-// ── Credit helpers (mirrors voice.routes pattern) ────────────────────
-
-async function deductCredits(userId: string, credits: number): Promise<void> {
-  if (!db) throw new Error('Firebase is not configured');
-  const { assertGenerationAllowed } = await import('../../lib/generation-guards');
-  await assertGenerationAllowed(userId, credits);
-  const ref = userCreditsCol().doc(userId);
-  await db.runTransaction(async (tx) => {
-    const doc = await tx.get(ref);
-    const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-    if (balance < credits) {
-      throw new TRPCError({
-        code: 'PAYMENT_REQUIRED',
-        message: `Insufficient credits. Need ${credits}, have ${balance}.`,
-      });
-    }
-    tx.update(ref, {
-      balance: balance - credits,
-      totalSpent: (doc.data()?.totalSpent || 0) + credits,
-      updatedAt: new Date(),
-    });
-  });
-}
-
-async function refundCredits(userId: string, credits: number, jobId?: string): Promise<void> {
-  const ref = userCreditsCol().doc(userId);
-  try {
-    await ref.update({
-      balance: FieldValue.increment(credits),
-      totalSpent: FieldValue.increment(-credits),
-      updatedAt: new Date(),
-    });
-  } catch (err) {
-    console.error(`Dubbing refund failed for ${userId}:`, err);
-    logFailedRefund({
-      userId,
-      credits,
-      source: 'dubbing',
-      generationId: jobId ?? 'unknown',
-      error: err instanceof Error ? err.message : 'Unknown',
-    });
-  }
-}
 
 async function uploadAudio(buffer: Buffer, filename: string): Promise<string> {
   const key = await firebaseStorageService.upload(buffer, filename);
@@ -333,60 +283,69 @@ async function generateLineInternal(args: GenerateLineArgs) {
   const { fiatMargin } = await getMargins();
   const credits = Math.max(2, toCredits(CHAR_COST[model] * text.length, fiatMargin));
 
-  await deductCredits(args.userId, credits);
-
   // Mark generating (best effort — concurrent writes resolved by final tx)
   await ref.update({ updatedAt: new Date() });
 
   try {
-    const { resolveProviderKey } = await import('../../lib/byok');
-    const apiKey = await resolveProviderKey(args.userId, 'elevenlabs');
+    return await withReservation(
+      {
+        userId: args.userId,
+        modelId: model,
+        provider: 'elevenlabs',
+        estimatedCredits: credits,
+        byok: false,
+        meta: { generationId: args.jobId, lineId: args.lineId },
+      },
+      async () => {
+        const { resolveProviderKey } = await import('../../lib/byok');
+        const apiKey = await resolveProviderKey(args.userId, 'elevenlabs');
 
-    const tts = await elevenLabsService.textToSpeech({
-      text,
-      voiceId: line.voiceId,
-      modelId: model,
-      stability,
-      similarityBoost: 0.75,
-      style,
-      useSpeakerBoost: true,
-      apiKey,
-    });
+        const tts = await elevenLabsService.textToSpeech({
+          text,
+          voiceId: line.voiceId,
+          modelId: model,
+          stability,
+          similarityBoost: 0.75,
+          style,
+          useSpeakerBoost: true,
+          apiKey,
+        });
 
-    const audioUrl = await uploadAudio(
-      tts.audioBuffer,
-      `dubbing/${args.jobId}/${line.id}-${randomUUID()}.mp3`
-    );
+        const audioUrl = await uploadAudio(
+          tts.audioBuffer,
+          `dubbing/${args.jobId}/${line.id}-${randomUUID()}.mp3`
+        );
 
-    // Best-effort word-level alignment for the multi-track editor.
-    let wordTimings: Array<{ word: string; start: number; end: number }> | undefined;
-    try {
-      const align = await elevenLabsService.forcedAlignment(tts.audioBuffer, text, { apiKey });
-      wordTimings = align.words;
-    } catch (alignErr) {
-      console.warn('forcedAlignment failed for line', line.id, alignErr);
-    }
+        // Best-effort word-level alignment for the multi-track editor.
+        let wordTimings: Array<{ word: string; start: number; end: number }> | undefined;
+        try {
+          const align = await elevenLabsService.forcedAlignment(tts.audioBuffer, text, { apiKey });
+          wordTimings = align.words;
+        } catch (alignErr) {
+          console.warn('forcedAlignment failed for line', line.id, alignErr);
+        }
 
-    await db.runTransaction(async (tx) => {
-      const cur = await tx.get(ref);
-      const curLines = ((cur.data()?.scriptLines as ScriptLine[]) ?? []).slice();
-      const j = curLines.findIndex((l) => l.id === line.id);
-      if (j !== -1) {
-        curLines[j] = {
-          ...curLines[j],
-          audioUrl,
-          status: 'ready',
-          error: undefined,
-          ...(wordTimings ? { wordTimings } : {}),
-        };
+        await db.runTransaction(async (tx) => {
+          const cur = await tx.get(ref);
+          const curLines = ((cur.data()?.scriptLines as ScriptLine[]) ?? []).slice();
+          const j = curLines.findIndex((l) => l.id === line.id);
+          if (j !== -1) {
+            curLines[j] = {
+              ...curLines[j],
+              audioUrl,
+              status: 'ready',
+              error: undefined,
+              ...(wordTimings ? { wordTimings } : {}),
+            };
+          }
+          tx.update(ref, { scriptLines: curLines, updatedAt: new Date() });
+        });
+
+        return { result: { audioUrl, creditsCharged: credits } };
       }
-      tx.update(ref, { scriptLines: curLines, updatedAt: new Date() });
-    });
-
-    return { audioUrl, creditsCharged: credits };
+    );
   } catch (err) {
-    await refundCredits(args.userId, credits, args.jobId);
-
+    // withReservation already cancelled the reservation (full refund).
     await db.runTransaction(async (tx) => {
       const cur = await tx.get(ref);
       const curLines = ((cur.data()?.scriptLines as ScriptLine[]) ?? []).slice();

@@ -157,8 +157,10 @@ export async function getEntity(first: string, second?: string): Promise<Entity 
 
 export async function getEntitiesByUniverse(
   universeAddress: string,
-  kind?: EntityKind
-): Promise<Entity[]> {
+  kind?: EntityKind,
+  limit?: number,
+  cursorId?: string
+): Promise<{ entities: Entity[]; nextCursorId: string | null }> {
   const col = entitiesCol();
   let query: FirebaseFirestore.Query = col.where(
     'universeAddress',
@@ -170,10 +172,24 @@ export async function getEntitiesByUniverse(
     query = query.where('kind', '==', kind);
   }
 
-  query = query.orderBy('createdAt', 'desc');
+  query = query.orderBy('createdAt', 'desc').orderBy('__name__', 'desc');
+
+  if (cursorId) {
+    const cursorDoc = await col.doc(cursorId).get();
+    if (cursorDoc.exists) {
+      query = query.startAfter(cursorDoc);
+    }
+  }
+
+  if (limit) {
+    query = query.limit(limit);
+  }
 
   const snapshot = await query.get();
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
+  const entities = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
+  const nextCursorId =
+    limit && snapshot.docs.length === limit ? snapshot.docs[snapshot.docs.length - 1].id : null;
+  return { entities, nextCursorId };
 }
 
 export async function getEntitiesByKind(

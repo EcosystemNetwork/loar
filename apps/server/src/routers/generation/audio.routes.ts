@@ -28,10 +28,9 @@ import { db } from '../../lib/firebase';
 import { falService } from '../../services/fal';
 import { firebaseStorageService } from '../../services/firebase-storage';
 import { trackQuests } from '../../services/quest-tracker';
-import { FieldValue } from 'firebase-admin/firestore';
 import { createAttachment } from '../media/media.handlers';
-import { logFailedRefund } from '../../lib/refund-audit';
 import { publishToGallery } from '../../lib/gallery-publish';
+import { withReservation } from '../../services/credits';
 import {
   getVisibleModels,
   getModelById,
@@ -69,59 +68,6 @@ const audioGenerationsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('audioGenerations');
 };
-
-// ── Credit helpers ───────────────────────────────────────────────────
-
-const userCreditsCol = () => {
-  if (!db) throw new Error('Firebase is not configured');
-  return db.collection('userCredits');
-};
-
-async function deductCredits(userId: string, credits: number): Promise<void> {
-  if (!db) throw new Error('Firebase is not configured');
-  const { assertGenerationAllowed } = await import('../../lib/generation-guards');
-  await assertGenerationAllowed(userId, credits);
-  const ref = userCreditsCol().doc(userId);
-  await db.runTransaction(async (tx) => {
-    const doc = await tx.get(ref);
-    const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-    if (balance < credits) {
-      throw new Error(
-        `Insufficient credits. Need ${credits}, have ${balance}. Purchase more to continue.`
-      );
-    }
-    tx.update(ref, {
-      balance: balance - credits,
-      totalSpent: (doc.data()?.totalSpent || 0) + credits,
-      updatedAt: new Date(),
-    });
-  });
-}
-
-async function refundCredits(userId: string, credits: number, genId?: string): Promise<void> {
-  const ref = userCreditsCol().doc(userId);
-  const { recordCreditsTx, recordAiGeneration } = await import('../../lib/metrics');
-  try {
-    await ref.update({
-      balance: FieldValue.increment(credits),
-      totalSpent: FieldValue.increment(-credits),
-      updatedAt: new Date(),
-    });
-    recordCreditsTx('refund', 'success');
-  } catch (err) {
-    recordCreditsTx('refund', 'failure');
-    console.error(`CRITICAL: Audio credit refund failed for ${userId}:`, err);
-    logFailedRefund({
-      userId,
-      credits,
-      source: 'audio',
-      generationId: genId ?? 'unknown',
-      error: err instanceof Error ? err.message : 'Unknown',
-    });
-  }
-  // Refund always pairs with a failed generation.
-  recordAiGeneration('fal', 'audio', 'failure');
-}
 
 // ── Storage upload helper ────────────────────────────────────────────
 
@@ -320,89 +266,103 @@ export const audioRouter = router({
           createdAt: new Date(),
         });
 
-      // Deduct credits before generation
-      await deductCredits(ctx.user.uid, credits);
-
       try {
-        await audioGenerationsCol().doc(genId).update({ status: 'running' });
+        return await withReservation(
+          {
+            userId: ctx.user.uid,
+            modelId,
+            provider: model.provider,
+            estimatedCredits: credits,
+            byok: false,
+            meta: {
+              generationId: genId,
+              entityId: input.entityId ?? null,
+              universeId: input.universeId ?? null,
+            },
+          },
+          async () => {
+            await audioGenerationsCol().doc(genId).update({ status: 'running' });
 
-        // Build prompt with genre/style context
-        let fullPrompt = input.prompt;
-        if (input.genre) fullPrompt = `${input.genre} music: ${fullPrompt}`;
-        if (input.style) fullPrompt = `${input.style} style. ${fullPrompt}`;
+            // Build prompt with genre/style context
+            let fullPrompt = input.prompt;
+            if (input.genre) fullPrompt = `${input.genre} music: ${fullPrompt}`;
+            if (input.style) fullPrompt = `${input.style} style. ${fullPrompt}`;
 
-        const falModelId = toFalModel(modelId);
-        const { resolveProviderKey } = await import('../../lib/byok');
-        const apiKey = await resolveProviderKey(ctx.user.uid, 'fal');
-        const result = await falService.generateAudio({
-          prompt: fullPrompt,
-          model: falModelId as any,
-          durationSec: input.durationSec,
-          apiKey,
-        });
+            const falModelId = toFalModel(modelId);
+            const { resolveProviderKey } = await import('../../lib/byok');
+            const apiKey = await resolveProviderKey(ctx.user.uid, 'fal');
+            const result = await falService.generateAudio({
+              prompt: fullPrompt,
+              model: falModelId as any,
+              durationSec: input.durationSec,
+              apiKey,
+            });
 
-        if (result.status === 'failed' || !result.audioUrl) {
-          throw new Error(result.error || 'Audio generation failed — no audio returned');
-        }
+            if (result.status === 'failed' || !result.audioUrl) {
+              throw new Error(result.error || 'Audio generation failed — no audio returned');
+            }
 
-        // Download and re-upload to Firebase Storage for permanence
-        const audioRes = await fetch(result.audioUrl);
-        if (!audioRes.ok) throw new Error('Failed to download generated audio from provider');
-        const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
-        const filename = `music-${genId}.mp3`;
-        const permanentUrl = await uploadAudio(audioBuffer, filename);
+            // Download and re-upload to Firebase Storage for permanence
+            const audioRes = await fetch(result.audioUrl);
+            if (!audioRes.ok) throw new Error('Failed to download generated audio from provider');
+            const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+            const filename = `music-${genId}.mp3`;
+            const permanentUrl = await uploadAudio(audioBuffer, filename);
 
-        const latencyMs = Date.now() - startTime;
+            const latencyMs = Date.now() - startTime;
 
-        markProviderHealthy(model.provider);
+            markProviderHealthy(model.provider);
 
-        trackQuests(ctx.user.uid, [{ questId: 'first_music_generation' }]);
+            trackQuests(ctx.user.uid, [{ questId: 'first_music_generation' }]);
 
-        await audioGenerationsCol().doc(genId).update({
-          status: 'completed',
-          audioUrl: permanentUrl,
-          permanentAudioUrl: permanentUrl,
-          latencyMs,
-          completedAt: new Date(),
-        });
+            await audioGenerationsCol().doc(genId).update({
+              status: 'completed',
+              audioUrl: permanentUrl,
+              permanentAudioUrl: permanentUrl,
+              latencyMs,
+              completedAt: new Date(),
+            });
 
-        // Auto-attach to entity
-        autoAttachAudio({
-          creator: ctx.user.uid,
-          entityId: input.entityId,
-          generationId: genId,
-          audioUrl: permanentUrl,
-          label: `Music — ${input.prompt.slice(0, 60)}`,
-        });
+            // Auto-attach to entity
+            autoAttachAudio({
+              creator: ctx.user.uid,
+              entityId: input.entityId,
+              generationId: genId,
+              audioUrl: permanentUrl,
+              label: `Music — ${input.prompt.slice(0, 60)}`,
+            });
 
-        const audioTags = [input.genre, input.style].filter(Boolean) as string[];
-        void publishToGallery({
-          creatorUid: ctx.user.uid,
-          mediaUrl: permanentUrl,
-          mediaType: 'audio',
-          title: input.prompt.slice(0, 100) || 'Generated Audio',
-          description: input.prompt,
-          universeId: input.universeId || null,
-          generationId: genId,
-          generationModel: modelId,
-          tags: audioTags,
-        });
+            const audioTags = [input.genre, input.style].filter(Boolean) as string[];
+            void publishToGallery({
+              creatorUid: ctx.user.uid,
+              mediaUrl: permanentUrl,
+              mediaType: 'audio',
+              title: input.prompt.slice(0, 100) || 'Generated Audio',
+              description: input.prompt,
+              universeId: input.universeId || null,
+              generationId: genId,
+              generationModel: modelId,
+              tags: audioTags,
+            });
 
-        return {
-          generationId: genId,
-          status: 'completed' as const,
-          audioUrl: permanentUrl,
-          modelId,
-          modelName: model.displayName,
-          durationSec: input.durationSec,
-          creditsCharged: credits,
-          fiatPriceUsd: fiatPrice,
-          loarPriceUsd: loarPrice,
-          latencyMs,
-        };
+            return {
+              result: {
+                generationId: genId,
+                status: 'completed' as const,
+                audioUrl: permanentUrl,
+                modelId,
+                modelName: model.displayName,
+                durationSec: input.durationSec,
+                creditsCharged: credits,
+                fiatPriceUsd: fiatPrice,
+                loarPriceUsd: loarPrice,
+                latencyMs,
+              },
+            };
+          }
+        );
       } catch (error) {
         markProviderUnhealthy(model.provider);
-        await refundCredits(ctx.user.uid, credits, genId);
         await audioGenerationsCol()
           .doc(genId)
           .update({

@@ -30,6 +30,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { TRPCError } from '@trpc/server';
 import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 import { getPlatformConfig } from '../../services/platformConfig';
+import { withReservation } from '../../services/credits';
 
 // ── Pricing ──────────────────────────────────────────────────────────
 
@@ -97,30 +98,19 @@ const SUPPORTED_LANGS = [
 type SupportedLang = (typeof SUPPORTED_LANGS)[number];
 
 // ── Credit helpers ───────────────────────────────────────────────────
+//
+// NOTE: `create` uses `withReservation` per target language (one reservation
+// per ElevenLabs dub call). The polling `status` endpoint handles
+// async-resolved provider failures that surface AFTER the reservation was
+// reconciled, so it still needs a direct post-reconcile refund — implemented
+// below with a raw `FieldValue.increment`. This is the same async-failure
+// pattern flagged in `feedback_no_cutting_corners.md`.
 
-async function deductCredits(userId: string, credits: number): Promise<void> {
-  if (!db) throw new Error('Firebase is not configured');
-  const { assertGenerationAllowed } = await import('../../lib/generation-guards');
-  await assertGenerationAllowed(userId, credits);
-  const ref = userCreditsCol().doc(userId);
-  await db.runTransaction(async (tx) => {
-    const doc = await tx.get(ref);
-    const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-    if (balance < credits) {
-      throw new TRPCError({
-        code: 'PAYMENT_REQUIRED',
-        message: `Insufficient credits. Need ${credits}, have ${balance}.`,
-      });
-    }
-    tx.update(ref, {
-      balance: balance - credits,
-      totalSpent: (doc.data()?.totalSpent || 0) + credits,
-      updatedAt: new Date(),
-    });
-  });
-}
-
-async function refundCredits(userId: string, credits: number, jobId?: string): Promise<void> {
+async function refundCreditsAfterReconcile(
+  userId: string,
+  credits: number,
+  jobId?: string
+): Promise<void> {
   const ref = userCreditsCol().doc(userId);
   try {
     await ref.update({
@@ -189,9 +179,6 @@ export const multilingualDubRouter = router({
         2,
         toCredits(DUBBING_USD_PER_MINUTE * durationMin, fiatMargin)
       );
-      const totalCredits = perLangCredits * targets.length;
-
-      await deductCredits(ctx.user.uid, totalCredits);
 
       const { resolveProviderKey } = await import('../../lib/byok');
       const apiKey = await resolveProviderKey(ctx.user.uid, 'elevenlabs');
@@ -204,53 +191,68 @@ export const multilingualDubRouter = router({
 
       const failures: Array<{ targetLang: SupportedLang; error: string }> = [];
 
+      // One reservation per target language so a failure on lang A doesn't
+      // strand credits charged for lang B. `withReservation` debits up front,
+      // reconciles on success of the dub-job-creation call, or fully refunds
+      // when the call throws.
       for (const lang of targets) {
         const id = randomUUID();
         try {
-          const res = await elevenLabsService.dubbing({
-            sourceUrl: input.sourceVideoUrl,
-            sourceLang: input.sourceLang,
-            targetLang: lang,
-            name: input.name ?? `LOAR dub → ${lang}`,
-            numSpeakers: input.numSpeakers,
-            highestResolution: input.highestResolution,
-            apiKey,
-          });
-
-          await multilingualDubsCol()
-            .doc(id)
-            .set({
-              id,
+          await withReservation(
+            {
               userId: ctx.user.uid,
-              episodeId: input.episodeId ?? null,
-              universeId: input.universeId ?? null,
-              sourceVideoUrl: input.sourceVideoUrl,
-              sourceLang: input.sourceLang ?? null,
-              targetLang: lang,
-              elevenLabsDubbingId: res.dubbingId,
-              durationSec: input.durationSec,
-              status: 'dubbing',
-              creditsCharged: perLangCredits,
-              outputVideoUrl: null,
-              outputAudioUrl: null,
-              publishedToEpisode: false,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            });
+              modelId: 'elevenlabs-dubbing',
+              provider: 'elevenlabs',
+              estimatedCredits: perLangCredits,
+              byok: false,
+              meta: {
+                generationId: id,
+                episodeId: input.episodeId ?? null,
+                targetLang: lang,
+              },
+            },
+            async () => {
+              const res = await elevenLabsService.dubbing({
+                sourceUrl: input.sourceVideoUrl,
+                sourceLang: input.sourceLang,
+                targetLang: lang,
+                name: input.name ?? `LOAR dub → ${lang}`,
+                numSpeakers: input.numSpeakers,
+                highestResolution: input.highestResolution,
+                apiKey,
+              });
 
-          created.push({ id, targetLang: lang, elevenLabsDubbingId: res.dubbingId });
+              await multilingualDubsCol()
+                .doc(id)
+                .set({
+                  id,
+                  userId: ctx.user.uid,
+                  episodeId: input.episodeId ?? null,
+                  universeId: input.universeId ?? null,
+                  sourceVideoUrl: input.sourceVideoUrl,
+                  sourceLang: input.sourceLang ?? null,
+                  targetLang: lang,
+                  elevenLabsDubbingId: res.dubbingId,
+                  durationSec: input.durationSec,
+                  status: 'dubbing',
+                  creditsCharged: perLangCredits,
+                  outputVideoUrl: null,
+                  outputAudioUrl: null,
+                  publishedToEpisode: false,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                });
+
+              created.push({ id, targetLang: lang, elevenLabsDubbingId: res.dubbingId });
+              return { result: undefined };
+            }
+          );
         } catch (err) {
           failures.push({
             targetLang: lang,
             error: err instanceof Error ? err.message : 'Unknown',
           });
         }
-      }
-
-      // Refund credits for any languages that failed to even start.
-      if (failures.length > 0) {
-        const refundAmt = perLangCredits * failures.length;
-        await refundCredits(ctx.user.uid, refundAmt);
       }
 
       return { jobs: created, failures, creditsCharged: perLangCredits * created.length };
@@ -295,7 +297,11 @@ export const multilingualDubRouter = router({
           updatedAt: new Date(),
         });
         // Refund — provider work didn't complete.
-        await refundCredits(ctx.user.uid, (data.creditsCharged as number) ?? 0, input.id);
+        await refundCreditsAfterReconcile(
+          ctx.user.uid,
+          (data.creditsCharged as number) ?? 0,
+          input.id
+        );
         return { ...data, status: 'failed', failureReason: status.error };
       }
 
@@ -336,7 +342,11 @@ export const multilingualDubRouter = router({
           failureReason: err instanceof Error ? err.message : 'Output fetch failed',
           updatedAt: new Date(),
         });
-        await refundCredits(ctx.user.uid, (data.creditsCharged as number) ?? 0, input.id);
+        await refundCreditsAfterReconcile(
+          ctx.user.uid,
+          (data.creditsCharged as number) ?? 0,
+          input.id
+        );
         throw err;
       }
     }),

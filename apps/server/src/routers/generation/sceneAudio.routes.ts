@@ -38,6 +38,7 @@ import { logFailedRefund } from '../../lib/refund-audit';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 import { TRPCError } from '@trpc/server';
+import { withReservation } from '../../services/credits';
 
 // ── Pricing ─────────────────────────────────────────────────────────────
 
@@ -188,54 +189,60 @@ export const sceneAudioRouter = router({
     .mutation(async ({ input, ctx }) => {
       const { fiatMargin } = await getMargins();
       const credits = toCredits(VOICE_DESIGN_COST_USD, fiatMargin);
-      await deductCredits(ctx.user.uid, credits);
-
       const jobId = randomUUID();
-      const { resolveProviderKey: resolveElevenDesign } = await import('../../lib/byok');
-      const elevenDesignKey = await resolveElevenDesign(ctx.user.uid, 'elevenlabs');
-      try {
-        const result = await elevenLabsService.designVoice({
-          name: `${input.characterName} - ${input.universeId}`,
-          description: input.description,
-          gender: input.gender,
-          age: input.age,
-          accent: input.accent,
-          accentStrength: input.accentStrength,
-          text: input.previewText,
-          apiKey: elevenDesignKey,
-        });
 
-        // Upload preview audio
-        let previewUrl: string | undefined;
-        if (result.audioBuffer.length > 0) {
-          previewUrl = await uploadAudioBuffer(result.audioBuffer, `voice-preview/${jobId}.mp3`);
+      return withReservation(
+        {
+          userId: ctx.user.uid,
+          modelId: 'elevenlabs-voice-design',
+          provider: 'elevenlabs',
+          estimatedCredits: credits,
+          byok: false,
+          meta: { generationId: jobId, universeId: input.universeId },
+        },
+        async () => {
+          const { resolveProviderKey: resolveElevenDesign } = await import('../../lib/byok');
+          const elevenDesignKey = await resolveElevenDesign(ctx.user.uid, 'elevenlabs');
+          const result = await elevenLabsService.designVoice({
+            name: `${input.characterName} - ${input.universeId}`,
+            description: input.description,
+            gender: input.gender,
+            age: input.age,
+            accent: input.accent,
+            accentStrength: input.accentStrength,
+            text: input.previewText,
+            apiKey: elevenDesignKey,
+          });
+
+          // Upload preview audio
+          let previewUrl: string | undefined;
+          if (result.audioBuffer.length > 0) {
+            previewUrl = await uploadAudioBuffer(result.audioBuffer, `voice-preview/${jobId}.mp3`);
+          }
+
+          // Save voice profile to Firestore
+          const profile = {
+            id: jobId,
+            universeId: input.universeId,
+            characterName: input.characterName,
+            voiceId: result.voiceId,
+            description: input.description,
+            gender: input.gender,
+            age: input.age,
+            accent: input.accent,
+            stability: input.stability,
+            style: input.style,
+            previewUrl,
+            castMemberId: input.castMemberId || null,
+            createdBy: ctx.user.uid,
+            createdAt: new Date(),
+          };
+
+          await voiceProfilesCol().doc(jobId).set(profile);
+
+          return { result: { id: jobId, voiceId: result.voiceId, previewUrl, credits } };
         }
-
-        // Save voice profile to Firestore
-        const profile = {
-          id: jobId,
-          universeId: input.universeId,
-          characterName: input.characterName,
-          voiceId: result.voiceId,
-          description: input.description,
-          gender: input.gender,
-          age: input.age,
-          accent: input.accent,
-          stability: input.stability,
-          style: input.style,
-          previewUrl,
-          castMemberId: input.castMemberId || null,
-          createdBy: ctx.user.uid,
-          createdAt: new Date(),
-        };
-
-        await voiceProfilesCol().doc(jobId).set(profile);
-
-        return { id: jobId, voiceId: result.voiceId, previewUrl, credits };
-      } catch (err) {
-        await refundCredits(ctx.user.uid, credits, jobId);
-        throw err;
-      }
+      );
     }),
 
   /**
@@ -332,61 +339,67 @@ export const sceneAudioRouter = router({
       const costUsd = totalChars * TTS_COST_PER_CHAR_USD;
       const { fiatMargin } = await getMargins();
       const credits = Math.max(2, toCredits(costUsd, fiatMargin));
-      await deductCredits(ctx.user.uid, credits);
-
       const jobId = randomUUID();
-      const { resolveProviderKey: resolveDialogueKey } = await import('../../lib/byok');
-      const dialogueKey = await resolveDialogueKey(ctx.user.uid, 'elevenlabs');
-      try {
-        const audioBuffers: Buffer[] = [];
 
-        for (const line of input.dialogue) {
-          const profile = profiles[line.voiceProfileId];
-          if (!profile) {
-            throw new Error(`Voice profile ${line.voiceProfileId} not found`);
+      return withReservation(
+        {
+          userId: ctx.user.uid,
+          modelId: 'elevenlabs-dialogue',
+          provider: 'elevenlabs',
+          estimatedCredits: credits,
+          byok: false,
+          meta: { generationId: jobId, universeId: input.universeId, sceneId: input.sceneId },
+        },
+        async () => {
+          const { resolveProviderKey: resolveDialogueKey } = await import('../../lib/byok');
+          const dialogueKey = await resolveDialogueKey(ctx.user.uid, 'elevenlabs');
+          const audioBuffers: Buffer[] = [];
+
+          for (const line of input.dialogue) {
+            const profile = profiles[line.voiceProfileId];
+            if (!profile) {
+              throw new Error(`Voice profile ${line.voiceProfileId} not found`);
+            }
+
+            const result = await elevenLabsService.textToSpeech({
+              text: sanitizePrompt(line.text),
+              voiceId: profile.voiceId,
+              modelId: 'eleven_v3',
+              stability: profile.stability ?? 0.5,
+              similarityBoost: 0.75,
+              style: profile.style ?? 0.3,
+              useSpeakerBoost: true,
+              apiKey: dialogueKey,
+            });
+
+            audioBuffers.push(result.audioBuffer);
+            // Small silence gap between lines
+            audioBuffers.push(Buffer.alloc(8820));
           }
 
-          const result = await elevenLabsService.textToSpeech({
-            text: sanitizePrompt(line.text),
-            voiceId: profile.voiceId,
-            modelId: 'eleven_v3',
-            stability: profile.stability ?? 0.5,
-            similarityBoost: 0.75,
-            style: profile.style ?? 0.3,
-            useSpeakerBoost: true,
-            apiKey: dialogueKey,
+          const merged = Buffer.concat(audioBuffers);
+          const audioUrl = await uploadAudioBuffer(
+            merged,
+            `dialogue/${input.universeId}/${input.sceneId}-${jobId}.mp3`
+          );
+
+          // Record job
+          await sceneAudioCol().doc(jobId).set({
+            id: jobId,
+            type: 'dialogue',
+            universeId: input.universeId,
+            sceneId: input.sceneId,
+            audioUrl,
+            dialogueCount: input.dialogue.length,
+            totalChars,
+            credits,
+            createdBy: ctx.user.uid,
+            createdAt: new Date(),
           });
 
-          audioBuffers.push(result.audioBuffer);
-          // Small silence gap between lines
-          audioBuffers.push(Buffer.alloc(8820));
+          return { result: { id: jobId, audioUrl, credits, totalChars } };
         }
-
-        const merged = Buffer.concat(audioBuffers);
-        const audioUrl = await uploadAudioBuffer(
-          merged,
-          `dialogue/${input.universeId}/${input.sceneId}-${jobId}.mp3`
-        );
-
-        // Record job
-        await sceneAudioCol().doc(jobId).set({
-          id: jobId,
-          type: 'dialogue',
-          universeId: input.universeId,
-          sceneId: input.sceneId,
-          audioUrl,
-          dialogueCount: input.dialogue.length,
-          totalChars,
-          credits,
-          createdBy: ctx.user.uid,
-          createdAt: new Date(),
-        });
-
-        return { id: jobId, audioUrl, credits, totalChars };
-      } catch (err) {
-        await refundCredits(ctx.user.uid, credits, jobId);
-        throw err;
-      }
+      );
     }),
 
   /**
@@ -405,41 +418,47 @@ export const sceneAudioRouter = router({
     .mutation(async ({ input, ctx }) => {
       const { fiatMargin } = await getMargins();
       const credits = toCredits(SFX_COST_USD, fiatMargin);
-      await deductCredits(ctx.user.uid, credits);
-
       const jobId = randomUUID();
-      const { resolveProviderKey: resolveSfxKey } = await import('../../lib/byok');
-      const sfxKey = await resolveSfxKey(ctx.user.uid, 'elevenlabs');
-      try {
-        const result = await elevenLabsService.soundEffect({
-          text: sanitizePrompt(input.description),
-          durationSeconds: input.durationSec,
-          promptInfluence: 0.4,
-          apiKey: sfxKey,
-        });
 
-        const audioUrl = await uploadAudioBuffer(
-          result.audioBuffer,
-          `sfx/${input.universeId}/${input.sceneId}-${jobId}.mp3`
-        );
+      return withReservation(
+        {
+          userId: ctx.user.uid,
+          modelId: 'elevenlabs-sfx',
+          provider: 'elevenlabs',
+          estimatedCredits: credits,
+          byok: false,
+          meta: { generationId: jobId, universeId: input.universeId, sceneId: input.sceneId },
+        },
+        async () => {
+          const { resolveProviderKey: resolveSfxKey } = await import('../../lib/byok');
+          const sfxKey = await resolveSfxKey(ctx.user.uid, 'elevenlabs');
+          const result = await elevenLabsService.soundEffect({
+            text: sanitizePrompt(input.description),
+            durationSeconds: input.durationSec,
+            promptInfluence: 0.4,
+            apiKey: sfxKey,
+          });
 
-        await sceneAudioCol().doc(jobId).set({
-          id: jobId,
-          type: 'sfx',
-          universeId: input.universeId,
-          sceneId: input.sceneId,
-          audioUrl,
-          description: input.description,
-          credits,
-          createdBy: ctx.user.uid,
-          createdAt: new Date(),
-        });
+          const audioUrl = await uploadAudioBuffer(
+            result.audioBuffer,
+            `sfx/${input.universeId}/${input.sceneId}-${jobId}.mp3`
+          );
 
-        return { id: jobId, audioUrl, credits };
-      } catch (err) {
-        await refundCredits(ctx.user.uid, credits, jobId);
-        throw err;
-      }
+          await sceneAudioCol().doc(jobId).set({
+            id: jobId,
+            type: 'sfx',
+            universeId: input.universeId,
+            sceneId: input.sceneId,
+            audioUrl,
+            description: input.description,
+            credits,
+            createdBy: ctx.user.uid,
+            createdAt: new Date(),
+          });
+
+          return { result: { id: jobId, audioUrl, credits } };
+        }
+      );
     }),
 
   /**
