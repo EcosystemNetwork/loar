@@ -7,6 +7,7 @@ import { db } from '../../lib/firebase';
 import { isUniverseAdmin } from '../../lib/safe-admin';
 import { resolveActingUid } from '../../services/agentAuth';
 import { assertContentHashOperable } from '../../lib/content-status';
+import { flushImpressionsOnce } from '../../services/impressionBatcher';
 import { z } from 'zod';
 
 const adSlotsCol = () => {
@@ -385,6 +386,13 @@ export const adsRouter = router({
       const snap = await q.get();
       return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     }),
+
+  /** Admin/cron: flush accumulated off-chain impression deltas on-chain
+   *  via AdPlacement.recordImpressionsBatch. Returns a small summary so
+   *  the cron operator can alert on stuck rows (pendingOnChainId > 0). */
+  flushImpressionsOnChain: adminProcedure.mutation(async () => {
+    return flushImpressionsOnce();
+  }),
 
   // ---- Impressions ----
 

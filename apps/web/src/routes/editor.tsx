@@ -37,6 +37,7 @@ import { AnimateImagePanel } from '@/components/editing/AnimateImagePanel';
 import { TalkingScenePanel } from '@/components/editing/TalkingScenePanel';
 import { VoiceModifyPanel } from '@/components/editing/VoiceModifyPanel';
 import { PublishEpisodeDialog } from '@/components/editing/PublishEpisodeDialog';
+import { DubLipsyncPanel } from '@/components/editing/DubLipsyncPanel';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
@@ -397,6 +398,9 @@ function EditorPage() {
               <TabsTrigger value="voice" className="text-xs flex-1">
                 Voice
               </TabsTrigger>
+              <TabsTrigger value="dub" className="text-xs flex-1">
+                Dub
+              </TabsTrigger>
               <TabsTrigger value="input" className="text-xs flex-1">
                 Input
               </TabsTrigger>
@@ -434,6 +438,17 @@ function EditorPage() {
                 onComplete={(newUrl) => {
                   setAudioUrl(newUrl);
                   toast.success('Voice modified — preview updated');
+                }}
+              />
+            </TabsContent>
+
+            {/* Dub Tab — E2 multilingual dubbing + E3 inline lipsync */}
+            <TabsContent value="dub" className="flex-1 p-4 m-0 overflow-y-auto">
+              <DubLipsyncPanel
+                videoUrl={videoUrl}
+                onVideoReplaced={(newUrl) => {
+                  setVideoUrl(newUrl);
+                  toast.success('Video updated to lipsynced version');
                 }}
               />
             </TabsContent>

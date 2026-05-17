@@ -88,9 +88,22 @@ contract AdPlacement is
     error TransferFailed();
     error FeeTooHigh();
     error NoPendingWithdrawal();
+    /// @dev AD-02: slot creator must declare a positive impression cap so
+    ///      the platform cannot inflate `recordImpression` unbounded.
+    error EpisodesMustBePositive();
+    /// @dev AD-02: slot creator's `episodes` cap exceeds the safety ceiling.
+    error EpisodesAboveMax();
 
     uint256 public constant BID_CANCEL_COOLDOWN = 3 days;
     uint256 public constant BID_EXPIRY = 30 days;
+
+    /// @notice AD-02 defensive ceiling on per-slot impression caps. Slot
+    ///         creators set their own `episodes`, but the contract refuses
+    ///         values above this to bound the worst-case platform-inflation
+    ///         damage if the platform key is compromised. 1,000,000 ≈
+    ///         3,000 impressions/day for a year — well above any honest
+    ///         placement need.
+    uint256 public constant MAX_EPISODES_PER_SLOT = 1_000_000;
 
     /// @notice Timestamp when the current bid was placed, per slot
     mapping(uint256 => uint256) public bidPlacedAt;
@@ -169,6 +182,14 @@ contract AdPlacement is
     }
 
     /// @notice Create an ad placement slot
+    /// @dev AD-02: `episodes` is now bounded `[1, MAX_EPISODES_PER_SLOT]`.
+    ///      The pre-AD-02 code allowed `episodes == 0`, which left
+    ///      `recordImpression`'s `episodesRemaining > 0` decrement gate
+    ///      permanently false — a compromised platform key could then
+    ///      inflate `sp.impressions` unboundedly and skew creator
+    ///      revenue/analytics. Forcing a non-zero, capped value gives the
+    ///      slot creator a per-sponsorship inflation ceiling without
+    ///      requiring an off-chain oracle for v1.
     function createAdSlot(
         uint256 universeId,
         PlacementType placementType,
@@ -180,6 +201,8 @@ contract AdPlacement is
         require(
             msg.sender == _currentCreator(universeId) || msg.sender == platform, "Not authorized"
         );
+        if (episodes == 0) revert EpisodesMustBePositive();
+        if (episodes > MAX_EPISODES_PER_SLOT) revert EpisodesAboveMax();
 
         slotId = nextSlotId++;
         adSlots[slotId] = AdSlot({
@@ -294,19 +317,54 @@ contract AdPlacement is
     }
 
     /// @notice Record an ad impression (called by platform per episode)
+    /// @dev AD-02: `episodesRemaining` is now guaranteed > 0 at slot
+    ///      creation (capped by `MAX_EPISODES_PER_SLOT`), so this function
+    ///      can no longer be looped indefinitely against a 0-cap slot.
+    ///      Reverts when the slot's impression budget is exhausted instead
+    ///      of silently incrementing — gives the sponsor an explicit
+    ///      "your campaign hit its cap" signal rather than letting the
+    ///      platform overshoot.
     function recordImpression(uint256 sponsorshipId) external onlyPlatform {
         Sponsorship storage sp = sponsorships[sponsorshipId];
-        sp.impressions++;
-
         AdSlot storage slot = adSlots[sp.adSlotId];
-        if (slot.episodesRemaining > 0) {
-            slot.episodesRemaining--;
-            if (slot.episodesRemaining == 0) {
-                sp.active = false;
-            }
+        if (!sp.active || slot.episodesRemaining == 0) revert SlotNotActive();
+
+        sp.impressions++;
+        slot.episodesRemaining--;
+        if (slot.episodesRemaining == 0) {
+            sp.active = false;
         }
 
         emit ImpressionRecorded(sponsorshipId, sp.impressions);
+    }
+
+    /// @notice Batch impression recording — A5 from prd-ad-placements.md.
+    ///         Server cron aggregates the previous hour's impression counts
+    ///         per sponsorship and sends one tx instead of per-call. Caps
+    ///         each entry at the slot's remaining episode budget so a stale
+    ///         off-chain counter can't over-debit the slot.
+    function recordImpressionsBatch(uint256[] calldata sponsorshipIds, uint256[] calldata counts)
+        external
+        onlyPlatform
+    {
+        if (sponsorshipIds.length != counts.length) revert SlotNotActive();
+        for (uint256 i = 0; i < sponsorshipIds.length; i++) {
+            uint256 sId = sponsorshipIds[i];
+            uint256 add = counts[i];
+            if (add == 0) continue;
+
+            Sponsorship storage sp = sponsorships[sId];
+            AdSlot storage slot = adSlots[sp.adSlotId];
+            if (!sp.active || slot.episodesRemaining == 0) continue;
+
+            uint256 applied = add > slot.episodesRemaining ? slot.episodesRemaining : add;
+            sp.impressions += applied;
+            slot.episodesRemaining -= applied;
+            if (slot.episodesRemaining == 0) {
+                sp.active = false;
+            }
+            emit ImpressionRecorded(sId, sp.impressions);
+        }
     }
 
     /// @notice Get ad slots for a universe

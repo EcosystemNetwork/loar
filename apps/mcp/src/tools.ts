@@ -323,6 +323,99 @@ const getPipelineRun: ToolDefinition = {
   },
 };
 
+// ── AI Agent Management Tools (G5) ────────────────────────────────────
+
+const createAIAgent: ToolDefinition = {
+  name: 'loar_create_ai_agent',
+  description:
+    'Create a new AI agent owned by the calling user. Agents run pipelines on a budget against specified permissions.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Agent display name' },
+      type: {
+        type: 'string',
+        description: 'Agent type',
+        enum: ['content_creator', 'curator', 'moderator', 'community_manager'],
+      },
+      description: { type: 'string', description: 'Optional agent bio' },
+      universeId: {
+        type: 'string',
+        description: 'Universe scope (optional — omit for cross-universe agents)',
+      },
+      permissions: {
+        type: 'string',
+        description:
+          'Comma-separated permissions (e.g. "generation,content.create,marketplace.submit")',
+      },
+      useBYOK: {
+        type: 'boolean',
+        description: "Bill generations against the owner's BYOK keys instead of platform credits",
+      },
+    },
+    required: ['name', 'type', 'permissions'],
+  },
+  handler: async (client, args) => {
+    const permissions =
+      typeof args.permissions === 'string'
+        ? args.permissions
+            .split(',')
+            .map((s: string) => s.trim())
+            .filter(Boolean)
+        : [];
+    return client.mutate('aiAgents.create', { ...args, permissions });
+  },
+};
+
+const updatePipeline: ToolDefinition = {
+  name: 'loar_update_pipeline',
+  description: 'Update an existing AI pipeline (name, description, or steps)',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      pipelineId: { type: 'string', description: 'Pipeline ID to update' },
+      name: { type: 'string', description: 'New name (optional)' },
+      description: { type: 'string', description: 'New description (optional)' },
+    },
+    required: ['pipelineId'],
+  },
+  handler: async (client, args) => {
+    return client.mutate('aiPipelines.update', args);
+  },
+};
+
+const createApiKey: ToolDefinition = {
+  name: 'loar_create_api_key',
+  description:
+    'Issue a scoped API key for external automation (Zapier, custom scripts, MCP clients). Returns the secret once — store it immediately.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Human-readable key name' },
+      permissions: {
+        type: 'string',
+        description:
+          "Comma-separated permissions the key may use (subset of the caller's permissions)",
+      },
+      expiresInDays: {
+        type: 'number',
+        description: 'Optional expiry in days; omit for no expiry',
+      },
+    },
+    required: ['name', 'permissions'],
+  },
+  handler: async (client, args) => {
+    const permissions =
+      typeof args.permissions === 'string'
+        ? args.permissions
+            .split(',')
+            .map((s: string) => s.trim())
+            .filter(Boolean)
+        : [];
+    return client.mutate('apiKeys.create', { ...args, permissions });
+  },
+};
+
 // ── Profile Tools ──────────────────────────────────────────────────────
 
 const getProfile: ToolDefinition = {
@@ -850,6 +943,355 @@ const solanaAttestation: ToolDefinition = {
     client.rawGet(`/api/solana/attestation/${String(args.episodePda)}`),
 };
 
+// ── Solana ported-program tools ────────────────────────────────────────────
+//
+// One MCP tool per high-value op across the 10 ported Anchor programs (canon
+// vote, license buy, subscribe, stake/unstake, buy credits, bonding-curve
+// trade, claim fees, premium action, charge remix fee, route splits) plus
+// the read tools that AI agents need to make decisions. Mirrors the EVM
+// surface so an agent can drive the full monetization stack on either chain.
+
+const solanaLicenseBuy: ToolDefinition = {
+  name: 'loar_solana_license_buy',
+  description:
+    'Buy permanent access to content via the Solana licensing program. Returns the BuyerDeal PDA — caller can then prove access via loar_solana_license_check_access.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      contentHashHex: {
+        type: 'string',
+        description:
+          '32-byte content hash as 0x-prefixed hex (matches the EVM ContentLicensing bytes32 shape)',
+      },
+    },
+    required: ['contentHashHex'],
+  },
+  handler: async (client, args) => client.rawPost('/api/solana/licensing/buy', args),
+};
+
+const solanaLicenseCheckAccess: ToolDefinition = {
+  name: 'loar_solana_license_check_access',
+  description:
+    'Check whether the caller holds a BuyerDeal for a given content hash on Solana licensing. Returns { hasAccess: boolean, address }.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      contentHashHex: { type: 'string', description: '32-byte content hash as 0x-hex' },
+    },
+    required: ['contentHashHex'],
+  },
+  handler: async (client, args) =>
+    client.rawGet('/api/solana/licensing/access', { contentHashHex: String(args.contentHashHex) }),
+};
+
+const solanaLicenseReadRegistration: ToolDefinition = {
+  name: 'loar_solana_license_read_registration',
+  description:
+    'Read the Registration PDA for a content hash — returns price, creator, and active state for licensable Solana content. Public read; no auth required.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      contentHashHex: { type: 'string', description: '32-byte content hash as 0x-hex' },
+    },
+    required: ['contentHashHex'],
+  },
+  handler: async (client, args) =>
+    client.rawGet(`/api/solana/licensing/registration/${String(args.contentHashHex)}`),
+};
+
+const solanaCanonVote: ToolDefinition = {
+  name: 'loar_solana_canon_vote',
+  description:
+    'Token-weighted vote on a canon submission. Locks `amount` of the universe token until the voting window closes (lock-during-window model — replaces EVM snapshot voting).',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      universe: { type: 'string', description: 'Solana Universe PDA (base58)' },
+      contentHashHex: { type: 'string', description: 'Submission content hash, 0x-hex' },
+      support: { type: 'boolean', description: 'true = for, false = against' },
+      amount: {
+        type: 'string',
+        description: 'Token amount to lock (decimal integer string, base units)',
+      },
+    },
+    required: ['universe', 'contentHashHex', 'support', 'amount'],
+  },
+  handler: async (client, args) => client.rawPost('/api/solana/canon-market/vote', args),
+};
+
+const solanaCanonReadSubmission: ToolDefinition = {
+  name: 'loar_solana_canon_read_submission',
+  description:
+    'Read a canon submission — returns state (Active / Accepted / Rejected / Expired), votes for/against, and participation vs quorum. Public read.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      universe: { type: 'string', description: 'Universe PDA (base58)' },
+      contentHashHex: { type: 'string', description: 'Content hash, 0x-hex' },
+    },
+    required: ['universe', 'contentHashHex'],
+  },
+  handler: async (client, args) =>
+    client.rawGet('/api/solana/canon-market/submission', {
+      universe: String(args.universe),
+      contentHashHex: String(args.contentHashHex),
+    }),
+};
+
+const solanaStake: ToolDefinition = {
+  name: 'loar_solana_stake',
+  description:
+    'Stake $LOAR to climb staking tiers (Bronze → Diamond) on the Solana LaunchpadStaking port. Tier confers launchpad benefits + governance weight.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      amount: { type: 'string', description: 'Amount in base units (decimal integer string)' },
+    },
+    required: ['amount'],
+  },
+  handler: async (client, args) => client.rawPost('/api/solana/staking/stake', args),
+};
+
+const solanaUnstake: ToolDefinition = {
+  name: 'loar_solana_unstake',
+  description:
+    'Unstake $LOAR. Early-unstake penalty applies if the lock period has not elapsed; the penalty share is sent to penaltyDestinationAta.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      amount: { type: 'string', description: 'Amount in base units (decimal integer string)' },
+      penaltyDestinationAta: {
+        type: 'string',
+        description: 'ATA (base58) that receives any early-unstake penalty share',
+      },
+    },
+    required: ['amount', 'penaltyDestinationAta'],
+  },
+  handler: async (client, args) => client.rawPost('/api/solana/staking/unstake', args),
+};
+
+const solanaStakingInfo: ToolDefinition = {
+  name: 'loar_solana_staking_info',
+  description:
+    "Read the caller's stake info — staked amount, tier, lock period, weighted average staked_at.",
+  inputSchema: { type: 'object', properties: {} },
+  handler: async (client) => client.rawGet('/api/solana/staking/info'),
+};
+
+const solanaCreditsBuySol: ToolDefinition = {
+  name: 'loar_solana_credits_buy_sol',
+  description: 'Buy a credit package with SOL on the Solana credit_manager program.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      packageId: { type: 'string', description: 'Credit package id (decimal integer string)' },
+    },
+    required: ['packageId'],
+  },
+  handler: async (client, args) => client.rawPost('/api/solana/credits/purchase-sol', args),
+};
+
+const solanaCreditsBuyLoar: ToolDefinition = {
+  name: 'loar_solana_credits_buy_loar',
+  description: 'Buy a credit package with $LOAR (Token-2022) on the Solana credit_manager program.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      packageId: { type: 'string', description: 'Credit package id (decimal integer string)' },
+    },
+    required: ['packageId'],
+  },
+  handler: async (client, args) => client.rawPost('/api/solana/credits/purchase-loar', args),
+};
+
+const solanaCreditsBalance: ToolDefinition = {
+  name: 'loar_solana_credits_balance',
+  description: "Read the caller's Solana credit balance + lifetime spend / earned.",
+  inputSchema: { type: 'object', properties: {} },
+  handler: async (client) => client.rawGet('/api/solana/credits/balance'),
+};
+
+const solanaSubscribe: ToolDefinition = {
+  name: 'loar_solana_subscribe',
+  description:
+    'Subscribe to a universe on Solana. tierId 0=FREE, 1=BASIC, 2=PREMIUM, 3=VIP. SOL flows to the universe creator (split per Config) + platform treasury.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      universe: { type: 'string', description: 'Universe PDA (base58)' },
+      tierId: { type: 'number', description: '0=FREE, 1=BASIC, 2=PREMIUM, 3=VIP' },
+      months: { type: 'number', description: 'Number of months (1–60)' },
+    },
+    required: ['universe', 'tierId', 'months'],
+  },
+  handler: async (client, args) => client.rawPost('/api/solana/subscription/subscribe', args),
+};
+
+const solanaSubscriptionStatus: ToolDefinition = {
+  name: 'loar_solana_subscription_status',
+  description:
+    "Check the caller's subscription status for a universe — returns active flag, remaining seconds, tier, and expiresAt.",
+  inputSchema: {
+    type: 'object',
+    properties: {
+      universe: { type: 'string', description: 'Universe PDA (base58)' },
+    },
+    required: ['universe'],
+  },
+  handler: async (client, args) =>
+    client.rawGet('/api/solana/subscription/status', { universe: String(args.universe) }),
+};
+
+const solanaCurveBuy: ToolDefinition = {
+  name: 'loar_solana_curve_buy',
+  description:
+    'Buy universe tokens on a Solana bonding curve. Pays up to solInMaxLamports SOL, receives at least minTokensOut tokens. Reverts past deadlineSecs (default now+120s).',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      universe: { type: 'string', description: 'Universe PDA (base58)' },
+      solInMaxLamports: {
+        type: 'string',
+        description: 'Max SOL to spend, in lamports (decimal integer string)',
+      },
+      minTokensOut: {
+        type: 'string',
+        description: 'Slippage floor — min tokens (base units, decimal integer string)',
+      },
+      deadlineSecs: {
+        type: 'string',
+        description: 'Optional unix-seconds deadline; default now+120s',
+      },
+    },
+    required: ['universe', 'solInMaxLamports', 'minTokensOut'],
+  },
+  handler: async (client, args) => client.rawPost('/api/solana/bonding-curve/buy', args),
+};
+
+const solanaCurveSell: ToolDefinition = {
+  name: 'loar_solana_curve_sell',
+  description:
+    'Sell universe tokens back to a Solana bonding curve. Receives at least minSolOutLamports (1% sell fee retained in reserve).',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      universe: { type: 'string', description: 'Universe PDA (base58)' },
+      tokenAmount: { type: 'string', description: 'Token amount to sell (base units)' },
+      minSolOutLamports: { type: 'string', description: 'Slippage floor — min SOL in lamports' },
+      deadlineSecs: {
+        type: 'string',
+        description: 'Optional unix-seconds deadline; default now+120s',
+      },
+    },
+    required: ['universe', 'tokenAmount', 'minSolOutLamports'],
+  },
+  handler: async (client, args) => client.rawPost('/api/solana/bonding-curve/sell', args),
+};
+
+const solanaCurveState: ToolDefinition = {
+  name: 'loar_solana_curve_state',
+  description:
+    'Read a Solana bonding-curve state — price, tokens sold, SOL raised, graduation progress (bps), and graduated/halted flags.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      universe: { type: 'string', description: 'Universe PDA (base58)' },
+    },
+    required: ['universe'],
+  },
+  handler: async (client, args) =>
+    client.rawGet('/api/solana/bonding-curve/state', { universe: String(args.universe) }),
+};
+
+const solanaClaimFees: ToolDefinition = {
+  name: 'loar_solana_claim_fees',
+  description:
+    'Pull accrued fees for the caller from the Solana fee_locker for a given SPL mint. Pull pattern — no auto-distribution.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      mint: {
+        type: 'string',
+        description: 'SPL token mint (base58) — which token balance to claim',
+      },
+    },
+    required: ['mint'],
+  },
+  handler: async (client, args) => client.rawPost('/api/solana/fee-locker/claim', args),
+};
+
+const solanaFeeBalance: ToolDefinition = {
+  name: 'loar_solana_fee_balance',
+  description:
+    "Read the caller's accrued fee balance for a given SPL mint in the Solana fee locker.",
+  inputSchema: {
+    type: 'object',
+    properties: {
+      mint: { type: 'string', description: 'SPL token mint (base58)' },
+    },
+    required: ['mint'],
+  },
+  handler: async (client, args) =>
+    client.rawGet('/api/solana/fee-locker/balance', { mint: String(args.mint) }),
+};
+
+const solanaPremiumAction: ToolDefinition = {
+  name: 'loar_solana_premium_action',
+  description:
+    'Pay $LOAR for a premium action (priority_generation, permanent_canon, premium_profile, remix_boost, custom). $LOAR splits between LP + treasury per Config.lpRatioBps. Despite legacy "burner" naming, no supply destruction.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      label: {
+        type: 'string',
+        description: "Human action label (sha256'd server-side). Use this OR actionHex.",
+      },
+      actionHex: {
+        type: 'string',
+        description: 'Pre-hashed 32-byte action name as 0x-hex. Use this OR label.',
+      },
+    },
+  },
+  handler: async (client, args) => client.rawPost('/api/solana/premium-actions/execute', args),
+};
+
+const solanaChargeRemixFee: ToolDefinition = {
+  name: 'loar_solana_charge_remix_fee',
+  description:
+    'Charge the Solana remix fee for re-using content. 3-way $LOAR split: creator / LP / treasury. Per-universe override falls back to Config.defaultRemixFee.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      universe: { type: 'string', description: 'Source universe PDA (base58)' },
+      contentHashHex: { type: 'string', description: 'Remixed content hash, 0x-hex' },
+    },
+    required: ['universe', 'contentHashHex'],
+  },
+  handler: async (client, args) => client.rawPost('/api/solana/remix-fees/charge', args),
+};
+
+const solanaRouteSplits: ToolDefinition = {
+  name: 'loar_solana_route_splits',
+  description:
+    "Route SOL through an entity's configured splits + platform fee on the Solana split_router. Recipients + their bps come from the on-chain Splits PDA; ordering must match.",
+  inputSchema: {
+    type: 'object',
+    properties: {
+      entityHashHex: {
+        type: 'string',
+        description: '32-byte entity hash as 0x-hex (identifies the splits config)',
+      },
+      amountLamports: { type: 'string', description: 'Total SOL to route, in lamports' },
+      platformFeeBps: {
+        type: 'number',
+        description: 'Platform fee in basis points (0–5000)',
+      },
+    },
+    required: ['entityHashHex', 'amountLamports', 'platformFeeBps'],
+  },
+  handler: async (client, args) => client.rawPost('/api/solana/split-router/route', args),
+};
+
 // ── Export All Tools ───────────────────────────────────────────────────
 
 export const ALL_TOOLS: ToolDefinition[] = [
@@ -877,8 +1319,11 @@ export const ALL_TOOLS: ToolDefinition[] = [
   proposeCollab,
   // AI Agents
   listAIAgents,
+  createAIAgent,
   runPipeline,
+  updatePipeline,
   getPipelineRun,
+  createApiKey,
   // Profiles
   getProfile,
   discoverProfiles,
@@ -904,4 +1349,26 @@ export const ALL_TOOLS: ToolDefinition[] = [
   solanaPayStatus,
   solanaActivity,
   solanaAttestation,
+  // Solana ported programs — full EVM-feature parity
+  solanaLicenseBuy,
+  solanaLicenseCheckAccess,
+  solanaLicenseReadRegistration,
+  solanaCanonVote,
+  solanaCanonReadSubmission,
+  solanaStake,
+  solanaUnstake,
+  solanaStakingInfo,
+  solanaCreditsBuySol,
+  solanaCreditsBuyLoar,
+  solanaCreditsBalance,
+  solanaSubscribe,
+  solanaSubscriptionStatus,
+  solanaCurveBuy,
+  solanaCurveSell,
+  solanaCurveState,
+  solanaClaimFees,
+  solanaFeeBalance,
+  solanaPremiumAction,
+  solanaChargeRemixFee,
+  solanaRouteSplits,
 ];
