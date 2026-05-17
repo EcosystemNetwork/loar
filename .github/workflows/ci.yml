@@ -214,7 +214,13 @@ jobs:
         run: forge fmt --check
 
       - name: Install Soldeer dependencies
-        run: forge soldeer install
+        run: |
+          forge soldeer install
+          # OpenZeppelin's Soldeer package extracts flat (no /contracts/ subdir),
+          # but remappings.txt and historical local installs expect a nested
+          # contracts/ path. Self-loop symlink lets both forms resolve.
+          ln -sfn . dependencies/@openzeppelin-contracts-5.0.2/contracts
+          ln -sfn . dependencies/@openzeppelin-contracts-upgradeable-5.0.2/contracts
 
       - name: Forge build
         run: forge build --sizes
