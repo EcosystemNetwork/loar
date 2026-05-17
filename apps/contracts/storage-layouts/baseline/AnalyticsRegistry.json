@@ -1,0 +1,236 @@
+{
+  "storage": [
+    {
+      "astId": 1591,
+      "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+      "label": "universeMetrics",
+      "offset": 0,
+      "slot": "0",
+      "type": "t_mapping(t_uint256,t_struct(UniverseMetrics)1570_storage)"
+    },
+    {
+      "astId": 1598,
+      "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+      "label": "episodeMetrics",
+      "offset": 0,
+      "slot": "1",
+      "type": "t_mapping(t_uint256,t_mapping(t_uint256,t_struct(EpisodeMetrics)1579_storage))"
+    },
+    {
+      "astId": 1605,
+      "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+      "label": "characterMetrics",
+      "offset": 0,
+      "slot": "2",
+      "type": "t_mapping(t_uint256,t_mapping(t_uint256,t_struct(CharacterMetrics)1586_storage))"
+    },
+    {
+      "astId": 1608,
+      "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+      "label": "trendingUniverseIds",
+      "offset": 0,
+      "slot": "3",
+      "type": "t_array(t_uint256)dyn_storage"
+    },
+    {
+      "astId": 1610,
+      "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+      "label": "platform",
+      "offset": 0,
+      "slot": "4",
+      "type": "t_address"
+    },
+    {
+      "astId": 2141,
+      "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+      "label": "__gap",
+      "offset": 0,
+      "slot": "5",
+      "type": "t_array(t_uint256)49_storage"
+    }
+  ],
+  "types": {
+    "t_address": {
+      "encoding": "inplace",
+      "label": "address",
+      "numberOfBytes": "20"
+    },
+    "t_array(t_uint256)49_storage": {
+      "encoding": "inplace",
+      "label": "uint256[49]",
+      "numberOfBytes": "1568",
+      "base": "t_uint256"
+    },
+    "t_array(t_uint256)dyn_storage": {
+      "encoding": "dynamic_array",
+      "label": "uint256[]",
+      "numberOfBytes": "32",
+      "base": "t_uint256"
+    },
+    "t_mapping(t_uint256,t_mapping(t_uint256,t_struct(CharacterMetrics)1586_storage))": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => mapping(uint256 => struct AnalyticsRegistry.CharacterMetrics))",
+      "numberOfBytes": "32",
+      "value": "t_mapping(t_uint256,t_struct(CharacterMetrics)1586_storage)"
+    },
+    "t_mapping(t_uint256,t_mapping(t_uint256,t_struct(EpisodeMetrics)1579_storage))": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => mapping(uint256 => struct AnalyticsRegistry.EpisodeMetrics))",
+      "numberOfBytes": "32",
+      "value": "t_mapping(t_uint256,t_struct(EpisodeMetrics)1579_storage)"
+    },
+    "t_mapping(t_uint256,t_struct(CharacterMetrics)1586_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct AnalyticsRegistry.CharacterMetrics)",
+      "numberOfBytes": "32",
+      "value": "t_struct(CharacterMetrics)1586_storage"
+    },
+    "t_mapping(t_uint256,t_struct(EpisodeMetrics)1579_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct AnalyticsRegistry.EpisodeMetrics)",
+      "numberOfBytes": "32",
+      "value": "t_struct(EpisodeMetrics)1579_storage"
+    },
+    "t_mapping(t_uint256,t_struct(UniverseMetrics)1570_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct AnalyticsRegistry.UniverseMetrics)",
+      "numberOfBytes": "32",
+      "value": "t_struct(UniverseMetrics)1570_storage"
+    },
+    "t_struct(CharacterMetrics)1586_storage": {
+      "encoding": "inplace",
+      "label": "struct AnalyticsRegistry.CharacterMetrics",
+      "numberOfBytes": "96",
+      "members": [
+        {
+          "astId": 1581,
+          "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+          "label": "appearances",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1583,
+          "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+          "label": "votes",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1585,
+          "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+          "label": "popularity",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        }
+      ]
+    },
+    "t_struct(EpisodeMetrics)1579_storage": {
+      "encoding": "inplace",
+      "label": "struct AnalyticsRegistry.EpisodeMetrics",
+      "numberOfBytes": "128",
+      "members": [
+        {
+          "astId": 1572,
+          "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+          "label": "views",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1574,
+          "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+          "label": "mints",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1576,
+          "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+          "label": "likes",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1578,
+          "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+          "label": "shares",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_uint256"
+        }
+      ]
+    },
+    "t_struct(UniverseMetrics)1570_storage": {
+      "encoding": "inplace",
+      "label": "struct AnalyticsRegistry.UniverseMetrics",
+      "numberOfBytes": "192",
+      "members": [
+        {
+          "astId": 1559,
+          "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+          "label": "totalViews",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1561,
+          "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+          "label": "totalMints",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1563,
+          "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+          "label": "totalVotes",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1565,
+          "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+          "label": "totalSubscribers",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1567,
+          "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+          "label": "totalRevenue",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1569,
+          "contract": "src/revenue/AnalyticsRegistry.sol:AnalyticsRegistry",
+          "label": "lastUpdated",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_uint256"
+        }
+      ]
+    },
+    "t_uint256": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "numberOfBytes": "32"
+    }
+  }
+}

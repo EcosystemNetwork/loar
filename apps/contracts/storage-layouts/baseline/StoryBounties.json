@@ -1,0 +1,279 @@
+{
+  "storage": [
+    {
+      "astId": 2446,
+      "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+      "label": "loarToken",
+      "offset": 0,
+      "slot": "0",
+      "type": "t_contract(IERC20)767"
+    },
+    {
+      "astId": 2449,
+      "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+      "label": "paymentRouter",
+      "offset": 0,
+      "slot": "1",
+      "type": "t_contract(IPaymentRouter)2379"
+    },
+    {
+      "astId": 2451,
+      "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+      "label": "treasury",
+      "offset": 0,
+      "slot": "2",
+      "type": "t_address"
+    },
+    {
+      "astId": 2453,
+      "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+      "label": "platform",
+      "offset": 0,
+      "slot": "3",
+      "type": "t_address"
+    },
+    {
+      "astId": 2455,
+      "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+      "label": "nextBountyId",
+      "offset": 0,
+      "slot": "4",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2460,
+      "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+      "label": "bounties",
+      "offset": 0,
+      "slot": "5",
+      "type": "t_mapping(t_uint256,t_struct(Bounty)2443_storage)"
+    },
+    {
+      "astId": 2463,
+      "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+      "label": "platformFeeBps",
+      "offset": 0,
+      "slot": "6",
+      "type": "t_uint16"
+    },
+    {
+      "astId": 2466,
+      "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+      "label": "cancellationFeeBps",
+      "offset": 2,
+      "slot": "6",
+      "type": "t_uint16"
+    },
+    {
+      "astId": 2469,
+      "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+      "label": "minBountyAmount",
+      "offset": 0,
+      "slot": "7",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2480,
+      "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+      "label": "totalDistributed",
+      "offset": 0,
+      "slot": "8",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2483,
+      "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+      "label": "totalBounties",
+      "offset": 0,
+      "slot": "9",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2488,
+      "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+      "label": "universeBounties",
+      "offset": 0,
+      "slot": "10",
+      "type": "t_mapping(t_uint256,t_array(t_uint256)dyn_storage)"
+    },
+    {
+      "astId": 3379,
+      "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+      "label": "__gap",
+      "offset": 0,
+      "slot": "11",
+      "type": "t_array(t_uint256)49_storage"
+    }
+  ],
+  "types": {
+    "t_address": {
+      "encoding": "inplace",
+      "label": "address",
+      "numberOfBytes": "20"
+    },
+    "t_array(t_uint256)49_storage": {
+      "encoding": "inplace",
+      "label": "uint256[49]",
+      "numberOfBytes": "1568",
+      "base": "t_uint256"
+    },
+    "t_array(t_uint256)dyn_storage": {
+      "encoding": "dynamic_array",
+      "label": "uint256[]",
+      "numberOfBytes": "32",
+      "base": "t_uint256"
+    },
+    "t_bytes32": {
+      "encoding": "inplace",
+      "label": "bytes32",
+      "numberOfBytes": "32"
+    },
+    "t_contract(IERC20)767": {
+      "encoding": "inplace",
+      "label": "contract IERC20",
+      "numberOfBytes": "20"
+    },
+    "t_contract(IPaymentRouter)2379": {
+      "encoding": "inplace",
+      "label": "contract IPaymentRouter",
+      "numberOfBytes": "20"
+    },
+    "t_enum(BountyStatus)2417": {
+      "encoding": "inplace",
+      "label": "enum StoryBounties.BountyStatus",
+      "numberOfBytes": "1"
+    },
+    "t_mapping(t_uint256,t_array(t_uint256)dyn_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => uint256[])",
+      "numberOfBytes": "32",
+      "value": "t_array(t_uint256)dyn_storage"
+    },
+    "t_mapping(t_uint256,t_struct(Bounty)2443_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct StoryBounties.Bounty)",
+      "numberOfBytes": "32",
+      "value": "t_struct(Bounty)2443_storage"
+    },
+    "t_string_storage": {
+      "encoding": "bytes",
+      "label": "string",
+      "numberOfBytes": "32"
+    },
+    "t_struct(Bounty)2443_storage": {
+      "encoding": "inplace",
+      "label": "struct StoryBounties.Bounty",
+      "numberOfBytes": "352",
+      "members": [
+        {
+          "astId": 2419,
+          "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+          "label": "id",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2421,
+          "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+          "label": "poster",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_address"
+        },
+        {
+          "astId": 2423,
+          "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+          "label": "universeId",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2425,
+          "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+          "label": "reward",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2427,
+          "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+          "label": "title",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 2429,
+          "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+          "label": "descriptionHash",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 2431,
+          "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+          "label": "contentType",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 2433,
+          "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+          "label": "deadline",
+          "offset": 0,
+          "slot": "7",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2436,
+          "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+          "label": "status",
+          "offset": 0,
+          "slot": "8",
+          "type": "t_enum(BountyStatus)2417"
+        },
+        {
+          "astId": 2438,
+          "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+          "label": "claimedBy",
+          "offset": 1,
+          "slot": "8",
+          "type": "t_address"
+        },
+        {
+          "astId": 2440,
+          "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+          "label": "submissionHash",
+          "offset": 0,
+          "slot": "9",
+          "type": "t_bytes32"
+        },
+        {
+          "astId": 2442,
+          "contract": "src/revenue/StoryBounties.sol:StoryBounties",
+          "label": "createdAt",
+          "offset": 0,
+          "slot": "10",
+          "type": "t_uint256"
+        }
+      ]
+    },
+    "t_uint16": {
+      "encoding": "inplace",
+      "label": "uint16",
+      "numberOfBytes": "2"
+    },
+    "t_uint256": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "numberOfBytes": "32"
+    }
+  }
+}

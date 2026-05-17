@@ -1,0 +1,218 @@
+{
+  "storage": [
+    {
+      "astId": 2498,
+      "contract": "src/revenue/RemixFees.sol:RemixFees",
+      "label": "loarToken",
+      "offset": 0,
+      "slot": "0",
+      "type": "t_contract(IERC20)767"
+    },
+    {
+      "astId": 2500,
+      "contract": "src/revenue/RemixFees.sol:RemixFees",
+      "label": "treasury",
+      "offset": 0,
+      "slot": "1",
+      "type": "t_address"
+    },
+    {
+      "astId": 2502,
+      "contract": "src/revenue/RemixFees.sol:RemixFees",
+      "label": "liquidityPool",
+      "offset": 0,
+      "slot": "2",
+      "type": "t_address"
+    },
+    {
+      "astId": 2504,
+      "contract": "src/revenue/RemixFees.sol:RemixFees",
+      "label": "platform",
+      "offset": 0,
+      "slot": "3",
+      "type": "t_address"
+    },
+    {
+      "astId": 2507,
+      "contract": "src/revenue/RemixFees.sol:RemixFees",
+      "label": "defaultRemixFee",
+      "offset": 0,
+      "slot": "4",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2510,
+      "contract": "src/revenue/RemixFees.sol:RemixFees",
+      "label": "minRemixFee",
+      "offset": 0,
+      "slot": "5",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2513,
+      "contract": "src/revenue/RemixFees.sol:RemixFees",
+      "label": "creatorShareBps",
+      "offset": 0,
+      "slot": "6",
+      "type": "t_uint16"
+    },
+    {
+      "astId": 2515,
+      "contract": "src/revenue/RemixFees.sol:RemixFees",
+      "label": "lpShareBps",
+      "offset": 2,
+      "slot": "6",
+      "type": "t_uint16"
+    },
+    {
+      "astId": 2517,
+      "contract": "src/revenue/RemixFees.sol:RemixFees",
+      "label": "treasuryShareBps",
+      "offset": 4,
+      "slot": "6",
+      "type": "t_uint16"
+    },
+    {
+      "astId": 2520,
+      "contract": "src/revenue/RemixFees.sol:RemixFees",
+      "label": "universeManager",
+      "offset": 6,
+      "slot": "6",
+      "type": "t_address"
+    },
+    {
+      "astId": 2526,
+      "contract": "src/revenue/RemixFees.sol:RemixFees",
+      "label": "universeConfigs",
+      "offset": 0,
+      "slot": "7",
+      "type": "t_mapping(t_uint256,t_struct(RemixConfig)2495_storage)"
+    },
+    {
+      "astId": 2531,
+      "contract": "src/revenue/RemixFees.sol:RemixFees",
+      "label": "universeCreators",
+      "offset": 0,
+      "slot": "8",
+      "type": "t_mapping(t_uint256,t_address)"
+    },
+    {
+      "astId": 2534,
+      "contract": "src/revenue/RemixFees.sol:RemixFees",
+      "label": "totalRemixFees",
+      "offset": 0,
+      "slot": "9",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2536,
+      "contract": "src/revenue/RemixFees.sol:RemixFees",
+      "label": "totalRemixes",
+      "offset": 0,
+      "slot": "10",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2538,
+      "contract": "src/revenue/RemixFees.sol:RemixFees",
+      "label": "totalToCreators",
+      "offset": 0,
+      "slot": "11",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2540,
+      "contract": "src/revenue/RemixFees.sol:RemixFees",
+      "label": "totalToLp",
+      "offset": 0,
+      "slot": "12",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2581,
+      "contract": "src/revenue/RemixFees.sol:RemixFees",
+      "label": "maxRemixFee",
+      "offset": 0,
+      "slot": "13",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 3236,
+      "contract": "src/revenue/RemixFees.sol:RemixFees",
+      "label": "__gap",
+      "offset": 0,
+      "slot": "14",
+      "type": "t_array(t_uint256)49_storage"
+    }
+  ],
+  "types": {
+    "t_address": {
+      "encoding": "inplace",
+      "label": "address",
+      "numberOfBytes": "20"
+    },
+    "t_array(t_uint256)49_storage": {
+      "encoding": "inplace",
+      "label": "uint256[49]",
+      "numberOfBytes": "1568",
+      "base": "t_uint256"
+    },
+    "t_bool": {
+      "encoding": "inplace",
+      "label": "bool",
+      "numberOfBytes": "1"
+    },
+    "t_contract(IERC20)767": {
+      "encoding": "inplace",
+      "label": "contract IERC20",
+      "numberOfBytes": "20"
+    },
+    "t_mapping(t_uint256,t_address)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => address)",
+      "numberOfBytes": "32",
+      "value": "t_address"
+    },
+    "t_mapping(t_uint256,t_struct(RemixConfig)2495_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct RemixFees.RemixConfig)",
+      "numberOfBytes": "32",
+      "value": "t_struct(RemixConfig)2495_storage"
+    },
+    "t_struct(RemixConfig)2495_storage": {
+      "encoding": "inplace",
+      "label": "struct RemixFees.RemixConfig",
+      "numberOfBytes": "64",
+      "members": [
+        {
+          "astId": 2492,
+          "contract": "src/revenue/RemixFees.sol:RemixFees",
+          "label": "fee",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2494,
+          "contract": "src/revenue/RemixFees.sol:RemixFees",
+          "label": "customFee",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_bool"
+        }
+      ]
+    },
+    "t_uint16": {
+      "encoding": "inplace",
+      "label": "uint16",
+      "numberOfBytes": "2"
+    },
+    "t_uint256": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "numberOfBytes": "32"
+    }
+  }
+}

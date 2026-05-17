@@ -1,0 +1,116 @@
+{
+  "storage": [
+    {
+      "astId": 2365,
+      "contract": "src/PaymentRouter.sol:PaymentRouter",
+      "label": "treasury",
+      "offset": 0,
+      "slot": "0",
+      "type": "t_address"
+    },
+    {
+      "astId": 2367,
+      "contract": "src/PaymentRouter.sol:PaymentRouter",
+      "label": "defaultPlatformFeeBps",
+      "offset": 20,
+      "slot": "0",
+      "type": "t_uint16"
+    },
+    {
+      "astId": 2372,
+      "contract": "src/PaymentRouter.sol:PaymentRouter",
+      "label": "claimable",
+      "offset": 0,
+      "slot": "1",
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "astId": 2377,
+      "contract": "src/PaymentRouter.sol:PaymentRouter",
+      "label": "pendingWithdrawals",
+      "offset": 0,
+      "slot": "2",
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "astId": 2393,
+      "contract": "src/PaymentRouter.sol:PaymentRouter",
+      "label": "loarToken",
+      "offset": 0,
+      "slot": "3",
+      "type": "t_contract(IERC20)767"
+    },
+    {
+      "astId": 2398,
+      "contract": "src/PaymentRouter.sol:PaymentRouter",
+      "label": "claimableLoar",
+      "offset": 0,
+      "slot": "4",
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "astId": 2401,
+      "contract": "src/PaymentRouter.sol:PaymentRouter",
+      "label": "loarFeeDiscountBps",
+      "offset": 0,
+      "slot": "5",
+      "type": "t_uint16"
+    },
+    {
+      "astId": 2404,
+      "contract": "src/PaymentRouter.sol:PaymentRouter",
+      "label": "loarTokenLocked",
+      "offset": 2,
+      "slot": "5",
+      "type": "t_bool"
+    },
+    {
+      "astId": 3245,
+      "contract": "src/PaymentRouter.sol:PaymentRouter",
+      "label": "__gap",
+      "offset": 0,
+      "slot": "6",
+      "type": "t_array(t_uint256)44_storage"
+    }
+  ],
+  "types": {
+    "t_address": {
+      "encoding": "inplace",
+      "label": "address",
+      "numberOfBytes": "20"
+    },
+    "t_array(t_uint256)44_storage": {
+      "encoding": "inplace",
+      "label": "uint256[44]",
+      "numberOfBytes": "1408",
+      "base": "t_uint256"
+    },
+    "t_bool": {
+      "encoding": "inplace",
+      "label": "bool",
+      "numberOfBytes": "1"
+    },
+    "t_contract(IERC20)767": {
+      "encoding": "inplace",
+      "label": "contract IERC20",
+      "numberOfBytes": "20"
+    },
+    "t_mapping(t_address,t_uint256)": {
+      "encoding": "mapping",
+      "key": "t_address",
+      "label": "mapping(address => uint256)",
+      "numberOfBytes": "32",
+      "value": "t_uint256"
+    },
+    "t_uint16": {
+      "encoding": "inplace",
+      "label": "uint16",
+      "numberOfBytes": "2"
+    },
+    "t_uint256": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "numberOfBytes": "32"
+    }
+  }
+}

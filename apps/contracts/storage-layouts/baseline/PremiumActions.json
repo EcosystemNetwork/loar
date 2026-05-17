@@ -1,0 +1,180 @@
+{
+  "storage": [
+    {
+      "astId": 2378,
+      "contract": "src/revenue/PremiumActions.sol:PremiumActions",
+      "label": "loarToken",
+      "offset": 0,
+      "slot": "0",
+      "type": "t_contract(IERC20)767"
+    },
+    {
+      "astId": 2380,
+      "contract": "src/revenue/PremiumActions.sol:PremiumActions",
+      "label": "treasury",
+      "offset": 0,
+      "slot": "1",
+      "type": "t_address"
+    },
+    {
+      "astId": 2382,
+      "contract": "src/revenue/PremiumActions.sol:PremiumActions",
+      "label": "liquidityPool",
+      "offset": 0,
+      "slot": "2",
+      "type": "t_address"
+    },
+    {
+      "astId": 2385,
+      "contract": "src/revenue/PremiumActions.sol:PremiumActions",
+      "label": "lpRatioBps",
+      "offset": 20,
+      "slot": "2",
+      "type": "t_uint16"
+    },
+    {
+      "astId": 2392,
+      "contract": "src/revenue/PremiumActions.sol:PremiumActions",
+      "label": "actions",
+      "offset": 0,
+      "slot": "3",
+      "type": "t_mapping(t_enum(BurnAction)2366,t_struct(ActionConfig)2375_storage)"
+    },
+    {
+      "astId": 2398,
+      "contract": "src/revenue/PremiumActions.sol:PremiumActions",
+      "label": "customActions",
+      "offset": 0,
+      "slot": "4",
+      "type": "t_mapping(t_bytes32,t_struct(ActionConfig)2375_storage)"
+    },
+    {
+      "astId": 2401,
+      "contract": "src/revenue/PremiumActions.sol:PremiumActions",
+      "label": "totalCollected",
+      "offset": 0,
+      "slot": "5",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2404,
+      "contract": "src/revenue/PremiumActions.sol:PremiumActions",
+      "label": "totalToLp",
+      "offset": 0,
+      "slot": "6",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2407,
+      "contract": "src/revenue/PremiumActions.sol:PremiumActions",
+      "label": "platform",
+      "offset": 0,
+      "slot": "7",
+      "type": "t_address"
+    },
+    {
+      "astId": 3067,
+      "contract": "src/revenue/PremiumActions.sol:PremiumActions",
+      "label": "__gap",
+      "offset": 0,
+      "slot": "8",
+      "type": "t_array(t_uint256)50_storage"
+    }
+  ],
+  "types": {
+    "t_address": {
+      "encoding": "inplace",
+      "label": "address",
+      "numberOfBytes": "20"
+    },
+    "t_array(t_uint256)50_storage": {
+      "encoding": "inplace",
+      "label": "uint256[50]",
+      "numberOfBytes": "1600",
+      "base": "t_uint256"
+    },
+    "t_bool": {
+      "encoding": "inplace",
+      "label": "bool",
+      "numberOfBytes": "1"
+    },
+    "t_bytes32": {
+      "encoding": "inplace",
+      "label": "bytes32",
+      "numberOfBytes": "32"
+    },
+    "t_contract(IERC20)767": {
+      "encoding": "inplace",
+      "label": "contract IERC20",
+      "numberOfBytes": "20"
+    },
+    "t_enum(BurnAction)2366": {
+      "encoding": "inplace",
+      "label": "enum PremiumActions.BurnAction",
+      "numberOfBytes": "1"
+    },
+    "t_mapping(t_bytes32,t_struct(ActionConfig)2375_storage)": {
+      "encoding": "mapping",
+      "key": "t_bytes32",
+      "label": "mapping(bytes32 => struct PremiumActions.ActionConfig)",
+      "numberOfBytes": "32",
+      "value": "t_struct(ActionConfig)2375_storage"
+    },
+    "t_mapping(t_enum(BurnAction)2366,t_struct(ActionConfig)2375_storage)": {
+      "encoding": "mapping",
+      "key": "t_enum(BurnAction)2366",
+      "label": "mapping(enum PremiumActions.BurnAction => struct PremiumActions.ActionConfig)",
+      "numberOfBytes": "32",
+      "value": "t_struct(ActionConfig)2375_storage"
+    },
+    "t_struct(ActionConfig)2375_storage": {
+      "encoding": "inplace",
+      "label": "struct PremiumActions.ActionConfig",
+      "numberOfBytes": "128",
+      "members": [
+        {
+          "astId": 2368,
+          "contract": "src/revenue/PremiumActions.sol:PremiumActions",
+          "label": "cost",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2370,
+          "contract": "src/revenue/PremiumActions.sol:PremiumActions",
+          "label": "active",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_bool"
+        },
+        {
+          "astId": 2372,
+          "contract": "src/revenue/PremiumActions.sol:PremiumActions",
+          "label": "totalBurned",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2374,
+          "contract": "src/revenue/PremiumActions.sol:PremiumActions",
+          "label": "totalCount",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_uint256"
+        }
+      ]
+    },
+    "t_uint16": {
+      "encoding": "inplace",
+      "label": "uint16",
+      "numberOfBytes": "2"
+    },
+    "t_uint256": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "numberOfBytes": "32"
+    }
+  }
+}

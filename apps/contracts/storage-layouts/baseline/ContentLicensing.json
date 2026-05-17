@@ -1,0 +1,379 @@
+{
+  "storage": [
+    {
+      "astId": 1909,
+      "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+      "label": "splitRouter",
+      "offset": 0,
+      "slot": "0",
+      "type": "t_contract(ISplitRouter)1829"
+    },
+    {
+      "astId": 1912,
+      "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+      "label": "paymentRouter",
+      "offset": 0,
+      "slot": "1",
+      "type": "t_contract(IPaymentRouter)1718"
+    },
+    {
+      "astId": 1915,
+      "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+      "label": "rightsRegistry",
+      "offset": 0,
+      "slot": "2",
+      "type": "t_contract(IRightsRegistry)1775"
+    },
+    {
+      "astId": 1917,
+      "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+      "label": "platform",
+      "offset": 0,
+      "slot": "3",
+      "type": "t_address"
+    },
+    {
+      "astId": 1919,
+      "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+      "label": "platformFeeBps",
+      "offset": 20,
+      "slot": "3",
+      "type": "t_uint16"
+    },
+    {
+      "astId": 1924,
+      "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+      "label": "registrations",
+      "offset": 0,
+      "slot": "4",
+      "type": "t_mapping(t_bytes32,t_struct(ContentRegistration)1885_storage)"
+    },
+    {
+      "astId": 1929,
+      "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+      "label": "deals",
+      "offset": 0,
+      "slot": "5",
+      "type": "t_mapping(t_uint256,t_struct(Deal)1906_storage)"
+    },
+    {
+      "astId": 1931,
+      "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+      "label": "nextDealId",
+      "offset": 0,
+      "slot": "6",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 1936,
+      "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+      "label": "_contentDeals",
+      "offset": 0,
+      "slot": "7",
+      "type": "t_mapping(t_bytes32,t_array(t_uint256)dyn_storage)"
+    },
+    {
+      "astId": 1946,
+      "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+      "label": "_buyerLatestDeal",
+      "offset": 0,
+      "slot": "8",
+      "type": "t_mapping(t_bytes32,t_mapping(t_address,t_uint256))"
+    },
+    {
+      "astId": 1950,
+      "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+      "label": "contentOwner",
+      "offset": 0,
+      "slot": "9",
+      "type": "t_mapping(t_bytes32,t_address)"
+    },
+    {
+      "astId": 1954,
+      "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+      "label": "splitToContent",
+      "offset": 0,
+      "slot": "10",
+      "type": "t_mapping(t_bytes32,t_bytes32)"
+    },
+    {
+      "astId": 3470,
+      "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+      "label": "__gap",
+      "offset": 0,
+      "slot": "11",
+      "type": "t_array(t_uint256)38_storage"
+    }
+  ],
+  "types": {
+    "t_address": {
+      "encoding": "inplace",
+      "label": "address",
+      "numberOfBytes": "20"
+    },
+    "t_array(t_uint256)38_storage": {
+      "encoding": "inplace",
+      "label": "uint256[38]",
+      "numberOfBytes": "1216",
+      "base": "t_uint256"
+    },
+    "t_array(t_uint256)dyn_storage": {
+      "encoding": "dynamic_array",
+      "label": "uint256[]",
+      "numberOfBytes": "32",
+      "base": "t_uint256"
+    },
+    "t_bool": {
+      "encoding": "inplace",
+      "label": "bool",
+      "numberOfBytes": "1"
+    },
+    "t_bytes32": {
+      "encoding": "inplace",
+      "label": "bytes32",
+      "numberOfBytes": "32"
+    },
+    "t_contract(IPaymentRouter)1718": {
+      "encoding": "inplace",
+      "label": "contract IPaymentRouter",
+      "numberOfBytes": "20"
+    },
+    "t_contract(IRightsRegistry)1775": {
+      "encoding": "inplace",
+      "label": "contract IRightsRegistry",
+      "numberOfBytes": "20"
+    },
+    "t_contract(ISplitRouter)1829": {
+      "encoding": "inplace",
+      "label": "contract ISplitRouter",
+      "numberOfBytes": "20"
+    },
+    "t_enum(DealStatus)1866": {
+      "encoding": "inplace",
+      "label": "enum ContentLicensing.DealStatus",
+      "numberOfBytes": "1"
+    },
+    "t_enum(DealType)1862": {
+      "encoding": "inplace",
+      "label": "enum ContentLicensing.DealType",
+      "numberOfBytes": "1"
+    },
+    "t_mapping(t_address,t_uint256)": {
+      "encoding": "mapping",
+      "key": "t_address",
+      "label": "mapping(address => uint256)",
+      "numberOfBytes": "32",
+      "value": "t_uint256"
+    },
+    "t_mapping(t_bytes32,t_address)": {
+      "encoding": "mapping",
+      "key": "t_bytes32",
+      "label": "mapping(bytes32 => address)",
+      "numberOfBytes": "32",
+      "value": "t_address"
+    },
+    "t_mapping(t_bytes32,t_array(t_uint256)dyn_storage)": {
+      "encoding": "mapping",
+      "key": "t_bytes32",
+      "label": "mapping(bytes32 => uint256[])",
+      "numberOfBytes": "32",
+      "value": "t_array(t_uint256)dyn_storage"
+    },
+    "t_mapping(t_bytes32,t_bytes32)": {
+      "encoding": "mapping",
+      "key": "t_bytes32",
+      "label": "mapping(bytes32 => bytes32)",
+      "numberOfBytes": "32",
+      "value": "t_bytes32"
+    },
+    "t_mapping(t_bytes32,t_mapping(t_address,t_uint256))": {
+      "encoding": "mapping",
+      "key": "t_bytes32",
+      "label": "mapping(bytes32 => mapping(address => uint256))",
+      "numberOfBytes": "32",
+      "value": "t_mapping(t_address,t_uint256)"
+    },
+    "t_mapping(t_bytes32,t_struct(ContentRegistration)1885_storage)": {
+      "encoding": "mapping",
+      "key": "t_bytes32",
+      "label": "mapping(bytes32 => struct ContentLicensing.ContentRegistration)",
+      "numberOfBytes": "32",
+      "value": "t_struct(ContentRegistration)1885_storage"
+    },
+    "t_mapping(t_uint256,t_struct(Deal)1906_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct ContentLicensing.Deal)",
+      "numberOfBytes": "32",
+      "value": "t_struct(Deal)1906_storage"
+    },
+    "t_struct(ContentRegistration)1885_storage": {
+      "encoding": "inplace",
+      "label": "struct ContentLicensing.ContentRegistration",
+      "numberOfBytes": "256",
+      "members": [
+        {
+          "astId": 1868,
+          "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+          "label": "contentHash",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_bytes32"
+        },
+        {
+          "astId": 1870,
+          "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+          "label": "creator",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_address"
+        },
+        {
+          "astId": 1872,
+          "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+          "label": "universeId",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1874,
+          "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+          "label": "splitEntityHash",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_bytes32"
+        },
+        {
+          "astId": 1876,
+          "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+          "label": "buyPrice",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1878,
+          "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+          "label": "rentPricePerDay",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1880,
+          "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+          "label": "licenseFee",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1882,
+          "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+          "label": "licenseRoyaltyBps",
+          "offset": 0,
+          "slot": "7",
+          "type": "t_uint16"
+        },
+        {
+          "astId": 1884,
+          "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+          "label": "active",
+          "offset": 2,
+          "slot": "7",
+          "type": "t_bool"
+        }
+      ]
+    },
+    "t_struct(Deal)1906_storage": {
+      "encoding": "inplace",
+      "label": "struct ContentLicensing.Deal",
+      "numberOfBytes": "224",
+      "members": [
+        {
+          "astId": 1887,
+          "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+          "label": "id",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1889,
+          "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+          "label": "contentHash",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_bytes32"
+        },
+        {
+          "astId": 1891,
+          "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+          "label": "splitEntityHash",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_bytes32"
+        },
+        {
+          "astId": 1894,
+          "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+          "label": "dealType",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_enum(DealType)1862"
+        },
+        {
+          "astId": 1897,
+          "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+          "label": "status",
+          "offset": 1,
+          "slot": "3",
+          "type": "t_enum(DealStatus)1866"
+        },
+        {
+          "astId": 1899,
+          "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+          "label": "buyer",
+          "offset": 2,
+          "slot": "3",
+          "type": "t_address"
+        },
+        {
+          "astId": 1901,
+          "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+          "label": "pricePaid",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1903,
+          "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+          "label": "startTime",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1905,
+          "contract": "src/revenue/ContentLicensing.sol:ContentLicensing",
+          "label": "endTime",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_uint256"
+        }
+      ]
+    },
+    "t_uint16": {
+      "encoding": "inplace",
+      "label": "uint16",
+      "numberOfBytes": "2"
+    },
+    "t_uint256": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "numberOfBytes": "32"
+    }
+  }
+}

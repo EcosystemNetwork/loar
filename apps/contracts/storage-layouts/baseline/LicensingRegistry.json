@@ -1,0 +1,356 @@
+{
+  "storage": [
+    {
+      "astId": 1933,
+      "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+      "label": "nextLicenseId",
+      "offset": 0,
+      "slot": "0",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 1935,
+      "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+      "label": "nextMerchId",
+      "offset": 0,
+      "slot": "1",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 1940,
+      "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+      "label": "licenses",
+      "offset": 0,
+      "slot": "2",
+      "type": "t_mapping(t_uint256,t_struct(License)1914_storage)"
+    },
+    {
+      "astId": 1945,
+      "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+      "label": "merchItems",
+      "offset": 0,
+      "slot": "3",
+      "type": "t_mapping(t_uint256,t_struct(MerchItem)1931_storage)"
+    },
+    {
+      "astId": 1950,
+      "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+      "label": "universeLicenses",
+      "offset": 0,
+      "slot": "4",
+      "type": "t_mapping(t_uint256,t_array(t_uint256)dyn_storage)"
+    },
+    {
+      "astId": 1955,
+      "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+      "label": "universeMerch",
+      "offset": 0,
+      "slot": "5",
+      "type": "t_mapping(t_uint256,t_array(t_uint256)dyn_storage)"
+    },
+    {
+      "astId": 1959,
+      "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+      "label": "universeCreators",
+      "offset": 0,
+      "slot": "6",
+      "type": "t_mapping(t_uint256,t_address)"
+    },
+    {
+      "astId": 1962,
+      "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+      "label": "universeManager",
+      "offset": 0,
+      "slot": "7",
+      "type": "t_address"
+    },
+    {
+      "astId": 1964,
+      "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+      "label": "platform",
+      "offset": 0,
+      "slot": "8",
+      "type": "t_address"
+    },
+    {
+      "astId": 1967,
+      "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+      "label": "paymentRouter",
+      "offset": 0,
+      "slot": "9",
+      "type": "t_contract(IPaymentRouter)1847"
+    },
+    {
+      "astId": 1969,
+      "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+      "label": "platformFeeBps",
+      "offset": 20,
+      "slot": "9",
+      "type": "t_uint16"
+    },
+    {
+      "astId": 2971,
+      "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+      "label": "__gap",
+      "offset": 0,
+      "slot": "10",
+      "type": "t_array(t_uint256)50_storage"
+    }
+  ],
+  "types": {
+    "t_address": {
+      "encoding": "inplace",
+      "label": "address",
+      "numberOfBytes": "20"
+    },
+    "t_array(t_uint256)50_storage": {
+      "encoding": "inplace",
+      "label": "uint256[50]",
+      "numberOfBytes": "1600",
+      "base": "t_uint256"
+    },
+    "t_array(t_uint256)dyn_storage": {
+      "encoding": "dynamic_array",
+      "label": "uint256[]",
+      "numberOfBytes": "32",
+      "base": "t_uint256"
+    },
+    "t_bool": {
+      "encoding": "inplace",
+      "label": "bool",
+      "numberOfBytes": "1"
+    },
+    "t_contract(IPaymentRouter)1847": {
+      "encoding": "inplace",
+      "label": "contract IPaymentRouter",
+      "numberOfBytes": "20"
+    },
+    "t_enum(LicenseStatus)1886": {
+      "encoding": "inplace",
+      "label": "enum LicensingRegistry.LicenseStatus",
+      "numberOfBytes": "1"
+    },
+    "t_enum(LicenseType)1881": {
+      "encoding": "inplace",
+      "label": "enum LicensingRegistry.LicenseType",
+      "numberOfBytes": "1"
+    },
+    "t_mapping(t_uint256,t_address)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => address)",
+      "numberOfBytes": "32",
+      "value": "t_address"
+    },
+    "t_mapping(t_uint256,t_array(t_uint256)dyn_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => uint256[])",
+      "numberOfBytes": "32",
+      "value": "t_array(t_uint256)dyn_storage"
+    },
+    "t_mapping(t_uint256,t_struct(License)1914_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct LicensingRegistry.License)",
+      "numberOfBytes": "32",
+      "value": "t_struct(License)1914_storage"
+    },
+    "t_mapping(t_uint256,t_struct(MerchItem)1931_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct LicensingRegistry.MerchItem)",
+      "numberOfBytes": "32",
+      "value": "t_struct(MerchItem)1931_storage"
+    },
+    "t_string_storage": {
+      "encoding": "bytes",
+      "label": "string",
+      "numberOfBytes": "32"
+    },
+    "t_struct(License)1914_storage": {
+      "encoding": "inplace",
+      "label": "struct LicensingRegistry.License",
+      "numberOfBytes": "320",
+      "members": [
+        {
+          "astId": 1888,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "id",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1890,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "universeId",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1893,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "licenseType",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_enum(LicenseType)1881"
+        },
+        {
+          "astId": 1896,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "status",
+          "offset": 1,
+          "slot": "2",
+          "type": "t_enum(LicenseStatus)1886"
+        },
+        {
+          "astId": 1898,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "licensor",
+          "offset": 2,
+          "slot": "2",
+          "type": "t_address"
+        },
+        {
+          "astId": 1900,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "licensee",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_address"
+        },
+        {
+          "astId": 1902,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "upfrontFee",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1905,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "royaltyBps",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_uint16"
+        },
+        {
+          "astId": 1907,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "totalRoyalties",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1909,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "startTime",
+          "offset": 0,
+          "slot": "7",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1911,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "endTime",
+          "offset": 0,
+          "slot": "8",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1913,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "terms",
+          "offset": 0,
+          "slot": "9",
+          "type": "t_string_storage"
+        }
+      ]
+    },
+    "t_struct(MerchItem)1931_storage": {
+      "encoding": "inplace",
+      "label": "struct LicensingRegistry.MerchItem",
+      "numberOfBytes": "224",
+      "members": [
+        {
+          "astId": 1916,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "id",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1918,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "universeId",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1920,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "name",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 1922,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "metadataURI",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 1924,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "price",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1926,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "sold",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 1928,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "creator",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_address"
+        },
+        {
+          "astId": 1930,
+          "contract": "src/revenue/LicensingRegistry.sol:LicensingRegistry",
+          "label": "active",
+          "offset": 20,
+          "slot": "6",
+          "type": "t_bool"
+        }
+      ]
+    },
+    "t_uint16": {
+      "encoding": "inplace",
+      "label": "uint16",
+      "numberOfBytes": "2"
+    },
+    "t_uint256": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "numberOfBytes": "32"
+    }
+  }
+}

@@ -1,0 +1,234 @@
+{
+  "storage": [
+    {
+      "astId": 6152,
+      "contract": "src/revenue/CollabManager.sol:CollabManager",
+      "label": "nextCollabId",
+      "offset": 0,
+      "slot": "0",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 6157,
+      "contract": "src/revenue/CollabManager.sol:CollabManager",
+      "label": "collabs",
+      "offset": 0,
+      "slot": "1",
+      "type": "t_mapping(t_uint256,t_struct(Collab)6150_storage)"
+    },
+    {
+      "astId": 6162,
+      "contract": "src/revenue/CollabManager.sol:CollabManager",
+      "label": "universeCollabs",
+      "offset": 0,
+      "slot": "2",
+      "type": "t_mapping(t_uint256,t_array(t_uint256)dyn_storage)"
+    },
+    {
+      "astId": 6164,
+      "contract": "src/revenue/CollabManager.sol:CollabManager",
+      "label": "platform",
+      "offset": 0,
+      "slot": "3",
+      "type": "t_address"
+    },
+    {
+      "astId": 6167,
+      "contract": "src/revenue/CollabManager.sol:CollabManager",
+      "label": "paymentRouter",
+      "offset": 0,
+      "slot": "4",
+      "type": "t_contract(IPaymentRouter)5543"
+    },
+    {
+      "astId": 6170,
+      "contract": "src/revenue/CollabManager.sol:CollabManager",
+      "label": "universeManager",
+      "offset": 0,
+      "slot": "5",
+      "type": "t_contract(IUniverseManager)6078"
+    },
+    {
+      "astId": 6172,
+      "contract": "src/revenue/CollabManager.sol:CollabManager",
+      "label": "platformFeeBps",
+      "offset": 20,
+      "slot": "5",
+      "type": "t_uint16"
+    },
+    {
+      "astId": 6967,
+      "contract": "src/revenue/CollabManager.sol:CollabManager",
+      "label": "__gap",
+      "offset": 0,
+      "slot": "6",
+      "type": "t_array(t_uint256)50_storage"
+    }
+  ],
+  "types": {
+    "t_address": {
+      "encoding": "inplace",
+      "label": "address",
+      "numberOfBytes": "20"
+    },
+    "t_array(t_uint256)50_storage": {
+      "encoding": "inplace",
+      "label": "uint256[50]",
+      "numberOfBytes": "1600",
+      "base": "t_uint256"
+    },
+    "t_array(t_uint256)dyn_storage": {
+      "encoding": "dynamic_array",
+      "label": "uint256[]",
+      "numberOfBytes": "32",
+      "base": "t_uint256"
+    },
+    "t_contract(IPaymentRouter)5543": {
+      "encoding": "inplace",
+      "label": "contract IPaymentRouter",
+      "numberOfBytes": "20"
+    },
+    "t_contract(IUniverseManager)6078": {
+      "encoding": "inplace",
+      "label": "contract IUniverseManager",
+      "numberOfBytes": "20"
+    },
+    "t_enum(CollabStatus)6124": {
+      "encoding": "inplace",
+      "label": "enum CollabManager.CollabStatus",
+      "numberOfBytes": "1"
+    },
+    "t_mapping(t_uint256,t_array(t_uint256)dyn_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => uint256[])",
+      "numberOfBytes": "32",
+      "value": "t_array(t_uint256)dyn_storage"
+    },
+    "t_mapping(t_uint256,t_struct(Collab)6150_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct CollabManager.Collab)",
+      "numberOfBytes": "32",
+      "value": "t_struct(Collab)6150_storage"
+    },
+    "t_string_storage": {
+      "encoding": "bytes",
+      "label": "string",
+      "numberOfBytes": "32"
+    },
+    "t_struct(Collab)6150_storage": {
+      "encoding": "inplace",
+      "label": "struct CollabManager.Collab",
+      "numberOfBytes": "352",
+      "members": [
+        {
+          "astId": 6126,
+          "contract": "src/revenue/CollabManager.sol:CollabManager",
+          "label": "id",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 6128,
+          "contract": "src/revenue/CollabManager.sol:CollabManager",
+          "label": "universeA",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 6130,
+          "contract": "src/revenue/CollabManager.sol:CollabManager",
+          "label": "universeB",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 6132,
+          "contract": "src/revenue/CollabManager.sol:CollabManager",
+          "label": "proposer",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_address"
+        },
+        {
+          "astId": 6134,
+          "contract": "src/revenue/CollabManager.sol:CollabManager",
+          "label": "acceptor",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_address"
+        },
+        {
+          "astId": 6137,
+          "contract": "src/revenue/CollabManager.sol:CollabManager",
+          "label": "status",
+          "offset": 20,
+          "slot": "4",
+          "type": "t_enum(CollabStatus)6124"
+        },
+        {
+          "astId": 6139,
+          "contract": "src/revenue/CollabManager.sol:CollabManager",
+          "label": "revenueShareBps",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 6141,
+          "contract": "src/revenue/CollabManager.sol:CollabManager",
+          "label": "totalRevenue",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 6143,
+          "contract": "src/revenue/CollabManager.sol:CollabManager",
+          "label": "startTime",
+          "offset": 0,
+          "slot": "7",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 6145,
+          "contract": "src/revenue/CollabManager.sol:CollabManager",
+          "label": "endTime",
+          "offset": 0,
+          "slot": "8",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 6147,
+          "contract": "src/revenue/CollabManager.sol:CollabManager",
+          "label": "metadataURI",
+          "offset": 0,
+          "slot": "9",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 6149,
+          "contract": "src/revenue/CollabManager.sol:CollabManager",
+          "label": "episodeCount",
+          "offset": 0,
+          "slot": "10",
+          "type": "t_uint256"
+        }
+      ]
+    },
+    "t_uint16": {
+      "encoding": "inplace",
+      "label": "uint16",
+      "numberOfBytes": "2"
+    },
+    "t_uint256": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "numberOfBytes": "32"
+    }
+  }
+}

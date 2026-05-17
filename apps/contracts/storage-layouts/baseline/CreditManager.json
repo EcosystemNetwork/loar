@@ -1,0 +1,309 @@
+{
+  "storage": [
+    {
+      "astId": 2439,
+      "contract": "src/revenue/CreditManager.sol:CreditManager",
+      "label": "loarToken",
+      "offset": 0,
+      "slot": "0",
+      "type": "t_contract(IERC20)767"
+    },
+    {
+      "astId": 2441,
+      "contract": "src/revenue/CreditManager.sol:CreditManager",
+      "label": "platform",
+      "offset": 0,
+      "slot": "1",
+      "type": "t_address"
+    },
+    {
+      "astId": 2443,
+      "contract": "src/revenue/CreditManager.sol:CreditManager",
+      "label": "treasury",
+      "offset": 0,
+      "slot": "2",
+      "type": "t_address"
+    },
+    {
+      "astId": 2446,
+      "contract": "src/revenue/CreditManager.sol:CreditManager",
+      "label": "paymentRouter",
+      "offset": 0,
+      "slot": "3",
+      "type": "t_contract(IPaymentRouter)2379"
+    },
+    {
+      "astId": 2448,
+      "contract": "src/revenue/CreditManager.sol:CreditManager",
+      "label": "nextPackageId",
+      "offset": 0,
+      "slot": "4",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2453,
+      "contract": "src/revenue/CreditManager.sol:CreditManager",
+      "label": "packages",
+      "offset": 0,
+      "slot": "5",
+      "type": "t_mapping(t_uint256,t_struct(CreditPackage)2427_storage)"
+    },
+    {
+      "astId": 2458,
+      "contract": "src/revenue/CreditManager.sol:CreditManager",
+      "label": "userCredits",
+      "offset": 0,
+      "slot": "6",
+      "type": "t_mapping(t_address,t_struct(UserCredits)2436_storage)"
+    },
+    {
+      "astId": 2462,
+      "contract": "src/revenue/CreditManager.sol:CreditManager",
+      "label": "holderDiscountBps",
+      "offset": 0,
+      "slot": "7",
+      "type": "t_mapping(t_address,t_uint16)"
+    },
+    {
+      "astId": 2466,
+      "contract": "src/revenue/CreditManager.sol:CreditManager",
+      "label": "generationCosts",
+      "offset": 0,
+      "slot": "8",
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "astId": 2468,
+      "contract": "src/revenue/CreditManager.sol:CreditManager",
+      "label": "dailyGrantLimit",
+      "offset": 0,
+      "slot": "9",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2470,
+      "contract": "src/revenue/CreditManager.sol:CreditManager",
+      "label": "grantedToday",
+      "offset": 0,
+      "slot": "10",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2472,
+      "contract": "src/revenue/CreditManager.sol:CreditManager",
+      "label": "currentGrantDay",
+      "offset": 0,
+      "slot": "11",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2474,
+      "contract": "src/revenue/CreditManager.sol:CreditManager",
+      "label": "maxGrantPerUser",
+      "offset": 0,
+      "slot": "12",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2479,
+      "contract": "src/revenue/CreditManager.sol:CreditManager",
+      "label": "grantedPerUser",
+      "offset": 0,
+      "slot": "13",
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "astId": 3620,
+      "contract": "src/revenue/CreditManager.sol:CreditManager",
+      "label": "__gap",
+      "offset": 0,
+      "slot": "14",
+      "type": "t_array(t_uint256)48_storage"
+    }
+  ],
+  "types": {
+    "t_address": {
+      "encoding": "inplace",
+      "label": "address",
+      "numberOfBytes": "20"
+    },
+    "t_array(t_uint256)48_storage": {
+      "encoding": "inplace",
+      "label": "uint256[48]",
+      "numberOfBytes": "1536",
+      "base": "t_uint256"
+    },
+    "t_bool": {
+      "encoding": "inplace",
+      "label": "bool",
+      "numberOfBytes": "1"
+    },
+    "t_bytes32": {
+      "encoding": "inplace",
+      "label": "bytes32",
+      "numberOfBytes": "32"
+    },
+    "t_contract(IERC20)767": {
+      "encoding": "inplace",
+      "label": "contract IERC20",
+      "numberOfBytes": "20"
+    },
+    "t_contract(IPaymentRouter)2379": {
+      "encoding": "inplace",
+      "label": "contract IPaymentRouter",
+      "numberOfBytes": "20"
+    },
+    "t_mapping(t_address,t_struct(UserCredits)2436_storage)": {
+      "encoding": "mapping",
+      "key": "t_address",
+      "label": "mapping(address => struct CreditManager.UserCredits)",
+      "numberOfBytes": "32",
+      "value": "t_struct(UserCredits)2436_storage"
+    },
+    "t_mapping(t_address,t_uint16)": {
+      "encoding": "mapping",
+      "key": "t_address",
+      "label": "mapping(address => uint16)",
+      "numberOfBytes": "32",
+      "value": "t_uint16"
+    },
+    "t_mapping(t_address,t_uint256)": {
+      "encoding": "mapping",
+      "key": "t_address",
+      "label": "mapping(address => uint256)",
+      "numberOfBytes": "32",
+      "value": "t_uint256"
+    },
+    "t_mapping(t_bytes32,t_uint256)": {
+      "encoding": "mapping",
+      "key": "t_bytes32",
+      "label": "mapping(bytes32 => uint256)",
+      "numberOfBytes": "32",
+      "value": "t_uint256"
+    },
+    "t_mapping(t_uint256,t_struct(CreditPackage)2427_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct CreditManager.CreditPackage)",
+      "numberOfBytes": "32",
+      "value": "t_struct(CreditPackage)2427_storage"
+    },
+    "t_string_storage": {
+      "encoding": "bytes",
+      "label": "string",
+      "numberOfBytes": "32"
+    },
+    "t_struct(CreditPackage)2427_storage": {
+      "encoding": "inplace",
+      "label": "struct CreditManager.CreditPackage",
+      "numberOfBytes": "224",
+      "members": [
+        {
+          "astId": 2414,
+          "contract": "src/revenue/CreditManager.sol:CreditManager",
+          "label": "id",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2416,
+          "contract": "src/revenue/CreditManager.sol:CreditManager",
+          "label": "name",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 2418,
+          "contract": "src/revenue/CreditManager.sol:CreditManager",
+          "label": "credits",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2420,
+          "contract": "src/revenue/CreditManager.sol:CreditManager",
+          "label": "priceWei",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2422,
+          "contract": "src/revenue/CreditManager.sol:CreditManager",
+          "label": "priceLoar",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2424,
+          "contract": "src/revenue/CreditManager.sol:CreditManager",
+          "label": "bonusCredits",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2426,
+          "contract": "src/revenue/CreditManager.sol:CreditManager",
+          "label": "active",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_bool"
+        }
+      ]
+    },
+    "t_struct(UserCredits)2436_storage": {
+      "encoding": "inplace",
+      "label": "struct CreditManager.UserCredits",
+      "numberOfBytes": "128",
+      "members": [
+        {
+          "astId": 2429,
+          "contract": "src/revenue/CreditManager.sol:CreditManager",
+          "label": "balance",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2431,
+          "contract": "src/revenue/CreditManager.sol:CreditManager",
+          "label": "totalPurchased",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2433,
+          "contract": "src/revenue/CreditManager.sol:CreditManager",
+          "label": "totalSpent",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2435,
+          "contract": "src/revenue/CreditManager.sol:CreditManager",
+          "label": "totalBonusReceived",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_uint256"
+        }
+      ]
+    },
+    "t_uint16": {
+      "encoding": "inplace",
+      "label": "uint16",
+      "numberOfBytes": "2"
+    },
+    "t_uint256": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "numberOfBytes": "32"
+    }
+  }
+}
