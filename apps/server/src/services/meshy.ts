@@ -118,6 +118,64 @@ export interface MeshyTextureTask extends MeshyTask {
   textureUrls?: string[];
 }
 
+// ── Rigging & Animation (Meshy auto-rig + animation library) ──────────
+
+export interface RigOptions {
+  /** Public URL or Data URI for a textured humanoid GLB. */
+  modelUrl?: string;
+  /** Alternative to modelUrl — reuse a previous Meshy image-to-3D task. */
+  inputTaskId?: string;
+  /** Approximate character height in metres (Meshy default 1.7). */
+  heightMeters?: number;
+  /** BYOK override. */
+  apiKey?: string;
+}
+
+export interface MeshyRiggingTask {
+  id: string;
+  status: MeshyTaskStatus;
+  progress: number;
+  task_error?: { message: string };
+  taskError?: { message: string };
+  /** Rigged result URLs (snake_case from API). */
+  rigged_model_urls?: { glb?: string; fbx?: string };
+  riggedModelUrls?: { glb?: string; fbx?: string };
+  /** Walk/run animations Meshy bakes into the rig output. */
+  basic_animations?: Record<string, { glb?: string; fbx?: string }>;
+  basicAnimations?: Record<string, { glb?: string; fbx?: string }>;
+  thumbnail_url?: string;
+  thumbnailUrl?: string;
+}
+
+export interface AnimateOptions {
+  /** Task ID from a completed rigging task. */
+  rigTaskId: string;
+  /** Preset ID from the Meshy animation library (e.g. 0=Idle, 14=Run). */
+  actionId: number;
+  /** Frame-rate override for the post-processed clip. */
+  fps?: number;
+  /** BYOK override. */
+  apiKey?: string;
+}
+
+export interface MeshyAnimationTask {
+  id: string;
+  status: MeshyTaskStatus;
+  progress: number;
+  task_error?: { message: string };
+  taskError?: { message: string };
+  /** GLB with the chosen animation baked in (snake_case from API). */
+  animation_glb_url?: string;
+  animationGlbUrl?: string;
+  animation_fbx_url?: string;
+  animationFbxUrl?: string;
+  processed_usdz_url?: string;
+  processedUsdzUrl?: string;
+  thumbnail_url?: string;
+  thumbnailUrl?: string;
+  consumed_credits?: number;
+}
+
 // ── Service ───────────────────────────────────────────────────────────
 
 class MeshyService {
@@ -365,6 +423,127 @@ class MeshyService {
       await new Promise((r) => setTimeout(r, pollIntervalMs));
     }
     throw new Error(`Meshy task ${taskId} timed out after ${maxWaitMs / 1000}s`);
+  }
+
+  // ── Rigging ───────────────────────────────────────────────────────────
+
+  /**
+   * Auto-rig a textured humanoid GLB so it can accept library animations.
+   * One of `modelUrl` or `inputTaskId` is required. Returns a task ID that
+   * must be polled until SUCCEEDED — typical wall-clock is 1-3 min.
+   *
+   * Meshy ships walk/run animations baked into the rigging output, available
+   * under `basic_animations`. Apply richer animations separately via
+   * `applyAnimation` using the rig task ID.
+   */
+  async rigModel(options: RigOptions): Promise<{ taskId: string }> {
+    if (!options.modelUrl && !options.inputTaskId) {
+      throw new Error('rigModel requires modelUrl or inputTaskId');
+    }
+    const apiKey = this.resolveKey(options.apiKey);
+    const body: Record<string, unknown> = {};
+    if (options.inputTaskId) body.input_task_id = options.inputTaskId;
+    else if (options.modelUrl) body.model_url = options.modelUrl;
+    if (options.heightMeters) body.height_meters = options.heightMeters;
+    const data = await this.post<{ result: string }>('/rigging', body, apiKey, IMAGE_TO_3D_BASE);
+    return { taskId: data.result };
+  }
+
+  async getRiggingTask(taskId: string, apiKey?: string): Promise<MeshyRiggingTask> {
+    const key = this.resolveKey(apiKey);
+    const task = await this.get<MeshyRiggingTask>(`/rigging/${taskId}`, key, IMAGE_TO_3D_BASE);
+    // Surface camelCase aliases for the few snake_case fields we read in callers.
+    task.riggedModelUrls = task.rigged_model_urls ?? task.riggedModelUrls;
+    task.basicAnimations = task.basic_animations ?? task.basicAnimations;
+    task.thumbnailUrl = task.thumbnail_url ?? task.thumbnailUrl;
+    task.taskError = task.task_error ?? task.taskError;
+    return task;
+  }
+
+  async waitForRigging(
+    taskId: string,
+    maxWaitMs = 10 * 60 * 1000,
+    pollIntervalMs = 5000,
+    apiKey?: string
+  ): Promise<MeshyRiggingTask> {
+    const deadline = Date.now() + maxWaitMs;
+    while (Date.now() < deadline) {
+      const task = await this.getRiggingTask(taskId, apiKey);
+      if (task.status === 'SUCCEEDED') return task;
+      if (task.status === 'FAILED') {
+        throw new Error(
+          `Meshy rigging task ${taskId} failed: ${task.taskError?.message || 'unknown'}`
+        );
+      }
+      if (task.status === 'EXPIRED') {
+        throw new Error(`Meshy rigging task ${taskId} expired`);
+      }
+      await new Promise((r) => setTimeout(r, pollIntervalMs));
+    }
+    throw new Error(`Meshy rigging task ${taskId} timed out after ${maxWaitMs / 1000}s`);
+  }
+
+  // ── Animation library ─────────────────────────────────────────────────
+
+  /**
+   * Apply one of Meshy's library animations (600+ presets across DailyActions,
+   * WalkAndRun, Fighting, Dancing, BodyMovements) to a previously rigged model.
+   * `rigTaskId` must reference a SUCCEEDED rigging task.
+   */
+  async applyAnimation(options: AnimateOptions): Promise<{ taskId: string }> {
+    const apiKey = this.resolveKey(options.apiKey);
+    const body: Record<string, unknown> = {
+      rig_task_id: options.rigTaskId,
+      action_id: options.actionId,
+    };
+    if (options.fps) {
+      body.post_process = { operation_type: 'fps', fps: options.fps };
+    }
+    const data = await this.post<{ result?: string; id?: string }>(
+      '/animations',
+      body,
+      apiKey,
+      IMAGE_TO_3D_BASE
+    );
+    const taskId = data.result ?? data.id;
+    if (!taskId) {
+      throw new Error('Meshy animation API returned no task ID');
+    }
+    return { taskId };
+  }
+
+  async getAnimationTask(taskId: string, apiKey?: string): Promise<MeshyAnimationTask> {
+    const key = this.resolveKey(apiKey);
+    const task = await this.get<MeshyAnimationTask>(`/animations/${taskId}`, key, IMAGE_TO_3D_BASE);
+    task.animationGlbUrl = task.animation_glb_url ?? task.animationGlbUrl;
+    task.animationFbxUrl = task.animation_fbx_url ?? task.animationFbxUrl;
+    task.processedUsdzUrl = task.processed_usdz_url ?? task.processedUsdzUrl;
+    task.thumbnailUrl = task.thumbnail_url ?? task.thumbnailUrl;
+    task.taskError = task.task_error ?? task.taskError;
+    return task;
+  }
+
+  async waitForAnimation(
+    taskId: string,
+    maxWaitMs = 10 * 60 * 1000,
+    pollIntervalMs = 5000,
+    apiKey?: string
+  ): Promise<MeshyAnimationTask> {
+    const deadline = Date.now() + maxWaitMs;
+    while (Date.now() < deadline) {
+      const task = await this.getAnimationTask(taskId, apiKey);
+      if (task.status === 'SUCCEEDED') return task;
+      if (task.status === 'FAILED') {
+        throw new Error(
+          `Meshy animation task ${taskId} failed: ${task.taskError?.message || 'unknown'}`
+        );
+      }
+      if (task.status === 'EXPIRED') {
+        throw new Error(`Meshy animation task ${taskId} expired`);
+      }
+      await new Promise((r) => setTimeout(r, pollIntervalMs));
+    }
+    throw new Error(`Meshy animation task ${taskId} timed out after ${maxWaitMs / 1000}s`);
   }
 
   // ── Health check ──────────────────────────────────────────────────────

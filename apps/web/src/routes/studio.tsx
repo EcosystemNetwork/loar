@@ -230,32 +230,36 @@ function StudioCard({ universe: u }: { universe: StudioUniverse }) {
         <p className="text-xs text-muted-foreground line-clamp-2 px-4 pt-3">{u.description}</p>
       )}
 
-      {/* Actions */}
-      <div className="p-4 pt-3 grid grid-cols-2 gap-2">
-        <Button asChild size="sm" className="gap-1.5">
+      {/* Actions — Open Editor is the primary CTA: full-width, large, primary
+          color, so creators can't miss the entry point to the React Flow
+          universe canvas. Secondary actions sit below in a compact row. */}
+      <div className="p-4 pt-3 space-y-2">
+        <Button asChild size="lg" className="w-full gap-2 font-semibold shadow-sm">
           <Link to="/universe/$id" params={{ id: u.id }}>
-            <Wand2 className="h-3.5 w-3.5" />
-            Edit
+            <Wand2 className="h-4 w-4" />
+            Open Editor
           </Link>
         </Button>
-        <Button asChild size="sm" variant="outline" className="gap-1.5">
-          <Link to="/universe/$id/watch" params={{ id: u.id }}>
-            <Eye className="h-3.5 w-3.5" />
-            Watch page
-          </Link>
-        </Button>
-        <Button asChild size="sm" variant="ghost" className="gap-1.5 text-muted-foreground">
-          <Link to="/analytics/$universeId" params={{ universeId: u.id }}>
-            <BarChart3 className="h-3.5 w-3.5" />
-            Analytics
-          </Link>
-        </Button>
-        <Button asChild size="sm" variant="ghost" className="gap-1.5 text-muted-foreground">
-          <Link to="/universe/$id" params={{ id: u.id }} search={{ panel: 'access' } as any}>
-            <Settings className="h-3.5 w-3.5" />
-            Access
-          </Link>
-        </Button>
+        <div className="grid grid-cols-3 gap-1">
+          <Button asChild size="sm" variant="ghost" className="gap-1.5 text-muted-foreground">
+            <Link to="/universe/$id/watch" params={{ id: u.id }}>
+              <Eye className="h-3.5 w-3.5" />
+              Watch
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="ghost" className="gap-1.5 text-muted-foreground">
+            <Link to="/analytics/$universeId" params={{ universeId: u.id }}>
+              <BarChart3 className="h-3.5 w-3.5" />
+              Analytics
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="ghost" className="gap-1.5 text-muted-foreground">
+            <Link to="/universe/$id" params={{ id: u.id }} search={{ panel: 'access' } as any}>
+              <Settings className="h-3.5 w-3.5" />
+              Access
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {hasToken && (

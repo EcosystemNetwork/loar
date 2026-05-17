@@ -775,9 +775,13 @@ export function FlowCreationPanel({
                     </button>
                   ))}
                 {selectedVideoModel === 'fal-veo3' && (
-                  <button className="flex-1 px-3 py-2 text-sm rounded-md border border-primary bg-primary text-primary-foreground">
+                  <div
+                    role="presentation"
+                    aria-label="Duration: 8 seconds (only option for veo3)"
+                    className="flex-1 px-3 py-2 text-sm rounded-md border border-primary bg-primary text-primary-foreground text-center"
+                  >
                     8s
-                  </button>
+                  </div>
                 )}
                 {(selectedVideoModel === 'fal-kling' || selectedVideoModel === 'fal-wan25') &&
                   [5, 10].map((duration) => (

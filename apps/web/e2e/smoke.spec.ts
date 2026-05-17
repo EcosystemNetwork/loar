@@ -18,7 +18,7 @@ test.describe('Landing & Discovery', () => {
   test('homepage loads with header and hero', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('header')).toBeVisible();
-    await expect(page.locator('img[alt="LOAR Logo"]')).toBeVisible();
+    await expect(page.locator('img[alt="LOAR"]')).toBeVisible();
   });
 
   test('discover page renders', async ({ page }) => {
@@ -27,9 +27,9 @@ test.describe('Landing & Discovery', () => {
     await expect(page.locator('header')).toBeVisible();
   });
 
-  test('gallery page renders', async ({ page }) => {
+  test('gallery page renders (redirects into wiki)', async ({ page }) => {
     await page.goto('/gallery');
-    await expect(page).toHaveURL(/\/gallery/);
+    await expect(page).toHaveURL(/\/wiki|\/gallery/);
   });
 });
 
@@ -151,10 +151,9 @@ test.describe('Navigation', () => {
   test('header shows expected primary links', async ({ page }) => {
     await page.goto('/');
     const nav = page.locator('header nav').first();
+    // Top-level nav was redesigned: Gallery + Pricing moved into submenus.
     await expect(nav.getByText('Discover')).toBeVisible();
     await expect(nav.getByText('Create')).toBeVisible();
-    await expect(nav.getByText('Gallery')).toBeVisible();
-    await expect(nav.getByText('Pricing')).toBeVisible();
     await expect(nav.getByText('Dashboard')).toBeVisible();
   });
 

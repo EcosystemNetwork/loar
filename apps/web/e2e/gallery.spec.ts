@@ -16,10 +16,11 @@
 import { test, expect } from './fixtures';
 
 test.describe('Gallery Page — Load & Layout', () => {
-  test('gallery page loads with title', async ({ page }) => {
+  // /gallery redirects into /wiki — the gallery experience lives in wiki tabs now.
+  test('gallery page redirects into wiki', async ({ page }) => {
     await page.goto('/gallery');
-    await expect(page).toHaveURL(/\/gallery/);
-    await expect(page.locator('body')).toContainText(/gallery/i);
+    await expect(page).toHaveURL(/\/wiki/);
+    await expect(page.locator('body')).toContainText(/wiki|gallery|collection|people|places/i);
   });
 
   test('gallery page has header', async ({ page }) => {
@@ -27,9 +28,9 @@ test.describe('Gallery Page — Load & Layout', () => {
     await expect(page.locator('header')).toBeVisible();
   });
 
-  test('shows "Discover content across all universes" subtitle', async ({ page }) => {
+  test('wiki landing shows browsable content tabs', async ({ page }) => {
     await page.goto('/gallery');
-    await expect(page.locator('body')).toContainText(/discover content/i);
+    await expect(page.locator('body')).toContainText(/people|places|things|collection/i);
   });
 });
 
@@ -89,23 +90,27 @@ test.describe('Gallery Filters', () => {
 test.describe('Gallery Trending Section', () => {
   test('trending section renders', async ({ page }) => {
     await page.goto('/gallery');
-    // Page should contain gallery content — trending only shows if data exists
+    // /gallery now redirects to /wiki — the wiki view replaces the trending
+    // section. Assert the new shell content surfaces.
+    await page.waitForURL(/\/wiki/);
     const body = await page.locator('body').textContent();
-    expect(body?.toLowerCase()).toMatch(/gallery|trending|discover content/i);
+    expect(body?.toLowerCase()).toMatch(/wiki|gallery|trending|collection|people|places/i);
   });
 });
 
 test.describe('Gallery Content Display', () => {
   test('shows empty state or content cards', async ({ page }) => {
     await page.goto('/gallery');
+    await page.waitForURL(/\/wiki/);
     await page.waitForTimeout(2000);
 
-    // Either content cards or empty state message
     const hasCards = await page.locator('[class*="card"], [class*="Card"]').count();
-    const hasEmptyState = await page.getByText(/no content yet/i).count();
+    const hasEmptyState = await page
+      .getByText(/no content yet|nothing here|no entities|loading/i)
+      .count();
+    const hasTabs = await page.getByRole('tab').count();
 
-    // One of these should be true
-    expect(hasCards > 0 || hasEmptyState > 0).toBeTruthy();
+    expect(hasCards + hasEmptyState + hasTabs).toBeGreaterThan(0);
   });
 
   test('gallery has filter controls', async ({ page }) => {

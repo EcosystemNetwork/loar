@@ -11,8 +11,9 @@
 import { createFileRoute, Link, useSearch, useNavigate } from '@tanstack/react-router';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useVideoLoad } from '@/hooks/useVideoLoad';
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
+import { useWalletAuth } from '@/lib/wallet-auth';
 import { z } from 'zod';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -92,7 +93,13 @@ import { ActivityTab } from '@/components/wiki/ActivityTab';
 import { StatsTab } from '@/components/wiki/StatsTab';
 import { CreatorsTab } from '@/components/wiki/CreatorsTab';
 import { BookmarksTab } from '@/components/wiki/BookmarksTab';
-import type { EntityKind, WikiEntity, WikiTab, WikiSort } from '@/components/wiki/types';
+import {
+  STRUCTURAL_KIND_DESCRIPTIONS,
+  type EntityKind,
+  type WikiEntity,
+  type WikiTab,
+  type WikiSort,
+} from '@/components/wiki/types';
 
 const TABS: {
   id: WikiTab;
@@ -217,8 +224,20 @@ function EntityTab({ kind, universeAddress }: { kind: EntityKind; universeAddres
     return () => observer.disconnect();
   }, [hasMore, isFetchingNextPage, query]);
 
+  const structuralBlurb =
+    kind in STRUCTURAL_KIND_DESCRIPTIONS
+      ? STRUCTURAL_KIND_DESCRIPTIONS[kind as keyof typeof STRUCTURAL_KIND_DESCRIPTIONS]
+      : null;
+
   return (
     <div className="space-y-4">
+      {structuralBlurb && (
+        <div className="rounded-md border border-violet-500/20 bg-violet-500/5 px-3 py-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">In the hierarchy:</span> Universe → Timeline
+          → Reality → Dimension → Plane → Realm → Domain.
+          <div className="mt-1">{structuralBlurb}</div>
+        </div>
+      )}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -848,31 +867,321 @@ function ThreeDModelsTab({ universeAddress }: { universeAddress?: string }) {
         </div>
       )}
 
-      <Dialog open={!!selectedItem} onOpenChange={(open) => !open && setSelectedItem(null)}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>{selectedItem?.title ?? '3D Model'}</DialogTitle>
-            {selectedItem?.description && (
-              <DialogDescription>{selectedItem.description}</DialogDescription>
-            )}
-          </DialogHeader>
-          {selectedItem?.mediaUrl ? (
-            <div className="h-[60vh] w-full">
-              <ModelViewer
-                src={resolveIpfsUrl(selectedItem.mediaUrl)}
-                poster={resolveIpfsUrl(selectedItem.thumbnailUrl) || undefined}
-                alt={selectedItem.title || '3D Model'}
-                className="h-full"
-              />
-            </div>
-          ) : (
-            <div className="h-[40vh] flex items-center justify-center text-muted-foreground text-sm">
-              No 3D asset URL available for this item.
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <Model3DTestbenchDialog
+        item={selectedItem}
+        onOpenChange={(open) => !open && setSelectedItem(null)}
+      />
     </div>
+  );
+}
+
+/**
+ * Modal preview for a single 3D model. Wraps the testbench-mode ModelViewer
+ * and pulls lineage (source 2D image, turntable video, rigged + animated
+ * derivatives) so creators can preview, rig, and play animation presets
+ * without leaving the wiki.
+ */
+function Model3DTestbenchDialog({
+  item,
+  onOpenChange,
+}: {
+  item: any | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { address } = useWalletAuth();
+  const queryClient = useQueryClient();
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+  const [pendingRig, setPendingRig] = useState(false);
+  const [pendingAnimateId, setPendingAnimateId] = useState<number | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const isCreator =
+    !!address &&
+    (item?.creatorUid?.toLowerCase?.() === address.toLowerCase() ||
+      item?.creatorAddress?.toLowerCase?.() === address.toLowerCase());
+
+  const { data: lineage } = useQuery({
+    queryKey: ['gallery', 'lineage', item?.id],
+    queryFn: () => trpcClient.gallery.lineage.query({ contentId: item!.id }),
+    enabled: !!item?.id,
+    // Poll while an action is in flight so the new derivative shows up
+    // automatically when Meshy finishes (typical 1–3 min for rigging,
+    // 30s–2min for animation library applies).
+    refetchInterval: pendingRig || pendingAnimateId !== null ? 5000 : false,
+    staleTime: pendingRig || pendingAnimateId !== null ? 0 : WIKI_LIST_STALE_TIME,
+  });
+
+  const derivatives = (lineage?.derivatives ?? []) as any[];
+  const riggedItem = derivatives.find(
+    (d) => typeof d.generationId === 'string' && d.generationId.startsWith('rig:')
+  );
+  const animatedItems = derivatives.filter(
+    (d) => typeof d.generationId === 'string' && d.generationId.startsWith('anim:')
+  );
+  const turntable = derivatives.find(
+    (d) => d.mediaType === 'video' && Array.isArray(d.tags) && d.tags.includes('turntable')
+  );
+
+  const { data: presets } = useQuery({
+    queryKey: ['threed', 'animationPresets'],
+    queryFn: () => trpcClient.threed.animationPresets.query(),
+    staleTime: Infinity,
+  });
+
+  // Clear pending flags as soon as the expected derivative appears.
+  useEffect(() => {
+    if (pendingRig && riggedItem) setPendingRig(false);
+  }, [pendingRig, riggedItem]);
+  useEffect(() => {
+    if (pendingAnimateId === null) return;
+    const arrived = animatedItems.some(
+      (d) =>
+        typeof d.generationModel === 'string' &&
+        d.generationModel === `meshy-animation:${pendingAnimateId}`
+    );
+    if (arrived) setPendingAnimateId(null);
+  }, [pendingAnimateId, animatedItems]);
+
+  // Reset transient state when switching items.
+  useEffect(() => {
+    setViewerUrl(null);
+    setPendingRig(false);
+    setPendingAnimateId(null);
+    setActionError(null);
+  }, [item?.id]);
+
+  const sourceImageUrl = item?.sourceImageUrl
+    ? resolveIpfsUrl(item.sourceImageUrl)
+    : lineage?.parent?.mediaUrl
+      ? resolveIpfsUrl(lineage.parent.mediaUrl)
+      : null;
+
+  const rigMutation = useMutation({
+    mutationFn: ({ contentId }: { contentId: string }) =>
+      trpcClient.threed.rig.mutate({ contentId }),
+    onMutate: () => {
+      setActionError(null);
+      setPendingRig(true);
+    },
+    onError: (err: any) => {
+      setPendingRig(false);
+      setActionError(err?.message ?? 'Rigging failed to start');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['gallery', 'lineage', item?.id] });
+    },
+  });
+
+  const animateMutation = useMutation({
+    mutationFn: ({ riggedContentId, actionId }: { riggedContentId: string; actionId: number }) =>
+      trpcClient.threed.animate.mutate({ riggedContentId, actionId }),
+    onMutate: (vars) => {
+      setActionError(null);
+      setPendingAnimateId(vars.actionId);
+    },
+    onError: (err: any) => {
+      setPendingAnimateId(null);
+      setActionError(err?.message ?? 'Animation failed to start');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['gallery', 'lineage', item?.id] });
+    },
+  });
+
+  const activeUrl = viewerUrl ?? (item?.mediaUrl ? resolveIpfsUrl(item.mediaUrl) : null);
+
+  return (
+    <Dialog open={!!item} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-6xl">
+        <DialogHeader>
+          <DialogTitle>{item?.title ?? '3D Model'}</DialogTitle>
+          {item?.description && <DialogDescription>{item.description}</DialogDescription>}
+        </DialogHeader>
+        {item?.mediaUrl && activeUrl ? (
+          <div className="grid gap-4 md:grid-cols-[1fr_260px]">
+            <div className="flex flex-col gap-2">
+              <div className="h-[60vh] w-full">
+                <ModelViewer
+                  src={activeUrl}
+                  poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
+                  alt={item.title || '3D Model'}
+                  className="h-full"
+                  testbench
+                />
+              </div>
+              {/* Variant switcher: static / rigged base / each animated take */}
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setViewerUrl(resolveIpfsUrl(item.mediaUrl))}
+                  className={`px-2 py-1 rounded border ${
+                    activeUrl === resolveIpfsUrl(item.mediaUrl)
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Static
+                </button>
+                {riggedItem && (
+                  <button
+                    type="button"
+                    onClick={() => setViewerUrl(resolveIpfsUrl(riggedItem.mediaUrl))}
+                    className={`px-2 py-1 rounded border ${
+                      activeUrl === resolveIpfsUrl(riggedItem.mediaUrl)
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Rigged
+                  </button>
+                )}
+                {animatedItems.map((d) => {
+                  const presetName =
+                    (presets ?? []).find(
+                      (p) => `meshy-animation:${p.actionId}` === d.generationModel
+                    )?.name ??
+                    d.tags?.find((t: string) => !['character', '3d', 'animated'].includes(t)) ??
+                    'Animation';
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setViewerUrl(resolveIpfsUrl(d.mediaUrl))}
+                      className={`px-2 py-1 rounded border capitalize ${
+                        activeUrl === resolveIpfsUrl(d.mediaUrl)
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {presetName}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-4 overflow-y-auto max-h-[65vh] pr-1">
+              {/* Rigging + animation testbench — creator-only */}
+              {isCreator && (
+                <div className="rounded-md border p-3 space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Animate</p>
+                  {!riggedItem ? (
+                    <>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Rig this humanoid mesh once (Meshy auto-rig, ~1–3 min) to unlock the
+                        animation library.
+                      </p>
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        disabled={pendingRig || rigMutation.isPending}
+                        onClick={() => rigMutation.mutate({ contentId: item.id })}
+                      >
+                        {pendingRig || rigMutation.isPending ? 'Rigging…' : 'Rig this model'}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[11px] text-muted-foreground">
+                        Pick a preset — each adds a new GLB to the variant switcher above.
+                      </p>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {(presets ?? []).map((p) => {
+                          const already = animatedItems.some(
+                            (d) => d.generationModel === `meshy-animation:${p.actionId}`
+                          );
+                          const isPending = pendingAnimateId === p.actionId;
+                          return (
+                            <Button
+                              key={p.actionId}
+                              size="sm"
+                              variant={already ? 'secondary' : 'outline'}
+                              className="text-xs h-8"
+                              disabled={already || isPending || animateMutation.isPending}
+                              onClick={() =>
+                                animateMutation.mutate({
+                                  riggedContentId: riggedItem.id,
+                                  actionId: p.actionId,
+                                })
+                              }
+                              title={p.category}
+                            >
+                              {isPending ? '…' : already ? `✓ ${p.name}` : p.name}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                  {actionError && (
+                    <p className="text-[11px] text-red-500 leading-snug">{actionError}</p>
+                  )}
+                </div>
+              )}
+
+              {sourceImageUrl && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Source concept</p>
+                  <div className="aspect-square rounded-md overflow-hidden bg-muted">
+                    <img
+                      src={sourceImageUrl}
+                      alt="Source concept"
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+              )}
+              {turntable?.mediaUrl && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">
+                    Turntable preview
+                  </p>
+                  <div className="aspect-square rounded-md overflow-hidden bg-black">
+                    <video
+                      src={resolveIpfsUrl(turntable.mediaUrl)}
+                      poster={resolveIpfsUrl(turntable.thumbnailUrl) || undefined}
+                      className="w-full h-full object-cover"
+                      controls
+                      muted
+                      loop
+                      playsInline
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground">Assets</p>
+                <a href={activeUrl} target="_blank" rel="noreferrer" download className="block">
+                  <Button variant="outline" size="sm" className="w-full justify-start">
+                    Download active GLB
+                  </Button>
+                </a>
+                {item.generationModel && (
+                  <p className="text-[11px] text-muted-foreground pt-1">
+                    Generated by {item.generationModel}
+                  </p>
+                )}
+                {Array.isArray(item.tags) && item.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {item.tags.map((tag: string) => (
+                      <Badge key={tag} variant="secondary" className="text-[10px]">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="h-[40vh] flex items-center justify-center text-muted-foreground text-sm">
+            No 3D asset URL available for this item.
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 

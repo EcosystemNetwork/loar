@@ -39,11 +39,15 @@ const primaryLinksBase = [
   { to: '/discover', label: 'Discover' },
   { to: '/create', label: 'Create' },
   { to: '/canvas', label: 'Canvas' },
-  { to: '/editor', label: 'Editor' },
+  { to: '/editor', label: 'Clip Editor' },
   { to: '/tokens', label: 'Launchpad' },
   { to: '/wiki', label: 'Wiki' },
   { to: '/dashboard', label: 'Dashboard' },
 ] as const;
+
+/** Surfaced inline only for users who own universes — Studio is the entry
+ *  point to the React Flow universe editor (`/universe/$id`). */
+const ownerPrimaryLink = { to: '/studio', label: 'My Studio' } as const;
 
 type MoreLink = { to: string; label: string; beta?: boolean };
 type MoreGroup = { label: string; links: MoreLink[] };
@@ -101,17 +105,10 @@ const moreGroupsBase: MoreGroup[] = [
 
 function buildMoreGroups(hasUniverses: boolean): MoreGroup[] {
   if (!hasUniverses) return moreGroupsBase;
+  // Studio is promoted inline (see `ownerPrimaryLink`); keep Gallery in the
+  // dropdown alongside the other owner-only items.
   return moreGroupsBase.map((g) =>
-    g.label === 'My Stuff'
-      ? {
-          ...g,
-          links: [
-            { to: '/studio', label: 'Studio' },
-            { to: '/gallery', label: 'Gallery' },
-            ...g.links,
-          ],
-        }
-      : g
+    g.label === 'My Stuff' ? { ...g, links: [{ to: '/gallery', label: 'Gallery' }, ...g.links] } : g
   );
 }
 
@@ -131,10 +128,14 @@ export default function Header() {
     staleTime: 60_000,
   });
 
-  // Studio + Gallery surface only for users with universes, but we keep them
-  // in the More dropdown instead of inline to avoid overflowing the header on
-  // 1440px viewports.
-  const primaryLinks = primaryLinksBase.filter((l) => !HIDDEN_ROUTES.has(l.to));
+  // Studio is the entry point to the React Flow universe editor — surface it
+  // inline for owners so they don't have to dig through the More dropdown.
+  // Gallery stays in More (less time-critical).
+  const primaryLinks = [
+    ...primaryLinksBase.slice(0, 2),
+    ...(hasUniverses ? [ownerPrimaryLink] : []),
+    ...primaryLinksBase.slice(2),
+  ].filter((l) => !HIDDEN_ROUTES.has(l.to));
   const moreGroups = buildMoreGroups(!!hasUniverses);
   const moreLinks = moreGroups.flatMap((g) => g.links.filter((l) => !HIDDEN_ROUTES.has(l.to)));
 

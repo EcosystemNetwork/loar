@@ -61,3 +61,27 @@ export type WikiTab =
   | 'bookmarks';
 
 export type WikiSort = 'newest' | 'oldest' | 'a-z' | 'z-a';
+
+/**
+ * Short hierarchy-aware blurbs for the structural kinds. Surfaced at the top
+ * of each structural tab so creators don't have to guess the difference
+ * between Timeline / Reality / Dimension / Plane / Realm / Domain.
+ *
+ * Hierarchy reminder: Universe → Timeline → Reality → Dimension → Plane → Realm → Domain.
+ */
+export const STRUCTURAL_KIND_DESCRIPTIONS: Record<
+  'timeline' | 'reality' | 'dimension' | 'plane' | 'realm' | 'domain',
+  string
+> = {
+  timeline:
+    'Alternate history branches inside a Universe — same world, different sequence of events. Use for what-ifs, season resets, or community-voted divergences.',
+  reality:
+    'Drastic alternate versions of the same Universe — different physics, genre, or tone (e.g. cyberpunk vs. medieval take on the same mythos). Bigger swing than a Timeline.',
+  dimension:
+    'Accessible spatial layers within a Reality — pocket worlds, hidden layers, underworld / overworld / void. "Places you can travel to."',
+  plane:
+    'Mystical or abstract layers — dream, astral, divine, memory. More fantasy-coded than a Dimension; lives inside a Dimension or Reality.',
+  realm: 'Named territories, regions, kingdoms, or cities. The right kind for geography.',
+  domain:
+    'Ownership / influence zones inside a Realm — faction territory, deity sphere, character-controlled sectors. Useful for governance mechanics.',
+};

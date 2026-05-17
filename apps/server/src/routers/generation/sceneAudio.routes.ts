@@ -480,42 +480,48 @@ export const sceneAudioRouter = router({
     .mutation(async ({ input, ctx }) => {
       const { fiatMargin } = await getMargins();
       const credits = toCredits(MUSIC_COST_USD, fiatMargin);
-      await deductCredits(ctx.user.uid, credits);
-
       const jobId = randomUUID();
-      const { resolveProviderKey: resolveMusicKey } = await import('../../lib/byok');
-      const musicKey = await resolveMusicKey(ctx.user.uid, 'fal');
-      try {
-        const result = await falService.generateAudio({
-          prompt: sanitizePrompt(input.prompt),
-          model: input.model,
-          durationSec: input.durationSec,
-          apiKey: musicKey,
-        });
 
-        if (result.status === 'failed' || !result.audioUrl) {
-          throw new Error(result.error || 'Music generation failed');
+      return withReservation(
+        {
+          userId: ctx.user.uid,
+          modelId: input.model,
+          provider: 'fal',
+          estimatedCredits: credits,
+          byok: false,
+          meta: { generationId: jobId, universeId: input.universeId, sceneId: input.sceneId },
+        },
+        async () => {
+          const { resolveProviderKey: resolveMusicKey } = await import('../../lib/byok');
+          const musicKey = await resolveMusicKey(ctx.user.uid, 'fal');
+          const result = await falService.generateAudio({
+            prompt: sanitizePrompt(input.prompt),
+            model: input.model,
+            durationSec: input.durationSec,
+            apiKey: musicKey,
+          });
+
+          if (result.status === 'failed' || !result.audioUrl) {
+            throw new Error(result.error || 'Music generation failed');
+          }
+
+          await sceneAudioCol().doc(jobId).set({
+            id: jobId,
+            type: 'music',
+            universeId: input.universeId,
+            sceneId: input.sceneId,
+            audioUrl: result.audioUrl,
+            prompt: input.prompt,
+            durationSec: input.durationSec,
+            model: input.model,
+            credits,
+            createdBy: ctx.user.uid,
+            createdAt: new Date(),
+          });
+
+          return { result: { id: jobId, audioUrl: result.audioUrl, credits } };
         }
-
-        await sceneAudioCol().doc(jobId).set({
-          id: jobId,
-          type: 'music',
-          universeId: input.universeId,
-          sceneId: input.sceneId,
-          audioUrl: result.audioUrl,
-          prompt: input.prompt,
-          durationSec: input.durationSec,
-          model: input.model,
-          credits,
-          createdBy: ctx.user.uid,
-          createdAt: new Date(),
-        });
-
-        return { id: jobId, audioUrl: result.audioUrl, credits };
-      } catch (err) {
-        await refundCredits(ctx.user.uid, credits, jobId);
-        throw err;
-      }
+      );
     }),
 
   /**
@@ -545,37 +551,43 @@ export const sceneAudioRouter = router({
       }
       const { fiatMargin } = await getMargins();
       const credits = toCredits(LIPSYNC_COST_USD, fiatMargin);
-      await deductCredits(ctx.user.uid, credits);
-
       const jobId = randomUUID();
-      try {
-        const result = await lipSyncService.sync({
-          videoUrl: input.videoUrl,
-          audioUrl: input.audioUrl,
-        });
 
-        if (result.status === 'failed' || !result.videoUrl) {
-          throw new Error(result.error || 'Lip-sync failed');
+      return withReservation(
+        {
+          userId: ctx.user.uid,
+          modelId: 'fal-lipsync',
+          provider: 'fal',
+          estimatedCredits: credits,
+          byok: false,
+          meta: { generationId: jobId, universeId: input.universeId, sceneId: input.sceneId },
+        },
+        async () => {
+          const result = await lipSyncService.sync({
+            videoUrl: input.videoUrl,
+            audioUrl: input.audioUrl,
+          });
+
+          if (result.status === 'failed' || !result.videoUrl) {
+            throw new Error(result.error || 'Lip-sync failed');
+          }
+
+          await sceneAudioCol().doc(jobId).set({
+            id: jobId,
+            type: 'lipsync',
+            universeId: input.universeId,
+            sceneId: input.sceneId,
+            videoUrl: result.videoUrl,
+            sourceVideoUrl: input.videoUrl,
+            sourceAudioUrl: input.audioUrl,
+            credits,
+            createdBy: ctx.user.uid,
+            createdAt: new Date(),
+          });
+
+          return { result: { id: jobId, videoUrl: result.videoUrl, credits } };
         }
-
-        await sceneAudioCol().doc(jobId).set({
-          id: jobId,
-          type: 'lipsync',
-          universeId: input.universeId,
-          sceneId: input.sceneId,
-          videoUrl: result.videoUrl,
-          sourceVideoUrl: input.videoUrl,
-          sourceAudioUrl: input.audioUrl,
-          credits,
-          createdBy: ctx.user.uid,
-          createdAt: new Date(),
-        });
-
-        return { id: jobId, videoUrl: result.videoUrl, credits };
-      } catch (err) {
-        await refundCredits(ctx.user.uid, credits, jobId);
-        throw err;
-      }
+      );
     }),
 
   /**
@@ -1150,99 +1162,105 @@ export const sceneAudioRouter = router({
       }
 
       const credits = toCredits(costUsd, fiatMargin);
-      await deductCredits(ctx.user.uid, credits);
 
-      const { resolveProviderKey: resolveNodeKey } = await import('../../lib/byok');
-      const [nodeElevenKey, nodeFalKey] = await Promise.all([
-        resolveNodeKey(ctx.user.uid, 'elevenlabs'),
-        resolveNodeKey(ctx.user.uid, 'fal'),
-      ]);
+      return withReservation(
+        {
+          userId: ctx.user.uid,
+          modelId: input.kind === 'music' ? input.musicModel : `sound-node-${input.kind}`,
+          provider: input.kind === 'music' ? 'fal' : 'elevenlabs',
+          estimatedCredits: credits,
+          byok: false,
+          meta: { generationId: nodeId, universeId: input.universeId, kind: input.kind },
+        },
+        async () => {
+          const { resolveProviderKey: resolveNodeKey } = await import('../../lib/byok');
+          const [nodeElevenKey, nodeFalKey] = await Promise.all([
+            resolveNodeKey(ctx.user.uid, 'elevenlabs'),
+            resolveNodeKey(ctx.user.uid, 'fal'),
+          ]);
 
-      try {
-        let audioUrl: string;
+          let audioUrl: string;
 
-        switch (input.kind) {
-          case 'sfx':
-          case 'ambient': {
-            const sfxResult = await elevenLabsService.soundEffect({
-              text: sanitizePrompt(input.prompt),
-              durationSeconds: input.durationSec ? Math.min(input.durationSec, 22) : undefined,
-              promptInfluence: 0.4,
-              apiKey: nodeElevenKey,
-            });
-            audioUrl = await uploadAudioBuffer(
-              sfxResult.audioBuffer,
-              `sound-nodes/${input.universeId}/${nodeId}.mp3`
-            );
-            break;
-          }
-          case 'music': {
-            const musicResult = await falService.generateAudio({
-              prompt: sanitizePrompt(input.prompt),
-              model: input.musicModel,
-              durationSec: input.durationSec || 30,
-              apiKey: nodeFalKey,
-            });
-            if (musicResult.status === 'failed' || !musicResult.audioUrl) {
-              throw new Error(musicResult.error || 'Music generation failed');
+          switch (input.kind) {
+            case 'sfx':
+            case 'ambient': {
+              const sfxResult = await elevenLabsService.soundEffect({
+                text: sanitizePrompt(input.prompt),
+                durationSeconds: input.durationSec ? Math.min(input.durationSec, 22) : undefined,
+                promptInfluence: 0.4,
+                apiKey: nodeElevenKey,
+              });
+              audioUrl = await uploadAudioBuffer(
+                sfxResult.audioBuffer,
+                `sound-nodes/${input.universeId}/${nodeId}.mp3`
+              );
+              break;
             }
-            audioUrl = musicResult.audioUrl;
-            break;
-          }
-          case 'dialogue': {
-            if (!input.voiceProfileId) {
-              throw new Error('voiceProfileId is required for dialogue sound nodes');
+            case 'music': {
+              const musicResult = await falService.generateAudio({
+                prompt: sanitizePrompt(input.prompt),
+                model: input.musicModel,
+                durationSec: input.durationSec || 30,
+                apiKey: nodeFalKey,
+              });
+              if (musicResult.status === 'failed' || !musicResult.audioUrl) {
+                throw new Error(musicResult.error || 'Music generation failed');
+              }
+              audioUrl = musicResult.audioUrl;
+              break;
             }
-            const profileDoc = await voiceProfilesCol().doc(input.voiceProfileId).get();
-            if (!profileDoc.exists) {
-              throw new Error(`Voice profile ${input.voiceProfileId} not found`);
+            case 'dialogue': {
+              if (!input.voiceProfileId) {
+                throw new Error('voiceProfileId is required for dialogue sound nodes');
+              }
+              const profileDoc = await voiceProfilesCol().doc(input.voiceProfileId).get();
+              if (!profileDoc.exists) {
+                throw new Error(`Voice profile ${input.voiceProfileId} not found`);
+              }
+              const profile = profileDoc.data()!;
+              const ttsResult = await elevenLabsService.textToSpeech({
+                text: sanitizePrompt(input.prompt),
+                voiceId: profile.voiceId,
+                modelId: 'eleven_v3',
+                stability: profile.stability ?? 0.5,
+                similarityBoost: 0.75,
+                style: profile.style ?? 0.3,
+                apiKey: nodeElevenKey,
+              });
+              audioUrl = await uploadAudioBuffer(
+                ttsResult.audioBuffer,
+                `sound-nodes/${input.universeId}/${nodeId}.mp3`
+              );
+              break;
             }
-            const profile = profileDoc.data()!;
-            const ttsResult = await elevenLabsService.textToSpeech({
-              text: sanitizePrompt(input.prompt),
-              voiceId: profile.voiceId,
-              modelId: 'eleven_v3',
-              stability: profile.stability ?? 0.5,
-              similarityBoost: 0.75,
-              style: profile.style ?? 0.3,
-              apiKey: nodeElevenKey,
-            });
-            audioUrl = await uploadAudioBuffer(
-              ttsResult.audioBuffer,
-              `sound-nodes/${input.universeId}/${nodeId}.mp3`
-            );
-            break;
           }
+
+          const soundNode = {
+            id: nodeId,
+            universeId: input.universeId,
+            kind: input.kind,
+            prompt: input.prompt,
+            audioUrl,
+            volume: input.volume,
+            startAtNodeId: input.startAtNodeId ?? null,
+            offsetSec: input.offsetSec,
+            spanNodes: input.spanNodes,
+            durationSec: input.durationSec ?? null,
+            loop: input.loop,
+            label: input.label || `${input.kind} — ${input.prompt.slice(0, 40)}`,
+            voiceProfileId: input.voiceProfileId ?? null,
+            musicModel: input.kind === 'music' ? input.musicModel : null,
+            credits,
+            createdBy: ctx.user.uid,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+
+          await soundNodesCol().doc(nodeId).set(soundNode);
+
+          return { result: soundNode };
         }
-
-        const soundNode = {
-          id: nodeId,
-          universeId: input.universeId,
-          kind: input.kind,
-          prompt: input.prompt,
-          audioUrl,
-          volume: input.volume,
-          startAtNodeId: input.startAtNodeId ?? null,
-          offsetSec: input.offsetSec,
-          spanNodes: input.spanNodes,
-          durationSec: input.durationSec ?? null,
-          loop: input.loop,
-          label: input.label || `${input.kind} — ${input.prompt.slice(0, 40)}`,
-          voiceProfileId: input.voiceProfileId ?? null,
-          musicModel: input.kind === 'music' ? input.musicModel : null,
-          credits,
-          createdBy: ctx.user.uid,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-
-        await soundNodesCol().doc(nodeId).set(soundNode);
-
-        return soundNode;
-      } catch (err) {
-        await refundCredits(ctx.user.uid, credits, nodeId);
-        throw err;
-      }
+      );
     }),
 
   /**

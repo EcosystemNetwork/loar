@@ -71,22 +71,38 @@ export const PUBLIC_ROUTES = [
  * Call BEFORE page.goto() in tests that need authentication.
  */
 export async function injectMockSession(page: Page, address = TEST_WALLET) {
-  // Navigate to the base URL first to set storage on the right origin
+  // Without these intercepts the app's /auth/me probe returns
+  // {authenticated:false}, which triggers clearSiweSession() and wipes the
+  // localStorage we set below — every authed test falls back to the
+  // signed-out shell. These two routes keep the test session alive.
+  await page.route('**/auth/me**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        authenticated: true,
+        address,
+        provider: 'siwe',
+        expiresAt: Date.now() + 86_400_000,
+      }),
+    })
+  );
+  await page.route('**/auth/refresh**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, expiresAt: Date.now() + 86_400_000 }),
+    })
+  );
+
   await page.goto('/', { waitUntil: 'commit' });
 
   await page.evaluate(
     ({ addr }) => {
-      localStorage.setItem('siwe_address', addr);
-      localStorage.setItem('siwe_session', 'true');
-      localStorage.setItem(
-        'siwe_session_data',
-        JSON.stringify({
-          address: addr,
-          chainId: 8453,
-          issuedAt: new Date().toISOString(),
-          expiresAt: new Date(Date.now() + 86400_000).toISOString(),
-        })
-      );
+      // Keys must match apps/web/src/lib/wallet-auth.ts ADDRESS_KEY / EXPIRY_KEY.
+      localStorage.setItem('siwe-address', addr);
+      localStorage.setItem('siwe-expiry', String(Date.now() + 86_400_000));
+      localStorage.setItem('auth-provider', 'siwe');
     },
     { addr: address }
   );
@@ -97,9 +113,9 @@ export async function injectMockSession(page: Page, address = TEST_WALLET) {
  */
 export async function clearMockSession(page: Page) {
   await page.evaluate(() => {
-    localStorage.removeItem('siwe_address');
-    localStorage.removeItem('siwe_session');
-    localStorage.removeItem('siwe_session_data');
+    localStorage.removeItem('siwe-address');
+    localStorage.removeItem('siwe-expiry');
+    localStorage.removeItem('auth-provider');
   });
 }
 

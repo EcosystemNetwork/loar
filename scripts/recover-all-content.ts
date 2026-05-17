@@ -27,8 +27,9 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { readFileSync } from 'fs';
-import { initializeApp, cert } from 'firebase-admin/app';
+import { initializeApp, cert, applicationDefault } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { existsSync } from 'fs';
 import { rehostVideoToPinata, isEphemeralVideoUrl } from './lib/rehost-video';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -37,13 +38,23 @@ const DRY_RUN = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true';
 const MODE = (process.argv[2] ?? 'all') as 'all' | 'videos-only' | 'images-only' | 'gallery-only';
 const REHOST_CONCURRENCY = Number(process.env.REHOST_CONCURRENCY ?? '3');
 
-// ── Firebase ────────────────────────────────────────────────────────────
+// ── Firebase: SA env/file if present, else fall back to gcloud ADC ──────
 const saPathEnv = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
-const saPath = path.resolve(process.cwd(), saPathEnv ?? 'firebase-sa-key-20260416.json');
-const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
-  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-  : JSON.parse(readFileSync(saPath, 'utf-8'));
-const app = initializeApp({ credential: cert(serviceAccount) }, `recover-${Date.now()}`);
+const saPath = saPathEnv ? path.resolve(process.cwd(), saPathEnv) : '';
+let credentialOpts: any;
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  credentialOpts = { credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) };
+} else if (saPath && existsSync(saPath)) {
+  try {
+    const sa = JSON.parse(readFileSync(saPath, 'utf-8'));
+    credentialOpts = { credential: cert(sa) };
+  } catch {
+    credentialOpts = { credential: applicationDefault(), projectId: 'loar-db' };
+  }
+} else {
+  credentialOpts = { credential: applicationDefault(), projectId: 'loar-db' };
+}
+const app = initializeApp(credentialOpts, `recover-${Date.now()}`);
 const db = getFirestore(app);
 db.settings({ preferRest: true });
 

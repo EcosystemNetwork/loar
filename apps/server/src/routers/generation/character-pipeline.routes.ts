@@ -31,6 +31,7 @@ import { publishToGallery } from '../../lib/gallery-publish';
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 import { TRPCError } from '@trpc/server';
+import { withReservation } from '../../services/credits';
 
 // ── Collections ──────────────────────────────────────────────────────
 
@@ -60,29 +61,18 @@ function toCredits(usd: number) {
 }
 
 // ── Credit helpers ───────────────────────────────────────────────────
+//
+// The synchronous mutation reserves credits via `withReservation` and
+// reconciles them when the background `executePipeline` task is dispatched.
+// `executePipeline` runs hours later and needs a post-reconcile refund path
+// when a step fails downstream — implemented below with a raw
+// `FieldValue.increment`.
 
-async function deductCredits(userId: string, credits: number): Promise<void> {
-  if (!db) throw new Error('Firebase is not configured');
-  const { assertGenerationAllowed } = await import('../../lib/generation-guards');
-  await assertGenerationAllowed(userId, credits);
-  const ref = userCreditsCol().doc(userId);
-  await db.runTransaction(async (tx) => {
-    const doc = await tx.get(ref);
-    const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-    if (balance < credits) {
-      throw new Error(
-        `Insufficient credits. Need ${credits}, have ${balance}. Purchase more to continue.`
-      );
-    }
-    tx.update(ref, {
-      balance: balance - credits,
-      totalSpent: (doc.data()?.totalSpent || 0) + credits,
-      updatedAt: new Date(),
-    });
-  });
-}
-
-async function refundCredits(userId: string, credits: number, pipelineId: string): Promise<void> {
+async function refundCreditsAfterReconcile(
+  userId: string,
+  credits: number,
+  pipelineId: string
+): Promise<void> {
   const ref = userCreditsCol().doc(userId);
   const { recordCreditsTx, recordAiGeneration } = await import('../../lib/metrics');
   try {
@@ -471,7 +461,7 @@ async function executePipeline(opts: {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error(`[pipeline ${pipelineId}] Failed:`, error);
 
-    await refundCredits(userId, credits, pipelineId);
+    await refundCreditsAfterReconcile(userId, credits, pipelineId);
 
     await updatePipeline(pipelineId, {
       status: 'failed',
@@ -620,44 +610,67 @@ export const characterPipelineRouter = router({
           ...(input.clientToken ? { clientToken: input.clientToken } : {}),
         });
 
-      // ── Deduct credits ─────────────────────────────────────────────
-      await deductCredits(ctx.user.uid, totalCredits);
+      // ── Reserve credits via the shared helper, then launch the background
+      //    pipeline. The reservation is reconciled immediately on success of
+      //    the synchronous launch — post-launch step failures use
+      //    `refundCreditsAfterReconcile` (see `executePipeline`).
+      return withReservation(
+        {
+          userId: ctx.user.uid,
+          modelId: 'character-pipeline',
+          provider: 'multi',
+          estimatedCredits: totalCredits,
+          byok: false,
+          meta: { generationId: pipelineId, entityId },
+        },
+        async () => {
+          // ── Launch pipeline in background ──────────────────────────────
+          // Webhook fires from inside executePipeline on terminal state.
+          executePipeline({
+            pipelineId,
+            userId: ctx.user.uid,
+            entityId,
+            entityName: input.name,
+            entityDescription: input.description,
+            characterStyle: input.characterStyle,
+            artStyle: input.artStyle,
+            texturePrompt: input.texturePrompt || '',
+            credits: totalCredits,
+            universeAddress: input.universeAddress || null,
+            webhookUrl: validatedWebhookUrl,
+            clientToken: input.clientToken,
+          }).catch((err) =>
+            console.error(`[pipeline] Background pipeline ${pipelineId} unhandled:`, err)
+          );
 
-      // ── Launch pipeline in background ──────────────────────────────
-      // Webhook fires from inside executePipeline on terminal state.
-      executePipeline({
-        pipelineId,
-        userId: ctx.user.uid,
-        entityId,
-        entityName: input.name,
-        entityDescription: input.description,
-        characterStyle: input.characterStyle,
-        artStyle: input.artStyle,
-        texturePrompt: input.texturePrompt || '',
-        credits: totalCredits,
-        universeAddress: input.universeAddress || null,
-        webhookUrl: validatedWebhookUrl,
-        clientToken: input.clientToken,
-      }).catch((err) =>
-        console.error(`[pipeline] Background pipeline ${pipelineId} unhandled:`, err)
+          return {
+            result: {
+              pipelineId,
+              entityId: entityId as string | null,
+              status: 'running' as const,
+              creditsCharged: totalCredits,
+              estimatedSteps: [
+                {
+                  step: 'imagen_2d',
+                  label: 'Generate 2D character art (Google Imagen 3)',
+                  estimateSeconds: 15,
+                },
+                {
+                  step: 'meshy_3d',
+                  label: 'Convert to 3D model (Meshy)',
+                  estimateSeconds: 300,
+                },
+                {
+                  step: 'meshy_texture',
+                  label: 'Apply AI textures (Meshy)',
+                  estimateSeconds: 300,
+                },
+              ],
+              idempotentReplay: false as const,
+            },
+          };
+        }
       );
-
-      return {
-        pipelineId,
-        entityId: entityId as string | null,
-        status: 'running' as const,
-        creditsCharged: totalCredits,
-        estimatedSteps: [
-          {
-            step: 'imagen_2d',
-            label: 'Generate 2D character art (Google Imagen 3)',
-            estimateSeconds: 15,
-          },
-          { step: 'meshy_3d', label: 'Convert to 3D model (Meshy)', estimateSeconds: 300 },
-          { step: 'meshy_texture', label: 'Apply AI textures (Meshy)', estimateSeconds: 300 },
-        ],
-        idempotentReplay: false as const,
-      };
     }),
 
   /**

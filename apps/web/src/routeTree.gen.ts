@@ -62,6 +62,7 @@ import { Route as TokensLaunchRouteImport } from './routes/tokens/launch'
 import { Route as TokensAddressRouteImport } from './routes/tokens/$address'
 import { Route as ShopUniverseIdRouteImport } from './routes/shop/$universeId'
 import { Route as SettingsWalletsRouteImport } from './routes/settings.wallets'
+import { Route as SettingsUsageRouteImport } from './routes/settings.usage'
 import { Route as SettingsApiKeysRouteImport } from './routes/settings.api-keys'
 import { Route as SellNewRouteImport } from './routes/sell/new'
 import { Route as SellEarningsRouteImport } from './routes/sell/earnings'
@@ -391,6 +392,11 @@ const ShopUniverseIdRoute = ShopUniverseIdRouteImport.update({
 const SettingsWalletsRoute = SettingsWalletsRouteImport.update({
   id: '/settings/wallets',
   path: '/settings/wallets',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsUsageRoute = SettingsUsageRouteImport.update({
+  id: '/settings/usage',
+  path: '/settings/usage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsApiKeysRoute = SettingsApiKeysRouteImport.update({
@@ -803,6 +809,7 @@ export interface FileRoutesByFullPath {
   '/sell/earnings': typeof SellEarningsRoute
   '/sell/new': typeof SellNewRoute
   '/settings/api-keys': typeof SettingsApiKeysRoute
+  '/settings/usage': typeof SettingsUsageRoute
   '/settings/wallets': typeof SettingsWalletsRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
@@ -923,6 +930,7 @@ export interface FileRoutesByTo {
   '/sell/earnings': typeof SellEarningsRoute
   '/sell/new': typeof SellNewRoute
   '/settings/api-keys': typeof SettingsApiKeysRoute
+  '/settings/usage': typeof SettingsUsageRoute
   '/settings/wallets': typeof SettingsWalletsRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
@@ -1044,6 +1052,7 @@ export interface FileRoutesById {
   '/sell/earnings': typeof SellEarningsRoute
   '/sell/new': typeof SellNewRoute
   '/settings/api-keys': typeof SettingsApiKeysRoute
+  '/settings/usage': typeof SettingsUsageRoute
   '/settings/wallets': typeof SettingsWalletsRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
@@ -1166,6 +1175,7 @@ export interface FileRouteTypes {
     | '/sell/earnings'
     | '/sell/new'
     | '/settings/api-keys'
+    | '/settings/usage'
     | '/settings/wallets'
     | '/shop/$universeId'
     | '/tokens/$address'
@@ -1286,6 +1296,7 @@ export interface FileRouteTypes {
     | '/sell/earnings'
     | '/sell/new'
     | '/settings/api-keys'
+    | '/settings/usage'
     | '/settings/wallets'
     | '/shop/$universeId'
     | '/tokens/$address'
@@ -1406,6 +1417,7 @@ export interface FileRouteTypes {
     | '/sell/earnings'
     | '/sell/new'
     | '/settings/api-keys'
+    | '/settings/usage'
     | '/settings/wallets'
     | '/shop/$universeId'
     | '/tokens/$address'
@@ -1523,6 +1535,7 @@ export interface RootRouteChildren {
   SellEarningsRoute: typeof SellEarningsRoute
   SellNewRoute: typeof SellNewRoute
   SettingsApiKeysRoute: typeof SettingsApiKeysRoute
+  SettingsUsageRoute: typeof SettingsUsageRoute
   SettingsWalletsRoute: typeof SettingsWalletsRoute
   ShopUniverseIdRoute: typeof ShopUniverseIdRoute
   TokensAddressRoute: typeof TokensAddressRoute
@@ -1922,6 +1935,13 @@ declare module '@tanstack/react-router' {
       path: '/settings/wallets'
       fullPath: '/settings/wallets'
       preLoaderRoute: typeof SettingsWalletsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/usage': {
+      id: '/settings/usage'
+      path: '/settings/usage'
+      fullPath: '/settings/usage'
+      preLoaderRoute: typeof SettingsUsageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/api-keys': {
@@ -2566,6 +2586,7 @@ const rootRouteChildren: RootRouteChildren = {
   SellEarningsRoute: SellEarningsRoute,
   SellNewRoute: SellNewRoute,
   SettingsApiKeysRoute: SettingsApiKeysRoute,
+  SettingsUsageRoute: SettingsUsageRoute,
   SettingsWalletsRoute: SettingsWalletsRoute,
   ShopUniverseIdRoute: ShopUniverseIdRoute,
   TokensAddressRoute: TokensAddressRoute,

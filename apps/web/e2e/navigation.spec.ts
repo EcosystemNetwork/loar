@@ -17,7 +17,7 @@ test.describe('Header & Logo', () => {
     await page.goto('/');
     const header = getHeader(page);
     await expect(header).toBeVisible();
-    await expect(page.locator('img[alt="LOAR Logo"]')).toBeVisible();
+    await expect(page.locator('img[alt="LOAR"]')).toBeVisible();
   });
 
   test('header is present on every public route', async ({ page }) => {
@@ -31,7 +31,7 @@ test.describe('Header & Logo', () => {
 
   test('logo links to homepage', async ({ page }) => {
     await page.goto('/discover');
-    const logo = page.locator('header a').filter({ has: page.locator('img[alt="LOAR Logo"]') });
+    const logo = page.locator('header a').filter({ has: page.locator('img[alt="LOAR"]') });
     await logo.click();
     await expect(page).toHaveURL('/');
   });
@@ -50,16 +50,15 @@ test.describe('Primary Navigation Links', () => {
     await expect(nav.getByText('Create')).toBeVisible();
   });
 
-  test('shows Gallery link', async ({ page }) => {
-    await page.goto('/');
-    const nav = getNav(page);
-    await expect(nav.getByText('Gallery')).toBeVisible();
+  test('Gallery is reachable (direct nav — moved to submenu)', async ({ page }) => {
+    // Top-level "Gallery" link was moved into a submenu. Direct nav still works.
+    await page.goto('/gallery');
+    await expect(page).toHaveURL(/\/wiki|\/gallery/);
   });
 
-  test('shows Pricing link', async ({ page }) => {
-    await page.goto('/');
-    const nav = getNav(page);
-    await expect(nav.getByText('Pricing')).toBeVisible();
+  test('Pricing is reachable (direct nav — moved to submenu)', async ({ page }) => {
+    await page.goto('/pricing');
+    await expect(page).toHaveURL(/\/pricing/);
   });
 
   test('shows Dashboard link', async ({ page }) => {
@@ -80,15 +79,13 @@ test.describe('Primary Navigation Links', () => {
     await expect(page).toHaveURL(/\/create/);
   });
 
-  test('Gallery link navigates to /gallery', async ({ page }) => {
-    await page.goto('/');
-    await getNav(page).getByText('Gallery').click();
-    await expect(page).toHaveURL(/\/gallery/);
+  test('Direct nav to /gallery still works (redirects to wiki)', async ({ page }) => {
+    await page.goto('/gallery');
+    await expect(page).toHaveURL(/\/wiki/);
   });
 
-  test('Pricing link navigates to /pricing', async ({ page }) => {
-    await page.goto('/');
-    await getNav(page).getByText('Pricing').click();
+  test('Direct nav to /pricing still works', async ({ page }) => {
+    await page.goto('/pricing');
     await expect(page).toHaveURL(/\/pricing/);
   });
 });
@@ -132,10 +129,16 @@ test.describe('Mobile Navigation', () => {
   });
 
   test('mobile can access all main pages via direct navigation', async ({ page }) => {
-    const routes = ['/discover', '/gallery', '/create', '/pricing'];
-    for (const route of routes) {
-      await page.goto(route);
-      await expect(page).toHaveURL(new RegExp(route.replace('/', '\\/')));
+    // /gallery redirects to /wiki; match either landing.
+    const routes: Array<{ visit: string; expect: RegExp }> = [
+      { visit: '/discover', expect: /\/discover/ },
+      { visit: '/gallery', expect: /\/wiki|\/gallery/ },
+      { visit: '/create', expect: /\/create/ },
+      { visit: '/pricing', expect: /\/pricing/ },
+    ];
+    for (const r of routes) {
+      await page.goto(r.visit);
+      await expect(page).toHaveURL(r.expect);
     }
   });
 });

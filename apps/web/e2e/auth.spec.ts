@@ -12,11 +12,10 @@
 import { test, expect, PROTECTED_ROUTES, injectMockSession, clearMockSession } from './fixtures';
 
 test.describe('Login Page', () => {
-  test('renders wallet connection UI', async ({ page }) => {
+  test('renders sign-in UI', async ({ page }) => {
     await page.goto('/login');
     await expect(page).toHaveURL(/\/login/);
-    await expect(page.locator('body')).toContainText(/welcome to loar/i);
-    await expect(page.locator('body')).toContainText(/connect your ethereum wallet/i);
+    // Login uses Circle email OTP — check the page rendered the sign-in flow.
     await expect(page.locator('body')).toContainText(/sign in/i);
   });
 

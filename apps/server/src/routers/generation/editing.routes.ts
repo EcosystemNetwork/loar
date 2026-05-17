@@ -26,7 +26,6 @@ import {
   type EditingOperation,
   type InpaintMode,
 } from '../../services/editing-models';
-import { FieldValue } from 'firebase-admin/firestore';
 import { publishToGallery } from '../../lib/gallery-publish';
 import { recordAssetEventAsync } from '../../services/lineage';
 import type { AssetEventStep, AssetOutputKind } from '../../services/lineage/types';
@@ -34,6 +33,7 @@ import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 import { assertEditSourceAuthorized } from '../../lib/edit-source-authz';
 import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
+import { withReservation } from '../../services/credits';
 
 // Prompt length caps. Kept tight (≤500) because these strings are forwarded to
 // Flux/FAL/Google where unbounded input drives GPU memory and provider cost.
@@ -68,62 +68,9 @@ const editingJobsCol = () => {
   return db.collection('editingJobs');
 };
 
-// ── Credit helpers (same pattern as generation router) ──────────────────
-
-async function deductCredits(uid: string, cost: number, operation: string): Promise<void> {
-  if (!db) return;
-  const { assertGenerationAllowed } = await import('../../lib/generation-guards');
-  await assertGenerationAllowed(uid, cost);
-  const userRef = db.collection('userCredits').doc(uid);
-
-  await db.runTransaction(async (transaction) => {
-    const userDoc = await transaction.get(userRef);
-    const balance = userDoc.data()?.balance || 0;
-
-    if (balance < cost) {
-      throw new TRPCError({
-        code: 'PRECONDITION_FAILED',
-        message: `Insufficient credits. Need ${cost}, have ${balance}. Purchase more credits to continue.`,
-      });
-    }
-
-    transaction.update(userRef, {
-      balance: balance - cost,
-      totalSpent: (userDoc.data()?.totalSpent || 0) + cost,
-      updatedAt: new Date(),
-    });
-
-    const txRef = db.collection('creditTransactions').doc();
-    transaction.set(txRef, {
-      uid,
-      type: 'spend',
-      generationType: `editing_${operation}`,
-      credits: -cost,
-      source: 'editing',
-      createdAt: new Date(),
-    });
-  });
-}
-
-async function refundCredits(uid: string, cost: number): Promise<void> {
-  if (!db) return;
-  const { recordCreditsTx, recordAiGeneration } = await import('../../lib/metrics');
-  try {
-    await db
-      .collection('userCredits')
-      .doc(uid)
-      .update({
-        balance: FieldValue.increment(cost),
-        totalSpent: FieldValue.increment(-cost),
-        updatedAt: new Date(),
-      });
-    recordCreditsTx('refund', 'success');
-  } catch (err) {
-    recordCreditsTx('refund', 'failure');
-    console.error(`[editing refund] Failed to refund ${cost} to ${uid}:`, err);
-  }
-  recordAiGeneration('fal', 'editing', 'failure');
-}
+// Credit handling moved to `withReservation` (`../../services/credits`).
+// Each procedure below wraps the provider call in a reservation that
+// reconciles on success and cancels on thrown error.
 
 const EDIT_OUTPUT_KIND: Record<EditingOperation, AssetOutputKind> = {
   upscale: 'image',
@@ -350,21 +297,60 @@ export const editingRouter = router({
       }
 
       const jobId = randomUUID();
-      await deductCredits(ctx.user.uid, model.creditCost, 'upscale');
-
       const startTime = Date.now();
-      const { resolveProviderKey } = await import('../../lib/byok');
-      const apiKey = await resolveProviderKey(ctx.user.uid, 'fal');
-      const result = await falService.upscaleImage({
-        imageUrl: input.imageUrl,
-        model: model.falModelId,
-        prompt: input.prompt,
-        scale: input.scale,
-        apiKey,
-      });
 
-      if (result.status === 'failed' || !result.imageUrl) {
-        await refundCredits(ctx.user.uid, model.creditCost);
+      try {
+        return await withReservation(
+          {
+            userId: ctx.user.uid,
+            modelId: model.id,
+            provider: 'fal',
+            estimatedCredits: model.creditCost,
+            byok: false,
+            meta: { generationId: jobId, operation: 'upscale' },
+          },
+          async () => {
+            const { resolveProviderKey } = await import('../../lib/byok');
+            const apiKey = await resolveProviderKey(ctx.user.uid, 'fal');
+            const result = await falService.upscaleImage({
+              imageUrl: input.imageUrl,
+              model: model.falModelId,
+              prompt: input.prompt,
+              scale: input.scale,
+              apiKey,
+            });
+
+            if (result.status === 'failed' || !result.imageUrl) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: safeErrorMessage(result.error, 'Upscale failed'),
+              });
+            }
+
+            const record: EditingJobRecord = {
+              id: jobId,
+              userId: ctx.user.uid,
+              operation: 'upscale',
+              modelId: model.id,
+              status: 'completed',
+              inputUrl: input.imageUrl,
+              outputUrl: result.imageUrl,
+              providerCostUsd: model.providerCostUsd,
+              creditsCharged: model.creditCost,
+              latencyMs: Date.now() - startTime,
+              createdAt: new Date(),
+              completedAt: new Date(),
+              sourceGenerationId: input.sourceGenerationId,
+            };
+            saveJobRecord(record).catch(console.error);
+
+            return {
+              result: { jobId, imageUrl: result.imageUrl, model: model.displayName },
+            };
+          }
+        );
+      } catch (err) {
+        // withReservation already cancelled the reservation (full refund).
         const record: EditingJobRecord = {
           id: jobId,
           userId: ctx.user.uid,
@@ -374,36 +360,14 @@ export const editingRouter = router({
           inputUrl: input.imageUrl,
           providerCostUsd: 0,
           creditsCharged: 0,
-          failureReason: safeErrorMessage(result.error, 'Upscale failed'),
+          failureReason: err instanceof Error ? err.message : 'Upscale failed',
           createdAt: new Date(),
           completedAt: new Date(),
           sourceGenerationId: input.sourceGenerationId,
         };
         saveJobRecord(record).catch(console.error);
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: safeErrorMessage(result.error, 'Upscale failed'),
-        });
+        throw err;
       }
-
-      const record: EditingJobRecord = {
-        id: jobId,
-        userId: ctx.user.uid,
-        operation: 'upscale',
-        modelId: model.id,
-        status: 'completed',
-        inputUrl: input.imageUrl,
-        outputUrl: result.imageUrl,
-        providerCostUsd: model.providerCostUsd,
-        creditsCharged: model.creditCost,
-        latencyMs: Date.now() - startTime,
-        createdAt: new Date(),
-        completedAt: new Date(),
-        sourceGenerationId: input.sourceGenerationId,
-      };
-      saveJobRecord(record).catch(console.error);
-
-      return { jobId, imageUrl: result.imageUrl, model: model.displayName };
     }),
 
   // ── Frame Interpolation ─────────────────────────────────────────────
@@ -439,20 +403,58 @@ export const editingRouter = router({
       }
 
       const jobId = randomUUID();
-      await deductCredits(ctx.user.uid, model.creditCost, 'interpolate');
-
       const startTime = Date.now();
-      const { resolveProviderKey: resolveInterp } = await import('../../lib/byok');
-      const interpKey = await resolveInterp(ctx.user.uid, 'fal');
-      const result = await falService.interpolateFrames({
-        videoUrl: input.videoUrl,
-        model: model.falModelId,
-        multiplier: input.multiplier,
-        apiKey: interpKey,
-      });
 
-      if (result.status === 'failed' || !result.videoUrl) {
-        await refundCredits(ctx.user.uid, model.creditCost);
+      try {
+        return await withReservation(
+          {
+            userId: ctx.user.uid,
+            modelId: model.id,
+            provider: 'fal',
+            estimatedCredits: model.creditCost,
+            byok: false,
+            meta: { generationId: jobId, operation: 'interpolate' },
+          },
+          async () => {
+            const { resolveProviderKey: resolveInterp } = await import('../../lib/byok');
+            const interpKey = await resolveInterp(ctx.user.uid, 'fal');
+            const result = await falService.interpolateFrames({
+              videoUrl: input.videoUrl,
+              model: model.falModelId,
+              multiplier: input.multiplier,
+              apiKey: interpKey,
+            });
+
+            if (result.status === 'failed' || !result.videoUrl) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: safeErrorMessage(result.error, 'Interpolation failed'),
+              });
+            }
+
+            const record: EditingJobRecord = {
+              id: jobId,
+              userId: ctx.user.uid,
+              operation: 'interpolate',
+              modelId: model.id,
+              status: 'completed',
+              inputUrl: input.videoUrl,
+              outputUrl: result.videoUrl,
+              providerCostUsd: model.providerCostUsd,
+              creditsCharged: model.creditCost,
+              latencyMs: Date.now() - startTime,
+              createdAt: new Date(),
+              completedAt: new Date(),
+              sourceGenerationId: input.sourceGenerationId,
+            };
+            saveJobRecord(record).catch(console.error);
+
+            return {
+              result: { jobId, videoUrl: result.videoUrl, model: model.displayName },
+            };
+          }
+        );
+      } catch (err) {
         const record: EditingJobRecord = {
           id: jobId,
           userId: ctx.user.uid,
@@ -462,36 +464,14 @@ export const editingRouter = router({
           inputUrl: input.videoUrl,
           providerCostUsd: 0,
           creditsCharged: 0,
-          failureReason: safeErrorMessage(result.error, 'Interpolation failed'),
+          failureReason: err instanceof Error ? err.message : 'Interpolation failed',
           createdAt: new Date(),
           completedAt: new Date(),
           sourceGenerationId: input.sourceGenerationId,
         };
         saveJobRecord(record).catch(console.error);
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: safeErrorMessage(result.error, 'Interpolation failed'),
-        });
+        throw err;
       }
-
-      const record: EditingJobRecord = {
-        id: jobId,
-        userId: ctx.user.uid,
-        operation: 'interpolate',
-        modelId: model.id,
-        status: 'completed',
-        inputUrl: input.videoUrl,
-        outputUrl: result.videoUrl,
-        providerCostUsd: model.providerCostUsd,
-        creditsCharged: model.creditCost,
-        latencyMs: Date.now() - startTime,
-        createdAt: new Date(),
-        completedAt: new Date(),
-        sourceGenerationId: input.sourceGenerationId,
-      };
-      saveJobRecord(record).catch(console.error);
-
-      return { jobId, videoUrl: result.videoUrl, model: model.displayName };
     }),
 
   // ── Video-to-Video Restyle ──────────────────────────────────────────
@@ -561,22 +541,105 @@ export const editingRouter = router({
       }
 
       checkEditThrottle(ctx.user.uid);
-      await deductCredits(ctx.user.uid, model.creditCost, 'restyle');
-
       const startTime = Date.now();
-      const { resolveProviderKey: resolveRestyle } = await import('../../lib/byok');
-      const restyleKey = await resolveRestyle(ctx.user.uid, 'fal');
-      const result = await falService.restyleVideo({
-        videoUrl: input.videoUrl,
-        prompt: input.prompt,
-        model: model.falModelId,
-        strength: input.strength,
-        negativePrompt: input.negativePrompt,
-        apiKey: restyleKey,
-      });
 
-      if (result.status === 'failed' || !result.videoUrl) {
-        await refundCredits(ctx.user.uid, model.creditCost);
+      try {
+        return await withReservation(
+          {
+            userId: ctx.user.uid,
+            modelId: model.id,
+            provider: 'fal',
+            estimatedCredits: model.creditCost,
+            byok: false,
+            meta: { generationId: jobId, operation: 'restyle' },
+          },
+          async () => {
+            const { resolveProviderKey: resolveRestyle } = await import('../../lib/byok');
+            const restyleKey = await resolveRestyle(ctx.user.uid, 'fal');
+            const result = await falService.restyleVideo({
+              videoUrl: input.videoUrl,
+              prompt: input.prompt,
+              model: model.falModelId,
+              strength: input.strength,
+              negativePrompt: input.negativePrompt,
+              apiKey: restyleKey,
+            });
+
+            if (result.status === 'failed' || !result.videoUrl) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: safeErrorMessage(result.error, 'Restyle failed'),
+              });
+            }
+
+            const record: EditingJobRecord & { webhookUrl?: string; clientToken?: string } = {
+              id: jobId,
+              userId: ctx.user.uid,
+              operation: 'restyle',
+              modelId: model.id,
+              status: 'completed',
+              inputUrl: input.videoUrl,
+              outputUrl: result.videoUrl,
+              prompt: input.prompt,
+              providerCostUsd: model.providerCostUsd,
+              creditsCharged: model.creditCost,
+              latencyMs: Date.now() - startTime,
+              createdAt: new Date(),
+              completedAt: new Date(),
+              sourceGenerationId: input.sourceGenerationId,
+              ...(validatedWebhookUrl ? { webhookUrl: validatedWebhookUrl } : {}),
+              ...(input.clientToken ? { clientToken: input.clientToken } : {}),
+            };
+            saveJobRecord(record).catch(console.error);
+
+            // Auto-publish derivative clip to gallery with source-video lineage
+            try {
+              const { extractVideoThumbnail } = await import('../../services/video-thumbnail');
+              const thumbnailUrl = await extractVideoThumbnail(result.videoUrl, jobId);
+              await publishToGallery({
+                creatorUid: ctx.user.uid,
+                mediaUrl: result.videoUrl,
+                thumbnailUrl,
+                mediaType: 'ai-video',
+                title: input.prompt.slice(0, 80) || 'Restyled Clip',
+                description: input.prompt,
+                generationId: jobId,
+                generationModel: model.id,
+                parentGenerationId: input.sourceGenerationId || null,
+                sourceVideoGenerationId: input.sourceGenerationId || null,
+              });
+            } catch (err) {
+              console.error('[restyle] gallery publish failed:', err);
+            }
+
+            fireJobWebhook({
+              ownerUid: ctx.user.uid,
+              webhookUrl: validatedWebhookUrl,
+              clientToken: input.clientToken,
+              event: 'job.completed',
+              jobId,
+              kind: 'video',
+              payload: {
+                operation: 'restyle',
+                status: 'completed',
+                resultUrl: result.videoUrl,
+                modelUsed: model.id,
+                creditsCharged: model.creditCost,
+              },
+            });
+
+            return {
+              result: {
+                jobId,
+                videoUrl: result.videoUrl as string | undefined,
+                model: model.displayName,
+                idempotentReplay: false as const,
+              },
+            };
+          }
+        );
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Restyle failed';
         const record: EditingJobRecord & { webhookUrl?: string; clientToken?: string } = {
           id: jobId,
           userId: ctx.user.uid,
@@ -587,7 +650,7 @@ export const editingRouter = router({
           prompt: input.prompt,
           providerCostUsd: 0,
           creditsCharged: 0,
-          failureReason: safeErrorMessage(result.error, 'Restyle failed'),
+          failureReason: errMsg,
           createdAt: new Date(),
           completedAt: new Date(),
           sourceGenerationId: input.sourceGenerationId,
@@ -605,78 +668,12 @@ export const editingRouter = router({
           payload: {
             operation: 'restyle',
             status: 'failed',
-            errorMessage: safeErrorMessage(result.error, 'Restyle failed'),
+            errorMessage: errMsg,
             creditsRefunded: true,
           },
         });
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: safeErrorMessage(result.error, 'Restyle failed'),
-        });
+        throw err;
       }
-
-      const record: EditingJobRecord & { webhookUrl?: string; clientToken?: string } = {
-        id: jobId,
-        userId: ctx.user.uid,
-        operation: 'restyle',
-        modelId: model.id,
-        status: 'completed',
-        inputUrl: input.videoUrl,
-        outputUrl: result.videoUrl,
-        prompt: input.prompt,
-        providerCostUsd: model.providerCostUsd,
-        creditsCharged: model.creditCost,
-        latencyMs: Date.now() - startTime,
-        createdAt: new Date(),
-        completedAt: new Date(),
-        sourceGenerationId: input.sourceGenerationId,
-        ...(validatedWebhookUrl ? { webhookUrl: validatedWebhookUrl } : {}),
-        ...(input.clientToken ? { clientToken: input.clientToken } : {}),
-      };
-      saveJobRecord(record).catch(console.error);
-
-      // Auto-publish derivative clip to gallery with source-video lineage
-      try {
-        const { extractVideoThumbnail } = await import('../../services/video-thumbnail');
-        const thumbnailUrl = await extractVideoThumbnail(result.videoUrl, jobId);
-        await publishToGallery({
-          creatorUid: ctx.user.uid,
-          mediaUrl: result.videoUrl,
-          thumbnailUrl,
-          mediaType: 'ai-video',
-          title: input.prompt.slice(0, 80) || 'Restyled Clip',
-          description: input.prompt,
-          generationId: jobId,
-          generationModel: model.id,
-          parentGenerationId: input.sourceGenerationId || null,
-          sourceVideoGenerationId: input.sourceGenerationId || null,
-        });
-      } catch (err) {
-        console.error('[restyle] gallery publish failed:', err);
-      }
-
-      fireJobWebhook({
-        ownerUid: ctx.user.uid,
-        webhookUrl: validatedWebhookUrl,
-        clientToken: input.clientToken,
-        event: 'job.completed',
-        jobId,
-        kind: 'video',
-        payload: {
-          operation: 'restyle',
-          status: 'completed',
-          resultUrl: result.videoUrl,
-          modelUsed: model.id,
-          creditsCharged: model.creditCost,
-        },
-      });
-
-      return {
-        jobId,
-        videoUrl: result.videoUrl as string | undefined,
-        model: model.displayName,
-        idempotentReplay: false as const,
-      };
     }),
 
   // ── Inpainting ──────────────────────────────────────────────────────
@@ -748,32 +745,117 @@ export const editingRouter = router({
         : composedNegative;
 
       const jobId = randomUUID();
-      await deductCredits(ctx.user.uid, model.creditCost, 'inpaint');
-
       const startTime = Date.now();
-      const { resolveProviderKey: resolveInpaintKey } = await import('../../lib/byok');
-      const inpaintKey = await resolveInpaintKey(ctx.user.uid, 'fal');
-      const result = isEraser
-        ? await falService.eraseRegion({
-            imageUrl: input.imageUrl,
-            maskUrl: input.maskUrl,
-            model: model.falModelId,
-            apiKey: inpaintKey,
-          })
-        : await falService.inpaintImage({
-            imageUrl: input.imageUrl,
-            maskUrl: input.maskUrl,
-            prompt: composedPrompt,
-            model: model.falModelId,
-            negativePrompt: finalNegative,
-            seed: input.seed,
-            strength: input.strength,
-            guidanceScale: input.guidanceScale,
-            apiKey: inpaintKey,
-          });
 
-      if (result.status === 'failed' || !result.imageUrl) {
-        await refundCredits(ctx.user.uid, model.creditCost);
+      try {
+        return await withReservation(
+          {
+            userId: ctx.user.uid,
+            modelId: model.id,
+            provider: 'fal',
+            estimatedCredits: model.creditCost,
+            byok: false,
+            meta: { generationId: jobId, operation: 'inpaint' },
+          },
+          async () => {
+            const { resolveProviderKey: resolveInpaintKey } = await import('../../lib/byok');
+            const inpaintKey = await resolveInpaintKey(ctx.user.uid, 'fal');
+            const result = isEraser
+              ? await falService.eraseRegion({
+                  imageUrl: input.imageUrl,
+                  maskUrl: input.maskUrl,
+                  model: model.falModelId,
+                  apiKey: inpaintKey,
+                })
+              : await falService.inpaintImage({
+                  imageUrl: input.imageUrl,
+                  maskUrl: input.maskUrl,
+                  prompt: composedPrompt,
+                  model: model.falModelId,
+                  negativePrompt: finalNegative,
+                  seed: input.seed,
+                  strength: input.strength,
+                  guidanceScale: input.guidanceScale,
+                  apiKey: inpaintKey,
+                });
+
+            if (result.status === 'failed' || !result.imageUrl) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: safeErrorMessage(result.error, 'Inpaint failed'),
+              });
+            }
+
+            const record: EditingJobRecord = {
+              id: jobId,
+              userId: ctx.user.uid,
+              operation: 'inpaint',
+              modelId: model.id,
+              status: 'completed',
+              inputUrl: input.imageUrl,
+              outputUrl: result.imageUrl,
+              maskUrl: input.maskUrl,
+              prompt: input.prompt,
+              negativePrompt: input.negativePrompt,
+              mode: input.mode,
+              seed: result.seed,
+              providerCostUsd: model.providerCostUsd,
+              creditsCharged: model.creditCost,
+              latencyMs: Date.now() - startTime,
+              createdAt: new Date(),
+              completedAt: new Date(),
+              sourceGenerationId: input.sourceGenerationId,
+            };
+
+            // Gallery auto-publish — per product rule, every generated image must
+            // appear in the user's gallery without a manual promote step.
+            if (input.publishToGallery) {
+              try {
+                const modeLabels: Record<InpaintMode, string> = {
+                  replace: 'Replaced region',
+                  remove: 'Removed object',
+                  add: 'Added content',
+                  fix: 'Fixed details',
+                };
+                const title = input.prompt.trim()
+                  ? `${modeLabels[input.mode]}: ${input.prompt.trim().slice(0, 60)}`
+                  : modeLabels[input.mode];
+
+                await publishToGallery({
+                  creatorUid: ctx.user.uid,
+                  mediaUrl: result.imageUrl,
+                  mediaType: 'ai-image',
+                  title,
+                  description: `Inpaint (${input.mode}) via ${model.displayName}${
+                    input.prompt.trim() ? ` — "${input.prompt.trim()}"` : ''
+                  }`,
+                  generationId: jobId,
+                  generationModel: model.displayName,
+                  universeId: input.universeId ?? null,
+                  tags: ['inpaint', input.mode, 'edit'],
+                });
+                record.galleryContentId = jobId;
+              } catch (err) {
+                // Gallery publish is best-effort — don't fail the whole request.
+                console.warn('[inpaint] publishToGallery failed:', err);
+              }
+            }
+
+            saveJobRecord(record).catch(console.error);
+
+            return {
+              result: {
+                jobId,
+                imageUrl: result.imageUrl,
+                model: model.displayName,
+                seed: result.seed,
+                mode: input.mode,
+              },
+            };
+          }
+        );
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Inpaint failed';
         const record: EditingJobRecord = {
           id: jobId,
           userId: ctx.user.uid,
@@ -788,82 +870,14 @@ export const editingRouter = router({
           seed: input.seed,
           providerCostUsd: 0,
           creditsCharged: 0,
-          failureReason: safeErrorMessage(result.error, 'Inpaint failed'),
+          failureReason: errMsg,
           createdAt: new Date(),
           completedAt: new Date(),
           sourceGenerationId: input.sourceGenerationId,
         };
         saveJobRecord(record).catch(console.error);
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: safeErrorMessage(result.error, 'Inpaint failed'),
-        });
+        throw err;
       }
-
-      const record: EditingJobRecord = {
-        id: jobId,
-        userId: ctx.user.uid,
-        operation: 'inpaint',
-        modelId: model.id,
-        status: 'completed',
-        inputUrl: input.imageUrl,
-        outputUrl: result.imageUrl,
-        maskUrl: input.maskUrl,
-        prompt: input.prompt,
-        negativePrompt: input.negativePrompt,
-        mode: input.mode,
-        seed: result.seed,
-        providerCostUsd: model.providerCostUsd,
-        creditsCharged: model.creditCost,
-        latencyMs: Date.now() - startTime,
-        createdAt: new Date(),
-        completedAt: new Date(),
-        sourceGenerationId: input.sourceGenerationId,
-      };
-
-      // Gallery auto-publish — per product rule, every generated image must
-      // appear in the user's gallery without a manual promote step.
-      if (input.publishToGallery) {
-        try {
-          const modeLabels: Record<InpaintMode, string> = {
-            replace: 'Replaced region',
-            remove: 'Removed object',
-            add: 'Added content',
-            fix: 'Fixed details',
-          };
-          const title = input.prompt.trim()
-            ? `${modeLabels[input.mode]}: ${input.prompt.trim().slice(0, 60)}`
-            : modeLabels[input.mode];
-
-          await publishToGallery({
-            creatorUid: ctx.user.uid,
-            mediaUrl: result.imageUrl,
-            mediaType: 'ai-image',
-            title,
-            description: `Inpaint (${input.mode}) via ${model.displayName}${
-              input.prompt.trim() ? ` — "${input.prompt.trim()}"` : ''
-            }`,
-            generationId: jobId,
-            generationModel: model.displayName,
-            universeId: input.universeId ?? null,
-            tags: ['inpaint', input.mode, 'edit'],
-          });
-          record.galleryContentId = jobId;
-        } catch (err) {
-          // Gallery publish is best-effort — don't fail the whole request.
-          console.warn('[inpaint] publishToGallery failed:', err);
-        }
-      }
-
-      saveJobRecord(record).catch(console.error);
-
-      return {
-        jobId,
-        imageUrl: result.imageUrl,
-        model: model.displayName,
-        seed: result.seed,
-        mode: input.mode,
-      };
     }),
 
   // ── Background Removal ──────────────────────────────────────────────
@@ -898,43 +912,53 @@ export const editingRouter = router({
       }
 
       const jobId = randomUUID();
-      await deductCredits(ctx.user.uid, model.creditCost, 'remove_bg');
-
       const startTime = Date.now();
-      const { resolveProviderKey: resolveBgKey } = await import('../../lib/byok');
-      const bgKey = await resolveBgKey(ctx.user.uid, 'fal');
-      const result = await falService.removeBackground({
-        imageUrl: input.imageUrl,
-        model: model.falModelId,
-        apiKey: bgKey,
-      });
 
-      if (result.status === 'failed' || !result.imageUrl) {
-        await refundCredits(ctx.user.uid, model.creditCost);
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: safeErrorMessage(result.error, 'Background removal failed'),
-        });
-      }
+      return withReservation(
+        {
+          userId: ctx.user.uid,
+          modelId: model.id,
+          provider: 'fal',
+          estimatedCredits: model.creditCost,
+          byok: false,
+          meta: { generationId: jobId, operation: 'remove_bg' },
+        },
+        async () => {
+          const { resolveProviderKey: resolveBgKey } = await import('../../lib/byok');
+          const bgKey = await resolveBgKey(ctx.user.uid, 'fal');
+          const result = await falService.removeBackground({
+            imageUrl: input.imageUrl,
+            model: model.falModelId,
+            apiKey: bgKey,
+          });
 
-      const record: EditingJobRecord = {
-        id: jobId,
-        userId: ctx.user.uid,
-        operation: 'remove_bg',
-        modelId: model.id,
-        status: 'completed',
-        inputUrl: input.imageUrl,
-        outputUrl: result.imageUrl,
-        providerCostUsd: model.providerCostUsd,
-        creditsCharged: model.creditCost,
-        latencyMs: Date.now() - startTime,
-        createdAt: new Date(),
-        completedAt: new Date(),
-        sourceGenerationId: input.sourceGenerationId,
-      };
-      saveJobRecord(record).catch(console.error);
+          if (result.status === 'failed' || !result.imageUrl) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: safeErrorMessage(result.error, 'Background removal failed'),
+            });
+          }
 
-      return { jobId, imageUrl: result.imageUrl, model: model.displayName };
+          const record: EditingJobRecord = {
+            id: jobId,
+            userId: ctx.user.uid,
+            operation: 'remove_bg',
+            modelId: model.id,
+            status: 'completed',
+            inputUrl: input.imageUrl,
+            outputUrl: result.imageUrl,
+            providerCostUsd: model.providerCostUsd,
+            creditsCharged: model.creditCost,
+            latencyMs: Date.now() - startTime,
+            createdAt: new Date(),
+            completedAt: new Date(),
+            sourceGenerationId: input.sourceGenerationId,
+          };
+          saveJobRecord(record).catch(console.error);
+
+          return { result: { jobId, imageUrl: result.imageUrl, model: model.displayName } };
+        }
+      );
     }),
 
   // ── Video Extension ─────────────────────────────────────────────────
@@ -971,100 +995,109 @@ export const editingRouter = router({
       }
 
       const jobId = randomUUID();
-      await deductCredits(ctx.user.uid, model.creditCost, 'extend');
-
-      // Extract last frame from the video using ffmpeg, then use image-to-video
       const startTime = Date.now();
 
-      let lastFrameUrl = input.videoUrl;
-      try {
-        // Only accept HTTPS — ffmpeg's default protocol set can read local
-        // files via `file:`, `concat:`, `subfile:`, etc.
-        let parsedVideoUrl: URL;
-        try {
-          parsedVideoUrl = new URL(input.videoUrl);
-        } catch {
-          throw new Error('videoUrl is not a valid URL');
+      return withReservation(
+        {
+          userId: ctx.user.uid,
+          modelId: model.id,
+          provider: 'fal',
+          estimatedCredits: model.creditCost,
+          byok: false,
+          meta: { generationId: jobId, operation: 'extend' },
+        },
+        async () => {
+          // Extract last frame from the video using ffmpeg, then use image-to-video
+          let lastFrameUrl = input.videoUrl;
+          try {
+            // Only accept HTTPS — ffmpeg's default protocol set can read local
+            // files via `file:`, `concat:`, `subfile:`, etc.
+            let parsedVideoUrl: URL;
+            try {
+              parsedVideoUrl = new URL(input.videoUrl);
+            } catch {
+              throw new Error('videoUrl is not a valid URL');
+            }
+            if (parsedVideoUrl.protocol !== 'https:') {
+              throw new Error('videoUrl must be an https: URL');
+            }
+
+            const { execFile } = await import('child_process');
+            const { promisify } = await import('util');
+            const { tmpdir } = await import('os');
+            const { join } = await import('path');
+            const { readFile, unlink } = await import('fs/promises');
+            const execFileAsync = promisify(execFile);
+
+            const outPath = join(tmpdir(), `lastframe-${jobId}.jpg`);
+
+            // Extract the last frame using ffmpeg (seek to near-end)
+            await execFileAsync(
+              'ffmpeg',
+              [
+                '-y',
+                '-protocol_whitelist',
+                'https,tls,tcp',
+                '-sseof',
+                '-0.5',
+                '-i',
+                input.videoUrl,
+                '-frames:v',
+                '1',
+                '-q:v',
+                '2',
+                outPath,
+              ],
+              { timeout: 15000 }
+            );
+
+            // Upload to FAL as data URL for the image-to-video call
+            const frameBuffer = await readFile(outPath);
+            lastFrameUrl = `data:image/jpeg;base64,${frameBuffer.toString('base64')}`;
+            unlink(outPath).catch(() => {});
+          } catch (err) {
+            console.warn('[extend] Could not extract last frame, using video URL directly:', err);
+          }
+
+          // Use image-to-video generation with the last frame
+          const { resolveProviderKey: resolveExtendKey } = await import('../../lib/byok');
+          const extendKey = await resolveExtendKey(ctx.user.uid, 'fal');
+          const result = await falService.generateVideo({
+            prompt: input.prompt,
+            model: model.falModelId as any,
+            imageUrl: lastFrameUrl,
+            duration: input.durationSec,
+            apiKey: extendKey,
+          });
+
+          if (result.status === 'failed' || !result.videoUrl) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: safeErrorMessage(result.error, 'Video extension failed'),
+            });
+          }
+
+          const record: EditingJobRecord = {
+            id: jobId,
+            userId: ctx.user.uid,
+            operation: 'extend',
+            modelId: model.id,
+            status: 'completed',
+            inputUrl: input.videoUrl,
+            outputUrl: result.videoUrl,
+            prompt: input.prompt,
+            providerCostUsd: model.providerCostUsd,
+            creditsCharged: model.creditCost,
+            latencyMs: Date.now() - startTime,
+            createdAt: new Date(),
+            completedAt: new Date(),
+            sourceGenerationId: input.sourceGenerationId,
+          };
+          saveJobRecord(record).catch(console.error);
+
+          return { result: { jobId, videoUrl: result.videoUrl, model: model.displayName } };
         }
-        if (parsedVideoUrl.protocol !== 'https:') {
-          throw new Error('videoUrl must be an https: URL');
-        }
-
-        const { execFile } = await import('child_process');
-        const { promisify } = await import('util');
-        const { tmpdir } = await import('os');
-        const { join } = await import('path');
-        const { readFile, unlink } = await import('fs/promises');
-        const execFileAsync = promisify(execFile);
-
-        const outPath = join(tmpdir(), `lastframe-${jobId}.jpg`);
-
-        // Extract the last frame using ffmpeg (seek to near-end)
-        await execFileAsync(
-          'ffmpeg',
-          [
-            '-y',
-            '-protocol_whitelist',
-            'https,tls,tcp',
-            '-sseof',
-            '-0.5',
-            '-i',
-            input.videoUrl,
-            '-frames:v',
-            '1',
-            '-q:v',
-            '2',
-            outPath,
-          ],
-          { timeout: 15000 }
-        );
-
-        // Upload to FAL as data URL for the image-to-video call
-        const frameBuffer = await readFile(outPath);
-        lastFrameUrl = `data:image/jpeg;base64,${frameBuffer.toString('base64')}`;
-        unlink(outPath).catch(() => {});
-      } catch (err) {
-        console.warn('[extend] Could not extract last frame, using video URL directly:', err);
-      }
-
-      // Use image-to-video generation with the last frame
-      const { resolveProviderKey: resolveExtendKey } = await import('../../lib/byok');
-      const extendKey = await resolveExtendKey(ctx.user.uid, 'fal');
-      const result = await falService.generateVideo({
-        prompt: input.prompt,
-        model: model.falModelId as any,
-        imageUrl: lastFrameUrl,
-        duration: input.durationSec,
-        apiKey: extendKey,
-      });
-
-      if (result.status === 'failed' || !result.videoUrl) {
-        await refundCredits(ctx.user.uid, model.creditCost);
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: safeErrorMessage(result.error, 'Video extension failed'),
-        });
-      }
-
-      const record: EditingJobRecord = {
-        id: jobId,
-        userId: ctx.user.uid,
-        operation: 'extend',
-        modelId: model.id,
-        status: 'completed',
-        inputUrl: input.videoUrl,
-        outputUrl: result.videoUrl,
-        prompt: input.prompt,
-        providerCostUsd: model.providerCostUsd,
-        creditsCharged: model.creditCost,
-        latencyMs: Date.now() - startTime,
-        createdAt: new Date(),
-        completedAt: new Date(),
-        sourceGenerationId: input.sourceGenerationId,
-      };
-      saveJobRecord(record).catch(console.error);
-
-      return { jobId, videoUrl: result.videoUrl, model: model.displayName };
+      );
     }),
 
   // ── Relight (lighting / time-of-day / backdrop / color mood) ────────
@@ -1168,21 +1201,146 @@ export const editingRouter = router({
 
       const totalCost = model.creditCost * input.numImages;
       const jobId = randomUUID();
-      await deductCredits(ctx.user.uid, totalCost, 'relight');
-
       const startTime = Date.now();
-      const { resolveProviderKey: resolveRelightKey } = await import('../../lib/byok');
-      const relightKey = await resolveRelightKey(ctx.user.uid, 'fal');
-      const result = await falService.editImage({
-        prompt: composed.prompt,
-        imageUrls: [input.imageUrl],
-        numImages: input.numImages,
-        negativePrompt: composed.negativePrompt || undefined,
-        apiKey: relightKey,
-      });
 
-      if (result.status === 'failed' || !result.imageUrl) {
-        await refundCredits(ctx.user.uid, totalCost);
+      try {
+        return await withReservation(
+          {
+            userId: ctx.user.uid,
+            modelId: model.id,
+            provider: 'fal',
+            estimatedCredits: totalCost,
+            byok: false,
+            meta: { generationId: jobId, operation: 'relight' },
+          },
+          async () => {
+            const { resolveProviderKey: resolveRelightKey } = await import('../../lib/byok');
+            const relightKey = await resolveRelightKey(ctx.user.uid, 'fal');
+            const result = await falService.editImage({
+              prompt: composed.prompt,
+              imageUrls: [input.imageUrl],
+              numImages: input.numImages,
+              negativePrompt: composed.negativePrompt || undefined,
+              apiKey: relightKey,
+            });
+
+            if (result.status === 'failed' || !result.imageUrl) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: safeErrorMessage(result.error, 'Relight failed'),
+              });
+            }
+
+            const outputs = (result.images ?? [{ url: result.imageUrl }]).map((img) => img.url);
+
+            const record: EditingJobRecord = {
+              id: jobId,
+              userId: ctx.user.uid,
+              operation: 'relight',
+              modelId: model.id,
+              status: 'completed',
+              inputUrl: input.imageUrl,
+              outputUrl: outputs[0],
+              prompt: composed.prompt,
+              negativePrompt: composed.negativePrompt,
+              providerCostUsd: model.providerCostUsd * input.numImages,
+              creditsCharged: totalCost,
+              latencyMs: Date.now() - startTime,
+              seed: result.seed,
+              createdAt: new Date(),
+              completedAt: new Date(),
+              sourceGenerationId: input.sourceGenerationId,
+              sourceAttachmentId: input.sourceAttachmentId,
+              presetIds: composed.appliedPresetIds,
+              tonePackId: input.tonePackId,
+              universeAddress: input.universeAddress,
+            };
+            saveJobRecord(record).catch(console.error);
+
+            // Auto-publish each output to the public gallery so it joins the
+            // creator's portfolio without a manual step. Best-effort — failure
+            // here does NOT fail the relight call.
+            if (input.publishToGallery) {
+              const presetTags = composed.appliedPresetIds.map((p) => `relight:${p}`);
+              for (const outUrl of outputs) {
+                publishToGallery({
+                  creatorUid: ctx.user.uid,
+                  mediaUrl: outUrl,
+                  mediaType: 'ai-image',
+                  title: `Relight — ${composed.appliedPresetIds.slice(0, 2).join(', ') || 'custom'}`,
+                  description: composed.prompt.slice(0, 240),
+                  universeId: input.universeAddress ?? null,
+                  generationId: jobId,
+                  generationModel: model.displayName,
+                  tags: ['relight', ...presetTags],
+                }).catch((err) =>
+                  console.error(`[relight] gallery publish failed for ${jobId}:`, err)
+                );
+              }
+            }
+
+            // If the source was a tracked media attachment, chain new variants so
+            // the entity / universe sees them grouped under the original.
+            if (input.sourceAttachmentId && db) {
+              try {
+                const { createAttachment, getNextVersion } =
+                  await import('../../routers/media/media.handlers');
+                const sourceDoc = await db
+                  .collection('mediaAttachments')
+                  .doc(input.sourceAttachmentId)
+                  .get();
+                if (sourceDoc.exists && ctx.user.address) {
+                  const src = sourceDoc.data()!;
+                  const variantLabel =
+                    composed.appliedPresetIds.slice(0, 2).join(' + ') ||
+                    (input.freeText ? input.freeText.slice(0, 40) : 'Relight');
+                  for (const outUrl of outputs) {
+                    const version = await getNextVersion(
+                      src.targetType,
+                      src.targetId,
+                      src.category ?? 'image',
+                      input.sourceAttachmentId
+                    );
+                    await createAttachment(ctx.user.address, {
+                      contentHash: '', // unknown — gallery rehost computes its own
+                      originalFilename: `${jobId}.png`,
+                      mimeType: 'image/png',
+                      size: 0,
+                      url: outUrl,
+                      targetType: src.targetType,
+                      targetId: src.targetId,
+                      targetName: src.targetName ?? '',
+                      category: src.category ?? 'image',
+                      label: `${src.label ?? 'Image'} — ${variantLabel}`,
+                      subCategory: src.subCategory ?? null,
+                      version,
+                      variantOf: input.sourceAttachmentId,
+                      variantLabel,
+                      sortOrder: src.sortOrder ?? 0,
+                      generationId: jobId,
+                    });
+                  }
+                }
+              } catch (err) {
+                console.error(`[relight] variant chain failed for ${jobId}:`, err);
+              }
+            }
+
+            return {
+              result: {
+                jobId,
+                imageUrl: outputs[0],
+                images: outputs,
+                appliedPresetIds: composed.appliedPresetIds,
+                prompt: composed.prompt,
+                creditsCharged: totalCost,
+                model: model.displayName,
+              },
+            };
+          }
+        );
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Relight failed';
         const failedRecord: EditingJobRecord = {
           id: jobId,
           userId: ctx.user.uid,
@@ -1194,7 +1352,7 @@ export const editingRouter = router({
           negativePrompt: composed.negativePrompt,
           providerCostUsd: 0,
           creditsCharged: 0,
-          failureReason: safeErrorMessage(result.error, 'Relight failed'),
+          failureReason: errMsg,
           createdAt: new Date(),
           completedAt: new Date(),
           sourceGenerationId: input.sourceGenerationId,
@@ -1204,114 +1362,8 @@ export const editingRouter = router({
           universeAddress: input.universeAddress,
         };
         saveJobRecord(failedRecord).catch(console.error);
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: safeErrorMessage(result.error, 'Relight failed'),
-        });
+        throw err;
       }
-
-      const outputs = (result.images ?? [{ url: result.imageUrl }]).map((img) => img.url);
-
-      const record: EditingJobRecord = {
-        id: jobId,
-        userId: ctx.user.uid,
-        operation: 'relight',
-        modelId: model.id,
-        status: 'completed',
-        inputUrl: input.imageUrl,
-        outputUrl: outputs[0],
-        prompt: composed.prompt,
-        negativePrompt: composed.negativePrompt,
-        providerCostUsd: model.providerCostUsd * input.numImages,
-        creditsCharged: totalCost,
-        latencyMs: Date.now() - startTime,
-        seed: result.seed,
-        createdAt: new Date(),
-        completedAt: new Date(),
-        sourceGenerationId: input.sourceGenerationId,
-        sourceAttachmentId: input.sourceAttachmentId,
-        presetIds: composed.appliedPresetIds,
-        tonePackId: input.tonePackId,
-        universeAddress: input.universeAddress,
-      };
-      saveJobRecord(record).catch(console.error);
-
-      // Auto-publish each output to the public gallery so it joins the
-      // creator's portfolio without a manual step. Best-effort — failure
-      // here does NOT fail the relight call.
-      if (input.publishToGallery) {
-        const presetTags = composed.appliedPresetIds.map((p) => `relight:${p}`);
-        for (const outUrl of outputs) {
-          publishToGallery({
-            creatorUid: ctx.user.uid,
-            mediaUrl: outUrl,
-            mediaType: 'ai-image',
-            title: `Relight — ${composed.appliedPresetIds.slice(0, 2).join(', ') || 'custom'}`,
-            description: composed.prompt.slice(0, 240),
-            universeId: input.universeAddress ?? null,
-            generationId: jobId,
-            generationModel: model.displayName,
-            tags: ['relight', ...presetTags],
-          }).catch((err) => console.error(`[relight] gallery publish failed for ${jobId}:`, err));
-        }
-      }
-
-      // If the source was a tracked media attachment, chain new variants so
-      // the entity / universe sees them grouped under the original.
-      if (input.sourceAttachmentId && db) {
-        try {
-          const { createAttachment, getNextVersion } =
-            await import('../../routers/media/media.handlers');
-          const sourceDoc = await db
-            .collection('mediaAttachments')
-            .doc(input.sourceAttachmentId)
-            .get();
-          if (sourceDoc.exists && ctx.user.address) {
-            const src = sourceDoc.data()!;
-            const variantLabel =
-              composed.appliedPresetIds.slice(0, 2).join(' + ') ||
-              (input.freeText ? input.freeText.slice(0, 40) : 'Relight');
-            for (const outUrl of outputs) {
-              const version = await getNextVersion(
-                src.targetType,
-                src.targetId,
-                src.category ?? 'image',
-                input.sourceAttachmentId
-              );
-              await createAttachment(ctx.user.address, {
-                contentHash: '', // unknown — gallery rehost computes its own
-                originalFilename: `${jobId}.png`,
-                mimeType: 'image/png',
-                size: 0,
-                url: outUrl,
-                targetType: src.targetType,
-                targetId: src.targetId,
-                targetName: src.targetName ?? '',
-                category: src.category ?? 'image',
-                label: `${src.label ?? 'Image'} — ${variantLabel}`,
-                subCategory: src.subCategory ?? null,
-                version,
-                variantOf: input.sourceAttachmentId,
-                variantLabel,
-                sortOrder: src.sortOrder ?? 0,
-                generationId: jobId,
-              });
-            }
-          }
-        } catch (err) {
-          console.error(`[relight] variant chain failed for ${jobId}:`, err);
-        }
-      }
-
-      return {
-        jobId,
-        imageUrl: outputs[0],
-        images: outputs,
-        appliedPresetIds: composed.appliedPresetIds,
-        prompt: composed.prompt,
-        creditsCharged: totalCost,
-        model: model.displayName,
-      };
     }),
 
   // ── History ─────────────────────────────────────────────────────────
