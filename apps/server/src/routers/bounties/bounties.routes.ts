@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure, publicProcedure } from '../../lib/trpc';
 import { db, firebaseAvailable } from '../../lib/firebase';
+import { resolveActingUid } from '../../services/agentAuth';
 
 const getBountiesCol = () => (firebaseAvailable ? db.collection('bounties') : null);
 const getBountySubmissionsCol = () =>
@@ -65,6 +66,7 @@ export const bountiesRouter = router({
         ]),
         deadlineDays: z.number().min(1).max(365),
         txHash: z.string().optional(), // on-chain tx hash for $LOAR lock
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -72,12 +74,14 @@ export const bountiesRouter = router({
       if (!col)
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Bounties not available' });
 
+      const { actingUid } = await resolveActingUid(ctx.user.uid, input.onBehalfOfUid, 'bounties');
+
       const now = new Date();
       const deadline = new Date(now.getTime() + input.deadlineDays * 86400 * 1000);
 
       const bounty = {
         poster: ctx.user.address,
-        posterUid: ctx.user.uid,
+        posterUid: actingUid,
         universeId: input.universeId || null,
         reward: input.reward,
         title: input.title,
@@ -104,6 +108,7 @@ export const bountiesRouter = router({
         contentUrl: z.string().url(), // IPFS/storage URL of submission
         contentHash: z.string().optional(),
         description: z.string().max(2000),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -111,6 +116,8 @@ export const bountiesRouter = router({
       const subsCol = getBountySubmissionsCol();
       if (!bountiesCol || !subsCol)
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Service not available' });
+
+      const { actingUid } = await resolveActingUid(ctx.user.uid, input.onBehalfOfUid, 'bounties');
 
       const bountyDoc = await bountiesCol.doc(input.bountyId).get();
       if (!bountyDoc.exists)
@@ -125,7 +132,7 @@ export const bountiesRouter = router({
       const submission = {
         bountyId: input.bountyId,
         submitter: ctx.user.address,
-        submitterUid: ctx.user.uid,
+        submitterUid: actingUid,
         contentUrl: input.contentUrl,
         contentHash: input.contentHash || null,
         description: input.description,
@@ -162,6 +169,8 @@ export const bountiesRouter = router({
         bountyId: z.string(),
         submissionId: z.string(),
         txHash: z.string().optional(), // on-chain award tx
+        autoCanonize: z.boolean().default(true),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -170,11 +179,13 @@ export const bountiesRouter = router({
       if (!bountiesCol || !subsCol)
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Service not available' });
 
+      const { actingUid } = await resolveActingUid(ctx.user.uid, input.onBehalfOfUid, 'bounties');
+
       const bountyDoc = await bountiesCol.doc(input.bountyId).get();
       if (!bountyDoc.exists)
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Bounty not found' });
       const bounty = bountyDoc.data()!;
-      if (!ctx.user.uid || bounty.posterUid !== ctx.user.uid)
+      if (bounty.posterUid !== actingUid)
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Only poster can award' });
       if (bounty.status !== 'open')
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Bounty not open' });
@@ -195,22 +206,69 @@ export const bountiesRouter = router({
 
       await subsCol.doc(input.submissionId).update({
         status: 'accepted',
+        acceptedAt: now.toISOString(),
       });
 
-      return { success: true };
+      // Auto-canonize: owner-paid work skips the public vote and lands in canon directly.
+      let canonSubmissionId: string | null = null;
+      if (input.autoCanonize && bounty.universeId) {
+        try {
+          const submissionsCol = firebaseAvailable ? db.collection('canonSubmissions') : null;
+          if (submissionsCol) {
+            const canonRef = await submissionsCol.add({
+              universeId: bounty.universeId,
+              universeToken: bounty.universeToken || null,
+              submissionType: bounty.contentType || 'other',
+              title: bounty.title,
+              description: bounty.description,
+              contentHash: submission.contentHash || null,
+              metadataURI: submission.contentUrl,
+              mediaUrl: submission.contentUrl,
+              onChainSubmissionId: null,
+              creatorUid: submission.submitterUid,
+              creatorAddress: submission.submitter,
+              status: 'ACCEPTED',
+              votesFor: 0,
+              votesAgainst: 0,
+              voterCount: 0,
+              votingDeadline: now,
+              acceptedAt: now,
+              originatedFrom: `bounty:${input.bountyId}`,
+              createdAt: now,
+              updatedAt: now,
+            });
+            canonSubmissionId = canonRef.id;
+            await subsCol.doc(input.submissionId).update({ canonSubmissionId });
+          }
+        } catch (err) {
+          // Don't fail the award just because canonization failed; log and continue.
+          console.error('Auto-canonize on bounty award failed:', err);
+        }
+      }
+
+      return { success: true, canonSubmissionId };
     }),
 
   // ── Cancel bounty ──────────────────────────────────────────
   cancel: protectedProcedure
-    .input(z.object({ bountyId: z.string(), txHash: z.string().optional() }))
+    .input(
+      z.object({
+        bountyId: z.string(),
+        txHash: z.string().optional(),
+        onBehalfOfUid: z.string().optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const col = getBountiesCol();
       if (!col)
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Service not available' });
+
+      const { actingUid } = await resolveActingUid(ctx.user.uid, input.onBehalfOfUid, 'bounties');
+
       const doc = await col.doc(input.bountyId).get();
       if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Bounty not found' });
       const bounty = doc.data()!;
-      if (!ctx.user.uid || bounty.posterUid !== ctx.user.uid)
+      if (bounty.posterUid !== actingUid)
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Only poster can cancel' });
       if (bounty.status !== 'open')
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Bounty not open' });

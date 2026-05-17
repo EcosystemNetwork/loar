@@ -22,6 +22,7 @@ import { sepolia, baseSepolia } from 'viem/chains';
 import { getStorageManager } from '../../services/storage';
 import { throwApiError } from '../../lib/errors';
 import { recordRevenueEvent } from '../../services/revenue-recorder';
+import { resolveActingUid } from '../../services/agentAuth';
 import {
   assertContentOperable,
   assertContentHashOperable,
@@ -83,10 +84,13 @@ export const nftRouter = router({
         royaltyBps: z.number().min(0).max(10000).default(500),
         /** Optional universe to associate with */
         universeId: z.string().optional(),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       try {
+        const { actingUid } = await resolveActingUid(ctx.user.uid, input.onBehalfOfUid, 'nft');
+
         // Block minting of moderated content
         await assertContentOperable(input.contentId);
         // For monetized universes, require at least one canon episode before
@@ -99,7 +103,7 @@ export const nftRouter = router({
         if (!contentDoc.exists) throwApiError('NOT_FOUND', 'Content not found in gallery');
         const content = contentDoc.data()!;
 
-        if (content.creatorUid !== ctx.user.uid) {
+        if (content.creatorUid !== actingUid) {
           throwApiError('FORBIDDEN', 'Only the creator can mint their content');
         }
 

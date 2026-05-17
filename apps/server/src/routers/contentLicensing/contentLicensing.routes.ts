@@ -13,6 +13,7 @@ import { computeEntityHash } from '../../services/split-orchestrator';
 import { recordRevenueEvent } from '../../services/revenue-recorder';
 import { verifyAndClaimTx } from '../../services/tx-verify';
 import { isUniverseAdmin } from '../../lib/safe-admin';
+import { resolveActingUid } from '../../services/agentAuth';
 import { assertContentOperable } from '../../lib/content-status';
 
 const registrationsCol = () => {
@@ -45,12 +46,16 @@ export const contentLicensingRouter = router({
         thumbnailUrl: z.string().optional(),
         mediaType: z.string().optional(),
         txHash: z.string().optional(),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const { onBehalfOfUid, ...registerInput } = input;
+      const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'contentLicensing');
+
       // Verify caller is the universe admin
       const callerAddress = ctx.user.address || ctx.user.uid;
-      if (!(await isUniverseAdmin(input.universeId, callerAddress))) {
+      if (!(await isUniverseAdmin(registerInput.universeId, callerAddress))) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'Only the universe admin can register content for licensing',
@@ -61,10 +66,10 @@ export const contentLicensingRouter = router({
       // removed / under-review content cannot accept new commercial deals —
       // otherwise a creator can race the moderation team by listing right
       // before a takedown lands.
-      await assertContentOperable(input.contentId);
+      await assertContentOperable(registerInput.contentId);
 
       // Verify content is not fan-classified (non-commercial content cannot be licensed)
-      const contentDoc = await db.collection('content').doc(input.contentId).get();
+      const contentDoc = await db.collection('content').doc(registerInput.contentId).get();
       if (contentDoc.exists && contentDoc.data()?.classification === 'fan') {
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -73,11 +78,11 @@ export const contentLicensingRouter = router({
         });
       }
 
-      const entityHash = computeEntityHash(input.contentId);
+      const entityHash = computeEntityHash(registerInput.contentId);
 
       const registration = {
-        ...input,
-        creatorUid: ctx.user.uid,
+        ...registerInput,
+        creatorUid: actingUid,
         creatorAddress: ctx.user.address || null,
         splitEntityHash: entityHash,
         active: true,

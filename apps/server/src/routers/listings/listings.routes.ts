@@ -11,6 +11,7 @@ import { createPublicClient, http, parseEther, type Hash } from 'viem';
 import { sepolia, baseSepolia } from 'viem/chains';
 import { throwApiError } from '../../lib/errors';
 import { recordRevenueEvent } from '../../services/revenue-recorder';
+import { resolveActingUid } from '../../services/agentAuth';
 import { assertContentOperable, assertCanonReadyForMonetization } from '../../lib/content-status';
 
 const sepoliaClient = createPublicClient({
@@ -130,25 +131,29 @@ export const listingsRouter = router({
         rightsLane: z.enum(RIGHTS_LANES).default('original'),
         royaltyBps: z.number().min(0).max(10000).default(500),
         publishImmediately: z.boolean().default(false),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       if (!db) throwApiError('INTERNAL_SERVER_ERROR', 'Firebase not configured');
 
+      const { onBehalfOfUid, ...listingInput } = input;
+      const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'listings');
+
       // Block listing of moderated content
-      if (input.assetRef) {
-        await assertContentOperable(input.assetRef);
-        await assertCanonReadyForMonetization(input.assetRef);
+      if (listingInput.assetRef) {
+        await assertContentOperable(listingInput.assetRef);
+        await assertCanonReadyForMonetization(listingInput.assetRef);
       }
 
       const now = new Date();
       const listing = {
-        ...input,
-        sellerUid: ctx.user.uid,
+        ...listingInput,
+        sellerUid: actingUid,
         sellerAddress: ctx.user.address ?? null,
         sold: 0,
-        priceNum: parseFloat(input.price) || 0,
-        status: input.publishImmediately ? 'ACTIVE' : 'DRAFT',
+        priceNum: parseFloat(listingInput.price) || 0,
+        status: listingInput.publishImmediately ? 'ACTIVE' : 'DRAFT',
         createdAt: now,
         updatedAt: now,
       };

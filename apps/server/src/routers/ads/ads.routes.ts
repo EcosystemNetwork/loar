@@ -5,6 +5,8 @@ import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { TRPCError } from '@trpc/server';
 import { db } from '../../lib/firebase';
 import { isUniverseAdmin } from '../../lib/safe-admin';
+import { resolveActingUid } from '../../services/agentAuth';
+import { assertContentHashOperable } from '../../lib/content-status';
 import { z } from 'zod';
 
 const adSlotsCol = () => {
@@ -34,12 +36,16 @@ export const adsRouter = router({
         episodes: z.number().min(1),
         description: z.string(),
         constraints: z.string().optional(),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const { onBehalfOfUid, ...slotInput } = input;
+      const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'ads');
+
       // Verify caller owns or administers the universe
       const callerAddress = ctx.user.address || ctx.user.uid;
-      const isAdmin = await isUniverseAdmin(input.universeId, callerAddress);
+      const isAdmin = await isUniverseAdmin(slotInput.universeId, callerAddress);
       if (!isAdmin) {
         throw new TRPCError({
           code: 'FORBIDDEN',
@@ -48,8 +54,8 @@ export const adsRouter = router({
       }
 
       const slot = {
-        ...input,
-        creatorUid: ctx.user.uid,
+        ...slotInput,
+        creatorUid: actingUid,
         currentBid: '0',
         currentBidder: null as string | null,
         active: true,
@@ -71,10 +77,13 @@ export const adsRouter = router({
         txHash: z.string(),
         brandName: z.string(),
         creativeUrl: z.string().optional(),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       if (!db) throw new Error('Firebase is not configured');
+
+      const { actingUid } = await resolveActingUid(ctx.user.uid, input.onBehalfOfUid, 'ads');
 
       return db.runTransaction(async (tx) => {
         const slotRef = adSlotsCol().doc(input.slotId);
@@ -85,7 +94,7 @@ export const adsRouter = router({
           throw new TRPCError({ code: 'BAD_REQUEST', message: 'Slot is not active' });
 
         // Prevent creator from bidding on their own slot
-        if (slot.creatorUid === ctx.user.uid) {
+        if (slot.creatorUid === actingUid) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'Cannot bid on your own slot',
@@ -103,18 +112,19 @@ export const adsRouter = router({
         const bidRef = adBidsCol().doc();
         tx.set(bidRef, {
           slotId: input.slotId,
-          bidderUid: ctx.user.uid,
+          bidderUid: actingUid,
           bidderAddress: ctx.user.address || null,
           amount: input.amount,
           brandName: input.brandName,
           creativeUrl: input.creativeUrl || null,
+          creativeStatus: input.creativeUrl ? 'pending' : null,
           txHash: input.txHash,
           createdAt: new Date(),
         });
 
         tx.update(slotRef, {
           currentBid: input.amount,
-          currentBidder: ctx.user.uid,
+          currentBidder: actingUid,
           updatedAt: new Date(),
         });
 
@@ -123,16 +133,23 @@ export const adsRouter = router({
     }),
 
   acceptBid: protectedProcedure
-    .input(z.object({ slotId: z.string() }))
+    .input(
+      z.object({
+        slotId: z.string(),
+        onBehalfOfUid: z.string().optional(),
+      })
+    )
     .mutation(async ({ input, ctx }) => {
       if (!db) throw new Error('Firebase is not configured');
+
+      const { actingUid } = await resolveActingUid(ctx.user.uid, input.onBehalfOfUid, 'ads');
 
       return db.runTransaction(async (tx) => {
         const slotRef = adSlotsCol().doc(input.slotId);
         const slotDoc = await tx.get(slotRef);
         if (!slotDoc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Slot not found' });
         const slot = slotDoc.data()!;
-        if (slot.creatorUid !== ctx.user.uid)
+        if (slot.creatorUid !== actingUid)
           throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
         if (!slot.currentBidder) throw new TRPCError({ code: 'BAD_REQUEST', message: 'No bids' });
 
@@ -162,6 +179,97 @@ export const adsRouter = router({
 
         return { id: sponsorRef.id, ...sponsorship };
       });
+    }),
+
+  // ---- Creative moderation ----
+
+  /** Sponsor uploads or updates the creative asset for an active sponsorship.
+   *  Resets `creativeStatus` to `pending` and requires the content hash to be
+   *  operable (not flagged/removed) before it can be served. */
+  submitCreative: protectedProcedure
+    .input(
+      z.object({
+        sponsorshipId: z.string(),
+        creativeUrl: z.string().url(),
+        creativeContentHash: z.string(),
+        rightsDeclaration: z.enum(['original', 'licensed', 'fan']),
+        onBehalfOfUid: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { actingUid } = await resolveActingUid(ctx.user.uid, input.onBehalfOfUid, 'ads');
+
+      if (input.rightsDeclaration === 'fan') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message:
+            'Brand creative must be original or licensed — fan classification is not eligible for paid placement',
+        });
+      }
+
+      // Gate against existing moderation state for the content hash
+      await assertContentHashOperable(input.creativeContentHash);
+
+      const ref = sponsorshipsCol().doc(input.sponsorshipId);
+      const doc = await ref.get();
+      if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Sponsorship not found' });
+      const sponsorship = doc.data()!;
+      if (sponsorship.sponsorUid !== actingUid) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the sponsor can submit creative',
+        });
+      }
+
+      await ref.update({
+        creativeUrl: input.creativeUrl,
+        creativeContentHash: input.creativeContentHash,
+        rightsDeclaration: input.rightsDeclaration,
+        creativeStatus: 'pending',
+        creativeSubmittedAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      return { ok: true, creativeStatus: 'pending' as const };
+    }),
+
+  /** Universe owner flags creative on a live sponsorship — pauses serving until admin review. */
+  flagCreative: protectedProcedure
+    .input(
+      z.object({
+        sponsorshipId: z.string(),
+        reason: z.string().min(5).max(500),
+        onBehalfOfUid: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { actingUid } = await resolveActingUid(ctx.user.uid, input.onBehalfOfUid, 'ads');
+
+      const ref = sponsorshipsCol().doc(input.sponsorshipId);
+      const doc = await ref.get();
+      if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Sponsorship not found' });
+      const sponsorship = doc.data()!;
+
+      // Universe owner / admin only
+      const callerAddress = ctx.user.address || ctx.user.uid;
+      const isAdmin = await isUniverseAdmin(sponsorship.universeId, callerAddress);
+      if (!isAdmin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the universe admin can flag creative',
+        });
+      }
+
+      await ref.update({
+        creativeStatus: 'flagged',
+        flaggedAt: new Date(),
+        flaggedBy: actingUid,
+        flaggedReason: input.reason,
+        active: false,
+        updatedAt: new Date(),
+      });
+
+      return { ok: true };
     }),
 
   // ---- Impressions ----

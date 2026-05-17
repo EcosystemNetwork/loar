@@ -4,6 +4,7 @@
  */
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
+import { resolveActingUid } from '../../services/agentAuth';
 import { z } from 'zod';
 
 const subscriptionsCol = () => {
@@ -35,24 +36,28 @@ export const subscriptionsRouter = router({
         premiumContent: z.boolean().default(false),
         behindTheScenes: z.boolean().default(false),
         creditBonus: z.number().default(0),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const { onBehalfOfUid, ...tierInput } = input;
+      const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'subscriptions');
+
       // Verify caller is universe admin
       const universeDoc = await db
         .collection('cinematicUniverses')
-        .doc(input.universeId.toLowerCase())
+        .doc(tierInput.universeId.toLowerCase())
         .get();
       if (!universeDoc.exists) throw new Error('Universe not found');
       const universeData = universeDoc.data()!;
-      if (universeData.creator?.toLowerCase() !== ctx.user.uid.toLowerCase()) {
+      if (universeData.creator?.toLowerCase() !== actingUid.toLowerCase()) {
         throw new Error('Only the universe admin can configure subscription tiers');
       }
 
-      const tierId = `${input.universeId}-${input.tier}`;
+      const tierId = `${tierInput.universeId}-${tierInput.tier}`;
       const tierData = {
-        ...input,
-        creatorUid: ctx.user.uid,
+        ...tierInput,
+        creatorUid: actingUid,
         active: true,
         createdAt: new Date(),
         updatedAt: new Date(),
