@@ -11,10 +11,16 @@ export type PriceTier = 'low' | 'medium' | 'high';
 
 export interface AudioModelConfig {
   id: string;
-  provider: string; // 'fal' | 'elevenlabs'
+  provider: string; // 'fal' | 'elevenlabs' | 'google' | 'bytedance' | 'zai'
   displayName: string;
   shortDescription: string;
   falModelId?: string;
+  /** ElevenLabs `model_id` (e.g. `music_v1`). */
+  elevenlabsModelId?: string;
+  /** Google Gemini API model param (e.g. `lyria-3-pro-preview`). */
+  googleModelId?: string;
+  /** ByteDance ModelArk model param. */
+  bytedanceModelId?: string;
   mode: AudioGenerationMode[];
   qualityTier: QualityTier;
   speedTier: SpeedTier;

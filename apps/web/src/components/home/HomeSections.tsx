@@ -1277,5 +1277,172 @@ export function SearchOverlay({
 }
 
 /* ──────────────────────────────────────────
+ * Continue Watching — non-completed sessions, deduped per episode.
+ * Renders nothing for anon / new users (server returns []).
+ * ────────────────────────────────────────── */
+export function ContinueWatchingRow() {
+  const { data: episodes } = useQuery<FeedEpisode[]>({
+    queryKey: ['recommendations', 'continueWatching'],
+    queryFn: () =>
+      trpcClient.recommendations.continueWatching.query({ limit: 12 }) as Promise<FeedEpisode[]>,
+    staleTime: 60_000,
+    retry: false,
+    meta: { silent: true },
+  });
+
+  if (!episodes || episodes.length === 0) return null;
+
+  return (
+    <section className="py-6">
+      <SectionHeader icon={Play} title="Continue Watching" subtitle="Pick up where you left off" />
+      <ScrollRow>
+        {episodes.map((ep) => {
+          const resume =
+            (ep as FeedEpisode & { resumePositionSec?: number }).resumePositionSec ?? 0;
+          // We don't have duration here — show generous-but-capped progress.
+          const progressPct = Math.min(95, Math.max(5, Math.round((resume / 60) * 10)));
+          return (
+            <Link
+              key={ep.id}
+              to="/episode/$id"
+              params={{ id: ep.id }}
+              className="group flex-shrink-0 w-[260px] md:w-[300px]"
+            >
+              <div className="relative aspect-video rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all">
+                {ep.videoUrl ? (
+                  <video
+                    src={`${resolveIpfsUrl(ep.videoUrl)}#t=${Math.max(0, resume - 1)}`}
+                    poster={resolveIpfsUrl(ep.thumbnailUrl) || undefined}
+                    className="w-full h-full object-cover"
+                    muted
+                    playsInline
+                    preload="metadata"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-900/40 to-rose-900/40">
+                    <Play className="h-8 w-8 text-white/60" />
+                  </div>
+                )}
+                <div className="absolute inset-x-0 bottom-0 h-1 bg-black/50">
+                  <div className="h-full bg-primary" style={{ width: `${progressPct}%` }} />
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30 pointer-events-none">
+                  <Play className="h-8 w-8 text-white fill-white" />
+                </div>
+              </div>
+              <div className="flex gap-2 items-start px-0.5">
+                {ep.universe.imageURL ? (
+                  <img
+                    src={resolveIpfsUrl(ep.universe.imageURL)}
+                    alt=""
+                    loading="lazy"
+                    className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex-shrink-0 mt-0.5" />
+                )}
+                <div className="min-w-0">
+                  <h4 className="text-sm font-semibold text-white truncate group-hover:text-primary transition-colors">
+                    {ep.title}
+                  </h4>
+                  <p className="text-xs text-muted-foreground line-clamp-1 leading-relaxed">
+                    {ep.universe.name || 'Untitled universe'}
+                  </p>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </ScrollRow>
+    </section>
+  );
+}
+
+/* ──────────────────────────────────────────
+ * For You — personalized with cold-start fallback to recent canon.
+ * Visible to anon users too (anon = pure fallback path).
+ * ────────────────────────────────────────── */
+export function ForYouRow() {
+  const { data: episodes } = useQuery<FeedEpisode[]>({
+    queryKey: ['recommendations', 'forMe'],
+    queryFn: () => trpcClient.recommendations.forMe.query({ limit: 15 }) as Promise<FeedEpisode[]>,
+    staleTime: 5 * 60_000,
+    retry: false,
+    meta: { silent: true },
+  });
+
+  if (!episodes || episodes.length === 0) return null;
+
+  return (
+    <section className="py-6">
+      <SectionHeader
+        icon={Sparkles}
+        title="For You"
+        subtitle="Picked from universes you've watched"
+      />
+      <ScrollRow>
+        {episodes.map((ep) => (
+          <Link
+            key={ep.id}
+            to="/episode/$id"
+            params={{ id: ep.id }}
+            className="group flex-shrink-0 w-[260px] md:w-[300px]"
+          >
+            <div className="relative aspect-video rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all">
+              {ep.videoUrl ? (
+                <video
+                  src={`${resolveIpfsUrl(ep.videoUrl)}#t=0.1`}
+                  poster={resolveIpfsUrl(ep.thumbnailUrl) || undefined}
+                  className="w-full h-full object-cover"
+                  muted
+                  loop
+                  playsInline
+                  preload="metadata"
+                  onMouseEnter={(e) => {
+                    const p = e.currentTarget.play();
+                    if (p) p.catch(() => {});
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.pause();
+                    e.currentTarget.currentTime = 0;
+                  }}
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-violet-900/40 to-pink-900/40">
+                  <Sparkles className="h-8 w-8 text-white/60" />
+                </div>
+              )}
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30 pointer-events-none">
+                <Play className="h-8 w-8 text-white fill-white" />
+              </div>
+            </div>
+            <div className="flex gap-2 items-start px-0.5">
+              {ep.universe.imageURL ? (
+                <img
+                  src={resolveIpfsUrl(ep.universe.imageURL)}
+                  alt=""
+                  loading="lazy"
+                  className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex-shrink-0 mt-0.5" />
+              )}
+              <div className="min-w-0">
+                <h4 className="text-sm font-semibold text-white truncate group-hover:text-primary transition-colors">
+                  {ep.title}
+                </h4>
+                <p className="text-xs text-muted-foreground line-clamp-1 leading-relaxed">
+                  {ep.universe.name || 'Untitled universe'}
+                </p>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </ScrollRow>
+    </section>
+  );
+}
+
+/* ──────────────────────────────────────────
  * Main Home Component
  * ────────────────────────────────────────── */

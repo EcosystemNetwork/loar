@@ -34,6 +34,7 @@ function toPublic(doc: ProviderKeyDoc): ProviderKeyPublic {
   return {
     provider: doc.provider,
     fingerprint: doc.fingerprint,
+    last4: doc.last4 ?? '',
     enabled: doc.enabled,
     testedAt: doc.testedAt,
     lastUsedAt: doc.lastUsedAt,
@@ -75,6 +76,7 @@ export async function upsert(
 
   const fp = fingerprint(plaintextKey);
   const encryptedKey = seal(plaintextKey);
+  const last4 = plaintextKey.slice(-4);
   const now = new Date();
   const ref = col().doc(docId(userId, provider));
   const prior = await ref.get();
@@ -82,6 +84,7 @@ export async function upsert(
     userId,
     provider,
     fingerprint: fp,
+    last4,
     encryptedKey,
     enabled: prior.exists ? ((prior.data()?.enabled as boolean) ?? true) : true,
     testedAt: now,

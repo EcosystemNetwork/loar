@@ -168,19 +168,16 @@ test.describe('Entity Form — Monetization & Rights', () => {
   test('selecting monetized shows rights declaration', async ({ page }) => {
     await injectMockSession(page);
     await page.goto('/create/person');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(800);
 
-    // Look for and click the monetized option
-    const monetizedBtn = page
-      .getByRole('button', { name: /monetized/i })
-      .first()
-      .or(page.getByText(/monetized/i).first());
-    if (await monetizedBtn.isVisible()) {
+    // Two adjacent toggles exist: "Non-Monetized" and "Monetized". Anchor the
+    // regex so `.first()` doesn't match "Non-Monetized" by accident.
+    const monetizedBtn = page.getByText(/^Monetized$/).first();
+    if (await monetizedBtn.isVisible().catch(() => false)) {
       await monetizedBtn.click();
-      await page.waitForTimeout(300);
-      // Rights declaration should appear
+      await page.waitForTimeout(400);
       const body = await page.locator('body').textContent();
-      expect(body?.toLowerCase()).toMatch(/original work|licensed|rights/i);
+      expect(body?.toLowerCase()).toMatch(/original work|licensed|rights declaration/i);
     }
   });
 });

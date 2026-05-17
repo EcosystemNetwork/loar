@@ -269,8 +269,8 @@ export async function dispatchGeneration(
     // BYOK: if the caller has a stored ByteDance key, route their gen calls
     // through it so they spend their own ModelArk credits — not the platform's.
     if (callerUid) {
-      const { getUserSecret } = await import('../../services/userSecrets');
-      const userKey = await getUserSecret(callerUid, 'bytedance');
+      const { resolveProviderKey } = await import('../../lib/byok');
+      const userKey = await resolveProviderKey(callerUid, 'bytedance');
       if (userKey) bdInput.apiKey = userKey;
     }
     return bytedanceService.generateVideo(bdInput);
@@ -279,8 +279,8 @@ export async function dispatchGeneration(
   if (model.provider === 'zai') {
     // Z.AI / Zhipu — CogVideoX-3 + Vidu Q1.
     const { zaiService } = await import('../../services/zai');
-    const { getUserSecret } = await import('../../services/userSecrets');
-    const userKey = callerUid ? ((await getUserSecret(callerUid, 'zai')) ?? undefined) : undefined;
+    const { resolveProviderKey } = await import('../../lib/byok');
+    const userKey = callerUid ? await resolveProviderKey(callerUid, 'zai') : undefined;
     const result = await zaiService.generateVideo({
       apiKey: userKey,
       prompt: input.prompt,

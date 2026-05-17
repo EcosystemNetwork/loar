@@ -20,7 +20,6 @@ import { randomUUID } from 'crypto';
 import { TRPCError } from '@trpc/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { db } from '../../lib/firebase';
-import { transcriptionService } from '../../services/transcription';
 import { trackQuests } from '../../services/quest-tracker';
 import {
   renderCaptions,
@@ -29,8 +28,15 @@ import {
   type CaptionFormat,
 } from '../../lib/captions-format';
 import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
-import { quoteCredits, getModelById } from '../../services/transcription-models';
+import {
+  quoteCredits,
+  getModelById,
+  BYOK_ROUTING_FEE_CREDITS,
+} from '../../services/transcription-models';
 import { reserve, reconcile, cancel } from '../../services/credits';
+import { getBackend } from '../../services/captions-backend';
+import { resolveProviderKey } from '../../services/provider-keys';
+import { translateCaptions, supportedTranslationLanguages } from '../../services/caption-translate';
 
 // ── Pricing ─────────────────────────────────────────────────────────
 //
@@ -42,6 +48,7 @@ import { reserve, reconcile, cancel } from '../../services/credits';
 const DEFAULT_MODEL_ID = 'whisper-fal';
 const DEFAULT_EXPECTED_MINUTES = 1;
 const RESERVE_BUFFER = 1.2;
+const TRANSLATION_CREDITS_PER_LANGUAGE = 2;
 
 // ── Collections ─────────────────────────────────────────────────────
 
@@ -99,6 +106,9 @@ export const captionsRouter = router({
          * flat 2-credit charge for whisper-fal).
          */
         expectedMinutes: z.number().positive().max(240).optional(),
+        wordTimings: z.boolean().optional(),
+        diarize: z.boolean().optional(),
+        numSpeakers: z.number().int().min(1).max(20).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -125,8 +135,25 @@ export const captionsRouter = router({
       const captionProjectId = input.projectId ?? randomUUID();
       const startTime = Date.now();
       const expectedMinutes = input.expectedMinutes ?? DEFAULT_EXPECTED_MINUTES;
-      const quoted = quoteCredits(modelId, expectedMinutes);
-      const reserveCredits = Math.ceil(quoted * RESERVE_BUFFER);
+
+      // Resolve the API key up-front so we know whether we're on BYOK
+      // (pay flat routing fee) or server pool (pay metered per-minute).
+      let resolvedKey;
+      try {
+        resolvedKey = await resolveProviderKey(ctx.user.uid, model.provider);
+      } catch (err) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message:
+            err instanceof Error
+              ? err.message
+              : `No API key available for provider ${model.provider}. Add one in Settings → Providers.`,
+        });
+      }
+      const isByok = resolvedKey.source === 'byok';
+
+      const quoted = isByok ? BYOK_ROUTING_FEE_CREDITS : quoteCredits(modelId, expectedMinutes);
+      const reserveCredits = isByok ? quoted : Math.ceil(quoted * RESERVE_BUFFER);
 
       // Create or refresh the project record up front in 'running' state.
       await captionProjectsCol()
@@ -141,6 +168,8 @@ export const captionsRouter = router({
             language: input.language ?? 'en',
             status: 'running',
             modelId,
+            provider: model.provider,
+            byok: isByok,
             expectedMinutes,
             reservedCredits: reserveCredits,
             createdAt: FieldValue.serverTimestamp(),
@@ -154,38 +183,39 @@ export const captionsRouter = router({
         modelId,
         provider: model.provider,
         estimatedCredits: reserveCredits,
-        byok: false, // Phase 1: server pool only
+        byok: isByok,
         meta: { captionProjectId, episodeId: input.episodeId ?? null },
       });
 
       await captionProjectsCol().doc(captionProjectId).update({ reservationId });
 
       try {
-        const result = await transcriptionService.transcribe({
+        const backend = getBackend(modelId);
+        const result = await backend.transcribe({
           audioUrl: input.sourceUrl,
+          apiKey: resolvedKey.apiKey,
           language: input.language,
+          wordTimings: input.wordTimings,
+          diarize: input.diarize,
+          numSpeakers: input.numSpeakers,
         });
 
         if (result.status === 'failed' || !result.segments || result.segments.length === 0) {
           throw new Error(result.error || 'Transcription failed — no segments returned');
         }
 
-        const segments: CaptionSegment[] = result.segments.map((s) => ({
-          start: s.start,
-          end: s.end,
-          text: s.text,
-          speaker: null,
-        }));
+        const segments: CaptionSegment[] = result.segments;
 
         const latencyMs = Date.now() - startTime;
 
         // Derive actual audio minutes from the last segment's end timestamp.
-        // FAL Whisper returns timestamps in seconds; convert to minutes and
-        // round up (any partial minute charges as a full minute, matching
-        // every other per-minute API on the market).
+        // For BYOK calls we still record minutes for analytics but charge
+        // the flat routing fee — no metered debit.
         const actualSeconds = segments[segments.length - 1]?.end ?? 0;
         const actualMinutes = Math.max(1, Math.ceil(actualSeconds / 60));
-        const actualCredits = quoteCredits(modelId, actualMinutes);
+        const actualCredits = isByok
+          ? BYOK_ROUTING_FEE_CREDITS
+          : quoteCredits(modelId, actualMinutes);
         const reconciled = await reconcile({ reservationId, actualCredits });
 
         trackQuests(ctx.user.uid, [{ questId: 'first_captions' }]);
@@ -197,6 +227,8 @@ export const captionsRouter = router({
             segments,
             text: result.text ?? null,
             detectedLanguage: result.language ?? null,
+            hasWordTimings: result.hasWordTimings,
+            hasSpeakers: result.hasSpeakers,
             actualMinutes,
             creditsCharged: actualCredits,
             reconcileStatus: reconciled.status,
@@ -211,6 +243,10 @@ export const captionsRouter = router({
           segments,
           detectedLanguage: result.language ?? null,
           modelId,
+          provider: model.provider,
+          byok: isByok,
+          hasWordTimings: result.hasWordTimings,
+          hasSpeakers: result.hasSpeakers,
           actualMinutes,
           creditsCharged: actualCredits,
           reservationId,
@@ -227,6 +263,121 @@ export const captionsRouter = router({
           });
         throw error;
       }
+    }),
+
+  // ── Translation: target-language tracks via Gemini ────────────────
+  //
+  // Translation is metered separately: `TRANSLATION_CREDITS_PER_LANGUAGE`
+  // × #targetLanguages, reserved + reconciled. Translated segments
+  // preserve timing/speakers but drop the per-word array.
+
+  listSupportedLanguages: protectedProcedure.query(() => {
+    return supportedTranslationLanguages();
+  }),
+
+  translate: expensiveProcedure
+    .use(requirePermission('generation.voice'))
+    .input(
+      z.object({
+        captionProjectId: z.string().uuid(),
+        targetLanguages: z.array(z.string().min(2).max(10)).min(1).max(8),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ref = captionProjectsCol().doc(input.captionProjectId);
+      const snap = await ref.get();
+      if (!snap.exists) throw new TRPCError({ code: 'NOT_FOUND' });
+      const data = snap.data() as Record<string, unknown>;
+      if (data.userId !== ctx.user.uid) throw new TRPCError({ code: 'FORBIDDEN' });
+
+      const segments = (data.segments as CaptionSegment[] | undefined) ?? [];
+      if (segments.length === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Project has no segments — transcribe first',
+        });
+      }
+      const sourceLanguage =
+        (data.detectedLanguage as string | null) ?? (data.language as string | null) ?? 'en';
+      const targets = Array.from(new Set(input.targetLanguages)).filter(
+        (l) => l !== sourceLanguage
+      );
+      if (targets.length === 0) {
+        return { translations: {}, charged: 0, sourceLanguage, availableTranslations: [] };
+      }
+
+      const credits = TRANSLATION_CREDITS_PER_LANGUAGE * targets.length;
+      const { reservationId } = await reserve({
+        userId: ctx.user.uid,
+        modelId: 'gemini-translate',
+        provider: 'google',
+        estimatedCredits: credits,
+        byok: false,
+        meta: { captionProjectId: input.captionProjectId, targets: targets.join(',') },
+      });
+
+      try {
+        const out: Record<string, CaptionSegment[]> = {};
+        for (const target of targets) {
+          const result = await translateCaptions({
+            segments,
+            sourceLanguage,
+            targetLanguage: target,
+          });
+          out[target] = result.segments;
+          await ref.collection('translations').doc(target).set({
+            targetLanguage: target,
+            sourceLanguage,
+            segments: result.segments,
+            translated: result.translated,
+            fallback: result.fallback,
+            sourceChars: result.sourceChars,
+            translatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+        await reconcile({ reservationId, actualCredits: credits });
+
+        const existing = (data.availableTranslations as string[] | undefined) ?? [];
+        const merged = Array.from(new Set([...existing, ...targets])).sort();
+        await ref.update({
+          availableTranslations: merged,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+
+        return {
+          translations: out,
+          charged: credits,
+          sourceLanguage,
+          availableTranslations: merged,
+        };
+      } catch (error) {
+        await cancel(reservationId, error instanceof Error ? error.message : 'translate failed');
+        throw error;
+      }
+    }),
+
+  getTranslation: protectedProcedure
+    .input(
+      z.object({
+        captionProjectId: z.string().uuid(),
+        targetLanguage: z.string().min(2).max(10),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const projRef = captionProjectsCol().doc(input.captionProjectId);
+      const proj = await projRef.get();
+      if (!proj.exists) throw new TRPCError({ code: 'NOT_FOUND' });
+      if ((proj.data() as Record<string, unknown>).userId !== ctx.user.uid) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+      const trSnap = await projRef.collection('translations').doc(input.targetLanguage).get();
+      if (!trSnap.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'no translation' });
+      const tr = trSnap.data() as Record<string, unknown>;
+      return {
+        targetLanguage: input.targetLanguage,
+        sourceLanguage: (tr.sourceLanguage as string) ?? null,
+        segments: (tr.segments as CaptionSegment[]) ?? [],
+      };
     }),
 
   // ── Persist user edits to a caption project ───────────────────────

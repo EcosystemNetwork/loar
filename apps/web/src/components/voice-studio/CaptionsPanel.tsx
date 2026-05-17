@@ -23,6 +23,11 @@ import {
   Download,
   FileText,
   Wand2,
+  Cpu,
+  Lock,
+  ExternalLink,
+  Users,
+  Type,
 } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,12 +43,40 @@ interface CaptionsPanelProps {
   episodeId?: string;
 }
 
+interface CaptionWord {
+  start: number;
+  end: number;
+  text: string;
+}
+
 interface Segment {
   start: number;
   end: number;
   text: string;
   speaker?: string | null;
+  words?: CaptionWord[];
 }
+
+interface ModelInfo {
+  id: string;
+  provider: string;
+  displayName: string;
+  shortDescription: string;
+  capabilities: {
+    wordTimings: boolean;
+    diarize: boolean;
+    translate: boolean;
+  };
+  priceTier: string;
+  speedTier: string;
+  qualityTier: string;
+  creditCostPerMinute: number;
+  usableByMe: boolean;
+  unusableReason: string | null;
+  sourceOnDispatch: 'byok' | 'server' | null;
+}
+
+const DEFAULT_MODEL_ID = 'whisper-fal';
 
 interface StyleState {
   maxCharsPerLine: number;
@@ -91,8 +124,27 @@ export function CaptionsPanel({ episodeId }: CaptionsPanelProps) {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [style, setStyle] = useState<StyleState>(DEFAULT_STYLE);
   const [dirty, setDirty] = useState(false);
+  const [modelId, setModelId] = useState<string>(DEFAULT_MODEL_ID);
+  const [expectedMinutes, setExpectedMinutes] = useState<number>(1);
+  const [wantWordTimings, setWantWordTimings] = useState(false);
+  const [wantDiarize, setWantDiarize] = useState(false);
+  const [numSpeakers, setNumSpeakers] = useState<number | ''>('');
+  const [targetLangs, setTargetLangs] = useState<string[]>([]);
+  const [exportLang, setExportLang] = useState<string>('');
 
   // ── Server queries ────────────────────────────────────────────────
+
+  const modelsQuery = useQuery({
+    queryKey: ['providers', 'listModels'],
+    queryFn: () => trpcClient.providers.listModels.query(),
+    staleTime: 5 * 60_000,
+  });
+
+  const supportedLangsQuery = useQuery({
+    queryKey: ['captions', 'listSupportedLanguages'],
+    queryFn: () => trpcClient.captions.listSupportedLanguages.query(),
+    staleTime: 60 * 60_000,
+  });
 
   const projectsQuery = useQuery({
     queryKey: ['captions', 'list', episodeId],
@@ -124,24 +176,61 @@ export function CaptionsPanel({ episodeId }: CaptionsPanelProps) {
   // ── Mutations ─────────────────────────────────────────────────────
 
   const transcribe = useMutation({
-    mutationFn: () =>
-      trpcClient.captions.transcribe.mutate({
+    mutationFn: () => {
+      const selected = (modelsQuery.data ?? []).find((m) => m.id === modelId);
+      return trpcClient.captions.transcribe.mutate({
         sourceUrl: sourceUrl.trim(),
         language: language || undefined,
         title,
         episodeId,
-      }),
+        modelId,
+        expectedMinutes: expectedMinutes > 0 ? expectedMinutes : undefined,
+        wordTimings: wantWordTimings && (selected?.capabilities.wordTimings ?? false),
+        diarize: wantDiarize && (selected?.capabilities.diarize ?? false),
+        numSpeakers:
+          wantDiarize && typeof numSpeakers === 'number' && numSpeakers > 0
+            ? numSpeakers
+            : undefined,
+      });
+    },
     onSuccess: (res) => {
       setProjectId(res.captionProjectId);
-      setSegments(res.segments);
+      setSegments(res.segments as Segment[]);
       setDirty(false);
+      const byokTag = res.byok ? ' · BYOK' : '';
       toast.success(
-        `Transcribed ${res.segments.length} segment(s) · ${res.creditsCharged} credits`
+        `Transcribed ${res.segments.length} segment(s) · ${res.creditsCharged} credits${byokTag}`
       );
       queryClient.invalidateQueries({ queryKey: ['captions', 'list'] });
     },
     onError: (err: Error) => toast.error(err.message || 'Transcription failed'),
   });
+
+  const translate = useMutation({
+    mutationFn: () => {
+      if (!projectId) throw new Error('Transcribe first');
+      if (targetLangs.length === 0) throw new Error('Pick at least one target language');
+      return trpcClient.captions.translate.mutate({
+        captionProjectId: projectId,
+        targetLanguages: targetLangs,
+      });
+    },
+    onSuccess: (res) => {
+      toast.success(
+        `Translated to ${Object.keys(res.translations).length} language(s) · ${res.charged} credits`
+      );
+      queryClient.invalidateQueries({ queryKey: ['captions', 'get', projectId] });
+    },
+    onError: (err: Error) => toast.error(err.message || 'Translation failed'),
+  });
+
+  const toggleTargetLang = (code: string) =>
+    setTargetLangs((cur) => (cur.includes(code) ? cur.filter((c) => c !== code) : [...cur, code]));
+
+  const availableTranslations = useMemo(() => {
+    const p = loadedQuery.data as Record<string, unknown> | null | undefined;
+    return Array.isArray(p?.availableTranslations) ? (p?.availableTranslations as string[]) : [];
+  }, [loadedQuery.data]);
 
   const save = useMutation({
     mutationFn: () => {
@@ -224,20 +313,37 @@ export function CaptionsPanel({ episodeId }: CaptionsPanelProps) {
 
   // ── Export ────────────────────────────────────────────────────────
 
+  async function segmentsForExport(): Promise<Segment[]> {
+    if (!exportLang) return segments;
+    if (!projectId) return segments;
+    try {
+      const tr = await trpcClient.captions.getTranslation.query({
+        captionProjectId: projectId,
+        targetLanguage: exportLang,
+      });
+      return tr.segments as Segment[];
+    } catch {
+      toast.error('No translation for this language yet — run Translate first');
+      return segments;
+    }
+  }
+
   const downloadAs = async (format: 'srt' | 'vtt' | 'json') => {
     if (segments.length === 0) {
       toast.error('Nothing to export — add segments first');
       return;
     }
     try {
-      const res = await render.mutateAsync(format);
+      const segs = await segmentsForExport();
+      const res = await trpcClient.captions.render.mutate({ segments: segs, format, style });
       const mime = format === 'json' ? 'application/json' : 'text/plain';
       const blob = new Blob([res.rendered], { type: mime });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
+      const langSuffix = exportLang ? `.${exportLang}` : '';
       const safeTitle = title.replace(/[^a-z0-9-_]+/gi, '_').slice(0, 60) || 'captions';
-      a.download = `${safeTitle}.${format}`;
+      a.download = `${safeTitle}${langSuffix}.${format}`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -253,7 +359,39 @@ export function CaptionsPanel({ episodeId }: CaptionsPanelProps) {
     return segments[segments.length - 1].end - segments[0].start;
   }, [segments]);
 
-  const canTranscribe = sourceUrl.trim().length > 0 && !transcribe.isPending;
+  const selectedModel: ModelInfo | undefined = useMemo(
+    () => (modelsQuery.data ?? []).find((m) => m.id === modelId) as ModelInfo | undefined,
+    [modelsQuery.data, modelId]
+  );
+
+  const isByokDispatch = selectedModel?.sourceOnDispatch === 'byok';
+
+  const estimatedCredits = useMemo(() => {
+    if (!selectedModel) return null;
+    if (isByokDispatch) return 1;
+    const mins = Math.max(1, expectedMinutes || 1);
+    return Math.ceil(selectedModel.creditCostPerMinute * mins);
+  }, [selectedModel, isByokDispatch, expectedMinutes]);
+
+  const transcribeButtonLabel =
+    estimatedCredits === null
+      ? 'Transcribe'
+      : isByokDispatch
+        ? `Transcribe (${estimatedCredits} credit · BYOK)`
+        : `Transcribe (~${estimatedCredits} credits)`;
+
+  const canTranscribe =
+    sourceUrl.trim().length > 0 &&
+    !transcribe.isPending &&
+    !!selectedModel &&
+    selectedModel.usableByMe;
+
+  // Capability auto-disable
+  useEffect(() => {
+    if (!selectedModel) return;
+    if (wantWordTimings && !selectedModel.capabilities.wordTimings) setWantWordTimings(false);
+    if (wantDiarize && !selectedModel.capabilities.diarize) setWantDiarize(false);
+  }, [selectedModel, wantWordTimings, wantDiarize]);
 
   return (
     <div className="space-y-5">
@@ -324,7 +462,7 @@ export function CaptionsPanel({ episodeId }: CaptionsPanelProps) {
                 ) : (
                   <Wand2 className="mr-2 size-4" />
                 )}
-                Transcribe (2 credits)
+                {transcribeButtonLabel}
               </Button>
             </div>
           </div>
@@ -356,6 +494,145 @@ export function CaptionsPanel({ episodeId }: CaptionsPanelProps) {
                   <Trash2 className="mr-2 size-4" /> Delete
                 </Button>
               </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Model picker ─────────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Cpu className="size-4 text-violet-400" /> Model
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-[2fr_140px]">
+            <div className="space-y-1.5">
+              <Label htmlFor="caption-model">Transcription model</Label>
+              <select
+                id="caption-model"
+                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                value={modelId}
+                onChange={(e) => setModelId(e.target.value)}
+                disabled={modelsQuery.isPending}
+              >
+                {(modelsQuery.data ?? []).map((m) => (
+                  <option key={m.id} value={m.id} disabled={!m.usableByMe}>
+                    {m.displayName}
+                    {m.usableByMe ? '' : ' · API key required'}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="expected-minutes">Expected length (min)</Label>
+              <Input
+                id="expected-minutes"
+                type="number"
+                min={1}
+                max={240}
+                value={expectedMinutes}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setExpectedMinutes(Number.isFinite(v) && v > 0 ? Math.min(240, v) : 1);
+                }}
+              />
+            </div>
+          </div>
+
+          {selectedModel && (
+            <div className="space-y-2 rounded-md border border-border/60 bg-muted/30 p-3 text-xs">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="capitalize">
+                  {selectedModel.provider}
+                </Badge>
+                <Badge variant="outline" className="capitalize">
+                  {selectedModel.qualityTier}
+                </Badge>
+                <Badge variant="outline" className="capitalize">
+                  {selectedModel.speedTier}
+                </Badge>
+                <Badge variant="outline" className="capitalize">
+                  {selectedModel.priceTier} price
+                </Badge>
+                {selectedModel.capabilities.wordTimings && (
+                  <Badge variant="secondary">
+                    <Type className="mr-1 size-3" /> word timings
+                  </Badge>
+                )}
+                {selectedModel.capabilities.diarize && (
+                  <Badge variant="secondary">
+                    <Users className="mr-1 size-3" /> diarization
+                  </Badge>
+                )}
+                {isByokDispatch && (
+                  <Badge variant="secondary">
+                    <Lock className="mr-1 size-3" /> using your key
+                  </Badge>
+                )}
+                <span className="ml-auto text-muted-foreground">
+                  {selectedModel.creditCostPerMinute} credits / min
+                </span>
+              </div>
+              <p className="text-muted-foreground">{selectedModel.shortDescription}</p>
+              {!selectedModel.usableByMe && (
+                <p className="flex items-center gap-1 text-amber-500">
+                  {selectedModel.unusableReason}
+                  <a
+                    href="/settings/api-keys"
+                    className="ml-1 inline-flex items-center gap-1 underline"
+                  >
+                    Add key <ExternalLink className="size-3" />
+                  </a>
+                </p>
+              )}
+            </div>
+          )}
+
+          {selectedModel?.capabilities.wordTimings && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="want-word-timings"
+                checked={wantWordTimings}
+                onCheckedChange={(v) => setWantWordTimings(v === true)}
+              />
+              <Label htmlFor="want-word-timings" className="text-xs">
+                Word-level timings (karaoke-style highlight in VTT)
+              </Label>
+            </div>
+          )}
+          {selectedModel?.capabilities.diarize && (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="want-diarize"
+                  checked={wantDiarize}
+                  onCheckedChange={(v) => setWantDiarize(v === true)}
+                />
+                <Label htmlFor="want-diarize" className="text-xs">
+                  Detect speakers
+                </Label>
+              </div>
+              {wantDiarize && (
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="num-speakers" className="text-xs text-muted-foreground">
+                    Hint: # of speakers
+                  </Label>
+                  <Input
+                    id="num-speakers"
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={numSpeakers}
+                    onChange={(e) =>
+                      setNumSpeakers(e.target.value === '' ? '' : Number(e.target.value))
+                    }
+                    className="h-7 w-20 text-xs"
+                    placeholder="auto"
+                  />
+                </div>
+              )}
             </div>
           )}
         </CardContent>
@@ -509,6 +786,64 @@ export function CaptionsPanel({ episodeId }: CaptionsPanelProps) {
         </CardContent>
       </Card>
 
+      {/* ── Translation ──────────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Captions className="size-4 text-emerald-400" /> Translate
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!projectId ? (
+            <p className="text-xs text-muted-foreground">
+              Transcribe first, then pick target languages to add translated tracks.
+            </p>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {(supportedLangsQuery.data ?? []).map((code) => {
+                  const isSelected = targetLangs.includes(code);
+                  const isAvailable = availableTranslations.includes(code);
+                  return (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => toggleTargetLang(code)}
+                      className={
+                        'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition ' +
+                        (isSelected
+                          ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-200'
+                          : 'border-border/60 hover:bg-muted')
+                      }
+                    >
+                      {code}
+                      {isAvailable && <Badge variant="outline">ready</Badge>}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => translate.mutate()}
+                  disabled={!projectId || translate.isPending || targetLangs.length === 0}
+                >
+                  {translate.isPending ? (
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                  ) : (
+                    <Wand2 className="mr-2 size-4" />
+                  )}
+                  Translate ({targetLangs.length * 2} credits)
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  2 credits per target language · Gemini · timing preserved, word arrays dropped
+                </p>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       {/* ── Export ───────────────────────────────────────────────── */}
       <Card>
         <CardHeader>
@@ -516,19 +851,41 @@ export function CaptionsPanel({ episodeId }: CaptionsPanelProps) {
             <FileText className="size-4" /> Export
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Button onClick={() => downloadAs('srt')} disabled={segments.length === 0}>
-            <Download className="mr-2 size-4" /> SRT
-          </Button>
-          <Button onClick={() => downloadAs('vtt')} disabled={segments.length === 0}>
-            <Download className="mr-2 size-4" /> WebVTT
-          </Button>
-          <Button onClick={() => downloadAs('json')} disabled={segments.length === 0}>
-            <Download className="mr-2 size-4" /> JSON
-          </Button>
-          <p className="ml-auto text-xs text-muted-foreground self-center">
-            Style settings shape the export before download.
-          </p>
+        <CardContent className="space-y-3">
+          {availableTranslations.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Label htmlFor="export-lang" className="text-xs">
+                Language
+              </Label>
+              <select
+                id="export-lang"
+                value={exportLang}
+                onChange={(e) => setExportLang(e.target.value)}
+                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+              >
+                <option value="">Source</option>
+                {availableTranslations.map((code) => (
+                  <option key={code} value={code}>
+                    {code}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => downloadAs('srt')} disabled={segments.length === 0}>
+              <Download className="mr-2 size-4" /> SRT
+            </Button>
+            <Button onClick={() => downloadAs('vtt')} disabled={segments.length === 0}>
+              <Download className="mr-2 size-4" /> WebVTT
+            </Button>
+            <Button onClick={() => downloadAs('json')} disabled={segments.length === 0}>
+              <Download className="mr-2 size-4" /> JSON
+            </Button>
+            <p className="ml-auto text-xs text-muted-foreground self-center">
+              Style settings shape the export before download.
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -65,6 +65,8 @@ import {
   TokenPoweredRow,
   CreateBanner,
   SearchOverlay,
+  ContinueWatchingRow,
+  ForYouRow,
 } from '../components/home/HomeSections';
 
 /* ──────────────────────────────────────────
@@ -278,7 +280,9 @@ function HomeComponent() {
       {/* Content Rows — only render once we have real data */}
       {!universesLoading && (
         <div className="-mt-16 relative z-10 pb-20 space-y-2">
+          <ContinueWatchingRow />
           <Top10Strip universes={universes} />
+          <ForYouRow />
           <TrendingRow universes={universes} />
           <RecentEpisodes />
           <NewArrivalsRow universes={universes} />

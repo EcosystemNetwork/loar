@@ -47,6 +47,7 @@ import { runAdminLayer } from './layers/admin.ts';
 import { runEditingLayer } from './layers/editing.ts';
 import { runLaunchpadLayer } from './layers/launchpad.ts';
 import { runVoiceStudioLayer } from './layers/voice-studio.ts';
+import { runByokLayer } from './layers/byok.ts';
 
 async function main() {
   const cfg = loadConfig();
@@ -194,6 +195,18 @@ async function main() {
     reporter.recordLayer({
       layer: 'voice-studio',
       title: 'voiceLibrary + dubbing + multilingualDub',
+      checks: result.checks,
+      skipped: false,
+    });
+  }
+
+  // ── Layer 12: byok / metering / recommendations (2026-05-17 landing) ──────
+  if (!only || only === 'byok') {
+    reporter.beginLayer('byok', 'providers + watchSessions + recommendations + captions translate');
+    const result = await runByokLayer(cfg, jwt);
+    reporter.recordLayer({
+      layer: 'byok',
+      title: 'providers + watchSessions + recommendations + captions translate',
       checks: result.checks,
       skipped: false,
     });

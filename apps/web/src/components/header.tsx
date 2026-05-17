@@ -38,8 +38,6 @@ const HIDDEN_ROUTES = new Set<string>([]);
 const primaryLinksBase = [
   { to: '/discover', label: 'Discover' },
   { to: '/create', label: 'Create' },
-  { to: '/canvas', label: 'Canvas' },
-  { to: '/editor', label: 'Clip Editor' },
   { to: '/tokens', label: 'Launchpad' },
   { to: '/wiki', label: 'Wiki' },
   { to: '/dashboard', label: 'Dashboard' },
@@ -67,6 +65,8 @@ const moreGroupsBase: MoreGroup[] = [
   {
     label: 'Tools',
     links: [
+      { to: '/canvas', label: 'Canvas' },
+      { to: '/editor', label: 'Clip Editor' },
       { to: '/lab/zai', label: 'Model Lab' },
       { to: '/lab/voice-studio', label: 'Voice Studio' },
     ],

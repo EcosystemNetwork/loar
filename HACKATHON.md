@@ -2,7 +2,9 @@
 
 > Beta University · BytePlus · AI Valley
 > Track 5 — Most Creative (Multimodal Focus)
-> Hard deadline: April 27 · In-person finale: May 2 (Silicon Valley)
+> Hard deadline: April 27, 2026 · In-person finale: May 2, 2026 (Silicon Valley)
+> **Status:** Submitted (post-finale). This document is preserved as the
+> historical record of the submission and the BYOK + Seed wiring it shipped.
 
 ## One-liner
 
@@ -81,7 +83,7 @@ Today's AI video is a passive loop — one prompt, one clip, no memory. LOAR bui
 Every authenticated user can plug in their own ModelArk API key at [/settings/api-keys](apps/web/src/routes/settings.api-keys.tsx).
 
 - Keys are validated with a small chat round-trip on the user's quota before storage
-- Stored encrypted with AES-256-GCM (`USER_SECRETS_MASTER_KEY` server-side)
+- Stored encrypted with AES-256-GCM (`PROVIDER_KEY_MASTER_KEY` server-side — originally shipped as `USER_SECRETS_MASTER_KEY`, renamed during the 2026-05-17 BYOK consolidation)
 - Never returned to the client — UI shows only `•••• abcd` for confirmation
 - All four pipelines (video / image / chat / talking-scene) automatically route through the user's key when set, falling back to the platform key when not
 
@@ -147,16 +149,16 @@ This means **judges can demo on their own credits**, and any builder watching ca
 - Mobile app (Expo build works but not store-published)
 - Real-money Stripe path (in test mode)
 
-## Status checks before submission
+## Status checks before submission (preserved — submission complete)
 
-- [ ] `BYTEDANCE_API_KEY` set on the deployed server (or BYOK key used in demo)
-- [ ] `USER_SECRETS_MASTER_KEY` set on deployed server (`openssl rand -hex 32`) so BYOK encryption works
-- [ ] At least one Space Fleet episode end-to-end through Seed pipeline
-- [ ] Judge wallet pre-funded with testnet ETH + $LOAR + ModelArk credits
-- [ ] Demo URL loads in <30s on cold cache
-- [ ] Repo public, no secrets in git history
-- [ ] 2-min video uploaded; link in submission form
-- [ ] [betahacks.org](https://betahacks.org) submission form filled out
+- [x] `BYTEDANCE_API_KEY` set on the deployed server (or BYOK key used in demo)
+- [x] `PROVIDER_KEY_MASTER_KEY` set on deployed server (`openssl rand -hex 32`) so BYOK encryption works
+- [x] At least one Space Fleet episode end-to-end through Seed pipeline
+- [x] Judge wallet pre-funded with testnet ETH + $LOAR + ModelArk credits
+- [x] Demo URL loads in <30s on cold cache
+- [x] Repo public, no secrets in git history
+- [x] 2-min video uploaded; link in submission form
+- [x] [betahacks.org](https://betahacks.org) submission form filled out
 
 ## What was built specifically for this submission
 
@@ -164,8 +166,8 @@ This means **judges can demo on their own credits**, and any builder watching ca
 - `seedOrchestrator.chat()` — Seed 2.0 chat-completion wrapper for the showrunner agent
 - `generateSpeech()` — Seed Speech wrapper
 - `generateTalkingScene()` — OmniHuman wrapper
-- Encrypted user-secrets store (`apps/server/src/services/userSecrets.ts`) with AES-256-GCM
-- `userSecrets` tRPC router (set / clear / test / list)
+- Encrypted BYOK store (originally `apps/server/src/services/userSecrets.ts`, consolidated into [`apps/server/src/services/provider-keys/`](apps/server/src/services/provider-keys/) on 2026-05-17) with AES-256-GCM
+- BYOK tRPC router (originally `userSecrets`, now `providers.*` after the 2026-05-17 consolidation)
 - `/settings/api-keys` UI — paste, test, save, remove
 - Hackathon-aware README block + this document
 

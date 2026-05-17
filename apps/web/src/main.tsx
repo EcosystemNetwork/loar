@@ -33,6 +33,11 @@ window.addEventListener('vite:preloadError', (e) => {
 import { installGlobalIpfsFallback } from './utils/install-ipfs-fallback';
 installGlobalIpfsFallback();
 
+// Offline-video service worker. Fire-and-forget — caches episodes the user
+// explicitly flags via the "Save offline" button. No app-shell caching.
+import { registerOfflineWorker } from './lib/offline-cache';
+void registerOfflineWorker();
+
 import { RouterProvider, createRouter } from '@tanstack/react-router';
 import ReactDOM from 'react-dom/client';
 import Loader from './components/loader';

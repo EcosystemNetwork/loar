@@ -65,6 +65,67 @@ async function testElevenLabsKey(key: string): Promise<boolean> {
   return res.ok;
 }
 
+async function testBytedanceKey(key: string): Promise<boolean> {
+  const res = await fetch('https://ark.cn-beijing.volces.com/api/v3/models', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${key}` },
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (res.status === 401 || res.status === 403) return false;
+  return true;
+}
+
+async function testZaiKey(key: string): Promise<boolean> {
+  const res = await fetch('https://open.bigmodel.cn/api/paas/v4/models', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${key}` },
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (res.status === 401 || res.status === 403) return false;
+  return true;
+}
+
+async function testOpenAIKey(key: string): Promise<boolean> {
+  const res = await fetch('https://api.openai.com/v1/models', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${key}` },
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (res.status === 401 || res.status === 403) return false;
+  return res.ok;
+}
+
+async function testGoogleKey(key: string): Promise<boolean> {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`,
+    { method: 'GET', signal: AbortSignal.timeout(8_000) }
+  );
+  if (res.status === 401 || res.status === 403 || res.status === 400) return false;
+  return res.ok;
+}
+
+async function testMeshyKey(key: string): Promise<boolean> {
+  const res = await fetch('https://api.meshy.ai/v2/text-to-3d?page_size=1', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${key}` },
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (res.status === 401 || res.status === 403) return false;
+  return true;
+}
+
+async function testTripoKey(key: string): Promise<boolean> {
+  // Tripo's lightest reachable endpoint — account balance. 200 == valid,
+  // 401/403 == bad key, anything else we treat as transient (don't reject).
+  const res = await fetch('https://api.tripo3d.ai/v2/openapi/user/balance', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${key}` },
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (res.status === 401 || res.status === 403) return false;
+  return true;
+}
+
 export const PROVIDER_REGISTRY: Record<ProviderId, ProviderRegistryEntry> = {
   fal: {
     id: 'fal',
@@ -100,6 +161,48 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderRegistryEntry> = {
     apiKeyDocsUrl: 'https://elevenlabs.io/app/settings/api-keys',
     serverPoolEnvVar: 'ELEVENLABS_API_KEY',
     testKey: testElevenLabsKey,
+  },
+  bytedance: {
+    id: 'bytedance',
+    displayName: 'ByteDance ModelArk',
+    apiKeyDocsUrl: 'https://docs.byteplus.com/en/docs/ModelArk/',
+    serverPoolEnvVar: 'BYTEDANCE_API_KEY',
+    testKey: testBytedanceKey,
+  },
+  zai: {
+    id: 'zai',
+    displayName: 'Z.AI (GLM)',
+    apiKeyDocsUrl: 'https://docs.z.ai/llms.txt',
+    serverPoolEnvVar: 'ZAI_API_KEY',
+    testKey: testZaiKey,
+  },
+  openai: {
+    id: 'openai',
+    displayName: 'OpenAI',
+    apiKeyDocsUrl: 'https://platform.openai.com/api-keys',
+    serverPoolEnvVar: 'OPENAI_API_KEY',
+    testKey: testOpenAIKey,
+  },
+  google: {
+    id: 'google',
+    displayName: 'Google AI (Imagen + Gemini)',
+    apiKeyDocsUrl: 'https://ai.google.dev/gemini-api/docs/api-key',
+    serverPoolEnvVar: 'GOOGLE_API_KEY',
+    testKey: testGoogleKey,
+  },
+  meshy: {
+    id: 'meshy',
+    displayName: 'Meshy',
+    apiKeyDocsUrl: 'https://www.meshy.ai/api-keys',
+    serverPoolEnvVar: 'MESHY_API_KEY',
+    testKey: testMeshyKey,
+  },
+  tripo: {
+    id: 'tripo',
+    displayName: 'Tripo3D',
+    apiKeyDocsUrl: 'https://platform.tripo3d.ai/api-keys',
+    serverPoolEnvVar: 'TRIPO_API_KEY',
+    testKey: testTripoKey,
   },
 };
 

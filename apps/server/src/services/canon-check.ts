@@ -23,7 +23,7 @@
 import { db, firebaseAvailable } from '../lib/firebase';
 import { extractVideoThumbnail } from './video-thumbnail';
 import { zaiService } from './zai';
-import { getUserSecret } from './userSecrets';
+import { resolveProviderKey } from '../lib/byok';
 
 export interface CanonCheckResult {
   score: number;
@@ -45,8 +45,8 @@ export async function runEpisodeCanonCheck(
   if (!firebaseAvailable) return null;
 
   // Resolve user-bound or platform Z.AI key. If neither, skip silently.
-  const byok = await getUserSecret(callerUid, 'zai').catch(() => null);
-  if (!zaiService.isConfigured(byok ?? undefined)) {
+  const byok = await resolveProviderKey(callerUid, 'zai').catch(() => undefined);
+  if (!zaiService.isConfigured(byok)) {
     return null;
   }
 
@@ -82,8 +82,8 @@ export async function runEpisodeCanonCheck(
 
   const visionResult = await zaiService
     .vision({
-      apiKey: byok ?? undefined,
-      model: 'glm-4.5v',
+      apiKey: byok,
+      model: 'glm-4.6v',
       maxTokens: 1200,
       prompt: `You are LOAR's canon consistency reviewer for the universe "${universeName}".
 

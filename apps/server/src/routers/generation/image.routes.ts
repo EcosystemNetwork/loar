@@ -305,10 +305,8 @@ async function dispatchImageGen(
 
   if (model.provider === 'bytedance') {
     // BYOK — let users plug in their own ModelArk credits.
-    const { getUserSecret } = await import('../../services/userSecrets');
-    const userKey = ctx.userId
-      ? ((await getUserSecret(ctx.userId, 'bytedance')) ?? undefined)
-      : undefined;
+    const { resolveProviderKey } = await import('../../lib/byok');
+    const userKey = ctx.userId ? await resolveProviderKey(ctx.userId, 'bytedance') : undefined;
     const result = await bytedanceService.generateImage({
       prompt: input.prompt,
       model: model.bytedanceModelId || 'seedream-5-0-260128',
@@ -329,11 +327,9 @@ async function dispatchImageGen(
 
   if (model.provider === 'zai') {
     // BYOK Z.AI — falls back to platform ZAI_API_KEY when no user key is set.
-    const { getUserSecret } = await import('../../services/userSecrets');
+    const { resolveProviderKey } = await import('../../lib/byok');
     const { zaiService } = await import('../../services/zai');
-    const userKey = ctx.userId
-      ? ((await getUserSecret(ctx.userId, 'zai')) ?? undefined)
-      : undefined;
+    const userKey = ctx.userId ? await resolveProviderKey(ctx.userId, 'zai') : undefined;
     const size = imageSizeToPixelSize(input.imageSize);
     const result = await zaiService.generateImage({
       apiKey: userKey,

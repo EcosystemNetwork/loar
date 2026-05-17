@@ -99,7 +99,11 @@ const PROVIDER_META: Record<
   },
 };
 
+// The new `providers.upsertKey` mutation tests every key against the provider
+// before persisting — bad keys never hit disk. The legacy "test then save"
+// double-call pattern is no longer needed.
 const TESTABLE_PROVIDERS = new Set<Provider>(['bytedance', 'zai']);
+void TESTABLE_PROVIDERS;
 
 function ApiKeysPage() {
   const { address } = useWalletAuth();
@@ -158,63 +162,44 @@ function ProviderCard({ provider }: { provider: Provider }) {
   const queryClient = useQueryClient();
   const [value, setValue] = useState('');
 
-  const { data: summary, isLoading } = useQuery({
-    queryKey: ['userSecrets', 'list'],
-    queryFn: () => trpcClient.userSecrets.list.query(),
+  const { data: keys, isLoading } = useQuery({
+    queryKey: ['providers', 'listKeys'],
+    queryFn: () => trpcClient.providers.listKeys.query(),
     refetchOnWindowFocus: false,
   });
 
   const stored = useMemo(() => {
-    if (!summary) return null;
-    return summary[provider] ?? null;
-  }, [summary, provider]);
+    if (!keys) return null;
+    return keys.find((k) => k.provider === provider) ?? null;
+  }, [keys, provider]);
 
   const setKey = useMutation({
-    mutationFn: (v: string) => trpcClient.userSecrets.setKey.mutate({ provider, value: v }),
+    mutationFn: (v: string) => trpcClient.providers.upsertKey.mutate({ provider, apiKey: v }),
     onSuccess: () => {
       toast.success(`${meta.label} key saved`);
       setValue('');
-      queryClient.invalidateQueries({ queryKey: ['userSecrets', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['providers', 'listKeys'] });
+      queryClient.invalidateQueries({ queryKey: ['providers', 'listModels'] });
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Save failed'),
   });
 
   const clearKey = useMutation({
-    mutationFn: () => trpcClient.userSecrets.clearKey.mutate({ provider }),
+    mutationFn: () => trpcClient.providers.deleteKey.mutate({ provider }),
     onSuccess: () => {
       toast.success(`${meta.label} key removed`);
-      queryClient.invalidateQueries({ queryKey: ['userSecrets', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['providers', 'listKeys'] });
+      queryClient.invalidateQueries({ queryKey: ['providers', 'listModels'] });
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Remove failed'),
-  });
-
-  const testKey = useMutation({
-    mutationFn: (v: string) => {
-      if (provider === 'zai') return trpcClient.userSecrets.testZai.mutate({ value: v });
-      return trpcClient.userSecrets.testBytedance.mutate({ value: v });
-    },
-    onSuccess: (res) => {
-      if (res.ok) {
-        toast.success('Key verified — saving…', { description: res.sample });
-        setKey.mutate(value.trim());
-      } else {
-        toast.error('Key did not authenticate', { description: res.error });
-      }
-    },
-    onError: (err) => toast.error(err instanceof Error ? err.message : 'Test failed'),
   });
 
   const handleSave = () => {
     const trimmed = value.trim();
     if (!trimmed) return;
-    if (TESTABLE_PROVIDERS.has(provider)) {
-      // Test before saving — surfaces auth errors immediately on the user's
-      // own quota, so a bad paste doesn't silently end up encrypted at rest.
-      testKey.mutate(trimmed);
-    } else {
-      // Providers without a server-side test endpoint save directly.
-      setKey.mutate(trimmed);
-    }
+    // `providers.upsertKey` server-side runs the provider's test endpoint
+    // before persisting. No separate test call needed.
+    setKey.mutate(trimmed);
   };
 
   return (
@@ -253,7 +238,9 @@ function ProviderCard({ provider }: { provider: Provider }) {
         ) : stored ? (
           <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm">
             <div className="flex items-center justify-between gap-3">
-              <div className="font-mono text-emerald-300">•••• {stored.last4}</div>
+              <div className="font-mono text-emerald-300">
+                •••• {stored.last4 || stored.fingerprint.slice(-4)}
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -266,7 +253,7 @@ function ProviderCard({ provider }: { provider: Provider }) {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Last updated {new Date(stored.updatedAt).toLocaleString()}
+              Saved {new Date(stored.createdAt).toLocaleString()}
             </p>
           </div>
         ) : (
@@ -291,11 +278,8 @@ function ProviderCard({ provider }: { provider: Provider }) {
               onChange={(e) => setValue(e.target.value)}
               className="flex-1 font-mono text-sm"
             />
-            <Button
-              onClick={handleSave}
-              disabled={!value.trim() || setKey.isPending || testKey.isPending}
-            >
-              {testKey.isPending ? 'Testing…' : setKey.isPending ? 'Saving…' : 'Save'}
+            <Button onClick={handleSave} disabled={!value.trim() || setKey.isPending}>
+              {setKey.isPending ? 'Saving…' : 'Save'}
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">

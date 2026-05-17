@@ -28,7 +28,7 @@ import {
   requirePermission,
 } from '../../lib/trpc';
 import { zaiService } from '../../services/zai';
-import { getUserSecret } from '../../services/userSecrets';
+import { resolveProviderKey } from '../../lib/byok';
 import { getStorageManager } from '../../services/storage';
 import { runEpisodeCanonCheck } from '../../services/canon-check';
 import { createEntity } from '../entities/entities.handlers';
@@ -38,8 +38,7 @@ import { db, firebaseAvailable } from '../../lib/firebase';
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 async function resolveKey(uid: string): Promise<string | undefined> {
-  const byok = await getUserSecret(uid, 'zai').catch(() => null);
-  return byok ?? undefined;
+  return resolveProviderKey(uid, 'zai').catch(() => undefined);
 }
 
 async function rehostUrl(

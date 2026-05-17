@@ -12,7 +12,18 @@
  * provider here, then list it in `PROVIDER_REGISTRY` in `registry.ts`
  * with its test endpoint and SDK env var.
  */
-export type ProviderId = 'fal' | 'assemblyai' | 'deepgram' | 'groq' | 'elevenlabs';
+export type ProviderId =
+  | 'fal'
+  | 'assemblyai'
+  | 'deepgram'
+  | 'groq'
+  | 'elevenlabs'
+  | 'bytedance'
+  | 'zai'
+  | 'openai'
+  | 'google'
+  | 'meshy'
+  | 'tripo';
 
 export interface ProviderKeyDoc {
   /** Doc id is `${userId}_${provider}`. */
@@ -20,6 +31,12 @@ export interface ProviderKeyDoc {
   provider: ProviderId;
   /** `sha256(plaintext).slice(0, 16)`. Safe to expose to the UI. */
   fingerprint: string;
+  /**
+   * Trailing 4 chars of the plaintext key for UI display ("•••• a3f4").
+   * Not an entropy leak — the user can already see this in their own
+   * provider dashboard.
+   */
+  last4: string;
   /** base64(nonce || ciphertext || authTag). Decryption owns the master key. */
   encryptedKey: string;
   enabled: boolean;
@@ -35,6 +52,7 @@ export interface ProviderKeyDoc {
 export interface ProviderKeyPublic {
   provider: ProviderId;
   fingerprint: string;
+  last4: string;
   enabled: boolean;
   testedAt: Date | null;
   lastUsedAt: Date | null;

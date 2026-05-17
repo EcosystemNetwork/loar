@@ -46,7 +46,7 @@ chore: upgrade pnpm to 9.15.0
 3. Register it in `apps/server/src/routers/index.ts` on the `appRouter`
 4. Use it in the frontend via the tRPC client (`apps/web/src/utils/trpc.ts`)
 
-Example pattern — see `apps/server/src/routers/cinematicUniverses/` for a full sub-router example.
+Example pattern — see `apps/server/src/routers/universes/` for a full sub-router example. For a router that fans out to multiple AI backends with credit metering, see `apps/server/src/routers/generation/`.
 
 ### Adding a New Web Route
 
@@ -58,8 +58,24 @@ Example pattern — see `apps/server/src/routers/cinematicUniverses/` for a full
 
 1. Write the contract in `apps/contracts/src/`
 2. Write tests in `apps/contracts/test/`
-3. Run tests: `make test-contracts`
-4. After deployment, update `wagmi.config.ts` and run `make codegen`
+3. Run tests: `make test-contracts` (or `FOUNDRY_PROFILE=test forge build` if you hit the Solc 0.8.30 "Tag too large" IR bug)
+4. **Before any state-changing change to an existing contract**, check the storage layout against `apps/contracts/storage-layouts/baseline/` — the CI security workflow enforces this
+5. After deployment, update `wagmi.config.ts` and run `make codegen`
+
+### Adding an Anchor / Solana Program
+
+1. Write the program in `apps/programs/programs/<name>/`
+2. Add an entry to `apps/programs/Anchor.toml`
+3. `anchor build && anchor test` (devnet config)
+4. Update the corresponding server glue in `apps/server/src/services/solana/`
+5. See [`docs/prd-solana-native-sdk-glue.md`](docs/prd-solana-native-sdk-glue.md) for the glue-layer conventions
+
+### Adding a Metered AI Pipeline
+
+1. Use the centralized reservation service — `reserve` → invoke provider → `reconcile` — never inline the credit math
+2. Register the model in the appropriate registry under `apps/server/src/services/{image,audio,transcription}-models/registry.ts`
+3. If it's a BYOK-able provider, wire it through `apps/server/src/services/provider-keys/dispatcher.ts` so user keys are picked first
+4. See [`docs/prd-model-metering.md`](docs/prd-model-metering.md) for the full contract
 
 ### Adding Environment Variables
 
@@ -67,6 +83,7 @@ Example pattern — see `apps/server/src/routers/cinematicUniverses/` for a full
 2. Update `docs/environment.md`
 3. For `VITE_` prefixed vars: they are auto-exposed to the web app via Vite
 4. For server vars: access via `process.env.YOUR_VAR` (dotenv loads from root `.env`)
+5. Never commit secrets — `.env` is gitignored; CI uses GitHub Actions secrets
 
 ## Code Style
 
@@ -80,12 +97,15 @@ Example pattern — see `apps/server/src/routers/cinematicUniverses/` for a full
 Before submitting a PR:
 
 ```bash
-make check-types    # TypeScript verification
+make check-types    # TypeScript verification (web + server should both pass)
 make test           # Smart contract tests
 make lint           # Linting
+pnpm smoke          # Optional: end-to-end testnet smoke harness (7 layers, seeded wallets)
 ```
 
-Note: There are pre-existing type errors in the web app (GenerativeMedia, GovernanceSidebar, flow components). These do not block development.
+Run [`gitnexus_detect_changes()`](AGENTS.md) before committing if you're touching code paths flagged by `gitnexus_impact` as HIGH/CRITICAL — the project is indexed and the impact graph catches cross-module breakage that the type checker misses.
+
+Before editing a smart contract, also follow the [`AGENTS.md`](AGENTS.md) protocol: run impact analysis, then check the storage layout against the baseline in `apps/contracts/storage-layouts/baseline/`.
 
 ## Pull Request Process
 
@@ -99,26 +119,47 @@ Note: There are pre-existing type errors in the web app (GenerativeMedia, Govern
 
 ```
 apps/web/src/
-├── components/     # React components (ui/, flow/, segments/)
-├── lib/            # Firebase client, auth helpers, tRPC client
-├── routes/         # File-based routes (TanStack Router)
-├── hooks/          # Custom React hooks
-├── types/          # TypeScript type definitions
-└── utils/          # Utilities (ponder-api, trpc)
+├── components/         # React components (ui/, flow/, voice-studio/, segments/)
+│   └── voice-studio/   # CaptionsPanel, VoiceLibrary, ScriptEditor, MultilingualPanel, etc.
+├── lib/                # wallet-auth (SIWE), tRPC client, Firebase client
+├── routes/             # File-based routes (TanStack Router, 65+ pages)
+├── hooks/              # Custom React hooks (useWalletAuth, useCircleWrite, useCircleSolanaAddress)
+└── utils/              # trpc, ponder-api
 
 apps/server/src/
-├── lib/            # Firebase admin, auth, tRPC config, context
-├── routers/        # tRPC routers (cinematicUniverses/, fal/)
-├── services/       # Business logic (fal, gemini, storage/, wikia) — minio.ts uses Firebase Storage (legacy name)
-└── routes/         # REST routes (images)
+├── lib/                # Firebase admin, SIWE auth, tRPC config, context, byok
+├── routers/            # tRPC routers (90+, grouped by domain: universes/, generation/, marketplace/, ...)
+│   └── generation/     # image / video / voice / threed / captions / lipsync / cutdown / talking-scene
+├── services/           # Business logic
+│   ├── provider-keys/  # BYOK single source of truth (AES-256-GCM, dispatcher)
+│   ├── image-models/   # Registry + types for image backends
+│   ├── audio-models/   # Registry + types for audio backends
+│   ├── transcription-models/  # 4-backend caption registry (FAL/AssemblyAI/Deepgram/Groq)
+│   ├── storage/        # Pinata / Lighthouse / Firebase fallback chain
+│   ├── solana/         # Anchor program glue, bridge, attestation
+│   └── ...             # gemini, vlm, canon-check, tripo3d, meshy, elevenlabs, etc.
+└── routes/             # Direct Hono REST routes (uploads, Solana writes, webhooks)
 
 apps/indexer/
-├── src/api/        # Ponder GraphQL API handlers
+├── src/api/            # Ponder GraphQL API handlers
 ├── ponder.config.ts
 └── ponder.schema.ts
 
 apps/contracts/
-├── src/            # Solidity contracts
-├── test/           # Foundry tests
-└── script/         # Deployment scripts
+├── src/                # Solidity contracts (69, upgradeable via UUPS + Beacon)
+├── test/               # Foundry tests
+├── script/             # Deployment scripts
+└── storage-layouts/baseline/  # 15 layout snapshots — CI diffs against these
+
+apps/programs/          # Anchor / Solana workspace (16 programs on devnet)
+├── programs/
+│   ├── universe/  episode/  payment/  canon_market/  licensing/
+│   ├── staking/   subscription/  credit_manager/  collab_manager/
+│   ├── split_router/  rights/  fee_locker/  bonding_curve/
+│   ├── remix_fees/  premium_actions/
+└── Anchor.toml
+
+apps/mcp/               # MCP server (25+ tools for AI agents, +6 Solana tools)
+apps/mobile/            # Expo 52 / React Native (iOS + Android, Circle DCW)
+scripts/                # Ops scripts: smoke harness, reattribution, recovery
 ```

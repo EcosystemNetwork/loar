@@ -876,6 +876,54 @@ function ThreeDModelsTab({ universeAddress }: { universeAddress?: string }) {
 }
 
 /**
+ * Rig types exposed in the 3D testbench. Mirror the server enum
+ * (apps/server/src/routers/generation/threed.routes.ts). `biped` routes to
+ * Meshy auto-rig; everything else routes to Tripo3D.
+ */
+type RigTypeId =
+  | 'biped'
+  | 'quadruped'
+  | 'hexapod'
+  | 'octopod'
+  | 'avian'
+  | 'serpentine'
+  | 'aquatic'
+  | 'others';
+
+const RIG_TYPES: RigTypeId[] = [
+  'biped',
+  'quadruped',
+  'hexapod',
+  'octopod',
+  'avian',
+  'serpentine',
+  'aquatic',
+  'others',
+];
+
+const RIG_TYPE_LABELS: Record<RigTypeId, string> = {
+  biped: 'Humanoid',
+  quadruped: 'Quadruped',
+  hexapod: 'Insect (6 legs)',
+  octopod: 'Spider (8 legs)',
+  avian: 'Bird',
+  serpentine: 'Snake / serpent',
+  aquatic: 'Fish / aquatic',
+  others: 'Vehicle / other',
+};
+
+const RIG_TYPE_HINTS: Record<RigTypeId, string> = {
+  biped: 'People, humanoid monsters — uses Meshy auto-rig',
+  quadruped: 'Dogs, horses, lions, dinosaurs — uses Tripo3D',
+  hexapod: 'Insects, beetles, ants — uses Tripo3D',
+  octopod: 'Spiders, crabs — uses Tripo3D',
+  avian: 'Birds, dragons with wings — uses Tripo3D',
+  serpentine: 'Snakes, eels, serpents — uses Tripo3D',
+  aquatic: 'Fish, sharks, sea creatures — uses Tripo3D',
+  others: 'Planes, cars, boats, mechs — uses Tripo3D generic',
+};
+
+/**
  * Modal preview for a single 3D model. Wraps the testbench-mode ModelViewer
  * and pulls lineage (source 2D image, turntable video, rigged + animated
  * derivatives) so creators can preview, rig, and play animation presets
@@ -892,8 +940,9 @@ function Model3DTestbenchDialog({
   const queryClient = useQueryClient();
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
   const [pendingRig, setPendingRig] = useState(false);
-  const [pendingAnimateId, setPendingAnimateId] = useState<number | null>(null);
+  const [pendingActionRef, setPendingActionRef] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [chosenRigType, setChosenRigType] = useState<RigTypeId>('biped');
 
   const isCreator =
     !!address &&
@@ -905,10 +954,10 @@ function Model3DTestbenchDialog({
     queryFn: () => trpcClient.gallery.lineage.query({ contentId: item!.id }),
     enabled: !!item?.id,
     // Poll while an action is in flight so the new derivative shows up
-    // automatically when Meshy finishes (typical 1–3 min for rigging,
-    // 30s–2min for animation library applies).
-    refetchInterval: pendingRig || pendingAnimateId !== null ? 5000 : false,
-    staleTime: pendingRig || pendingAnimateId !== null ? 0 : WIKI_LIST_STALE_TIME,
+    // automatically when the provider finishes (1–5 min typical for rigging,
+    // 30s–3min for an animation retarget).
+    refetchInterval: pendingRig || pendingActionRef !== null ? 5000 : false,
+    staleTime: pendingRig || pendingActionRef !== null ? 0 : WIKI_LIST_STALE_TIME,
   });
 
   const derivatives = (lineage?.derivatives ?? []) as any[];
@@ -922,32 +971,54 @@ function Model3DTestbenchDialog({
     (d) => d.mediaType === 'video' && Array.isArray(d.tags) && d.tags.includes('turntable')
   );
 
+  // Pull rig provider + rig type out of the rigged derivative so we filter the
+  // preset grid correctly (Meshy biped vs Tripo quadruped etc.).
+  const riggedProvider: 'meshy' | 'tripo' | null = riggedItem?.generationId?.startsWith(
+    'rig:meshy:'
+  )
+    ? 'meshy'
+    : riggedItem?.generationId?.startsWith('rig:tripo:')
+      ? 'tripo'
+      : null;
+  const riggedRigType: RigTypeId | null = riggedItem
+    ? (RIG_TYPES.find((t) => riggedItem.tags?.includes(t)) ?? null)
+    : null;
+
   const { data: presets } = useQuery({
     queryKey: ['threed', 'animationPresets'],
     queryFn: () => trpcClient.threed.animationPresets.query(),
     staleTime: Infinity,
   });
 
+  // Presets filtered to those compatible with the *existing* rigged item's
+  // provider + rig type. If no rigged item yet, this is empty.
+  const visiblePresets = (presets ?? []).filter(
+    (p) =>
+      riggedProvider === p.provider && (riggedRigType ? p.rigTypes.includes(riggedRigType) : true)
+  );
+
   // Clear pending flags as soon as the expected derivative appears.
   useEffect(() => {
     if (pendingRig && riggedItem) setPendingRig(false);
   }, [pendingRig, riggedItem]);
   useEffect(() => {
-    if (pendingAnimateId === null) return;
+    if (pendingActionRef === null) return;
     const arrived = animatedItems.some(
       (d) =>
         typeof d.generationModel === 'string' &&
-        d.generationModel === `meshy-animation:${pendingAnimateId}`
+        (d.generationModel === `meshy-animation:${pendingActionRef}` ||
+          d.generationModel === `tripo-animation:${pendingActionRef}`)
     );
-    if (arrived) setPendingAnimateId(null);
-  }, [pendingAnimateId, animatedItems]);
+    if (arrived) setPendingActionRef(null);
+  }, [pendingActionRef, animatedItems]);
 
   // Reset transient state when switching items.
   useEffect(() => {
     setViewerUrl(null);
     setPendingRig(false);
-    setPendingAnimateId(null);
+    setPendingActionRef(null);
     setActionError(null);
+    setChosenRigType('biped');
   }, [item?.id]);
 
   const sourceImageUrl = item?.sourceImageUrl
@@ -957,8 +1028,8 @@ function Model3DTestbenchDialog({
       : null;
 
   const rigMutation = useMutation({
-    mutationFn: ({ contentId }: { contentId: string }) =>
-      trpcClient.threed.rig.mutate({ contentId }),
+    mutationFn: ({ contentId, rigType }: { contentId: string; rigType: RigTypeId }) =>
+      trpcClient.threed.rig.mutate({ contentId, rigType }),
     onMutate: () => {
       setActionError(null);
       setPendingRig(true);
@@ -973,14 +1044,14 @@ function Model3DTestbenchDialog({
   });
 
   const animateMutation = useMutation({
-    mutationFn: ({ riggedContentId, actionId }: { riggedContentId: string; actionId: number }) =>
-      trpcClient.threed.animate.mutate({ riggedContentId, actionId }),
+    mutationFn: ({ riggedContentId, actionRef }: { riggedContentId: string; actionRef: string }) =>
+      trpcClient.threed.animate.mutate({ riggedContentId, actionRef }),
     onMutate: (vars) => {
       setActionError(null);
-      setPendingAnimateId(vars.actionId);
+      setPendingActionRef(vars.actionRef);
     },
     onError: (err: any) => {
-      setPendingAnimateId(null);
+      setPendingActionRef(null);
       setActionError(err?.message ?? 'Animation failed to start');
     },
     onSuccess: () => {
@@ -1038,9 +1109,14 @@ function Model3DTestbenchDialog({
                 {animatedItems.map((d) => {
                   const presetName =
                     (presets ?? []).find(
-                      (p) => `meshy-animation:${p.actionId}` === d.generationModel
+                      (p) =>
+                        d.generationModel === `meshy-animation:${p.actionRef}` ||
+                        d.generationModel === `tripo-animation:${p.actionRef}`
                     )?.name ??
-                    d.tags?.find((t: string) => !['character', '3d', 'animated'].includes(t)) ??
+                    d.tags?.find(
+                      (t: string) =>
+                        !['character', '3d', 'animated', ...RIG_TYPES].includes(t as RigTypeId)
+                    ) ??
                     'Animation';
                   return (
                     <button
@@ -1068,49 +1144,88 @@ function Model3DTestbenchDialog({
                   {!riggedItem ? (
                     <>
                       <p className="text-[11px] text-muted-foreground leading-relaxed">
-                        Rig this humanoid mesh once (Meshy auto-rig, ~1–3 min) to unlock the
-                        animation library.
+                        Rig this mesh once (~1–5 min) to unlock the animation library. Humanoid uses
+                        Meshy auto-rig; everything else uses Tripo3D.
                       </p>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          Rig type
+                        </label>
+                        <Select
+                          value={chosenRigType}
+                          onValueChange={(v) => setChosenRigType(v as RigTypeId)}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {RIG_TYPES.map((t) => (
+                              <SelectItem key={t} value={t} className="text-xs">
+                                {RIG_TYPE_LABELS[t]}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-[10px] text-muted-foreground italic">
+                          {RIG_TYPE_HINTS[chosenRigType]}
+                        </p>
+                      </div>
                       <Button
                         size="sm"
                         className="w-full"
                         disabled={pendingRig || rigMutation.isPending}
-                        onClick={() => rigMutation.mutate({ contentId: item.id })}
+                        onClick={() =>
+                          rigMutation.mutate({ contentId: item.id, rigType: chosenRigType })
+                        }
                       >
-                        {pendingRig || rigMutation.isPending ? 'Rigging…' : 'Rig this model'}
+                        {pendingRig || rigMutation.isPending
+                          ? 'Rigging…'
+                          : `Rig as ${RIG_TYPE_LABELS[chosenRigType].toLowerCase()}`}
                       </Button>
                     </>
                   ) : (
                     <>
                       <p className="text-[11px] text-muted-foreground">
-                        Pick a preset — each adds a new GLB to the variant switcher above.
+                        Rigged as{' '}
+                        <span className="font-medium">
+                          {riggedRigType ? RIG_TYPE_LABELS[riggedRigType] : 'unknown'}
+                        </span>{' '}
+                        ({riggedProvider}). Pick a preset — each adds a new GLB to the switcher.
                       </p>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {(presets ?? []).map((p) => {
-                          const already = animatedItems.some(
-                            (d) => d.generationModel === `meshy-animation:${p.actionId}`
-                          );
-                          const isPending = pendingAnimateId === p.actionId;
-                          return (
-                            <Button
-                              key={p.actionId}
-                              size="sm"
-                              variant={already ? 'secondary' : 'outline'}
-                              className="text-xs h-8"
-                              disabled={already || isPending || animateMutation.isPending}
-                              onClick={() =>
-                                animateMutation.mutate({
-                                  riggedContentId: riggedItem.id,
-                                  actionId: p.actionId,
-                                })
-                              }
-                              title={p.category}
-                            >
-                              {isPending ? '…' : already ? `✓ ${p.name}` : p.name}
-                            </Button>
-                          );
-                        })}
-                      </div>
+                      {visiblePresets.length === 0 ? (
+                        <p className="text-[11px] text-muted-foreground italic">
+                          No presets available for this rig type yet.
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {visiblePresets.map((p) => {
+                            const already = animatedItems.some(
+                              (d) =>
+                                d.generationModel === `meshy-animation:${p.actionRef}` ||
+                                d.generationModel === `tripo-animation:${p.actionRef}`
+                            );
+                            const isPending = pendingActionRef === p.actionRef;
+                            return (
+                              <Button
+                                key={p.actionRef}
+                                size="sm"
+                                variant={already ? 'secondary' : 'outline'}
+                                className="text-xs h-8"
+                                disabled={already || isPending || animateMutation.isPending}
+                                onClick={() =>
+                                  animateMutation.mutate({
+                                    riggedContentId: riggedItem.id,
+                                    actionRef: p.actionRef,
+                                  })
+                                }
+                                title={p.category}
+                              >
+                                {isPending ? '…' : already ? `✓ ${p.name}` : p.name}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </>
                   )}
                   {actionError && (

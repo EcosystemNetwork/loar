@@ -1,16 +1,37 @@
 /**
- * BYOK key resolver — returns a user's stored API key for a given provider,
- * falling back to the platform's env-var key if the user hasn't supplied one.
+ * BYOK key resolver — thin facade that returns the plaintext key string for
+ * a (user, provider) pair, or `undefined` if neither a user-supplied BYOK
+ * key nor the server's env-configured pool key is available.
  *
- * Use at every external-API call site:
+ * Backed by `services/provider-keys/dispatcher.ts`. The legacy `userSecrets`
+ * collection is retired; this facade preserves the historical signature so
+ * the small number of existing callers (`canon-check`, `zai.routes`,
+ * `wikia`, `editJobs/dispatchers`) don't have to learn the richer
+ * `ResolvedKey` shape.
+ *
+ * Usage:
  *
  *   const apiKey = await resolveProviderKey(ctx.userId, 'fal');
  *   await falService.generateImage({ ...input, apiKey });
  *
- * Returns `undefined` when neither a user key nor an env key is set — caller
- * decides whether that's a hard error or a graceful no-op.
+ * For dispatch metadata (`source: 'byok' | 'server'`, fingerprint), import
+ * `resolveProviderKey` from `services/provider-keys` instead.
  */
-import { getUserSecret, type SecretProvider } from '../services/userSecrets';
+import {
+  resolveProviderKey as resolveResolvedKey,
+  NoKeyAvailableError,
+  isKnownProvider,
+} from '../services/provider-keys';
+
+export type SecretProvider =
+  | 'bytedance'
+  | 'zai'
+  | 'openai'
+  | 'google'
+  | 'fal'
+  | 'elevenlabs'
+  | 'meshy'
+  | 'tripo';
 
 const ENV_VAR_BY_PROVIDER: Record<SecretProvider, string> = {
   bytedance: 'BYTEDANCE_API_KEY',
@@ -20,17 +41,27 @@ const ENV_VAR_BY_PROVIDER: Record<SecretProvider, string> = {
   fal: 'FAL_KEY',
   elevenlabs: 'ELEVENLABS_API_KEY',
   meshy: 'MESHY_API_KEY',
+  tripo: 'TRIPO_API_KEY',
 };
 
 export async function resolveProviderKey(
   uid: string | undefined | null,
   provider: SecretProvider
 ): Promise<string | undefined> {
+  if (!isKnownProvider(provider)) return undefined;
   if (uid) {
-    const userKey = await getUserSecret(uid, provider);
-    if (userKey) return userKey;
+    try {
+      const { apiKey } = await resolveResolvedKey(uid, provider);
+      return apiKey;
+    } catch (err) {
+      // NoKeyAvailable just means no BYOK key + no env pool — fall through
+      // to direct env read below. Anything else (Firestore down etc.) we
+      // still try env so anonymous service paths keep working.
+      if (!(err instanceof NoKeyAvailableError)) {
+        // Best-effort fallthrough — never blow up the caller.
+      }
+    }
   }
-  const envVar = ENV_VAR_BY_PROVIDER[provider];
-  const envKey = process.env[envVar]?.trim();
+  const envKey = process.env[ENV_VAR_BY_PROVIDER[provider]]?.trim();
   return envKey || undefined;
 }

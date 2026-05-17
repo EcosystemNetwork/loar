@@ -29,6 +29,7 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
 import { meshyService } from '../../services/meshy';
+import { tripo3dService, type TripoRigType, type TripoAnimation } from '../../services/tripo3d';
 import { trackQuests } from '../../services/quest-tracker';
 import { FieldValue } from 'firebase-admin/firestore';
 import { createAttachment } from '../media/media.handlers';
@@ -839,21 +840,50 @@ export const threedRouter = router({
   // ── Rigging + animation (Meshy auto-rig + library) ──────────────────
 
   /**
-   * Curated subset of Meshy's 600+ preset animations exposed in the wiki
-   * testbench. Action IDs match the Meshy animation library reference.
-   * Add more by extending this array — no other code changes needed.
+   * Curated preset list surfaced in the wiki testbench. Each preset carries
+   * an `actionRef` that the server parses to route to the right provider:
+   *   - `meshy:<number>`     → Meshy animation library (humanoid only)
+   *   - `tripo:<preset name>` → Tripo3D animation library (all rig types)
+   *
+   * The client filters by `rigTypes` to show only animations valid for the
+   * rig the user picked.
    */
   animationPresets: publicProcedure.query(() => ANIMATION_PRESETS),
 
   /**
    * Rig a textured static GLB so it can accept library animations.
-   * Pass the gallery `contentId` of the textured 3D model. Publishes the
-   * rigged GLB to the gallery as a derivative when Meshy finishes (1–3 min
-   * typical wall-clock). Returns immediately with a job id the client polls.
+   *
+   * `rigType` chooses the provider:
+   *   - `biped`                                                 → Meshy auto-rig
+   *   - `quadruped | hexapod | octopod | avian | serpentine | aquatic | others`
+   *                                                              → Tripo3D
+   *
+   * "Others" is the catch-all for vehicles (planes, cars, boats) and
+   * mechanical/abstract meshes — Tripo applies a generic rig.
+   *
+   * Publishes the rigged GLB to the gallery as a derivative when the
+   * provider finishes (1–5 min typical). Returns immediately with a job id
+   * the client polls via lineage refetch.
    */
   rig: expensiveProcedure
     .use(requirePermission('generation.3d'))
-    .input(z.object({ contentId: z.string().min(1) }))
+    .input(
+      z.object({
+        contentId: z.string().min(1),
+        rigType: z
+          .enum([
+            'biped',
+            'quadruped',
+            'hexapod',
+            'octopod',
+            'avian',
+            'serpentine',
+            'aquatic',
+            'others',
+          ])
+          .default('biped'),
+      })
+    )
     .mutation(async ({ input, ctx }) => {
       if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
       const contentDoc = await db.collection('content').doc(input.contentId).get();
@@ -874,73 +904,113 @@ export const threedRouter = router({
         });
       }
 
+      const provider: 'meshy' | 'tripo' = input.rigType === 'biped' ? 'meshy' : 'tripo';
       const { fiatMargin } = await getMargins();
       const credits = toCredits(RIG_COST, fiatMargin);
       const genId = randomUUID();
+      const sourceTitle = (content.title as string | undefined) ?? '3D model';
+      const sourceUrl = content.mediaUrl as string;
+      const universeId = (content.universeId as string | null | undefined) ?? null;
+      const parentGenerationId = (content.generationId as string | null | undefined) ?? null;
 
       return withReservation(
         {
           userId: ctx.user.uid,
-          modelId: 'meshy-rigging',
-          provider: 'meshy',
+          modelId: `${provider}-rigging:${input.rigType}`,
+          provider,
           estimatedCredits: credits,
           byok: false,
-          meta: { genId, sourceContentId: input.contentId, kind: 'rig' },
+          meta: {
+            genId,
+            sourceContentId: input.contentId,
+            rigType: input.rigType,
+            kind: 'rig',
+          },
         },
         async () => {
           const { resolveProviderKey } = await import('../../lib/byok');
-          const apiKey = await resolveProviderKey(ctx.user.uid, 'meshy');
-          const { taskId } = await meshyService.rigModel({
-            modelUrl: content.mediaUrl as string,
-            apiKey,
-          });
 
-          await threeDGenCol()
-            .doc(genId)
-            .set({
+          if (provider === 'meshy') {
+            const apiKey = await resolveProviderKey(ctx.user.uid, 'meshy');
+            const { taskId } = await meshyService.rigModel({ modelUrl: sourceUrl, apiKey });
+            await threeDGenCol().doc(genId).set({
               id: genId,
               userId: ctx.user.uid,
               type: 'meshy_rigging',
               status: 'running',
               meshyTaskId: taskId,
               sourceContentId: input.contentId,
-              sourceMediaUrl: content.mediaUrl,
-              universeId: content.universeId ?? null,
-              parentGenerationId: content.generationId ?? null,
+              sourceMediaUrl: sourceUrl,
+              rigType: input.rigType,
+              universeId,
+              parentGenerationId,
               createdAt: new Date(),
             });
+            void completeMeshyRiggingTask({
+              genId,
+              userId: ctx.user.uid,
+              meshyTaskId: taskId,
+              sourceTitle,
+              universeId,
+              parentGenerationId,
+              credits,
+            });
+            return { result: { jobId: genId, providerTaskId: taskId }, actualCredits: credits };
+          }
 
-          // Fire-and-forget — credit reconciles successfully at submit time;
-          // the polling worker refunds via `refundCreditsAfterReconcile` if
-          // Meshy ultimately fails. Matches the existing 3D background pattern.
-          void completeRiggingTask({
+          // Tripo3D path — import, then rig (animate is a separate request)
+          const apiKey = await resolveProviderKey(ctx.user.uid, 'tripo').catch(() => undefined);
+          const fileToken = await tripo3dService.uploadRemoteGlb(sourceUrl, apiKey);
+          const importTask = await tripo3dService.importModel(fileToken, apiKey);
+          // Wait for import to land — it's fast (~10s) so we wait inline.
+          await tripo3dService.waitForTask(importTask.taskId, 5 * 60 * 1000, 3000, apiKey);
+          const { taskId } = await tripo3dService.rigModel({
+            originalModelTaskId: importTask.taskId,
+            rigType: input.rigType as TripoRigType,
+            apiKey,
+          });
+          await threeDGenCol().doc(genId).set({
+            id: genId,
+            userId: ctx.user.uid,
+            type: 'tripo_rigging',
+            status: 'running',
+            tripoImportTaskId: importTask.taskId,
+            tripoRigTaskId: taskId,
+            sourceContentId: input.contentId,
+            sourceMediaUrl: sourceUrl,
+            rigType: input.rigType,
+            universeId,
+            parentGenerationId,
+            createdAt: new Date(),
+          });
+          void completeTripoRiggingTask({
             genId,
             userId: ctx.user.uid,
-            meshyTaskId: taskId,
-            sourceContentId: input.contentId,
-            sourceMediaUrl: content.mediaUrl as string,
-            sourceTitle: (content.title as string | undefined) ?? '3D model',
-            universeId: (content.universeId as string | null | undefined) ?? null,
-            parentGenerationId: (content.generationId as string | null | undefined) ?? null,
+            tripoRigTaskId: taskId,
+            sourceTitle,
+            rigType: input.rigType as TripoRigType,
+            universeId,
+            parentGenerationId,
             credits,
           });
-
-          return { result: { jobId: genId, meshyTaskId: taskId }, actualCredits: credits };
+          return { result: { jobId: genId, providerTaskId: taskId }, actualCredits: credits };
         }
       );
     }),
 
   /**
-   * Apply a library animation to a previously-rigged 3D model. Pass the
-   * gallery `contentId` of the RIGGED item (its `generationId` carries the
-   * `rig:<taskId>` reference that Meshy needs as `rig_task_id`).
+   * Apply a library animation to a previously-rigged 3D model.
+   * Pass `riggedContentId` (the gallery doc id of the rigged item) and an
+   * `actionRef` from `animationPresets`. The server reads the rigged item's
+   * `generationId` (encoded as `rig:meshy:<taskId>` or `rig:tripo:<taskId>`)
+   * to dispatch to the correct provider.
    */
   animate: expensiveProcedure
     .use(requirePermission('generation.3d'))
     .input(
       z.object({
         riggedContentId: z.string().min(1),
-        actionId: z.number().int().min(0),
+        actionRef: z.string().min(1),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -956,75 +1026,116 @@ export const threedRouter = router({
           message: 'Only the creator can animate this model',
         });
       }
-      const rigGenId: string | undefined = rigged.generationId;
-      if (!rigGenId || !rigGenId.startsWith('rig:')) {
+      const parsed = parseRigGenerationId(rigged.generationId as string | undefined);
+      if (!parsed) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'Source is not a rigged model — rig it first via threed.rig',
         });
       }
-      const rigTaskId = rigGenId.slice('rig:'.length);
-
-      const preset = ANIMATION_PRESETS.find((p) => p.actionId === input.actionId);
-      const presetName = preset?.name ?? `action_${input.actionId}`;
+      const preset = ANIMATION_PRESETS.find((p) => p.actionRef === input.actionRef);
+      if (!preset) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Unknown animation preset' });
+      }
+      if (preset.provider !== parsed.provider) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `This preset requires a ${preset.provider}-rigged model — this one is ${parsed.provider}`,
+        });
+      }
 
       const { fiatMargin } = await getMargins();
       const credits = toCredits(ANIMATION_COST, fiatMargin);
       const genId = randomUUID();
+      const riggedTitle = (rigged.title as string | undefined) ?? '3D model';
+      const universeId = (rigged.universeId as string | null | undefined) ?? null;
+      const rigGenId = rigged.generationId as string;
 
       return withReservation(
         {
           userId: ctx.user.uid,
-          modelId: `meshy-animation:${input.actionId}`,
-          provider: 'meshy',
+          modelId: `${parsed.provider}-animation:${input.actionRef}`,
+          provider: parsed.provider,
           estimatedCredits: credits,
           byok: false,
           meta: {
             genId,
             riggedContentId: input.riggedContentId,
-            actionId: input.actionId,
+            actionRef: input.actionRef,
             kind: 'animate',
           },
         },
         async () => {
           const { resolveProviderKey } = await import('../../lib/byok');
-          const apiKey = await resolveProviderKey(ctx.user.uid, 'meshy');
-          const { taskId } = await meshyService.applyAnimation({
-            rigTaskId,
-            actionId: input.actionId,
-            apiKey,
-          });
 
-          await threeDGenCol()
-            .doc(genId)
-            .set({
+          if (parsed.provider === 'meshy') {
+            const apiKey = await resolveProviderKey(ctx.user.uid, 'meshy');
+            const actionId = Number(input.actionRef.slice('meshy:'.length));
+            const { taskId } = await meshyService.applyAnimation({
+              rigTaskId: parsed.taskId,
+              actionId,
+              apiKey,
+            });
+            await threeDGenCol().doc(genId).set({
               id: genId,
               userId: ctx.user.uid,
               type: 'meshy_animation',
               status: 'running',
               meshyTaskId: taskId,
               riggedContentId: input.riggedContentId,
-              actionId: input.actionId,
-              actionName: presetName,
-              universeId: rigged.universeId ?? null,
+              actionRef: input.actionRef,
+              actionName: preset.name,
+              universeId,
               parentGenerationId: rigGenId,
               createdAt: new Date(),
             });
+            void completeMeshyAnimationTask({
+              genId,
+              userId: ctx.user.uid,
+              meshyTaskId: taskId,
+              riggedTitle,
+              actionRef: input.actionRef,
+              actionName: preset.name,
+              universeId,
+              parentGenerationId: rigGenId,
+              credits,
+            });
+            return { result: { jobId: genId, providerTaskId: taskId }, actualCredits: credits };
+          }
 
-          void completeAnimationTask({
+          // Tripo3D animation retarget
+          const apiKey = await resolveProviderKey(ctx.user.uid, 'tripo').catch(() => undefined);
+          const tripoAnimation = input.actionRef.slice('tripo:'.length) as TripoAnimation;
+          const { taskId } = await tripo3dService.retargetAnimation({
+            rigTaskId: parsed.taskId,
+            animation: tripoAnimation,
+            apiKey,
+          });
+          await threeDGenCol().doc(genId).set({
+            id: genId,
+            userId: ctx.user.uid,
+            type: 'tripo_animation',
+            status: 'running',
+            tripoAnimationTaskId: taskId,
+            riggedContentId: input.riggedContentId,
+            actionRef: input.actionRef,
+            actionName: preset.name,
+            universeId,
+            parentGenerationId: rigGenId,
+            createdAt: new Date(),
+          });
+          void completeTripoAnimationTask({
             genId,
             userId: ctx.user.uid,
-            meshyTaskId: taskId,
-            riggedContentId: input.riggedContentId,
-            riggedTitle: (rigged.title as string | undefined) ?? '3D model',
-            actionId: input.actionId,
-            actionName: presetName,
-            universeId: (rigged.universeId as string | null | undefined) ?? null,
+            tripoAnimationTaskId: taskId,
+            riggedTitle,
+            actionRef: input.actionRef,
+            actionName: preset.name,
+            universeId,
             parentGenerationId: rigGenId,
             credits,
           });
-
-          return { result: { jobId: genId, meshyTaskId: taskId }, actualCredits: credits };
+          return { result: { jobId: genId, providerTaskId: taskId }, actualCredits: credits };
         }
       );
     }),
@@ -1035,31 +1146,225 @@ export const threedRouter = router({
 const RIG_COST = 0.3;
 const ANIMATION_COST = 0.1;
 
-/**
- * Curated animation set surfaced in the wiki 3D testbench. IDs come from
- * Meshy's animation library reference — extend freely.
- */
-const ANIMATION_PRESETS: Array<{
-  actionId: number;
+export type RigTypeId =
+  | 'biped'
+  | 'quadruped'
+  | 'hexapod'
+  | 'octopod'
+  | 'avian'
+  | 'serpentine'
+  | 'aquatic'
+  | 'others';
+
+export interface AnimationPreset {
+  /** Stable preset id; `meshy:<n>` or `tripo:<preset name>`. */
+  actionRef: string;
+  /** Human-readable label for the UI button. */
   name: string;
+  /** Rough grouping (DailyActions, Locomotion, Combat, Stunts, Vehicle…). */
   category: string;
-}> = [
-  { actionId: 0, name: 'Idle', category: 'DailyActions' },
-  { actionId: 1, name: 'Walking', category: 'WalkAndRun' },
-  { actionId: 14, name: 'Run', category: 'WalkAndRun' },
-  { actionId: 22, name: 'Dance', category: 'Dancing' },
-  { actionId: 87, name: 'Boxing', category: 'Fighting' },
-  { actionId: 452, name: 'Backflip', category: 'BodyMovements' },
+  /** Which provider handles this preset — must match the rigged model's. */
+  provider: 'meshy' | 'tripo';
+  /** Rig types that can use this animation — UI filters by the rig in use. */
+  rigTypes: RigTypeId[];
+}
+
+/**
+ * Curated cross-provider preset list. Meshy presets cover humanoids only;
+ * Tripo presets fan out across every non-humanoid rig type so quadrupeds,
+ * birds, snakes, fish, insects, spiders, and vehicles all have something to
+ * test. Extend freely — UI auto-derives rig-type filters.
+ */
+const ANIMATION_PRESETS: AnimationPreset[] = [
+  // ── Meshy (humanoid) — numeric IDs from the Meshy animation library
+  {
+    actionRef: 'meshy:0',
+    name: 'Idle',
+    category: 'DailyActions',
+    provider: 'meshy',
+    rigTypes: ['biped'],
+  },
+  {
+    actionRef: 'meshy:1',
+    name: 'Walking',
+    category: 'Locomotion',
+    provider: 'meshy',
+    rigTypes: ['biped'],
+  },
+  {
+    actionRef: 'meshy:14',
+    name: 'Run',
+    category: 'Locomotion',
+    provider: 'meshy',
+    rigTypes: ['biped'],
+  },
+  {
+    actionRef: 'meshy:22',
+    name: 'Dance',
+    category: 'Performance',
+    provider: 'meshy',
+    rigTypes: ['biped'],
+  },
+  {
+    actionRef: 'meshy:87',
+    name: 'Boxing',
+    category: 'Combat',
+    provider: 'meshy',
+    rigTypes: ['biped'],
+  },
+  {
+    actionRef: 'meshy:452',
+    name: 'Backflip',
+    category: 'Stunts',
+    provider: 'meshy',
+    rigTypes: ['biped'],
+  },
+
+  // ── Tripo3D (everything else + biped fallback)
+  // Generic presets work on humanoid + quadruped + avian + others
+  {
+    actionRef: 'tripo:preset:idle',
+    name: 'Idle',
+    category: 'DailyActions',
+    provider: 'tripo',
+    rigTypes: ['biped', 'quadruped', 'hexapod', 'octopod', 'avian', 'others'],
+  },
+  {
+    actionRef: 'tripo:preset:walk',
+    name: 'Walk',
+    category: 'Locomotion',
+    provider: 'tripo',
+    rigTypes: ['biped', 'others'],
+  },
+  {
+    actionRef: 'tripo:preset:run',
+    name: 'Run',
+    category: 'Locomotion',
+    provider: 'tripo',
+    rigTypes: ['biped', 'others'],
+  },
+  {
+    actionRef: 'tripo:preset:jump',
+    name: 'Jump',
+    category: 'Stunts',
+    provider: 'tripo',
+    rigTypes: ['biped', 'quadruped', 'hexapod', 'others'],
+  },
+  {
+    actionRef: 'tripo:preset:turn',
+    name: 'Turn',
+    category: 'Locomotion',
+    provider: 'tripo',
+    rigTypes: ['biped', 'quadruped', 'hexapod', 'octopod', 'avian', 'aquatic', 'others'],
+  },
+  {
+    actionRef: 'tripo:preset:fall',
+    name: 'Fall',
+    category: 'Reactions',
+    provider: 'tripo',
+    rigTypes: ['biped', 'quadruped', 'avian', 'others'],
+  },
+  {
+    actionRef: 'tripo:preset:hurt',
+    name: 'Hurt',
+    category: 'Reactions',
+    provider: 'tripo',
+    rigTypes: ['biped', 'quadruped', 'hexapod', 'avian', 'others'],
+  },
+  {
+    actionRef: 'tripo:preset:climb',
+    name: 'Climb',
+    category: 'Locomotion',
+    provider: 'tripo',
+    rigTypes: ['biped', 'hexapod', 'others'],
+  },
+  {
+    actionRef: 'tripo:preset:dive',
+    name: 'Dive',
+    category: 'Locomotion',
+    provider: 'tripo',
+    rigTypes: ['biped', 'aquatic', 'avian', 'others'],
+  },
+  {
+    actionRef: 'tripo:preset:slash',
+    name: 'Slash',
+    category: 'Combat',
+    provider: 'tripo',
+    rigTypes: ['biped', 'quadruped', 'others'],
+  },
+  {
+    actionRef: 'tripo:preset:shoot',
+    name: 'Shoot',
+    category: 'Combat',
+    provider: 'tripo',
+    rigTypes: ['biped', 'others'],
+  },
+  // Rig-type-specific gaits
+  {
+    actionRef: 'tripo:preset:quadruped:walk',
+    name: 'Quadruped Walk',
+    category: 'Locomotion',
+    provider: 'tripo',
+    rigTypes: ['quadruped'],
+  },
+  {
+    actionRef: 'tripo:preset:hexapod:walk',
+    name: 'Hexapod Walk',
+    category: 'Locomotion',
+    provider: 'tripo',
+    rigTypes: ['hexapod'],
+  },
+  {
+    actionRef: 'tripo:preset:octopod:walk',
+    name: 'Octopod Walk',
+    category: 'Locomotion',
+    provider: 'tripo',
+    rigTypes: ['octopod'],
+  },
+  {
+    actionRef: 'tripo:preset:serpentine:march',
+    name: 'Serpentine Slither',
+    category: 'Locomotion',
+    provider: 'tripo',
+    rigTypes: ['serpentine'],
+  },
+  {
+    actionRef: 'tripo:preset:aquatic:march',
+    name: 'Aquatic Swim',
+    category: 'Locomotion',
+    provider: 'tripo',
+    rigTypes: ['aquatic'],
+  },
 ];
+
+/**
+ * Decode the provider + provider-side task id from a rigged gallery item's
+ * `generationId`. The encoding is `rig:<provider>:<taskId>`.
+ */
+function parseRigGenerationId(
+  raw: string | undefined
+): { provider: 'meshy' | 'tripo'; taskId: string } | null {
+  if (!raw) return null;
+  if (raw.startsWith('rig:meshy:')) {
+    return { provider: 'meshy', taskId: raw.slice('rig:meshy:'.length) };
+  }
+  if (raw.startsWith('rig:tripo:')) {
+    return { provider: 'tripo', taskId: raw.slice('rig:tripo:'.length) };
+  }
+  // Legacy items predating the provider-tagged scheme — assume Meshy since
+  // Tripo wasn't available then.
+  if (raw.startsWith('rig:')) {
+    return { provider: 'meshy', taskId: raw.slice('rig:'.length) };
+  }
+  return null;
+}
 
 // ── Background completion handlers ───────────────────────────────────────
 
-async function completeRiggingTask(opts: {
+async function completeMeshyRiggingTask(opts: {
   genId: string;
   userId: string;
   meshyTaskId: string;
-  sourceContentId: string;
-  sourceMediaUrl: string;
   sourceTitle: string;
   universeId: string | null;
   parentGenerationId: string | null;
@@ -1084,19 +1389,17 @@ async function completeRiggingTask(opts: {
         completedAt: new Date(),
       });
 
-    // Encode the Meshy rig task ID into the gallery generationId so future
-    // animation requests can recover it without a sidecar collection.
     void publishToGallery({
       creatorUid: opts.userId,
       mediaUrl: glbUrl,
       mediaType: '3d',
-      title: `${opts.sourceTitle} — rigged`,
+      title: `${opts.sourceTitle} — rigged (humanoid)`,
       description: 'Auto-rigged humanoid skeleton, ready for animation library presets.',
       thumbnailUrl: task.thumbnailUrl ?? null,
       universeId: opts.universeId,
-      generationId: `rig:${opts.meshyTaskId}`,
+      generationId: `rig:meshy:${opts.meshyTaskId}`,
       generationModel: 'meshy-rigging',
-      tags: ['character', '3d', 'rigged'],
+      tags: ['character', '3d', 'rigged', 'biped'],
       parentGenerationId: opts.parentGenerationId,
     });
   } catch (error) {
@@ -1110,17 +1413,16 @@ async function completeRiggingTask(opts: {
         completedAt: new Date(),
       })
       .catch(() => {});
-    console.error(`Rigging ${opts.genId} failed:`, error);
+    console.error(`Meshy rigging ${opts.genId} failed:`, error);
   }
 }
 
-async function completeAnimationTask(opts: {
+async function completeMeshyAnimationTask(opts: {
   genId: string;
   userId: string;
   meshyTaskId: string;
-  riggedContentId: string;
   riggedTitle: string;
-  actionId: number;
+  actionRef: string;
   actionName: string;
   universeId: string | null;
   parentGenerationId: string | null;
@@ -1154,12 +1456,12 @@ async function completeAnimationTask(opts: {
       creatorUid: opts.userId,
       mediaUrl: glbUrl,
       mediaType: '3d',
-      title: `${opts.riggedTitle.replace(/ — rigged$/, '')} — ${opts.actionName}`,
+      title: `${stripRigSuffix(opts.riggedTitle)} — ${opts.actionName}`,
       description: `${opts.actionName} animation applied to the rigged model.`,
       thumbnailUrl: task.thumbnailUrl ?? null,
       universeId: opts.universeId,
-      generationId: `anim:${opts.meshyTaskId}`,
-      generationModel: `meshy-animation:${opts.actionId}`,
+      generationId: `anim:meshy:${opts.meshyTaskId}`,
+      generationModel: `meshy-animation:${opts.actionRef}`,
       tags: ['character', '3d', 'animated', opts.actionName.toLowerCase()],
       parentGenerationId: opts.parentGenerationId,
     });
@@ -1174,6 +1476,127 @@ async function completeAnimationTask(opts: {
         completedAt: new Date(),
       })
       .catch(() => {});
-    console.error(`Animation ${opts.genId} failed:`, error);
+    console.error(`Meshy animation ${opts.genId} failed:`, error);
   }
+}
+
+async function completeTripoRiggingTask(opts: {
+  genId: string;
+  userId: string;
+  tripoRigTaskId: string;
+  sourceTitle: string;
+  rigType: TripoRigType;
+  universeId: string | null;
+  parentGenerationId: string | null;
+  credits: number;
+}) {
+  try {
+    const { resolveProviderKey } = await import('../../lib/byok');
+    const apiKey = await resolveProviderKey(opts.userId, 'tripo').catch(() => undefined);
+    const task = await tripo3dService.waitForTask(
+      opts.tripoRigTaskId,
+      20 * 60 * 1000,
+      5000,
+      apiKey
+    );
+    const glbUrl = task.output?.model || task.output?.pbr_model;
+    if (!glbUrl) {
+      throw new Error('Tripo rigging completed without a GLB output');
+    }
+
+    await threeDGenCol().doc(opts.genId).update({
+      status: 'completed',
+      riggedGlbUrl: glbUrl,
+      completedAt: new Date(),
+    });
+
+    void publishToGallery({
+      creatorUid: opts.userId,
+      mediaUrl: glbUrl,
+      mediaType: '3d',
+      title: `${opts.sourceTitle} — rigged (${opts.rigType})`,
+      description: `Auto-rigged ${opts.rigType} skeleton via Tripo3D, ready for animation presets.`,
+      thumbnailUrl: null,
+      universeId: opts.universeId,
+      generationId: `rig:tripo:${opts.tripoRigTaskId}`,
+      generationModel: 'tripo-rigging',
+      tags: ['character', '3d', 'rigged', opts.rigType],
+      parentGenerationId: opts.parentGenerationId,
+    });
+  } catch (error) {
+    await refundCreditsAfterReconcile(opts.userId, opts.credits, opts.genId);
+    await threeDGenCol()
+      .doc(opts.genId)
+      .update({
+        status: 'failed',
+        creditsRefunded: true,
+        failureReason: error instanceof Error ? error.message : 'Unknown error',
+        completedAt: new Date(),
+      })
+      .catch(() => {});
+    console.error(`Tripo rigging ${opts.genId} failed:`, error);
+  }
+}
+
+async function completeTripoAnimationTask(opts: {
+  genId: string;
+  userId: string;
+  tripoAnimationTaskId: string;
+  riggedTitle: string;
+  actionRef: string;
+  actionName: string;
+  universeId: string | null;
+  parentGenerationId: string | null;
+  credits: number;
+}) {
+  try {
+    const { resolveProviderKey } = await import('../../lib/byok');
+    const apiKey = await resolveProviderKey(opts.userId, 'tripo').catch(() => undefined);
+    const task = await tripo3dService.waitForTask(
+      opts.tripoAnimationTaskId,
+      20 * 60 * 1000,
+      5000,
+      apiKey
+    );
+    const glbUrl = task.output?.model || task.output?.pbr_model;
+    if (!glbUrl) {
+      throw new Error('Tripo animation completed without a GLB output');
+    }
+
+    await threeDGenCol().doc(opts.genId).update({
+      status: 'completed',
+      animationGlbUrl: glbUrl,
+      completedAt: new Date(),
+    });
+
+    void publishToGallery({
+      creatorUid: opts.userId,
+      mediaUrl: glbUrl,
+      mediaType: '3d',
+      title: `${stripRigSuffix(opts.riggedTitle)} — ${opts.actionName}`,
+      description: `${opts.actionName} animation applied via Tripo3D.`,
+      thumbnailUrl: null,
+      universeId: opts.universeId,
+      generationId: `anim:tripo:${opts.tripoAnimationTaskId}`,
+      generationModel: `tripo-animation:${opts.actionRef}`,
+      tags: ['character', '3d', 'animated', opts.actionName.toLowerCase()],
+      parentGenerationId: opts.parentGenerationId,
+    });
+  } catch (error) {
+    await refundCreditsAfterReconcile(opts.userId, opts.credits, opts.genId);
+    await threeDGenCol()
+      .doc(opts.genId)
+      .update({
+        status: 'failed',
+        creditsRefunded: true,
+        failureReason: error instanceof Error ? error.message : 'Unknown error',
+        completedAt: new Date(),
+      })
+      .catch(() => {});
+    console.error(`Tripo animation ${opts.genId} failed:`, error);
+  }
+}
+
+function stripRigSuffix(title: string): string {
+  return title.replace(/ — rigged(?: \([^)]+\))?$/i, '');
 }

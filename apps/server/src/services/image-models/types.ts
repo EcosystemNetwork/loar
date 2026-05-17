@@ -18,13 +18,14 @@ export type PriceTier = 'low' | 'medium' | 'high';
 
 export interface ImageModelConfig {
   id: string;
-  provider: 'fal' | 'comfyui' | 'bytedance' | 'google' | 'zai';
+  provider: 'fal' | 'comfyui' | 'bytedance' | 'google' | 'zai' | 'openai';
   displayName: string;
   shortDescription: string;
   falModelId?: string; // undefined for non-fal providers
   bytedanceModelId?: string; // ModelArk model ID (used when provider='bytedance')
   googleModelId?: string; // Google generativelanguage model id (used when provider='google')
   zaiModelId?: string; // Z.AI model id (used when provider='zai'), e.g. 'cogview-4'
+  openaiModelId?: string; // OpenAI model id (used when provider='openai'), e.g. 'gpt-image-1.5'
   tasks: ImageGenerationTask[];
   qualityTier: QualityTier;
   speedTier: SpeedTier;

@@ -12,7 +12,19 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { trpcClient } from '@/utils/trpc';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, CheckCircle2, Film, Play, Mic2 } from 'lucide-react';
+import {
+  Loader2,
+  ArrowLeft,
+  CheckCircle2,
+  Film,
+  Play,
+  Mic2,
+  DownloadCloud,
+  Trash2,
+} from 'lucide-react';
+import { useWatchSession } from '@/hooks/useWatchSession';
+import { isSaved, offlineSupported, removeEpisode, saveEpisode } from '@/lib/offline-cache';
+import { toast } from 'sonner';
 
 export const Route = createFileRoute('/episode/$id')({
   component: EpisodePlayer,
@@ -70,6 +82,19 @@ function EpisodePlayer() {
   const [activeIndex, setActiveIndex] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // Silent watch-session collector — accumulates data for Continue Watching
+  // and For You rows. No UI surfaces here.
+  useWatchSession({
+    episodeId: episode?.id ?? null,
+    videoRef,
+    sourceRoute: 'episode-player',
+  });
+
+  // Offline cache state
+  const [savedOffline, setSavedOffline] = useState(false);
+  const [offlineBusy, setOfflineBusy] = useState(false);
+  const canOffline = offlineSupported();
+
   // When the active clip changes, load + play the new source. Browsers ignore
   // autoplay on a fresh <video> in some configurations, so we explicitly call
   // play() and swallow the rejection (e.g. iOS without user gesture).
@@ -86,6 +111,41 @@ function EpisodePlayer() {
   useEffect(() => {
     setActiveIndex(0);
   }, [episode?.id]);
+
+  // Probe offline-cache state once we know the episode id.
+  useEffect(() => {
+    if (!episode?.id || !canOffline) return;
+    void isSaved(episode.id).then(setSavedOffline);
+  }, [episode?.id, canOffline]);
+
+  const handleSaveOffline = async () => {
+    if (!episode?.id) return;
+    setOfflineBusy(true);
+    try {
+      if (savedOffline) {
+        await removeEpisode(episode.id);
+        setSavedOffline(false);
+        toast.success('Removed from offline');
+      } else {
+        const urls = clips
+          .map((c) => (c.videoUrl ? resolveIpfsUrl(c.videoUrl) : null))
+          .filter((u): u is string => !!u);
+        const res = await saveEpisode({
+          episodeId: episode.id,
+          urls,
+          title: episode.title,
+        });
+        if (res.ok) {
+          setSavedOffline(true);
+          toast.success('Saved for offline playback');
+        } else {
+          toast.error(`Saved with errors: ${res.errors.slice(0, 1).join('; ')}`);
+        }
+      }
+    } finally {
+      setOfflineBusy(false);
+    }
+  };
 
   const handleClipEnded = () => {
     if (activeIndex < clips.length - 1) {
@@ -193,6 +253,29 @@ function EpisodePlayer() {
                 </div>
                 <p className="text-sm text-muted-foreground">{universeName}</p>
               </div>
+              {canOffline && (
+                <Button
+                  size="sm"
+                  variant={savedOffline ? 'outline' : 'secondary'}
+                  onClick={handleSaveOffline}
+                  disabled={offlineBusy || clips.length === 0}
+                  className="flex-shrink-0"
+                  title={
+                    savedOffline
+                      ? 'Remove this episode from offline cache'
+                      : 'Save this episode for offline playback'
+                  }
+                >
+                  {offlineBusy ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : savedOffline ? (
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                  ) : (
+                    <DownloadCloud className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  {savedOffline ? 'Remove offline' : 'Save offline'}
+                </Button>
+              )}
             </div>
 
             {episode.description && (

@@ -120,10 +120,10 @@ import { indexerRouter } from './indexer/indexer.routes';
 import { notebookRouter } from './notebook/notebook.index';
 import { physicsRouter } from './physics/physics.index';
 import { curationRouter } from './curation/curation.index';
-import { userSecretsRouter } from './userSecrets/userSecrets.routes';
 import { zaiRouter } from './zai/zai.routes';
 import { watchSessionsRouter } from './watchSessions/watchSessions.routes';
 import { providersRouter } from './providers/providers.routes';
+import { recommendationsRouter } from './recommendations/recommendations.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
@@ -278,7 +278,6 @@ export const appRouter = router({
 
   // ── User ────────────────────────────────────────────────────────────
   profiles: profilesRouter,
-  userSecrets: userSecretsRouter,
   quests: questsRouter,
   sandbox: sandboxRouter,
 
@@ -393,6 +392,9 @@ export const appRouter = router({
 
   // ── BYOK provider keys (bring-your-own-key for AI generation) ─────
   providers: providersRouter,
+
+  // ── Personalized recommendations + Continue Watching ──────────────
+  recommendations: recommendationsRouter,
 });
 
 export type AppRouter = typeof appRouter;
