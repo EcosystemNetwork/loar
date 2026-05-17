@@ -79,9 +79,13 @@ contract UpgradeRightsRegistryScript is Script {
 
         console.log("\n=== Verification (do these after broadcast) ===");
         console.log("cast call <proxy> 'creatorNonce(address)(uint256)' <any-address>");
-        console.log("cast call <proxy> 'isMonetizable(bytes32)(bool)' 0x000...0  # expect false now");
+        console.log(
+            "cast call <proxy> 'isMonetizable(bytes32)(bool)' 0x000...0  # expect false now"
+        );
         console.log("\n=== Storage-layout check (run BEFORE broadcast on mainnet) ===");
-        console.log("forge inspect src/RightsRegistry.sol:RightsRegistry storage-layout > new-layout.json");
+        console.log(
+            "forge inspect src/RightsRegistry.sol:RightsRegistry storage-layout > new-layout.json"
+        );
         console.log("# Diff against the deployed impl artifact and fail on any non-append change.");
     }
 }

@@ -79,7 +79,7 @@ export function SceneTemplatesPanel({
   });
 
   const applyMutation = useMutation({
-    mutationFn: (id: string) => trpcClient.sceneTemplates.apply.mutate({ id }),
+    mutationFn: (id: string) => trpcClient.sceneTemplates.use.mutate({ id }),
     onSuccess: (bundle: SceneTemplateBundle) => {
       onApply(bundle);
       toast.success('Template applied');

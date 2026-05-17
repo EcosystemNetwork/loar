@@ -51,7 +51,7 @@ export interface ResidencyApplication {
 }
 
 export const residenciesRouter = router({
-  apply: protectedProcedure.input(applySchema).mutation(async ({ input, ctx }) => {
+  submit: protectedProcedure.input(applySchema).mutation(async ({ input, ctx }) => {
     // One pending application per (user, cohort)
     const existing = await residencyApplicationsCol()
       .where('applicantUid', '==', ctx.user.uid)

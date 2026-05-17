@@ -197,7 +197,7 @@ function ApplyForm({ onCancel, onSuccess }: { onCancel: () => void; onSuccess: (
       portfolioUrl: string;
       statement: string;
       sampleWorkUrls: string[];
-    }) => trpcClient.residencies.apply.mutate(input),
+    }) => trpcClient.residencies.submit.mutate(input),
     onSuccess: () => {
       toast.success('Application submitted');
       onSuccess();

@@ -151,7 +151,7 @@ export const sceneTemplatesRouter = router({
   }),
 
   /** Increments use_count and returns the bundle for client application. */
-  apply: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ input, ctx }) => {
+  use: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ input, ctx }) => {
     const ref = sceneTemplatesCol().doc(input.id);
     const snap = await ref.get();
     if (!snap.exists) {
