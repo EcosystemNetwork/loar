@@ -25,7 +25,8 @@ export type ContractKind =
   | 'CanonMarketplace'
   | 'AdPlacement'
   | 'LicensingRegistry'
-  | 'CollabManager';
+  | 'CollabManager'
+  | 'StoryBounties';
 
 export interface HandlerCtx<TArgs = unknown> {
   /** Raw viem log — available for unusual cases where decoded args aren't enough. */

@@ -194,15 +194,18 @@ export const listingsRouter = router({
         rightsLane: z.enum(RIGHTS_LANES).optional(),
         royaltyBps: z.number().min(0).max(10000).optional(),
         status: z.enum(LISTING_STATUSES).optional(),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       if (!db) throwApiError('INTERNAL_SERVER_ERROR', 'Firebase not configured');
-      const { listingId, ...changes } = input;
+      const { listingId, onBehalfOfUid, ...changes } = input;
+      const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'listings');
+
       const ref = listingsCol().doc(listingId);
       const doc = await ref.get();
       if (!doc.exists) throwApiError('NOT_FOUND', 'Listing not found');
-      if (doc.data()?.sellerUid !== ctx.user.uid) throwApiError('FORBIDDEN', 'Not your listing');
+      if (doc.data()?.sellerUid !== actingUid) throwApiError('FORBIDDEN', 'Not your listing');
 
       const updates: Record<string, unknown> = { ...changes, updatedAt: new Date() };
       if (changes.price !== undefined) updates.priceNum = parseFloat(changes.price) || 0;
@@ -213,13 +216,19 @@ export const listingsRouter = router({
 
   /** Delist a listing (seller only) */
   delist: protectedProcedure
-    .input(z.object({ listingId: z.string() }))
+    .input(
+      z.object({
+        listingId: z.string(),
+        onBehalfOfUid: z.string().optional(),
+      })
+    )
     .mutation(async ({ input, ctx }) => {
       if (!db) throwApiError('INTERNAL_SERVER_ERROR', 'Firebase not configured');
+      const { actingUid } = await resolveActingUid(ctx.user.uid, input.onBehalfOfUid, 'listings');
       const ref = listingsCol().doc(input.listingId);
       const doc = await ref.get();
       if (!doc.exists) throwApiError('NOT_FOUND', 'Listing not found');
-      if (doc.data()?.sellerUid !== ctx.user.uid) throwApiError('FORBIDDEN', 'Not your listing');
+      if (doc.data()?.sellerUid !== actingUid) throwApiError('FORBIDDEN', 'Not your listing');
       await ref.update({ status: 'DELISTED', updatedAt: new Date() });
       return { ok: true };
     }),

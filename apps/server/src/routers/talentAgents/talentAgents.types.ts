@@ -53,7 +53,18 @@ export type TalentAgentProfile = z.infer<typeof talentAgentProfileSchema> & {
 
 // ── Agent contract ─────────────────────────────────────────────────────
 
-export const CONTRACT_SCOPES = ['licensing', 'collabs', 'marketplace', 'merch'] as const;
+export const CONTRACT_SCOPES = [
+  'licensing', // LicensingRegistry.sol (legacy)
+  'contentLicensing', // ContentLicensing.sol (current)
+  'collabs', // CollabManager.sol
+  'marketplace', // CanonMarketplace.sol
+  'merch', // generic merch / shop listings (catch-all)
+  'bounties', // StoryBounties.sol
+  'ads', // AdPlacement.sol
+  'listings', // unified listings router
+  'nft', // primary NFT mint + episode/character/edition mgmt
+  'subscriptions', // SubscriptionManager.sol
+] as const;
 export type ContractScope = (typeof CONTRACT_SCOPES)[number];
 
 export const contractStatusEnum = z.enum(['PROPOSED', 'ACTIVE', 'EXPIRED', 'TERMINATED']);

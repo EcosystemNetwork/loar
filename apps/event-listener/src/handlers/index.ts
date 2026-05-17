@@ -20,6 +20,7 @@ import { canonMarketplaceHandlers } from './canon-marketplace.js';
 import { adPlacementHandlers } from './ad-placement.js';
 import { licensingHandlers } from './licensing.js';
 import { collabHandlers } from './collab.js';
+import { storyBountiesHandlers } from './story-bounties.js';
 import type { Handler, ContractKind } from './types.js';
 
 export const allHandlers: Handler[] = [
@@ -33,6 +34,7 @@ export const allHandlers: Handler[] = [
   ...adPlacementHandlers,
   ...licensingHandlers,
   ...collabHandlers,
+  ...storyBountiesHandlers,
 ];
 
 function eventTopic0(abi: AbiEvent): string {
@@ -55,6 +57,7 @@ const topicsByKind: Record<ContractKind, string[]> = {
   AdPlacement: [],
   LicensingRegistry: [],
   CollabManager: [],
+  StoryBounties: [],
 };
 
 for (const h of allHandlers) {

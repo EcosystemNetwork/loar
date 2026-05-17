@@ -4,7 +4,7 @@
  */
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
-import { resolveActingUid } from '../../services/agentAuth';
+import { resolveActingUid, recordAgentCommission } from '../../services/agentAuth';
 import { z } from 'zod';
 
 const subscriptionsCol = () => {
@@ -86,10 +86,17 @@ export const subscriptionsRouter = router({
         months: z.number().min(1).max(12),
         txHash: z.string(),
         amount: z.string(), // wei paid
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const subId = `${ctx.user.uid}-${input.universeId}`;
+      const { actingUid, agentContract } = await resolveActingUid(
+        ctx.user.uid,
+        input.onBehalfOfUid,
+        'subscriptions'
+      );
+
+      const subId = `${actingUid}-${input.universeId}`;
       const subRef = subscriptionsCol().doc(subId);
       const existing = await subRef.get();
 
@@ -105,7 +112,7 @@ export const subscriptionsRouter = router({
       const expiresAt = new Date(startTime.getTime() + input.months * 30 * 24 * 60 * 60 * 1000);
 
       const subData = {
-        uid: ctx.user.uid,
+        uid: actingUid,
         universeId: input.universeId,
         tier: input.tier,
         startedAt: existing.exists ? existing.data()?.startedAt : new Date(),
@@ -121,7 +128,7 @@ export const subscriptionsRouter = router({
       // Track revenue
       await subRevenueCol().add({
         universeId: input.universeId,
-        subscriberUid: ctx.user.uid,
+        subscriberUid: actingUid,
         tier: input.tier,
         amount: input.amount,
         months: input.months,
@@ -129,15 +136,41 @@ export const subscriptionsRouter = router({
         createdAt: new Date(),
       });
 
+      // Pay the talent agent their commission slice (if the subscribe was
+      // initiated by an agent acting for the subscriber).
+      if (agentContract) {
+        recordAgentCommission({
+          agentContractId: agentContract.id,
+          agentUid: ctx.user.uid,
+          creatorUid: actingUid,
+          sourceType: 'subscription',
+          sourceId: subId,
+          grossAmountWei: input.amount,
+          commissionBps: agentContract.commissionBps,
+          txHash: input.txHash,
+        }).catch(() => {});
+      }
+
       return { id: subId, ...subData };
     }),
 
   // ---- Cancel ----
 
   cancel: protectedProcedure
-    .input(z.object({ universeId: z.string() }))
+    .input(
+      z.object({
+        universeId: z.string(),
+        onBehalfOfUid: z.string().optional(),
+      })
+    )
     .mutation(async ({ input, ctx }) => {
-      const subId = `${ctx.user.uid}-${input.universeId}`;
+      const { actingUid } = await resolveActingUid(
+        ctx.user.uid,
+        input.onBehalfOfUid,
+        'subscriptions'
+      );
+
+      const subId = `${actingUid}-${input.universeId}`;
       const ref = subscriptionsCol().doc(subId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('No subscription found');

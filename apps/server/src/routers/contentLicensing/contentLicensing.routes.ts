@@ -13,7 +13,7 @@ import { computeEntityHash } from '../../services/split-orchestrator';
 import { recordRevenueEvent } from '../../services/revenue-recorder';
 import { verifyAndClaimTx } from '../../services/tx-verify';
 import { isUniverseAdmin } from '../../lib/safe-admin';
-import { resolveActingUid } from '../../services/agentAuth';
+import { resolveActingUid, recordAgentCommission } from '../../services/agentAuth';
 import { assertContentOperable } from '../../lib/content-status';
 
 const registrationsCol = () => {
@@ -105,31 +105,45 @@ export const contentLicensingRouter = router({
         rentPricePerDay: z.string().optional(),
         licenseFee: z.string().optional(),
         licenseRoyaltyBps: z.number().int().min(0).max(5000).optional(),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const ref = registrationsCol().doc(input.registrationId);
+      const { onBehalfOfUid, registrationId, ...updates } = input;
+      const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'contentLicensing');
+
+      const ref = registrationsCol().doc(registrationId);
       const doc = await ref.get();
       if (!doc.exists)
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Registration not found' });
-      if (doc.data()?.creatorUid !== ctx.user.uid) {
+      if (doc.data()?.creatorUid !== actingUid) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not the content creator' });
       }
 
-      const { registrationId, ...updates } = input;
       await ref.update({ ...updates, updatedAt: new Date() });
       return { ok: true };
     }),
 
   /** Deactivate content from the marketplace */
   deactivate: protectedProcedure
-    .input(z.object({ registrationId: z.string() }))
+    .input(
+      z.object({
+        registrationId: z.string(),
+        onBehalfOfUid: z.string().optional(),
+      })
+    )
     .mutation(async ({ input, ctx }) => {
+      const { actingUid } = await resolveActingUid(
+        ctx.user.uid,
+        input.onBehalfOfUid,
+        'contentLicensing'
+      );
+
       const ref = registrationsCol().doc(input.registrationId);
       const doc = await ref.get();
       if (!doc.exists)
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Registration not found' });
-      if (doc.data()?.creatorUid !== ctx.user.uid) {
+      if (doc.data()?.creatorUid !== actingUid) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not the content creator' });
       }
 
@@ -147,9 +161,18 @@ export const contentLicensingRouter = router({
         pricePaid: z.string(),
         durationDays: z.number().int().optional(),
         txHash: z.string(),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // For recordDeal, "acting" = the BUYER. Agents can buy on a buyer's
+      // behalf and earn commission on the buyer's purchase.
+      const { actingUid, agentContract } = await resolveActingUid(
+        ctx.user.uid,
+        input.onBehalfOfUid,
+        'contentLicensing'
+      );
+
       const regDoc = await registrationsCol().doc(input.registrationId).get();
       if (!regDoc.exists)
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Registration not found' });
@@ -180,9 +203,10 @@ export const contentLicensingRouter = router({
       );
 
       const now = new Date();
+      const { onBehalfOfUid, ...dealInput } = input;
       const deal = {
-        ...input,
-        buyerUid: ctx.user.uid,
+        ...dealInput,
+        buyerUid: actingUid,
         buyerAddress: ctx.user.address || null,
         sellerUid: regDoc.data()?.creatorUid || null,
         universeId: regDoc.data()?.universeId || null,
@@ -214,6 +238,27 @@ export const contentLicensingRouter = router({
         universeId: regData.universeId,
         metadata: { dealType: input.dealType, registrationId: input.registrationId },
       }).catch((err) => console.error('[contentLicensing] revenue recording failed:', err));
+
+      // Talent agent commission — paid out of the buyer's spend when an
+      // agent transacted on the buyer's behalf.
+      if (agentContract) {
+        const sourceTypeForCommission =
+          input.dealType === 'LICENSE'
+            ? 'license'
+            : input.dealType === 'BUY'
+              ? 'license'
+              : 'license';
+        recordAgentCommission({
+          agentContractId: agentContract.id,
+          agentUid: ctx.user.uid,
+          creatorUid: actingUid,
+          sourceType: sourceTypeForCommission as 'license',
+          sourceId: ref.id,
+          grossAmountWei: input.pricePaid,
+          commissionBps: agentContract.commissionBps,
+          txHash: input.txHash,
+        }).catch(() => {});
+      }
 
       return { id: ref.id, ...deal };
     }),
@@ -325,9 +370,16 @@ export const contentLicensingRouter = router({
         proposedPrice: z.string(),
         durationDays: z.number().int().optional(),
         message: z.string().max(2000).default(''),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const { actingUid } = await resolveActingUid(
+        ctx.user.uid,
+        input.onBehalfOfUid,
+        'contentLicensing'
+      );
+
       const regDoc = await registrationsCol().doc(input.registrationId).get();
       if (!regDoc.exists)
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Registration not found' });
@@ -343,7 +395,7 @@ export const contentLicensingRouter = router({
       }
 
       // Can't request your own content
-      if (regData.creatorUid === ctx.user.uid)
+      if (regData.creatorUid === actingUid)
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'Cannot request license for your own content',
@@ -358,7 +410,7 @@ export const contentLicensingRouter = router({
         proposedPrice: input.proposedPrice,
         durationDays: input.durationDays ?? null,
         message: input.message,
-        buyerUid: ctx.user.uid,
+        buyerUid: actingUid,
         buyerAddress: ctx.user.address || null,
         sellerUid: regData.creatorUid,
         status: 'PENDING' as const, // PENDING | APPROVED | REJECTED | COMPLETED
@@ -378,15 +430,22 @@ export const contentLicensingRouter = router({
         action: z.enum(['APPROVED', 'REJECTED']),
         counterPrice: z.string().optional(),
         message: z.string().max(2000).default(''),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const { actingUid } = await resolveActingUid(
+        ctx.user.uid,
+        input.onBehalfOfUid,
+        'contentLicensing'
+      );
+
       const reqRef = db.collection('licenseRequests').doc(input.requestId);
       const reqDoc = await reqRef.get();
       if (!reqDoc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Request not found' });
 
       const reqData = reqDoc.data()!;
-      if (reqData.sellerUid !== ctx.user.uid)
+      if (reqData.sellerUid !== actingUid)
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not the content owner' });
       if (reqData.status !== 'PENDING')
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Request is no longer pending' });

@@ -57,6 +57,7 @@ export const chainConfig = {
     AdPlacement: lc(deployment.contracts.AdPlacement),
     LicensingRegistry: lc(deployment.contracts.LicensingRegistry),
     CollabManager: lc(deployment.contracts.CollabManager),
+    StoryBounties: lc(deployment.contracts.StoryBounties),
   } satisfies Partial<Record<ContractKind, Hex | undefined>>,
 };
 

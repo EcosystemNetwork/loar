@@ -8,11 +8,30 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure, publicProcedure } from '../../lib/trpc';
 import { db, firebaseAvailable } from '../../lib/firebase';
-import { resolveActingUid } from '../../services/agentAuth';
+import { resolveActingUid, recordAgentCommission } from '../../services/agentAuth';
 
 const getBountiesCol = () => (firebaseAvailable ? db.collection('bounties') : null);
 const getBountySubmissionsCol = () =>
   firebaseAvailable ? db.collection('bountySubmissions') : null;
+
+/**
+ * Map a bounty `contentType` to the marketplace `submissionTypeEnum`.
+ * Marketplace canon submissions accept only CHARACTER/PLOT_ARC/LOCATION/LORE_RULE —
+ * bounty types are broader (video/art/music/voiceover/etc), so we collapse them
+ * onto the closest canon type. PLOT_ARC is the catch-all for narrative work.
+ */
+function bountyContentTypeToCanonType(
+  contentType: string | undefined
+): 'CHARACTER' | 'PLOT_ARC' | 'LOCATION' | 'LORE_RULE' {
+  switch (contentType) {
+    case 'character':
+      return 'CHARACTER';
+    case 'lore':
+      return 'LORE_RULE';
+    default:
+      return 'PLOT_ARC';
+  }
+}
 
 export const bountiesRouter = router({
   // ── List bounties (public) ─────────────────────────────────
@@ -179,7 +198,11 @@ export const bountiesRouter = router({
       if (!bountiesCol || !subsCol)
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Service not available' });
 
-      const { actingUid } = await resolveActingUid(ctx.user.uid, input.onBehalfOfUid, 'bounties');
+      const { actingUid, agentContract } = await resolveActingUid(
+        ctx.user.uid,
+        input.onBehalfOfUid,
+        'bounties'
+      );
 
       const bountyDoc = await bountiesCol.doc(input.bountyId).get();
       if (!bountyDoc.exists)
@@ -218,7 +241,7 @@ export const bountiesRouter = router({
             const canonRef = await submissionsCol.add({
               universeId: bounty.universeId,
               universeToken: bounty.universeToken || null,
-              submissionType: bounty.contentType || 'other',
+              submissionType: bountyContentTypeToCanonType(bounty.contentType),
               title: bounty.title,
               description: bounty.description,
               contentHash: submission.contentHash || null,
@@ -239,11 +262,48 @@ export const bountiesRouter = router({
             });
             canonSubmissionId = canonRef.id;
             await subsCol.doc(input.submissionId).update({ canonSubmissionId });
+
+            // Audit log entry — bounty award → auto-canonized
+            if (firebaseAvailable) {
+              await db
+                .collection('contentAuditLog')
+                .add({
+                  action: 'bounty.awarded.canonized',
+                  bountyId: input.bountyId,
+                  submissionId: input.submissionId,
+                  canonSubmissionId,
+                  universeId: bounty.universeId,
+                  posterUid: bounty.posterUid,
+                  submitterUid: submission.submitterUid,
+                  actingUid,
+                  rewardLoar: bounty.reward,
+                  txHash: input.txHash || null,
+                  createdAt: now,
+                })
+                .catch((err) => console.error('Audit log write failed:', err));
+            }
           }
         } catch (err) {
           // Don't fail the award just because canonization failed; log and continue.
           console.error('Auto-canonize on bounty award failed:', err);
         }
+      }
+
+      // Record talent-agent commission when an agent posted/awarded on behalf
+      // of the universe owner. Commission is taken off the bounty reward
+      // (denominated in $LOAR — convert to 18-decimal wei for the ledger).
+      if (agentContract && bounty.reward) {
+        const rewardWei = (BigInt(Math.floor(Number(bounty.reward))) * BigInt(1e18)).toString();
+        recordAgentCommission({
+          agentContractId: agentContract.id,
+          agentUid: ctx.user.uid,
+          creatorUid: actingUid,
+          sourceType: 'collab',
+          sourceId: `bounty:${input.bountyId}`,
+          grossAmountWei: rewardWei,
+          commissionBps: agentContract.commissionBps,
+          txHash: input.txHash,
+        }).catch(() => {});
       }
 
       return { success: true, canonSubmissionId };

@@ -209,17 +209,21 @@ export const nftRouter = router({
         maxSupply: z.number().default(0), // 0 = unlimited
         royaltyBps: z.number().default(500), // 5% default
         metadataURI: z.string(),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const { onBehalfOfUid, ...episodeInput } = input;
+      const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'nft');
+
       // SRV-2: episode NFT listings set a mintPrice, so this is a monetizing
       // mutation. The listing is keyed by contentHash (not contentId); resolve
       // via the hash helper which no-ops if there's no off-chain content doc.
-      await assertContentHashOperable(input.contentHash);
+      await assertContentHashOperable(episodeInput.contentHash);
 
       const episodeData = {
-        ...input,
-        creatorUid: ctx.user.uid,
+        ...episodeInput,
+        creatorUid: actingUid,
         creatorAddress: ctx.user.address || null,
         minted: 0,
         active: true,
@@ -257,10 +261,13 @@ export const nftRouter = router({
           )
           .min(1)
           .max(50),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       if (!db) throw new Error('Firebase is not configured');
+
+      const { actingUid } = await resolveActingUid(ctx.user.uid, input.onBehalfOfUid, 'nft');
 
       // SRV-2: gate every episode in the batch on its content status. Do
       // these in parallel so a 50-episode drop stays responsive — total
@@ -276,7 +283,7 @@ export const nftRouter = router({
         batch.set(ref, {
           ...ep,
           universeId: input.universeId,
-          creatorUid: ctx.user.uid,
+          creatorUid: actingUid,
           creatorAddress: ctx.user.address || null,
           minted: 0,
           active: true,
@@ -393,21 +400,25 @@ export const nftRouter = router({
         visualHash: z.string(),
         metadataURI: z.string(),
         traits: z.record(z.string(), z.string()).optional(),
+        onBehalfOfUid: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       try {
+        const { onBehalfOfUid, ...characterInput } = input;
+        const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'nft');
+
         // Check for duplicate character name in universe
         const existing = await characterNFTsCol()
-          .where('universeId', '==', input.universeId)
-          .where('name', '==', input.name)
+          .where('universeId', '==', characterInput.universeId)
+          .where('name', '==', characterInput.name)
           .get();
 
         if (!existing.empty) throw new Error('Character already exists in this universe');
 
         const characterData = {
-          ...input,
-          creatorUid: ctx.user.uid,
+          ...characterInput,
+          creatorUid: actingUid,
           creatorAddress: ctx.user.address || null,
           appearanceCount: 0,
           accumulatedRoyalties: '0',

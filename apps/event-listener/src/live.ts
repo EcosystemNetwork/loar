@@ -54,6 +54,7 @@ const PER_EVENT_COLLECTIONS = [
   COLLECTIONS.sponsorships,
   COLLECTIONS.licenses,
   COLLECTIONS.collabs,
+  COLLECTIONS.bounties,
 ];
 
 async function detectReorg(windowStart: number): Promise<number | null> {

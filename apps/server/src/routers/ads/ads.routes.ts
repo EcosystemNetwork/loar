@@ -1,7 +1,7 @@
 /**
  * Ads Router — Programmatic product placement and sponsorship management
  */
-import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
+import { adminProcedure, protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { TRPCError } from '@trpc/server';
 import { db } from '../../lib/firebase';
 import { isUniverseAdmin } from '../../lib/safe-admin';
@@ -185,7 +185,12 @@ export const adsRouter = router({
 
   /** Sponsor uploads or updates the creative asset for an active sponsorship.
    *  Resets `creativeStatus` to `pending` and requires the content hash to be
-   *  operable (not flagged/removed) before it can be served. */
+   *  operable (not flagged/removed) before it can be served.
+   *
+   *  If no `content` record exists for the hash, we auto-create one so later
+   *  flag/takedown operations have a target. Without this, brand creative
+   *  pinned to fresh IPFS hashes would slip past `assertContentHashOperable`
+   *  (which is a no-op on unknown hashes by design). */
   submitCreative: protectedProcedure
     .input(
       z.object({
@@ -197,6 +202,7 @@ export const adsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      if (!db) throw new Error('Firebase is not configured');
       const { actingUid } = await resolveActingUid(ctx.user.uid, input.onBehalfOfUid, 'ads');
 
       if (input.rightsDeclaration === 'fan') {
@@ -221,16 +227,50 @@ export const adsRouter = router({
         });
       }
 
+      // Ensure a content record exists for the creative hash so moderation
+      // can act on it later. If a doc already exists for the hash, we leave
+      // it alone (a prior submission of the same asset may already carry
+      // status). If it does not, create a minimal record.
+      const existingContent = await db
+        .collection('content')
+        .where('contentHash', '==', input.creativeContentHash)
+        .limit(1)
+        .get();
+
+      let contentDocId: string;
+      if (existingContent.empty) {
+        const contentRef = db.collection('content').doc();
+        await contentRef.set({
+          id: contentRef.id,
+          contentHash: input.creativeContentHash,
+          mediaUrl: input.creativeUrl,
+          title: `Ad creative for sponsorship ${input.sponsorshipId}`,
+          description: 'Auto-recorded from ads.submitCreative',
+          classification: input.rightsDeclaration,
+          creatorUid: actingUid,
+          creatorAddress: ctx.user.address || null,
+          contentStatus: 'active',
+          source: 'ad_creative',
+          sponsorshipId: input.sponsorshipId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        contentDocId = contentRef.id;
+      } else {
+        contentDocId = existingContent.docs[0].id;
+      }
+
       await ref.update({
         creativeUrl: input.creativeUrl,
         creativeContentHash: input.creativeContentHash,
+        creativeContentId: contentDocId,
         rightsDeclaration: input.rightsDeclaration,
         creativeStatus: 'pending',
         creativeSubmittedAt: new Date(),
         updatedAt: new Date(),
       });
 
-      return { ok: true, creativeStatus: 'pending' as const };
+      return { ok: true, creativeStatus: 'pending' as const, contentId: contentDocId };
     }),
 
   /** Universe owner flags creative on a live sponsorship — pauses serving until admin review. */
@@ -270,6 +310,80 @@ export const adsRouter = router({
       });
 
       return { ok: true };
+    }),
+
+  /** Admin: approve a pending or flagged creative — re-activates serving. */
+  approveCreative: adminProcedure
+    .input(
+      z.object({
+        sponsorshipId: z.string(),
+        note: z.string().max(500).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ref = sponsorshipsCol().doc(input.sponsorshipId);
+      const doc = await ref.get();
+      if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Sponsorship not found' });
+
+      const now = new Date();
+      await ref.update({
+        creativeStatus: 'approved',
+        creativeApprovedAt: now,
+        creativeApprovedBy: ctx.user.uid,
+        creativeApprovalNote: input.note ?? null,
+        active: true,
+        updatedAt: now,
+      });
+
+      return { ok: true, creativeStatus: 'approved' as const };
+    }),
+
+  /** Admin: reject creative — keeps the sponsorship paused with a rejection reason
+   *  the sponsor can see in their dashboard. */
+  rejectCreative: adminProcedure
+    .input(
+      z.object({
+        sponsorshipId: z.string(),
+        reason: z.string().min(5).max(500),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ref = sponsorshipsCol().doc(input.sponsorshipId);
+      const doc = await ref.get();
+      if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Sponsorship not found' });
+
+      const now = new Date();
+      await ref.update({
+        creativeStatus: 'rejected',
+        creativeRejectedAt: now,
+        creativeRejectedBy: ctx.user.uid,
+        creativeRejectionReason: input.reason,
+        active: false,
+        updatedAt: now,
+      });
+
+      return { ok: true, creativeStatus: 'rejected' as const };
+    }),
+
+  /** Admin queue: list sponsorships needing moderation review.
+   *  Default: pending + flagged. */
+  listForModeration: adminProcedure
+    .input(
+      z
+        .object({
+          status: z.enum(['pending', 'flagged', 'approved', 'rejected', 'all']).default('pending'),
+          limit: z.number().int().min(1).max(100).default(50),
+        })
+        .default({ status: 'pending', limit: 50 })
+    )
+    .query(async ({ input }) => {
+      let q: FirebaseFirestore.Query = sponsorshipsCol();
+      if (input.status !== 'all') {
+        q = q.where('creativeStatus', '==', input.status);
+      }
+      q = q.orderBy('updatedAt', 'desc').limit(input.limit);
+      const snap = await q.get();
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     }),
 
   // ---- Impressions ----

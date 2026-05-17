@@ -396,6 +396,7 @@ export const COLLECTIONS = {
   sponsorships: 'indexer_sponsorships',
   licenses: 'indexer_licenses',
   collabs: 'indexer_collabs',
+  bounties: 'indexer_bounties',
   checkpoints: 'indexer_checkpoints',
   factoryChildren: 'indexer_factoryChildren',
 } as const;
