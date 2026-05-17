@@ -38,6 +38,7 @@ import { TalkingScenePanel } from '@/components/editing/TalkingScenePanel';
 import { VoiceModifyPanel } from '@/components/editing/VoiceModifyPanel';
 import { PublishEpisodeDialog } from '@/components/editing/PublishEpisodeDialog';
 import { DubLipsyncPanel } from '@/components/editing/DubLipsyncPanel';
+import { CutdownPanel } from '@/components/editing/CutdownPanel';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
@@ -401,6 +402,9 @@ function EditorPage() {
               <TabsTrigger value="dub" className="text-xs flex-1">
                 Dub
               </TabsTrigger>
+              <TabsTrigger value="cutdown" className="text-xs flex-1">
+                Cutdown
+              </TabsTrigger>
               <TabsTrigger value="input" className="text-xs flex-1">
                 Input
               </TabsTrigger>
@@ -449,6 +453,17 @@ function EditorPage() {
                 onVideoReplaced={(newUrl) => {
                   setVideoUrl(newUrl);
                   toast.success('Video updated to lipsynced version');
+                }}
+              />
+            </TabsContent>
+
+            {/* Cutdown Tab — E5 auto-assembled short-form from source video */}
+            <TabsContent value="cutdown" className="flex-1 p-4 m-0 overflow-y-auto">
+              <CutdownPanel
+                videoUrl={videoUrl}
+                onVideoReplaced={(newUrl) => {
+                  setVideoUrl(newUrl);
+                  setActiveTab('tools');
                 }}
               />
             </TabsContent>
