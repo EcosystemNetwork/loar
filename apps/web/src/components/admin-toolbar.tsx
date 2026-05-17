@@ -1194,6 +1194,7 @@ export default function AdminToolbar() {
                 '/',
                 '/discover',
                 '/create',
+                '/editor',
                 '/studio',
                 '/wiki',
                 '/dashboard',

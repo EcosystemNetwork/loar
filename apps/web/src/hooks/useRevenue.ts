@@ -218,6 +218,187 @@ export function useUniverseSubStats(universeId: string) {
   });
 }
 
+// ---- Ads ----
+
+export function useAdSlots(universeId: string) {
+  return useQuery({
+    queryKey: ['ad-slots', universeId],
+    queryFn: () => trpcClient.ads.getSlotsByUniverse.query({ universeId }),
+    enabled: !!universeId,
+  });
+}
+
+export function useAdSlot(slotId: string) {
+  return useQuery({
+    queryKey: ['ad-slot', slotId],
+    queryFn: () => trpcClient.ads.getSlot.query({ slotId }),
+    enabled: !!slotId,
+  });
+}
+
+export function useAdBids(slotId: string) {
+  return useQuery({
+    queryKey: ['ad-bids', slotId],
+    queryFn: () => trpcClient.ads.getBids.query({ slotId }),
+    enabled: !!slotId,
+  });
+}
+
+export function useUniverseSponsorships(universeId: string) {
+  return useQuery({
+    queryKey: ['universe-sponsorships', universeId],
+    queryFn: () => trpcClient.ads.getSponsorships.query({ universeId }),
+    enabled: !!universeId,
+  });
+}
+
+export function useCreateAdSlot() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.ads.createSlot.mutate>[0]) =>
+      trpcClient.ads.createSlot.mutate(input),
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['ad-slots', vars.universeId] }),
+  });
+}
+
+export function usePlaceBid() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.ads.placeBid.mutate>[0]) =>
+      trpcClient.ads.placeBid.mutate(input),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['ad-slots'] });
+      qc.invalidateQueries({ queryKey: ['ad-bids', vars.slotId] });
+    },
+  });
+}
+
+export function useAcceptBid() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.ads.acceptBid.mutate>[0]) =>
+      trpcClient.ads.acceptBid.mutate(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ad-slots'] });
+      qc.invalidateQueries({ queryKey: ['ad-bids'] });
+      qc.invalidateQueries({ queryKey: ['universe-sponsorships'] });
+    },
+  });
+}
+
+export function useMySponsorships() {
+  const { isAuthenticated } = useWalletAuth();
+  return useQuery({
+    queryKey: ['my-sponsorships'],
+    queryFn: () => trpcClient.ads.mySponsorships.query(),
+    enabled: isAuthenticated,
+  });
+}
+
+// ---- Ad Seeds (Seed Dance) ----
+
+export function useAdSeeds(status?: string, seedType?: string) {
+  return useQuery({
+    queryKey: ['ad-seeds', status, seedType],
+    queryFn: () =>
+      trpcClient.adSeeds.list.query({
+        status: status as any,
+        seedType: seedType as any,
+      }),
+  });
+}
+
+export function useAdSeed(seedId: string) {
+  return useQuery({
+    queryKey: ['ad-seed', seedId],
+    queryFn: () => trpcClient.adSeeds.get.query({ seedId }),
+    enabled: !!seedId,
+  });
+}
+
+export function useAdSeedPlacements(seedId: string) {
+  return useQuery({
+    queryKey: ['ad-seed-placements', seedId],
+    queryFn: () => trpcClient.adSeeds.placements.query({ seedId }),
+    enabled: !!seedId,
+  });
+}
+
+export function useAdSeedStats() {
+  return useQuery({
+    queryKey: ['ad-seed-stats'],
+    queryFn: () => trpcClient.adSeeds.stats.query(),
+  });
+}
+
+export function useMyAdSeeds() {
+  const { isAuthenticated } = useWalletAuth();
+  return useQuery({
+    queryKey: ['my-ad-seeds'],
+    queryFn: () => trpcClient.adSeeds.mySeeds.query(),
+    enabled: isAuthenticated,
+  });
+}
+
+export function useMyAdSeedPlacements() {
+  const { isAuthenticated } = useWalletAuth();
+  return useQuery({
+    queryKey: ['my-ad-seed-placements'],
+    queryFn: () => trpcClient.adSeeds.myPlacements.query(),
+    enabled: isAuthenticated,
+  });
+}
+
+export function useCreateAdSeed() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.adSeeds.create.mutate>[0]) =>
+      trpcClient.adSeeds.create.mutate(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ad-seeds'] });
+      qc.invalidateQueries({ queryKey: ['my-ad-seeds'] });
+    },
+  });
+}
+
+export function useSubmitAdSeedPlacement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.adSeeds.submitPlacement.mutate>[0]) =>
+      trpcClient.adSeeds.submitPlacement.mutate(input),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['ad-seed-placements', vars.seedId] });
+      qc.invalidateQueries({ queryKey: ['ad-seed', vars.seedId] });
+      qc.invalidateQueries({ queryKey: ['my-ad-seed-placements'] });
+    },
+  });
+}
+
+export function useApproveAdSeedPlacement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.adSeeds.approvePlacement.mutate>[0]) =>
+      trpcClient.adSeeds.approvePlacement.mutate(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ad-seed-placements'] });
+      qc.invalidateQueries({ queryKey: ['ad-seeds'] });
+      qc.invalidateQueries({ queryKey: ['my-ad-seeds'] });
+    },
+  });
+}
+
+export function useRejectAdSeedPlacement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof trpcClient.adSeeds.rejectPlacement.mutate>[0]) =>
+      trpcClient.adSeeds.rejectPlacement.mutate(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ad-seed-placements'] });
+      qc.invalidateQueries({ queryKey: ['ad-seeds'] });
+    },
+  });
+}
+
 // ---- Analytics ----
 
 export function useUniverseMetrics(universeId: string) {

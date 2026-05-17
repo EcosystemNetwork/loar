@@ -276,6 +276,53 @@ const proposeCollab: ToolDefinition = {
   },
 };
 
+// ── AI Agent Tools ─────────────────────────────────────────────────────
+
+const listAIAgents: ToolDefinition = {
+  name: 'loar_list_ai_agents',
+  description: 'List AI agents assigned to a universe',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      universeId: { type: 'string', description: 'Universe ID' },
+    },
+    required: ['universeId'],
+  },
+  handler: async (client, args) => {
+    return client.query('aiAgents.listByUniverse', args);
+  },
+};
+
+const runPipeline: ToolDefinition = {
+  name: 'loar_run_pipeline',
+  description: 'Execute an AI agent pipeline (multi-step automated workflow)',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      pipelineId: { type: 'string', description: 'Pipeline ID to execute' },
+    },
+    required: ['pipelineId'],
+  },
+  handler: async (client, args) => {
+    return client.mutate('aiPipelines.run', args);
+  },
+};
+
+const getPipelineRun: ToolDefinition = {
+  name: 'loar_get_pipeline_run',
+  description: 'Get the status and results of a pipeline execution',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      runId: { type: 'string', description: 'Pipeline run ID' },
+    },
+    required: ['runId'],
+  },
+  handler: async (client, args) => {
+    return client.query('aiPipelines.getRun', args);
+  },
+};
+
 // ── Profile Tools ──────────────────────────────────────────────────────
 
 const getProfile: ToolDefinition = {
@@ -305,6 +352,29 @@ const discoverProfiles: ToolDefinition = {
   },
   handler: async (client, args) => {
     return client.query('profiles.discover', args);
+  },
+};
+
+// ── Talent Agent Tools ─────────────────────────────────────────────────
+
+const discoverTalentAgents: ToolDefinition = {
+  name: 'loar_discover_talent_agents',
+  description:
+    'Browse talent agents on the platform. Filter by specialties and verification status.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      search: { type: 'string', description: 'Search by name or agency' },
+      specialties: { type: 'string', description: 'Comma-separated specialties filter' },
+      verifiedOnly: { type: 'boolean', description: 'Only show verified agents' },
+    },
+  },
+  handler: async (client, args) => {
+    const specialties =
+      typeof args.specialties === 'string'
+        ? args.specialties.split(',').map((s: string) => s.trim())
+        : undefined;
+    return client.query('talentAgents.discover', { ...args, specialties });
   },
 };
 
@@ -805,9 +875,15 @@ export const ALL_TOOLS: ToolDefinition[] = [
   getCanon,
   // Collabs
   proposeCollab,
+  // AI Agents
+  listAIAgents,
+  runPipeline,
+  getPipelineRun,
   // Profiles
   getProfile,
   discoverProfiles,
+  // Talent Agents
+  discoverTalentAgents,
   // Pipeline Step Tools (for AI agent pipeline execution)
   generateVoice,
   generate3D,

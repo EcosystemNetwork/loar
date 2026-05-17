@@ -45,11 +45,13 @@ import {UpgradeableBeacon} from "@openzeppelin/proxy/beacon/UpgradeableBeacon.so
  *     RIGHTS_REGISTRY_ADDRESS          - RightsRegistry
  *     CANON_MARKETPLACE_ADDRESS        - CanonMarketplace
  *     CREDIT_MANAGER_ADDRESS           - CreditManager
+ *     AD_PLACEMENT_ADDRESS             - AdPlacement
  *     SUBSCRIPTION_MANAGER_ADDRESS     - SubscriptionManager
  *     LICENSING_REGISTRY_ADDRESS       - LicensingRegistry
  *     COLLAB_MANAGER_ADDRESS           - CollabManager
  *     ANALYTICS_REGISTRY_ADDRESS       - AnalyticsRegistry
  *     LAUNCHPAD_STAKING_ADDRESS        - LaunchpadStaking
+ *     STORY_BOUNTIES_ADDRESS           - StoryBounties
  *     ESCROW_ADDRESS                   - Escrow
  *     LOAR_BURNER_ADDRESS              - LoarBurner
  *     REMIX_FEES_ADDRESS               - RemixFees
@@ -136,11 +138,13 @@ contract TransferToMultisigScript is Script {
         _transferOwnableUpgradeable("RIGHTS_REGISTRY_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("CANON_MARKETPLACE_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("CREDIT_MANAGER_ADDRESS", timelockAddr);
+        _transferOwnableUpgradeable("AD_PLACEMENT_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("SUBSCRIPTION_MANAGER_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("LICENSING_REGISTRY_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("COLLAB_MANAGER_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("ANALYTICS_REGISTRY_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("LAUNCHPAD_STAKING_ADDRESS", timelockAddr);
+        _transferOwnableUpgradeable("STORY_BOUNTIES_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("ESCROW_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("LOAR_BURNER_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("REMIX_FEES_ADDRESS", timelockAddr);

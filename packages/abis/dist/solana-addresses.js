@@ -18,19 +18,23 @@ export const EpisodeProgram = {
     devnet: 'voLiAXoYbq8go1CUS9UshQRZnNu9Y44qNBZ6czgn8Bs',
     'mainnet-beta': '',
 };
-/** Payment — Solana Pay receiver with on-chain receipts → cNFT attribution. */
+/** Payment — Solana sister to PaymentRouter.sol. Routes SOL + $LOAR with
+ *  pull-style accumulators per creator, owner-gated treasury, two-step
+ *  ownership transfer, pause, one-way LOAR-mint lock. */
 export const PaymentProgram = {
-    devnet: '',
+    devnet: '9xWo4djcHmGFkJnLQF9phdpsUhj6BQFW6yR8sHUsKVbj',
     'mainnet-beta': '',
 };
-/** $LOAR SPL mint per cluster. Bridge to canonical EVM $LOAR via Wormhole NTT (v2). */
+/** $LOAR SPL mint per cluster. Token-2022 with Pausable + Metadata extensions
+ *  (9 decimals, 1B supply). Bridge to canonical EVM $LOAR via Wormhole NTT (v2). */
 export const LoarMint = {
-    devnet: '',
+    devnet: '482ScJ9EffmyWRWhVsysrPBw3LPDdUXuRL1rXoAx1tez',
     'mainnet-beta': '',
 };
-/** Bubblegum cNFT merkle tree per cluster. One tree, ~1M slots at depth=14/buffer=64. */
+/** Bubblegum cNFT merkle tree per cluster. Devnet uses depth=14/buffer=64/canopy=10
+ *  (16k cNFTs). Mainnet uses depth=20/buffer=64/canopy=14 (~1M cNFTs). */
 export const BubblegumTree = {
-    devnet: '',
+    devnet: 'Dmn6X8ToDwG6VcawQ6prpm6rV3KYBdoV31RQQFrx1Tu2',
     'mainnet-beta': '',
 };
 /**

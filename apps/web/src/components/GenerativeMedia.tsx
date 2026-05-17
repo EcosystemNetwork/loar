@@ -16,6 +16,12 @@ import { Label } from './ui/label';
 import { trpcClient } from '../utils/trpc';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { StylePresetPicker } from './StylePresetPicker';
+import type { StylePresetId } from './style-presets';
+import { ShotPresetPicker } from './ShotPresetPicker';
+import type { ShotPresetId } from './shot-presets';
+import { SceneTemplatesPanel } from './SceneTemplatesPanel';
+import { CinematicReferencesPanel } from './CinematicReferencesPanel';
 
 interface ImageResult {
   status: string;
@@ -42,6 +48,8 @@ export function GenerativeMedia() {
     'A simple cartoon drawing of a cute orange cat sitting on grass. Clean, minimal illustration with soft pastel colors.'
   );
   const [videoPrompt, setVideoPrompt] = useState('A cute cat gently swaying in a soft breeze');
+  const [stylePreset, setStylePreset] = useState<StylePresetId | null>(null);
+  const [shotPreset, setShotPreset] = useState<ShotPresetId | null>(null);
   const [content, setContent] = useState<GeneratedContent>({ isGenerating: false });
 
   const generateImageMutation = useMutation({
@@ -56,6 +64,8 @@ export function GenerativeMedia() {
         | 'landscape_4_3'
         | 'landscape_16_9';
       numImages: number;
+      stylePreset?: StylePresetId | null;
+      shotPreset?: ShotPresetId | null;
     }) => trpcClient.image.generateImage.mutate(input),
     onError: (error: any) => {
       toast.error(error.message || 'Image generation failed');
@@ -69,6 +79,8 @@ export function GenerativeMedia() {
       duration: 5 | 10;
       aspectRatio: '16:9' | '9:16' | '1:1';
       motionStrength: number;
+      stylePreset?: StylePresetId | null;
+      shotPreset?: ShotPresetId | null;
     }) => trpcClient.generation.veo3ImageToVideo.mutate(input),
     onError: (error: any) => {
       toast.error(error.message || 'Video generation failed');
@@ -91,6 +103,8 @@ export function GenerativeMedia() {
         model: 'fal-ai/nano-banana',
         imageSize: 'landscape_16_9',
         numImages: 1,
+        stylePreset,
+        shotPreset,
       })) as ImageResult;
 
       if (imageResult.status !== 'completed' || !imageResult.imageUrl) {
@@ -104,6 +118,8 @@ export function GenerativeMedia() {
         duration: 5,
         aspectRatio: '16:9',
         motionStrength: 127,
+        stylePreset,
+        shotPreset,
       })) as VideoResult;
 
       setContent({
@@ -170,6 +186,46 @@ export function GenerativeMedia() {
             disabled={content.isGenerating}
           />
         </div>
+
+        <StylePresetPicker
+          value={stylePreset}
+          onChange={setStylePreset}
+          disabled={content.isGenerating}
+        />
+
+        <ShotPresetPicker
+          value={shotPreset}
+          onChange={setShotPreset}
+          disabled={content.isGenerating}
+        />
+
+        <SceneTemplatesPanel
+          stylePreset={stylePreset}
+          shotPreset={shotPreset}
+          starterPrompt={imagePrompt}
+          disabled={content.isGenerating}
+          onApply={(bundle) => {
+            if (bundle.stylePreset !== undefined) setStylePreset(bundle.stylePreset ?? null);
+            if (bundle.shotPreset !== undefined) setShotPreset(bundle.shotPreset ?? null);
+            if (bundle.starterPrompt) setImagePrompt(bundle.starterPrompt);
+          }}
+        />
+
+        <CinematicReferencesPanel
+          disabled={content.isGenerating}
+          onPin={(pinned) => {
+            // Splice the reference's tags + title into the active prompt so the
+            // generator gets influenced by the cinematic language the user chose.
+            const inspiration = [
+              `inspired by "${pinned.title}"`,
+              ...(pinned.film ? [`(${pinned.film})`] : []),
+              ...pinned.tags,
+            ].join(', ');
+            setImagePrompt((prev) =>
+              prev.trim() ? `${prev.trim()} — ${inspiration}` : inspiration
+            );
+          }}
+        />
 
         <Button
           onClick={handleGenerate}

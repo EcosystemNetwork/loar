@@ -596,6 +596,17 @@ export interface LikenessListing {
   onChainRegisterTxHash: string | null;
   /** Hash of the setRightsWithCreatorSig transaction submitted by the operator. */
   onChainRightsTxHash: string | null;
+  /**
+   * Optional multi-recipient revenue splits. If set, payments route through
+   * SplitRouter to all recipients in proportion to bps (must sum to 10000).
+   * If null/empty, payments go to the seller directly via PaymentRouter and
+   * the platform fee is skimmed by ContentLicensing.
+   */
+  splitRecipients: Array<{ recipient: string; bps: number }> | null;
+  /** bytes32 splitEntityHash registered with SplitRouter. Null until splits are configured on-chain. */
+  onChainSplitEntityHash: string | null;
+  /** Hash of the setSplits transaction. */
+  onChainSplitsTxHash: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

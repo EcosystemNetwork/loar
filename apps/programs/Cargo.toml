@@ -9,6 +9,10 @@ members = [
   "programs/split_router",
   "programs/staking",
   "programs/credit_manager",
+  "programs/subscription",
+  "programs/remix_fees",
+  "programs/bonding_curve",
+  "programs/canon_market",
 ]
 
 [profile.release]

@@ -29,18 +29,32 @@ import { recordRevenueEvent } from '../../services/revenue-recorder';
 import {
   RightsType,
   computeEntityContentHash,
+  computeSplitEntityHash,
   buildRightsAttestationDigest,
   readCreatorNonce,
   readIsMonetizable,
   readContentRegistration,
   readBuyerDeal,
+  readSplitRouterAddress,
+  readSplitOwner,
+  submitRegisterSplitOwner,
+  encodeSetSplitsCall,
   verifyContractTx,
   submitSetRightsWithCreatorSig,
   getOnChainEnv,
   defaultOnChainChainId,
   isOnChainAvailable,
 } from '../../services/likeness-onchain';
-import { createPublicClient, http, type Address, type Hex, type Hash } from 'viem';
+import {
+  createPublicClient,
+  http,
+  BaseError as ViemBaseError,
+  ContractFunctionExecutionError,
+  ContractFunctionRevertedError,
+  type Address,
+  type Hex,
+  type Hash,
+} from 'viem';
 import { sepolia, baseSepolia } from 'viem/chains';
 import { syncRightsHashToSolana } from '../../services/rights-bridge';
 import { createEntity, getEntity, updateEntity } from '../entities/entities.handlers';
@@ -405,6 +419,22 @@ export const likenessMarketplaceRouter = router({
         licenseFeeWei: weiString,
         licenseRoyaltyBps: z.number().int().min(0).max(MAX_ROYALTY_BPS).default(0),
         maxDurationDays: z.number().int().min(1).max(MAX_DURATION_DAYS).default(MAX_DURATION_DAYS),
+        /**
+         * Optional multi-recipient revenue splits. If provided, the SUM of
+         * bps across recipients must equal 10000 (= 100%). Max 10 recipients
+         * per the SplitRouter contract cap. The seller's address is implicit
+         * — it counts as one of the recipients if listed here, otherwise the
+         * seller receives nothing from the split (rare, but supported).
+         */
+        splitRecipients: z
+          .array(
+            z.object({
+              recipient: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid address'),
+              bps: z.number().int().min(1).max(10000),
+            })
+          )
+          .max(10)
+          .optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -412,6 +442,17 @@ export const likenessMarketplaceRouter = router({
         throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Connected wallet required to list' });
       }
       const entity = await readOwnedEntity(input.entityId, ctx.user.address);
+
+      // Validate splits if provided — sum must equal 10000.
+      if (input.splitRecipients && input.splitRecipients.length > 0) {
+        const totalBps = input.splitRecipients.reduce((s, r) => s + r.bps, 0);
+        if (totalBps !== 10000) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Split bps must sum to exactly 10000 (got ${totalBps})`,
+          });
+        }
+      }
 
       const consent = await getActiveConsent(input.entityId);
       if (!consent) {
@@ -493,6 +534,15 @@ export const likenessMarketplaceRouter = router({
         onChainContentLicensingAddress: null,
         onChainRegisterTxHash: null,
         onChainRightsTxHash: null,
+        splitRecipients:
+          input.splitRecipients && input.splitRecipients.length > 0
+            ? input.splitRecipients.map((r) => ({
+                recipient: r.recipient.toLowerCase(),
+                bps: r.bps,
+              }))
+            : null,
+        onChainSplitEntityHash: null,
+        onChainSplitsTxHash: null,
         createdAt: now,
         updatedAt: now,
       };
@@ -635,7 +685,31 @@ export const likenessMarketplaceRouter = router({
       // If already monetizable (e.g., a prior publish attempt landed setRights
       // but failed on registerContent), skip the rights step entirely.
       const alreadyMonetizable = await readIsMonetizable(env, contentHash);
-      const nonce = alreadyMonetizable ? 0n : await readCreatorNonce(env, creator);
+
+      // Detect whether the deployed RightsRegistry supports the hardened
+      // `setRightsWithCreatorSig` flow. Older deployments lack the
+      // `creatorNonce` mapping AND default `isMonetizable` to true for unset
+      // hashes — in that case the rights step is unnecessary and we proceed
+      // straight to registerContent.
+      //
+      // We only treat a CONTRACT-LEVEL revert (selector missing on legacy impl)
+      // as "skip rights"; transient RPC errors (HTTP/Timeout) must surface so
+      // the caller can retry rather than silently bypassing the hardened path
+      // post-upgrade.
+      let nonce = 0n;
+      let skipRightsAttestation = alreadyMonetizable;
+      if (!alreadyMonetizable) {
+        try {
+          nonce = await readCreatorNonce(env, creator);
+        } catch (err) {
+          const isContractRevert =
+            err instanceof ContractFunctionExecutionError ||
+            (err instanceof ViemBaseError &&
+              err.walk((e) => e instanceof ContractFunctionRevertedError) !== null);
+          if (!isContractRevert) throw err;
+          skipRightsAttestation = true;
+        }
+      }
 
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 60); // 1h validity
       const digest = buildRightsAttestationDigest({
@@ -646,6 +720,59 @@ export const likenessMarketplaceRouter = router({
         creatorNonce: nonce,
         deadline,
       });
+
+      // ── Multi-recipient splits prep (optional) ────────────────────────
+      // When the listing has splitRecipients, we:
+      //   1. Pre-claim split ownership for the seller via the operator
+      //      (registerSplitOwner is registrar-gated; the seller cannot do
+      //      this directly).
+      //   2. Return the setSplits calldata so the client (seller's wallet
+      //      via Circle DCW) can submit the actual split configuration as
+      //      the new owner.
+      //   3. Pass the splitEntityHash through registerContent so payments
+      //      route via SplitRouter instead of the direct PaymentRouter
+      //      fallback.
+      let splitEntityHash: Hex =
+        '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex;
+      let setSplitsCall: {
+        address: Address;
+        abi: ReturnType<typeof encodeSetSplitsCall>['abi'];
+        functionName: 'setSplits';
+        args: ReturnType<typeof encodeSetSplitsCall>['args'];
+      } | null = null;
+
+      if (listing.splitRecipients && listing.splitRecipients.length > 0) {
+        splitEntityHash = computeSplitEntityHash(listing.entityId);
+        const splitRouter = await readSplitRouterAddress(env);
+
+        // Operator pre-claims ownership so the seller's setSplits call lands.
+        // No-op if already claimed by the seller (e.g., a prior publish attempt).
+        try {
+          await submitRegisterSplitOwner({
+            chainId: env.chainId,
+            splitRouter,
+            entityHash: splitEntityHash,
+            newOwner: creator,
+          });
+        } catch (err) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: `Could not register split owner: ${(err as Error).message}. Make sure OPERATOR_PRIVATE_KEY is a SplitRouter registrar.`,
+          });
+        }
+
+        const encoded = encodeSetSplitsCall({
+          entityHash: splitEntityHash,
+          splits: listing.splitRecipients.map((r) => ({
+            recipient: r.recipient as Address,
+            bps: r.bps,
+          })),
+        });
+        setSplitsCall = {
+          address: splitRouter,
+          ...encoded,
+        };
+      }
 
       return {
         chainId: env.chainId,
@@ -658,12 +785,18 @@ export const likenessMarketplaceRouter = router({
         deadline: deadline.toString(),
         digest,
         // The wallet wraps `digest` with EIP-191 personal_sign prefix before signing.
-        skipRightsAttestation: alreadyMonetizable,
+        skipRightsAttestation,
+        /**
+         * setSplits calldata for the seller's wallet. Null when the listing
+         * has no splitRecipients — in that case payments fall back to direct
+         * creator payout via PaymentRouter.
+         */
+        setSplitsCall,
+        splitEntityHash,
         registerContentArgs: {
           contentHash,
           universeId: '0', // Personal listings carry universeId=0 (no universe)
-          splitEntityHash:
-            '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex,
+          splitEntityHash,
           buyPriceWei: listing.buyPriceWei,
           rentPricePerDayWei: listing.leasePricePerDayWei,
           licenseFeeWei: listing.licenseFeeWei,
@@ -771,6 +904,11 @@ export const likenessMarketplaceRouter = router({
       z.object({
         listingId: z.string(),
         registerTxHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid txHash format'),
+        /** Optional: the setSplits tx hash, when the listing has splitRecipients. */
+        splitsTxHash: z
+          .string()
+          .regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid txHash format')
+          .optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -820,11 +958,32 @@ export const likenessMarketplaceRouter = router({
         });
       }
 
+      // If the listing has splits, verify the splits were actually configured
+      // on-chain. Reading splitOwner ≠ zero AND splits exist proves the
+      // setSplits tx landed.
+      let onChainSplitEntityHash: Hex | null = null;
+      let onChainSplitsTxHash: string | null = null;
+      if (listing.splitRecipients && listing.splitRecipients.length > 0) {
+        const splitRouter = await readSplitRouterAddress(env);
+        const splitHash = computeSplitEntityHash(listing.entityId);
+        const owner = await readSplitOwner(env, splitRouter, splitHash);
+        if (owner.toLowerCase() !== ctx.user.address.toLowerCase()) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'SplitRouter ownership not assigned to seller — setSplits may have reverted',
+          });
+        }
+        onChainSplitEntityHash = splitHash;
+        onChainSplitsTxHash = input.splitsTxHash?.toLowerCase() ?? null;
+      }
+
       await listingsCol().doc(input.listingId).update({
         onChainContentHash: contentHash,
         onChainChainId: env.chainId,
         onChainContentLicensingAddress: env.contentLicensing,
         onChainRegisterTxHash: input.registerTxHash.toLowerCase(),
+        onChainSplitEntityHash,
+        onChainSplitsTxHash,
         updatedAt: new Date(),
       });
 
@@ -833,6 +992,7 @@ export const likenessMarketplaceRouter = router({
         chainId: env.chainId,
         contentHash,
         contentLicensing: env.contentLicensing,
+        splitEntityHash: onChainSplitEntityHash,
       };
     }),
 

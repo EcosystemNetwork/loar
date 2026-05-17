@@ -56,17 +56,17 @@ Mapping each EVM contract → Solana approach. **Strategy** column:
 
 ### Marketplaces + rights (P0 — most user-visible parity gap)
 
-| EVM contract              | Solana strategy | Notes                                                                                    | Complexity |
-| ------------------------- | --------------- | ---------------------------------------------------------------------------------------- | ---------- |
-| `CanonMarketplace.sol`    | port            | Custom Anchor program. Carries 4 P0 audit findings on EVM side — port post-fix, not pre. | XL         |
-| `ContentLicensing.sol`    | port            | License issuance PDA + payment composition with `programs/payment`.                      | L          |
-| `LicensingRegistry.sol`   | port            | Registry PDA. Hash-keyed for cross-chain lookup.                                         | M          |
-| `RightsRegistry.sol`      | port            | Single source of rights truth on Solana side; must mirror EVM RightsRegistry events.     | L          |
-| `SlopMarket.sol`          | native          | Use Tensor / Magic Eden cNFT marketplace SDK. Custom only for royalty enforcement glue.  | M          |
-| `Escrow.sol`              | port            | Generic escrow PDA. Pull-pattern.                                                        | M          |
-| `RemixFees.sol`           | port            | Fee-split PDA. Could compose with native splitter (Streamflow).                          | S          |
-| `SubscriptionManager.sol` | port            | Time-gated PDA + Solana Pay recurring intents (Pay v2).                                  | L          |
-| `CreditManager.sol`       | port            | Off-chain credits + on-chain settlement, same shape as EVM.                              | M          |
+| EVM contract              | Solana strategy | Notes                                                                                                                                                                   | Complexity |
+| ------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `CanonMarketplace.sol`    | port            | Custom Anchor program. Carries 4 P0 audit findings on EVM side — port post-fix, not pre.                                                                                | XL         |
+| `ContentLicensing.sol`    | port            | License issuance PDA + payment composition with `programs/payment`.                                                                                                     | L          |
+| `LicensingRegistry.sol`   | port            | Registry PDA. Hash-keyed for cross-chain lookup.                                                                                                                        | M          |
+| `RightsRegistry.sol`      | port            | Single source of rights truth on Solana side; must mirror EVM RightsRegistry events.                                                                                    | L          |
+| `SlopMarket.sol`          | native          | Use Tensor / Magic Eden cNFT marketplace SDK. Custom only for royalty enforcement glue.                                                                                 | M          |
+| `Escrow.sol`              | port            | Generic escrow PDA. Pull-pattern.                                                                                                                                       | M          |
+| `RemixFees.sol`           | port            | **✅ devnet 2026-05-16** — `programs/remix_fees` (`5JdzozEXeto8CRgUZmLqrtwkGtt8smpaM4vhahW1gNLs`). 3-way $LOAR split (creator/LP/treasury). Universe.creator read live. | S          |
+| `SubscriptionManager.sol` | port            | Time-gated PDA + Solana Pay recurring intents (Pay v2).                                                                                                                 | L          |
+| `CreditManager.sol`       | port            | Off-chain credits + on-chain settlement, same shape as EVM.                                                                                                             | M          |
 
 ### Token economy (P1)
 
@@ -203,16 +203,16 @@ Most-load-bearing parity work. Without these, original IP can be minted on Solan
 ### Phase S2 — Marketplace + staking + governance (weeks 8-16, overlaps S1)
 
 - `programs/canon-market` (CanonMarketplace port — all 4 P0 EVM CANON-01/02/03/04 are `[x] FIXED` per audit-fix-tracker; gate clear)
-- `programs/staking` (LaunchpadStaking port — STAKE-01 + STAKE-02 `[x] FIXED`; gate clear)
-- `programs/bonding-curve` (BondingCurve port)
+- `programs/staking` — **✅ devnet 2026-05-16** (v1: global tiers + per-universe stake/unstake; reward distribution deferred to v2 pending revenue-source wiring). Program ID `9EjnngPFpE3QaUgS3zspXwkLby2AnNwyC2UjPFL9zBqJ`. Weighted-average `staked_at` recomputation (STAKE-01 analog), 5-tier ladder (None/Bronze/Silver/Gold/Diamond) with default 1k/10k/100k/500k $LOAR thresholds, early-unstake penalty bps + lock period configurable by admin, `transfer_checked` for Token-2022 compatibility, two-step admin transfer.
+- `programs/bonding_curve` — **✅ devnet 2026-05-16**. Program ID `seJzMSz9EkVYuNN9Nu3eJF3UgepeWzfgGvDnzrp2Uiw`. Linear curve `price = slope × tokens_sold`, slope derived so full supply raises exactly `graduation_lamports` SOL. u128 fixed-point with `PRECISION = 1e18`, integer-sqrt (Newton's method) for tokens-for-SOL. Per-tx max_buy + cumulative cap (CURVE-03 analog), 1% sell fee retained in reserve, deadline + slippage on both buy/sell (CURVE-01 analog). v1 deferrals: 48h halt timelock (CURVE-02; needs governance primitive), auto-graduation LP-seeding via Raydium/Meteora CPI (manual `mark_graduated()` emits event; LP creation is a v2 caller responsibility).
 - Realms / SPL Governance wiring per universe
 - Tensor / ME secondary-market SDK glue (no `programs/slop` — use native)
 - **Exit criteria**: end-to-end universe lifecycle on Solana — create → bond → launch → canon → trade → govern.
 
 ### Phase S3 — Subscriptions, credits, splits, NFTs (weeks 14-20, overlaps S2)
 
-- `programs/subscription` + Solana Pay recurring intents (SUB-01/02/04 `[x] FIXED`; gate clear)
-- `programs/credit-manager` (CREDIT-01..06 `[x] FIXED`; gate clear)
+- `programs/subscription` — **✅ devnet 2026-05-16**. Program ID `Hnnkuf933sv2rEucpCLaLbXxA1zPNxTNpUsp1WX9Fwbm`. v1: per-universe tier config (4 tiers: FREE/BASIC/PREMIUM/VIP with perks bitmask + credit bonus), SOL subscription + extension, integer-months `expires_at` accounting, creator auth read live from `Universe.creator` via cross-program account dependency on the `universe` crate. Tier upgrade/downgrade prorating (SUB-04 fix logic) defers to v2; auto-renew via Solana Pay recurring is a separate design pass.
+- `programs/credit_manager` — **✅ devnet 2026-05-16**. Program ID `71rtSGzuBENiQa1cdmBbrN5F496CGQ46TnRGbGNpQ3xs`. v1: package CRUD + SOL/$LOAR purchase + platform-only spend + rate-limited grants (CREDIT-01 daily limit + CREDIT-06 per-user cumulative cap). Holder discount deferred to v2 (requires universe-token balance proof plumbing). Two-step admin AND platform key rotation (separate keys → tighter blast radius).
 - `programs/split_router` — **✅ devnet 2026-05-15**. Program ID `7hcFnt2Tgzi1Sc3PDWqAQRFb6BoRmEtmoizBSLaYCGkr`. Config PDA `HCF7ZutJ79xa6kF8d3jdJqBxBt5Ces64Z4cddkiN9c5u`. SOL routing with platform-fee deduction + co-creator splits, 1-day cooldown (SPLIT-02 analog), 10000-bps total enforcement, last-recipient rounding-dust pattern, MAX_RECIPIENTS=10, MAX_FEE_BPS=5000. SPL token routing deferred to v2.
 - Metaplex Core wiring for CharacterNFT / EntityNFT / IdentityNFT / StructuralDeed
 - **Exit criteria**: payment/subscription/credit/NFT surfaces all chain-aware.

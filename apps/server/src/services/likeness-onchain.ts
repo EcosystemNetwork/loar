@@ -248,6 +248,157 @@ export async function submitSetRightsWithCreatorSig(opts: {
   });
 }
 
+// ── SplitRouter: multi-recipient revenue splits ──────────────────────────
+
+/**
+ * Deterministic split-entity hash for a likeness/voice listing. Distinct from
+ * `computeEntityContentHash` so creators can reconfigure splits without
+ * invalidating the on-chain content registration.
+ */
+export function computeSplitEntityHash(entityId: string): Hex {
+  return keccak256(encodePacked(['string', 'string'], ['likeness-marketplace:split:', entityId]));
+}
+
+/** Minimal ABI for the SplitRouter calls Phase 1.5 needs. */
+const splitRouterAbi = [
+  {
+    type: 'function',
+    name: 'registerSplitOwner',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'entityHash', type: 'bytes32' },
+      { name: 'owner_', type: 'address' },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'setSplits',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'entityHash', type: 'bytes32' },
+      {
+        name: 'splits',
+        type: 'tuple[]',
+        components: [
+          { name: 'recipient', type: 'address' },
+          { name: 'bps', type: 'uint16' },
+        ],
+      },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'splitOwner',
+    stateMutability: 'view',
+    inputs: [{ name: 'entityHash', type: 'bytes32' }],
+    outputs: [{ type: 'address' }],
+  },
+  {
+    type: 'function',
+    name: 'getSplits',
+    stateMutability: 'view',
+    inputs: [{ name: 'entityHash', type: 'bytes32' }],
+    outputs: [
+      {
+        type: 'tuple[]',
+        components: [
+          { name: 'recipient', type: 'address' },
+          { name: 'bps', type: 'uint16' },
+        ],
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'registrars',
+    stateMutability: 'view',
+    inputs: [{ type: 'address' }],
+    outputs: [{ type: 'bool' }],
+  },
+] as const;
+
+/** Read the SplitRouter address that a given ContentLicensing instance is wired to. */
+export async function readSplitRouterAddress(env: OnChainEnv): Promise<Address> {
+  const client = publicClient(env);
+  return (await client.readContract({
+    address: env.contentLicensing,
+    abi: contentLicensingAbi,
+    functionName: 'splitRouter',
+  })) as Address;
+}
+
+/** Read the current split owner for an entity (zero address means unowned). */
+export async function readSplitOwner(
+  env: OnChainEnv,
+  splitRouter: Address,
+  entityHash: Hex
+): Promise<Address> {
+  const client = publicClient(env);
+  return (await client.readContract({
+    address: splitRouter,
+    abi: splitRouterAbi,
+    functionName: 'splitOwner',
+    args: [entityHash],
+  })) as Address;
+}
+
+/**
+ * Operator-only call: claim an unowned split-entity for the seller. After
+ * this lands, the seller can call setSplits via their own wallet. No-ops if
+ * the entity is already owned by the seller.
+ */
+export async function submitRegisterSplitOwner(opts: {
+  chainId: number;
+  splitRouter: Address;
+  entityHash: Hex;
+  newOwner: Address;
+}): Promise<Hash | null> {
+  const env = getOnChainEnv(opts.chainId);
+  if (!env) {
+    throw new Error(`On-chain config missing for chain ${opts.chainId}`);
+  }
+  const existing = await readSplitOwner(env, opts.splitRouter, opts.entityHash);
+  if (existing.toLowerCase() === opts.newOwner.toLowerCase()) {
+    return null; // already owned by the seller — nothing to do
+  }
+  if (existing !== '0x0000000000000000000000000000000000000000') {
+    throw new Error(
+      `Split entity ${opts.entityHash} already owned by ${existing}, cannot re-register`
+    );
+  }
+  const pk = process.env.OPERATOR_PRIVATE_KEY ?? process.env.PRIVATE_KEY;
+  if (!pk) throw new Error('OPERATOR_PRIVATE_KEY (or PRIVATE_KEY) required');
+  const account = privateKeyToAccount(`0x${pk.replace(/^0x/, '')}` as Hex);
+  const wallet = createWalletClient({
+    account,
+    chain: viemChain(opts.chainId),
+    transport: http(env.rpcUrl),
+  });
+  return wallet.writeContract({
+    address: opts.splitRouter,
+    abi: splitRouterAbi,
+    functionName: 'registerSplitOwner',
+    args: [opts.entityHash, opts.newOwner],
+  });
+}
+
+/**
+ * Encode the calldata + ABI for a `SplitRouter.setSplits` call. Returned in
+ * a shape the client can pass straight into `useWriteContract`.
+ */
+export function encodeSetSplitsCall(opts: {
+  entityHash: Hex;
+  splits: Array<{ recipient: Address; bps: number }>;
+}) {
+  return {
+    abi: splitRouterAbi,
+    functionName: 'setSplits' as const,
+    args: [opts.entityHash, opts.splits] as const,
+  };
+}
+
 // ── ContentLicensing: registerContent ────────────────────────────────────
 
 /**

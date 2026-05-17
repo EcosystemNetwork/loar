@@ -14,11 +14,15 @@ type ClusterMap = Partial<Record<SolanaCluster, string>>;
 export declare const UniverseProgram: ClusterMap;
 /** Episode — cNFT mints via Bubblegum + Core promotion path for canon promotion. */
 export declare const EpisodeProgram: ClusterMap;
-/** Payment — Solana Pay receiver with on-chain receipts → cNFT attribution. */
+/** Payment — Solana sister to PaymentRouter.sol. Routes SOL + $LOAR with
+ *  pull-style accumulators per creator, owner-gated treasury, two-step
+ *  ownership transfer, pause, one-way LOAR-mint lock. */
 export declare const PaymentProgram: ClusterMap;
-/** $LOAR SPL mint per cluster. Bridge to canonical EVM $LOAR via Wormhole NTT (v2). */
+/** $LOAR SPL mint per cluster. Token-2022 with Pausable + Metadata extensions
+ *  (9 decimals, 1B supply). Bridge to canonical EVM $LOAR via Wormhole NTT (v2). */
 export declare const LoarMint: ClusterMap;
-/** Bubblegum cNFT merkle tree per cluster. One tree, ~1M slots at depth=14/buffer=64. */
+/** Bubblegum cNFT merkle tree per cluster. Devnet uses depth=14/buffer=64/canopy=10
+ *  (16k cNFTs). Mainnet uses depth=20/buffer=64/canopy=14 (~1M cNFTs). */
 export declare const BubblegumTree: ClusterMap;
 /**
  * Read an address for the active cluster.

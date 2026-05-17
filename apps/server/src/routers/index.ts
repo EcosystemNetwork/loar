@@ -13,6 +13,7 @@
  *   credits        — Credit packages, balances, spend/purchase
  *   subscriptions  — Universe subscription tiers
  *   analytics      — Views, engagement, trending, wallet tracking
+ *   ads            — Ad slots, sponsorships, bidding
  *   licensing      — IP licensing, merch, royalties
  *   storage        — Unified storage, Firebase Storage, Filecoin Synapse
  *   profiles       — User profiles, discovery
@@ -40,6 +41,8 @@ import { listingsRouter } from './listings/listings.routes';
 import { creditsRouter, grantCreditsInTxn } from './credits/credits.routes';
 import { subscriptionsRouter } from './subscriptions/subscriptions.routes';
 import { analyticsRouter } from './analytics/analytics.routes';
+import { adsRouter } from './ads/ads.routes';
+import { adSeedsRouter } from './ads/adSeeds.routes';
 import { storageRouter } from './storage/storage.routes';
 import { firebaseStorageRouter } from './storage/firebase.routes';
 import { synapseRouter } from './storage/synapse.routes';
@@ -71,6 +74,11 @@ import { feedRouter } from './feed/feed.routes';
 import { playerRouter } from './player/player.routes';
 import { loraRouter } from './generation/lora.routes';
 import { privateSectionRouter } from './privateSection/privateSection.routes';
+import { talentAgentsRouter } from './talentAgents/talentAgents.routes';
+import { aiAgentsRouter } from './aiAgents/aiAgents.routes';
+import { aiPipelinesRouter } from './aiPipelines/aiPipelines.routes';
+import { apiKeysRouter } from './apiKeys/apiKeys.routes';
+import { bountiesRouter } from './bounties/bounties.routes';
 import { splitsRouter } from './splits/splits.routes';
 import { universeGenConfigRouter } from './universeGenConfig/universeGenConfig.routes';
 import { contentLicensingRouter } from './contentLicensing/contentLicensing.routes';
@@ -83,6 +91,10 @@ import { tokenSocialRouter } from './tokenSocial/tokenSocial.routes';
 import { platformSubscriptionsRouter } from './platformSubscriptions/platformSubscriptions.routes';
 import { castRouter } from './cast/cast.routes';
 import { sceneControlsRouter } from './sceneControls/sceneControls.routes';
+import { sceneTemplatesRouter } from './sceneTemplates/sceneTemplates.routes';
+import { cinematicReferencesRouter } from './cinematicReferences/cinematicReferences.routes';
+import { residenciesRouter } from './residencies/residencies.routes';
+import { canvasRouter } from './canvas/canvas.routes';
 import { pollsRouter } from './polls/polls.routes';
 import { notificationsRouter } from './notifications/notifications.routes';
 import { lipsyncRouter } from './generation/lipsync.routes';
@@ -246,6 +258,8 @@ export const appRouter = router({
   // ── Monetization ────────────────────────────────────────────────────
   credits: creditsRouter,
   subscriptions: subscriptionsRouter,
+  ads: adsRouter,
+  adSeeds: adSeedsRouter,
 
   // ── Analytics ───────────────────────────────────────────────────────
   analytics: analyticsRouter,
@@ -288,6 +302,15 @@ export const appRouter = router({
   // ── Portfolio BFF (mobile vault aggregation) ────────────────────────
   portfolio: portfolioRouter,
 
+  // ── $LOAR Token Economy ─────────────────────────────────────────────
+  bounties: bountiesRouter,
+
+  // ── Agent Systems ──────────────────────────────────────────────────
+  talentAgents: talentAgentsRouter,
+  aiAgents: aiAgentsRouter,
+  aiPipelines: aiPipelinesRouter,
+  apiKeys: apiKeysRouter,
+
   // ── Pricing ────────────────────────────────────────────────────────
   pricing: pricingRouter,
 
@@ -308,6 +331,10 @@ export const appRouter = router({
   // ── Node Editor Expansion (v1) ────────────────────────────────────
   cast: castRouter,
   sceneControls: sceneControlsRouter,
+  sceneTemplates: sceneTemplatesRouter,
+  cinematicReferences: cinematicReferencesRouter,
+  residencies: residenciesRouter,
+  canvas: canvasRouter,
 
   // ── Polls & Fan-Input-to-Canon ────────────────────────────────────
   polls: pollsRouter,

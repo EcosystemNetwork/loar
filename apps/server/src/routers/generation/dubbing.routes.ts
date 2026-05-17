@@ -29,6 +29,7 @@ import { firebaseStorageService } from '../../services/firebase-storage';
 import { lipSyncService } from '../../services/lipsync';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { logFailedRefund } from '../../lib/refund-audit';
+import { assertVoiceUsageAllowed } from '../../lib/likeness-access';
 import { FieldValue } from 'firebase-admin/firestore';
 import { TRPCError } from '@trpc/server';
 import { getPlatformConfig } from '../../services/platformConfig';
@@ -301,6 +302,7 @@ async function loadJobOwned(jobId: string, uid: string) {
 
 interface GenerateLineArgs {
   userId: string;
+  callerAddress: string | null;
   jobId: string;
   lineId: string;
   overrideModel?: ElevenLabsVoiceModel;
@@ -314,6 +316,14 @@ async function generateLineInternal(args: GenerateLineArgs) {
   const idx = lines.findIndex((l) => l.id === args.lineId);
   if (idx === -1) throw new TRPCError({ code: 'NOT_FOUND', message: 'Line not found' });
   const line = lines[idx];
+
+  // Likeness Marketplace access gate — block before any billable work if the
+  // caller is dubbing with a marketplace-listed voice they don't own/license.
+  await assertVoiceUsageAllowed({
+    elevenLabsVoiceId: line.voiceId,
+    callerUid: args.userId,
+    callerAddress: args.callerAddress,
+  });
 
   const model = args.overrideModel ?? line.model ?? 'eleven_flash_v2_5';
   const stability = args.overrideStability ?? line.stability ?? 0.5;
@@ -556,6 +566,7 @@ export const dubbingRouter = router({
     .mutation(async ({ input, ctx }) => {
       return generateLineInternal({
         userId: ctx.user.uid,
+        callerAddress: ctx.user.address ?? null,
         jobId: input.jobId,
         lineId: input.lineId,
         overrideModel: input.overrideModel,
@@ -586,6 +597,7 @@ export const dubbingRouter = router({
           try {
             await generateLineInternal({
               userId: ctx.user.uid,
+              callerAddress: ctx.user.address ?? null,
               jobId: input.jobId,
               lineId: line.id,
             });

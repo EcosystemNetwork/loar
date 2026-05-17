@@ -25,11 +25,13 @@ import {SplitRouter} from "../src/SplitRouter.sol";
 import {RevenueModuleFactory} from "../src/RevenueModuleFactory.sol";
 import {CanonMarketplace} from "../src/revenue/CanonMarketplace.sol";
 import {CreditManager} from "../src/revenue/CreditManager.sol";
+import {AdPlacement} from "../src/revenue/AdPlacement.sol";
 import {SubscriptionManager} from "../src/revenue/SubscriptionManager.sol";
 import {LicensingRegistry} from "../src/revenue/LicensingRegistry.sol";
 import {CollabManager} from "../src/revenue/CollabManager.sol";
 import {AnalyticsRegistry} from "../src/revenue/AnalyticsRegistry.sol";
 import {LaunchpadStaking} from "../src/revenue/LaunchpadStaking.sol";
+import {StoryBounties} from "../src/revenue/StoryBounties.sol";
 import {IdentityNFT} from "../src/IdentityNFT.sol";
 import {Escrow} from "../src/revenue/Escrow.sol";
 
@@ -49,8 +51,8 @@ import {EpisodeNFT} from "../src/revenue/EpisodeNFT.sol";
  *   1. $LOAR Token + Faucet
  *   2. Core protocol (UniverseManager, TokenDeployer, FeeLocker)
  *   3. Revenue infra (PaymentRouter, RightsRegistry, NFT beacons, Factory)
- *   4. Marketplace contracts (Canon, Credit, Subs, Licensing, Collabs, Analytics)
- *   5. Staking + SplitRouter
+ *   4. Marketplace contracts (Canon, Credit, Ads, Subs, Licensing, Collabs, Analytics)
+ *   5. Staking + SplitRouter + StoryBounties
  *
  * Run:
  *   forge script script/DeployAll.s.sol \
@@ -65,6 +67,9 @@ contract DeployAllScript is Script {
     uint16 constant LOAR_DISCOUNT_BPS = 500; // 5% discount for $LOAR payments
     uint256 constant CANON_MIN_FEE = 0.001 ether;
     uint256 constant CANON_VOTE_DURATION = 7 days;
+    uint256 constant BOUNTY_MIN = 10e18; // 10 $LOAR minimum bounty
+    uint16 constant BOUNTY_FEE = 500; // 5%
+    uint16 constant BOUNTY_CANCEL_FEE = 200; // 2%
 
     function run() public {
         uint256 pk = vm.envUint("PRIVATE_KEY");
@@ -236,6 +241,19 @@ contract DeployAllScript is Script {
         );
         console.log("[4] CreditManager:", address(creditManager));
 
+        // AdPlacement
+        AdPlacement adPlacement = AdPlacement(
+            address(
+                new ERC1967Proxy(
+                    address(new AdPlacement()),
+                    abi.encodeCall(
+                        AdPlacement.initialize, (d, address(paymentRouter), PLATFORM_FEE_BPS)
+                    )
+                )
+            )
+        );
+        console.log("[4] AdPlacement:", address(adPlacement));
+
         // SubscriptionManager
         SubscriptionManager subManager = SubscriptionManager(
             address(
@@ -309,6 +327,17 @@ contract DeployAllScript is Script {
         staking.setTierConfig(LaunchpadStaking.Tier(4), 500_000e18, 800, 1000, 300, true); // DIAMOND
         console.log("[5] Staking tiers configured");
 
+        // StoryBounties (UUPS proxy)
+        StoryBounties bounties = StoryBounties(
+            address(
+                new ERC1967Proxy(
+                    address(new StoryBounties()),
+                    abi.encodeCall(StoryBounties.initialize, (address(loarToken), treasury, d))
+                )
+            )
+        );
+        console.log("[5] StoryBounties:", address(bounties));
+
         // ── Phase 6: Marketplace Escrow ─────────────────────────────────
         Escrow escrow = Escrow(
             address(
@@ -349,13 +378,15 @@ contract DeployAllScript is Script {
         _logEnv("REVENUE_MODULE_FACTORY", address(rmf));
         _logEnv("CANON_MARKETPLACE_ADDRESS", address(canon));
         _logEnv("CREDIT_MANAGER_ADDRESS", address(creditManager));
+        _logEnv("AD_PLACEMENT_ADDRESS", address(adPlacement));
         _logEnv("SUBSCRIPTION_MANAGER_ADDRESS", address(subManager));
         _logEnv("LICENSING_REGISTRY_ADDRESS", address(licensingRegistry));
         _logEnv("COLLAB_MANAGER_ADDRESS", address(collabManager));
         _logEnv("ANALYTICS_REGISTRY_ADDRESS", address(analytics));
         console.log("");
-        console.log("# --- Staking & Escrow ---");
+        console.log("# --- Staking, Bounties & Escrow ---");
         _logEnv("LAUNCHPAD_STAKING_ADDRESS", address(staking));
+        _logEnv("STORY_BOUNTIES_ADDRESS", address(bounties));
         _logEnv("ESCROW_ADDRESS", address(escrow));
         console.log("");
         console.log("# --- Vite (frontend) ---");
@@ -366,6 +397,7 @@ contract DeployAllScript is Script {
         _logEnv("VITE_PAYMENT_ROUTER_ADDRESS", address(paymentRouter));
         _logEnv("VITE_SPLIT_ROUTER_ADDRESS", address(splitRouter));
         _logEnv("VITE_LAUNCHPAD_STAKING_ADDRESS", address(staking));
+        _logEnv("VITE_STORY_BOUNTIES_ADDRESS", address(bounties));
         _logEnv("VITE_IDENTITY_NFT_ADDRESS", address(identityNft));
         console.log("");
         console.log("# --- Platform treasury for split orchestrator ---");

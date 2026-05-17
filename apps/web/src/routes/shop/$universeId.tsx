@@ -12,6 +12,13 @@ import {
   ShoppingBag,
   Store,
   Loader2,
+  ExternalLink,
+  Megaphone,
+  TrendingUp,
+  Tv2,
+  Volume2,
+  User,
+  Plus,
   Gavel,
 } from 'lucide-react';
 import { LoarIcon } from '@/components/loar-icons';
@@ -20,8 +27,9 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUniverseStorefront } from '@/hooks/useListings';
-import { useSubscriptionTiers, useCanonSubmissions } from '@/hooks/useRevenue';
+import { useSubscriptionTiers, useAdSlots, useCanonSubmissions } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
+import { formatEther } from 'viem';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { useVocab } from '@/hooks/use-vocab';
@@ -39,6 +47,7 @@ function UniverseShopPage() {
 
   const { data: storefront, isLoading } = useUniverseStorefront(universeId);
   const { data: subTiers } = useSubscriptionTiers(universeId);
+  const { data: adSlots, isLoading: adsLoading } = useAdSlots(universeId);
   const { data: votingSubmissions } = useCanonSubmissions(universeId, 'VOTING');
   const { data: universe } = useQuery({
     queryKey: ['universe', universeId],
@@ -116,6 +125,12 @@ function UniverseShopPage() {
                   {subTiers.length} subscription tiers
                 </Badge>
               )}
+              {adSlots && adSlots.length > 0 && (
+                <Badge variant="outline" className="gap-1">
+                  <Megaphone className="w-3 h-3" />
+                  {adSlots.length} ad slots
+                </Badge>
+              )}
               {votingSubmissions && votingSubmissions.length > 0 && (
                 <Badge variant="outline" className="gap-1">
                   <Gavel className="w-3 h-3" />
@@ -144,6 +159,10 @@ function UniverseShopPage() {
               <TabsTrigger value="canon" className="flex-1 gap-1">
                 <Gavel className="w-3 h-3" />
                 Canon
+              </TabsTrigger>
+              <TabsTrigger value="ads" className="flex-1 gap-1">
+                <Megaphone className="w-3 h-3" />
+                Ads
               </TabsTrigger>
             </TabsList>
 
@@ -196,6 +215,39 @@ function UniverseShopPage() {
               </div>
             </TabsContent>
 
+            <TabsContent value="ads">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-sm">Open Ad Slots</h3>
+                <Link to="/adplacements/new">
+                  <Button size="sm" variant="outline" className="gap-1 h-7 text-xs">
+                    <Plus className="w-3 h-3" />
+                    New Slot
+                  </Button>
+                </Link>
+              </div>
+              {adsLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : adSlots?.length ? (
+                <div className="space-y-3">
+                  {adSlots.map((slot: any) => (
+                    <AdSlotCard key={slot.id} slot={slot} />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Megaphone className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">No open ad slots</p>
+                  <Link to="/adplacements/new">
+                    <Button variant="outline" size="sm" className="mt-3">
+                      Create a Slot
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </TabsContent>
+
             <TabsContent value="subs">
               {subTiers?.length ? (
                 <div className="space-y-3">
@@ -214,6 +266,86 @@ function UniverseShopPage() {
         )}
       </div>
     </div>
+  );
+}
+
+const PLACEMENT_ICONS: Record<string, React.ReactNode> = {
+  BILLBOARD: <Tv2 className="w-4 h-4" />,
+  PRODUCT: <Package className="w-4 h-4" />,
+  SPONSORED_CHARACTER: <User className="w-4 h-4" />,
+  AUDIO_MENTION: <Volume2 className="w-4 h-4" />,
+};
+
+const PLACEMENT_LABELS: Record<string, string> = {
+  BILLBOARD: 'Billboard',
+  PRODUCT: 'Product',
+  SPONSORED_CHARACTER: 'Character',
+  AUDIO_MENTION: 'Audio',
+};
+
+function AdSlotCard({ slot }: { slot: any }) {
+  const minBidEth = slot.minBid ? parseFloat(formatEther(BigInt(slot.minBid))).toFixed(4) : '—';
+  const topBidEth =
+    slot.currentBid && slot.currentBid !== '0'
+      ? parseFloat(formatEther(BigInt(slot.currentBid))).toFixed(4)
+      : null;
+
+  return (
+    <Link
+      to="/adplacements/$slotId"
+      params={{ slotId: slot.id }}
+      search={{
+        universeId: slot.universeId,
+        placementType: slot.placementType,
+        minBid: slot.minBid,
+        currentBid: slot.currentBid,
+        currentBidder: slot.currentBidder,
+        description: slot.description,
+        constraints: slot.constraints,
+        episodes: slot.episodes,
+        creatorUid: slot.creatorUid,
+        active: slot.active,
+      }}
+    >
+      <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                {PLACEMENT_ICONS[slot.placementType] ?? <Megaphone className="w-4 h-4" />}
+              </div>
+              <div>
+                <p className="text-sm font-medium">
+                  {PLACEMENT_LABELS[slot.placementType] ?? slot.placementType}
+                </p>
+                <p className="text-xs text-muted-foreground">{slot.episodes} episodes</p>
+              </div>
+            </div>
+            <Badge variant={slot.active ? 'default' : 'secondary'} className="text-xs">
+              {slot.active ? 'Open' : 'Closed'}
+            </Badge>
+          </div>
+
+          {slot.description && (
+            <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{slot.description}</p>
+          )}
+
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">
+              Floor: <span className="text-foreground font-medium">{minBidEth} ETH</span>
+            </span>
+            {topBidEth ? (
+              <span className="flex items-center gap-1 text-yellow-400 font-medium">
+                <TrendingUp className="w-3 h-3" />
+                {topBidEth} ETH
+              </span>
+            ) : (
+              <span className="text-muted-foreground">No bids yet</span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 

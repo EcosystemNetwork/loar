@@ -11,12 +11,14 @@ export * from './types';
 // Camera
 export { translateCameraPreset, getCameraPromptFragment, getByteDanceCameraParams } from './camera';
 
-// Style
+// Style + Shot grammar
 export {
   resolveInheritedStyle,
   applyStyleToPrompt,
   listStylePresets,
   getStyleInfo,
+  applyShotToPrompt,
+  listShotPresets,
 } from './styles';
 
 // VFX

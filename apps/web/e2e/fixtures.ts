@@ -52,9 +52,12 @@ export const PUBLIC_ROUTES = [
   '/tokens',
   '/market',
   '/staking',
+  '/bounties',
+  '/agents',
   '/sell',
   '/licensing',
   '/collabs',
+  '/ads',
 ] as const;
 
 /* -------------------------------------------------------------------------- */

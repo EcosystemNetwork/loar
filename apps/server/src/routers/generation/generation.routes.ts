@@ -46,10 +46,12 @@ import type {
 import {
   translateCameraPreset,
   applyStyleToPrompt,
+  applyShotToPrompt,
   PROVIDER_CAPABILITIES,
   type CameraPresetId,
   type CameraIntensity,
   type StylePresetId,
+  type ShotPresetId,
   type VfxPresetId,
 } from '../../services/scene-controls';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
@@ -2095,10 +2097,18 @@ export const generationRouter = router({
         aspectRatio: z.enum(['16:9', '9:16', '1:1']).optional().default('16:9'),
         motionStrength: z.number().min(1).max(255).optional().default(127),
         universeId: z.string().optional(),
+        stylePreset: z.string().nullable().optional(),
+        shotPreset: z.string().nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       input.prompt = sanitizePrompt(input.prompt);
+      if (input.shotPreset) {
+        input.prompt = applyShotToPrompt(input.prompt, input.shotPreset as ShotPresetId);
+      }
+      if (input.stylePreset) {
+        input.prompt = applyStyleToPrompt(input.prompt, input.stylePreset as StylePresetId);
+      }
       await deductCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video, 'video_veo3');
       const startTime = Date.now();
       const { resolveProviderKey: resolveVeo3Key } = await import('../../lib/byok');

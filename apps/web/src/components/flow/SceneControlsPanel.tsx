@@ -25,13 +25,8 @@ import {
   X,
   Check,
 } from 'lucide-react';
-import type {
-  SceneControls,
-  CameraPresetId,
-  CameraIntensity,
-  StylePresetId,
-  VfxPresetId,
-} from './TimelineNodes';
+import type { SceneControls, CameraPresetId, CameraIntensity, VfxPresetId } from './TimelineNodes';
+import { STYLE_PRESETS as STYLE_PRESET_LIBRARY } from '../style-presets';
 
 // ── Camera Presets ─────────────────────────────────────────────────────
 
@@ -58,20 +53,7 @@ const CAMERA_PRESETS: Array<{
   { id: 'whip_pan_right', label: 'Whip Pan', category: 'Push' },
 ];
 
-const STYLE_PRESETS: Array<{ id: StylePresetId; label: string; color: string }> = [
-  { id: 'noir', label: 'Noir', color: '#1a1a2e' },
-  { id: 'watercolor', label: 'Watercolor', color: '#a8d8ea' },
-  { id: 'vhs_80s', label: "'80s VHS", color: '#ff6b9d' },
-  { id: 'anime', label: 'Anime', color: '#c44dff' },
-  { id: 'cyberpunk', label: 'Cyberpunk', color: '#00fff5' },
-  { id: 'fantasy', label: 'Fantasy', color: '#ffd700' },
-  { id: 'horror', label: 'Horror', color: '#2d0a0a' },
-  { id: 'documentary', label: 'Documentary', color: '#8b7355' },
-  { id: 'comic_book', label: 'Comic Book', color: '#ff4444' },
-  { id: 'cinematic', label: 'Cinematic', color: '#2c3e50' },
-  { id: 'surreal', label: 'Surreal', color: '#9b59b6' },
-  { id: 'steampunk', label: 'Steampunk', color: '#b87333' },
-];
+const STYLE_PRESETS = STYLE_PRESET_LIBRARY;
 
 const VFX_PRESETS: Array<{ id: VfxPresetId; label: string; category: string }> = [
   { id: 'noir_grade', label: 'Noir Grade', category: 'Color' },

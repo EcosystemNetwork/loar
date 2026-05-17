@@ -38,6 +38,8 @@ const HIDDEN_ROUTES = new Set<string>([]);
 const primaryLinksBase = [
   { to: '/discover', label: 'Discover' },
   { to: '/create', label: 'Create' },
+  { to: '/canvas', label: 'Canvas' },
+  { to: '/editor', label: 'Editor' },
   { to: '/tokens', label: 'Launchpad' },
   { to: '/wiki', label: 'Wiki' },
   { to: '/dashboard', label: 'Dashboard' },
@@ -76,11 +78,17 @@ const moreGroupsBase: MoreGroup[] = [
   },
   {
     label: 'Earn',
-    links: [{ to: '/sell', label: 'Sell' }],
+    links: [
+      { to: '/bounties', label: 'Bounties' },
+      { to: '/sell', label: 'Sell' },
+      { to: '/residency', label: 'Residency', beta: true },
+    ],
   },
   {
     label: 'More',
     links: [
+      { to: '/agents', label: 'Agents', beta: true },
+      { to: '/adplacements', label: 'Ads', beta: true },
       // Sandbox is reachable from /create — no longer a standalone nav entry.
       { to: '/subscriptions', label: 'Subscriptions' },
       { to: '/faucet', label: 'Faucet' },

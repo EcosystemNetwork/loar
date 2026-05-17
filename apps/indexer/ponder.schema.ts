@@ -614,6 +614,42 @@ export const collab = onchainTable(
   })
 );
 
+// Ad Placements
+export const adSlot = onchainTable(
+  'ad_slot',
+  (t) => ({
+    id: t.text().primaryKey(), // slotId
+    universeId: t.integer().notNull(),
+    placementType: t.integer().notNull(), // 0=BILLBOARD, 1=PRODUCT, 2=SPONSORED_CHARACTER, 3=AUDIO_MENTION
+    minBid: t.text().notNull(),
+    currentBid: t.text().notNull().default('0'),
+    currentBidder: t.hex(),
+    episodesRemaining: t.integer().notNull(),
+    active: t.boolean().notNull().default(true),
+    createdAt: t.integer().notNull(),
+  }),
+  (table) => ({
+    universeIdx: index('adslot_universe_idx').on(table.universeId),
+  })
+);
+
+export const sponsorship = onchainTable(
+  'sponsorship',
+  (t) => ({
+    id: t.text().primaryKey(),
+    adSlotId: t.integer().notNull(),
+    sponsor: t.hex().notNull(),
+    totalPaid: t.text().notNull(),
+    impressions: t.integer().notNull().default(0),
+    active: t.boolean().notNull().default(true),
+    startedAt: t.integer().notNull(),
+  }),
+  (table) => ({
+    sponsorIdx: index('spon_sponsor_idx').on(table.sponsor),
+    slotIdx: index('spon_slot_idx').on(table.adSlotId),
+  })
+);
+
 // Licensing
 export const license = onchainTable(
   'license',

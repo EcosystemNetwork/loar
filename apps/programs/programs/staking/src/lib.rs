@@ -111,6 +111,11 @@ pub mod staking {
     ) -> Result<()> {
         require!((tier as usize) < TIER_COUNT, StakingError::InvalidTier);
         require!(tier != 0 || min_stake == 0, StakingError::InvalidTier); // tier 0 = NONE, must have 0 minStake
+        // Sanity caps so a future admin can't accidentally configure a tier
+        // with a 1000× multiplier or 100% fee discount. All values are bps.
+        require!(weight_bps as u64 <= BPS_DENOM * 10, StakingError::InvalidTier);
+        require!(fee_discount_bps as u64 <= BPS_DENOM, StakingError::InvalidTier);
+        require!(curation_boost_bps as u64 <= BPS_DENOM, StakingError::InvalidTier);
         let config = &mut ctx.accounts.config;
         config.tier_configs[tier as usize] = TierConfig {
             min_stake,
@@ -706,9 +711,21 @@ pub struct Unstake<'info> {
         associated_token::authority = user,
     )]
     pub user_loar_ata: InterfaceAccount<'info, TokenAccount>,
-    /// CHECK: penalty destination ATA — caller provides; could be LP, treasury,
-    /// or burn address depending on the operational decision at deploy time.
-    #[account(mut)]
+    /// Penalty destination ATA — must be owned by `config.liquidity_pool`
+    /// (or `config.treasury` if LP is unset). Without this constraint a
+    /// caller could direct the penalty to their own ATA, nullifying the
+    /// early-unstake lock. Mirrors EVM `LaunchpadStaking.sol`'s hard-coded
+    /// `penaltyRecipient = liquidityPool != 0 ? liquidityPool : treasury`.
+    #[account(
+        mut,
+        constraint = penalty_destination_ata.mint == loar_mint.key()
+            @ StakingError::MintMismatch,
+        constraint = (
+            penalty_destination_ata.owner == config.liquidity_pool
+            || (config.liquidity_pool == Pubkey::default()
+                && penalty_destination_ata.owner == config.treasury)
+        ) @ StakingError::WrongPenaltyDestination,
+    )]
     pub penalty_destination_ata: InterfaceAccount<'info, TokenAccount>,
     pub token_program: Interface<'info, TokenInterface>,
 }
@@ -801,7 +818,18 @@ pub struct UnstakeFromUniverse<'info> {
         associated_token::authority = user,
     )]
     pub user_loar_ata: InterfaceAccount<'info, TokenAccount>,
-    #[account(mut)]
+    /// Penalty destination ATA — see `Unstake.penalty_destination_ata` for the
+    /// rationale. Same constraint enforced here.
+    #[account(
+        mut,
+        constraint = penalty_destination_ata.mint == loar_mint.key()
+            @ StakingError::MintMismatch,
+        constraint = (
+            penalty_destination_ata.owner == config.liquidity_pool
+            || (config.liquidity_pool == Pubkey::default()
+                && penalty_destination_ata.owner == config.treasury)
+        ) @ StakingError::WrongPenaltyDestination,
+    )]
     pub penalty_destination_ata: InterfaceAccount<'info, TokenAccount>,
     pub token_program: Interface<'info, TokenInterface>,
 }
@@ -990,6 +1018,8 @@ pub enum StakingError {
     InvalidLockPeriod,
     #[msg("Penalty bps exceeds MAX_PENALTY_BPS (1000 = 10%)")]
     PenaltyTooHigh,
+    #[msg("Penalty destination ATA must be owned by config.liquidity_pool (or treasury if LP unset)")]
+    WrongPenaltyDestination,
     #[msg("Arithmetic overflow")]
     MathOverflow,
     #[msg("Program is paused")]

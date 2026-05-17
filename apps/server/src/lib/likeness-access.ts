@@ -30,22 +30,24 @@ async function findVoiceEntityByElevenLabsId(
   elevenLabsVoiceId: string
 ): Promise<VoiceEntityLookup | null> {
   if (!db) return null;
-  // Firestore can't query inside metadata without a composite index. We scan
-  // the small set of voice entities (this collection is creator-scale, not
-  // user-scale) and match in-memory. Index this as `metadata.elevenLabsVoiceId`
-  // when the marketplace grows large.
-  const snap = await db.collection('entities').where('kind', '==', 'voice').limit(1000).get();
-  for (const doc of snap.docs) {
-    const data = doc.data();
-    const meta = (data?.metadata ?? {}) as Record<string, unknown>;
-    if (meta.elevenLabsVoiceId === elevenLabsVoiceId) {
-      return {
-        entityId: doc.id,
-        creatorAddress: ((data?.creator as string | undefined) ?? '').toLowerCase(),
-      };
-    }
-  }
-  return null;
+  // Backed by the composite index `entities (kind ASC, metadata.elevenLabsVoiceId ASC)`
+  // declared in firestore.indexes.json. Scales O(1) regardless of total
+  // voice-entity count — the previous 1000-doc scan + in-memory filter would
+  // silently fail closed (return null) past the limit, leaving listed voices
+  // usable without a license.
+  const snap = await db
+    .collection('entities')
+    .where('kind', '==', 'voice')
+    .where('metadata.elevenLabsVoiceId', '==', elevenLabsVoiceId)
+    .limit(1)
+    .get();
+  if (snap.empty) return null;
+  const doc = snap.docs[0];
+  const data = doc.data();
+  return {
+    entityId: doc.id,
+    creatorAddress: ((data?.creator as string | undefined) ?? '').toLowerCase(),
+  };
 }
 
 /** True if there is at least one active listing for this entity. */

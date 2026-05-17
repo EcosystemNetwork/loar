@@ -309,6 +309,30 @@ export interface CanonVote {
   _event: EventEnvelope;
 }
 
+export interface AdSlot {
+  id: string;
+  universeId: number;
+  placementType: number;
+  minBid: string;
+  currentBid: string;
+  currentBidder: Hex | null;
+  episodesRemaining: number;
+  active: boolean;
+  createdAt: number;
+  _event: EventEnvelope;
+}
+
+export interface Sponsorship {
+  id: string;
+  adSlotId: number;
+  sponsor: Hex;
+  totalPaid: string;
+  impressions: number;
+  active: boolean;
+  startedAt: number;
+  _event: EventEnvelope;
+}
+
 export interface License {
   id: string;
   universeId: number;
@@ -368,6 +392,8 @@ export const COLLECTIONS = {
   votes: 'indexer_votes',
   canonSubmissions: 'indexer_canonSubmissions',
   canonVotes: 'indexer_canonVotes',
+  adSlots: 'indexer_adSlots',
+  sponsorships: 'indexer_sponsorships',
   licenses: 'indexer_licenses',
   collabs: 'indexer_collabs',
   checkpoints: 'indexer_checkpoints',

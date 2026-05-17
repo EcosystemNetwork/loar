@@ -51,6 +51,14 @@
       ]
     },
     {
+      "collectionGroup": "entities",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "kind", "order": "ASCENDING" },
+        { "fieldPath": "metadata.elevenLabsVoiceId", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "entityRelations",
       "queryScope": "COLLECTION",
       "fields": [

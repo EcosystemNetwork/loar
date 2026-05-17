@@ -57,10 +57,14 @@ const APPLY = process.argv.includes('--apply');
 const chainArg = process.argv.find((a) => a.startsWith('--chain='))?.split('=')[1];
 const CHAINS_TO_RUN = chainArg ? [chainArg] : ['sepolia', 'base-sepolia'];
 
-// Contracts that are *just* proxy wrappers (ERC1967Proxy, UpgradeableBeacon) —
-// these don't have a distinct contract name per deployment, so we skip them in
-// the tracked manifest. They're reachable via the named contract that created them.
-const SKIP_NAMES = new Set(['ERC1967Proxy', 'UpgradeableBeacon']);
+// UpgradeableBeacon entries are still skipped — the beacon address itself isn't
+// the user-facing contract. ERC1967Proxy entries are NO LONGER skipped: every
+// upgradeable contract in this repo is deployed as `new <Impl>()` immediately
+// followed by `new ERC1967Proxy(impl, initData)`, so the proxy IS the canonical
+// address that apps should call. `loadBroadcasts` pairs each ERC1967Proxy with
+// the preceding named-contract CREATE and overrides the tracked address to the
+// proxy's. Standalone (non-proxy) deploys like SplitRouter pass through untouched.
+const SKIP_NAMES = new Set(['UpgradeableBeacon']);
 
 interface Creation {
   name: string;
@@ -68,6 +72,61 @@ interface Creation {
   timestamp: number;
   blockNumber?: number;
   script: string;
+  /** True if this CREATE was wrapped by an ERC1967Proxy (canonical user-facing
+   *  address); false if it's an impl-only deploy (e.g., a UUPS upgrade). */
+  proxied: boolean;
+}
+
+/**
+ * Decode the `_implementation` constructor arg from an ERC1967Proxy CREATE tx.
+ * Returns the implementation address (checksummed) or null if we can't parse.
+ *
+ * Foundry serializes constructor args two ways across versions:
+ *   1. `arguments: ["<impl_address>", "<init_calldata_hex>"]`  (decoded array)
+ *   2. raw `transaction.input` = bytecode || abi.encode(address, bytes)
+ * We try (1) first since it's cheap, then fall back to slicing the last 64
+ * bytes from the encoded tail of `transaction.input`.
+ */
+function decodeProxyImpl(tx: {
+  arguments?: unknown[];
+  transaction?: { input?: string };
+}): Address | null {
+  // Path 1: parsed arguments
+  const args = tx.arguments;
+  if (Array.isArray(args) && args.length >= 1 && typeof args[0] === 'string') {
+    const a = args[0];
+    if (/^0x[0-9a-fA-F]{40}$/.test(a)) {
+      try {
+        return getAddress(a);
+      } catch {
+        /* fall through */
+      }
+    }
+  }
+  // Path 2: raw input. The first ABI-encoded arg (address, padded to 32 bytes)
+  // lives immediately after the contract creation bytecode. We look for the
+  // address inside the last 64 bytes of the input — that's where viem/forge
+  // typically stitch the constructor args.
+  const input = tx.transaction?.input;
+  if (typeof input === 'string' && input.length > 64 * 2) {
+    // Constructor sig ABI-encoded is (address, bytes). bytes is dynamic so its
+    // offset lives at args slot 1; address at args slot 0 is the last 32-byte
+    // word before the bytes offset. Heuristic: scan the trailing 256 bytes for
+    // any 20-byte address-padded slot. Imperfect but covers OZ's ERC1967Proxy.
+    for (let i = input.length - 64; i >= input.length - 1024 && i >= 0; i -= 64) {
+      const slot = input.slice(i, i + 64);
+      // address-padded slot: 24 zero hex chars + 40 address hex chars
+      const m = slot.match(/^0{24}([0-9a-fA-F]{40})$/);
+      if (m) {
+        try {
+          return getAddress(`0x${m[1]}`);
+        } catch {
+          /* keep scanning */
+        }
+      }
+    }
+  }
+  return null;
 }
 
 function loadBroadcasts(chainId: number): Creation[] {
@@ -83,27 +142,79 @@ function loadBroadcasts(chainId: number): Creation[] {
 
     const broadcast = JSON.parse(fs.readFileSync(runLatest, 'utf-8'));
     const ts = broadcast.timestamp ?? 0;
-    for (const tx of broadcast.transactions ?? []) {
+    const txs = (broadcast.transactions ?? []) as Array<{
+      transactionType?: string;
+      contractName?: string;
+      contractAddress?: string;
+      arguments?: unknown[];
+      transaction?: { input?: string };
+    }>;
+
+    // First pass: index by implementation address so a following ERC1967Proxy
+    // can promote that named CREATE into a proxy-wrapped entry.
+    const implIndex = new Map<string, { name: string; index: number }>();
+    const localCreations: Creation[] = [];
+
+    for (const tx of txs) {
       if (tx.transactionType !== 'CREATE' || !tx.contractName || !tx.contractAddress) continue;
       if (SKIP_NAMES.has(tx.contractName)) continue;
-      all.push({
+
+      if (tx.contractName === 'ERC1967Proxy') {
+        const impl = decodeProxyImpl(tx);
+        const proxyAddr = getAddress(tx.contractAddress);
+        if (impl) {
+          const target = implIndex.get(impl.toLowerCase());
+          if (target) {
+            // Promote the impl entry to point at the proxy. The named contract
+            // is what apps should call; the impl address is just storage layout.
+            localCreations[target.index].address = proxyAddr;
+            localCreations[target.index].proxied = true;
+            continue;
+          }
+        }
+        // Orphaned proxy (no matching impl seen in this run) — skip; we can't
+        // assign it to a name we don't know.
+        continue;
+      }
+
+      const created: Creation = {
         name: tx.contractName,
         address: getAddress(tx.contractAddress),
         timestamp: ts,
         script: scriptDir,
+        proxied: false,
+      };
+      implIndex.set(created.address.toLowerCase(), {
+        name: created.name,
+        index: localCreations.length,
       });
+      localCreations.push(created);
     }
+
+    all.push(...localCreations);
   }
   return all;
 }
 
 function latestPerContract(creations: Creation[]): Record<string, Creation> {
-  const by: Record<string, Creation> = {};
+  // Two-pass: collect ALL entries per name, then pick the canonical one.
+  //   - If any entry is proxied (paired with ERC1967Proxy), prefer the newest
+  //     proxied entry — that's the user-facing proxy address.
+  //   - Otherwise pick the newest unproxied entry (regular contracts).
+  // Without this rule, a UUPS upgrade script (which deploys a new impl with
+  // no new proxy) would overwrite the original proxy entry with the impl
+  // address, breaking every app that calls the named contract.
+  const byName: Record<string, Creation[]> = {};
   for (const c of creations) {
-    const existing = by[c.name];
-    if (!existing || c.timestamp > existing.timestamp) by[c.name] = c;
+    (byName[c.name] ??= []).push(c);
   }
-  return by;
+  const result: Record<string, Creation> = {};
+  for (const [name, entries] of Object.entries(byName)) {
+    const proxied = entries.filter((e) => e.proxied);
+    const pool = proxied.length > 0 ? proxied : entries;
+    result[name] = pool.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
+  }
+  return result;
 }
 
 async function verifyOnChain(

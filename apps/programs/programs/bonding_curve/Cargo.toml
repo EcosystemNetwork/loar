@@ -1,0 +1,23 @@
+[package]
+name = "bonding_curve"
+version = "0.1.0"
+description = "LOAR BondingCurve — Solana sister to apps/contracts/src/BondingCurve.sol"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "bonding_curve"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "universe/idl-build"]
+
+[dependencies]
+anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
+anchor-spl = { version = "0.31.1", features = ["token", "associated_token"] }
+# Live `Universe.creator` lookup gates trading-halt + graduate authority.
+universe = { path = "../universe", features = ["cpi"] }

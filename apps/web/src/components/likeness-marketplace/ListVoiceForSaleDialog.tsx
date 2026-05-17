@@ -23,6 +23,7 @@ import {
   consentStateReady,
   pricingStateReady,
   safeParseEther,
+  splitsToBpsPayload,
   type ConsentState,
   type PricingState,
 } from './consent-pricing-steps';
@@ -72,6 +73,7 @@ export function ListVoiceForSaleDialog({ voice, onClose, onSuccess }: ListVoiceF
       if (buyWei < 0n || leaseWei < 0n || licenseWei < 0n) {
         throw new Error('One of the prices is not a valid ETH amount.');
       }
+      const splitRecipients = splitsToBpsPayload(pricing.splitRecipients) ?? undefined;
 
       const listing = await trpcClient.likenessMarketplace.createListing.mutate({
         entityId: entity.id,
@@ -82,6 +84,7 @@ export function ListVoiceForSaleDialog({ voice, onClose, onSuccess }: ListVoiceF
         licenseFeeWei: licenseWei.toString(),
         licenseRoyaltyBps: Number(pricing.licenseRoyaltyBps) || 0,
         maxDurationDays: Math.max(1, Math.min(365, Number(pricing.maxDurationDays) || 30)),
+        ...(splitRecipients ? { splitRecipients } : {}),
       });
       return listing;
     },

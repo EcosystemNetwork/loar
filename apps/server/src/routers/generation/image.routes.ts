@@ -87,6 +87,21 @@ import {
   type ControlInput,
 } from '../../services/scene-controls/controlled-gen';
 import { composeStyle, applyStyleToPrompt } from '../../services/style-pack';
+import {
+  applyStyleToPrompt as applyStylePresetToPrompt,
+  applyShotToPrompt,
+} from '../../services/scene-controls/styles';
+import {
+  STYLE_PRESETS,
+  SHOT_PRESETS,
+  type StylePresetId,
+  type ShotPresetId,
+} from '../../services/scene-controls/types';
+
+const stylePresetIds = Object.keys(STYLE_PRESETS) as [StylePresetId, ...StylePresetId[]];
+const stylePresetSchema = z.enum(stylePresetIds);
+const shotPresetIds = Object.keys(SHOT_PRESETS) as [ShotPresetId, ...ShotPresetId[]];
+const shotPresetSchema = z.enum(shotPresetIds);
 
 // ── Collections ───────────────────────────────────────────────────────
 
@@ -1636,6 +1651,8 @@ export const imageRouter = router({
         numImages: z.number().min(1).max(4).optional(),
         seed: z.number().optional(),
         enableSafetyChecker: z.boolean().optional(),
+        stylePreset: stylePresetSchema.nullable().optional(),
+        shotPreset: shotPresetSchema.nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -1643,6 +1660,13 @@ export const imageRouter = router({
       await deductLegacyCredits(ctx.user.uid, cost);
       input.prompt = sanitizePrompt(input.prompt);
       if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
+      // Apply shot grammar first (composition) then style (look) on top.
+      if (input.shotPreset) {
+        input.prompt = applyShotToPrompt(input.prompt, input.shotPreset);
+      }
+      if (input.stylePreset) {
+        input.prompt = applyStylePresetToPrompt(input.prompt, input.stylePreset);
+      }
       const startTime = Date.now();
       const { resolveProviderKey } = await import('../../lib/byok');
       const apiKey = await resolveProviderKey(ctx.user.uid, 'fal');

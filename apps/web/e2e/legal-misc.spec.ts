@@ -119,9 +119,12 @@ test.describe('Feature Pages Load Successfully', () => {
     { path: '/tokens', name: 'Token Launchpad' },
     { path: '/market', name: 'Market' },
     { path: '/staking', name: 'Staking' },
+    { path: '/bounties', name: 'Bounties' },
+    { path: '/agents', name: 'Agents' },
     { path: '/sell', name: 'Sell' },
     { path: '/licensing', name: 'Licensing' },
     { path: '/collabs', name: 'Collabs' },
+    { path: '/ads', name: 'Ads' },
     { path: '/docs', name: 'Docs' },
   ];
 
@@ -170,6 +173,24 @@ test.describe('Token Detail Page', () => {
 
   test('token portfolio page loads', async ({ page }) => {
     await page.goto('/tokens/portfolio');
+    await page.waitForTimeout(1000);
+    await expect(page.locator('body')).toBeVisible();
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Bounty Sub-Routes                                                         */
+/* -------------------------------------------------------------------------- */
+
+test.describe('Bounty Detail Page', () => {
+  test('bounty detail page loads', async ({ page }) => {
+    await page.goto('/bounties/test-bounty-123');
+    await page.waitForTimeout(1000);
+    await expect(page.locator('body')).toBeVisible();
+  });
+
+  test('my bounties page loads', async ({ page }) => {
+    await page.goto('/bounties/mine');
     await page.waitForTimeout(1000);
     await expect(page.locator('body')).toBeVisible();
   });

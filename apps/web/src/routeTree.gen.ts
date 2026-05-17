@@ -20,6 +20,7 @@ import { Route as StatusRouteImport } from './routes/status'
 import { Route as SolanaRouteImport } from './routes/solana'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SandboxRouteImport } from './routes/sandbox'
+import { Route as ResidencyRouteImport } from './routes/residency'
 import { Route as RelightRouteImport } from './routes/relight'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PricingRouteImport } from './routes/pricing'
@@ -31,6 +32,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as GalleryRouteImport } from './routes/gallery'
 import { Route as FaucetRouteImport } from './routes/faucet'
+import { Route as EditorRouteImport } from './routes/editor'
 import { Route as DocsRouteImport } from './routes/docs'
 import { Route as DmcaRouteImport } from './routes/dmca'
 import { Route as DiscoverRouteImport } from './routes/discover'
@@ -40,6 +42,7 @@ import { Route as CounterNoticeRouteImport } from './routes/counter-notice'
 import { Route as ComingSoonRouteImport } from './routes/coming-soon'
 import { Route as CinematicUniverseCreateRouteImport } from './routes/cinematicUniverseCreate'
 import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as CanvasRouteImport } from './routes/canvas'
 import { Route as BridgeRouteImport } from './routes/bridge'
 import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as IndexRouteImport } from './routes/index'
@@ -47,6 +50,9 @@ import { Route as WikiIndexRouteImport } from './routes/wiki/index'
 import { Route as TokensIndexRouteImport } from './routes/tokens/index'
 import { Route as SellIndexRouteImport } from './routes/sell/index'
 import { Route as CreateIndexRouteImport } from './routes/create/index'
+import { Route as BountiesIndexRouteImport } from './routes/bounties/index'
+import { Route as AgentsIndexRouteImport } from './routes/agents/index'
+import { Route as AdplacementsIndexRouteImport } from './routes/adplacements/index'
 import { Route as WikiKindRouteImport } from './routes/wiki/$kind'
 import { Route as UniverseIdRouteImport } from './routes/universe/$id'
 import { Route as TreasuryUniverseIdRouteImport } from './routes/treasury/$universeId'
@@ -79,14 +85,24 @@ import { Route as DashboardRevenueRouteImport } from './routes/dashboard.revenue
 import { Route as CreateLikenessRouteImport } from './routes/create.likeness'
 import { Route as CreateKindRouteImport } from './routes/create/$kind'
 import { Route as CharactersUniverseIdRouteImport } from './routes/characters.$universeId'
+import { Route as CanvasCanvasIdRouteImport } from './routes/canvas.$canvasId'
 import { Route as CanonUniverseIdRouteImport } from './routes/canon/$universeId'
+import { Route as BountiesMineRouteImport } from './routes/bounties/mine'
+import { Route as BountiesBountyIdRouteImport } from './routes/bounties/$bountyId'
 import { Route as AnatomyUniverseRouteImport } from './routes/anatomy.$universe'
 import { Route as AnalyticsUniverseIdRouteImport } from './routes/analytics.$universeId'
+import { Route as AgentsRegisterRouteImport } from './routes/agents/register'
+import { Route as AgentsDashboardRouteImport } from './routes/agents/dashboard'
+import { Route as AgentsUidRouteImport } from './routes/agents/$uid'
+import { Route as AdplacementsNewRouteImport } from './routes/adplacements/new'
+import { Route as AdplacementsSlotIdRouteImport } from './routes/adplacements/$slotId'
 import { Route as AdminUniversesRouteImport } from './routes/admin/universes'
+import { Route as AdminResidencyRouteImport } from './routes/admin/residency'
 import { Route as AdminOpsRouteImport } from './routes/admin/ops'
 import { Route as AdminModerationRouteImport } from './routes/admin/moderation'
 import { Route as AdminMcpUsageRouteImport } from './routes/admin/mcp-usage'
 import { Route as AdminCostRouteImport } from './routes/admin/cost'
+import { Route as AdplacementsSeedsIndexRouteImport } from './routes/adplacements/seeds/index'
 import { Route as WikiEntityIdRouteImport } from './routes/wiki/entity/$id'
 import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
 import { Route as UniverseIdWatchRouteImport } from './routes/universe/$id/watch'
@@ -103,6 +119,8 @@ import { Route as StudioEditAssetIdRouteImport } from './routes/studio.edit.$ass
 import { Route as MarketplaceLikenessListingIdRouteImport } from './routes/marketplace.likeness.$listingId'
 import { Route as LabZaiDiagnosticRouteImport } from './routes/lab.zai.diagnostic'
 import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
+import { Route as AdplacementsSeedsNewRouteImport } from './routes/adplacements/seeds/new'
+import { Route as AdplacementsSeedsSeedIdRouteImport } from './routes/adplacements/seeds/$seedId'
 import { Route as LabZaiVideoJobIdRouteImport } from './routes/lab.zai.video.$jobId'
 
 const VideosRoute = VideosRouteImport.update({
@@ -160,6 +178,11 @@ const SandboxRoute = SandboxRouteImport.update({
   path: '/sandbox',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResidencyRoute = ResidencyRouteImport.update({
+  id: '/residency',
+  path: '/residency',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RelightRoute = RelightRouteImport.update({
   id: '/relight',
   path: '/relight',
@@ -215,6 +238,11 @@ const FaucetRoute = FaucetRouteImport.update({
   path: '/faucet',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EditorRoute = EditorRouteImport.update({
+  id: '/editor',
+  path: '/editor',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DocsRoute = DocsRouteImport.update({
   id: '/docs',
   path: '/docs',
@@ -260,6 +288,11 @@ const CheckoutRoute = CheckoutRouteImport.update({
   path: '/checkout',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CanvasRoute = CanvasRouteImport.update({
+  id: '/canvas',
+  path: '/canvas',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BridgeRoute = BridgeRouteImport.update({
   id: '/bridge',
   path: '/bridge',
@@ -293,6 +326,21 @@ const SellIndexRoute = SellIndexRouteImport.update({
 const CreateIndexRoute = CreateIndexRouteImport.update({
   id: '/create/',
   path: '/create/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BountiesIndexRoute = BountiesIndexRouteImport.update({
+  id: '/bounties/',
+  path: '/bounties/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsIndexRoute = AgentsIndexRouteImport.update({
+  id: '/agents/',
+  path: '/agents/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdplacementsIndexRoute = AdplacementsIndexRouteImport.update({
+  id: '/adplacements/',
+  path: '/adplacements/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WikiKindRoute = WikiKindRouteImport.update({
@@ -455,9 +503,24 @@ const CharactersUniverseIdRoute = CharactersUniverseIdRouteImport.update({
   path: '/characters/$universeId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CanvasCanvasIdRoute = CanvasCanvasIdRouteImport.update({
+  id: '/$canvasId',
+  path: '/$canvasId',
+  getParentRoute: () => CanvasRoute,
+} as any)
 const CanonUniverseIdRoute = CanonUniverseIdRouteImport.update({
   id: '/canon/$universeId',
   path: '/canon/$universeId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BountiesMineRoute = BountiesMineRouteImport.update({
+  id: '/bounties/mine',
+  path: '/bounties/mine',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BountiesBountyIdRoute = BountiesBountyIdRouteImport.update({
+  id: '/bounties/$bountyId',
+  path: '/bounties/$bountyId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AnatomyUniverseRoute = AnatomyUniverseRouteImport.update({
@@ -470,9 +533,39 @@ const AnalyticsUniverseIdRoute = AnalyticsUniverseIdRouteImport.update({
   path: '/analytics/$universeId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AgentsRegisterRoute = AgentsRegisterRouteImport.update({
+  id: '/agents/register',
+  path: '/agents/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsDashboardRoute = AgentsDashboardRouteImport.update({
+  id: '/agents/dashboard',
+  path: '/agents/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsUidRoute = AgentsUidRouteImport.update({
+  id: '/agents/$uid',
+  path: '/agents/$uid',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdplacementsNewRoute = AdplacementsNewRouteImport.update({
+  id: '/adplacements/new',
+  path: '/adplacements/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdplacementsSlotIdRoute = AdplacementsSlotIdRouteImport.update({
+  id: '/adplacements/$slotId',
+  path: '/adplacements/$slotId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminUniversesRoute = AdminUniversesRouteImport.update({
   id: '/admin/universes',
   path: '/admin/universes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminResidencyRoute = AdminResidencyRouteImport.update({
+  id: '/admin/residency',
+  path: '/admin/residency',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminOpsRoute = AdminOpsRouteImport.update({
@@ -493,6 +586,11 @@ const AdminMcpUsageRoute = AdminMcpUsageRouteImport.update({
 const AdminCostRoute = AdminCostRouteImport.update({
   id: '/admin/cost',
   path: '/admin/cost',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdplacementsSeedsIndexRoute = AdplacementsSeedsIndexRouteImport.update({
+  id: '/adplacements/seeds/',
+  path: '/adplacements/seeds/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WikiEntityIdRoute = WikiEntityIdRouteImport.update({
@@ -576,6 +674,16 @@ const EventUniverseEventRoute = EventUniverseEventRouteImport.update({
   path: '/event/$universe/$event',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdplacementsSeedsNewRoute = AdplacementsSeedsNewRouteImport.update({
+  id: '/adplacements/seeds/new',
+  path: '/adplacements/seeds/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdplacementsSeedsSeedIdRoute = AdplacementsSeedsSeedIdRouteImport.update({
+  id: '/adplacements/seeds/$seedId',
+  path: '/adplacements/seeds/$seedId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LabZaiVideoJobIdRoute = LabZaiVideoJobIdRouteImport.update({
   id: '/video/$jobId',
   path: '/video/$jobId',
@@ -586,6 +694,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
   '/bridge': typeof BridgeRoute
+  '/canvas': typeof CanvasRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/coming-soon': typeof ComingSoonRoute
@@ -595,6 +704,7 @@ export interface FileRoutesByFullPath {
   '/discover': typeof DiscoverRoute
   '/dmca': typeof DmcaRoute
   '/docs': typeof DocsRoute
+  '/editor': typeof EditorRoute
   '/faucet': typeof FaucetRoute
   '/gallery': typeof GalleryRoute
   '/leaderboard': typeof LeaderboardRoute
@@ -606,6 +716,7 @@ export interface FileRoutesByFullPath {
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/relight': typeof RelightRoute
+  '/residency': typeof ResidencyRoute
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
   '/solana': typeof SolanaRoute
@@ -621,10 +732,19 @@ export interface FileRoutesByFullPath {
   '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/admin/ops': typeof AdminOpsRoute
+  '/admin/residency': typeof AdminResidencyRoute
   '/admin/universes': typeof AdminUniversesRoute
+  '/adplacements/$slotId': typeof AdplacementsSlotIdRoute
+  '/adplacements/new': typeof AdplacementsNewRoute
+  '/agents/$uid': typeof AgentsUidRoute
+  '/agents/dashboard': typeof AgentsDashboardRoute
+  '/agents/register': typeof AgentsRegisterRoute
   '/analytics/$universeId': typeof AnalyticsUniverseIdRoute
   '/anatomy/$universe': typeof AnatomyUniverseRoute
+  '/bounties/$bountyId': typeof BountiesBountyIdRoute
+  '/bounties/mine': typeof BountiesMineRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
+  '/canvas/$canvasId': typeof CanvasCanvasIdRoute
   '/characters/$universeId': typeof CharactersUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
   '/create/likeness': typeof CreateLikenessRoute
@@ -657,10 +777,15 @@ export interface FileRoutesByFullPath {
   '/treasury/$universeId': typeof TreasuryUniverseIdRoute
   '/universe/$id': typeof UniverseIdRouteWithChildren
   '/wiki/$kind': typeof WikiKindRoute
+  '/adplacements/': typeof AdplacementsIndexRoute
+  '/agents/': typeof AgentsIndexRoute
+  '/bounties/': typeof BountiesIndexRoute
   '/create/': typeof CreateIndexRoute
   '/sell/': typeof SellIndexRoute
   '/tokens/': typeof TokensIndexRoute
   '/wiki/': typeof WikiIndexRoute
+  '/adplacements/seeds/$seedId': typeof AdplacementsSeedsSeedIdRoute
+  '/adplacements/seeds/new': typeof AdplacementsSeedsNewRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/lab/zai/diagnostic': typeof LabZaiDiagnosticRoute
   '/marketplace/likeness/$listingId': typeof MarketplaceLikenessListingIdRoute
@@ -677,12 +802,14 @@ export interface FileRoutesByFullPath {
   '/universe/$id/watch': typeof UniverseIdWatchRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
+  '/adplacements/seeds/': typeof AdplacementsSeedsIndexRoute
   '/lab/zai/video/$jobId': typeof LabZaiVideoJobIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
   '/bridge': typeof BridgeRoute
+  '/canvas': typeof CanvasRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/coming-soon': typeof ComingSoonRoute
@@ -692,6 +819,7 @@ export interface FileRoutesByTo {
   '/discover': typeof DiscoverRoute
   '/dmca': typeof DmcaRoute
   '/docs': typeof DocsRoute
+  '/editor': typeof EditorRoute
   '/faucet': typeof FaucetRoute
   '/gallery': typeof GalleryRoute
   '/leaderboard': typeof LeaderboardRoute
@@ -703,6 +831,7 @@ export interface FileRoutesByTo {
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/relight': typeof RelightRoute
+  '/residency': typeof ResidencyRoute
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
   '/solana': typeof SolanaRoute
@@ -718,10 +847,19 @@ export interface FileRoutesByTo {
   '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/admin/ops': typeof AdminOpsRoute
+  '/admin/residency': typeof AdminResidencyRoute
   '/admin/universes': typeof AdminUniversesRoute
+  '/adplacements/$slotId': typeof AdplacementsSlotIdRoute
+  '/adplacements/new': typeof AdplacementsNewRoute
+  '/agents/$uid': typeof AgentsUidRoute
+  '/agents/dashboard': typeof AgentsDashboardRoute
+  '/agents/register': typeof AgentsRegisterRoute
   '/analytics/$universeId': typeof AnalyticsUniverseIdRoute
   '/anatomy/$universe': typeof AnatomyUniverseRoute
+  '/bounties/$bountyId': typeof BountiesBountyIdRoute
+  '/bounties/mine': typeof BountiesMineRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
+  '/canvas/$canvasId': typeof CanvasCanvasIdRoute
   '/characters/$universeId': typeof CharactersUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
   '/create/likeness': typeof CreateLikenessRoute
@@ -754,10 +892,15 @@ export interface FileRoutesByTo {
   '/treasury/$universeId': typeof TreasuryUniverseIdRoute
   '/universe/$id': typeof UniverseIdRouteWithChildren
   '/wiki/$kind': typeof WikiKindRoute
+  '/adplacements': typeof AdplacementsIndexRoute
+  '/agents': typeof AgentsIndexRoute
+  '/bounties': typeof BountiesIndexRoute
   '/create': typeof CreateIndexRoute
   '/sell': typeof SellIndexRoute
   '/tokens': typeof TokensIndexRoute
   '/wiki': typeof WikiIndexRoute
+  '/adplacements/seeds/$seedId': typeof AdplacementsSeedsSeedIdRoute
+  '/adplacements/seeds/new': typeof AdplacementsSeedsNewRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/lab/zai/diagnostic': typeof LabZaiDiagnosticRoute
   '/marketplace/likeness/$listingId': typeof MarketplaceLikenessListingIdRoute
@@ -774,6 +917,7 @@ export interface FileRoutesByTo {
   '/universe/$id/watch': typeof UniverseIdWatchRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
+  '/adplacements/seeds': typeof AdplacementsSeedsIndexRoute
   '/lab/zai/video/$jobId': typeof LabZaiVideoJobIdRoute
 }
 export interface FileRoutesById {
@@ -781,6 +925,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
   '/bridge': typeof BridgeRoute
+  '/canvas': typeof CanvasRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/coming-soon': typeof ComingSoonRoute
@@ -790,6 +935,7 @@ export interface FileRoutesById {
   '/discover': typeof DiscoverRoute
   '/dmca': typeof DmcaRoute
   '/docs': typeof DocsRoute
+  '/editor': typeof EditorRoute
   '/faucet': typeof FaucetRoute
   '/gallery': typeof GalleryRoute
   '/leaderboard': typeof LeaderboardRoute
@@ -801,6 +947,7 @@ export interface FileRoutesById {
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/relight': typeof RelightRoute
+  '/residency': typeof ResidencyRoute
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
   '/solana': typeof SolanaRoute
@@ -816,10 +963,19 @@ export interface FileRoutesById {
   '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/admin/ops': typeof AdminOpsRoute
+  '/admin/residency': typeof AdminResidencyRoute
   '/admin/universes': typeof AdminUniversesRoute
+  '/adplacements/$slotId': typeof AdplacementsSlotIdRoute
+  '/adplacements/new': typeof AdplacementsNewRoute
+  '/agents/$uid': typeof AgentsUidRoute
+  '/agents/dashboard': typeof AgentsDashboardRoute
+  '/agents/register': typeof AgentsRegisterRoute
   '/analytics/$universeId': typeof AnalyticsUniverseIdRoute
   '/anatomy/$universe': typeof AnatomyUniverseRoute
+  '/bounties/$bountyId': typeof BountiesBountyIdRoute
+  '/bounties/mine': typeof BountiesMineRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
+  '/canvas/$canvasId': typeof CanvasCanvasIdRoute
   '/characters/$universeId': typeof CharactersUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
   '/create/likeness': typeof CreateLikenessRoute
@@ -852,10 +1008,15 @@ export interface FileRoutesById {
   '/treasury/$universeId': typeof TreasuryUniverseIdRoute
   '/universe/$id': typeof UniverseIdRouteWithChildren
   '/wiki/$kind': typeof WikiKindRoute
+  '/adplacements/': typeof AdplacementsIndexRoute
+  '/agents/': typeof AgentsIndexRoute
+  '/bounties/': typeof BountiesIndexRoute
   '/create/': typeof CreateIndexRoute
   '/sell/': typeof SellIndexRoute
   '/tokens/': typeof TokensIndexRoute
   '/wiki/': typeof WikiIndexRoute
+  '/adplacements/seeds/$seedId': typeof AdplacementsSeedsSeedIdRoute
+  '/adplacements/seeds/new': typeof AdplacementsSeedsNewRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/lab/zai/diagnostic': typeof LabZaiDiagnosticRoute
   '/marketplace/likeness/$listingId': typeof MarketplaceLikenessListingIdRoute
@@ -872,6 +1033,7 @@ export interface FileRoutesById {
   '/universe/$id/watch': typeof UniverseIdWatchRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
+  '/adplacements/seeds/': typeof AdplacementsSeedsIndexRoute
   '/lab/zai/video/$jobId': typeof LabZaiVideoJobIdRoute
 }
 export interface FileRouteTypes {
@@ -880,6 +1042,7 @@ export interface FileRouteTypes {
     | '/'
     | '/activity'
     | '/bridge'
+    | '/canvas'
     | '/checkout'
     | '/cinematicUniverseCreate'
     | '/coming-soon'
@@ -889,6 +1052,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/dmca'
     | '/docs'
+    | '/editor'
     | '/faucet'
     | '/gallery'
     | '/leaderboard'
@@ -900,6 +1064,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/privacy'
     | '/relight'
+    | '/residency'
     | '/sandbox'
     | '/search'
     | '/solana'
@@ -915,10 +1080,19 @@ export interface FileRouteTypes {
     | '/admin/mcp-usage'
     | '/admin/moderation'
     | '/admin/ops'
+    | '/admin/residency'
     | '/admin/universes'
+    | '/adplacements/$slotId'
+    | '/adplacements/new'
+    | '/agents/$uid'
+    | '/agents/dashboard'
+    | '/agents/register'
     | '/analytics/$universeId'
     | '/anatomy/$universe'
+    | '/bounties/$bountyId'
+    | '/bounties/mine'
     | '/canon/$universeId'
+    | '/canvas/$canvasId'
     | '/characters/$universeId'
     | '/create/$kind'
     | '/create/likeness'
@@ -951,10 +1125,15 @@ export interface FileRouteTypes {
     | '/treasury/$universeId'
     | '/universe/$id'
     | '/wiki/$kind'
+    | '/adplacements/'
+    | '/agents/'
+    | '/bounties/'
     | '/create/'
     | '/sell/'
     | '/tokens/'
     | '/wiki/'
+    | '/adplacements/seeds/$seedId'
+    | '/adplacements/seeds/new'
     | '/event/$universe/$event'
     | '/lab/zai/diagnostic'
     | '/marketplace/likeness/$listingId'
@@ -971,12 +1150,14 @@ export interface FileRouteTypes {
     | '/universe/$id/watch'
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
+    | '/adplacements/seeds/'
     | '/lab/zai/video/$jobId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/activity'
     | '/bridge'
+    | '/canvas'
     | '/checkout'
     | '/cinematicUniverseCreate'
     | '/coming-soon'
@@ -986,6 +1167,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/dmca'
     | '/docs'
+    | '/editor'
     | '/faucet'
     | '/gallery'
     | '/leaderboard'
@@ -997,6 +1179,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/privacy'
     | '/relight'
+    | '/residency'
     | '/sandbox'
     | '/search'
     | '/solana'
@@ -1012,10 +1195,19 @@ export interface FileRouteTypes {
     | '/admin/mcp-usage'
     | '/admin/moderation'
     | '/admin/ops'
+    | '/admin/residency'
     | '/admin/universes'
+    | '/adplacements/$slotId'
+    | '/adplacements/new'
+    | '/agents/$uid'
+    | '/agents/dashboard'
+    | '/agents/register'
     | '/analytics/$universeId'
     | '/anatomy/$universe'
+    | '/bounties/$bountyId'
+    | '/bounties/mine'
     | '/canon/$universeId'
+    | '/canvas/$canvasId'
     | '/characters/$universeId'
     | '/create/$kind'
     | '/create/likeness'
@@ -1048,10 +1240,15 @@ export interface FileRouteTypes {
     | '/treasury/$universeId'
     | '/universe/$id'
     | '/wiki/$kind'
+    | '/adplacements'
+    | '/agents'
+    | '/bounties'
     | '/create'
     | '/sell'
     | '/tokens'
     | '/wiki'
+    | '/adplacements/seeds/$seedId'
+    | '/adplacements/seeds/new'
     | '/event/$universe/$event'
     | '/lab/zai/diagnostic'
     | '/marketplace/likeness/$listingId'
@@ -1068,12 +1265,14 @@ export interface FileRouteTypes {
     | '/universe/$id/watch'
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
+    | '/adplacements/seeds'
     | '/lab/zai/video/$jobId'
   id:
     | '__root__'
     | '/'
     | '/activity'
     | '/bridge'
+    | '/canvas'
     | '/checkout'
     | '/cinematicUniverseCreate'
     | '/coming-soon'
@@ -1083,6 +1282,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/dmca'
     | '/docs'
+    | '/editor'
     | '/faucet'
     | '/gallery'
     | '/leaderboard'
@@ -1094,6 +1294,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/privacy'
     | '/relight'
+    | '/residency'
     | '/sandbox'
     | '/search'
     | '/solana'
@@ -1109,10 +1310,19 @@ export interface FileRouteTypes {
     | '/admin/mcp-usage'
     | '/admin/moderation'
     | '/admin/ops'
+    | '/admin/residency'
     | '/admin/universes'
+    | '/adplacements/$slotId'
+    | '/adplacements/new'
+    | '/agents/$uid'
+    | '/agents/dashboard'
+    | '/agents/register'
     | '/analytics/$universeId'
     | '/anatomy/$universe'
+    | '/bounties/$bountyId'
+    | '/bounties/mine'
     | '/canon/$universeId'
+    | '/canvas/$canvasId'
     | '/characters/$universeId'
     | '/create/$kind'
     | '/create/likeness'
@@ -1145,10 +1355,15 @@ export interface FileRouteTypes {
     | '/treasury/$universeId'
     | '/universe/$id'
     | '/wiki/$kind'
+    | '/adplacements/'
+    | '/agents/'
+    | '/bounties/'
     | '/create/'
     | '/sell/'
     | '/tokens/'
     | '/wiki/'
+    | '/adplacements/seeds/$seedId'
+    | '/adplacements/seeds/new'
     | '/event/$universe/$event'
     | '/lab/zai/diagnostic'
     | '/marketplace/likeness/$listingId'
@@ -1165,6 +1380,7 @@ export interface FileRouteTypes {
     | '/universe/$id/watch'
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
+    | '/adplacements/seeds/'
     | '/lab/zai/video/$jobId'
   fileRoutesById: FileRoutesById
 }
@@ -1172,6 +1388,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActivityRoute: typeof ActivityRoute
   BridgeRoute: typeof BridgeRoute
+  CanvasRoute: typeof CanvasRouteWithChildren
   CheckoutRoute: typeof CheckoutRoute
   CinematicUniverseCreateRoute: typeof CinematicUniverseCreateRoute
   ComingSoonRoute: typeof ComingSoonRoute
@@ -1181,6 +1398,7 @@ export interface RootRouteChildren {
   DiscoverRoute: typeof DiscoverRoute
   DmcaRoute: typeof DmcaRoute
   DocsRoute: typeof DocsRoute
+  EditorRoute: typeof EditorRoute
   FaucetRoute: typeof FaucetRoute
   GalleryRoute: typeof GalleryRoute
   LeaderboardRoute: typeof LeaderboardRoute
@@ -1192,6 +1410,7 @@ export interface RootRouteChildren {
   PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
   RelightRoute: typeof RelightRoute
+  ResidencyRoute: typeof ResidencyRoute
   SandboxRoute: typeof SandboxRoute
   SearchRoute: typeof SearchRoute
   SolanaRoute: typeof SolanaRoute
@@ -1207,9 +1426,17 @@ export interface RootRouteChildren {
   AdminMcpUsageRoute: typeof AdminMcpUsageRoute
   AdminModerationRoute: typeof AdminModerationRoute
   AdminOpsRoute: typeof AdminOpsRoute
+  AdminResidencyRoute: typeof AdminResidencyRoute
   AdminUniversesRoute: typeof AdminUniversesRoute
+  AdplacementsSlotIdRoute: typeof AdplacementsSlotIdRoute
+  AdplacementsNewRoute: typeof AdplacementsNewRoute
+  AgentsUidRoute: typeof AgentsUidRoute
+  AgentsDashboardRoute: typeof AgentsDashboardRoute
+  AgentsRegisterRoute: typeof AgentsRegisterRoute
   AnalyticsUniverseIdRoute: typeof AnalyticsUniverseIdRoute
   AnatomyUniverseRoute: typeof AnatomyUniverseRoute
+  BountiesBountyIdRoute: typeof BountiesBountyIdRoute
+  BountiesMineRoute: typeof BountiesMineRoute
   CanonUniverseIdRoute: typeof CanonUniverseIdRoute
   CharactersUniverseIdRoute: typeof CharactersUniverseIdRoute
   CreateKindRoute: typeof CreateKindRoute
@@ -1241,16 +1468,22 @@ export interface RootRouteChildren {
   TreasuryUniverseIdRoute: typeof TreasuryUniverseIdRoute
   UniverseIdRoute: typeof UniverseIdRouteWithChildren
   WikiKindRoute: typeof WikiKindRoute
+  AdplacementsIndexRoute: typeof AdplacementsIndexRoute
+  AgentsIndexRoute: typeof AgentsIndexRoute
+  BountiesIndexRoute: typeof BountiesIndexRoute
   CreateIndexRoute: typeof CreateIndexRoute
   SellIndexRoute: typeof SellIndexRoute
   TokensIndexRoute: typeof TokensIndexRoute
   WikiIndexRoute: typeof WikiIndexRoute
+  AdplacementsSeedsSeedIdRoute: typeof AdplacementsSeedsSeedIdRoute
+  AdplacementsSeedsNewRoute: typeof AdplacementsSeedsNewRoute
   EventUniverseEventRoute: typeof EventUniverseEventRoute
   TokensCreatorAddressRoute: typeof TokensCreatorAddressRoute
   UniverseAddressPhysicsRoute: typeof UniverseAddressPhysicsRoute
   UniverseAddressPollsRoute: typeof UniverseAddressPollsRoute
   WikiCharacterIdRoute: typeof WikiCharacterIdRoute
   WikiEntityIdRoute: typeof WikiEntityIdRoute
+  AdplacementsSeedsIndexRoute: typeof AdplacementsSeedsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1332,6 +1565,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SandboxRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/residency': {
+      id: '/residency'
+      path: '/residency'
+      fullPath: '/residency'
+      preLoaderRoute: typeof ResidencyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/relight': {
       id: '/relight'
       path: '/relight'
@@ -1409,6 +1649,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FaucetRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/editor': {
+      id: '/editor'
+      path: '/editor'
+      fullPath: '/editor'
+      preLoaderRoute: typeof EditorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/docs': {
       id: '/docs'
       path: '/docs'
@@ -1472,6 +1719,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckoutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/canvas': {
+      id: '/canvas'
+      path: '/canvas'
+      fullPath: '/canvas'
+      preLoaderRoute: typeof CanvasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/bridge': {
       id: '/bridge'
       path: '/bridge'
@@ -1519,6 +1773,27 @@ declare module '@tanstack/react-router' {
       path: '/create'
       fullPath: '/create/'
       preLoaderRoute: typeof CreateIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bounties/': {
+      id: '/bounties/'
+      path: '/bounties'
+      fullPath: '/bounties/'
+      preLoaderRoute: typeof BountiesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agents/': {
+      id: '/agents/'
+      path: '/agents'
+      fullPath: '/agents/'
+      preLoaderRoute: typeof AgentsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/adplacements/': {
+      id: '/adplacements/'
+      path: '/adplacements'
+      fullPath: '/adplacements/'
+      preLoaderRoute: typeof AdplacementsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/wiki/$kind': {
@@ -1745,11 +2020,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CharactersUniverseIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/canvas/$canvasId': {
+      id: '/canvas/$canvasId'
+      path: '/$canvasId'
+      fullPath: '/canvas/$canvasId'
+      preLoaderRoute: typeof CanvasCanvasIdRouteImport
+      parentRoute: typeof CanvasRoute
+    }
     '/canon/$universeId': {
       id: '/canon/$universeId'
       path: '/canon/$universeId'
       fullPath: '/canon/$universeId'
       preLoaderRoute: typeof CanonUniverseIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bounties/mine': {
+      id: '/bounties/mine'
+      path: '/bounties/mine'
+      fullPath: '/bounties/mine'
+      preLoaderRoute: typeof BountiesMineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bounties/$bountyId': {
+      id: '/bounties/$bountyId'
+      path: '/bounties/$bountyId'
+      fullPath: '/bounties/$bountyId'
+      preLoaderRoute: typeof BountiesBountyIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/anatomy/$universe': {
@@ -1766,11 +2062,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AnalyticsUniverseIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/agents/register': {
+      id: '/agents/register'
+      path: '/agents/register'
+      fullPath: '/agents/register'
+      preLoaderRoute: typeof AgentsRegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agents/dashboard': {
+      id: '/agents/dashboard'
+      path: '/agents/dashboard'
+      fullPath: '/agents/dashboard'
+      preLoaderRoute: typeof AgentsDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agents/$uid': {
+      id: '/agents/$uid'
+      path: '/agents/$uid'
+      fullPath: '/agents/$uid'
+      preLoaderRoute: typeof AgentsUidRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/adplacements/new': {
+      id: '/adplacements/new'
+      path: '/adplacements/new'
+      fullPath: '/adplacements/new'
+      preLoaderRoute: typeof AdplacementsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/adplacements/$slotId': {
+      id: '/adplacements/$slotId'
+      path: '/adplacements/$slotId'
+      fullPath: '/adplacements/$slotId'
+      preLoaderRoute: typeof AdplacementsSlotIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/universes': {
       id: '/admin/universes'
       path: '/admin/universes'
       fullPath: '/admin/universes'
       preLoaderRoute: typeof AdminUniversesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/residency': {
+      id: '/admin/residency'
+      path: '/admin/residency'
+      fullPath: '/admin/residency'
+      preLoaderRoute: typeof AdminResidencyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/ops': {
@@ -1799,6 +2137,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/cost'
       fullPath: '/admin/cost'
       preLoaderRoute: typeof AdminCostRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/adplacements/seeds/': {
+      id: '/adplacements/seeds/'
+      path: '/adplacements/seeds'
+      fullPath: '/adplacements/seeds/'
+      preLoaderRoute: typeof AdplacementsSeedsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/wiki/entity/$id': {
@@ -1913,6 +2258,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EventUniverseEventRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/adplacements/seeds/new': {
+      id: '/adplacements/seeds/new'
+      path: '/adplacements/seeds/new'
+      fullPath: '/adplacements/seeds/new'
+      preLoaderRoute: typeof AdplacementsSeedsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/adplacements/seeds/$seedId': {
+      id: '/adplacements/seeds/$seedId'
+      path: '/adplacements/seeds/$seedId'
+      fullPath: '/adplacements/seeds/$seedId'
+      preLoaderRoute: typeof AdplacementsSeedsSeedIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/lab/zai/video/$jobId': {
       id: '/lab/zai/video/$jobId'
       path: '/video/$jobId'
@@ -1922,6 +2281,17 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface CanvasRouteChildren {
+  CanvasCanvasIdRoute: typeof CanvasCanvasIdRoute
+}
+
+const CanvasRouteChildren: CanvasRouteChildren = {
+  CanvasCanvasIdRoute: CanvasCanvasIdRoute,
+}
+
+const CanvasRouteWithChildren =
+  CanvasRoute._addFileChildren(CanvasRouteChildren)
 
 interface DashboardRouteChildren {
   DashboardRevenueRoute: typeof DashboardRevenueRoute
@@ -2010,6 +2380,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivityRoute: ActivityRoute,
   BridgeRoute: BridgeRoute,
+  CanvasRoute: CanvasRouteWithChildren,
   CheckoutRoute: CheckoutRoute,
   CinematicUniverseCreateRoute: CinematicUniverseCreateRoute,
   ComingSoonRoute: ComingSoonRoute,
@@ -2019,6 +2390,7 @@ const rootRouteChildren: RootRouteChildren = {
   DiscoverRoute: DiscoverRoute,
   DmcaRoute: DmcaRoute,
   DocsRoute: DocsRoute,
+  EditorRoute: EditorRoute,
   FaucetRoute: FaucetRoute,
   GalleryRoute: GalleryRoute,
   LeaderboardRoute: LeaderboardRoute,
@@ -2030,6 +2402,7 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
   RelightRoute: RelightRoute,
+  ResidencyRoute: ResidencyRoute,
   SandboxRoute: SandboxRoute,
   SearchRoute: SearchRoute,
   SolanaRoute: SolanaRoute,
@@ -2045,9 +2418,17 @@ const rootRouteChildren: RootRouteChildren = {
   AdminMcpUsageRoute: AdminMcpUsageRoute,
   AdminModerationRoute: AdminModerationRoute,
   AdminOpsRoute: AdminOpsRoute,
+  AdminResidencyRoute: AdminResidencyRoute,
   AdminUniversesRoute: AdminUniversesRoute,
+  AdplacementsSlotIdRoute: AdplacementsSlotIdRoute,
+  AdplacementsNewRoute: AdplacementsNewRoute,
+  AgentsUidRoute: AgentsUidRoute,
+  AgentsDashboardRoute: AgentsDashboardRoute,
+  AgentsRegisterRoute: AgentsRegisterRoute,
   AnalyticsUniverseIdRoute: AnalyticsUniverseIdRoute,
   AnatomyUniverseRoute: AnatomyUniverseRoute,
+  BountiesBountyIdRoute: BountiesBountyIdRoute,
+  BountiesMineRoute: BountiesMineRoute,
   CanonUniverseIdRoute: CanonUniverseIdRoute,
   CharactersUniverseIdRoute: CharactersUniverseIdRoute,
   CreateKindRoute: CreateKindRoute,
@@ -2079,16 +2460,22 @@ const rootRouteChildren: RootRouteChildren = {
   TreasuryUniverseIdRoute: TreasuryUniverseIdRoute,
   UniverseIdRoute: UniverseIdRouteWithChildren,
   WikiKindRoute: WikiKindRoute,
+  AdplacementsIndexRoute: AdplacementsIndexRoute,
+  AgentsIndexRoute: AgentsIndexRoute,
+  BountiesIndexRoute: BountiesIndexRoute,
   CreateIndexRoute: CreateIndexRoute,
   SellIndexRoute: SellIndexRoute,
   TokensIndexRoute: TokensIndexRoute,
   WikiIndexRoute: WikiIndexRoute,
+  AdplacementsSeedsSeedIdRoute: AdplacementsSeedsSeedIdRoute,
+  AdplacementsSeedsNewRoute: AdplacementsSeedsNewRoute,
   EventUniverseEventRoute: EventUniverseEventRoute,
   TokensCreatorAddressRoute: TokensCreatorAddressRoute,
   UniverseAddressPhysicsRoute: UniverseAddressPhysicsRoute,
   UniverseAddressPollsRoute: UniverseAddressPollsRoute,
   WikiCharacterIdRoute: WikiCharacterIdRoute,
   WikiEntityIdRoute: WikiEntityIdRoute,
+  AdplacementsSeedsIndexRoute: AdplacementsSeedsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

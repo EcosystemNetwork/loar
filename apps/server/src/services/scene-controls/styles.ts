@@ -5,7 +5,7 @@
  * Used in the generation pipeline to prepend/append style prompts.
  */
 
-import { STYLE_PRESETS, type StylePresetId } from './types';
+import { STYLE_PRESETS, SHOT_PRESETS, type StylePresetId, type ShotPresetId } from './types';
 
 interface NodeStyleInfo {
   nodeId: string;
@@ -85,5 +85,33 @@ export function listStylePresets() {
     label: config.label,
     color: config.color,
     promptPrefix: config.promptPrefix,
+  }));
+}
+
+/**
+ * Apply a shot-grammar preset (framing/angle/lens/focus) to a prompt.
+ * Composes with applyStyleToPrompt — call this first so the shot direction
+ * leads the prompt, then layer the visual style on top.
+ */
+export function applyShotToPrompt(prompt: string, shotId: ShotPresetId): string {
+  const shot = SHOT_PRESETS[shotId];
+  if (!shot) return prompt;
+
+  const parts: string[] = [];
+  if (shot.promptPrefix) parts.push(shot.promptPrefix);
+  parts.push(prompt);
+  if (shot.promptSuffix) parts.push(shot.promptSuffix);
+
+  return parts.join(' ');
+}
+
+/**
+ * List all available shot presets with their display info.
+ */
+export function listShotPresets() {
+  return Object.entries(SHOT_PRESETS).map(([id, config]) => ({
+    id: id as ShotPresetId,
+    label: config.label,
+    category: config.category,
   }));
 }

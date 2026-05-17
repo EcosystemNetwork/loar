@@ -31,7 +31,7 @@
 //! - `transfer_checked` on every SPL movement.
 
 use anchor_lang::prelude::*;
-use anchor_lang::system_program;
+use anchor_lang::system_program::{self};
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token_interface::{
     self, Mint, TokenAccount, TokenInterface, TransferChecked,
@@ -334,6 +334,24 @@ pub mod credit_manager {
         Ok(())
     }
 
+    /// Sweep accrued SOL from the program-owned `sol_vault` PDA to a
+    /// destination account. Admin-only. Mirrors `payment::claim_treasury_sol`.
+    /// Enforces the rent-exempt floor on the vault so the runtime cannot
+    /// garbage-collect the account and take the discriminator with it.
+    pub fn sweep_sol(ctx: Context<SweepSol>, amount: u64) -> Result<()> {
+        require!(amount > 0, CreditError::ZeroAmount);
+        transfer_lamports_from_vault(
+            &ctx.accounts.sol_vault.to_account_info(),
+            &ctx.accounts.destination.to_account_info(),
+            amount,
+        )?;
+        emit!(SolSwept {
+            destination: ctx.accounts.destination.key(),
+            amount,
+        });
+        Ok(())
+    }
+
     // ─── Admin / Platform rotation ─────────────────────────────────────────
 
     pub fn pause(ctx: Context<AdminOnly>) -> Result<()> {
@@ -429,16 +447,18 @@ pub struct Initialize<'info> {
         bump
     )]
     pub config: Account<'info, Config>,
-    /// CHECK: SOL vault PDA — holds buyer SOL until admin sweeps.
+    /// SOL vault — program-owned account; lamports accrue from buyer SOL
+    /// purchases. The 8-byte discriminator + InitSpace empty body keeps the
+    /// account rent-exempt; lamports on top are sweepable by admin via a
+    /// future `sweep_sol` ix (v2). Same shape as `payment::SolVault`.
     #[account(
         init,
         payer = admin,
-        space = 0,
+        space = 8 + SolVault::INIT_SPACE,
         seeds = [SOL_VAULT_SEED],
         bump,
-        owner = system_program::ID,
     )]
-    pub sol_vault: SystemAccount<'info>,
+    pub sol_vault: Account<'info, SolVault>,
     /// CHECK: PDA authority for the LOAR token vault.
     #[account(seeds = [LOAR_VAULT_SEED], bump)]
     pub loar_vault: UncheckedAccount<'info>,
@@ -503,7 +523,7 @@ pub struct PurchaseWithSol<'info> {
         seeds = [SOL_VAULT_SEED],
         bump = config.sol_vault_bump,
     )]
-    pub sol_vault: SystemAccount<'info>,
+    pub sol_vault: Account<'info, SolVault>,
     #[account(
         init_if_needed,
         payer = buyer,
@@ -592,6 +612,24 @@ pub struct GrantCredits<'info> {
 }
 
 #[derive(Accounts)]
+pub struct SweepSol<'info> {
+    #[account(address = config.admin @ CreditError::Unauthorized)]
+    pub admin: Signer<'info>,
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, Config>,
+    #[account(
+        mut,
+        seeds = [SOL_VAULT_SEED],
+        bump = config.sol_vault_bump,
+    )]
+    pub sol_vault: Account<'info, SolVault>,
+    /// CHECK: lamport recipient — admin picks the destination at call time.
+    /// No data deserialized; balance-only manipulation.
+    #[account(mut)]
+    pub destination: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
 pub struct AdminOnly<'info> {
     #[account(address = config.admin @ CreditError::Unauthorized)]
     pub admin: Signer<'info>,
@@ -633,6 +671,12 @@ pub struct Config {
     pub sol_vault_bump: u8,
     pub loar_vault_bump: u8,
 }
+
+/// Empty marker — exists only to give the SOL vault PDA a program-owned
+/// container so lamports above the rent-exempt minimum belong to the program.
+#[account]
+#[derive(InitSpace)]
+pub struct SolVault {}
 
 #[account]
 #[derive(InitSpace)]
@@ -723,6 +767,12 @@ pub struct CreditsGranted {
 }
 
 #[event]
+pub struct SolSwept {
+    pub destination: Pubkey,
+    pub amount: u64,
+}
+
+#[event]
 pub struct GrantLimitsUpdated {
     pub daily_grant_limit: u64,
     pub max_grant_per_user: u64,
@@ -796,4 +846,31 @@ pub enum CreditError {
     AlreadyPaused,
     #[msg("Cannot unpause: not paused")]
     NotPaused,
+    #[msg("SOL vault has insufficient lamports above the rent-exempt floor")]
+    InsufficientVault,
+}
+
+/// Move lamports out of a program-owned vault PDA directly. CPI to the system
+/// program won't work for a non-system-owned source, so we manipulate lamports
+/// via try_borrow_mut_lamports. The rent-exempt floor is preserved so the
+/// runtime can't reap the account.
+fn transfer_lamports_from_vault(
+    vault: &AccountInfo,
+    to: &AccountInfo,
+    amount: u64,
+) -> Result<()> {
+    let vault_balance = vault.lamports();
+    let post_balance = vault_balance
+        .checked_sub(amount)
+        .ok_or(CreditError::InsufficientVault)?;
+
+    let rent_min = Rent::get()?.minimum_balance(vault.data_len());
+    require!(post_balance >= rent_min, CreditError::InsufficientVault);
+
+    **vault.try_borrow_mut_lamports()? = post_balance;
+    **to.try_borrow_mut_lamports()? = to
+        .lamports()
+        .checked_add(amount)
+        .ok_or(CreditError::MathOverflow)?;
+    Ok(())
 }

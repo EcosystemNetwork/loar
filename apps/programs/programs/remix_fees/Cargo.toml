@@ -1,0 +1,24 @@
+[package]
+name = "remix_fees"
+version = "0.1.0"
+description = "LOAR RemixFees — Solana sister to apps/contracts/src/revenue/RemixFees.sol"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "remix_fees"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "universe/idl-build"]
+
+[dependencies]
+anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
+anchor-spl = { version = "0.31.1", features = ["token", "associated_token"] }
+# Live `Universe.creator` lookup for `set_universe_fee` authority — same
+# trust model as EVM's ERC-721 `ownerOf` (REVENUE-01 analog).
+universe = { path = "../universe", features = ["cpi"] }

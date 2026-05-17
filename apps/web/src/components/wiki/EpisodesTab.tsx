@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { trpcClient } from '@/utils/trpc';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Film, Play } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Film, Play, Plus } from 'lucide-react';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 interface EpisodesTabProps {
@@ -113,6 +115,12 @@ export function EpisodesTab({ universeAddress }: EpisodesTabProps) {
           {sorted.length} episode{sorted.length !== 1 ? 's' : ''}
           {!universeAddress && ' across all universes'}
         </p>
+        <Link to="/editor" search={{ video: undefined, image: undefined, audio: undefined }}>
+          <Button size="sm" variant="outline">
+            <Plus className="h-4 w-4 mr-1" />
+            New Episode
+          </Button>
+        </Link>
       </div>
 
       {isLoading && <div className="text-center py-12 text-muted-foreground">Loading…</div>}
@@ -121,6 +129,12 @@ export function EpisodesTab({ universeAddress }: EpisodesTabProps) {
         <div className="text-center py-16 text-muted-foreground">
           <Film className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
           <p className="mb-2">No episodes yet.</p>
+          <p className="text-xs mb-4">
+            Build episodes from your timeline clips, or generate a full episode from a script.
+          </p>
+          <Link to="/editor" search={{ video: undefined, image: undefined, audio: undefined }}>
+            <Button variant="outline">Open Episode Builder</Button>
+          </Link>
         </div>
       )}
 

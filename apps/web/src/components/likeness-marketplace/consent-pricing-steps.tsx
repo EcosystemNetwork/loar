@@ -299,6 +299,12 @@ function DealTypeCheckbox({
 
 // ── Pricing step ─────────────────────────────────────────────────────────
 
+export interface SplitRecipient {
+  recipient: string;
+  /** Whole-percent display unit. Converted to bps (× 100) when submitting. */
+  percent: string;
+}
+
 export interface PricingState {
   title: string;
   description: string;
@@ -307,6 +313,8 @@ export interface PricingState {
   licenseFeeEth: string;
   licenseRoyaltyBps: string;
   maxDurationDays: string;
+  /** Optional multi-recipient revenue splits. Empty array = single-creator payout. */
+  splitRecipients: SplitRecipient[];
 }
 
 export function emptyPricingState(opts?: { title?: string; description?: string }): PricingState {
@@ -318,7 +326,51 @@ export function emptyPricingState(opts?: { title?: string; description?: string 
     licenseFeeEth: '',
     licenseRoyaltyBps: '500',
     maxDurationDays: '30',
+    splitRecipients: [],
   };
+}
+
+/** Sum of split percent fields; -1 if any entry is non-numeric. */
+export function splitsTotalPercent(splits: SplitRecipient[]): number {
+  let sum = 0;
+  for (const s of splits) {
+    const n = Number(s.percent);
+    if (!Number.isFinite(n) || n < 0) return -1;
+    sum += n;
+  }
+  return Math.round(sum * 100) / 100;
+}
+
+/**
+ * Convert UI splits to the on-chain bps shape. Returns null when no splits
+ * are configured (the listing will use direct-creator payment + platform fee).
+ * Throws if validation fails.
+ */
+export function splitsToBpsPayload(
+  splits: SplitRecipient[]
+): Array<{ recipient: string; bps: number }> | null {
+  const cleaned = splits.filter(
+    (s) => s.recipient.trim().length > 0 || s.percent.trim().length > 0
+  );
+  if (cleaned.length === 0) return null;
+  if (cleaned.length > 10) throw new Error('At most 10 recipients allowed');
+  const payload: Array<{ recipient: string; bps: number }> = [];
+  for (const s of cleaned) {
+    if (!/^0x[a-fA-F0-9]{40}$/.test(s.recipient.trim())) {
+      throw new Error(`Invalid recipient address: ${s.recipient}`);
+    }
+    const pct = Number(s.percent);
+    if (!Number.isFinite(pct) || pct <= 0) {
+      throw new Error(`Each recipient needs a positive percent`);
+    }
+    const bps = Math.round(pct * 100);
+    payload.push({ recipient: s.recipient.trim().toLowerCase(), bps });
+  }
+  const totalBps = payload.reduce((s, r) => s + r.bps, 0);
+  if (totalBps !== 10000) {
+    throw new Error(`Splits must sum to exactly 100% (got ${(totalBps / 100).toFixed(2)}%)`);
+  }
+  return payload;
 }
 
 export function pricingStateReady(
@@ -329,7 +381,19 @@ export function pricingStateReady(
   if (consent.permitLease && safeParseEther(pricing.leasePerDayEth) <= 0n) return false;
   if (consent.permitLicense && safeParseEther(pricing.licenseFeeEth) <= 0n) return false;
   if (!consent.permitSale && !consent.permitLease && !consent.permitLicense) return false;
-  return pricing.title.trim().length > 0;
+  if (pricing.title.trim().length === 0) return false;
+  // If splits are partially filled, require them to be valid.
+  const cleaned = pricing.splitRecipients.filter(
+    (s) => s.recipient.trim().length > 0 || s.percent.trim().length > 0
+  );
+  if (cleaned.length > 0) {
+    try {
+      splitsToBpsPayload(pricing.splitRecipients);
+    } catch {
+      return false;
+    }
+  }
+  return true;
 }
 
 interface PricingStepProps {
@@ -477,6 +541,122 @@ export function PricingStep({
           Capped at 365 days per the on-chain ContentLicensing contract.
         </p>
       </div>
+
+      <Separator />
+
+      <SplitsField
+        splits={state.splitRecipients}
+        onChange={(next) => onChange({ ...state, splitRecipients: next })}
+      />
+    </div>
+  );
+}
+
+interface SplitsFieldProps {
+  splits: SplitRecipient[];
+  onChange: (next: SplitRecipient[]) => void;
+}
+
+function SplitsField({ splits, onChange }: SplitsFieldProps) {
+  const total = splitsTotalPercent(splits);
+  const cleaned = splits.filter((s) => s.recipient.trim() || s.percent.trim());
+  const showValidator = cleaned.length > 0;
+  const isValid = (() => {
+    if (cleaned.length === 0) return true; // optional; empty is fine
+    try {
+      splitsToBpsPayload(splits);
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+
+  function update(i: number, patch: Partial<SplitRecipient>) {
+    const next = [...splits];
+    next[i] = { ...next[i], ...patch };
+    onChange(next);
+  }
+
+  function add() {
+    if (splits.length >= 10) return;
+    onChange([...splits, { recipient: '', percent: '' }]);
+  }
+
+  function remove(i: number) {
+    onChange(splits.filter((_, idx) => idx !== i));
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-semibold">
+          Revenue splits{' '}
+          <Badge variant="outline" className="ml-1 text-[10px]">
+            Optional
+          </Badge>
+        </Label>
+        {showValidator && (
+          <span
+            className={`text-xs font-medium ${
+              isValid && total === 100 ? 'text-green-600' : 'text-destructive'
+            }`}
+          >
+            {total < 0 ? 'Invalid' : `${total.toFixed(2)}% / 100%`}
+          </span>
+        )}
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Route payments to multiple recipients (collaborators, co-creators, charity). Percentages
+        must sum to exactly 100%. If empty, all revenue routes to your wallet minus the 5% platform
+        fee.
+      </p>
+
+      {splits.length > 0 && (
+        <div className="space-y-1.5">
+          {splits.map((s, i) => (
+            <div key={i} className="flex gap-2">
+              <Input
+                value={s.recipient}
+                onChange={(e) => update(i, { recipient: e.target.value })}
+                placeholder="0x… recipient address"
+                className="flex-1 font-mono text-xs"
+              />
+              <div className="relative w-24">
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={s.percent}
+                  onChange={(e) => update(i, { percent: e.target.value })}
+                  placeholder="25"
+                  className="pr-7"
+                />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                  %
+                </span>
+              </div>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => remove(i)}
+                title="Remove split"
+                className="shrink-0"
+              >
+                ×
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={add}
+        disabled={splits.length >= 10}
+        className="w-full"
+      >
+        + Add recipient {splits.length > 0 && `(${splits.length}/10)`}
+      </Button>
     </div>
   );
 }

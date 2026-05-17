@@ -222,6 +222,19 @@ function ListingDetailPage() {
         rightsTxHash = rightsResult.rightsTxHash;
       }
 
+      // Step 3.5 — if the listing has multi-recipient splits, the server
+      // already pre-claimed split ownership for us; we just submit setSplits
+      // via Circle DCW now (no popup) so payments route through SplitRouter.
+      let splitsTxHash: `0x${string}` | undefined;
+      if (prep.setSplitsCall) {
+        splitsTxHash = await writeContractAsync({
+          address: prep.setSplitsCall.address as `0x${string}`,
+          abi: prep.setSplitsCall.abi,
+          functionName: prep.setSplitsCall.functionName,
+          args: prep.setSplitsCall.args as never,
+        });
+      }
+
       // Step 4 — seller calls registerContent via Circle DCW (no popup)
       const registerTxHash = await writeContractAsync({
         address: prep.contentLicensing as `0x${string}`,
@@ -238,12 +251,13 @@ function ListingDetailPage() {
         ],
       });
 
-      // Step 5 — server verifies registerContent + stamps the listing
+      // Step 5 — server verifies registerContent (+ splits) + stamps the listing
       const result = await trpcClient.likenessMarketplace.confirmOnChainPublish.mutate({
         listingId,
         registerTxHash,
+        ...(splitsTxHash ? { splitsTxHash } : {}),
       });
-      return { ...result, rightsTxHash, registerTxHash };
+      return { ...result, rightsTxHash, registerTxHash, splitsTxHash };
     },
     onSuccess: () => {
       toast.success('Listing published on-chain');

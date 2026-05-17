@@ -120,7 +120,16 @@ test.describe('Moderation & Legal', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Feature routes load', () => {
-  const featureRoutes = ['/tokens', '/licensing', '/collabs', '/market', '/sell', '/staking'];
+  const featureRoutes = [
+    '/tokens',
+    '/licensing',
+    '/collabs',
+    '/ads',
+    '/market',
+    '/sell',
+    '/staking',
+    '/bounties',
+  ];
 
   for (const route of featureRoutes) {
     test(`${route} loads without crashing`, async ({ page }) => {

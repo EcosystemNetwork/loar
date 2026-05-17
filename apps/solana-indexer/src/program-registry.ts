@@ -53,6 +53,11 @@ export const PROGRAMS: RegisteredProgram[] = [
   registerProgram('rights', 'RIGHTS_PROGRAM_ID'),
   registerProgram('licensing', 'LICENSING_PROGRAM_ID'),
   registerProgram('split_router', 'SPLIT_ROUTER_PROGRAM_ID'),
+  registerProgram('staking', 'STAKING_PROGRAM_ID'),
+  registerProgram('credit_manager', 'CREDIT_MANAGER_PROGRAM_ID'),
+  registerProgram('subscription', 'SUBSCRIPTION_PROGRAM_ID'),
+  registerProgram('remix_fees', 'REMIX_FEES_PROGRAM_ID'),
+  registerProgram('bonding_curve', 'BONDING_CURVE_PROGRAM_ID'),
 ];
 
 export const PROGRAM_BY_ID: ReadonlyMap<string, RegisteredProgram> = new Map(

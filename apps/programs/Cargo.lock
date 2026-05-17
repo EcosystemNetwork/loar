@@ -359,6 +359,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bonding_curve"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "universe",
+]
+
+[[package]]
 name = "borsh"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1341,6 +1350,15 @@ name = "regex-syntax"
 version = "0.8.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
+
+[[package]]
+name = "remix_fees"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "universe",
+]
 
 [[package]]
 name = "rights"
@@ -2727,6 +2745,14 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+]
+
+[[package]]
+name = "subscription"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "universe",
 ]
 
 [[package]]

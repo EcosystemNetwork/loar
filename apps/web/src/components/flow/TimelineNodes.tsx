@@ -31,6 +31,7 @@ import {
 import { LoarIcon } from '@/components/loar-icons';
 import { useState, useEffect } from 'react';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import type { StylePresetId } from '../style-presets';
 
 // ── Scene Control Types (mirrors server scene-controls/types.ts) ──────
 
@@ -54,19 +55,8 @@ export type CameraPresetId =
 
 export type CameraIntensity = 'subtle' | 'standard' | 'pronounced';
 
-export type StylePresetId =
-  | 'noir'
-  | 'watercolor'
-  | 'vhs_80s'
-  | 'anime'
-  | 'cyberpunk'
-  | 'fantasy'
-  | 'horror'
-  | 'documentary'
-  | 'comic_book'
-  | 'cinematic'
-  | 'surreal'
-  | 'steampunk';
+// StylePresetId is the canonical web-side union from style-presets.ts (re-exported here for legacy consumers)
+export type { StylePresetId };
 
 export type VfxPresetId =
   | 'noir_grade'

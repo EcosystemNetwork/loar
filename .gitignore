@@ -9,6 +9,7 @@ coverage/
 # package by other apps). apps/mobile/dist is Expo bundle output kept for now.
 apps/mcp-gateway/dist/
 apps/mcp/dist/
+apps/solana-indexer/dist/
 
 .env
 .env.local

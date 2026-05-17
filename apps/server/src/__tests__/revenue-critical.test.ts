@@ -225,6 +225,41 @@ describe('analytics router', () => {
 });
 
 // ---------------------------------------------------------------------------
+// ads
+// ---------------------------------------------------------------------------
+describe('ads router', () => {
+  it('getSlotsByUniverse is public', async () => {
+    const caller = createPublicCaller();
+    const result = await caller.ads.getSlotsByUniverse({ universeId: 'test-universe' });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('getSponsorships is public', async () => {
+    const caller = createPublicCaller();
+    const result = await caller.ads.getSponsorships({ universeId: 'test-universe' });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('createSlot rejects unauthenticated callers', async () => {
+    const caller = createPublicCaller();
+    await expect(
+      caller.ads.createSlot({
+        universeId: 'u1',
+        placementType: 'BILLBOARD',
+        minBid: '100',
+        episodes: 5,
+        description: 'Prime placement',
+      })
+    ).rejects.toThrow(TRPCError);
+  });
+
+  it('mySponsorships rejects unauthenticated callers', async () => {
+    const caller = createPublicCaller();
+    await expect(caller.ads.mySponsorships()).rejects.toThrow(TRPCError);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // credits — admin-only route enforcement
 // ---------------------------------------------------------------------------
 describe('credits admin authorization', () => {
