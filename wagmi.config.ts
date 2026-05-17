@@ -23,8 +23,9 @@ import CharacterNFT from './apps/contracts/out/CharacterNFT.sol/CharacterNFT.jso
 import EntityNFT from './apps/contracts/out/EntityNFT.sol/EntityNFT.json';
 import EntityEditionNFT from './apps/contracts/out/EntityEditionNFT.sol/EntityEditionNFT.json';
 import CreditManager from './apps/contracts/out/CreditManager.sol/CreditManager.json';
-import LoarBurner from './apps/contracts/out/LoarBurner.sol/LoarBurner.json';
+import PremiumActions from './apps/contracts/out/PremiumActions.sol/PremiumActions.json';
 import StoryBounties from './apps/contracts/out/StoryBounties.sol/StoryBounties.json';
+import TalentAgentRegistry from './apps/contracts/out/TalentAgentRegistry.sol/TalentAgentRegistry.json';
 import LaunchpadStaking from './apps/contracts/out/LaunchpadStaking.sol/LaunchpadStaking.json';
 import RemixFees from './apps/contracts/out/RemixFees.sol/RemixFees.json';
 import SlopMarket from './apps/contracts/out/SlopMarket.sol/SlopMarket.json';
@@ -85,8 +86,9 @@ export default defineConfig({
     { name: 'EntityNFT', abi: EntityNFT.abi as Abi },
     { name: 'EntityEditionNFT', abi: EntityEditionNFT.abi as Abi },
     { name: 'CreditManager', abi: CreditManager.abi as Abi },
-    { name: 'LoarBurner', abi: LoarBurner.abi as Abi },
+    { name: 'PremiumActions', abi: PremiumActions.abi as Abi },
     { name: 'StoryBounties', abi: StoryBounties.abi as Abi },
+    { name: 'TalentAgentRegistry', abi: TalentAgentRegistry.abi as Abi },
     { name: 'LaunchpadStaking', abi: LaunchpadStaking.abi as Abi },
     { name: 'RemixFees', abi: RemixFees.abi as Abi },
     { name: 'SlopMarket', abi: SlopMarket.abi as Abi },

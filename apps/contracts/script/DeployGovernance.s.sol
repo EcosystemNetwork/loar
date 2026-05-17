@@ -47,7 +47,7 @@ import {UpgradeableBeacon} from "@openzeppelin/proxy/beacon/UpgradeableBeacon.so
  *
  *   Additional UUPS contracts (transferred if env vars are set):
  *     STORY_BOUNTIES_PROXY
- *     LOAR_BURNER_PROXY
+ *     LOAR_BURNER_PROXY            (PremiumActions proxy; env-var name retained from pre-BURN-01 rename)
  *     REMIX_FEES_PROXY
  *     CONTENT_LICENSING_PROXY
  *
@@ -126,6 +126,7 @@ contract DeployGovernanceScript is Script {
         console.log("\n--- Transferring additional UUPS contracts ---");
 
         _transferUUPS("STORY_BOUNTIES_PROXY", timelockAddr);
+        _transferUUPS("TALENT_AGENT_REGISTRY_PROXY", timelockAddr);
         _transferUUPS("LOAR_BURNER_PROXY", timelockAddr);
         _transferUUPS("REMIX_FEES_PROXY", timelockAddr);
         _transferUUPS("CONTENT_LICENSING_PROXY", timelockAddr);

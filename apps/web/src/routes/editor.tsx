@@ -10,7 +10,7 @@
 
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { awaitSessionValidation } from '@/lib/wallet-auth';
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -46,6 +46,7 @@ export const Route = createFileRoute('/editor')({
     video: (search.video as string) || undefined,
     image: (search.image as string) || undefined,
     audio: (search.audio as string) || undefined,
+    draft: (search.draft as string) || undefined,
   }),
   // WEB-6: await /auth/me so paid edit jobs can't fire during the auth hydration window.
   beforeLoad: async ({ context }) => {
@@ -58,10 +59,17 @@ export const Route = createFileRoute('/editor')({
 });
 
 function EditorPage() {
-  const { video: initialVideo, image: initialImage, audio: initialAudio } = Route.useSearch();
+  const {
+    video: initialVideo,
+    image: initialImage,
+    audio: initialAudio,
+    draft: initialDraftId,
+  } = Route.useSearch();
   const [videoUrl, setVideoUrl] = useState<string | null>(initialVideo || null);
   const [imageUrl, setImageUrl] = useState<string | null>(initialImage || null);
   const [audioUrl, setAudioUrl] = useState<string | null>(initialAudio || null);
+  const [draftId, setDraftId] = useState<string | null>(initialDraftId ?? null);
+  const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
   const [inputMode, setInputMode] = useState<'url' | 'upload'>('url');
   const [urlInput, setUrlInput] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
@@ -73,6 +81,58 @@ function EditorPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const editing = useVideoEditing();
+
+  // ── E7: drafts — resume on mount when ?draft=<id> is present ─────
+  useEffect(() => {
+    if (!initialDraftId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const draft = (await trpcClient.editorDrafts.get.query({
+          draftId: initialDraftId,
+        })) as {
+          id: string;
+          videoUrl: string | null;
+          imageUrl: string | null;
+          audioUrl: string | null;
+        };
+        if (cancelled) return;
+        if (draft.videoUrl) setVideoUrl(draft.videoUrl);
+        if (draft.imageUrl) setImageUrl(draft.imageUrl);
+        if (draft.audioUrl) setAudioUrl(draft.audioUrl);
+        setDraftId(draft.id);
+        toast.success('Draft resumed');
+      } catch (err) {
+        console.error('[editor] resume draft failed:', err);
+        toast.error('Could not load draft');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialDraftId]);
+
+  // ── E7: drafts — debounced autosave whenever media changes ──────
+  useEffect(() => {
+    if (!videoUrl && !imageUrl && !audioUrl) return;
+    const handle = setTimeout(async () => {
+      try {
+        const res = (await trpcClient.editorDrafts.save.mutate({
+          draftId: draftId ?? undefined,
+          title: '',
+          description: '',
+          videoUrl: videoUrl ?? null,
+          imageUrl: imageUrl ?? null,
+          audioUrl: audioUrl ?? null,
+        })) as { id: string };
+        if (!draftId) setDraftId(res.id);
+        setDraftSavedAt(new Date());
+      } catch (err) {
+        console.error('[editor] autosave failed:', err);
+      }
+    }, 5000);
+    return () => clearTimeout(handle);
+  }, [videoUrl, imageUrl, audioUrl, draftId]);
 
   // Editing history
   const historyQuery = useQuery({
@@ -183,8 +243,15 @@ function EditorPage() {
         </Badge>
 
         {/* E6: terminal publish — single button replaces the manual three-step
-            after export. Always visible; disabled until a video is loaded. */}
-        <div className="ml-auto">
+            after export. Always visible; disabled until a video is loaded.
+            E7: a passive "Draft saved …" tag whenever autosave fires. */}
+        <div className="ml-auto flex items-center gap-3">
+          {draftSavedAt && (
+            <span className="text-[10px] text-muted-foreground">
+              Draft saved{' '}
+              {draftSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
           <Button
             size="sm"
             onClick={() => setShowPublishDialog(true)}

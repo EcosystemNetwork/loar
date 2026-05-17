@@ -32,6 +32,7 @@ import {CollabManager} from "../src/revenue/CollabManager.sol";
 import {AnalyticsRegistry} from "../src/revenue/AnalyticsRegistry.sol";
 import {LaunchpadStaking} from "../src/revenue/LaunchpadStaking.sol";
 import {StoryBounties} from "../src/revenue/StoryBounties.sol";
+import {TalentAgentRegistry} from "../src/revenue/TalentAgentRegistry.sol";
 import {IdentityNFT} from "../src/IdentityNFT.sol";
 import {Escrow} from "../src/revenue/Escrow.sol";
 
@@ -338,6 +339,21 @@ contract DeployAllScript is Script {
         );
         console.log("[5] StoryBounties:", address(bounties));
 
+        // TalentAgentRegistry (UUPS proxy) — G4
+        // Platform fee on routed commissions: 100bps (1%) by default. Tunable.
+        uint16 talentAgentPlatformFee = 100;
+        TalentAgentRegistry talentAgentRegistry = TalentAgentRegistry(
+            address(
+                new ERC1967Proxy(
+                    address(new TalentAgentRegistry()),
+                    abi.encodeCall(
+                        TalentAgentRegistry.initialize, (d, treasury, talentAgentPlatformFee)
+                    )
+                )
+            )
+        );
+        console.log("[5] TalentAgentRegistry:", address(talentAgentRegistry));
+
         // ── Phase 6: Marketplace Escrow ─────────────────────────────────
         Escrow escrow = Escrow(
             address(
@@ -387,6 +403,7 @@ contract DeployAllScript is Script {
         console.log("# --- Staking, Bounties & Escrow ---");
         _logEnv("LAUNCHPAD_STAKING_ADDRESS", address(staking));
         _logEnv("STORY_BOUNTIES_ADDRESS", address(bounties));
+        _logEnv("TALENT_AGENT_REGISTRY_ADDRESS", address(talentAgentRegistry));
         _logEnv("ESCROW_ADDRESS", address(escrow));
         console.log("");
         console.log("# --- Vite (frontend) ---");
@@ -398,6 +415,7 @@ contract DeployAllScript is Script {
         _logEnv("VITE_SPLIT_ROUTER_ADDRESS", address(splitRouter));
         _logEnv("VITE_LAUNCHPAD_STAKING_ADDRESS", address(staking));
         _logEnv("VITE_STORY_BOUNTIES_ADDRESS", address(bounties));
+        _logEnv("VITE_TALENT_AGENT_REGISTRY_ADDRESS", address(talentAgentRegistry));
         _logEnv("VITE_IDENTITY_NFT_ADDRESS", address(identityNft));
         console.log("");
         console.log("# --- Platform treasury for split orchestrator ---");

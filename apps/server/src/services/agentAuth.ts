@@ -6,6 +6,7 @@
  */
 import { db } from '../lib/firebase';
 import { TRPCError } from '@trpc/server';
+import { routeCommissionOnChain } from './talentAgentRegistry';
 
 export interface AgentContract {
   id: string;
@@ -99,15 +100,38 @@ export async function recordAgentCommission(params: {
   grossAmountWei: string;
   commissionBps: number;
   txHash?: string;
+  /** ERC20 token to route through TalentAgentRegistry. Pass undefined for
+   *  the native ETH path. The platform Circle DCW wallet must already hold
+   *  the funds (or have approval for the token). */
+  routeOnChainToken?: string;
 }): Promise<void> {
   try {
     const commissionAmountWei =
       (BigInt(params.grossAmountWei) * BigInt(params.commissionBps)) / BigInt(10_000);
 
+    // G4: forward to the on-chain registry first so the off-chain ledger
+    // can record the resulting tx hash. Best-effort — when the registry
+    // isn't configured this just no-ops.
+    let routeTxHash: string | null = null;
+    try {
+      const routed = await routeCommissionOnChain({
+        agentUid: params.agentUid,
+        creatorUid: params.creatorUid,
+        grossAmountWei: params.grossAmountWei,
+        sourceType: params.sourceType,
+        sourceId: params.sourceId,
+        tokenAddress: params.routeOnChainToken,
+      });
+      if (routed) routeTxHash = routed.txHash;
+    } catch (err) {
+      console.error('[recordAgentCommission] on-chain route failed:', err);
+    }
+
     await db.collection('agentCommissions').add({
       ...params,
       commissionAmountWei: commissionAmountWei.toString(),
       txHash: params.txHash || null,
+      routeTxHash,
       createdAt: new Date(),
     });
 

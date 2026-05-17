@@ -43,6 +43,7 @@ import { subscriptionsRouter } from './subscriptions/subscriptions.routes';
 import { analyticsRouter } from './analytics/analytics.routes';
 import { adsRouter } from './ads/ads.routes';
 import { adSeedsRouter } from './ads/adSeeds.routes';
+import { editorDraftsRouter } from './editorDrafts/editorDrafts.routes';
 import { storageRouter } from './storage/storage.routes';
 import { firebaseStorageRouter } from './storage/firebase.routes';
 import { synapseRouter } from './storage/synapse.routes';
@@ -260,6 +261,7 @@ export const appRouter = router({
   subscriptions: subscriptionsRouter,
   ads: adsRouter,
   adSeeds: adSeedsRouter,
+  editorDrafts: editorDraftsRouter,
 
   // ── Analytics ───────────────────────────────────────────────────────
   analytics: analyticsRouter,

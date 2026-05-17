@@ -11,6 +11,10 @@ import {
   CONTRACT_SCOPES,
 } from './talentAgents.types';
 import { emitActivity, sendNotification } from '../../services/activity';
+import {
+  registerAgreementOnChain,
+  deactivateAgreementOnChain,
+} from '../../services/talentAgentRegistry';
 
 const agentProfilesCol = () => {
   if (!db)
@@ -294,6 +298,30 @@ export const talentAgentsRouter = router({
         updatedAt: now,
       });
 
+      // G4: register the agreement on-chain. Best-effort — if the registry
+      // env var isn't set yet, or the platform Circle wallet isn't
+      // provisioned, the Firestore record remains the source of truth and
+      // commission routing falls back to off-chain ledger only.
+      let onChainAgreementId: string | null = null;
+      let registerTxHash: string | null = null;
+      try {
+        const reg = await registerAgreementOnChain({
+          agentUid: data.agentUid,
+          creatorUid: data.creatorUid,
+          commissionBps: data.commissionBps,
+        });
+        if (reg) {
+          onChainAgreementId = reg.agreementId;
+          registerTxHash = reg.txHash;
+          await ref.update({
+            onChainAgreementId,
+            onChainRegisterTxHash: registerTxHash,
+          });
+        }
+      } catch (err) {
+        console.error('[talentAgents.acceptContract] on-chain register failed:', err);
+      }
+
       // Notify proposer
       const notifyUid = data.proposedBy === 'agent' ? data.agentUid : data.creatorUid;
       sendNotification({
@@ -305,7 +333,7 @@ export const talentAgentsRouter = router({
         targetId: input.contractId,
       }).catch(() => {});
 
-      return { ok: true, startDate: now, endDate };
+      return { ok: true, startDate: now, endDate, onChainAgreementId, registerTxHash };
     }),
 
   terminateContract: protectedProcedure
@@ -333,7 +361,21 @@ export const talentAgentsRouter = router({
         updatedAt: new Date(),
       });
 
-      return { ok: true };
+      // G4: deactivate on-chain if the agreement was previously registered.
+      let deactivateTxHash: string | null = null;
+      if (data.onChainAgreementId) {
+        try {
+          const res = await deactivateAgreementOnChain(data.agentUid, data.creatorUid);
+          if (res) {
+            deactivateTxHash = res.txHash;
+            await ref.update({ onChainDeactivateTxHash: deactivateTxHash });
+          }
+        } catch (err) {
+          console.error('[talentAgents.terminateContract] on-chain deactivate failed:', err);
+        }
+      }
+
+      return { ok: true, deactivateTxHash };
     }),
 
   getContract: publicProcedure
