@@ -289,6 +289,71 @@ export const bountiesRouter = router({
         }
       }
 
+      // B3: ContentLicensing record for the bounty-awarded work. Awarded
+      // bounties produce derivative content that the universe owner has
+      // effectively purchased — the licensor is the creator, the licensee
+      // is the bounty poster (universe owner), royaltyBps=0 (paid in $LOAR
+      // upfront, no ongoing royalty). Best-effort; failure does not unwind
+      // the award.
+      let contentRegistrationId: string | null = null;
+      let contentDealId: string | null = null;
+      if (firebaseAvailable && submission.contentHash) {
+        try {
+          const rewardLoarWei = (
+            BigInt(Math.floor(Number(bounty.reward || 0))) * BigInt(1e18)
+          ).toString();
+
+          const registration = {
+            contentHash: submission.contentHash,
+            contentId: null, // bounty submissions don't have a content doc id yet
+            universeId: bounty.universeId,
+            buyPrice: rewardLoarWei,
+            rentPricePerDay: '0',
+            licenseFee: rewardLoarWei,
+            licenseRoyaltyBps: 0,
+            title: bounty.title,
+            description: bounty.description,
+            mediaType: bounty.contentType || null,
+            txHash: input.txHash || null,
+            creatorUid: submission.submitterUid,
+            creatorAddress: submission.submitter || null,
+            splitEntityHash: null,
+            active: true,
+            totalSales: 1,
+            totalRevenue: rewardLoarWei,
+            originatedFrom: `bounty:${input.bountyId}`,
+            createdAt: now,
+            updatedAt: now,
+          };
+          const regRef = await db.collection('contentRegistrations').add(registration);
+          contentRegistrationId = regRef.id;
+
+          const deal = {
+            contentHash: submission.contentHash,
+            registrationId: regRef.id,
+            dealType: 'LICENSE' as const,
+            pricePaid: rewardLoarWei,
+            durationDays: null,
+            txHash: input.txHash || null,
+            buyerUid: bounty.posterUid,
+            buyerAddress: bounty.poster || null,
+            sellerUid: submission.submitterUid,
+            universeId: bounty.universeId,
+            startTime: now,
+            endTime: null, // never expires — full bounty-paid license
+            status: 'ACTIVE' as const,
+            originatedFrom: `bounty:${input.bountyId}`,
+            createdAt: now,
+          };
+          const dealRef = await db.collection('contentDeals').add(deal);
+          contentDealId = dealRef.id;
+
+          await subsCol.doc(input.submissionId).update({ contentRegistrationId, contentDealId });
+        } catch (err) {
+          console.error('[bounties.award] ContentLicensing record failed:', err);
+        }
+      }
+
       // Record talent-agent commission when an agent posted/awarded on behalf
       // of the universe owner. Commission is taken off the bounty reward
       // (denominated in $LOAR — convert to 18-decimal wei for the ledger).
@@ -306,7 +371,12 @@ export const bountiesRouter = router({
         }).catch(() => {});
       }
 
-      return { success: true, canonSubmissionId };
+      return {
+        success: true,
+        canonSubmissionId,
+        contentRegistrationId,
+        contentDealId,
+      };
     }),
 
   // ── Cancel bounty ──────────────────────────────────────────

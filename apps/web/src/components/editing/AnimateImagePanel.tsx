@@ -13,6 +13,10 @@ import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
+import { StylePresetPicker } from '@/components/StylePresetPicker';
+import { ShotPresetPicker } from '@/components/ShotPresetPicker';
+import type { StylePresetId } from '@/components/style-presets';
+import type { ShotPresetId } from '@/components/shot-presets';
 import {
   Select,
   SelectContent,
@@ -111,6 +115,10 @@ export function AnimateImagePanel({ imageUrl, onComplete }: AnimateImagePanelPro
   const [prompt, setPrompt] = useState('');
   const [durationSec, setDurationSec] = useState(5);
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
+  // E4: style + shot presets carry into the underlying generation call so
+  // editor-spawned clips match the look used in /create.
+  const [stylePresetId, setStylePresetId] = useState<StylePresetId | null>(null);
+  const [shotPresetId, setShotPresetId] = useState<ShotPresetId | null>(null);
 
   const animate = useMutation({
     mutationFn: async () => {
@@ -132,6 +140,9 @@ export function AnimateImagePanel({ imageUrl, onComplete }: AnimateImagePanelPro
         routingMode: 'auto',
         cameraPreset: camera.cameraPreset,
         cameraIntensity: camera.cameraIntensity,
+        // E4: forward the curated style + shot pickers
+        stylePresetId: stylePresetId ?? undefined,
+        shotPresetId: shotPresetId ?? undefined,
       } as any);
     },
     onSuccess: (r: any) => {
@@ -199,6 +210,18 @@ export function AnimateImagePanel({ imageUrl, onComplete }: AnimateImagePanelPro
             </Button>
           ))}
         </div>
+      </div>
+
+      {/* E4: Style preset */}
+      <div>
+        <label className="text-xs text-muted-foreground mb-1.5 block">Style</label>
+        <StylePresetPicker value={stylePresetId} onChange={setStylePresetId} compact />
+      </div>
+
+      {/* E4: Shot preset */}
+      <div>
+        <label className="text-xs text-muted-foreground mb-1.5 block">Shot</label>
+        <ShotPresetPicker value={shotPresetId} onChange={setShotPresetId} />
       </div>
 
       {/* Aspect ratio */}

@@ -15,6 +15,16 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure, publicProcedure } from '../../lib/trpc';
 import { db, firebaseAvailable } from '../../lib/firebase';
+import { keccak256, toBytes } from 'viem';
+
+/** Deterministic seedId hash that mirrors the AdSeedEscrow.sol seedId.
+ *  Server uses this to coordinate with the on-chain escrow when the
+ *  AdSeedEscrow contract is deployed and wired. */
+function computeSeedIdHash(advertiserUid: string, advertiserAddress: string, salt: string): string {
+  return keccak256(
+    toBytes(`${advertiserUid.toLowerCase()}:${advertiserAddress.toLowerCase()}:${salt}`)
+  );
+}
 
 const getSeedsCol = () => (firebaseAvailable ? db.collection('adSeeds') : null);
 const getPlacementsCol = () => (firebaseAvailable ? db.collection('adSeedPlacements') : null);
@@ -46,6 +56,15 @@ export const adSeedsRouter = router({
 
       const now = new Date();
       const deadline = new Date(now.getTime() + input.deadlineDays * 86400 * 1000);
+      // A4: deterministic seedId hash for the AdSeedEscrow contract. The
+      // sponsor's wallet escrows $LOAR against this hash; the platform's
+      // approvePlacement on-chain releases portions of it. Stored on the
+      // off-chain seed so the indexer + future flows can correlate.
+      const seedIdHash = computeSeedIdHash(
+        ctx.user.uid,
+        ctx.user.address || ctx.user.uid,
+        `${now.getTime()}:${input.brandName}`
+      );
 
       const seed = {
         advertiser: ctx.user.address,
@@ -65,6 +84,8 @@ export const adSeedsRouter = router({
         targetGenres: input.targetGenres || [],
         status: 'open' as const, // open | paused | exhausted | expired
         txHash: input.txHash || null,
+        seedIdHash,
+        escrowReleased: 0,
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
       };

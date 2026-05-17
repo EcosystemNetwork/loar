@@ -23,6 +23,8 @@ import {
 import { Loader2, Mic, Sparkles } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { StylePresetPicker } from '@/components/StylePresetPicker';
+import type { StylePresetId } from '@/components/style-presets';
 
 interface TalkingScenePanelProps {
   imageUrl: string | null;
@@ -44,6 +46,8 @@ export function TalkingScenePanel({ imageUrl, onComplete }: TalkingScenePanelPro
   >('eleven_v3');
   const [durationSec, setDurationSec] = useState(6);
   const [motionPrompt, setMotionPrompt] = useState('');
+  // E4: style preset bias for the talking-scene clip
+  const [stylePresetId, setStylePresetId] = useState<StylePresetId | null>(null);
 
   const voicesQuery = useQuery({
     queryKey: ['voices', 'list'],
@@ -77,7 +81,9 @@ export function TalkingScenePanel({ imageUrl, onComplete }: TalkingScenePanelPro
         voiceModelId,
         durationSec,
         motionPrompt: motionPrompt.trim() || undefined,
-      });
+        // E4: forward style preset to the underlying generation
+        stylePresetId: stylePresetId ?? undefined,
+      } as any);
     },
     onSuccess: (r) => {
       const url = r?.videoUrl;
@@ -188,6 +194,12 @@ export function TalkingScenePanel({ imageUrl, onComplete }: TalkingScenePanelPro
           placeholder="e.g. Character looks left then right while speaking, dramatic lighting"
           className="text-xs min-h-[50px]"
         />
+      </div>
+
+      {/* E4: Style preset */}
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">Style</label>
+        <StylePresetPicker value={stylePresetId} onChange={setStylePresetId} compact />
       </div>
 
       {/* Cost preview */}

@@ -26,6 +26,7 @@ import CreditManager from './apps/contracts/out/CreditManager.sol/CreditManager.
 import PremiumActions from './apps/contracts/out/PremiumActions.sol/PremiumActions.json';
 import StoryBounties from './apps/contracts/out/StoryBounties.sol/StoryBounties.json';
 import TalentAgentRegistry from './apps/contracts/out/TalentAgentRegistry.sol/TalentAgentRegistry.json';
+import AdSeedEscrow from './apps/contracts/out/AdSeedEscrow.sol/AdSeedEscrow.json';
 import LaunchpadStaking from './apps/contracts/out/LaunchpadStaking.sol/LaunchpadStaking.json';
 import RemixFees from './apps/contracts/out/RemixFees.sol/RemixFees.json';
 import SlopMarket from './apps/contracts/out/SlopMarket.sol/SlopMarket.json';
@@ -89,6 +90,7 @@ export default defineConfig({
     { name: 'PremiumActions', abi: PremiumActions.abi as Abi },
     { name: 'StoryBounties', abi: StoryBounties.abi as Abi },
     { name: 'TalentAgentRegistry', abi: TalentAgentRegistry.abi as Abi },
+    { name: 'AdSeedEscrow', abi: AdSeedEscrow.abi as Abi },
     { name: 'LaunchpadStaking', abi: LaunchpadStaking.abi as Abi },
     { name: 'RemixFees', abi: RemixFees.abi as Abi },
     { name: 'SlopMarket', abi: SlopMarket.abi as Abi },

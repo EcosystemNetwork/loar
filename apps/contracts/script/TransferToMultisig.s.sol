@@ -146,6 +146,7 @@ contract TransferToMultisigScript is Script {
         _transferOwnableUpgradeable("LAUNCHPAD_STAKING_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("STORY_BOUNTIES_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("TALENT_AGENT_REGISTRY_ADDRESS", timelockAddr);
+        _transferOwnableUpgradeable("AD_SEED_ESCROW_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("ESCROW_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("LOAR_BURNER_ADDRESS", timelockAddr);
         _transferOwnableUpgradeable("REMIX_FEES_ADDRESS", timelockAddr);

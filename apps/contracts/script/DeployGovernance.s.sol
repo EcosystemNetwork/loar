@@ -127,6 +127,7 @@ contract DeployGovernanceScript is Script {
 
         _transferUUPS("STORY_BOUNTIES_PROXY", timelockAddr);
         _transferUUPS("TALENT_AGENT_REGISTRY_PROXY", timelockAddr);
+        _transferUUPS("AD_SEED_ESCROW_PROXY", timelockAddr);
         _transferUUPS("LOAR_BURNER_PROXY", timelockAddr);
         _transferUUPS("REMIX_FEES_PROXY", timelockAddr);
         _transferUUPS("CONTENT_LICENSING_PROXY", timelockAddr);

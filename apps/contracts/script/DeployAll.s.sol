@@ -33,6 +33,7 @@ import {AnalyticsRegistry} from "../src/revenue/AnalyticsRegistry.sol";
 import {LaunchpadStaking} from "../src/revenue/LaunchpadStaking.sol";
 import {StoryBounties} from "../src/revenue/StoryBounties.sol";
 import {TalentAgentRegistry} from "../src/revenue/TalentAgentRegistry.sol";
+import {AdSeedEscrow} from "../src/revenue/AdSeedEscrow.sol";
 import {IdentityNFT} from "../src/IdentityNFT.sol";
 import {Escrow} from "../src/revenue/Escrow.sol";
 
@@ -354,6 +355,17 @@ contract DeployAllScript is Script {
         );
         console.log("[5] TalentAgentRegistry:", address(talentAgentRegistry));
 
+        // AdSeedEscrow (UUPS proxy) — A4
+        AdSeedEscrow adSeedEscrow = AdSeedEscrow(
+            address(
+                new ERC1967Proxy(
+                    address(new AdSeedEscrow()),
+                    abi.encodeCall(AdSeedEscrow.initialize, (d, address(loarToken)))
+                )
+            )
+        );
+        console.log("[5] AdSeedEscrow:", address(adSeedEscrow));
+
         // ── Phase 6: Marketplace Escrow ─────────────────────────────────
         Escrow escrow = Escrow(
             address(
@@ -404,6 +416,7 @@ contract DeployAllScript is Script {
         _logEnv("LAUNCHPAD_STAKING_ADDRESS", address(staking));
         _logEnv("STORY_BOUNTIES_ADDRESS", address(bounties));
         _logEnv("TALENT_AGENT_REGISTRY_ADDRESS", address(talentAgentRegistry));
+        _logEnv("AD_SEED_ESCROW_ADDRESS", address(adSeedEscrow));
         _logEnv("ESCROW_ADDRESS", address(escrow));
         console.log("");
         console.log("# --- Vite (frontend) ---");
@@ -416,6 +429,7 @@ contract DeployAllScript is Script {
         _logEnv("VITE_LAUNCHPAD_STAKING_ADDRESS", address(staking));
         _logEnv("VITE_STORY_BOUNTIES_ADDRESS", address(bounties));
         _logEnv("VITE_TALENT_AGENT_REGISTRY_ADDRESS", address(talentAgentRegistry));
+        _logEnv("VITE_AD_SEED_ESCROW_ADDRESS", address(adSeedEscrow));
         _logEnv("VITE_IDENTITY_NFT_ADDRESS", address(identityNft));
         console.log("");
         console.log("# --- Platform treasury for split orchestrator ---");
