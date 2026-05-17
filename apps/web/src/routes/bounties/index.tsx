@@ -35,6 +35,9 @@ import {
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useStoryBountiesWrite } from '@/hooks/useStoryBounties';
+import { keccak256, parseUnits, toHex } from 'viem';
+import { toast } from 'sonner';
 
 export const Route = createFileRoute('/bounties/')({
   component: BountiesPage,
@@ -89,8 +92,58 @@ function BountiesPage() {
     queryFn: () => trpcClient.bounties.stats.query(),
   });
 
+  const bountiesWrite = useStoryBountiesWrite();
+
+  /**
+   * Two-phase create:
+   *   1. Lock $LOAR escrow on-chain via createBounty (Circle DCW server-signed).
+   *   2. Record the off-chain bounty doc with the resulting tx hash.
+   *
+   * Phase 1 is skipped when universeId isn't a numeric on-chain id — happens
+   * during early testing on universes that haven't been minted yet. The
+   * Firestore-only path remains valid; the on-chain escrow is the new layer.
+   */
   const createMutation = useMutation({
-    mutationFn: (data: any) => trpcClient.bounties.create.mutate(data),
+    mutationFn: async (data: {
+      universeId?: string;
+      reward: number;
+      title: string;
+      description: string;
+      contentType:
+        | 'video'
+        | 'story'
+        | 'character'
+        | 'art'
+        | 'music'
+        | 'voiceover'
+        | 'lore'
+        | 'other';
+      deadlineDays: number;
+    }) => {
+      let txHash: string | undefined;
+      try {
+        const numericUniverseId = Number(data.universeId);
+        if (Number.isFinite(numericUniverseId) && numericUniverseId > 0) {
+          const deadline = BigInt(Math.floor(Date.now() / 1000) + data.deadlineDays * 86400);
+          const descriptionHash = keccak256(toHex(data.description));
+          txHash = await bountiesWrite.createBounty({
+            universeId: BigInt(numericUniverseId),
+            reward: parseUnits(data.reward.toString(), 18),
+            title: data.title,
+            descriptionHash,
+            contentType: data.contentType,
+            deadline,
+          });
+        }
+      } catch (err) {
+        toast.error(
+          `On-chain escrow failed: ${err instanceof Error ? err.message : 'unknown error'}`
+        );
+        throw err;
+      }
+
+      return trpcClient.bounties.create.mutate({ ...data, txHash });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bounties'] });
       queryClient.invalidateQueries({ queryKey: ['bounty-stats'] });
@@ -98,6 +151,7 @@ function BountiesPage() {
       setTitle('');
       setDescription('');
       setReward('');
+      toast.success('Bounty posted');
     },
   });
 

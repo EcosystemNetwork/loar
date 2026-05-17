@@ -35,6 +35,8 @@ import { trpcClient } from '@/utils/trpc';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DirectUpload } from '@/components/DirectUpload';
 import { toast } from 'sonner';
+import { useStoryBountiesWrite } from '@/hooks/useStoryBounties';
+import { keccak256, toHex, type Hex } from 'viem';
 
 export const Route = createFileRoute('/bounties/$bountyId')({
   component: BountyDetailPage,
@@ -106,9 +108,46 @@ function BountyDetailPage() {
     onError: (err: any) => toast.error(err.message || 'Submission failed'),
   });
 
+  const bountiesWrite = useStoryBountiesWrite();
+
   const awardMutation = useMutation({
-    mutationFn: (data: { bountyId: string; submissionId: string }) =>
-      trpcClient.bounties.award.mutate(data),
+    mutationFn: async (data: {
+      bountyId: string;
+      submissionId: string;
+      onChainBountyId?: number | null;
+      winnerAddress?: string | null;
+      submissionUrl?: string | null;
+    }) => {
+      let txHash: string | undefined;
+      // On-chain settle when the bounty has a numeric on-chain id and the
+      // winner has a wallet address. Without these, fall through to the
+      // off-chain-only canon write (server still records auto-canon).
+      if (
+        data.onChainBountyId != null &&
+        Number.isFinite(data.onChainBountyId) &&
+        data.winnerAddress &&
+        /^0x[a-fA-F0-9]{40}$/.test(data.winnerAddress)
+      ) {
+        try {
+          const submissionHash = data.submissionUrl
+            ? keccak256(toHex(data.submissionUrl))
+            : ('0x'.padEnd(66, '0') as Hex);
+          txHash = await bountiesWrite.awardBounty({
+            bountyId: BigInt(data.onChainBountyId),
+            winner: data.winnerAddress as Hex,
+            submissionHash,
+          });
+        } catch (err) {
+          toast.error(`On-chain award failed: ${err instanceof Error ? err.message : 'unknown'}`);
+          throw err;
+        }
+      }
+      return trpcClient.bounties.award.mutate({
+        bountyId: data.bountyId,
+        submissionId: data.submissionId,
+        ...(txHash ? { txHash } : {}),
+      });
+    },
     onSuccess: () => {
       invalidate();
       setAwardingId(null);
@@ -118,7 +157,23 @@ function BountyDetailPage() {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: (data: { bountyId: string }) => trpcClient.bounties.cancel.mutate(data),
+    mutationFn: async (data: { bountyId: string; onChainBountyId?: number | null }) => {
+      let txHash: string | undefined;
+      if (data.onChainBountyId != null && Number.isFinite(data.onChainBountyId)) {
+        try {
+          txHash = await bountiesWrite.cancelBounty({
+            bountyId: BigInt(data.onChainBountyId),
+          });
+        } catch (err) {
+          toast.error(`On-chain cancel failed: ${err instanceof Error ? err.message : 'unknown'}`);
+          throw err;
+        }
+      }
+      return trpcClient.bounties.cancel.mutate({
+        bountyId: data.bountyId,
+        ...(txHash ? { txHash } : {}),
+      });
+    },
     onSuccess: () => {
       invalidate();
       setShowCancel(false);
@@ -308,7 +363,12 @@ function BountyDetailPage() {
                       <Button
                         variant="destructive"
                         disabled={cancelMutation.isPending}
-                        onClick={() => cancelMutation.mutate({ bountyId })}
+                        onClick={() =>
+                          cancelMutation.mutate({
+                            bountyId,
+                            onChainBountyId: (bounty as any)?.onChainBountyId ?? null,
+                          })
+                        }
                       >
                         {cancelMutation.isPending && (
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -418,7 +478,13 @@ function BountyDetailPage() {
                                   size="sm"
                                   disabled={awardMutation.isPending}
                                   onClick={() =>
-                                    awardMutation.mutate({ bountyId, submissionId: sub.id })
+                                    awardMutation.mutate({
+                                      bountyId,
+                                      submissionId: sub.id,
+                                      onChainBountyId: (bounty as any)?.onChainBountyId ?? null,
+                                      winnerAddress: (sub as any)?.submitter ?? null,
+                                      submissionUrl: (sub as any)?.contentUrl ?? null,
+                                    })
                                   }
                                 >
                                   {awardMutation.isPending ? (

@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useCreateAdSlot } from '@/hooks/useRevenue';
+import { useAdPlacementWrite } from '@/hooks/useAdPlacement';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import { parseEther } from 'viem';
@@ -86,6 +87,7 @@ export function CreateAdSlotPage() {
   const navigate = useNavigate();
   const { isConnected, isAuthenticated, isAuthenticating } = useWalletAuth();
   const createSlot = useCreateAdSlot();
+  const adPlacementWrite = useAdPlacementWrite();
   const [step, setStep] = useState<Step>('placement');
 
   useEffect(() => {
@@ -151,11 +153,35 @@ export function CreateAdSlotPage() {
     }
     try {
       const minBidWei = parseEther(form.minBidEth as `${number}`).toString();
+      const episodesNum = parseInt(form.episodes);
+
+      // Phase 1: open the on-chain slot via Circle DCW. Only fires when the
+      // universe has a numeric on-chain id; otherwise we skip straight to the
+      // off-chain record (universe is still pre-mint).
+      const numericUniverseId = Number(form.universeId);
+      if (Number.isFinite(numericUniverseId) && numericUniverseId > 0) {
+        try {
+          await adPlacementWrite.createAdSlot({
+            universeId: BigInt(numericUniverseId),
+            placementType: form.placementType as PlacementType,
+            minBid: BigInt(minBidWei),
+            episodes: BigInt(episodesNum),
+            metadata: form.description,
+          });
+        } catch (chainErr) {
+          toast.error(
+            `On-chain createAdSlot failed: ${chainErr instanceof Error ? chainErr.message : 'unknown'}`
+          );
+          return;
+        }
+      }
+
+      // Phase 2: write the off-chain slot record (server stamps creatorUid).
       await createSlot.mutateAsync({
         universeId: form.universeId,
         placementType: form.placementType as PlacementType,
         minBid: minBidWei,
-        episodes: parseInt(form.episodes),
+        episodes: episodesNum,
         description: form.description,
         constraints: form.constraints || undefined,
       });

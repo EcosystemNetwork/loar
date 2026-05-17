@@ -28,6 +28,7 @@ import {
   ChevronLeft,
   Camera,
   Mic,
+  Rocket,
 } from 'lucide-react';
 import { useVideoEditing } from '@/hooks/useVideoEditing';
 import { VideoEditingToolbar } from '@/components/editing/VideoEditingToolbar';
@@ -35,6 +36,7 @@ import { InpaintCanvas } from '@/components/editing/InpaintCanvas';
 import { AnimateImagePanel } from '@/components/editing/AnimateImagePanel';
 import { TalkingScenePanel } from '@/components/editing/TalkingScenePanel';
 import { VoiceModifyPanel } from '@/components/editing/VoiceModifyPanel';
+import { PublishEpisodeDialog } from '@/components/editing/PublishEpisodeDialog';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
@@ -66,6 +68,7 @@ function EditorPage() {
   const [showInpaintCanvas, setShowInpaintCanvas] = useState(false);
   const [maskUrl, setMaskUrl] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('tools');
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -178,7 +181,27 @@ function EditorPage() {
         <Badge variant="secondary" className="text-[9px]">
           Beta
         </Badge>
+
+        {/* E6: terminal publish — single button replaces the manual three-step
+            after export. Always visible; disabled until a video is loaded. */}
+        <div className="ml-auto">
+          <Button
+            size="sm"
+            onClick={() => setShowPublishDialog(true)}
+            disabled={!videoUrl}
+            className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
+          >
+            <Rocket className="w-3 h-3 mr-1.5" />
+            Publish as Episode
+          </Button>
+        </div>
       </div>
+
+      <PublishEpisodeDialog
+        open={showPublishDialog}
+        onOpenChange={setShowPublishDialog}
+        videoUrl={videoUrl}
+      />
 
       <div className="flex h-[calc(100vh-49px)]">
         {/* Main Preview Area */}

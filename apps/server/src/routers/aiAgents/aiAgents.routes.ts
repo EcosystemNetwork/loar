@@ -62,6 +62,7 @@ export const aiAgentsRouter = router({
       creditSourceUid: uid,
       creditSourceType: 'personal' as const,
       status: 'active' as const,
+      useBYOK: input.useBYOK ?? false,
       lastRunAt: null,
       totalRunCount: 0,
       createdAt: new Date(),

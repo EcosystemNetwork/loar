@@ -116,6 +116,7 @@ export const aiPipelinesRouter = router({
         overrides: z
           .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
           .optional(),
+        chainId: z.number().int().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -188,6 +189,13 @@ export const aiPipelinesRouter = router({
         createdByUid: agent.createdByUid,
         universeId: agent.universeId || null,
         permissions: agent.permissions as AIAgentPermission[],
+        // G3: BYOK toggle defaults to false for back-compat with agents
+        // created before the field existed.
+        useBYOK: (agent.useBYOK as boolean | undefined) ?? false,
+        // G1: target chain for any on-chain action steps. Pipeline-level
+        // override via `chainId` config; otherwise falls back to Base Sepolia
+        // (84532) which is the current Circle DCW default.
+        chainId: (input.chainId as number | undefined) ?? 84532,
       };
 
       executePipeline(runId, steps, agentContext).catch((err) => {

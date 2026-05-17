@@ -33,6 +33,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useAdSlot, useAdBids, usePlaceBid, useAcceptBid } from '@/hooks/useRevenue';
+import { useAdPlacementWrite } from '@/hooks/useAdPlacement';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import { formatEther, parseEther } from 'viem';
@@ -73,6 +74,7 @@ export function SlotDetailPage() {
   const { data: bids, isLoading: bidsLoading } = useAdBids(slotId);
   const placeBid = usePlaceBid();
   const acceptBid = useAcceptBid();
+  const adPlacementWrite = useAdPlacementWrite();
 
   const [bidEth, setBidEth] = useState('');
   const [brandName, setBrandName] = useState('');
@@ -131,12 +133,31 @@ export function SlotDetailPage() {
     }
     try {
       const weiAmount = parseEther(bidEth as `${number}`).toString();
-      // TODO: In production, collect ETH via the AdPlacement.sol contract
-      // and pass the real txHash from the wallet transaction.
+
+      // Phase 1: on-chain bid via Circle DCW. The slotId in our system is a
+      // Firestore string, but AdPlacement.sol uses numeric ids — only fire
+      // on-chain when the slot record carries a numeric onChainSlotId.
+      let txHash = '';
+      const onChainSlotId = (slot as any)?.onChainSlotId;
+      if (onChainSlotId != null && Number.isFinite(Number(onChainSlotId))) {
+        try {
+          txHash = await adPlacementWrite.placeBid({
+            slotId: BigInt(onChainSlotId),
+            bidValueWei: weiAmount,
+          });
+        } catch (chainErr) {
+          toast.error(
+            `On-chain bid failed: ${chainErr instanceof Error ? chainErr.message : 'unknown'}`
+          );
+          return;
+        }
+      }
+
+      // Phase 2: record the off-chain bid row keyed by the on-chain tx hash.
       await placeBid.mutateAsync({
         slotId,
         amount: weiAmount,
-        txHash: '0x_placeholder_pending_contract_integration',
+        txHash: txHash || '0x_offchain_only',
         brandName: brandName.trim(),
         creativeUrl: creativeUrl.trim() || undefined,
       });
@@ -154,6 +175,18 @@ export function SlotDetailPage() {
       return;
     }
     try {
+      // On-chain accept first when the slot has an on-chain id.
+      const onChainSlotId = (slot as any)?.onChainSlotId;
+      if (onChainSlotId != null && Number.isFinite(Number(onChainSlotId))) {
+        try {
+          await adPlacementWrite.acceptBid({ slotId: BigInt(onChainSlotId) });
+        } catch (chainErr) {
+          toast.error(
+            `On-chain acceptBid failed: ${chainErr instanceof Error ? chainErr.message : 'unknown'}`
+          );
+          return;
+        }
+      }
       await acceptBid.mutateAsync({ slotId });
       toast.success('Bid accepted — sponsorship is now active!');
       navigate({ to: '/adplacements' });

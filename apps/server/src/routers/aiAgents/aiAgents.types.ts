@@ -49,6 +49,10 @@ export const createAIAgentSchema = z.object({
   universeId: z.string().optional(),
   permissions: z.array(z.enum(AI_AGENT_PERMISSIONS)).min(1),
   creditBudgetPeriod: z.enum(['monthly', 'total']).default('total'),
+  /** When true, generation/image steps bill against the agent owner's BYOK
+   *  API keys instead of platform credits. The agent owner's wallet still
+   *  pays for any on-chain operations regardless. */
+  useBYOK: z.boolean().default(false),
 });
 
 export const updateAIAgentSchema = z.object({
@@ -58,6 +62,7 @@ export const updateAIAgentSchema = z.object({
   avatarUrl: z.string().url().optional(),
   permissions: z.array(z.enum(AI_AGENT_PERMISSIONS)).min(1).optional(),
   creditBudgetPeriod: z.enum(['monthly', 'total']).optional(),
+  useBYOK: z.boolean().optional(),
 });
 
 // ── Document interfaces ────────────────────────────────────────────────
@@ -77,6 +82,7 @@ export interface AIAgentDoc {
   creditSourceUid: string;
   creditSourceType: 'personal' | 'universe_pool';
   status: 'active' | 'paused' | 'disabled';
+  useBYOK: boolean;
   lastRunAt: Date | null;
   totalRunCount: number;
   createdAt: Date;

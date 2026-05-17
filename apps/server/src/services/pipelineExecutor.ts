@@ -17,6 +17,56 @@ import {
   type PipelineRunStep,
 } from '../routers/aiAgents/aiAgents.types';
 import { deductAgentCredits, refundAgentCredits } from './aiAgentCredits';
+import { executeTransaction, getOrCreateWallet } from '../lib/circle-wallets';
+import { encodeFunctionData, type Abi, type Hex } from 'viem';
+
+// Minimal ABIs for the on-chain actions the executor can sign. Kept inline
+// to avoid pulling the full @loar/abis dist into the server bundle — only
+// the function signatures we actually invoke.
+const STORY_BOUNTIES_POST_ABI = [
+  {
+    type: 'function',
+    name: 'postBounty',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'universeId', type: 'uint256' },
+      { name: 'reward', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+      { name: 'contentType', type: 'string' },
+    ],
+    outputs: [{ name: 'bountyId', type: 'uint256' }],
+  },
+] as const satisfies Abi;
+
+const EPISODE_NFT_MINT_ABI = [
+  {
+    type: 'function',
+    name: 'createEpisode',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'metadataURI', type: 'string' },
+      { name: 'mintPrice', type: 'uint256' },
+      { name: 'maxSupply', type: 'uint256' },
+      { name: 'royaltyBps', type: 'uint256' },
+    ],
+    outputs: [{ name: 'episodeId', type: 'uint256' }],
+  },
+] as const satisfies Abi;
+
+const CANON_MARKETPLACE_SUBMIT_ABI = [
+  {
+    type: 'function',
+    name: 'submit',
+    stateMutability: 'payable',
+    inputs: [
+      { name: 'universeId', type: 'uint256' },
+      { name: 'subType', type: 'uint8' },
+      { name: 'contentHash', type: 'bytes32' },
+      { name: 'metadataURI', type: 'string' },
+    ],
+    outputs: [{ name: 'submissionId', type: 'uint256' }],
+  },
+] as const satisfies Abi;
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -25,6 +75,55 @@ interface AgentContext {
   createdByUid: string;
   universeId: string | null;
   permissions: AIAgentPermission[];
+  /** G3: when true, generation/image actions tag their queued docs with
+   *  `useBYOK: true` so the downstream worker bills against the agent
+   *  owner's stored API keys instead of platform credits. */
+  useBYOK: boolean;
+  /** G1: which EVM chain on-chain actions should target. Default is Base
+   *  Sepolia (84532) for testnet; the agent owner's Circle DCW wallet is
+   *  resolved at execution time. */
+  chainId: number;
+}
+
+// ── G1 helper: sign an EVM tx via the agent owner's Circle DCW ─────────
+//
+// Encodes the function call, fetches or provisions the owner's wallet, and
+// submits the contract execution. Synchronous path — waits up to 60s for
+// COMPLETE state. Throws on any error so the pipeline step's retry loop
+// can decide whether to abort.
+
+interface AgentEvmTxInput {
+  ownerUid: string;
+  contractAddress: string;
+  abi: Abi;
+  functionName: string;
+  args: readonly unknown[];
+  value?: string; // wei as string
+  chainId: number;
+}
+
+async function executeAgentEvmTx(input: AgentEvmTxInput): Promise<{ txHash: string }> {
+  const wallet = await getOrCreateWallet(input.ownerUid, input.chainId);
+  const calldata = encodeFunctionData({
+    abi: input.abi,
+    functionName: input.functionName,
+    args: input.args,
+  }) as Hex;
+
+  const result = await executeTransaction({
+    walletId: wallet.walletId,
+    contractAddress: input.contractAddress,
+    calldata,
+    chainId: input.chainId,
+    value: input.value,
+  });
+
+  if (!result.txHash) {
+    throw new Error(
+      `On-chain action returned no tx hash (state: ${result.state}, txId: ${result.txId})`
+    );
+  }
+  return { txHash: result.txHash };
 }
 
 interface StepResult {
@@ -119,13 +218,16 @@ const ACTION_REGISTRY: Record<string, ActionHandler> = {
       userId: ctx.createdByUid,
       aiAgentId: ctx.agentId,
       universeId: ctx.universeId,
+      useBYOK: ctx.useBYOK,
       status: 'queued',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
     const ref = await generationsCol.add(gen);
-    return { output: { generationId: ref.id, ...gen }, creditsUsed: 15 };
+    // BYOK runs bill against the agent owner's external provider account,
+    // not the platform's credit pool. Skip the platform-credit deduction.
+    return { output: { generationId: ref.id, ...gen }, creditsUsed: ctx.useBYOK ? 0 : 15 };
   },
 
   'image.generate': async (input, ctx) => {
@@ -137,13 +239,14 @@ const ACTION_REGISTRY: Record<string, ActionHandler> = {
       userId: ctx.createdByUid,
       aiAgentId: ctx.agentId,
       universeId: ctx.universeId,
+      useBYOK: ctx.useBYOK,
       status: 'queued',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
     const ref = await generationsCol.add(gen);
-    return { output: { generationId: ref.id, ...gen }, creditsUsed: 5 };
+    return { output: { generationId: ref.id, ...gen }, creditsUsed: ctx.useBYOK ? 0 : 5 };
   },
 
   'marketplace.submit': async (input, ctx) => {
@@ -214,6 +317,84 @@ const ACTION_REGISTRY: Record<string, ActionHandler> = {
 
     const ref = await contentCol.add(content);
     return { output: { contentId: ref.id, ...content }, creditsUsed: 0 };
+  },
+
+  // ── On-chain actions (G1: server-signed via owner's Circle DCW) ──────
+
+  /** Post a bounty on the StoryBounties contract. Requires the agent owner's
+   *  Circle DCW wallet to be funded with $LOAR for the escrow deposit and a
+   *  little ETH for gas. The off-chain bounty record (Firestore) is written
+   *  by a separate `bounty.create` action that follows this step. */
+  'onchain.bounty.post': async (input, ctx) => {
+    const contractAddress = (input.contractAddress as string) || process.env.STORY_BOUNTIES_ADDRESS;
+    if (!contractAddress) throw new Error('STORY_BOUNTIES_ADDRESS not configured');
+
+    const reward = input.reward as string;
+    const deadline = input.deadline as number;
+    const universeIdNum = input.universeIdOnChain as number;
+    const contentType = (input.contentType as string) || 'other';
+
+    const { txHash } = await executeAgentEvmTx({
+      ownerUid: ctx.createdByUid,
+      contractAddress,
+      abi: STORY_BOUNTIES_POST_ABI,
+      functionName: 'postBounty',
+      args: [BigInt(universeIdNum ?? 0), BigInt(reward), BigInt(deadline), contentType],
+      chainId: ctx.chainId,
+    });
+
+    return { output: { txHash, contractAddress, reward, deadline }, creditsUsed: 0 };
+  },
+
+  /** Mint an EpisodeNFT for content the agent created. The owner must already
+   *  hold rights to the underlying content (enforced server-side at the
+   *  upstream `nft.mintContent` mutation when actingUid resolves). */
+  'onchain.nft.mintEpisode': async (input, ctx) => {
+    const contractAddress = (input.contractAddress as string) || process.env.EPISODE_NFT_ADDRESS;
+    if (!contractAddress) throw new Error('EPISODE_NFT_ADDRESS not configured');
+
+    const metadataURI = input.metadataURI as string;
+    const mintPrice = input.mintPrice as string;
+    const maxSupply = (input.maxSupply as number) ?? 0;
+    const royaltyBps = (input.royaltyBps as number) ?? 500;
+
+    const { txHash } = await executeAgentEvmTx({
+      ownerUid: ctx.createdByUid,
+      contractAddress,
+      abi: EPISODE_NFT_MINT_ABI,
+      functionName: 'createEpisode',
+      args: [metadataURI, BigInt(mintPrice), BigInt(maxSupply), BigInt(royaltyBps)],
+      chainId: ctx.chainId,
+    });
+
+    return { output: { txHash, contractAddress, metadataURI }, creditsUsed: 0 };
+  },
+
+  /** Submit a canon proposal on-chain via CanonMarketplace. Off-chain
+   *  Firestore mirror is `marketplace.submit` (above) — typically both steps
+   *  run sequentially in a pipeline. */
+  'onchain.marketplace.submit': async (input, ctx) => {
+    const contractAddress =
+      (input.contractAddress as string) || process.env.CANON_MARKETPLACE_ADDRESS;
+    if (!contractAddress) throw new Error('CANON_MARKETPLACE_ADDRESS not configured');
+
+    const universeIdNum = input.universeIdOnChain as number;
+    const subType = (input.subType as number) ?? 0;
+    const contentHash = input.contentHash as Hex;
+    const metadataURI = input.metadataURI as string;
+    const submissionFee = (input.submissionFee as string) ?? '0';
+
+    const { txHash } = await executeAgentEvmTx({
+      ownerUid: ctx.createdByUid,
+      contractAddress,
+      abi: CANON_MARKETPLACE_SUBMIT_ABI,
+      functionName: 'submit',
+      args: [BigInt(universeIdNum), subType, contentHash, metadataURI],
+      value: submissionFee,
+      chainId: ctx.chainId,
+    });
+
+    return { output: { txHash, contractAddress, contentHash }, creditsUsed: 0 };
   },
 
   'wiki.generate': async (input, ctx) => {

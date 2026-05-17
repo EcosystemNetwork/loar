@@ -87,6 +87,7 @@ import { Route as CreateKindRouteImport } from './routes/create/$kind'
 import { Route as CharactersUniverseIdRouteImport } from './routes/characters.$universeId'
 import { Route as CanvasCanvasIdRouteImport } from './routes/canvas.$canvasId'
 import { Route as CanonUniverseIdRouteImport } from './routes/canon/$universeId'
+import { Route as BrandDashboardRouteImport } from './routes/brand/dashboard'
 import { Route as BountiesMineRouteImport } from './routes/bounties/mine'
 import { Route as BountiesBountyIdRouteImport } from './routes/bounties/$bountyId'
 import { Route as AnatomyUniverseRouteImport } from './routes/anatomy.$universe'
@@ -513,6 +514,11 @@ const CanonUniverseIdRoute = CanonUniverseIdRouteImport.update({
   path: '/canon/$universeId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BrandDashboardRoute = BrandDashboardRouteImport.update({
+  id: '/brand/dashboard',
+  path: '/brand/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BountiesMineRoute = BountiesMineRouteImport.update({
   id: '/bounties/mine',
   path: '/bounties/mine',
@@ -743,6 +749,7 @@ export interface FileRoutesByFullPath {
   '/anatomy/$universe': typeof AnatomyUniverseRoute
   '/bounties/$bountyId': typeof BountiesBountyIdRoute
   '/bounties/mine': typeof BountiesMineRoute
+  '/brand/dashboard': typeof BrandDashboardRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
   '/canvas/$canvasId': typeof CanvasCanvasIdRoute
   '/characters/$universeId': typeof CharactersUniverseIdRoute
@@ -858,6 +865,7 @@ export interface FileRoutesByTo {
   '/anatomy/$universe': typeof AnatomyUniverseRoute
   '/bounties/$bountyId': typeof BountiesBountyIdRoute
   '/bounties/mine': typeof BountiesMineRoute
+  '/brand/dashboard': typeof BrandDashboardRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
   '/canvas/$canvasId': typeof CanvasCanvasIdRoute
   '/characters/$universeId': typeof CharactersUniverseIdRoute
@@ -974,6 +982,7 @@ export interface FileRoutesById {
   '/anatomy/$universe': typeof AnatomyUniverseRoute
   '/bounties/$bountyId': typeof BountiesBountyIdRoute
   '/bounties/mine': typeof BountiesMineRoute
+  '/brand/dashboard': typeof BrandDashboardRoute
   '/canon/$universeId': typeof CanonUniverseIdRoute
   '/canvas/$canvasId': typeof CanvasCanvasIdRoute
   '/characters/$universeId': typeof CharactersUniverseIdRoute
@@ -1091,6 +1100,7 @@ export interface FileRouteTypes {
     | '/anatomy/$universe'
     | '/bounties/$bountyId'
     | '/bounties/mine'
+    | '/brand/dashboard'
     | '/canon/$universeId'
     | '/canvas/$canvasId'
     | '/characters/$universeId'
@@ -1206,6 +1216,7 @@ export interface FileRouteTypes {
     | '/anatomy/$universe'
     | '/bounties/$bountyId'
     | '/bounties/mine'
+    | '/brand/dashboard'
     | '/canon/$universeId'
     | '/canvas/$canvasId'
     | '/characters/$universeId'
@@ -1321,6 +1332,7 @@ export interface FileRouteTypes {
     | '/anatomy/$universe'
     | '/bounties/$bountyId'
     | '/bounties/mine'
+    | '/brand/dashboard'
     | '/canon/$universeId'
     | '/canvas/$canvasId'
     | '/characters/$universeId'
@@ -1437,6 +1449,7 @@ export interface RootRouteChildren {
   AnatomyUniverseRoute: typeof AnatomyUniverseRoute
   BountiesBountyIdRoute: typeof BountiesBountyIdRoute
   BountiesMineRoute: typeof BountiesMineRoute
+  BrandDashboardRoute: typeof BrandDashboardRoute
   CanonUniverseIdRoute: typeof CanonUniverseIdRoute
   CharactersUniverseIdRoute: typeof CharactersUniverseIdRoute
   CreateKindRoute: typeof CreateKindRoute
@@ -2034,6 +2047,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CanonUniverseIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/brand/dashboard': {
+      id: '/brand/dashboard'
+      path: '/brand/dashboard'
+      fullPath: '/brand/dashboard'
+      preLoaderRoute: typeof BrandDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/bounties/mine': {
       id: '/bounties/mine'
       path: '/bounties/mine'
@@ -2429,6 +2449,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnatomyUniverseRoute: AnatomyUniverseRoute,
   BountiesBountyIdRoute: BountiesBountyIdRoute,
   BountiesMineRoute: BountiesMineRoute,
+  BrandDashboardRoute: BrandDashboardRoute,
   CanonUniverseIdRoute: CanonUniverseIdRoute,
   CharactersUniverseIdRoute: CharactersUniverseIdRoute,
   CreateKindRoute: CreateKindRoute,
