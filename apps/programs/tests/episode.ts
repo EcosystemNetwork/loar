@@ -33,7 +33,7 @@ describe('episode', () => {
     if (!uCfg) {
       await universe.methods
         .initializeConfig()
-        .accounts({
+        .accountsPartial({
           admin: creator.publicKey,
           config: universeConfigPda,
           systemProgram: SystemProgram.programId,
@@ -44,7 +44,7 @@ describe('episode', () => {
     if (!eCfg) {
       await episode.methods
         .initializeConfig()
-        .accounts({
+        .accountsPartial({
           admin: creator.publicKey,
           config: episodeConfigPda,
           systemProgram: SystemProgram.programId,
@@ -58,7 +58,7 @@ describe('episode', () => {
     );
     await universe.methods
       .initializeUniverse(Array.from(universeHash), Array.from(plotHash), { public: {} } as never)
-      .accounts({
+      .accountsPartial({
         creator: creator.publicKey,
         universe: universePda,
         config: universeConfigPda,
@@ -78,7 +78,7 @@ describe('episode', () => {
     const [pda] = episodeRecordPda(episodeHashA);
     await episode.methods
       .mintEpisode(Array.from(episodeHashA), 'ipfs://bafy...', 'Pilot')
-      .accounts({
+      .accountsPartial({
         creator: creator.publicKey,
         universe: universePda,
         episodeRecord: pda,
@@ -99,7 +99,7 @@ describe('episode', () => {
     try {
       await episode.methods
         .mintEpisode(Array.from(bogusHash), longUri, 'X')
-        .accounts({
+        .accountsPartial({
           creator: creator.publicKey,
           universe: universePda,
           episodeRecord: pda,
@@ -123,7 +123,7 @@ describe('episode', () => {
     try {
       await episode.methods
         .mintEpisode(Array.from(otherHash), 'ipfs://x', 'Y')
-        .accounts({
+        .accountsPartial({
           creator: intruder.publicKey,
           universe: universePda,
           episodeRecord: pda,
@@ -142,7 +142,7 @@ describe('episode', () => {
     const [pda] = episodeRecordPda(episodeHashA);
     await episode.methods
       .canonize()
-      .accounts({ signer: creator.publicKey, episodeRecord: pda, config: episodeConfigPda })
+      .accountsPartial({ signer: creator.publicKey, episodeRecord: pda, config: episodeConfigPda })
       .rpc();
     const rec = await episode.account.episodeRecord.fetch(pda);
     expect(rec.isCanon).to.equal(true);
@@ -151,7 +151,11 @@ describe('episode', () => {
     try {
       await episode.methods
         .canonize()
-        .accounts({ signer: creator.publicKey, episodeRecord: pda, config: episodeConfigPda })
+        .accountsPartial({
+          signer: creator.publicKey,
+          episodeRecord: pda,
+          config: episodeConfigPda,
+        })
         .rpc();
     } catch (e) {
       err = e;
@@ -162,7 +166,7 @@ describe('episode', () => {
   it('blocks mint_episode while paused, then resumes after unpause', async () => {
     await episode.methods
       .pause()
-      .accounts({ admin: creator.publicKey, config: episodeConfigPda })
+      .accountsPartial({ admin: creator.publicKey, config: episodeConfigPda })
       .rpc();
 
     const [pda] = episodeRecordPda(episodeHashPaused);
@@ -170,7 +174,7 @@ describe('episode', () => {
     try {
       await episode.methods
         .mintEpisode(Array.from(episodeHashPaused), 'ipfs://x', 'Z')
-        .accounts({
+        .accountsPartial({
           creator: creator.publicKey,
           universe: universePda,
           episodeRecord: pda,
@@ -185,12 +189,12 @@ describe('episode', () => {
 
     await episode.methods
       .unpause()
-      .accounts({ admin: creator.publicKey, config: episodeConfigPda })
+      .accountsPartial({ admin: creator.publicKey, config: episodeConfigPda })
       .rpc();
 
     await episode.methods
       .mintEpisode(Array.from(episodeHashPaused), 'ipfs://x', 'Z')
-      .accounts({
+      .accountsPartial({
         creator: creator.publicKey,
         universe: universePda,
         episodeRecord: pda,
@@ -210,7 +214,7 @@ describe('episode', () => {
     try {
       await episode.methods
         .pause()
-        .accounts({ admin: intruder.publicKey, config: episodeConfigPda })
+        .accountsPartial({ admin: intruder.publicKey, config: episodeConfigPda })
         .signers([intruder])
         .rpc();
     } catch (e) {

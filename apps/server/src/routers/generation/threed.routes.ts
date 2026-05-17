@@ -42,6 +42,7 @@ import { getPlatformConfig } from '../../services/platformConfig';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
+import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 import { TRPCError } from '@trpc/server';
 
 const clientTokenSchema = z
@@ -595,6 +596,19 @@ export const threedRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const genId = randomUUID();
+
+      // SSRF guard: every image URL the server hands to Meshy must be a
+      // public address. Reject loopback / RFC1918 / IMDS / link-local up front.
+      for (const u of input.imageUrls) {
+        try {
+          assertSafeExternalUrl(u);
+        } catch (err) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: err instanceof Error ? err.message : 'imageUrls rejected',
+          });
+        }
+      }
 
       // Validate webhookUrl early.
       let validatedWebhookUrl: string | undefined;

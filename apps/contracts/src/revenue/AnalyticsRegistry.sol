@@ -65,6 +65,8 @@ contract AnalyticsRegistry is
     event TrendingUpdated(uint256[] universeIds);
 
     error NotPlatform();
+    error ZeroAddress();
+    error TooManyTrending();
 
     modifier onlyPlatform() {
         _checkPlatform();
@@ -81,7 +83,7 @@ contract AnalyticsRegistry is
     }
 
     function initialize(address _platform) external initializer {
-        require(_platform != address(0), "Zero address");
+        if (_platform == address(0)) revert ZeroAddress();
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __Pausable_init();
@@ -185,7 +187,7 @@ contract AnalyticsRegistry is
     ///      an editorial signal, not a neutral ranking. Transparency is enforced by the
     ///      `TrendingUpdated(ids)` event and the `onlyPlatform` gate.
     function setTrending(uint256[] calldata universeIds) external onlyPlatform whenNotPaused {
-        require(universeIds.length <= MAX_TRENDING, "Too many trending");
+        if (universeIds.length > MAX_TRENDING) revert TooManyTrending();
         trendingUniverseIds = universeIds;
 
         emit TrendingUpdated(universeIds);

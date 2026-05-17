@@ -27,6 +27,7 @@ import {
   expensiveProcedure,
 } from '../../lib/trpc';
 import { TRPCError } from '@trpc/server';
+import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { falService } from '../../services/fal';
@@ -1189,6 +1190,16 @@ export const imageRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      for (const ctrl of input.controls) {
+        try {
+          assertSafeExternalUrl(ctrl.guideImageUrl);
+        } catch (err) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: err instanceof Error ? err.message : 'guideImageUrl rejected',
+          });
+        }
+      }
       input.prompt = sanitizePrompt(input.prompt);
       if (input.negativePrompt) input.negativePrompt = sanitizePrompt(input.negativePrompt);
 
@@ -1739,6 +1750,16 @@ export const imageRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      for (const u of input.imageUrls) {
+        try {
+          assertSafeExternalUrl(u);
+        } catch (err) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: err instanceof Error ? err.message : 'imageUrl rejected',
+          });
+        }
+      }
       const cost = 3;
       await deductLegacyCredits(ctx.user.uid, cost);
       input.prompt = sanitizePrompt(input.prompt);
@@ -1823,6 +1844,16 @@ export const imageRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      for (const u of input.imageUrls) {
+        try {
+          assertSafeExternalUrl(u);
+        } catch (err) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: err instanceof Error ? err.message : 'imageUrl rejected',
+          });
+        }
+      }
       const cost = 3;
       await deductLegacyCredits(ctx.user.uid, cost);
       input.prompt = sanitizePrompt(input.prompt);

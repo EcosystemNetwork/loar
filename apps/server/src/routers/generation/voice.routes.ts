@@ -45,6 +45,7 @@ import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 import { publishToGallery } from '../../lib/gallery-publish';
 import { TRPCError } from '@trpc/server';
+import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 
 // Idempotency token regex shared across voice procedures.
 const clientTokenSchema = z
@@ -856,6 +857,14 @@ export const voiceRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      try {
+        assertSafeExternalUrl(input.audioUrl);
+      } catch (err) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: err instanceof Error ? err.message : 'audioUrl rejected',
+        });
+      }
       // C1 + C2 + H8: source-asset IDOR, voice allowlist, and (below) content-type check
       const { assertEditSourceAuthorized } = await import('../../lib/edit-source-authz');
       const { assertVoiceIdAllowed } = await import('../../lib/voice-authz');

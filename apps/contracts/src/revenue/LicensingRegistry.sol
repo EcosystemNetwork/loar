@@ -111,6 +111,7 @@ contract LicensingRegistry is
     error MerchNotActive();
     error InsufficientPayment();
     error FeeTooHigh();
+    error UniverseManagerNotSet();
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
@@ -169,7 +170,7 @@ contract LicensingRegistry is
     /// @dev REVENUE-01 FIX: Creator is now looked up on-chain via UniverseManager.ownerOf()
     ///      instead of trusting platform-supplied address.
     function registerUniverse(uint256 universeId) external onlyPlatform {
-        require(universeManager != address(0), "Universe manager not set");
+        if (universeManager == address(0)) revert UniverseManagerNotSet();
         // REVENUE-01: Read creator from on-chain source of truth
         address creator = IERC721(universeManager).ownerOf(universeId);
         if (creator == address(0)) revert ZeroAddress();
@@ -185,7 +186,7 @@ contract LicensingRegistry is
     ///      mapping is retained only as a "has-been-registered" flag.
     function _currentCreator(uint256 universeId) internal view returns (address) {
         address um = universeManager;
-        require(um != address(0), "Universe manager not set");
+        if (um == address(0)) revert UniverseManagerNotSet();
         return IERC721(um).ownerOf(universeId);
     }
 

@@ -10,6 +10,7 @@
  */
 import { createFileRoute, Link, useSearch, useNavigate } from '@tanstack/react-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useVideoLoad } from '@/hooks/useVideoLoad';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { z } from 'zod';
@@ -282,6 +283,80 @@ function EntityTab({ kind, universeAddress }: { kind: EntityKind; universeAddres
   );
 }
 
+/**
+ * TrendingTile — one card in the wiki's trending strip. Pulled out so each
+ * video instance can own its load state (queue slot + fade-in) instead of
+ * all of them firing their src at once and causing a flash of empty tiles.
+ */
+function TrendingTile({ item }: { item: any }) {
+  const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
+  const isAudio = item.mediaType === 'audio';
+  const is3D = item.mediaType === '3d' || item.mediaType === 'ai-3d';
+  const visualThumbnail =
+    isAudio || is3D
+      ? item.thumbnailUrl || item.imageUrl || null
+      : item.thumbnailUrl || item.imageUrl || item.mediaUrl || '/placeholder.jpg';
+  const { videoRef, ready, onLoaded } = useVideoLoad(isVideo ? item.mediaUrl : undefined);
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <div className="relative aspect-video rounded-lg overflow-hidden group cursor-pointer bg-gradient-to-br from-zinc-900 via-zinc-900/95 to-zinc-800">
+      {isVideo && item.mediaUrl ? (
+        <>
+          <video
+            ref={videoRef}
+            src={ready ? `${resolveIpfsUrl(item.mediaUrl)}#t=0.5` : undefined}
+            className={`w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            poster={resolveIpfsUrl(item.thumbnailUrl || item.imageUrl) || undefined}
+            onLoadedData={() => {
+              setLoaded(true);
+              onLoaded();
+            }}
+            onError={() => onLoaded()}
+            onMouseEnter={(e) => {
+              const p = e.currentTarget.play();
+              if (p) p.catch(() => {});
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.pause();
+              e.currentTarget.currentTime = 0;
+            }}
+          />
+          {!loaded && (
+            <div className="absolute inset-0 bg-[linear-gradient(110deg,transparent_25%,rgba(255,255,255,0.04)_50%,transparent_75%)] bg-[length:200%_100%] animate-shimmer pointer-events-none" />
+          )}
+        </>
+      ) : visualThumbnail ? (
+        <img
+          src={resolveIpfsUrl(visualThumbnail) || visualThumbnail}
+          alt={item.title || 'Trending'}
+          loading="lazy"
+          decoding="async"
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = '/placeholder.jpg';
+          }}
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          {is3D ? (
+            <Box className="h-8 w-8 text-amber-200/70" />
+          ) : (
+            <Music className="h-8 w-8 text-emerald-200/70" />
+          )}
+        </div>
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+      <div className="absolute bottom-2 left-2 text-white text-xs font-medium truncate max-w-[90%]">
+        {item.title || 'Untitled'}
+      </div>
+    </div>
+  );
+}
+
 type GalleryMediaType = 'all' | 'video' | 'image' | 'audio' | '3d';
 type GalleryOrigin = 'all' | 'generated' | 'uploaded';
 type GallerySort = 'newest' | 'trending' | 'price_asc' | 'price_desc';
@@ -327,65 +402,9 @@ function GalleryTab({ universeAddress }: { universeAddress?: string }) {
               Trending
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {trending.slice(0, 4).map((item: any) => {
-                const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
-                const isAudio = item.mediaType === 'audio';
-                const is3D = item.mediaType === '3d' || item.mediaType === 'ai-3d';
-                // 3D/audio mediaUrl is a .glb/.mp3 — never use as an <img> source.
-                const visualThumbnail =
-                  isAudio || is3D
-                    ? item.thumbnailUrl || item.imageUrl || null
-                    : item.thumbnailUrl || item.imageUrl || item.mediaUrl || '/placeholder.jpg';
-                return (
-                  <div
-                    key={item.id}
-                    className="relative aspect-video rounded-lg overflow-hidden group cursor-pointer"
-                  >
-                    {isVideo && item.mediaUrl ? (
-                      <video
-                        src={`${resolveIpfsUrl(item.mediaUrl)}#t=0.5`}
-                        className="w-full h-full object-cover"
-                        muted
-                        loop
-                        playsInline
-                        preload="metadata"
-                        poster={resolveIpfsUrl(item.thumbnailUrl || item.imageUrl) || undefined}
-                        onMouseEnter={(e) => {
-                          const p = e.currentTarget.play();
-                          if (p) p.catch(() => {});
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.pause();
-                          e.currentTarget.currentTime = 0;
-                        }}
-                      />
-                    ) : visualThumbnail ? (
-                      <img
-                        src={resolveIpfsUrl(visualThumbnail) || visualThumbnail}
-                        alt={item.title || 'Trending'}
-                        loading="lazy"
-                        decoding="async"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).src = '/placeholder.jpg';
-                        }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-500/20 to-rose-500/20">
-                        {is3D ? (
-                          <Box className="h-8 w-8 text-foreground/60" />
-                        ) : (
-                          <Music className="h-8 w-8 text-foreground/60" />
-                        )}
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                    <div className="absolute bottom-2 left-2 text-white text-xs font-medium truncate max-w-[90%]">
-                      {item.title || 'Untitled'}
-                    </div>
-                  </div>
-                );
-              })}
+              {trending.slice(0, 4).map((item: any) => (
+                <TrendingTile key={item.id} item={item} />
+              ))}
             </div>
           </CardContent>
         </Card>

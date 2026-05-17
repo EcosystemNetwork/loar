@@ -84,6 +84,7 @@ import { splitsRouter } from './splits/splits.routes';
 import { universeGenConfigRouter } from './universeGenConfig/universeGenConfig.routes';
 import { contentLicensingRouter } from './contentLicensing/contentLicensing.routes';
 import { likenessMarketplaceRouter } from './likenessMarketplace/likenessMarketplace.routes';
+import { personaRouter } from './persona/persona.routes';
 import { galleryRouter } from './gallery/gallery.routes';
 import { moderationRouter } from './moderation/moderation.routes';
 import { stripeRouter } from './credits/stripe.routes';
@@ -99,6 +100,7 @@ import { canvasRouter } from './canvas/canvas.routes';
 import { pollsRouter } from './polls/polls.routes';
 import { notificationsRouter } from './notifications/notifications.routes';
 import { lipsyncRouter } from './generation/lipsync.routes';
+import { captionsRouter } from './generation/captions.routes';
 import { cutdownRouter } from './generation/cutdown.routes';
 import { sceneAudioRouter } from './generation/sceneAudio.routes';
 import { talkingSceneRouter } from './generation/talking-scene.routes';
@@ -236,6 +238,7 @@ export const appRouter = router({
   outpaint: outpaintRouter,
   lora: loraRouter,
   lipsync: lipsyncRouter,
+  captions: captionsRouter,
   cutdown: cutdownRouter,
   sceneAudio: sceneAudioRouter,
   talkingScene: talkingSceneRouter,
@@ -322,6 +325,8 @@ export const appRouter = router({
   contentLicensing: contentLicensingRouter,
   // Verified Likeness Marketplace — voice/likeness sale/lease/license (PRD 8)
   likenessMarketplace: likenessMarketplaceRouter,
+  // Persona Packages — bundle voice + likeness + 3D + personality (PRD 9)
+  persona: personaRouter,
   gallery: galleryRouter,
 
   // ── Platform Subscriptions ──────────────────────────────────────────

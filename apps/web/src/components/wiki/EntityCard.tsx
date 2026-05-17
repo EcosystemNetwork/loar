@@ -94,9 +94,9 @@ export function EntityCard({ entity, showActions = true }: EntityCardProps) {
         onMouseEnter={() => setLikeQueryEnabled(true)}
       >
         <Link to="/wiki/entity/$id" params={{ id: entity.id }} className="block">
-          <div className="aspect-video w-full overflow-hidden relative bg-muted">
+          <div className="aspect-video w-full overflow-hidden relative bg-gradient-to-br from-zinc-900 via-zinc-900/95 to-zinc-800">
             <div className="absolute inset-0 flex items-center justify-center">
-              <KindIcon className="h-10 w-10 text-muted-foreground/30" />
+              <KindIcon className="h-10 w-10 text-white/20" />
             </div>
             {entity.imageUrl && (
               <img
@@ -104,7 +104,10 @@ export function EntityCard({ entity, showActions = true }: EntityCardProps) {
                 alt={entity.name}
                 loading="lazy"
                 decoding="async"
-                className="absolute inset-0 w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-500"
+                onLoad={(e) => {
+                  e.currentTarget.style.opacity = '1';
+                }}
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                 }}

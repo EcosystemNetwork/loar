@@ -131,6 +131,38 @@ contract TimelockFactoryTest is Test {
         factory.wireProposer(address(0), universeGovernor);
     }
 
+    /// SC-1 invariant: if the factory has somehow been stripped of
+    /// DEFAULT_ADMIN_ROLE on a timelock it deployed (e.g. an attacker who
+    /// previously held admin revoked it), `wireProposer` must NOT silently
+    /// no-op. `renounceRole` is a no-op when the caller doesn't hold the
+    /// role, so without this guard wireProposer could "succeed" while
+    /// leaving the timelock unmanaged.
+    function test_wireProposer_revertsWhenFactoryAdminLost() public {
+        vm.prank(authorizedDeployer);
+        address tl = factory.deployTimelock(6, 0);
+
+        // Simulate the malicious-admin-flip: factory renounces its own admin.
+        vm.prank(address(factory));
+        TimelockController(payable(tl)).renounceRole(DEFAULT_ADMIN_ROLE, address(factory));
+
+        vm.prank(authorizedDeployer);
+        vm.expectRevert(TimelockFactory.FactoryAdminLost.selector);
+        factory.wireProposer(tl, universeGovernor);
+
+        // Failed wire must leave the slot retryable — `wired[tl]` stays false
+        // so a future privileged operator (if admin is somehow re-granted) can
+        // still complete the wiring instead of being permanently locked out.
+        assertFalse(factory.wired(tl));
+
+        // Verify the governor never received any role on the stripped timelock.
+        TimelockController controller = TimelockController(payable(tl));
+        assertFalse(
+            controller.hasRole(PROPOSER_ROLE, universeGovernor),
+            "governor must not hold PROPOSER_ROLE after a failed wire"
+        );
+        assertFalse(controller.hasRole(CANCELLER_ROLE, universeGovernor));
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // TIMELOCK-02 — Authorization gates
     // ─────────────────────────────────────────────────────────────────────────
@@ -241,10 +273,11 @@ contract TimelockFactoryTest is Test {
     function test_deployTimelock_emitsEventWithDeployer() public {
         // We do not know the deployed timelock address ahead of time, so check
         // only the indexed universeId + deployer + the data field minDelay.
+        uint256 defaultMinDelay = factory.DEFAULT_MIN_DELAY();
         vm.prank(authorizedDeployer);
         vm.expectEmit(false, true, true, true);
         emit TimelockFactory.TimelockDeployed(
-            address(0), 40, factory.DEFAULT_MIN_DELAY(), authorizedDeployer
+            address(0), 40, defaultMinDelay, authorizedDeployer
         );
         factory.deployTimelock(40, 0);
     }

@@ -28,6 +28,7 @@ import {
   Globe,
   Wand2,
   Shuffle,
+  Captions,
 } from 'lucide-react';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -39,11 +40,22 @@ import { VoiceMixer } from '@/components/voice-studio/VoiceMixer';
 import { ScriptEditor } from '@/components/voice-studio/ScriptEditor';
 import { MultiTrackEditor } from '@/components/voice-studio/MultiTrackEditor';
 import { MultilingualPanel } from '@/components/voice-studio/MultilingualPanel';
+import { CaptionsPanel } from '@/components/voice-studio/CaptionsPanel';
 
 const searchSchema = z.object({
   episodeId: z.string().optional(),
   tab: z
-    .enum(['library', 'mine', 'create', 'clone', 'mix', 'script', 'multitrack', 'multilingual'])
+    .enum([
+      'library',
+      'mine',
+      'create',
+      'clone',
+      'mix',
+      'script',
+      'multitrack',
+      'multilingual',
+      'captions',
+    ])
     .optional(),
   projectId: z.string().optional(),
 });
@@ -88,7 +100,7 @@ function VoiceStudioPage() {
       </header>
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="grid grid-cols-4 lg:grid-cols-8">
+        <TabsList className="grid grid-cols-4 lg:grid-cols-9">
           <TabsTrigger value="library">
             <Library className="mr-1 size-3.5" /> Library
           </TabsTrigger>
@@ -112,6 +124,9 @@ function VoiceStudioPage() {
           </TabsTrigger>
           <TabsTrigger value="multilingual">
             <Globe className="mr-1 size-3.5" /> Multilingual
+          </TabsTrigger>
+          <TabsTrigger value="captions">
+            <Captions className="mr-1 size-3.5" /> Captions
           </TabsTrigger>
         </TabsList>
 
@@ -138,6 +153,9 @@ function VoiceStudioPage() {
         </TabsContent>
         <TabsContent value="multilingual" className="mt-4">
           <MultilingualPanel episodeId={episodeId} />
+        </TabsContent>
+        <TabsContent value="captions" className="mt-4">
+          <CaptionsPanel episodeId={episodeId} />
         </TabsContent>
       </Tabs>
     </div>

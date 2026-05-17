@@ -1,0 +1,21 @@
+[package]
+name = "premium_actions"
+version = "0.1.0"
+description = "Premium-action fee collector on Solana (formerly loar_burner; renamed for BURN-01 clarity — no supply destruction, only LP+treasury split). Sister to apps/contracts/src/revenue/PremiumActions.sol."
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "premium_actions"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
+anchor-spl = { version = "0.31.1", features = ["token", "associated_token"] }

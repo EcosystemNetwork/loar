@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Mic, Sparkles, Search, ShieldCheck, BadgeCheck } from 'lucide-react';
+import { Mic, Sparkles, Search, ShieldCheck, BadgeCheck, UserCircle2 } from 'lucide-react';
 import { formatEther } from 'viem';
 import { trpcClient } from '@/utils/trpc';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,7 +30,7 @@ export const Route = createFileRoute('/marketplace/likeness')({
 interface BrowseListing {
   id: string;
   entityId: string;
-  entityKind: 'voice' | 'likeness';
+  entityKind: 'voice' | 'likeness' | 'persona';
   title: string;
   description: string;
   thumbnailUrl: string | null;
@@ -55,7 +55,7 @@ function formatEthDisplay(wei: string): string {
 }
 
 function LikenessMarketplacePage() {
-  const [kind, setKind] = useState<'voice' | 'likeness' | null>(null);
+  const [kind, setKind] = useState<'voice' | 'likeness' | 'persona' | null>(null);
   const [modality, setModality] = useState<LikenessModality | null>(null);
   const [dealType, setDealType] = useState<LikenessDealType | null>(null);
   const [search, setSearch] = useState('');
@@ -129,6 +129,14 @@ function LikenessMarketplacePage() {
             <Sparkles className="size-3.5 mr-1" />
             Likenesses
           </Button>
+          <Button
+            size="sm"
+            variant={kind === 'persona' ? 'default' : 'outline'}
+            onClick={() => setKind('persona')}
+          >
+            <UserCircle2 className="size-3.5 mr-1" />
+            Personas
+          </Button>
         </div>
 
         {/* Deal type */}
@@ -198,78 +206,92 @@ function LikenessMarketplacePage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {listings.map((l) => (
-            <Link
-              key={l.id}
-              to="/marketplace/likeness/$listingId"
-              params={{ listingId: l.id }}
-              className="group"
-            >
-              <Card className="overflow-hidden transition-shadow hover:shadow-md h-full">
-                <div className="relative aspect-square bg-muted">
-                  {l.thumbnailUrl ? (
-                    <img
-                      src={l.thumbnailUrl}
-                      alt={l.title}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
+          {listings.map((l) => {
+            const linkProps =
+              l.entityKind === 'persona'
+                ? ({
+                    to: '/marketplace/persona/$personaId' as const,
+                    params: { personaId: l.entityId },
+                  } as const)
+                : ({
+                    to: '/marketplace/likeness/$listingId' as const,
+                    params: { listingId: l.id },
+                  } as const);
+            return (
+              <Link key={l.id} {...linkProps} className="group">
+                <Card className="overflow-hidden transition-shadow hover:shadow-md h-full">
+                  <div className="relative aspect-square bg-muted">
+                    {l.thumbnailUrl ? (
+                      <img
+                        src={l.thumbnailUrl}
+                        alt={l.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        {l.entityKind === 'voice' ? (
+                          <Mic className="size-12 text-muted-foreground/40" />
+                        ) : l.entityKind === 'persona' ? (
+                          <UserCircle2 className="size-12 text-muted-foreground/40" />
+                        ) : (
+                          <Sparkles className="size-12 text-muted-foreground/40" />
+                        )}
+                      </div>
+                    )}
+                    <Badge
+                      variant="secondary"
+                      className="absolute top-2 left-2 text-[10px] capitalize"
+                    >
                       {l.entityKind === 'voice' ? (
-                        <Mic className="size-12 text-muted-foreground/40" />
+                        <>
+                          <Mic className="size-2.5 mr-1" />
+                          Voice
+                        </>
+                      ) : l.entityKind === 'persona' ? (
+                        <>
+                          <UserCircle2 className="size-2.5 mr-1" />
+                          Persona
+                        </>
                       ) : (
-                        <Sparkles className="size-12 text-muted-foreground/40" />
+                        <>
+                          <Sparkles className="size-2.5 mr-1" />
+                          Likeness
+                        </>
+                      )}
+                    </Badge>
+                  </div>
+                  <CardContent className="p-3 space-y-2">
+                    <div className="flex items-start gap-1.5">
+                      <h3 className="font-semibold text-sm leading-tight truncate flex-1">
+                        {l.title}
+                      </h3>
+                      <BadgeCheck className="size-3.5 text-primary shrink-0 mt-0.5" />
+                    </div>
+                    {l.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-2">{l.description}</p>
+                    )}
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {l.buyPriceWei !== '0' && (
+                        <Badge variant="outline" className="text-[10px]">
+                          Buy {formatEthDisplay(l.buyPriceWei)}
+                        </Badge>
+                      )}
+                      {l.leasePricePerDayWei !== '0' && (
+                        <Badge variant="outline" className="text-[10px]">
+                          Lease {formatEthDisplay(l.leasePricePerDayWei)}/d
+                        </Badge>
+                      )}
+                      {l.licenseFeeWei !== '0' && (
+                        <Badge variant="outline" className="text-[10px]">
+                          License {formatEthDisplay(l.licenseFeeWei)}
+                        </Badge>
                       )}
                     </div>
-                  )}
-                  <Badge
-                    variant="secondary"
-                    className="absolute top-2 left-2 text-[10px] capitalize"
-                  >
-                    {l.entityKind === 'voice' ? (
-                      <>
-                        <Mic className="size-2.5 mr-1" />
-                        Voice
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="size-2.5 mr-1" />
-                        Likeness
-                      </>
-                    )}
-                  </Badge>
-                </div>
-                <CardContent className="p-3 space-y-2">
-                  <div className="flex items-start gap-1.5">
-                    <h3 className="font-semibold text-sm leading-tight truncate flex-1">
-                      {l.title}
-                    </h3>
-                    <BadgeCheck className="size-3.5 text-primary shrink-0 mt-0.5" />
-                  </div>
-                  {l.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-2">{l.description}</p>
-                  )}
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    {l.buyPriceWei !== '0' && (
-                      <Badge variant="outline" className="text-[10px]">
-                        Buy {formatEthDisplay(l.buyPriceWei)}
-                      </Badge>
-                    )}
-                    {l.leasePricePerDayWei !== '0' && (
-                      <Badge variant="outline" className="text-[10px]">
-                        Lease {formatEthDisplay(l.leasePricePerDayWei)}/d
-                      </Badge>
-                    )}
-                    {l.licenseFeeWei !== '0' && (
-                      <Badge variant="outline" className="text-[10px]">
-                        License {formatEthDisplay(l.licenseFeeWei)}
-                      </Badge>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

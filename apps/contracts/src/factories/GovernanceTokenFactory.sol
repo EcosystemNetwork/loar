@@ -53,9 +53,11 @@ contract GovernanceTokenFactory {
 
     error SymbolBlocked();
     error InvalidSymbolChar();
+    error NotOwner();
+    error InvalidSymbolLength();
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "Not owner");
+        if (msg.sender != owner) revert NotOwner();
         _;
     }
 
@@ -91,7 +93,7 @@ contract GovernanceTokenFactory {
         // GOV-03: Enforce symbol blocklist at deployment time (not post-hoc)
         if (blockedSymbols[symbol]) revert SymbolBlocked();
         // Validate symbol length
-        require(bytes(symbol).length >= 3 && bytes(symbol).length <= 10, "Invalid symbol length");
+        if (bytes(symbol).length < 3 || bytes(symbol).length > 10) revert InvalidSymbolLength();
 
         GovernanceERC20 token = new GovernanceERC20(
             name, symbol, imageURL, metadata, context, tokenAdmin, supply, mintTo

@@ -549,18 +549,20 @@ export function ActivityTicker() {
     const contentMap = new Map<string, NodeContent>();
     nodeContentData.forEach((c) => contentMap.set(c.id, c));
 
-    // Mirror Top10Strip ranking so the ticker surfaces the same 10 universes:
-    // pin "space fleet" first, then sort by nodeCount + token presence.
+    // Rank all universes (pin "space fleet" first, then score by nodeCount +
+    // token presence) and feed the entire ranked list to the marquee. The
+    // ticker needs as much content as possible so a single "copy" reliably
+    // spans the viewport — otherwise the -50% loop shows a gap.
     const isPinned = (u: Universe) => u.name?.trim().toLowerCase() === 'space fleet';
     const score = (u: Universe) =>
       (u.nodeCount || 0) * 100 +
       (u.tokenAddress && u.tokenAddress !== '0x0000000000000000000000000000000000000000' ? 50 : 0);
     const pinned = universesData.filter(isPinned);
     const rest = universesData.filter((u) => !isPinned(u)).sort((a, b) => score(b) - score(a));
-    const topTen = [...pinned, ...rest].slice(0, 10);
+    const ranked = [...pinned, ...rest];
 
-    // Latest node per universe — drives the action label so each top-10 entry
-    // reads with its most recent activity instead of a generic "trending".
+    // Latest node per universe — drives the action label so each entry reads
+    // with its most recent activity instead of a generic "trending".
     const latestNodeByUniverse = new Map<string, Node>();
     for (const n of nodesData) {
       const key = n.universeAddress.toLowerCase();
@@ -570,7 +572,7 @@ export function ActivityTicker() {
       }
     }
 
-    return topTen.map((u) => {
+    return ranked.map((u) => {
       const key = u.id.toLowerCase();
       const recentNode = latestNodeByUniverse.get(key);
       let action: string;
@@ -592,14 +594,19 @@ export function ActivityTicker() {
     });
   }, [nodesData, nodeContentData, universesData]);
 
-  // Marquee math: the `ticker` keyframe translates from 0 to -50%, so we
-  // render exactly 2 copies of the activity list side-by-side. As the first
-  // copy slides off the left, the second arrives in view — and since both
-  // halves are identical, the seam is invisible. If activity is too short
-  // for a full screen width the user sees the loop, but it still flows.
+  // Marquee math: the `ticker` keyframe translates from 0 to -50%, so the
+  // rendered list must be exactly 2 identical halves — when the first half
+  // slides off the left, the second half is already in view. Critically, a
+  // single half must be at least as wide as the viewport, otherwise the
+  // right edge goes blank during the loop ("runs out"). We over-pad one
+  // half to a minimum item count so even with few universes the marquee
+  // stays continuous on wide screens.
   const marqueeItems = useMemo(() => {
     if (activities.length === 0) return [];
-    return [...activities, ...activities];
+    const MIN_ITEMS_PER_HALF = 24;
+    const repeats = Math.max(1, Math.ceil(MIN_ITEMS_PER_HALF / activities.length));
+    const oneHalf = Array.from({ length: repeats }, () => activities).flat();
+    return [...oneHalf, ...oneHalf];
   }, [activities]);
 
   if (activities.length === 0) return null;

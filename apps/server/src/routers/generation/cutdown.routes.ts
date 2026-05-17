@@ -17,6 +17,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { trackQuests } from '../../services/quest-tracker';
 import { emitActivity } from '../../services/activity';
 import { TRPCError } from '@trpc/server';
+import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 
@@ -264,6 +265,14 @@ export const cutdownRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      try {
+        assertSafeExternalUrl(input.sourceVideoUrl);
+      } catch (err) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: err instanceof Error ? err.message : 'sourceVideoUrl rejected',
+        });
+      }
       const cutdownId = randomUUID();
       const userId = ctx.user.uid;
       const now = new Date();

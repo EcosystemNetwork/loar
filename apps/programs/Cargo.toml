@@ -13,6 +13,9 @@ members = [
   "programs/remix_fees",
   "programs/bonding_curve",
   "programs/canon_market",
+  "programs/fee_locker",
+  "programs/premium_actions",
+  "programs/collab_manager",
 ]
 
 [profile.release]

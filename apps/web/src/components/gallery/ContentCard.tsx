@@ -103,18 +103,19 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
       className="group overflow-hidden hover:shadow-lg transition-all duration-300 border-muted/50 cursor-pointer"
       onClick={onClick}
     >
-      {/* Thumbnail / Video */}
-      <div className="relative aspect-video overflow-hidden bg-muted">
+      {/* Thumbnail / Video — every variant sits on the same dark gradient base
+          so the grid stays visually even before any media has loaded. */}
+      <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-zinc-900 via-zinc-900/95 to-zinc-800">
         {isVideo && content.mediaUrl ? (
           <>
             <video
               ref={videoRef}
               src={videoReady ? `${resolveIpfsUrl(content.mediaUrl)}#t=0.5` : undefined}
-              className="w-full h-full object-cover"
+              className={`w-full h-full object-cover transition-opacity duration-500 ${videoLoaded ? 'opacity-100' : 'opacity-0'}`}
               muted
               loop
               playsInline
-              preload="none"
+              preload="metadata"
               poster={resolveIpfsUrl(content.thumbnailUrl || content.imageUrl) || undefined}
               onLoadedData={() => {
                 setVideoLoaded(true);
@@ -133,18 +134,32 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
                 e.currentTarget.currentTime = 0;
               }}
             />
-            {/* Loading placeholder shown until video frame loads */}
-            {!videoLoaded && !content.thumbnailUrl && !content.imageUrl && (
-              <div className="absolute inset-0 bg-gradient-to-br from-muted to-muted-foreground/20 flex items-center justify-center pointer-events-none">
-                <Film className="h-8 w-8 text-muted-foreground/40" />
+            {/* Skeleton shimmer behind every video tile — covered once the
+                first frame paints (videoLoaded → opacity-0). */}
+            {!videoLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="absolute inset-0 bg-[linear-gradient(110deg,transparent_25%,rgba(255,255,255,0.04)_50%,transparent_75%)] bg-[length:200%_100%] animate-shimmer" />
+                <Film className="h-8 w-8 text-white/30" />
               </div>
             )}
           </>
         ) : isAudio ? (
-          // Audio has no visual preview — render a waveform-style placeholder
-          // and expose the mp3 on click via the parent onClick handler.
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-500/20 to-cyan-500/20">
-            <Music className="h-10 w-10 text-foreground/60" />
+          // Audio has no visual preview — animated bars over the shared dark base.
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/15 to-cyan-500/15" />
+            <div className="relative flex items-end gap-1 h-10">
+              {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                <span
+                  key={i}
+                  className="block w-1 bg-emerald-300/70 rounded-sm animate-audio-bar"
+                  style={{
+                    height: `${30 + ((i * 17) % 70)}%`,
+                    animationDelay: `${i * 110}ms`,
+                  }}
+                />
+              ))}
+            </div>
+            <Music className="absolute bottom-3 right-3 h-4 w-4 text-emerald-200/60" />
           </div>
         ) : is3D ? (
           // 3D: prefer Meshy's rendered thumbnail; fall back to a cube glyph.
@@ -159,8 +174,9 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
               }}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-500/20 to-rose-500/20">
-              <Box className="h-10 w-10 text-foreground/60" />
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/15 to-rose-500/15" />
+              <Box className="relative h-10 w-10 text-amber-200/70" />
             </div>
           )
         ) : (

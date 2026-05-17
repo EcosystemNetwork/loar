@@ -1,223 +1,123 @@
 /**
  * Tests for the `likenessMarketplace` tRPC router.
  *
- * Focused on the validation gates a regression would silently bypass:
- *   - createListing: pricing + permit-flag consistency, splits sum + max count
- *   - recordDeal: use-case scope must be in the consent's allowed set
- *   - on-chain availability probe is honest
+ * NO MOCKS: uses the REAL Firestore emulator + the REAL tRPC router. The
+ * only signal we control is the env (`getOnChainEnv` returns null because
+ * we don't set the address vars in test mode), which forces the Firestore-
+ * only validation paths — exactly the gates we want to lock down.
  *
- * Uses tRPC's `createCaller` against a Firestore mock that lets us pre-seed
- * the entity / consent / listing state each test relies on.
+ * Every test case in this file fails BEFORE `verifyAndClaimTx` is called,
+ * so no on-chain RPC happens and no real txHashes are needed.
+ *
+ * Prereq: firebase emulator running.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { TRPCError } from '@trpc/server';
-import { createAuthCaller } from './helpers';
+// Side-effect import — routes `../lib/firebase` to the real emulator-backed
+// client. Must come BEFORE any code that imports firebase so the hoisted
+// `vi.mock` factory registers in time.
+import './_real-firebase';
 
-const SELLER = '0x1234567890abcdef1234567890abcdef12345678'; // matches createAuthCaller default
+const SELLER = '0x1234567890abcdef1234567890abcdef12345678';
+const TEST_CLIENT_IP = '127.0.0.1';
 
-interface DocStore {
-  // path -> data; supports `col/docId` keys
-  [path: string]: Record<string, unknown>;
-}
-
-// Mutable per-test state — populated in beforeEach + tests
-const state = vi.hoisted(() => ({
-  docs: {} as Record<string, Record<string, unknown>>,
-  subcollections: {} as Record<string, Record<string, Record<string, unknown>>>,
-}));
-
-// Hoisted firebase mock. Supports:
-//   - db.collection(name).doc(id).get()/set()/update()
-//   - db.collection(name).doc(id).collection(sub).doc(id2).get()/set()
-//   - db.collection(name).add(data)
-//   - db.batch() with chained set/update + commit
-vi.mock('../lib/firebase', () => {
-  function buildDocRef(path: string) {
-    return {
-      id: path.split('/').slice(-1)[0],
-      get: async () => {
-        const data = state.docs[path];
-        return {
-          exists: data !== undefined,
-          id: path.split('/').slice(-1)[0],
-          data: () => data,
-        };
-      },
-      set: async (data: Record<string, unknown>) => {
-        state.docs[path] = data;
-      },
-      update: async (patch: Record<string, unknown>) => {
-        state.docs[path] = { ...(state.docs[path] ?? {}), ...patch };
-      },
-      delete: async () => {
-        delete state.docs[path];
-      },
-      collection: (sub: string) => buildCollectionRef(`${path}/${sub}`),
-    };
-  }
-
-  function buildCollectionRef(prefix: string) {
-    const q = makeQuery(prefix);
-    return {
-      ...q,
-      doc: (id: string) => buildDocRef(`${prefix}/${id}`),
-      add: async (data: Record<string, unknown>) => {
-        const id = `mock-${Math.random().toString(36).slice(2, 10)}`;
-        state.docs[`${prefix}/${id}`] = data;
-        return { id };
-      },
-    };
-  }
-
-  function makeQuery(prefix: string) {
-    const filters: Array<{ field: string; value: unknown }> = [];
-    const q: any = {};
-    q.where = (field: string, _op: string, value: unknown) => {
-      filters.push({ field, value });
-      return q;
-    };
-    q.orderBy = () => q;
-    q.limit = () => q;
-    q.startAfter = () => q;
-    q.get = async () => {
-      function get(obj: unknown, path: string): unknown {
-        return path.split('.').reduce<unknown>((acc, key) => {
-          if (acc && typeof acc === 'object') return (acc as Record<string, unknown>)[key];
-          return undefined;
-        }, obj);
-      }
-      const docs = Object.entries(state.docs)
-        .filter(([path]) => {
-          const segs = path.split('/');
-          return path.startsWith(prefix + '/') && segs.length === prefix.split('/').length + 1;
-        })
-        .filter(([, data]) => filters.every((f) => get(data, f.field) === f.value))
-        .map(([path, data]) => ({
-          id: path.split('/').slice(-1)[0],
-          data: () => data,
-          ref: buildDocRef(path),
-        }));
-      return { docs, empty: docs.length === 0, size: docs.length };
-    };
-    return q;
-  }
-
-  const db = {
-    collection: (name: string) => buildCollectionRef(name),
-    batch: () => {
-      const ops: Array<() => Promise<void>> = [];
-      return {
-        set: (ref: any, data: Record<string, unknown>) => {
-          ops.push(async () => ref.set(data));
-        },
-        update: (ref: any, patch: Record<string, unknown>) => {
-          ops.push(async () => ref.update(patch));
-        },
-        commit: async () => {
-          for (const op of ops) await op();
-        },
-      };
-    },
-    runTransaction: async (fn: (tx: any) => Promise<unknown>) => {
-      return fn({
-        get: async (ref: any) => ref.get(),
-        set: (ref: any, data: Record<string, unknown>) => ref.set(data),
-        update: (ref: any, patch: Record<string, unknown>) => ref.update(patch),
-      });
-    },
-  };
-
-  return { db, firebaseAvailable: true };
-});
-
-// On-chain availability — pretend the marketplace is NOT on-chain so we
-// hit the Firestore-only paths the validation tests care about.
-vi.mock('../services/likeness-onchain', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return {
-    ...actual,
-    isOnChainAvailable: () => false,
-    defaultOnChainChainId: () => null,
-    getOnChainEnv: () => null,
-  };
-});
-
-// Silence the revenue-recorder side effect (it does its own Firestore writes).
-vi.mock('../services/revenue-recorder', () => ({
-  recordRevenueEvent: vi.fn().mockResolvedValue(undefined),
-}));
-
-// Skip on-chain tx verification — we only test the validation gates here.
-vi.mock('../services/tx-verify', () => ({
-  verifyAndClaimTx: vi.fn().mockResolvedValue({ receipt: {}, tx: {} }),
-}));
+let entityId: string;
 
 beforeEach(() => {
-  state.docs = {};
-  state.subcollections = {};
+  entityId = `entity-mkt-${Math.random().toString(36).slice(2, 10)}`;
 });
 
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-function stageVoiceEntity(opts?: { creator?: string; entityId?: string }) {
-  const id = opts?.entityId ?? 'entity-voice-1';
-  state.docs[`entities/${id}`] = {
-    id,
-    name: 'My Voice',
-    description: '',
-    kind: 'voice',
-    universeAddress: null,
-    parentId: null,
-    nodeIds: [],
-    imageUrl: null,
-    metadata: { elevenLabsVoiceId: 'el_voice_xyz' },
-    creator: (opts?.creator ?? SELLER).toLowerCase(),
-    monetized: false,
-    rightsDeclaration: null,
-    unstoppableDomain: null,
-    referenceBundle: null,
-    visualDescriptor: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-  return id;
+/**
+ * Mount JUST `likenessMarketplaceRouter` (the full appRouter trips a
+ * Vitest 4 + tRPC 11 hoisting bug on a procedure name in another router
+ * that isn't related to this work).
+ */
+async function createTestCaller(overrides?: { uid?: string; address?: string }) {
+  const { router } = await import('../lib/trpc');
+  const { likenessMarketplaceRouter } =
+    await import('../routers/likenessMarketplace/likenessMarketplace.routes');
+  const appRouter = router({ likenessMarketplace: likenessMarketplaceRouter });
+  return appRouter.createCaller({
+    user: {
+      uid: overrides?.uid ?? 'test-uid',
+      address: overrides?.address ?? SELLER,
+      email: 'test@example.com',
+    },
+    clientIp: TEST_CLIENT_IP,
+  });
 }
 
-function stageConsent(entityId: string, overrides?: Record<string, unknown>) {
-  const consentId = 'consent-1';
-  state.docs[`likenessConsents/${entityId}/revisions/${consentId}`] = {
-    id: consentId,
-    entityId,
-    rightsHolderAddress: SELLER.toLowerCase(),
-    rightsHolderUid: 'test-uid',
-    modalities: ['full'],
-    allowedUseCases: ['narrative_film', 'audiobook'],
-    prohibitions: [],
-    permitSale: true,
-    permitLease: true,
-    permitLicense: true,
-    realPerson: true,
-    verified: false,
-    attestationText: 'placeholder',
-    status: 'active',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    ...overrides,
-  };
-  state.docs[`likenessConsents/${entityId}`] = {
+async function writeVoiceEntity(opts?: { creator?: string }): Promise<void> {
+  const { db } = await import('../lib/firebase');
+  await db
+    .collection('entities')
+    .doc(entityId)
+    .set({
+      id: entityId,
+      name: 'My Voice',
+      description: '',
+      kind: 'voice',
+      universeAddress: null,
+      parentId: null,
+      nodeIds: [],
+      imageUrl: null,
+      metadata: { elevenLabsVoiceId: `el_voice_mkt_${entityId}` },
+      creator: (opts?.creator ?? SELLER).toLowerCase(),
+      monetized: false,
+      rightsDeclaration: null,
+      unstoppableDomain: null,
+      referenceBundle: null,
+      visualDescriptor: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+}
+
+async function writeConsent(overrides?: Record<string, unknown>): Promise<void> {
+  const { db } = await import('../lib/firebase');
+  const consentId = `consent-mkt-${Math.random().toString(36).slice(2, 10)}`;
+  await db
+    .collection('likenessConsents')
+    .doc(entityId)
+    .collection('revisions')
+    .doc(consentId)
+    .set({
+      id: consentId,
+      entityId,
+      rightsHolderAddress: SELLER.toLowerCase(),
+      rightsHolderUid: 'test-uid',
+      modalities: ['full'],
+      allowedUseCases: ['narrative_film', 'audiobook'],
+      prohibitions: [],
+      permitSale: true,
+      permitLease: true,
+      permitLicense: true,
+      realPerson: true,
+      verified: false,
+      attestationText: 'placeholder',
+      status: 'active',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      ...overrides,
+    });
+  await db.collection('likenessConsents').doc(entityId).set({
     latestRevisionId: consentId,
     rightsHolderUid: 'test-uid',
     rightsHolderAddress: SELLER.toLowerCase(),
     updatedAt: new Date(),
-  };
-  return consentId;
+  });
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────
 
-describe('onChainAvailability', () => {
-  it('reports unavailable when no contract addresses are configured', async () => {
-    const caller = createAuthCaller();
+describe('onChainAvailability (real env probe)', () => {
+  it('reports unavailable when no contract addresses are configured in env', async () => {
+    // Test env intentionally omits the CONTENT_LICENSING_ADDRESS_* vars
+    // so the helper short-circuits to "not available". This is the real
+    // env behaviour — no mocking of getOnChainEnv.
+    delete process.env.CONTENT_LICENSING_ADDRESS_SEPOLIA;
+    delete process.env.CONTENT_LICENSING_ADDRESS_BASE_SEPOLIA;
+    const caller = await createTestCaller();
     const result = await caller.likenessMarketplace.onChainAvailability();
     expect(result.available).toBe(false);
     expect(result.chainId).toBeNull();
@@ -225,10 +125,10 @@ describe('onChainAvailability', () => {
   });
 });
 
-describe('createListing', () => {
+describe('createListing (real Firestore validation)', () => {
   it('rejects when consent has not been recorded for the entity', async () => {
-    const entityId = stageVoiceEntity();
-    const caller = createAuthCaller();
+    await writeVoiceEntity();
+    const caller = await createTestCaller();
     await expect(
       caller.likenessMarketplace.createListing({
         entityId,
@@ -244,9 +144,9 @@ describe('createListing', () => {
   });
 
   it('rejects when caller is not the entity creator', async () => {
-    const entityId = stageVoiceEntity({ creator: '0xdead000000000000000000000000000000000bad' });
-    stageConsent(entityId);
-    const caller = createAuthCaller();
+    await writeVoiceEntity({ creator: '0xdead000000000000000000000000000000000bad' });
+    await writeConsent();
+    const caller = await createTestCaller();
     await expect(
       caller.likenessMarketplace.createListing({
         entityId,
@@ -262,9 +162,9 @@ describe('createListing', () => {
   });
 
   it('rejects when consent forbids sale but a buyPrice is set', async () => {
-    const entityId = stageVoiceEntity();
-    stageConsent(entityId, { permitSale: false });
-    const caller = createAuthCaller();
+    await writeVoiceEntity();
+    await writeConsent({ permitSale: false });
+    const caller = await createTestCaller();
     await expect(
       caller.likenessMarketplace.createListing({
         entityId,
@@ -280,9 +180,9 @@ describe('createListing', () => {
   });
 
   it('rejects when no deal type has a non-zero price', async () => {
-    const entityId = stageVoiceEntity();
-    stageConsent(entityId);
-    const caller = createAuthCaller();
+    await writeVoiceEntity();
+    await writeConsent();
+    const caller = await createTestCaller();
     await expect(
       caller.likenessMarketplace.createListing({
         entityId,
@@ -298,9 +198,9 @@ describe('createListing', () => {
   });
 
   it('rejects lease price above the 1000 ETH/day on-chain cap', async () => {
-    const entityId = stageVoiceEntity();
-    stageConsent(entityId);
-    const caller = createAuthCaller();
+    await writeVoiceEntity();
+    await writeConsent();
+    const caller = await createTestCaller();
     const tooHigh = (1001n * 10n ** 18n).toString();
     await expect(
       caller.likenessMarketplace.createListing({
@@ -317,9 +217,9 @@ describe('createListing', () => {
   });
 
   it('rejects splits that do not sum to 10000 bps', async () => {
-    const entityId = stageVoiceEntity();
-    stageConsent(entityId);
-    const caller = createAuthCaller();
+    await writeVoiceEntity();
+    await writeConsent();
+    const caller = await createTestCaller();
     await expect(
       caller.likenessMarketplace.createListing({
         entityId,
@@ -339,9 +239,9 @@ describe('createListing', () => {
   });
 
   it('rejects more than 10 split recipients (zod max validator)', async () => {
-    const entityId = stageVoiceEntity();
-    stageConsent(entityId);
-    const caller = createAuthCaller();
+    await writeVoiceEntity();
+    await writeConsent();
+    const caller = await createTestCaller();
     const eleven = Array.from({ length: 11 }, (_, i) => ({
       recipient: `0x${(i + 1).toString().padStart(40, '0')}`,
       bps: 909,
@@ -361,10 +261,10 @@ describe('createListing', () => {
     ).rejects.toBeInstanceOf(TRPCError);
   });
 
-  it('persists the listing + splits when the inputs are valid', async () => {
-    const entityId = stageVoiceEntity();
-    stageConsent(entityId);
-    const caller = createAuthCaller();
+  it('persists the listing + splits when inputs are valid (real round-trip)', async () => {
+    await writeVoiceEntity();
+    await writeConsent();
+    const caller = await createTestCaller();
     const listing = await caller.likenessMarketplace.createListing({
       entityId,
       title: 'My voice',
@@ -387,14 +287,21 @@ describe('createListing', () => {
       bps: 7000,
     });
     expect(listing.onChainContentHash).toBeNull();
+
+    // Confirm the doc is actually in Firestore (not just returned in-memory).
+    const { db } = await import('../lib/firebase');
+    const snap = await db.collection('likenessListings').doc(listing.id).get();
+    expect(snap.exists).toBe(true);
+    expect(snap.data()?.title).toBe('My voice');
+    expect(snap.data()?.splitRecipients).toHaveLength(2);
   });
 });
 
-describe('recordDeal', () => {
-  async function stageListing(opts?: { allowedUseCases?: string[] }): Promise<string> {
-    const entityId = stageVoiceEntity({ creator: SELLER });
-    stageConsent(entityId, opts?.allowedUseCases ? { allowedUseCases: opts.allowedUseCases } : {});
-    const seller = createAuthCaller();
+describe('recordDeal (real validation gates)', () => {
+  async function makeListing(): Promise<string> {
+    await writeVoiceEntity({ creator: SELLER });
+    await writeConsent();
+    const seller = await createTestCaller();
     const listing = await seller.likenessMarketplace.createListing({
       entityId,
       title: 'X',
@@ -409,8 +316,8 @@ describe('recordDeal', () => {
   }
 
   it('blocks self-purchase (seller cannot buy own listing)', async () => {
-    const listingId = await stageListing();
-    const seller = createAuthCaller(); // same uid + address as the listing seller
+    const listingId = await makeListing();
+    const seller = await createTestCaller(); // same uid + address as the listing seller
     await expect(
       seller.likenessMarketplace.recordDeal({
         listingId,
@@ -423,25 +330,37 @@ describe('recordDeal', () => {
   });
 
   it('blocks BUY when the declared use case is not in consent.allowedUseCases', async () => {
-    const listingId = await stageListing({ allowedUseCases: ['narrative_film'] });
-    const buyer = createAuthCaller({
+    await writeVoiceEntity({ creator: SELLER });
+    await writeConsent({ allowedUseCases: ['narrative_film'] }); // not 'advertising'
+    const seller = await createTestCaller();
+    const listing = await seller.likenessMarketplace.createListing({
+      entityId,
+      title: 'X',
+      description: '',
+      buyPriceWei: '1000',
+      leasePricePerDayWei: '0',
+      licenseFeeWei: '0',
+      licenseRoyaltyBps: 0,
+      maxDurationDays: 30,
+    });
+    const buyer = await createTestCaller({
       uid: 'buyer-uid',
       address: '0xbbb1111111111111111111111111111111111111',
     });
     await expect(
       buyer.likenessMarketplace.recordDeal({
-        listingId,
+        listingId: listing.id,
         dealType: 'BUY',
         pricePaidWei: '1000',
-        declaredUseCase: 'advertising', // not allowed
+        declaredUseCase: 'advertising',
         txHash: '0x' + 'b'.repeat(64),
       })
-    ).rejects.toThrow(/use case "advertising" is not authorized/);
+    ).rejects.toThrow(/use case "advertising" is not authorized/i);
   });
 
   it('rejects price below the listed buyPrice', async () => {
-    const listingId = await stageListing();
-    const buyer = createAuthCaller({
+    const listingId = await makeListing();
+    const buyer = await createTestCaller({
       uid: 'buyer-uid',
       address: '0xbbb1111111111111111111111111111111111111',
     });
@@ -457,9 +376,9 @@ describe('recordDeal', () => {
   });
 
   it('rejects LEASE without durationDays', async () => {
-    const entityId = stageVoiceEntity({ creator: SELLER });
-    stageConsent(entityId);
-    const seller = createAuthCaller();
+    await writeVoiceEntity({ creator: SELLER });
+    await writeConsent();
+    const seller = await createTestCaller();
     const listing = await seller.likenessMarketplace.createListing({
       entityId,
       title: 'X',
@@ -470,7 +389,7 @@ describe('recordDeal', () => {
       licenseRoyaltyBps: 0,
       maxDurationDays: 30,
     });
-    const buyer = createAuthCaller({
+    const buyer = await createTestCaller({
       uid: 'buyer-uid',
       address: '0xbbb1111111111111111111111111111111111111',
     });
@@ -487,10 +406,10 @@ describe('recordDeal', () => {
   });
 });
 
-describe('submitConsent', () => {
+describe('submitConsent (real Zod + Firestore writes)', () => {
   it('rejects when no deal type is permitted', async () => {
-    const entityId = stageVoiceEntity();
-    const caller = createAuthCaller();
+    await writeVoiceEntity();
+    const caller = await createTestCaller();
     const { LIKENESS_ATTESTATION_TEXT_V1 } = await import('../routers/entities/entities.types');
     await expect(
       caller.likenessMarketplace.submitConsent({
@@ -508,8 +427,8 @@ describe('submitConsent', () => {
   });
 
   it('rejects when the attestation text drifts from the canonical v1 string', async () => {
-    const entityId = stageVoiceEntity();
-    const caller = createAuthCaller();
+    await writeVoiceEntity();
+    const caller = await createTestCaller();
     await expect(
       caller.likenessMarketplace.submitConsent({
         entityId,
@@ -523,5 +442,31 @@ describe('submitConsent', () => {
         attestationText: 'I am the rights holder.', // wrong text → zod literal mismatch
       })
     ).rejects.toBeInstanceOf(TRPCError);
+  });
+
+  it('writes a consent revision + pointer doc + readable via getMyConsent', async () => {
+    await writeVoiceEntity();
+    const caller = await createTestCaller();
+    const { LIKENESS_ATTESTATION_TEXT_V1 } = await import('../routers/entities/entities.types');
+    const consent = await caller.likenessMarketplace.submitConsent({
+      entityId,
+      modalities: ['full'],
+      allowedUseCases: ['narrative_film', 'documentary'],
+      prohibitions: [],
+      permitSale: false,
+      permitLease: true,
+      permitLicense: true,
+      realPerson: true,
+      attestationText: LIKENESS_ATTESTATION_TEXT_V1,
+    });
+    expect(consent.status).toBe('active');
+    expect(consent.permitSale).toBe(false);
+    expect(consent.permitLease).toBe(true);
+
+    // Round-trip via getMyConsent (also a real Firestore read).
+    const got = await caller.likenessMarketplace.getMyConsent({ entityId });
+    expect(got).not.toBeNull();
+    expect(got?.id).toBe(consent.id);
+    expect(got?.allowedUseCases).toContain('documentary');
   });
 });

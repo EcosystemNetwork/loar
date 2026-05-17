@@ -82,6 +82,8 @@ import { Route as EpisodeIdRouteImport } from './routes/episode.$id'
 import { Route as EditOutpaintRouteImport } from './routes/edit.outpaint'
 import { Route as EditInpaintRouteImport } from './routes/edit.inpaint'
 import { Route as DashboardRevenueRouteImport } from './routes/dashboard.revenue'
+import { Route as DashboardPersonasRouteImport } from './routes/dashboard.personas'
+import { Route as CreatePersonaRouteImport } from './routes/create.persona'
 import { Route as CreateLikenessRouteImport } from './routes/create.likeness'
 import { Route as CreateKindRouteImport } from './routes/create/$kind'
 import { Route as CharactersUniverseIdRouteImport } from './routes/characters.$universeId'
@@ -117,12 +119,14 @@ import { Route as UniverseAddressPollsRouteImport } from './routes/universe.$add
 import { Route as UniverseAddressPhysicsRouteImport } from './routes/universe.$address.physics'
 import { Route as TokensCreatorAddressRouteImport } from './routes/tokens/creator.$address'
 import { Route as StudioEditAssetIdRouteImport } from './routes/studio.edit.$assetId'
+import { Route as MarketplacePersonaPersonaIdRouteImport } from './routes/marketplace.persona.$personaId'
 import { Route as MarketplaceLikenessListingIdRouteImport } from './routes/marketplace.likeness.$listingId'
 import { Route as LabZaiDiagnosticRouteImport } from './routes/lab.zai.diagnostic'
 import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
 import { Route as AdplacementsSeedsNewRouteImport } from './routes/adplacements/seeds/new'
 import { Route as AdplacementsSeedsSeedIdRouteImport } from './routes/adplacements/seeds/$seedId'
 import { Route as LabZaiVideoJobIdRouteImport } from './routes/lab.zai.video.$jobId'
+import { Route as DashboardPersonasPersonaIdEditRouteImport } from './routes/dashboard.personas.$personaId.edit'
 
 const VideosRoute = VideosRouteImport.update({
   id: '/videos',
@@ -489,6 +493,16 @@ const DashboardRevenueRoute = DashboardRevenueRouteImport.update({
   path: '/revenue',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardPersonasRoute = DashboardPersonasRouteImport.update({
+  id: '/personas',
+  path: '/personas',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const CreatePersonaRoute = CreatePersonaRouteImport.update({
+  id: '/create/persona',
+  path: '/create/persona',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CreateLikenessRoute = CreateLikenessRouteImport.update({
   id: '/create/likeness',
   path: '/create/likeness',
@@ -664,6 +678,12 @@ const StudioEditAssetIdRoute = StudioEditAssetIdRouteImport.update({
   path: '/edit/$assetId',
   getParentRoute: () => StudioRoute,
 } as any)
+const MarketplacePersonaPersonaIdRoute =
+  MarketplacePersonaPersonaIdRouteImport.update({
+    id: '/marketplace/persona/$personaId',
+    path: '/marketplace/persona/$personaId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const MarketplaceLikenessListingIdRoute =
   MarketplaceLikenessListingIdRouteImport.update({
     id: '/$listingId',
@@ -695,6 +715,12 @@ const LabZaiVideoJobIdRoute = LabZaiVideoJobIdRouteImport.update({
   path: '/video/$jobId',
   getParentRoute: () => LabZaiRoute,
 } as any)
+const DashboardPersonasPersonaIdEditRoute =
+  DashboardPersonasPersonaIdEditRouteImport.update({
+    id: '/$personaId/edit',
+    path: '/$personaId/edit',
+    getParentRoute: () => DashboardPersonasRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -755,6 +781,8 @@ export interface FileRoutesByFullPath {
   '/characters/$universeId': typeof CharactersUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
   '/create/likeness': typeof CreateLikenessRoute
+  '/create/persona': typeof CreatePersonaRoute
+  '/dashboard/personas': typeof DashboardPersonasRouteWithChildren
   '/dashboard/revenue': typeof DashboardRevenueRoute
   '/edit/inpaint': typeof EditInpaintRoute
   '/edit/outpaint': typeof EditOutpaintRoute
@@ -796,6 +824,7 @@ export interface FileRoutesByFullPath {
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/lab/zai/diagnostic': typeof LabZaiDiagnosticRoute
   '/marketplace/likeness/$listingId': typeof MarketplaceLikenessListingIdRoute
+  '/marketplace/persona/$personaId': typeof MarketplacePersonaPersonaIdRoute
   '/studio/edit/$assetId': typeof StudioEditAssetIdRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
   '/universe/$address/physics': typeof UniverseAddressPhysicsRoute
@@ -810,6 +839,7 @@ export interface FileRoutesByFullPath {
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
   '/adplacements/seeds/': typeof AdplacementsSeedsIndexRoute
+  '/dashboard/personas/$personaId/edit': typeof DashboardPersonasPersonaIdEditRoute
   '/lab/zai/video/$jobId': typeof LabZaiVideoJobIdRoute
 }
 export interface FileRoutesByTo {
@@ -871,6 +901,8 @@ export interface FileRoutesByTo {
   '/characters/$universeId': typeof CharactersUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
   '/create/likeness': typeof CreateLikenessRoute
+  '/create/persona': typeof CreatePersonaRoute
+  '/dashboard/personas': typeof DashboardPersonasRouteWithChildren
   '/dashboard/revenue': typeof DashboardRevenueRoute
   '/edit/inpaint': typeof EditInpaintRoute
   '/edit/outpaint': typeof EditOutpaintRoute
@@ -912,6 +944,7 @@ export interface FileRoutesByTo {
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/lab/zai/diagnostic': typeof LabZaiDiagnosticRoute
   '/marketplace/likeness/$listingId': typeof MarketplaceLikenessListingIdRoute
+  '/marketplace/persona/$personaId': typeof MarketplacePersonaPersonaIdRoute
   '/studio/edit/$assetId': typeof StudioEditAssetIdRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
   '/universe/$address/physics': typeof UniverseAddressPhysicsRoute
@@ -926,6 +959,7 @@ export interface FileRoutesByTo {
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
   '/adplacements/seeds': typeof AdplacementsSeedsIndexRoute
+  '/dashboard/personas/$personaId/edit': typeof DashboardPersonasPersonaIdEditRoute
   '/lab/zai/video/$jobId': typeof LabZaiVideoJobIdRoute
 }
 export interface FileRoutesById {
@@ -988,6 +1022,8 @@ export interface FileRoutesById {
   '/characters/$universeId': typeof CharactersUniverseIdRoute
   '/create/$kind': typeof CreateKindRoute
   '/create/likeness': typeof CreateLikenessRoute
+  '/create/persona': typeof CreatePersonaRoute
+  '/dashboard/personas': typeof DashboardPersonasRouteWithChildren
   '/dashboard/revenue': typeof DashboardRevenueRoute
   '/edit/inpaint': typeof EditInpaintRoute
   '/edit/outpaint': typeof EditOutpaintRoute
@@ -1029,6 +1065,7 @@ export interface FileRoutesById {
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/lab/zai/diagnostic': typeof LabZaiDiagnosticRoute
   '/marketplace/likeness/$listingId': typeof MarketplaceLikenessListingIdRoute
+  '/marketplace/persona/$personaId': typeof MarketplacePersonaPersonaIdRoute
   '/studio/edit/$assetId': typeof StudioEditAssetIdRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
   '/universe/$address/physics': typeof UniverseAddressPhysicsRoute
@@ -1043,6 +1080,7 @@ export interface FileRoutesById {
   '/wiki/character/$id': typeof WikiCharacterIdRoute
   '/wiki/entity/$id': typeof WikiEntityIdRoute
   '/adplacements/seeds/': typeof AdplacementsSeedsIndexRoute
+  '/dashboard/personas/$personaId/edit': typeof DashboardPersonasPersonaIdEditRoute
   '/lab/zai/video/$jobId': typeof LabZaiVideoJobIdRoute
 }
 export interface FileRouteTypes {
@@ -1106,6 +1144,8 @@ export interface FileRouteTypes {
     | '/characters/$universeId'
     | '/create/$kind'
     | '/create/likeness'
+    | '/create/persona'
+    | '/dashboard/personas'
     | '/dashboard/revenue'
     | '/edit/inpaint'
     | '/edit/outpaint'
@@ -1147,6 +1187,7 @@ export interface FileRouteTypes {
     | '/event/$universe/$event'
     | '/lab/zai/diagnostic'
     | '/marketplace/likeness/$listingId'
+    | '/marketplace/persona/$personaId'
     | '/studio/edit/$assetId'
     | '/tokens/creator/$address'
     | '/universe/$address/physics'
@@ -1161,6 +1202,7 @@ export interface FileRouteTypes {
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
     | '/adplacements/seeds/'
+    | '/dashboard/personas/$personaId/edit'
     | '/lab/zai/video/$jobId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -1222,6 +1264,8 @@ export interface FileRouteTypes {
     | '/characters/$universeId'
     | '/create/$kind'
     | '/create/likeness'
+    | '/create/persona'
+    | '/dashboard/personas'
     | '/dashboard/revenue'
     | '/edit/inpaint'
     | '/edit/outpaint'
@@ -1263,6 +1307,7 @@ export interface FileRouteTypes {
     | '/event/$universe/$event'
     | '/lab/zai/diagnostic'
     | '/marketplace/likeness/$listingId'
+    | '/marketplace/persona/$personaId'
     | '/studio/edit/$assetId'
     | '/tokens/creator/$address'
     | '/universe/$address/physics'
@@ -1277,6 +1322,7 @@ export interface FileRouteTypes {
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
     | '/adplacements/seeds'
+    | '/dashboard/personas/$personaId/edit'
     | '/lab/zai/video/$jobId'
   id:
     | '__root__'
@@ -1338,6 +1384,8 @@ export interface FileRouteTypes {
     | '/characters/$universeId'
     | '/create/$kind'
     | '/create/likeness'
+    | '/create/persona'
+    | '/dashboard/personas'
     | '/dashboard/revenue'
     | '/edit/inpaint'
     | '/edit/outpaint'
@@ -1379,6 +1427,7 @@ export interface FileRouteTypes {
     | '/event/$universe/$event'
     | '/lab/zai/diagnostic'
     | '/marketplace/likeness/$listingId'
+    | '/marketplace/persona/$personaId'
     | '/studio/edit/$assetId'
     | '/tokens/creator/$address'
     | '/universe/$address/physics'
@@ -1393,6 +1442,7 @@ export interface FileRouteTypes {
     | '/wiki/character/$id'
     | '/wiki/entity/$id'
     | '/adplacements/seeds/'
+    | '/dashboard/personas/$personaId/edit'
     | '/lab/zai/video/$jobId'
   fileRoutesById: FileRoutesById
 }
@@ -1454,6 +1504,7 @@ export interface RootRouteChildren {
   CharactersUniverseIdRoute: typeof CharactersUniverseIdRoute
   CreateKindRoute: typeof CreateKindRoute
   CreateLikenessRoute: typeof CreateLikenessRoute
+  CreatePersonaRoute: typeof CreatePersonaRoute
   EditInpaintRoute: typeof EditInpaintRoute
   EditOutpaintRoute: typeof EditOutpaintRoute
   EpisodeIdRoute: typeof EpisodeIdRoute
@@ -1491,6 +1542,7 @@ export interface RootRouteChildren {
   AdplacementsSeedsSeedIdRoute: typeof AdplacementsSeedsSeedIdRoute
   AdplacementsSeedsNewRoute: typeof AdplacementsSeedsNewRoute
   EventUniverseEventRoute: typeof EventUniverseEventRoute
+  MarketplacePersonaPersonaIdRoute: typeof MarketplacePersonaPersonaIdRoute
   TokensCreatorAddressRoute: typeof TokensCreatorAddressRoute
   UniverseAddressPhysicsRoute: typeof UniverseAddressPhysicsRoute
   UniverseAddressPollsRoute: typeof UniverseAddressPollsRoute
@@ -2012,6 +2064,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRevenueRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/personas': {
+      id: '/dashboard/personas'
+      path: '/personas'
+      fullPath: '/dashboard/personas'
+      preLoaderRoute: typeof DashboardPersonasRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/create/persona': {
+      id: '/create/persona'
+      path: '/create/persona'
+      fullPath: '/create/persona'
+      preLoaderRoute: typeof CreatePersonaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/create/likeness': {
       id: '/create/likeness'
       path: '/create/likeness'
@@ -2257,6 +2323,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioEditAssetIdRouteImport
       parentRoute: typeof StudioRoute
     }
+    '/marketplace/persona/$personaId': {
+      id: '/marketplace/persona/$personaId'
+      path: '/marketplace/persona/$personaId'
+      fullPath: '/marketplace/persona/$personaId'
+      preLoaderRoute: typeof MarketplacePersonaPersonaIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/marketplace/likeness/$listingId': {
       id: '/marketplace/likeness/$listingId'
       path: '/$listingId'
@@ -2299,6 +2372,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LabZaiVideoJobIdRouteImport
       parentRoute: typeof LabZaiRoute
     }
+    '/dashboard/personas/$personaId/edit': {
+      id: '/dashboard/personas/$personaId/edit'
+      path: '/$personaId/edit'
+      fullPath: '/dashboard/personas/$personaId/edit'
+      preLoaderRoute: typeof DashboardPersonasPersonaIdEditRouteImport
+      parentRoute: typeof DashboardPersonasRoute
+    }
   }
 }
 
@@ -2313,11 +2393,24 @@ const CanvasRouteChildren: CanvasRouteChildren = {
 const CanvasRouteWithChildren =
   CanvasRoute._addFileChildren(CanvasRouteChildren)
 
+interface DashboardPersonasRouteChildren {
+  DashboardPersonasPersonaIdEditRoute: typeof DashboardPersonasPersonaIdEditRoute
+}
+
+const DashboardPersonasRouteChildren: DashboardPersonasRouteChildren = {
+  DashboardPersonasPersonaIdEditRoute: DashboardPersonasPersonaIdEditRoute,
+}
+
+const DashboardPersonasRouteWithChildren =
+  DashboardPersonasRoute._addFileChildren(DashboardPersonasRouteChildren)
+
 interface DashboardRouteChildren {
+  DashboardPersonasRoute: typeof DashboardPersonasRouteWithChildren
   DashboardRevenueRoute: typeof DashboardRevenueRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardPersonasRoute: DashboardPersonasRouteWithChildren,
   DashboardRevenueRoute: DashboardRevenueRoute,
 }
 
@@ -2454,6 +2547,7 @@ const rootRouteChildren: RootRouteChildren = {
   CharactersUniverseIdRoute: CharactersUniverseIdRoute,
   CreateKindRoute: CreateKindRoute,
   CreateLikenessRoute: CreateLikenessRoute,
+  CreatePersonaRoute: CreatePersonaRoute,
   EditInpaintRoute: EditInpaintRoute,
   EditOutpaintRoute: EditOutpaintRoute,
   EpisodeIdRoute: EpisodeIdRoute,
@@ -2491,6 +2585,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdplacementsSeedsSeedIdRoute: AdplacementsSeedsSeedIdRoute,
   AdplacementsSeedsNewRoute: AdplacementsSeedsNewRoute,
   EventUniverseEventRoute: EventUniverseEventRoute,
+  MarketplacePersonaPersonaIdRoute: MarketplacePersonaPersonaIdRoute,
   TokensCreatorAddressRoute: TokensCreatorAddressRoute,
   UniverseAddressPhysicsRoute: UniverseAddressPhysicsRoute,
   UniverseAddressPollsRoute: UniverseAddressPollsRoute,

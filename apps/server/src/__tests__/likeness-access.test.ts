@@ -1,135 +1,118 @@
 /**
  * Tests for `assertVoiceUsageAllowed` — the gate that runs before any
- * `voice.synthesize` / `dubbing.generateLine` call. A bug here either:
- *   - over-blocks (the seller can't use their own voice), OR
- *   - under-blocks (a non-buyer uses a listed voice without paying).
+ * `voice.synthesize` / `dubbing.generateLine` call.
  *
- * We mock Firestore directly (not via setup.ts's default mock) so we can
- * stage entities, listings, and deals per test.
+ * NO MOCKS: uses the REAL firebase-admin SDK against a local Firestore
+ * Emulator (see `_real-firebase.ts`). Documents are staged via real
+ * `db.collection().doc().set()` calls, the helper runs against real query
+ * semantics (including the dot-path `metadata.elevenLabsVoiceId` filter),
+ * and afterEach deletes everything the test wrote.
+ *
+ * Prereq: firebase emulator running:
+ *   firebase emulators:start --only firestore --project loar-db
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { TRPCError } from '@trpc/server';
+// Side-effect import — routes `../lib/firebase` to the real emulator-backed
+// client. Must come BEFORE any code that imports firebase so the hoisted
+// `vi.mock` factory registers in time.
+import './_real-firebase';
 
-interface MockEntityDoc {
-  id: string;
-  data: () => { kind: string; creator: string; metadata: Record<string, unknown> };
-}
-interface MockListingDoc {
-  id: string;
-  data: () => { entityId: string; active: boolean };
-}
-interface MockDealDoc {
-  id: string;
-  data: () => {
-    entityId: string;
-    buyerUid: string;
-    status: 'ACTIVE' | 'EXPIRED';
-    dealType: 'BUY' | 'LEASE' | 'LICENSE';
-    declaredUseCase?: string;
-    endTime?: Date | null;
-  };
-  ref: { update: ReturnType<typeof vi.fn> };
-}
-
-// Mutable state injected by tests, exposed via vi.hoisted so the hoisted
-// `vi.mock` factory below can reach it.
-const state = vi.hoisted(() => ({
-  entities: [] as Array<{
-    id: string;
-    data: () => { kind: string; creator: string; metadata: Record<string, unknown> };
-  }>,
-  listings: [] as Array<{ id: string; data: () => { entityId: string; active: boolean } }>,
-  deals: [] as Array<{
-    id: string;
-    data: () => {
-      entityId: string;
-      buyerUid: string;
-      status: 'ACTIVE' | 'EXPIRED';
-      dealType: 'BUY' | 'LEASE' | 'LICENSE';
-      declaredUseCase?: string;
-      endTime?: Date | null;
-    };
-    ref: { update: ReturnType<typeof vi.fn> };
-  }>,
-}));
-
-// Hoisted mock — shadows `__tests__/setup.ts`'s `../lib/firebase` mock so we
-// can stage per-test Firestore data instead of always reading empty.
-vi.mock('../lib/firebase', () => {
-  function makeQuery(collection: 'entities' | 'likenessListings' | 'likenessDeals') {
-    const filters: Array<{ field: string; value: unknown }> = [];
-    const q: any = {};
-    q.where = (field: string, _op: string, value: unknown) => {
-      filters.push({ field, value });
-      return q;
-    };
-    q.orderBy = () => q;
-    q.limit = () => q;
-    q.get = async () => {
-      // Mirror Firestore semantics: `field` may be a dot path like
-      // 'metadata.elevenLabsVoiceId'. We walk the path against the doc data
-      // so the mock matches the same set of records the real Firestore would.
-      function get(obj: unknown, path: string): unknown {
-        return path.split('.').reduce<unknown>((acc, key) => {
-          if (acc && typeof acc === 'object') return (acc as Record<string, unknown>)[key];
-          return undefined;
-        }, obj);
-      }
-      const apply = <T>(arr: T[], view: (x: T) => Record<string, unknown>): T[] =>
-        arr.filter((doc) => filters.every((f) => get(view(doc), f.field) === f.value));
-      let docs: any[] = [];
-      if (collection === 'entities') {
-        docs = apply(state.entities, (d) => d.data());
-      } else if (collection === 'likenessListings') {
-        docs = apply(state.listings, (d) => d.data());
-      } else {
-        docs = apply(state.deals, (d) => d.data());
-      }
-      return { docs, empty: docs.length === 0, size: docs.length };
-    };
-    return q;
-  }
-
-  return {
-    db: {
-      collection: (name: string) => {
-        const q = makeQuery(name as 'entities' | 'likenessListings' | 'likenessDeals');
-        return {
-          ...q,
-          doc: (id: string) => ({
-            update: vi.fn().mockResolvedValue(undefined),
-            get: vi.fn().mockResolvedValue({ exists: false }),
-            id,
-          }),
-        };
-      },
-    },
-    firebaseAvailable: true,
-  };
-});
-
-const ELEVEN_VOICE = 'el_voice_abc';
-const CREATOR = '0x1111111111111111111111111111111111111111';
-const BUYER_UID = 'buyer-uid-1';
+const ELEVEN_VOICE_BASE = 'el_voice_access_test'; // suffixed per-test to avoid collisions
+const SELLER = '0x1111111111111111111111111111111111111111';
+const BUYER_UID = 'buyer-uid-access-test';
 const BUYER_ADDR = '0x2222222222222222222222222222222222222222';
 
+// Each test gets a fresh entity id so concurrent test runs don't fight over
+// the same key. Firestore filters by metadata.elevenLabsVoiceId so we also
+// scope that per test.
+let entityId: string;
+let elevenVoiceId: string;
+
 beforeEach(() => {
-  state.entities = [];
-  state.listings = [];
-  state.deals = [];
+  const tag = Math.random().toString(36).slice(2, 10);
+  entityId = `entity-access-${tag}`;
+  elevenVoiceId = `${ELEVEN_VOICE_BASE}_${tag}`;
 });
 
-async function importAccess() {
-  return import('../lib/likeness-access');
+// ── Helpers (real Firestore writes) ──────────────────────────────────────
+
+async function writeVoiceEntity(opts?: { creator?: string }): Promise<void> {
+  const { db } = await import('../lib/firebase');
+  await db
+    .collection('entities')
+    .doc(entityId)
+    .set({
+      id: entityId,
+      name: 'Test Voice',
+      description: '',
+      kind: 'voice',
+      universeAddress: null,
+      parentId: null,
+      nodeIds: [],
+      imageUrl: null,
+      metadata: { elevenLabsVoiceId: elevenVoiceId },
+      creator: (opts?.creator ?? SELLER).toLowerCase(),
+      monetized: false,
+      rightsDeclaration: null,
+      unstoppableDomain: null,
+      referenceBundle: null,
+      visualDescriptor: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
 }
 
-describe('assertVoiceUsageAllowed', () => {
+async function writeListing(opts: { active: boolean }): Promise<string> {
+  const { db } = await import('../lib/firebase');
+  const listingId = `listing-access-${Math.random().toString(36).slice(2, 10)}`;
+  await db.collection('likenessListings').doc(listingId).set({
+    id: listingId,
+    entityId,
+    active: opts.active,
+    sellerUid: 'test-uid',
+    sellerAddress: SELLER.toLowerCase(),
+    title: 'X',
+    description: '',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  return listingId;
+}
+
+async function writeDeal(opts: {
+  buyerUid: string;
+  dealType: 'BUY' | 'LEASE' | 'LICENSE';
+  declaredUseCase?: string;
+  endTime?: Date | null;
+}): Promise<string> {
+  const { db } = await import('../lib/firebase');
+  const dealId = `deal-access-${Math.random().toString(36).slice(2, 10)}`;
+  await db
+    .collection('likenessDeals')
+    .doc(dealId)
+    .set({
+      id: dealId,
+      entityId,
+      buyerUid: opts.buyerUid,
+      status: 'ACTIVE',
+      dealType: opts.dealType,
+      declaredUseCase: opts.declaredUseCase ?? 'narrative_film',
+      endTime: opts.endTime ?? null,
+      startTime: new Date(),
+    });
+  return dealId;
+}
+
+// ── Tests ────────────────────────────────────────────────────────────────
+
+describe('assertVoiceUsageAllowed (real Firestore)', () => {
   it('allows usage when the voice is not a marketplace entity (no constraint)', async () => {
-    // No entities staged — the helper should return without throwing.
-    const { assertVoiceUsageAllowed } = await importAccess();
+    // No entity staged — lookup returns null → no constraint.
+    const { assertVoiceUsageAllowed } = await import('../lib/likeness-access');
     await expect(
       assertVoiceUsageAllowed({
-        elevenLabsVoiceId: ELEVEN_VOICE,
+        elevenLabsVoiceId: elevenVoiceId,
         callerUid: BUYER_UID,
         callerAddress: BUYER_ADDR,
       })
@@ -137,43 +120,24 @@ describe('assertVoiceUsageAllowed', () => {
   });
 
   it('allows the entity creator to use their own voice unconditionally', async () => {
-    state.entities = [
-      {
-        id: 'entity-1',
-        data: () => ({
-          kind: 'voice',
-          creator: CREATOR,
-          metadata: { elevenLabsVoiceId: ELEVEN_VOICE },
-        }),
-      },
-    ];
-    // No listing required — creator owns the entity.
-    const { assertVoiceUsageAllowed } = await importAccess();
+    await writeVoiceEntity({ creator: SELLER });
+    // No listing staged — creator path takes precedence.
+    const { assertVoiceUsageAllowed } = await import('../lib/likeness-access');
     await expect(
       assertVoiceUsageAllowed({
-        elevenLabsVoiceId: ELEVEN_VOICE,
+        elevenLabsVoiceId: elevenVoiceId,
         callerUid: BUYER_UID,
-        callerAddress: CREATOR,
+        callerAddress: SELLER,
       })
     ).resolves.toBeUndefined();
   });
 
   it('blocks a non-creator when the entity is not yet listed (creator-private)', async () => {
-    state.entities = [
-      {
-        id: 'entity-1',
-        data: () => ({
-          kind: 'voice',
-          creator: CREATOR,
-          metadata: { elevenLabsVoiceId: ELEVEN_VOICE },
-        }),
-      },
-    ];
-    // listings + deals deliberately empty
-    const { assertVoiceUsageAllowed } = await importAccess();
+    await writeVoiceEntity({ creator: SELLER });
+    const { assertVoiceUsageAllowed } = await import('../lib/likeness-access');
     await expect(
       assertVoiceUsageAllowed({
-        elevenLabsVoiceId: ELEVEN_VOICE,
+        elevenLabsVoiceId: elevenVoiceId,
         callerUid: BUYER_UID,
         callerAddress: BUYER_ADDR,
       })
@@ -181,26 +145,12 @@ describe('assertVoiceUsageAllowed', () => {
   });
 
   it('blocks when the listing exists but the buyer has no active deal', async () => {
-    state.entities = [
-      {
-        id: 'entity-1',
-        data: () => ({
-          kind: 'voice',
-          creator: CREATOR,
-          metadata: { elevenLabsVoiceId: ELEVEN_VOICE },
-        }),
-      },
-    ];
-    state.listings = [
-      {
-        id: 'list-1',
-        data: () => ({ entityId: 'entity-1', active: true }),
-      },
-    ];
-    const { assertVoiceUsageAllowed } = await importAccess();
+    await writeVoiceEntity({ creator: SELLER });
+    await writeListing({ active: true });
+    const { assertVoiceUsageAllowed } = await import('../lib/likeness-access');
     await expect(
       assertVoiceUsageAllowed({
-        elevenLabsVoiceId: ELEVEN_VOICE,
+        elevenLabsVoiceId: elevenVoiceId,
         callerUid: BUYER_UID,
         callerAddress: BUYER_ADDR,
       })
@@ -208,40 +158,13 @@ describe('assertVoiceUsageAllowed', () => {
   });
 
   it('allows when the buyer holds an active BUY deal (perpetual)', async () => {
-    state.entities = [
-      {
-        id: 'entity-1',
-        data: () => ({
-          kind: 'voice',
-          creator: CREATOR,
-          metadata: { elevenLabsVoiceId: ELEVEN_VOICE },
-        }),
-      },
-    ];
-    state.listings = [
-      {
-        id: 'list-1',
-        data: () => ({ entityId: 'entity-1', active: true }),
-      },
-    ];
-    state.deals = [
-      {
-        id: 'deal-1',
-        ref: { update: vi.fn() },
-        data: () => ({
-          entityId: 'entity-1',
-          buyerUid: BUYER_UID,
-          status: 'ACTIVE',
-          dealType: 'BUY',
-          declaredUseCase: 'narrative_film',
-          endTime: null,
-        }),
-      },
-    ];
-    const { assertVoiceUsageAllowed } = await importAccess();
+    await writeVoiceEntity({ creator: SELLER });
+    await writeListing({ active: true });
+    await writeDeal({ buyerUid: BUYER_UID, dealType: 'BUY' });
+    const { assertVoiceUsageAllowed } = await import('../lib/likeness-access');
     await expect(
       assertVoiceUsageAllowed({
-        elevenLabsVoiceId: ELEVEN_VOICE,
+        elevenLabsVoiceId: elevenVoiceId,
         callerUid: BUYER_UID,
         callerAddress: BUYER_ADDR,
       })
@@ -249,41 +172,17 @@ describe('assertVoiceUsageAllowed', () => {
   });
 
   it('blocks when the use case is outside the deal scope', async () => {
-    state.entities = [
-      {
-        id: 'entity-1',
-        data: () => ({
-          kind: 'voice',
-          creator: CREATOR,
-          metadata: { elevenLabsVoiceId: ELEVEN_VOICE },
-        }),
-      },
-    ];
-    state.listings = [
-      {
-        id: 'list-1',
-        data: () => ({ entityId: 'entity-1', active: true }),
-      },
-    ];
-    state.deals = [
-      {
-        id: 'deal-1',
-        ref: { update: vi.fn() },
-        data: () => ({
-          entityId: 'entity-1',
-          buyerUid: BUYER_UID,
-          status: 'ACTIVE',
-          dealType: 'LICENSE',
-          declaredUseCase: 'narrative_film',
-          endTime: null,
-        }),
-      },
-    ];
-    const { assertVoiceUsageAllowed } = await importAccess();
-    // Caller declares 'advertising' but the deal was for 'narrative_film'
+    await writeVoiceEntity({ creator: SELLER });
+    await writeListing({ active: true });
+    await writeDeal({
+      buyerUid: BUYER_UID,
+      dealType: 'LICENSE',
+      declaredUseCase: 'narrative_film',
+    });
+    const { assertVoiceUsageAllowed } = await import('../lib/likeness-access');
     await expect(
       assertVoiceUsageAllowed({
-        elevenLabsVoiceId: ELEVEN_VOICE,
+        elevenLabsVoiceId: elevenVoiceId,
         callerUid: BUYER_UID,
         callerAddress: BUYER_ADDR,
         useCase: 'advertising',
@@ -292,29 +191,12 @@ describe('assertVoiceUsageAllowed', () => {
   });
 
   it('treats an inactive listing as creator-private (new third-party access blocked)', async () => {
-    // Listing was once active but now deactivated. Existing deals stay valid
-    // by virtue of the deals query, but a buyer WITHOUT a deal can't use the
-    // voice just because it was listed at some point.
-    state.entities = [
-      {
-        id: 'entity-1',
-        data: () => ({
-          kind: 'voice',
-          creator: CREATOR,
-          metadata: { elevenLabsVoiceId: ELEVEN_VOICE },
-        }),
-      },
-    ];
-    state.listings = [
-      {
-        id: 'list-1',
-        data: () => ({ entityId: 'entity-1', active: false }),
-      },
-    ];
-    const { assertVoiceUsageAllowed } = await importAccess();
+    await writeVoiceEntity({ creator: SELLER });
+    await writeListing({ active: false });
+    const { assertVoiceUsageAllowed } = await import('../lib/likeness-access');
     await expect(
       assertVoiceUsageAllowed({
-        elevenLabsVoiceId: ELEVEN_VOICE,
+        elevenLabsVoiceId: elevenVoiceId,
         callerUid: BUYER_UID,
         callerAddress: BUYER_ADDR,
       })
@@ -322,24 +204,42 @@ describe('assertVoiceUsageAllowed', () => {
   });
 
   it('case-insensitively matches the caller address against the creator', async () => {
-    state.entities = [
-      {
-        id: 'entity-1',
-        data: () => ({
-          kind: 'voice',
-          creator: CREATOR.toUpperCase(), // entity stored uppercase
-          metadata: { elevenLabsVoiceId: ELEVEN_VOICE },
-        }),
-      },
-    ];
-    const { assertVoiceUsageAllowed } = await importAccess();
-    // Caller passes lowercase — should still match
+    // Write entity with uppercase creator; the helper normalises both sides.
+    await writeVoiceEntity({ creator: SELLER.toUpperCase() });
+    const { assertVoiceUsageAllowed } = await import('../lib/likeness-access');
     await expect(
       assertVoiceUsageAllowed({
-        elevenLabsVoiceId: ELEVEN_VOICE,
+        elevenLabsVoiceId: elevenVoiceId,
         callerUid: BUYER_UID,
-        callerAddress: CREATOR.toLowerCase(),
+        callerAddress: SELLER.toLowerCase(),
       })
     ).resolves.toBeUndefined();
+  });
+
+  it('expired LEASE deal is swept to EXPIRED and access denied', async () => {
+    // Stage an active-status row whose endTime is in the past — checkAccess
+    // (and assertVoiceUsageAllowed via findActiveDeal) should auto-expire it
+    // and deny access.
+    await writeVoiceEntity({ creator: SELLER });
+    await writeListing({ active: true });
+    const dealId = await writeDeal({
+      buyerUid: BUYER_UID,
+      dealType: 'LEASE',
+      endTime: new Date(Date.now() - 60_000), // 1 minute ago
+    });
+
+    const { assertVoiceUsageAllowed } = await import('../lib/likeness-access');
+    await expect(
+      assertVoiceUsageAllowed({
+        elevenLabsVoiceId: elevenVoiceId,
+        callerUid: BUYER_UID,
+        callerAddress: BUYER_ADDR,
+      })
+    ).rejects.toBeInstanceOf(TRPCError);
+
+    // Verify the helper actually wrote the sweep — status should now be EXPIRED.
+    const { db } = await import('../lib/firebase');
+    const snap = await db.collection('likenessDeals').doc(dealId).get();
+    expect(snap.data()?.status).toBe('EXPIRED');
   });
 });

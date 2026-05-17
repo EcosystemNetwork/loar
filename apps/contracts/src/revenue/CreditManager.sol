@@ -111,6 +111,8 @@ contract CreditManager is
     error ZeroAddress();
     error DailyGrantLimitExceeded();
     error MaxGrantPerUserExceeded();
+    error PaymentRouterNotSet();
+    error DiscountTooHigh();
 
     modifier onlyPlatform() {
         _checkPlatform();
@@ -290,7 +292,7 @@ contract CreditManager is
         }
 
         // CREDIT-05: Require PaymentRouter — no fallback path that bypasses accounting
-        require(address(paymentRouter) != address(0), "PaymentRouter not set");
+        if (address(paymentRouter) == address(0)) revert PaymentRouterNotSet();
         loarToken.safeTransferFrom(msg.sender, address(this), loarAmount);
         loarToken.forceApprove(address(paymentRouter), loarAmount);
         paymentRouter.routeLoarToTreasury(loarAmount);
@@ -363,7 +365,7 @@ contract CreditManager is
     }
 
     function setHolderDiscount(address token, uint16 discountBps) external onlyPlatform {
-        require(discountBps <= 5000, "Max 50% discount");
+        if (discountBps > 5000) revert DiscountTooHigh();
         holderDiscountBps[token] = discountBps;
     }
 

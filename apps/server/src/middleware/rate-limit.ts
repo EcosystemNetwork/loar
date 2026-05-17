@@ -18,11 +18,13 @@ interface Bucket {
   lastRefill: number;
 }
 
+const MAX_BUCKETS = 100_000;
+
 class MemoryStore implements RateLimitStore {
   private buckets = new Map<string, Bucket>();
 
   constructor() {
-    // Clean up stale buckets every 10 minutes
+    // Clean up stale buckets every 2 minutes
     setInterval(
       () => {
         const staleThreshold = Date.now() - 10 * 60 * 1000;
@@ -32,8 +34,20 @@ class MemoryStore implements RateLimitStore {
           }
         }
       },
-      10 * 60 * 1000
+      2 * 60 * 1000
     );
+  }
+
+  private evictOldest() {
+    if (this.buckets.size < MAX_BUCKETS) return;
+    const lastRefills: number[] = [];
+    for (const bucket of this.buckets.values()) lastRefills.push(bucket.lastRefill);
+    lastRefills.sort((a, b) => a - b);
+    const p10Index = Math.floor(lastRefills.length * 0.1);
+    const cutoff = lastRefills[p10Index] ?? lastRefills[lastRefills.length - 1] ?? 0;
+    for (const [key, bucket] of this.buckets.entries()) {
+      if (bucket.lastRefill <= cutoff) this.buckets.delete(key);
+    }
   }
 
   async consume(key: string, windowMs: number, max: number) {
@@ -48,6 +62,9 @@ class MemoryStore implements RateLimitStore {
     }
 
     bucket.tokens--;
+    if (!this.buckets.has(key) && this.buckets.size >= MAX_BUCKETS) {
+      this.evictOldest();
+    }
     this.buckets.set(key, bucket);
     return { remaining: bucket.tokens, blocked: false };
   }

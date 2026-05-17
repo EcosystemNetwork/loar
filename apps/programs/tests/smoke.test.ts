@@ -24,6 +24,8 @@ import { createHash } from 'node:crypto';
 import * as anchor from '@coral-xyz/anchor';
 import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
 import { expect } from 'chai';
+import { Universe } from '../target/types/universe';
+import { Episode } from '../target/types/episode';
 
 function sha256(s: string): number[] {
   return [...createHash('sha256').update(s).digest()];
@@ -33,9 +35,11 @@ describe('LOAR — universe + episode smoke', () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
-  // Anchor's workspace exposes programs by their cargo crate name (lowercase).
-  const universeProgram = anchor.workspace.universe as anchor.Program<anchor.Idl>;
-  const episodeProgram = anchor.workspace.episode as anchor.Program<anchor.Idl>;
+  // Anchor's workspace exposes programs by their cargo crate name. Type them
+  // via the emitted IDL types so `.account.universe.fetch` / `.account.episodeRecord.fetch`
+  // resolve to typed methods instead of falling back to `AccountNamespace<Idl>`.
+  const universeProgram = anchor.workspace.Universe as anchor.Program<Universe>;
+  const episodeProgram = anchor.workspace.Episode as anchor.Program<Episode>;
 
   const creator = (provider.wallet as anchor.Wallet).payer as Keypair;
   const contentHash = sha256(`smoke-test-${Date.now()}`);
@@ -69,7 +73,7 @@ describe('LOAR — universe + episode smoke', () => {
     if (!uCfg) {
       await universeProgram.methods
         .initializeConfig()
-        .accounts({
+        .accountsPartial({
           admin: creator.publicKey,
           config: universeConfigPda,
           systemProgram: SystemProgram.programId,
@@ -80,7 +84,7 @@ describe('LOAR — universe + episode smoke', () => {
     if (!eCfg) {
       await episodeProgram.methods
         .initializeConfig()
-        .accounts({
+        .accountsPartial({
           admin: creator.publicKey,
           config: episodeConfigPda,
           systemProgram: SystemProgram.programId,
@@ -92,7 +96,7 @@ describe('LOAR — universe + episode smoke', () => {
   it('initializes a Universe', async () => {
     await universeProgram.methods
       .initializeUniverse(contentHash, plotHash, { private: {} })
-      .accounts({
+      .accountsPartial({
         creator: creator.publicKey,
         universe: universePda,
         config: universeConfigPda,
@@ -113,7 +117,11 @@ describe('LOAR — universe + episode smoke', () => {
   it('publishes the Universe (private → public)', async () => {
     await universeProgram.methods
       .publishUniverse()
-      .accounts({ signer: creator.publicKey, universe: universePda, config: universeConfigPda })
+      .accountsPartial({
+        signer: creator.publicKey,
+        universe: universePda,
+        config: universeConfigPda,
+      })
       .rpc();
 
     const acct = (await universeProgram.account.universe.fetch(universePda)) as {
@@ -131,7 +139,11 @@ describe('LOAR — universe + episode smoke', () => {
     try {
       await universeProgram.methods
         .publishUniverse()
-        .accounts({ signer: intruder.publicKey, universe: universePda, config: universeConfigPda })
+        .accountsPartial({
+          signer: intruder.publicKey,
+          universe: universePda,
+          config: universeConfigPda,
+        })
         .signers([intruder])
         .rpc();
     } catch (err) {
@@ -145,7 +157,7 @@ describe('LOAR — universe + episode smoke', () => {
   it('mints an Episode under the Universe', async () => {
     await episodeProgram.methods
       .mintEpisode(contentHash, 'https://example.com/m.json', 'Smoke Episode')
-      .accounts({
+      .accountsPartial({
         creator: creator.publicKey,
         universe: universePda,
         episodeRecord: episodePda,
@@ -167,7 +179,11 @@ describe('LOAR — universe + episode smoke', () => {
   it('canonizes the Episode (one-way flag flip)', async () => {
     await episodeProgram.methods
       .canonize()
-      .accounts({ signer: creator.publicKey, episodeRecord: episodePda, config: episodeConfigPda })
+      .accountsPartial({
+        signer: creator.publicKey,
+        episodeRecord: episodePda,
+        config: episodeConfigPda,
+      })
       .rpc();
 
     const acct = (await episodeProgram.account.episodeRecord.fetch(episodePda)) as {
@@ -181,7 +197,7 @@ describe('LOAR — universe + episode smoke', () => {
     try {
       await episodeProgram.methods
         .canonize()
-        .accounts({
+        .accountsPartial({
           signer: creator.publicKey,
           episodeRecord: episodePda,
           config: episodeConfigPda,

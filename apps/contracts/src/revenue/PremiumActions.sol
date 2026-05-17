@@ -11,29 +11,33 @@ import {PausableUpgradeable} from "@openzeppelin-upgradeable/utils/PausableUpgra
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
-/// @title LoarBurner
-/// @notice Premium-action fee collector. The "burn" in the name is a UX/narrative term for
-///         "token leaves the user's wallet to perform a protocol action"; it is NOT supply
-///         destruction. Collected $LOAR is split between the liquidity pool and the DAO
-///         treasury. If the DAO later wants to destroy some of its treasury holdings, it
-///         can do so by governance proposal calling `loarToken.burn()` — the token is
-///         `ERC20Burnable`. This contract itself never calls `burn()`.
-/// @dev BURN-01: Contract/enum names (`LoarBurner`, `BurnAction`) are retained for upgrade
-///      safety; a rename is deferred to a post-launch UUPS upgrade because it would churn
-///      every importer and the Safe-timelock path.
+/// @title PremiumActions
+/// @notice Premium-action fee collector. **No supply destruction** — every $LOAR
+///         collected is split between the protocol-owned liquidity pool and the
+///         DAO treasury. The contract was originally named `LoarBurner`; the
+///         BURN-01 audit finding (sources E H-28) flagged that name as
+///         misleading because no `burn()` is ever called. This is the renamed
+///         file. If the DAO later wants to destroy any of its treasury
+///         holdings, it does so via a governance proposal calling
+///         `loarToken.burn()` (the token is `ERC20Burnable`); this contract is
+///         not involved.
+/// @dev BURN-01 rename executed 2026-05-16. The `BurnAction` enum and
+///      `totalBurned` struct field are retained for ABI continuity — renaming
+///      them would change the public getter tuple and break any indexer that
+///      decodes by field name. `totalBurned` is "lifetime $LOAR collected for
+///      this action" — historical name, NOT supply destruction.
 ///
-///         Premium actions (`BurnAction` enum — historical name, no supply destruction):
-///         - PRIORITY_GENERATION: Skip AI generation queue
-///         - PERMANENT_CANON: Make a canon entry immutable (can't be overturned by vote)
-///         - PREMIUM_PROFILE: Verified/premium creator badge
-///         - REMIX_BOOST: Boost a remix's visibility for 7 days
-///         - CUSTOM: Platform-defined future actions
+///      Action catalogue (`BurnAction` enum — historical name, no destruction):
+///      - PRIORITY_GENERATION: Skip AI generation queue
+///      - PERMANENT_CANON: Make a canon entry immutable
+///      - PREMIUM_PROFILE: Verified/premium creator badge
+///      - REMIX_BOOST: Boost a remix's visibility for 7 days
+///      - CUSTOM: Platform-defined future actions
 ///
-///         Split (configurable):
-///         - lpRatioBps% → LP address (deepens protocol-owned liquidity)
-///         - remainder → DAO treasury (protocol revenue)
-///         Default: 50% LP, 50% treasury.
-contract LoarBurner is
+///      Split (configurable, default 50/50):
+///      - lpRatioBps% → liquidity pool
+///      - remainder    → DAO treasury
+contract PremiumActions is
     Initializable,
     UUPSUpgradeable,
     OwnableUpgradeable,
@@ -42,6 +46,8 @@ contract LoarBurner is
 {
     using SafeERC20 for IERC20;
 
+    /// @notice Action catalogue. Name retained from the pre-BURN-01 contract
+    ///         for ABI continuity — these are NOT supply-destroying burns.
     enum BurnAction {
         PRIORITY_GENERATION,
         PERMANENT_CANON,
@@ -64,7 +70,7 @@ contract LoarBurner is
     /// @notice Percentage of payment sent to LP (rest goes to DAO treasury). Default 5000 = 50%
     uint16 public lpRatioBps;
 
-    /// @notice Config per burn action
+    /// @notice Config per premium action
     mapping(BurnAction => ActionConfig) public actions;
 
     /// @notice Custom action configs by name hash
@@ -76,13 +82,23 @@ contract LoarBurner is
     /// @notice Total $LOAR sent to LP (lifetime)
     uint256 public totalToLp;
 
-    /// @notice Platform backend address (can execute burns on behalf of users with approval)
+    /// @notice Platform backend address (can execute actions on behalf of users with approval)
     address public platform;
 
+    /// @dev `cost` = the sticker price (action config) the caller agreed to
+    ///      pay. `received` = the actual balance delta after the SafeERC20
+    ///      transferFrom (fee-on-transfer protection — see `_processPayment`).
+    ///      Indexers that compute sticker revenue should read `cost`; indexers
+    ///      that reconcile treasury/LP inflows should read `received`. Pre-H-1
+    ///      the contract emitted `received` in the `cost` slot, silently
+    ///      breaking sticker-revenue dashboards if $LOAR ever gains transfer
+    ///      fees. ABI-breaking change: an extra `uint256 received` field was
+    ///      appended after `cost`.
     event ActionExecuted(
         address indexed user,
         BurnAction indexed action,
         uint256 cost,
+        uint256 received,
         uint256 toLp,
         uint256 toTreasury
     );
@@ -90,6 +106,7 @@ contract LoarBurner is
         address indexed user,
         bytes32 indexed actionName,
         uint256 cost,
+        uint256 received,
         uint256 toLp,
         uint256 toTreasury
     );
@@ -103,6 +120,10 @@ contract LoarBurner is
     error ActionNotActive();
     error InsufficientAllowance();
     error ZeroAddress();
+    error NotAuthorized();
+    error InvalidRatio();
+    error NoTokensReceived();
+    error UseCustomActionSetter();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -148,51 +169,63 @@ contract LoarBurner is
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    // ── Core burn functions ─────────────────────────────────────
+    // ── Core execute functions ──────────────────────────────────
 
     /// @notice Execute a premium action — $LOAR split to LP + treasury (requires prior approval)
     /// @param action The action type to execute
     function execute(BurnAction action) external nonReentrant whenNotPaused {
         ActionConfig storage config = actions[action];
         if (!config.active) revert ActionNotActive();
-        (uint256 toLp, uint256 toTreasury) = _processPayment(msg.sender, config.cost);
-        config.totalBurned += config.cost;
+        uint256 cost = config.cost;
+        (uint256 received, uint256 toLp, uint256 toTreasury) =
+            _processPayment(msg.sender, cost);
+        config.totalBurned += received;
         config.totalCount += 1;
-        emit ActionExecuted(msg.sender, action, config.cost, toLp, toTreasury);
+        emit ActionExecuted(msg.sender, action, cost, received, toLp, toTreasury);
     }
 
     /// @notice Platform executes on behalf of a user (user must have approved this contract)
     function executeFor(address user, BurnAction action) external nonReentrant whenNotPaused {
-        require(msg.sender == platform || msg.sender == owner(), "Unauthorized");
+        if (msg.sender != platform && msg.sender != owner()) revert NotAuthorized();
         ActionConfig storage config = actions[action];
         if (!config.active) revert ActionNotActive();
-        (uint256 toLp, uint256 toTreasury) = _processPayment(user, config.cost);
-        config.totalBurned += config.cost;
+        uint256 cost = config.cost;
+        (uint256 received, uint256 toLp, uint256 toTreasury) =
+            _processPayment(user, cost);
+        config.totalBurned += received;
         config.totalCount += 1;
-        emit ActionExecuted(user, action, config.cost, toLp, toTreasury);
+        emit ActionExecuted(user, action, cost, received, toLp, toTreasury);
     }
 
     /// @notice Execute a custom-named action
     function executeCustom(bytes32 actionName) external nonReentrant whenNotPaused {
         ActionConfig storage config = customActions[actionName];
         if (!config.active) revert ActionNotActive();
-        (uint256 toLp, uint256 toTreasury) = _processPayment(msg.sender, config.cost);
-        config.totalBurned += config.cost;
+        uint256 cost = config.cost;
+        (uint256 received, uint256 toLp, uint256 toTreasury) =
+            _processPayment(msg.sender, cost);
+        config.totalBurned += received;
         config.totalCount += 1;
-        emit CustomActionExecuted(msg.sender, actionName, config.cost, toLp, toTreasury);
+        emit CustomActionExecuted(msg.sender, actionName, cost, received, toLp, toTreasury);
     }
 
     // ── Internal ────────────────────────────────────────────────
 
     function _processPayment(address payer, uint256 cost)
         internal
-        returns (uint256 toLp, uint256 toTreasury)
+        returns (uint256 received, uint256 toLp, uint256 toTreasury)
     {
-        toLp = (cost * lpRatioBps) / 10_000;
-        toTreasury = cost - toLp;
-
-        // Transfer from payer to this contract
+        // Fee-on-transfer protection (M8): measure actual received amount rather
+        // than trusting `cost`. If $LOAR ever gains transfer fees, treasury+LP
+        // splits must be re-computed from the real balance delta, otherwise the
+        // contract over-promises tokens it never received.
+        uint256 balBefore = loarToken.balanceOf(address(this));
         loarToken.safeTransferFrom(payer, address(this), cost);
+        received = loarToken.balanceOf(address(this)) - balBefore;
+        if (received == 0) revert NoTokensReceived();
+
+        toLp = (received * lpRatioBps) / 10_000;
+        toTreasury = received - toLp;
 
         // LP portion — deepens protocol-owned liquidity
         if (toLp > 0 && liquidityPool != address(0)) {
@@ -209,12 +242,13 @@ contract LoarBurner is
             loarToken.safeTransfer(treasury, toTreasury);
         }
 
-        totalCollected += cost;
+        totalCollected += received;
     }
 
     // ── Admin ───────────────────────────────────────────────────
 
     function setActionConfig(BurnAction action, uint256 cost, bool active) external onlyOwner {
+        if (action == BurnAction.CUSTOM) revert UseCustomActionSetter();
         actions[action].cost = cost;
         actions[action].active = active;
         emit ActionConfigUpdated(action, cost, active);
@@ -227,7 +261,7 @@ contract LoarBurner is
     }
 
     function setLpRatio(uint16 newRatio) external onlyOwner {
-        require(newRatio <= 10_000, "Invalid ratio");
+        if (newRatio > 10_000) revert InvalidRatio();
         emit LpRatioUpdated(lpRatioBps, newRatio);
         lpRatioBps = newRatio;
     }
@@ -248,6 +282,6 @@ contract LoarBurner is
         platform = newPlatform;
     }
 
-    /// @dev Reserved storage gap for future upgrades (M4)
+    /// @dev Reserved storage gap for future upgrades
     uint256[50] private __gap;
 }

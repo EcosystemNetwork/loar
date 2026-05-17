@@ -18,6 +18,9 @@ subscription = "Hnnkuf933sv2rEucpCLaLbXxA1zPNxTNpUsp1WX9Fwbm"
 remix_fees = "5JdzozEXeto8CRgUZmLqrtwkGtt8smpaM4vhahW1gNLs"
 bonding_curve = "seJzMSz9EkVYuNN9Nu3eJF3UgepeWzfgGvDnzrp2Uiw"
 canon_market = "2T6WzMCrSRLzUp6zwPhWPuguk84pDqozs6VwrykTR25u"
+fee_locker = "AwUfDktCrNYe4PU7YSBgWG6sBVTQCZEMuYL9ZWsKWtde"
+premium_actions = "6rXM35SaYEViEfHJmeb1cEebJcTzXgLckX5RbshPXPrN"
+collab_manager = "6j9GBZXsdiGTJc7zJbJr3gJsibYQhJUDp2ZCDRBNzo2h"
 
 [programs.localnet]
 episode = "voLiAXoYbq8go1CUS9UshQRZnNu9Y44qNBZ6czgn8Bs"
@@ -37,7 +40,7 @@ cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [workspace]
-members = ["programs/universe", "programs/episode", "programs/payment", "programs/rights", "programs/licensing", "programs/split_router", "programs/staking", "programs/credit_manager", "programs/subscription", "programs/remix_fees", "programs/bonding_curve", "programs/canon_market"]
+members = ["programs/universe", "programs/episode", "programs/payment", "programs/rights", "programs/licensing", "programs/split_router", "programs/staking", "programs/credit_manager", "programs/subscription", "programs/remix_fees", "programs/bonding_curve", "programs/canon_market", "programs/fee_locker", "programs/premium_actions", "programs/collab_manager"]
 
 [scripts]
 test = "pnpm exec mocha --require tsx/cjs -t 1000000 tests/**/*.ts"

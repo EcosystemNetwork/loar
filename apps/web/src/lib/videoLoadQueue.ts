@@ -51,5 +51,11 @@ class VideoLoadQueue {
   }
 }
 
-/** Singleton queue shared across all gallery video cards. */
-export const videoLoadQueue = new VideoLoadQueue(3);
+/**
+ * Singleton queue shared across all gallery video cards.
+ * Concurrency 6 matches the browser's per-origin connection cap and lets a
+ * full above-the-fold row (4-column grid) load in parallel so the page looks
+ * even instead of staggered. Combined with intersection-based gating in
+ * useVideoLoad, off-screen cards still wait their turn.
+ */
+export const videoLoadQueue = new VideoLoadQueue(6);

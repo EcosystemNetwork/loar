@@ -29,7 +29,9 @@ import { publishToGallery } from '../../lib/gallery-publish';
 import { extractVideoThumbnail } from '../../services/video-thumbnail';
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
+import { segmentsToSRT, segmentsToVTT } from '../../lib/captions-format';
 import { TRPCError } from '@trpc/server';
+import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 
 const clientTokenSchema = z
   .string()
@@ -120,40 +122,6 @@ async function uploadVideo(buffer: Buffer, filename: string): Promise<string> {
   return firebaseStorageService.getPublicUrl(key);
 }
 
-// ── Caption formatting helpers ──────────────────────────────────────
-
-function formatTimeSRT(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  const ms = Math.round((seconds % 1) * 1000);
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
-}
-
-function formatTimeVTT(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  const ms = Math.round((seconds % 1) * 1000);
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(3, '0')}`;
-}
-
-function segmentsToSRT(segments: Array<{ start: number; end: number; text: string }>): string {
-  return segments
-    .map(
-      (seg, i) =>
-        `${i + 1}\n${formatTimeSRT(seg.start)} --> ${formatTimeSRT(seg.end)}\n${seg.text}\n`
-    )
-    .join('\n');
-}
-
-function segmentsToVTT(segments: Array<{ start: number; end: number; text: string }>): string {
-  const cues = segments
-    .map((seg) => `${formatTimeVTT(seg.start)} --> ${formatTimeVTT(seg.end)}\n${seg.text}\n`)
-    .join('\n');
-  return `WEBVTT\n\n${cues}`;
-}
-
 // ── Router ──────────────────────────────────────────────────────────
 
 export const lipsyncRouter = router({
@@ -178,6 +146,15 @@ export const lipsyncRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      try {
+        assertSafeExternalUrl(input.videoUrl);
+        assertSafeExternalUrl(input.audioUrl);
+      } catch (err) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: err instanceof Error ? err.message : 'URL rejected',
+        });
+      }
       const genId = randomUUID();
 
       // Idempotency check before any credit deduction.
@@ -360,6 +337,14 @@ export const lipsyncRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      try {
+        assertSafeExternalUrl(input.audioUrl);
+      } catch (err) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: err instanceof Error ? err.message : 'audioUrl rejected',
+        });
+      }
       const transcriptionId = randomUUID();
       const startTime = Date.now();
       const credits = TRANSCRIBE_CREDITS;
@@ -440,6 +425,14 @@ export const lipsyncRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      try {
+        assertSafeExternalUrl(input.videoUrl);
+      } catch (err) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: err instanceof Error ? err.message : 'videoUrl rejected',
+        });
+      }
       const captionId = randomUUID();
       const startTime = Date.now();
       const credits = CAPTION_CREDITS;

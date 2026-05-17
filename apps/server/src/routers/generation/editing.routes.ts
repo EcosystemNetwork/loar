@@ -33,6 +33,7 @@ import type { AssetEventStep, AssetOutputKind } from '../../services/lineage/typ
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 import { assertEditSourceAuthorized } from '../../lib/edit-source-authz';
+import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 
 // Prompt length caps. Kept tight (≤500) because these strings are forwarded to
 // Flux/FAL/Google where unbounded input drives GPU memory and provider cost.
@@ -328,6 +329,14 @@ export const editingRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      try {
+        assertSafeExternalUrl(input.imageUrl);
+      } catch (err) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: err instanceof Error ? err.message : 'imageUrl rejected',
+        });
+      }
       await assertEditSourceAuthorized({
         uid: ctx.user.uid,
         mediaUrl: input.imageUrl,
@@ -409,6 +418,14 @@ export const editingRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      try {
+        assertSafeExternalUrl(input.videoUrl);
+      } catch (err) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: err instanceof Error ? err.message : 'videoUrl rejected',
+        });
+      }
       await assertEditSourceAuthorized({
         uid: ctx.user.uid,
         mediaUrl: input.videoUrl,
@@ -493,6 +510,14 @@ export const editingRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      try {
+        assertSafeExternalUrl(input.videoUrl);
+      } catch (err) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: err instanceof Error ? err.message : 'videoUrl rejected',
+        });
+      }
       await assertEditSourceAuthorized({
         uid: ctx.user.uid,
         mediaUrl: input.videoUrl,
@@ -675,6 +700,15 @@ export const editingRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      try {
+        assertSafeExternalUrl(input.imageUrl);
+        assertSafeExternalUrl(input.maskUrl);
+      } catch (err) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: err instanceof Error ? err.message : 'URL rejected',
+        });
+      }
       await assertEditSourceAuthorized({
         uid: ctx.user.uid,
         mediaUrl: input.imageUrl,
@@ -843,6 +877,14 @@ export const editingRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      try {
+        assertSafeExternalUrl(input.imageUrl);
+      } catch (err) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: err instanceof Error ? err.message : 'imageUrl rejected',
+        });
+      }
       await assertEditSourceAuthorized({
         uid: ctx.user.uid,
         mediaUrl: input.imageUrl,
@@ -908,6 +950,14 @@ export const editingRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      try {
+        assertSafeExternalUrl(input.videoUrl);
+      } catch (err) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: err instanceof Error ? err.message : 'videoUrl rejected',
+        });
+      }
       await assertEditSourceAuthorized({
         uid: ctx.user.uid,
         mediaUrl: input.videoUrl,
@@ -1058,6 +1108,14 @@ export const editingRouter = router({
         })
     )
     .mutation(async ({ ctx, input }) => {
+      try {
+        assertSafeExternalUrl(input.imageUrl);
+      } catch (err) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: err instanceof Error ? err.message : 'imageUrl rejected',
+        });
+      }
       await assertEditSourceAuthorized({
         uid: ctx.user.uid,
         mediaUrl: input.imageUrl,

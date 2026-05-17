@@ -86,6 +86,7 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
     error ParentRequired();
     error NotUniverseAdmin();
     error RefundFailed();
+    error NotUniverseOwner();
 
     uint16 public constant MAX_FEE_BPS = 5000;
 
@@ -130,10 +131,9 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
         }
 
         // DEED-01: Verify caller owns or administers this universe
-        require(
-            IERC721(address(universeManager)).ownerOf(universeId) == msg.sender,
-            "Not universe owner or admin"
-        );
+        if (IERC721(address(universeManager)).ownerOf(universeId) != msg.sender) {
+            revert NotUniverseOwner();
+        }
 
         uint8 l = uint8(layer);
         if (msg.value < layerMintPrices[l]) revert InsufficientPayment();

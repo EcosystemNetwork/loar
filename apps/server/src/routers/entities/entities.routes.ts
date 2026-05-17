@@ -105,7 +105,8 @@ export const entitiesRouter = router({
       // Skip for `voice` and `likeness` kinds — those represent real-person
       // biometric assets where a generated stock-photo cover would
       // mis-portray the rights holder.
-      const skipCover = input.kind === 'voice' || input.kind === 'likeness';
+      const skipCover =
+        input.kind === 'voice' || input.kind === 'likeness' || input.kind === 'persona';
       if (!input.imageUrl && result.id && !skipCover) {
         triggerCoverImageGenerationAsync({
           id: result.id,

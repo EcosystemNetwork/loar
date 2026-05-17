@@ -32,6 +32,7 @@ import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 import { getImageModelById } from '../../services/image-models';
 import { assertEditSourceAuthorized } from '../../lib/edit-source-authz';
+import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 
 function maskProviderName(raw: string): string {
   return raw
@@ -277,6 +278,14 @@ export const outpaintRouter = router({
         });
       }
 
+      try {
+        assertSafeExternalUrl(input.sourceImageUrl);
+      } catch (err) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: err instanceof Error ? err.message : 'sourceImageUrl rejected',
+        });
+      }
       await assertEditSourceAuthorized({
         uid: ctx.user.uid,
         mediaUrl: input.sourceImageUrl,

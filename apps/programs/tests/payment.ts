@@ -62,7 +62,7 @@ describe('payment', () => {
   it('initializes config with treasury + default fee', async () => {
     await program.methods
       .initialize(treasury.publicKey, 250) // 2.5%
-      .accounts({
+      .accountsPartial({
         owner: owner.publicKey,
         config: configPda,
         solVault: solVaultPda,
@@ -85,7 +85,7 @@ describe('payment', () => {
     try {
       await program.methods
         .setDefaultFee(1500) // > 10%
-        .accounts({ owner: owner.publicKey, config: configPda })
+        .accountsPartial({ owner: owner.publicKey, config: configPda })
         .rpc();
     } catch (e) {
       err = e;
@@ -97,7 +97,7 @@ describe('payment', () => {
     const amount = new BN(1_000_000_000); // 1 SOL
     await program.methods
       .route(amount, null)
-      .accounts({
+      .accountsPartial({
         payer: owner.publicKey,
         creator: creator.publicKey,
         config: configPda,
@@ -115,12 +115,15 @@ describe('payment', () => {
   });
 
   it('rejects route while paused, allows claim', async () => {
-    await program.methods.pause().accounts({ owner: owner.publicKey, config: configPda }).rpc();
+    await program.methods
+      .pause()
+      .accountsPartial({ owner: owner.publicKey, config: configPda })
+      .rpc();
     let err: unknown;
     try {
       await program.methods
         .route(new BN(1_000_000), null)
-        .accounts({
+        .accountsPartial({
           payer: owner.publicKey,
           creator: creator.publicKey,
           config: configPda,
@@ -138,7 +141,7 @@ describe('payment', () => {
     const before = await provider.connection.getBalance(creator.publicKey);
     await program.methods
       .claim()
-      .accounts({
+      .accountsPartial({
         creator: creator.publicKey,
         config: configPda,
         solVault: solVaultPda,
@@ -149,14 +152,17 @@ describe('payment', () => {
     const after = await provider.connection.getBalance(creator.publicKey);
     expect(after - before).to.equal(975_000_000);
 
-    await program.methods.unpause().accounts({ owner: owner.publicKey, config: configPda }).rpc();
+    await program.methods
+      .unpause()
+      .accountsPartial({ owner: owner.publicKey, config: configPda })
+      .rpc();
   });
 
   it('rejects claim by non-creator', async () => {
     // Re-accumulate first.
     await program.methods
       .route(new BN(100_000_000), null)
-      .accounts({
+      .accountsPartial({
         payer: owner.publicKey,
         creator: creator.publicKey,
         config: configPda,
@@ -170,7 +176,7 @@ describe('payment', () => {
     try {
       await program.methods
         .claim()
-        .accounts({
+        .accountsPartial({
           creator: intruder.publicKey,
           config: configPda,
           solVault: solVaultPda,
@@ -193,7 +199,7 @@ describe('payment', () => {
 
     await program.methods
       .claimTreasurySol()
-      .accounts({
+      .accountsPartial({
         owner: owner.publicKey,
         config: configPda,
         solVault: solVaultPda,
@@ -212,7 +218,7 @@ describe('payment', () => {
     try {
       await program.methods
         .setDefaultFee(100)
-        .accounts({ owner: intruder.publicKey, config: configPda })
+        .accountsPartial({ owner: intruder.publicKey, config: configPda })
         .signers([intruder])
         .rpc();
     } catch (e) {
@@ -256,20 +262,20 @@ describe('payment', () => {
 
       await program.methods
         .setLoarMint(loarMint)
-        .accounts({ owner: owner.publicKey, config: configPda })
+        .accountsPartial({ owner: owner.publicKey, config: configPda })
         .rpc();
     });
 
     it('routes $LOAR with fee discount applied', async () => {
       await program.methods
         .setLoarFeeDiscount(50) // 0.5% off the SPL path
-        .accounts({ owner: owner.publicKey, config: configPda })
+        .accountsPartial({ owner: owner.publicKey, config: configPda })
         .rpc();
 
       const amount = new BN(1_000_000_000); // 1 token (9 decimals)
       await program.methods
         .routeSpl(amount, null)
-        .accounts({
+        .accountsPartial({
           payer: owner.publicKey,
           creator: creator.publicKey,
           config: configPda,
@@ -294,7 +300,7 @@ describe('payment', () => {
     it('creator claims $LOAR to their ATA', async () => {
       await program.methods
         .claimSpl()
-        .accounts({
+        .accountsPartial({
           creator: creator.publicKey,
           config: configPda,
           loarVault: loarVaultPda,
@@ -317,14 +323,14 @@ describe('payment', () => {
     it('locks LOAR mint and blocks further updates', async () => {
       await program.methods
         .lockLoarMint()
-        .accounts({ owner: owner.publicKey, config: configPda })
+        .accountsPartial({ owner: owner.publicKey, config: configPda })
         .rpc();
 
       let err: unknown;
       try {
         await program.methods
           .setLoarMint(Keypair.generate().publicKey)
-          .accounts({ owner: owner.publicKey, config: configPda })
+          .accountsPartial({ owner: owner.publicKey, config: configPda })
           .rpc();
       } catch (e) {
         err = e;
@@ -344,14 +350,14 @@ describe('payment', () => {
     it('proposes + accepts new owner', async () => {
       await program.methods
         .transferOwnership(newOwner.publicKey)
-        .accounts({ owner: owner.publicKey, config: configPda })
+        .accountsPartial({ owner: owner.publicKey, config: configPda })
         .rpc();
       let c = await program.account.config.fetch(configPda);
       expect(c.pendingOwner.toBase58()).to.equal(newOwner.publicKey.toBase58());
 
       await program.methods
         .acceptOwnership()
-        .accounts({ newOwner: newOwner.publicKey, config: configPda })
+        .accountsPartial({ newOwner: newOwner.publicKey, config: configPda })
         .signers([newOwner])
         .rpc();
       c = await program.account.config.fetch(configPda);
@@ -363,14 +369,14 @@ describe('payment', () => {
       // Already accepted; propose again to set up the case.
       await program.methods
         .transferOwnership(owner.publicKey)
-        .accounts({ owner: newOwner.publicKey, config: configPda })
+        .accountsPartial({ owner: newOwner.publicKey, config: configPda })
         .signers([newOwner])
         .rpc();
       let err: unknown;
       try {
         await program.methods
           .acceptOwnership()
-          .accounts({ newOwner: intruder.publicKey, config: configPda })
+          .accountsPartial({ newOwner: intruder.publicKey, config: configPda })
           .signers([intruder])
           .rpc();
       } catch (e) {
@@ -381,7 +387,7 @@ describe('payment', () => {
       // Real accept restores the original owner for the rest of the suite.
       await program.methods
         .acceptOwnership()
-        .accounts({ newOwner: owner.publicKey, config: configPda })
+        .accountsPartial({ newOwner: owner.publicKey, config: configPda })
         .rpc();
     });
   });

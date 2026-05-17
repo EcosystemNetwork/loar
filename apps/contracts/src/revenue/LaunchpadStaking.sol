@@ -430,7 +430,7 @@ contract LaunchpadStaking is
         // surface is closed by default even without owner action.
         uint256 lastBlock = lastDistributionBlock[universeId];
         uint256 interval = minDistributionInterval;
-        if (interval < MIN_DISTRIBUTION_INTERVAL) interval = MIN_DISTRIBUTION_INTERVAL;
+        if (interval < MIN_DISTRIBUTION_INTERVAL_FLOOR) interval = MIN_DISTRIBUTION_INTERVAL_FLOOR;
         if (lastBlock != 0 && block.number < lastBlock + interval) {
             revert DistributionTooSoon();
         }
@@ -628,7 +628,10 @@ contract LaunchpadStaking is
     ///         previously set this to 0. We now require at least a 1-block
     ///         gap so two distributions can never land in the same block as
     ///         an attacker's stake+claim.
-    uint256 public constant MIN_DISTRIBUTION_INTERVAL = 1;
+    /// @dev Renamed from `MIN_DISTRIBUTION_INTERVAL` to disambiguate the
+    ///      pascalCased getter from the `minDistributionInterval` storage var,
+    ///      which previously collided in the wagmi React hook generator.
+    uint256 public constant MIN_DISTRIBUTION_INTERVAL_FLOOR = 1;
 
     /// @notice Configure the sandwich-mitigation guards for distributions.
     /// @param newMinInterval Min blocks between distributions to a single pool.
@@ -642,7 +645,7 @@ contract LaunchpadStaking is
     {
         require(newMaxRewardBps >= MIN_MAX_REWARD_BPS, "Max bps below floor");
         require(newMaxRewardBps <= 10_000, "Max bps > 100%");
-        require(newMinInterval >= MIN_DISTRIBUTION_INTERVAL, "Interval below floor");
+        require(newMinInterval >= MIN_DISTRIBUTION_INTERVAL_FLOOR, "Interval below floor");
         require(newMinInterval <= 100_000, "Interval too large");
         minDistributionInterval = newMinInterval;
         maxRewardBpsPerDistribution = newMaxRewardBps;

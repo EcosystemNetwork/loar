@@ -67,6 +67,7 @@ contract TokenVesting is Ownable {
     error NotBeneficiary();
     error CliffExceedsVesting();
     error VestingIsNonRevocable();
+    error TooManyVestings();
 
     // ──────────────────────────────────────────────────────────────────────
     // Events
@@ -226,7 +227,7 @@ contract TokenVesting is Ownable {
     function claimAll() external {
         uint256[] storage ids = beneficiaryVestings[msg.sender];
         uint256 len = ids.length;
-        require(len <= 50, "Too many vestings, use claim() individually");
+        if (len > 50) revert TooManyVestings();
 
         for (uint256 i; i < len; ++i) {
             VestingSchedule storage v = vestings[ids[i]];

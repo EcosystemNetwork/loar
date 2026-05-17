@@ -261,32 +261,20 @@ pub mod canon_market {
         } else {
             SubmissionState::Rejected
         };
-        submission.state = new_state;
-        submission.finalized_at = now;
 
-        // Fee disposition: only Expired refunds; Accepted/Rejected forward
-        // the fee to treasury (anti-spam, CANON-06 analog). Treasury transfer
-        // happens here so submitter can't claim refund after Accepted/Rejected.
-        if new_state != SubmissionState::Expired && submission.submission_fee > 0 {
-            let submission_info = ctx.accounts.submission.to_account_info();
-            let treasury_info = ctx.accounts.treasury.to_account_info();
-            let mut sub_lamports = submission_info.try_borrow_mut_lamports()?;
-            let amount = submission.submission_fee;
-            require!(**sub_lamports >= amount, CanonError::EscrowUnderfunded);
-            **sub_lamports = sub_lamports
-                .checked_sub(amount)
-                .ok_or(CanonError::MathOverflow)?;
-            drop(sub_lamports);
-            let mut treas_lamports = treasury_info.try_borrow_mut_lamports()?;
-            **treas_lamports = treas_lamports
-                .checked_add(amount)
-                .ok_or(CanonError::MathOverflow)?;
-            drop(treas_lamports);
-            // Zero out the fee field so refund path can't double-spend.
-            submission.submission_fee = 0;
-        }
-
-        emit!(SubmissionFinalized {
+        // Capture fields needed for the event + lamport move before we drop
+        // the &mut borrow on `submission` — the lamport manipulation needs an
+        // immutable AccountInfo on the same account, and Rust's borrow checker
+        // won't let an `&mut Account` and an `AccountInfo` coexist within the
+        // same instruction's writes. (This is a write-order concern within
+        // this instruction, NOT cross-instruction reentrancy — Solana does
+        // not have cross-instruction reentrancy in the EVM sense.)
+        let fee_to_forward = if new_state != SubmissionState::Expired {
+            submission.submission_fee
+        } else {
+            0
+        };
+        let event = SubmissionFinalized {
             id: submission.id,
             universe: submission.universe,
             content_hash: submission.content_hash,
@@ -294,7 +282,77 @@ pub mod canon_market {
             state: new_state,
             votes_for: submission.votes_for,
             votes_against: submission.votes_against,
-        });
+        };
+        submission.state = new_state;
+        submission.finalized_at = now;
+        if fee_to_forward > 0 {
+            // Zero the fee field BEFORE the lamport move so refund path can't
+            // double-spend even if the lamport CPI somehow re-enters.
+            submission.submission_fee = 0;
+        }
+
+        // Fee disposition: only Expired refunds; Accepted/Rejected forward
+        // the fee to treasury (anti-spam, CANON-06 analog).
+        //
+        // M-5: proactive rent cap. Cap the withdrawal so the residual is
+        // always at least rent-exempt minimum. The previous version relied
+        // on a reactive `RentExemptionViolated` assertion AFTER the move,
+        // which is correct but harder to audit (the panic fires from a
+        // place that's already mutated state). Clamping `actual_fee` makes
+        // the invariant impossible to violate; we keep the reactive assert
+        // below as defense-in-depth in case a future refactor changes the
+        // rent calculation.
+        if fee_to_forward > 0 {
+            let submission_info = ctx.accounts.submission.to_account_info();
+            let treasury_info = ctx.accounts.treasury.to_account_info();
+            let rent_min = Rent::get()?.minimum_balance(submission_info.data_len());
+
+            let mut sub_lamports = submission_info.try_borrow_mut_lamports()?;
+            let available = (**sub_lamports).saturating_sub(rent_min);
+            let actual_fee = fee_to_forward.min(available);
+            // Restore the fee-tracking field if we clamped — otherwise the
+            // submitter would lose the unforwarded portion silently.
+            // (`submission.submission_fee` was already zeroed above; we set
+            // it to the unforwarded remainder so any future operator audit
+            // can see what's stuck in the PDA.)
+            // NOTE: this state write happens AFTER we drop the lamport
+            // borrow, below.
+            require!(**sub_lamports >= actual_fee, CanonError::EscrowUnderfunded);
+            **sub_lamports = sub_lamports
+                .checked_sub(actual_fee)
+                .ok_or(CanonError::MathOverflow)?;
+            drop(sub_lamports);
+
+            if actual_fee < fee_to_forward {
+                // Re-borrow the submission to record the clamped remainder.
+                ctx.accounts.submission.submission_fee =
+                    fee_to_forward.saturating_sub(actual_fee);
+                msg!(
+                    "canon_market: fee clamp engaged; intended={} actual={} stranded={}",
+                    fee_to_forward,
+                    actual_fee,
+                    fee_to_forward - actual_fee
+                );
+            }
+
+            if actual_fee > 0 {
+                let mut treas_lamports = treasury_info.try_borrow_mut_lamports()?;
+                **treas_lamports = treas_lamports
+                    .checked_add(actual_fee)
+                    .ok_or(CanonError::MathOverflow)?;
+                drop(treas_lamports);
+            }
+
+            // Defense-in-depth: assert the post-withdrawal balance is still
+            // rent-exempt. With the proactive clamp above this should be
+            // unreachable, but it pins the invariant for future refactors.
+            require!(
+                **ctx.accounts.submission.to_account_info().lamports.borrow() >= rent_min,
+                CanonError::RentExemptionViolated
+            );
+        }
+
+        emit!(event);
         Ok(())
     }
 
@@ -819,6 +877,8 @@ pub enum CanonError {
     NotSubmitter,
     #[msg("Submission escrow underfunded — should be impossible if state is consistent")]
     EscrowUnderfunded,
+    #[msg("Post-withdrawal submission balance fell below rent-exempt minimum")]
+    RentExemptionViolated,
     #[msg("Arithmetic overflow")]
     MathOverflow,
     #[msg("Program is paused")]

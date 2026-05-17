@@ -50,6 +50,16 @@ export const API_KEY_SCOPES = {
   'solana.canonize': 'Promote a Solana cNFT to canon (mints a Core asset)',
   'solana.pay': 'Create Solana Pay payment intents',
   'solana.bridge': 'Initiate $LOAR cross-chain transfers (custodial bridge)',
+  'solana.license': 'Buy content licenses via the Solana licensing program',
+  'solana.canon.vote': 'Vote on canon submissions via the Solana canon market',
+  'solana.stake': 'Stake / unstake $LOAR via the Solana staking program',
+  'solana.credits': 'Purchase credits with SOL or $LOAR via the Solana credit manager',
+  'solana.subscribe': 'Subscribe to universes via the Solana subscription program',
+  'solana.curve': 'Buy / sell on Solana bonding curves (universe token launchpad)',
+  'solana.fees': 'Claim accrued fees from the Solana fee locker',
+  'solana.premium': 'Execute premium actions via the Solana premium-actions program',
+  'solana.remix': 'Charge remix fees via the Solana remix-fees program',
+  'solana.splits': 'Route payments through the Solana split router',
 
   // MCP relay meta-scope — inherits all non-admin scopes. Keys with this
   // scope are treated as MCP servers relaying on behalf of an end-user.

@@ -90,6 +90,7 @@ contract Escrow is
     error NothingToClaim();
     error TransferFailed();
     error AmountMismatch();
+    error DisputeWindowTooLong();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -230,7 +231,7 @@ contract Escrow is
     // ── Admin ───────────────────────────────────────────────────────────
 
     function setDisputeWindow(uint256 _window) external onlyOwner {
-        require(_window <= 30 days, "Max 30 day dispute window");
+        if (_window > 30 days) revert DisputeWindowTooLong();
         disputeWindow = _window;
     }
 

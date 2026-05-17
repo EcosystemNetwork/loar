@@ -36,6 +36,8 @@ import { firebaseStorageService } from '../../services/firebase-storage';
 import { trackQuests } from '../../services/quest-tracker';
 import { logFailedRefund } from '../../lib/refund-audit';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
+import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
+import { TRPCError } from '@trpc/server';
 
 // ── Pricing ─────────────────────────────────────────────────────────────
 
@@ -513,6 +515,15 @@ export const sceneAudioRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      try {
+        assertSafeExternalUrl(input.videoUrl);
+        assertSafeExternalUrl(input.audioUrl);
+      } catch (err) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: err instanceof Error ? err.message : 'URL rejected',
+        });
+      }
       const { fiatMargin } = await getMargins();
       const credits = toCredits(LIPSYNC_COST_USD, fiatMargin);
       await deductCredits(ctx.user.uid, credits);
@@ -564,6 +575,14 @@ export const sceneAudioRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const { scene, universeId } = input;
+      try {
+        assertSafeExternalUrl(scene.videoUrl);
+      } catch (err) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: err instanceof Error ? err.message : 'videoUrl rejected',
+        });
+      }
       const jobId = randomUUID();
 
       // Estimate total credits upfront
@@ -774,6 +793,16 @@ export const sceneAudioRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const { universeId, scenes } = input;
+      for (const s of scenes) {
+        try {
+          assertSafeExternalUrl(s.videoUrl);
+        } catch (err) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: err instanceof Error ? err.message : 'videoUrl rejected',
+          });
+        }
+      }
       const timelineId = randomUUID();
 
       const { resolveProviderKey: resolveTimelineKey } = await import('../../lib/byok');

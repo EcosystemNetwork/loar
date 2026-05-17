@@ -72,6 +72,7 @@ import {
   type Entity,
   type VoiceEntityMetadata,
   type LikenessEntityMetadata,
+  type PersonaEntityMetadata,
 } from '../entities/entities.types';
 
 // ── Collections ──────────────────────────────────────────────────────────
@@ -144,11 +145,28 @@ async function readOwnedEntity(entityId: string, callerAddress: string): Promise
       message: 'You are not the rights holder of this entity',
     });
   }
-  if (entity.kind !== 'voice' && entity.kind !== 'likeness') {
+  if (entity.kind !== 'voice' && entity.kind !== 'likeness' && entity.kind !== 'persona') {
     throw new TRPCError({
       code: 'BAD_REQUEST',
-      message: 'Only `voice` and `likeness` entities can be listed on the Likeness Marketplace',
+      message:
+        'Only `voice`, `likeness`, and `persona` entities can be listed on the Likeness Marketplace',
     });
+  }
+  // Parody personas are blocked from listing until admin approval.
+  if (entity.kind === 'persona') {
+    const meta = entity.metadata as unknown as PersonaEntityMetadata | undefined;
+    if (meta?.moderationStatus === 'pending_review') {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Persona is awaiting parody moderation review and cannot be listed yet',
+      });
+    }
+    if (meta?.moderationStatus === 'rejected') {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Persona was rejected in moderation review and cannot be listed',
+      });
+    }
   }
   return entity;
 }
@@ -314,6 +332,11 @@ export const likenessMarketplaceRouter = router({
 
       const now = new Date();
       const consentId = randomUUID();
+      // Defense in depth — only include attestationSignature when actually
+      // present. Firestore rejects `undefined` values by default; production
+      // sets `ignoreUndefinedProperties: true` which papers over this, but
+      // any environment that ever forgets that setting (and the upcoming
+      // firebase-admin v12 default) would otherwise blow up on every write.
       const consent: LikenessConsent = {
         id: consentId,
         entityId: input.entityId,
@@ -328,7 +351,7 @@ export const likenessMarketplaceRouter = router({
         realPerson: input.realPerson,
         verified: false, // Phase 4 — KYC + liveness sets this true
         attestationText: input.attestationText,
-        attestationSignature: input.attestationSignature,
+        ...(input.attestationSignature ? { attestationSignature: input.attestationSignature } : {}),
         status: 'active',
         createdAt: now,
         updatedAt: now,
@@ -511,7 +534,7 @@ export const likenessMarketplaceRouter = router({
       const listing: LikenessListing = {
         id,
         entityId: entity.id,
-        entityKind: entity.kind as 'voice' | 'likeness',
+        entityKind: entity.kind as 'voice' | 'likeness' | 'persona',
         consentId: consent.id,
         sellerUid: ctx.user.uid,
         sellerAddress: ctx.user.address.toLowerCase(),
@@ -1083,6 +1106,19 @@ export const likenessMarketplaceRouter = router({
       const now = new Date();
       const dealId = randomUUID();
       const endTimeMs = onChainDeal.endTime > 0n ? Number(onChainDeal.endTime) * 1000 : null;
+
+      // M7: persona deals pin the version at sale so buyers keep getting
+      // the snapshot they paid for even if the seller publishes a new
+      // version (which would trigger re-review per C-1).
+      let personaVersionAtSale: number | null = null;
+      let personaVersionIdAtSale: string | null = null;
+      if (listing.entityKind === 'persona') {
+        const personaEnt = await getEntity(listing.entityId);
+        const pMeta = personaEnt?.metadata as unknown as PersonaEntityMetadata | undefined;
+        personaVersionAtSale = pMeta?.versionCount ?? null;
+        personaVersionIdAtSale = pMeta?.activeVersionId ?? null;
+      }
+
       const deal: LikenessDeal = {
         id: dealId,
         listingId: input.listingId,
@@ -1104,6 +1140,8 @@ export const likenessMarketplaceRouter = router({
         startTime: now,
         onChain: true,
         onChainDealId: onChainDeal.dealId.toString(),
+        personaVersionAtSale,
+        personaVersionIdAtSale,
       };
       await dealsCol().doc(dealId).set(deal);
 
@@ -1144,7 +1182,7 @@ export const likenessMarketplaceRouter = router({
     .input(
       z
         .object({
-          kind: z.enum(['voice', 'likeness']).optional(),
+          kind: z.enum(['voice', 'likeness', 'persona']).optional(),
           modality: modalitySchema.optional(),
           dealType: z.enum(LIKENESS_DEAL_TYPES).optional(),
           search: z.string().max(80).optional(),
@@ -1406,6 +1444,16 @@ export const likenessMarketplaceRouter = router({
             ? new Date(now.getTime() + input.durationDays * 24 * 60 * 60 * 1000)
             : null;
 
+      // M7: pin persona version at sale time (see recordOnChainDeal).
+      let personaVersionAtSale: number | null = null;
+      let personaVersionIdAtSale: string | null = null;
+      if (listing.entityKind === 'persona') {
+        const personaEnt = await getEntity(listing.entityId);
+        const pMeta = personaEnt?.metadata as unknown as PersonaEntityMetadata | undefined;
+        personaVersionAtSale = pMeta?.versionCount ?? null;
+        personaVersionIdAtSale = pMeta?.activeVersionId ?? null;
+      }
+
       const deal: LikenessDeal = {
         id: dealId,
         listingId: input.listingId,
@@ -1424,6 +1472,8 @@ export const likenessMarketplaceRouter = router({
         startTime: now,
         onChain: false,
         onChainDealId: null,
+        personaVersionAtSale,
+        personaVersionIdAtSale,
       };
 
       await dealsCol().doc(dealId).set(deal);

@@ -36,6 +36,7 @@ contract LoarTokenSpoke is ERC20, ERC20Permit, ERC20Burnable, Ownable, Pausable 
     error NotMinter();
     error ExceedsMaxSupply();
     error ZeroAddress();
+    error BatchTooLarge();
 
     modifier onlyMinter() {
         _checkMinter();
@@ -109,7 +110,7 @@ contract LoarTokenSpoke is ERC20, ERC20Permit, ERC20Burnable, Ownable, Pausable 
 
     /// @notice Batch-set fee exemptions for multiple addresses
     function batchSetFeeExempt(address[] calldata accounts, bool exempt) external onlyOwner {
-        require(accounts.length <= 200, "Batch too large");
+        if (accounts.length > 200) revert BatchTooLarge();
         for (uint256 i = 0; i < accounts.length; i++) {
             if (accounts[i] == address(0)) revert ZeroAddress();
             feeExempt[accounts[i]] = exempt;

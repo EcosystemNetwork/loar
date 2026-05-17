@@ -1150,7 +1150,7 @@ contract CreditManagerTest is Test {
 
         vm.startPrank(user);
         loarToken.approve(address(noRouterCredits), 50e18);
-        vm.expectRevert(bytes("PaymentRouter not set"));
+        vm.expectRevert(CreditManager.PaymentRouterNotSet.selector);
         noRouterCredits.purchaseWithLoar(0);
         vm.stopPrank();
     }

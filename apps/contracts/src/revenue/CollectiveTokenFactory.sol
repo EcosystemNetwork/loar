@@ -76,9 +76,10 @@ contract CollectiveTokenFactory {
     mapping(address => uint256) public collectiveByToken;
 
     error NotUniverseCreatorOrManager();
+    error ZeroAddress();
 
     constructor(address _universeManager) {
-        require(_universeManager != address(0), "Zero address");
+        if (_universeManager == address(0)) revert ZeroAddress();
         universeManager = _universeManager;
     }
 

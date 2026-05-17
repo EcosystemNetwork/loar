@@ -1273,7 +1273,7 @@ const solanaChargeRemixFee: ToolDefinition = {
 const solanaRouteSplits: ToolDefinition = {
   name: 'loar_solana_route_splits',
   description:
-    "Route SOL through an entity's configured splits + platform fee on the Solana split_router. Recipients + their bps come from the on-chain Splits PDA; ordering must match.",
+    "Route SOL through an entity's configured splits + platform fee on the Solana split_router. Recipients + their bps come from the on-chain Splits PDA; ordering must match. Platform fee bps is set server-side and not negotiable per call.",
   inputSchema: {
     type: 'object',
     properties: {
@@ -1282,12 +1282,8 @@ const solanaRouteSplits: ToolDefinition = {
         description: '32-byte entity hash as 0x-hex (identifies the splits config)',
       },
       amountLamports: { type: 'string', description: 'Total SOL to route, in lamports' },
-      platformFeeBps: {
-        type: 'number',
-        description: 'Platform fee in basis points (0–5000)',
-      },
     },
-    required: ['entityHashHex', 'amountLamports', 'platformFeeBps'],
+    required: ['entityHashHex', 'amountLamports'],
   },
   handler: async (client, args) => client.rawPost('/api/solana/split-router/route', args),
 };

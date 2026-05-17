@@ -11,6 +11,7 @@
  * The client only stores the wallet address and session expiry for UI purposes.
  */
 import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
+import { queryClient } from '../utils/query-client';
 
 const ADDRESS_KEY = 'siwe-address';
 const EXPIRY_KEY = 'siwe-expiry';
@@ -96,6 +97,20 @@ export function getAuthEmail(): string | null {
 
 /** Clear the SIWE/Circle session from local state and optionally revoke server-side. */
 export function clearSiweSession(revoke = false) {
+  // M-2: clear the React Query cache SYNCHRONOUSLY before notifying any
+  // subscriber that the session has gone away. Previously this was a
+  // fire-and-forget dynamic import — the resulting microtask could resolve
+  // AFTER a fast re-login (e.g. logout → login same tab), wiping the freshly
+  // fetched data of the new user. We pulled `queryClient` into its own
+  // module (utils/query-client) specifically so this can be imported at the
+  // top of the file without re-introducing the trpc.ts ⇄ wallet-auth cycle
+  // that motivated the original dynamic import.
+  //
+  // Also closes M10's intent — the next user signing in to the same tab
+  // cannot read the previous user's cached payloads (e.g. persona
+  // owner-only fields like `systemPrompt`).
+  queryClient.clear();
+
   localStorage.removeItem(ADDRESS_KEY);
   localStorage.removeItem(EXPIRY_KEY);
   localStorage.removeItem(EMAIL_KEY);

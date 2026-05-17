@@ -40,6 +40,23 @@ import { routeTree } from './routeTree.gen';
 
 import { queryClient, trpc } from './utils/trpc';
 
+// M-1: one-shot stale-cache invalidation across deploys. Bumping CACHE_VERSION
+// flushes only the persona cache (the M1-affected key) for any user whose
+// localStorage was hydrated before this deploy. We use removeQueries rather
+// than queryClient.clear() so unrelated cached data (wallet balances, gallery,
+// etc.) is preserved across the upgrade.
+const CACHE_VERSION = '2026-05-17-v1';
+const CACHE_VERSION_KEY = 'loar_query_cache_version';
+try {
+  const storedVersion = localStorage.getItem(CACHE_VERSION_KEY);
+  if (storedVersion !== CACHE_VERSION) {
+    queryClient.removeQueries({ queryKey: ['persona'] });
+    localStorage.setItem(CACHE_VERSION_KEY, CACHE_VERSION);
+  }
+} catch {
+  // localStorage unavailable (SSR / private mode) — skip the version check.
+}
+
 import { trackPageView } from './lib/ga';
 import { WalletProvider } from './lib/wallet-provider';
 import { Web3ModeProvider } from './lib/web3-mode';

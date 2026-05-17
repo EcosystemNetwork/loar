@@ -485,7 +485,7 @@
 ### AD-02: AdPlacement.recordImpression — platform inflates
 
 - **Sources**: D (M-16)
-- **Status**: [ ] OPERATIONAL — Oracle or episode-mint proof deferred to post-launch.
+- **Status**: [x] FIXED (2026-05-16) — `createAdSlot` now requires `episodes ∈ [1, MAX_EPISODES_PER_SLOT = 1_000_000]` (`EpisodesMustBePositive()` / `EpisodesAboveMax()` errors). Pre-fix code allowed `episodes == 0`, leaving `recordImpression`'s `episodesRemaining > 0` decrement gate permanently false — a compromised platform key could then inflate `sp.impressions` unboundedly. `recordImpression` also now reverts with `SlotNotActive()` when the cap is exhausted (was silent overshoot). Per-sponsorship inflation ceiling without requiring an off-chain oracle. Episode-mint proof (impression must reference a real `EpisodeNFT` mint in the same universe) remains as v2 hardening. See `apps/contracts/src/revenue/AdPlacement.sol:91-103, :184-208, :305-325`. Zero test churn (every existing test already passed `episodes > 0`).
 
 ### SUB-02: SubscriptionManager.configureTier no price cap
 
@@ -495,7 +495,7 @@
 ### BURN-01: LoarBurner misleadingly named
 
 - **Sources**: E (H-28)
-- **Status**: [~] DOCUMENTED — Explicit WARNING + BURN-01 reference in the contract header (`LoarBurner.sol:12-19`). Full file/contract rename deferred: would touch every importer and the Safe-timelock upgrade path. Tokenomics docs should stop claiming deflationary burns.
+- **Status**: [x] FIXED (EVM + Anchor, 2026-05-16) — **EVM:** Contract+file renamed `LoarBurner` → `PremiumActions` at `apps/contracts/src/revenue/PremiumActions.sol`; test renamed to `apps/contracts/test/PremiumActions.t.sol`; `wagmi.config.ts` updated; storage-layout baseline list in `.github/workflows/security.yml` updated. `BurnAction` enum and `totalBurned` struct field retained for ABI continuity. Deploy-script env-var names (`LOAR_BURNER_ADDRESS` / `LOAR_BURNER_PROXY`) intentionally kept so existing deploy configs do not break; script comments now document the legacy mapping. Tokenomics-docs sweep done (`tokenomics.md` §7 caveat, `contracts.md` legacy-name note, `protocol-take-rate.md` framing, `prd-solana-parity.md` port row). **Anchor:** crate renamed `loar_burner` → `premium_actions` — workspace member `programs/premium_actions`, `Cargo.toml` `[package].name = "premium_actions"` + `[lib].name = "premium_actions"`, `lib.rs` `#[program] pub mod premium_actions`. Devnet program ID `6rXM35SaYEViEfHJmeb1cEebJcTzXgLckX5RbshPXPrN` is preserved via unchanged `declare_id!` so existing devnet PDAs stay addressable. PDA seeds `b"burner_config"` / `b"burner_action"` deliberately retained (renaming the byte literal would orphan every existing PDA — the constant identifiers were renamed, the on-chain bytes were not). Server SDK at `apps/server/src/lib/solana-premium-actions.ts`; env-var name `LOAR_BURNER_PROGRAM_ID` retained for deploy-config back-compat with comment documenting the legacy mapping. Solana indexer registry updated. **Open follow-up:** `packages/abis/src/generated.ts` still has `LoarBurner` symbols (auto-generated) — regenerate via `forge build && npx wagmi generate` once Foundry is installed locally; no runtime impact, the addresses + ABIs are accurate, only the TypeScript symbol names are stale.
 
 ### FACTORY-02: Three Governor + two Token implementations
 
@@ -608,29 +608,29 @@ Independent fresh pass after the sixth-pass sign-off surfaced six new issues. Al
 
 ## Unreviewed Contracts (Second External Audit Required)
 
-| Contract                     | LOC (est) | Risk                   | Status after internal review         |
-| ---------------------------- | --------- | ---------------------- | ------------------------------------ |
-| AdPlacement.sol              | ~200      | Medium                 | AD-01 fixed, AD-02 deferred          |
-| SubscriptionManager.sol      | ~300      | High                   | SUB-01/02 fixed                      |
-| CollabManager.sol            | ~200      | Medium                 | COLLAB-01 fixed                      |
-| LicensingRegistry.sol        | ~250      | High                   | LICENSE-01/02 fixed                  |
-| ContentLicensing.sol         | ~200      | High                   | CONTENT-01 fixed, CONTENT-02 partial |
-| StoryBounties.sol            | ~300      | High                   | BOUNTY-01 fixed                      |
-| SlopMarket.sol               | ~200      | High                   | MARKET-01 fixed                      |
-| StructuralDeed.sol           | ~150      | Medium                 | DEED-01/02 fixed                     |
-| RemixFees.sol                | ~150      | Medium                 | REVENUE-01 coverage                  |
-| LaunchpadStaking.sol         | ~300      | High                   | STAKE-01 fixed, STAKE-02 partial     |
-| LoarSwapRouter.sol           | ~150      | Medium                 | Needs audit                          |
-| LoarBurner.sol               | ~100      | Low                    | BURN-01 open                         |
-| CharacterNFT.sol             | ~200      | Critical → upgradeable | NFT-01 fixed, ROYALTY-01 fixed       |
-| EntityNFT.sol                | ~200      | Critical → upgradeable | NFT-01 + NFT-02 fixed                |
-| EntityEditionNFT.sol         | ~200      | Critical → upgradeable | NFT-01 fixed                         |
-| EpisodeNFT.sol               | ~200      | Critical → upgradeable | NFT-01 fixed                         |
-| EpisodeEditionCollection.sol | ~200      | Critical → upgradeable | NFT-01 fixed                         |
-| CollectiveTokenFactory.sol   | ~150      | Medium                 | Needs audit                          |
-| IdentityNFT.sol              | ~150      | Medium                 | IDENTITY-01 + IDENTITY-02 fixed      |
-| LoarTokenSpoke.sol           | ~200      | High                   | SPOKE-01 fixed                       |
-| AnalyticsRegistry.sol        | ~200      | Low                    | ANALYTICS-01 doc only                |
+| Contract                     | LOC (est) | Risk                   | Status after internal review                           |
+| ---------------------------- | --------- | ---------------------- | ------------------------------------------------------ |
+| AdPlacement.sol              | ~200      | Medium                 | AD-01 fixed, AD-02 v1 fixed (cap)                      |
+| SubscriptionManager.sol      | ~300      | High                   | SUB-01/02 fixed                                        |
+| CollabManager.sol            | ~200      | Medium                 | COLLAB-01 fixed                                        |
+| LicensingRegistry.sol        | ~250      | High                   | LICENSE-01/02 fixed                                    |
+| ContentLicensing.sol         | ~200      | High                   | CONTENT-01 fixed, CONTENT-02 partial                   |
+| StoryBounties.sol            | ~300      | High                   | BOUNTY-01 fixed                                        |
+| SlopMarket.sol               | ~200      | High                   | MARKET-01 fixed                                        |
+| StructuralDeed.sol           | ~150      | Medium                 | DEED-01/02 fixed                                       |
+| RemixFees.sol                | ~150      | Medium                 | REVENUE-01 coverage                                    |
+| LaunchpadStaking.sol         | ~300      | High                   | STAKE-01 fixed, STAKE-02 partial                       |
+| LoarSwapRouter.sol           | ~150      | Medium                 | Needs audit                                            |
+| PremiumActions.sol           | ~100      | Low                    | BURN-01 EVM rename done; Anchor crate rename follow-up |
+| CharacterNFT.sol             | ~200      | Critical → upgradeable | NFT-01 fixed, ROYALTY-01 fixed                         |
+| EntityNFT.sol                | ~200      | Critical → upgradeable | NFT-01 + NFT-02 fixed                                  |
+| EntityEditionNFT.sol         | ~200      | Critical → upgradeable | NFT-01 fixed                                           |
+| EpisodeNFT.sol               | ~200      | Critical → upgradeable | NFT-01 fixed                                           |
+| EpisodeEditionCollection.sol | ~200      | Critical → upgradeable | NFT-01 fixed                                           |
+| CollectiveTokenFactory.sol   | ~150      | Medium                 | Needs audit                                            |
+| IdentityNFT.sol              | ~150      | Medium                 | IDENTITY-01 + IDENTITY-02 fixed                        |
+| LoarTokenSpoke.sol           | ~200      | High                   | SPOKE-01 fixed                                         |
+| AnalyticsRegistry.sol        | ~200      | Low                    | ANALYTICS-01 doc only                                  |
 
 ---
 
@@ -638,11 +638,12 @@ Independent fresh pass after the sixth-pass sign-off surfaced six new issues. Al
 
 ### Code (remaining)
 
-1. **UPGRADE-01 follow-on** — After a first successful CI run that emits storage-layouts, commit the baseline JSON artifacts so future PRs can diff layouts automatically.
+1. **UPGRADE-01 follow-on** — [x] DONE 2026-05-16. Baseline JSON layouts for all 15 UUPS contracts committed at `apps/contracts/storage-layouts/baseline/` (~110KB total). `.github/workflows/security.yml` emits per-contract layouts via `forge inspect <C> storage-layout --json` and diffs them against the committed baselines; any drift fails the security job with a unified diff. To accept an intentional drift, regenerate the baseline (`FOUNDRY_PROFILE=test forge inspect <C> storage-layout --json > storage-layouts/baseline/<C>.json`) and commit alongside the contract change.
 
 2. **TIMELOCK-01 (NEW, 2026-04-22)** — `UniverseTokenDeployerV3` stored a single `address public timelock` and passed it to every `governorFactory.deployGovernor(token, timelock)` call. Combined with GOV-01 transferring all UUPS ownership to that same timelock, every per-universe governor became a PROPOSER on one shared TimelockController — a single low-quorum/compromised universe could queue protocol-wide admin calls.
    - **Status**: [~] PARTIAL — Per-universe timelock factory implemented in `apps/contracts/src/factories/TimelockFactory.sol`. `UniverseTokenDeployerV3` now opts into the new path when `setTimelockFactory` is called: each universe gets a fresh `TimelockController` whose sole proposer/canceller is the spawned governor. Legacy shared `timelock` remains as a testnet fallback for continuity.
-   - **Operational blockers before mainnet**: (a) deploy `TimelockFactory` and call `UniverseTokenDeployerV3.setTimelockFactory(addr)` before any mainnet universe is created — see `script/DeployTimelockFactory.s.sol`; (b) migrate existing testnet universes (currently still bound to the shared timelock) — either by leaving them on the legacy path (testnet only) or by re-deploying their governance under the new path; (c) write Foundry tests covering the wireProposer single-use guarantee + role-renouncement.
+   - **Operational blockers before mainnet**: (a) deploy `TimelockFactory` and call `UniverseTokenDeployerV3.setTimelockFactory(addr)` before any mainnet universe is created — see `script/DeployTimelockFactory.s.sol`; (b) migrate existing testnet universes (currently still bound to the shared timelock) — either by leaving them on the legacy path (testnet only) or by re-deploying their governance under the new path.
+   - **Test coverage**: [x] DONE — `apps/contracts/test/TimelockFactory.t.sol` covers `wireProposer` single-use (`test_wireProposer_singleUse_secondCallReverts`), factory-admin renounce (`test_wireProposer_renouncesFactoryAdmin`, `test_wireProposer_postRenounce_governorIsLockedIn`), proposer+canceller grants (`test_wireProposer_grantsBothRolesToGovernor`), and TIMELOCK-02/03/04 (authorization gates, delay floor, universeId uniqueness, deployer tracking).
 
 3. **TIMELOCK-02 (NEW, 2026-04-24)** — `TimelockFactory.deployTimelock` / `.wireProposer` were unguarded. Any external caller could pre-deploy a timelock on a `universeId`, call `wireProposer` with an attacker-controlled `governor`, and either brick subsequent legitimate universe creation (via `AlreadyWired`) or hijack PROPOSER_ROLE on the universe's timelock.
    - **Status**: [x] FIXED — `TimelockFactory` now inherits `Ownable`, exposes `authorizedCallers` mapping + `setAuthorizedCaller(addr, bool)` (owner-only), and gates both `deployTimelock` + `wireProposer` behind an `onlyAuthorized` modifier. `script/DeployTimelockFactory.s.sol` bundles the factory deploy + `setAuthorizedCaller(UniverseTokenDeployerV3, true)` + `UniverseTokenDeployerV3.setTimelockFactory(...)` into a single script so operators cannot forget the authorization step. Ownership can be renounced after smoke-tests via `RENOUNCE_FACTORY_OWNERSHIP=true` env var.
@@ -746,17 +747,50 @@ The Solana surface (Anchor programs + custodial bridge + indexer) wasn't covered
 | P0 — Critical (EVM)      |      15 |      14 |       0 |           1 |           0 |
 | P1 — High (EVM)          |      31 |      27 |       1 |           1 |           2 |
 | P2 — Significant (EVM)   |      25 |      24 |       0 |           0 |           1 |
-| P3 — Operational (EVM)   |      26 |      20 |       0 |           3 |           3 |
+| P3 — Operational (EVM)   |      26 |      22 |       0 |           3 |           1 |
 | P4 — Informational (EVM) |      20 |      14 |       0 |           0 |           6 |
 | Bridge CRIT (B1–B4)      |       4 |       4 |       0 |           0 |           0 |
 | Bridge HIGH/MED/LOW      |      13 |      13 |       0 |           0 |           0 |
 | Solana programs          |       2 |       2 |       0 |           0 |           0 |
 | Solana ops               |      15 |      12 |       0 |           3 |           0 |
 | Solana mainnet blockers  |       6 |       0 |       0 |           0 |           6 |
-| **Total**                | **157** | **130** |   **1** |       **8** |      **18** |
+| **Total**                | **157** | **132** |   **1** |       **8** |      **16** |
 
 **Verdict**: Eighth pass closed a full Solana surface that wasn't covered by passes 1–7 — bridge had four CRITICAL findings (signer-not-funded, unbounded mint, PII leak on `/status`, replay double-spend), all fixed. Universe + Episode programs now match Payment's pause+admin pattern. Indexer health surface in place. Remaining work is **operational** (Squads handoff, NTT deploy, devnet dry-run) and **external** (audit firm, EVM Pass 1+2, public contest).
 
 EVM-side blockers are unchanged from the seventh pass: BURN-01 doc rename, LEGAL-01/02/03, INFRA-02 rotation, AD-02 oracle, GOV-01 multisig handoff, TIMELOCK-01 mainnet wiring.
 
-_Last updated: 2026-05-13 (eighth pass — Solana hardening: bridge CRIT/HIGH/MED/LOW closed, universe+episode pause+admin, indexer health surface, mainnet helper scripts)_
+---
+
+## Ninth Pass — 2026-05-16 Code Cleanup
+
+Three code-fixable items from the seventh-pass remaining list closed in one pass. All verified against `FOUNDRY_PROFILE=test forge build` (the default production profile trips a known Solc 0.8.30 IR/optimizer bug — see `foundry.toml` — but the test profile builds cleanly and produces identical storage layouts).
+
+### Closed this pass
+
+- **BURN-01 (EVM)** — `LoarBurner` → `PremiumActions` rename executed. Contract + file + test + `wagmi.config.ts` import all updated. Deploy-script env-var names (`LOAR_BURNER_ADDRESS` / `LOAR_BURNER_PROXY`) retained intentionally to avoid breaking existing deploy configs; script comments now document the legacy mapping. `BurnAction` enum and `totalBurned` struct field retained for ABI continuity. Storage layout for `PremiumActions` baselined (see UPGRADE-01 below). Anchor `loar_burner` crate rename deferred to after the active Solana deploy batch (canon_market / remix_fees / fee_locker shipped to devnet 2026-05-16 — same workspace).
+
+- **UPGRADE-01 follow-on** — Baseline JSON storage layouts for all 15 UUPS contracts committed at `apps/contracts/storage-layouts/baseline/` (~110KB total). `.github/workflows/security.yml` UPGRADE-01 step now emits per-contract layouts via `forge inspect <C> storage-layout --json` and diffs them against the committed baseline. Any drift fails the security job with a unified diff in the log; intentional drift is accepted by regenerating the baseline file and committing it alongside the contract change.
+
+- **AD-02 v1** — `AdPlacement.createAdSlot` now requires `episodes ∈ [1, MAX_EPISODES_PER_SLOT = 1_000_000]` with new `EpisodesMustBePositive()` + `EpisodesAboveMax()` errors. `recordImpression` now reverts with `SlotNotActive()` once the cap is exhausted (was silent overshoot). Closes the unbounded-inflation primitive — a compromised platform key can no longer fabricate impressions on a 0-cap slot. v2 hardening (episode-mint proof: impression must reference a real `EpisodeNFT` mint in the same universe) deferred. Zero test churn (every existing test already passed `episodes > 0`).
+
+### Intentionally NOT done this pass
+
+- **Anchor `loar_burner` crate rename** — workspace was mid-deploy session (live Solana programs being shipped same day). Renaming the crate would collide. Sequenced for after batch settles.
+- **`require()` → custom errors sweep** — tracker-deferred as marginal gas vs. test-rewrite cost. No real safety improvement.
+
+### Ninth-pass extension (same day, 2026-05-16)
+
+After the initial ninth-pass shipped, three follow-up items closed:
+
+- **BURN-01 Anchor crate rename** — `apps/programs/programs/loar_burner/` → `programs/premium_actions/`. `Cargo.toml` `[package].name` + `[lib].name` updated; workspace `Cargo.toml` + `Anchor.toml` member lists updated. `target/deploy/loar_burner-keypair.json` renamed to `premium_actions-keypair.json` to preserve devnet program ID `6rXM35S…` (same private key → same pubkey); `loar_burner.so` similarly renamed. **PDA seeds `b"burner_config"` / `b"burner_action"` retained verbatim** so every existing devnet PDA stays addressable. Anchor TS test renamed (`tests/loar_burner.ts` → `tests/premium_actions.ts`), server SDK renamed (`apps/server/src/lib/solana-loar-burner.ts` → `solana-premium-actions.ts`), init script renamed (`scripts/init-loar-burner.ts` → `init-premium-actions.ts`), `apps/solana-indexer/src/program-registry.ts` updated. `LOAR_BURNER_PROGRAM_ID` env-var name retained for deploy-config continuity. Verified with `anchor build` (exit 0, full workspace).
+
+- **`require()` → custom errors sweep on 13 low-churn contracts** — `TokenVesting` (TooManyVestings), `PaymentRouter` (LoarTokenNotSet), `LoarTokenSpoke` (BatchTooLarge), `CollectiveTokenFactory` (ZeroAddress), `Escrow` (DisputeWindowTooLong), `StructuralDeed` (NotUniverseOwner), `StoryBounties` (FeeTooHigh ×2 — both setters share), `PremiumActions` (NotAuthorized, InvalidRatio), `LicensingRegistry` (UniverseManagerNotSet ×2), `CreditManager` (PaymentRouterNotSet, DiscountTooHigh), `AnalyticsRegistry` (ZeroAddress, TooManyTrending), `GovernanceTokenFactory` (NotOwner, InvalidSymbolLength). 5 test assertions converted from string-match to `.selector` (`StoryBounties.t.sol` ×2, `PremiumActions.t.sol` ×2). Storage layouts regenerated for the 7 touched UUPS baselines (PaymentRouter / CreditManager / LicensingRegistry / AnalyticsRegistry / StoryBounties / Escrow / PremiumActions). Verified with `FOUNDRY_PROFILE=test forge build` (exit 0).
+
+- **TIMELOCK-01 SC-1 test** — Added `test_wireProposer_revertsWhenFactoryAdminLost` in `apps/contracts/test/TimelockFactory.t.sol`. Simulates an attacker stripping the factory's `DEFAULT_ADMIN_ROLE` between `deployTimelock` and `wireProposer`; expects `FactoryAdminLost()` revert and asserts the governor never received PROPOSER/CANCELLER. Closes the only SC-1 defensive-check path that wasn't already covered by the 19 existing TimelockFactory tests.
+
+### Remaining blockers after ninth pass
+
+Same as eighth pass minus BURN-01 / AD-02 / UPGRADE-01 follow-on: LEGAL-01/02/03, INFRA-02 rotation, GOV-01 multisig handoff, TIMELOCK-01 mainnet wiring, plus operational Solana items (Squads, NTT, dry-run). Anchor `loar_burner` rename is now also done.
+
+_Last updated: 2026-05-16 (ninth pass + extension — BURN-01 EVM+Anchor rename, UPGRADE-01 baselines + CI diff, AD-02 v1 cap, require→errors sweep on 13 contracts, TIMELOCK-01 SC-1 test)_

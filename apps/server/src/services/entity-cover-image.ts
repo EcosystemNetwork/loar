@@ -27,6 +27,7 @@ type EntityKind =
   | 'style_pack'
   | 'voice'
   | 'likeness'
+  | 'persona'
   | 'timeline'
   | 'reality'
   | 'dimension'

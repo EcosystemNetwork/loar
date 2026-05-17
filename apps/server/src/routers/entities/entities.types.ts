@@ -36,6 +36,10 @@ export const ENTITY_KINDS = [
   // sale / lease / license through likenessMarketplace.
   'voice',
   'likeness',
+  // Persona package — bundles voice + likeness + 3D + personality into one
+  // sellable identity. References component entities by ID; supports self /
+  // parody / fictional origin classes (PRD 9: Likeness Packages).
+  'persona',
   // Structural/ontology kinds
   'timeline',
   'reality',
@@ -69,7 +73,7 @@ export const CREATOR_KINDS: EntityKind[] = [
  * a creator's real biometric assets alongside their stories. Likeness entities
  * surface exclusively in the Likeness Marketplace.
  */
-export const LIKENESS_KINDS: EntityKind[] = ['voice', 'likeness'];
+export const LIKENESS_KINDS: EntityKind[] = ['voice', 'likeness', 'persona'];
 
 /** Advanced structural kinds for universe ontology. */
 export const STRUCTURAL_KINDS: EntityKind[] = [
@@ -108,6 +112,7 @@ export const VALID_PARENTS: Record<EntityKind, (EntityKind | null)[]> = {
   // Likeness kinds — owned directly by the creator, no universe relationship
   voice: [null],
   likeness: [null],
+  persona: [null],
   // Structural kinds — follow ontology hierarchy
   timeline: [null],
   reality: [null, 'timeline'],
@@ -133,6 +138,7 @@ export const KIND_LABELS: Record<EntityKind, string> = {
   style_pack: 'Style Pack',
   voice: 'Voice',
   likeness: 'Likeness',
+  persona: 'Persona',
   timeline: 'Timeline',
   reality: 'Reality',
   dimension: 'Dimension',
@@ -157,6 +163,7 @@ export const KIND_PLURAL_LABELS: Record<EntityKind, string> = {
   style_pack: 'Style Packs',
   voice: 'Voices',
   likeness: 'Likenesses',
+  persona: 'Personas',
   timeline: 'Timelines',
   reality: 'Realities',
   dimension: 'Dimensions',
@@ -562,7 +569,7 @@ export type LikenessDealType = (typeof LIKENESS_DEAL_TYPES)[number];
 export interface LikenessListing {
   id: string;
   entityId: string;
-  entityKind: 'voice' | 'likeness';
+  entityKind: 'voice' | 'likeness' | 'persona';
   /** Snapshot of the consent that authorized the listing (immutable per revision). */
   consentId: string;
   sellerUid: string;
@@ -635,7 +642,205 @@ export interface LikenessDeal {
   onChain: boolean;
   /** On-chain dealId from ContentLicensing.sol — used for hasAccessFast queries. */
   onChainDealId: string | null;
+  /**
+   * M7: For persona deals, pins the persona version the buyer purchased.
+   * Even if the seller publishes v2/v3 later (which goes back through parody
+   * re-review per C-1), the buyer continues to serve from the version they
+   * licensed. Null for non-persona deals (voice/likeness are single-version).
+   */
+  personaVersionAtSale?: number | null;
+  personaVersionIdAtSale?: string | null;
 }
+
+// ── Persona Packages (PRD 9: bundle voice + likeness + 3D + personality) ─
+
+/**
+ * Origin classification for a persona — gates which moderation path applies
+ * and what verification is required.
+ *
+ *  - `self`       Real-person likeness; KYC + consent gates apply (Phase 4).
+ *  - `parody`     Recognizable real person depicted as parody. Auto-routes to
+ *                 admin moderation queue before going live. Right-of-publicity
+ *                 risk lives here — listings hold until reviewed.
+ *  - `fictional`  Original character; performer affirms no real-person basis.
+ *                 No KYC required; flag/takedown path catches abuses post-hoc.
+ */
+export const PERSONA_ORIGINS = ['self', 'parody', 'fictional'] as const;
+export type PersonaOrigin = (typeof PERSONA_ORIGINS)[number];
+
+export const PERSONA_ORIGIN_LABELS: Record<PersonaOrigin, string> = {
+  self: 'Self (real me)',
+  parody: 'Parody of public figure',
+  fictional: 'Fictional character',
+};
+
+/** Moderation status for parody (and any future reviewed origins). */
+export const PERSONA_MODERATION_STATUSES = [
+  'not_required',
+  'pending_review',
+  'approved',
+  'rejected',
+] as const;
+export type PersonaModerationStatus = (typeof PERSONA_MODERATION_STATUSES)[number];
+
+/**
+ * Tone profile axes consumed by chat/scene generation when this persona is
+ * loaded. All values are 0–100; 50 = neutral. The runtime maps these into
+ * prompt suffixes (e.g. `humor=85` → "lean into wit and one-liners").
+ */
+export interface PersonaToneProfile {
+  warmth: number;
+  formality: number;
+  humor: number;
+  confidence: number;
+  energy: number;
+  /** Optional free-form extension — keys are persona-author-defined. */
+  custom?: Record<string, number>;
+}
+
+export const DEFAULT_PERSONA_TONE: PersonaToneProfile = {
+  warmth: 50,
+  formality: 50,
+  humor: 50,
+  confidence: 50,
+  energy: 50,
+};
+
+/**
+ * Few-shot dialogue exemplar — drives in-character generation. The runtime
+ * feeds these as messages preceding user input. Keep short (≤2 turns each).
+ */
+export interface PersonaDialogueExemplar {
+  /** What the user said to elicit the persona's response. */
+  userTurn: string;
+  /** How the persona answered, in-voice. */
+  personaTurn: string;
+  /** Optional label (e.g. "greeting", "rejection"). */
+  context?: string;
+}
+
+/**
+ * The full personality block. Read by generation pipelines when a buyer holds
+ * an active deal on the persona. Versioned via PersonaVersion (immutable).
+ */
+export interface PersonaProfile {
+  /** Free-form bio / character sheet (read by humans on the marketplace card). */
+  bio: string;
+  /** System-prompt block consumed by chat/scene AI. Plain text, ≤4000 chars. */
+  systemPrompt: string;
+  /** Tone sliders — quantitative dials feeding prompt weighting. */
+  tone: PersonaToneProfile;
+  /** Few-shot dialogue exemplars (≤8). */
+  exemplars: PersonaDialogueExemplar[];
+  /** Tags for browse filtering — "femme", "noir-detective", "shounen-hero", etc. */
+  tags: string[];
+  /** Catchphrases / signature lines the runtime should surface naturally. */
+  catchphrases?: string[];
+  /** Hard "do not say / do not do" rules (above the global prohibitions). */
+  redLines?: string[];
+}
+
+/** Limits for persona profile fields (validated server-side). */
+export const PERSONA_LIMITS = {
+  bioMaxChars: 2000,
+  systemPromptMaxChars: 4000,
+  exemplarMax: 8,
+  exemplarUserTurnMax: 400,
+  exemplarPersonaTurnMax: 800,
+  tagsMax: 12,
+  tagMaxChars: 32,
+  catchphraseMax: 12,
+  catchphraseMaxChars: 120,
+  redLineMax: 12,
+  redLineMaxChars: 160,
+} as const;
+
+/**
+ * Metadata stored on a `persona` entity. References component entities by ID
+ * so a buyer can opt to license the whole package OR an individual component;
+ * the components retain their own consent + listing surface.
+ */
+export interface PersonaEntityMetadata {
+  /** Origin class — drives moderation routing. */
+  origin: PersonaOrigin;
+  /** Required when origin = 'parody'. The public figure being parodied. */
+  parodySubject?: string;
+  /** Required when origin = 'parody'. Free-text disclaimer surfaced on every listing card. */
+  parodyDisclaimer?: string;
+  /** Required when origin = 'fictional'. Affirmation that no real person is depicted. */
+  fictionalAffirmation?: boolean;
+  /** Optional voice component (a `voice` entity owned by the same creator). */
+  voiceEntityId?: string;
+  /** Optional looks component (a `likeness` entity owned by the same creator). */
+  likenessEntityId?: string;
+  /**
+   * Optional standalone 3D asset URL (when the creator generated/uploaded a
+   * 3D model without binding it to a separate `likeness` entity). Format must
+   * be GLB / FBX / OBJ / USDZ; storage helper enforces this.
+   */
+  threeDAssetUrl?: string;
+  /** Meshy generationId backing the 3D asset (when generated, not uploaded). */
+  threeDGenerationId?: string;
+  /** The personality block (versioned — this is a denormalized snapshot of the latest active version). */
+  profile: PersonaProfile;
+  /** Latest published version id. New edits create a new version + bump pointer. */
+  activeVersionId: string;
+  /** Total version count — used for v1/v2 display. */
+  versionCount: number;
+  /** Moderation lifecycle for parody origin. `not_required` for self/fictional. */
+  moderationStatus: PersonaModerationStatus;
+  /** Admin uid that approved/rejected (when moderationStatus terminal). */
+  moderationReviewerUid?: string;
+  /** Admin's review notes (visible to the creator). */
+  moderationNotes?: string;
+  moderationReviewedAt?: Date;
+}
+
+/**
+ * Immutable versioned snapshot of a persona's profile. Persisted at
+ * `personaVersions/{personaEntityId}/versions/{versionId}`. Editing a persona
+ * appends a new version; existing deals stay pinned to the version they
+ * bought at deal time so buyers don't get drifted assets.
+ */
+export interface PersonaVersion {
+  /** UUID for this version. */
+  id: string;
+  /** Persona entity this version belongs to. */
+  personaEntityId: string;
+  /** Monotonic version number (1, 2, 3, …). */
+  version: number;
+  /** The full personality block at this point in time. */
+  profile: PersonaProfile;
+  /** Component refs at this version (so a buyer who licensed v2 doesn't get v3's voice). */
+  voiceEntityId?: string;
+  likenessEntityId?: string;
+  threeDAssetUrl?: string;
+  /** Author of the change. */
+  authorUid: string;
+  authorAddress: string;
+  /** Optional changelog note for the version. */
+  changeNote?: string;
+  /** Whether this version is the currently-active one. */
+  active: boolean;
+  createdAt: Date;
+}
+
+/** The literal affirmation text v1 for fictional personas — pinned for non-repudiation. */
+export const PERSONA_FICTIONAL_AFFIRMATION_V1 =
+  'I affirm that this persona depicts an original fictional character. ' +
+  'It is not based on, modeled after, or intended to be recognizable as any real ' +
+  'living or deceased person. I understand that any depiction of a real person ' +
+  'without authorization may carry legal liability and may result in takedown of ' +
+  'this listing under LOAR’s likeness rights policy.';
+
+/** The literal acknowledgement for parody personas — pinned for the moderation record. */
+export const PERSONA_PARODY_ACKNOWLEDGEMENT_V1 =
+  'I am submitting this persona as a parody of a recognizable public figure ' +
+  'under the protections afforded to commentary, satire, and transformative ' +
+  'works. I understand this listing will be held in admin moderation until ' +
+  'reviewed, and that misuse — including defamation, false endorsement, or ' +
+  'commercial exploitation outside parody scope — may result in takedown and ' +
+  'legal liability.';
 
 /** Expected metadata shape for a style_pack entity. */
 export interface StylePackMetadata {

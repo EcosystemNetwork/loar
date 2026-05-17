@@ -19,7 +19,14 @@
  * server boot to avoid double-flushing across replicas.
  */
 import { db } from '../lib/firebase';
-import { encodeFunctionData, getAddress, isAddress, type Abi, type Hex } from 'viem';
+import {
+  decodeErrorResult,
+  encodeFunctionData,
+  getAddress,
+  isAddress,
+  type Abi,
+  type Hex,
+} from 'viem';
 import { executeTransaction, getOrCreateWallet } from '../lib/circle-wallets';
 
 const AD_PLACEMENT_ABI = [
@@ -33,7 +40,68 @@ const AD_PLACEMENT_ABI = [
     ],
     outputs: [],
   },
+  // H-2: We need the custom-error selector to decode reverts on chain.
+  {
+    type: 'error',
+    name: 'BatchImpressionCapExceeded',
+    inputs: [
+      { name: 'sponsorshipId', type: 'uint256' },
+      { name: 'requested', type: 'uint256' },
+      { name: 'remaining', type: 'uint256' },
+    ],
+  },
 ] as const satisfies Abi;
+
+/**
+ * Attempt to extract a hex revert blob from an error thrown by Circle's
+ * `executeTransaction`. Circle surfaces the revert in different shapes
+ * depending on transport (REST error body vs. parsed json). Best-effort —
+ * returns null if we can't find one.
+ */
+function extractRevertHex(err: unknown): Hex | null {
+  if (!err) return null;
+  const candidates: string[] = [];
+  if (typeof err === 'string') candidates.push(err);
+  if (err instanceof Error) candidates.push(err.message);
+  // Walk a few common nested shapes (cause, data, response.data).
+  type Maybe = { [k: string]: unknown };
+  const e = err as Maybe;
+  for (const k of ['data', 'reason', 'message']) {
+    const v = e[k];
+    if (typeof v === 'string') candidates.push(v);
+  }
+  const cause = e.cause as Maybe | undefined;
+  if (cause) {
+    for (const k of ['data', 'message']) {
+      const v = cause[k];
+      if (typeof v === 'string') candidates.push(v);
+    }
+  }
+  for (const s of candidates) {
+    const match = s.match(/0x[0-9a-fA-F]{8,}/);
+    if (match) return match[0] as Hex;
+  }
+  return null;
+}
+
+/**
+ * If `err` is a `BatchImpressionCapExceeded(sponsorshipId, requested, remaining)`
+ * revert, return the offending sponsorshipId; otherwise null.
+ */
+function decodeBatchCapRevert(err: unknown): bigint | null {
+  const hex = extractRevertHex(err);
+  if (!hex) return null;
+  try {
+    const decoded = decodeErrorResult({ abi: AD_PLACEMENT_ABI, data: hex });
+    if (decoded.errorName === 'BatchImpressionCapExceeded') {
+      const args = decoded.args as readonly [bigint, bigint, bigint] | undefined;
+      if (args && args.length >= 1) return args[0];
+    }
+  } catch {
+    // Not a decodable revert blob — caller will fall through to normal error handling.
+  }
+  return null;
+}
 
 /** Max sponsorships per tx — keeps calldata + gas under typical limits. */
 const BATCH_SIZE = 50;
@@ -129,47 +197,91 @@ export async function flushImpressionsOnce(): Promise<FlushResult> {
   let totalImpressions = 0;
 
   for (let i = 0; i < pending.length; i += BATCH_SIZE) {
-    const batch = pending.slice(i, i + BATCH_SIZE);
-    const sponsorshipIds = batch.map((p) => BigInt(p.onChainSlotId));
-    const counts = batch.map((p) => BigInt(p.delta));
+    // H-2: Within each chunk we may need to retry after dropping a
+    // BatchImpressionCapExceeded offender. Bounded retry — at most one drop
+    // per surviving entry (defense against infinite loops if the revert
+    // decode misidentifies the bad id).
+    let batch = pending.slice(i, i + BATCH_SIZE);
+    const maxRetries = batch.length;
+    let attempts = 0;
+    let succeeded = false;
+    while (batch.length > 0 && attempts <= maxRetries && !succeeded) {
+      attempts++;
+      const sponsorshipIds = batch.map((p) => BigInt(p.onChainSlotId));
+      const counts = batch.map((p) => BigInt(p.delta));
 
-    const calldata = encodeFunctionData({
-      abi: AD_PLACEMENT_ABI,
-      functionName: 'recordImpressionsBatch',
-      args: [sponsorshipIds, counts],
-    }) as Hex;
+      const calldata = encodeFunctionData({
+        abi: AD_PLACEMENT_ABI,
+        functionName: 'recordImpressionsBatch',
+        args: [sponsorshipIds, counts],
+      }) as Hex;
 
-    const result = await executeTransaction({
-      walletId: wallet.walletId,
-      contractAddress: addr,
-      calldata,
-      chainId,
-    });
+      let result: Awaited<ReturnType<typeof executeTransaction>>;
+      try {
+        result = await executeTransaction({
+          walletId: wallet.walletId,
+          contractAddress: addr,
+          calldata,
+          chainId,
+        });
+      } catch (err) {
+        const offending = decodeBatchCapRevert(err);
+        if (offending !== null) {
+          const before = batch.length;
+          batch = batch.filter((p) => BigInt(p.onChainSlotId) !== offending);
+          if (batch.length === before) {
+            // Decoded id wasn't actually in this chunk — bail out rather than
+            // spin. Leave the chunk for the next flush so an operator can look.
+            console.error(
+              '[impressionBatcher] BatchImpressionCapExceeded for sponsorship',
+              offending.toString(),
+              'not present in current chunk — aborting retry'
+            );
+            break;
+          }
+          console.warn(
+            '[impressionBatcher] dropping exhausted slot',
+            offending.toString(),
+            'and retrying batch (size',
+            before,
+            '→',
+            batch.length,
+            ')'
+          );
+          continue;
+        }
+        // Non-cap revert: let the error propagate after logging — operator
+        // should see it.
+        console.error('[impressionBatcher] tx failed:', err);
+        throw err;
+      }
 
-    if (!result.txHash) {
-      console.error(
-        '[impressionBatcher] tx returned no hash (state',
-        result.state,
-        ') — leaving batch unflushed for retry'
-      );
-      continue;
+      if (!result.txHash) {
+        console.error(
+          '[impressionBatcher] tx returned no hash (state',
+          result.state,
+          ') — leaving batch unflushed for retry'
+        );
+        break;
+      }
+      txHashes.push(result.txHash);
+
+      // Commit per-batch — if a later batch fails, prior batches are still
+      // reflected. Update the high-water mark to the value we just confirmed.
+      const writeBatch = db.batch();
+      for (const p of batch) {
+        writeBatch.update(db.collection('sponsorships').doc(p.id), {
+          onChainImpressions: p.total,
+          lastImpressionFlushTxHash: result.txHash,
+          lastImpressionFlushAt: new Date(),
+        });
+      }
+      await writeBatch.commit();
+
+      flushed += batch.length;
+      totalImpressions += batch.reduce((sum, p) => sum + p.delta, 0);
+      succeeded = true;
     }
-    txHashes.push(result.txHash);
-
-    // Commit per-batch — if a later batch fails, prior batches are still
-    // reflected. Update the high-water mark to the value we just confirmed.
-    const writeBatch = db.batch();
-    for (const p of batch) {
-      writeBatch.update(db.collection('sponsorships').doc(p.id), {
-        onChainImpressions: p.total,
-        lastImpressionFlushTxHash: result.txHash,
-        lastImpressionFlushAt: new Date(),
-      });
-    }
-    await writeBatch.commit();
-
-    flushed += batch.length;
-    totalImpressions += batch.reduce((sum, p) => sum + p.delta, 0);
   }
 
   return { flushed, totalImpressions, txHashes, pendingOnChainId };

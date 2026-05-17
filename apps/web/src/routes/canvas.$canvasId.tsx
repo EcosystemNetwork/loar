@@ -403,7 +403,17 @@ function SceneNode({ data, selected }: NodeProps<CanvasScene>) {
       }`}
     >
       <Handle type="target" position={Position.Top} />
-      {data.generatedImageUrl ? (
+      {data.generatedVideoUrl ? (
+        <video
+          src={resolveIpfsUrl(data.generatedVideoUrl)}
+          poster={data.generatedImageUrl ? resolveIpfsUrl(data.generatedImageUrl) : undefined}
+          muted
+          loop
+          playsInline
+          autoPlay
+          className="w-full h-28 object-cover"
+        />
+      ) : data.generatedImageUrl ? (
         <img
           src={resolveIpfsUrl(data.generatedImageUrl)}
           alt="Scene"
@@ -530,8 +540,38 @@ function SceneInspector({
           title="Generate image for this scene"
         >
           <Sparkles className="h-3 w-3" />
-          {generating ? 'Generating…' : 'Generate'}
+          {generating ? 'Generating…' : 'Image'}
         </button>
+      </div>
+
+      {/* Video gen — needs a source image (this scene's, or parent's for continuity) */}
+      <div className="flex gap-1.5">
+        <button
+          onClick={() => scene.generatedImageUrl && onGenerateVideo(scene.generatedImageUrl)}
+          disabled={generatingVideo || !scene.generatedImageUrl || !prompt.trim()}
+          className="flex-1 px-2 py-1.5 rounded border text-xs flex items-center justify-center gap-1 disabled:opacity-50"
+          title={
+            !scene.generatedImageUrl
+              ? 'Generate an image first to animate it'
+              : 'Animate this scene from its current image'
+          }
+        >
+          <Video className="h-3 w-3" />
+          {generatingVideo ? 'Animating…' : 'Animate'}
+        </button>
+        {parentScene?.generatedImageUrl && (
+          <button
+            onClick={() =>
+              parentScene.generatedImageUrl && onGenerateVideo(parentScene.generatedImageUrl)
+            }
+            disabled={generatingVideo || !prompt.trim()}
+            className="flex-1 px-2 py-1.5 rounded border text-xs flex items-center justify-center gap-1 disabled:opacity-50"
+            title="Use the parent scene's image as the start frame — preserves continuity"
+          >
+            <Video className="h-3 w-3" />
+            From parent
+          </button>
+        )}
       </div>
 
       <div className="pt-2 border-t flex gap-1.5">

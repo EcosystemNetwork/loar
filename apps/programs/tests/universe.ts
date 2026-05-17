@@ -34,7 +34,7 @@ describe('universe', () => {
     if (!acct) {
       await program.methods
         .initializeConfig()
-        .accounts({
+        .accountsPartial({
           admin: creator.publicKey,
           config: configPda,
           systemProgram: SystemProgram.programId,
@@ -47,7 +47,7 @@ describe('universe', () => {
     const [pda] = universePda(creator.publicKey, hashA);
     await program.methods
       .initializeUniverse(Array.from(hashA), Array.from(plotA), { private: {} } as never)
-      .accounts({
+      .accountsPartial({
         creator: creator.publicKey,
         universe: pda,
         config: configPda,
@@ -66,7 +66,7 @@ describe('universe', () => {
     const [pda] = universePda(creator.publicKey, hashA);
     await program.methods
       .publishUniverse()
-      .accounts({ signer: creator.publicKey, universe: pda, config: configPda })
+      .accountsPartial({ signer: creator.publicKey, universe: pda, config: configPda })
       .rpc();
     const u = await program.account.universe.fetch(pda);
     expect(JSON.stringify(u.visibility)).to.equal(JSON.stringify({ public: {} }));
@@ -78,7 +78,7 @@ describe('universe', () => {
     try {
       await program.methods
         .publishUniverse()
-        .accounts({ signer: creator.publicKey, universe: pda, config: configPda })
+        .accountsPartial({ signer: creator.publicKey, universe: pda, config: configPda })
         .rpc();
     } catch (e) {
       err = e;
@@ -94,7 +94,7 @@ describe('universe', () => {
     const [pda] = universePda(creator.publicKey, hashB);
     await program.methods
       .initializeUniverse(Array.from(hashB), Array.from(plotA), { private: {} } as never)
-      .accounts({
+      .accountsPartial({
         creator: creator.publicKey,
         universe: pda,
         config: configPda,
@@ -106,7 +106,7 @@ describe('universe', () => {
     try {
       await program.methods
         .publishUniverse()
-        .accounts({ signer: intruder.publicKey, universe: pda, config: configPda })
+        .accountsPartial({ signer: intruder.publicKey, universe: pda, config: configPda })
         .signers([intruder])
         .rpc();
     } catch (e) {
@@ -120,7 +120,7 @@ describe('universe', () => {
     const before = await program.account.universe.fetch(pda);
     await program.methods
       .canonizeEpisode()
-      .accounts({ signer: creator.publicKey, universe: pda, config: configPda })
+      .accountsPartial({ signer: creator.publicKey, universe: pda, config: configPda })
       .rpc();
     const after = await program.account.universe.fetch(pda);
     expect(after.canonCount.toNumber()).to.equal(before.canonCount.toNumber() + 1);
@@ -137,7 +137,7 @@ describe('universe', () => {
     try {
       await program.methods
         .pause()
-        .accounts({ admin: intruder.publicKey, config: configPda })
+        .accountsPartial({ admin: intruder.publicKey, config: configPda })
         .signers([intruder])
         .rpc();
     } catch (e) {
@@ -148,14 +148,17 @@ describe('universe', () => {
 
   it('blocks initialize_universe while paused, then resumes after unpause', async () => {
     // Pause as the admin (provider wallet).
-    await program.methods.pause().accounts({ admin: creator.publicKey, config: configPda }).rpc();
+    await program.methods
+      .pause()
+      .accountsPartial({ admin: creator.publicKey, config: configPda })
+      .rpc();
 
     const [pda] = universePda(creator.publicKey, hashC);
     let err: unknown;
     try {
       await program.methods
         .initializeUniverse(Array.from(hashC), Array.from(plotA), { private: {} } as never)
-        .accounts({
+        .accountsPartial({
           creator: creator.publicKey,
           universe: pda,
           config: configPda,
@@ -168,11 +171,14 @@ describe('universe', () => {
     expect(String(err)).to.match(/Paused/);
 
     // Unpause and verify the same call succeeds.
-    await program.methods.unpause().accounts({ admin: creator.publicKey, config: configPda }).rpc();
+    await program.methods
+      .unpause()
+      .accountsPartial({ admin: creator.publicKey, config: configPda })
+      .rpc();
 
     await program.methods
       .initializeUniverse(Array.from(hashC), Array.from(plotA), { private: {} } as never)
-      .accounts({
+      .accountsPartial({
         creator: creator.publicKey,
         universe: pda,
         config: configPda,

@@ -258,6 +258,34 @@
   }
 }
 
+/* Gallery skeleton shimmer — runs over every video tile until its first
+   frame paints, so the grid reads as "loading" rather than "empty/broken". */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Audio-tile bars — placeholder animation for audio cards in the gallery so
+   they carry visual weight comparable to a video/image thumbnail. */
+@keyframes audio-bar {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@theme inline {
+  --animate-shimmer: shimmer 2.2s linear infinite;
+  --animate-audio-bar: audio-bar 0.9s ease-in-out infinite;
+}
+
 .route-progress-bar {
   position: fixed;
   top: 0;

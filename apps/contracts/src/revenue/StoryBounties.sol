@@ -108,6 +108,7 @@ contract StoryBounties is
     error AmountTooLow();
     error InvalidDeadline();
     error ZeroAddress();
+    error FeeTooHigh();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -291,14 +292,14 @@ contract StoryBounties is
     // ── Admin ───────────────────────────────────────────────────
 
     function setPlatformFee(uint16 newFeeBps) external onlyOwner {
-        require(newFeeBps <= 2000, "Max 20%");
+        if (newFeeBps > 2000) revert FeeTooHigh();
         uint16 old = platformFeeBps;
         platformFeeBps = newFeeBps;
         emit PlatformFeeChanged(old, newFeeBps);
     }
 
     function setCancellationFee(uint16 newFeeBps) external onlyOwner {
-        require(newFeeBps <= 1000, "Max 10%");
+        if (newFeeBps > 1000) revert FeeTooHigh();
         uint16 old = cancellationFeeBps;
         cancellationFeeBps = newFeeBps;
         emit CancellationFeeChanged(old, newFeeBps);

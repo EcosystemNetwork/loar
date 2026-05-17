@@ -74,6 +74,7 @@ contract PaymentRouter is
     error NothingToClaim();
     error TransferFailed();
     error FeeTooHigh();
+    error LoarTokenNotSet();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -270,7 +271,7 @@ contract PaymentRouter is
 
     /// @notice Permanently lock the $LOAR token address. Cannot be undone.
     function lockLoarToken() external onlyOwner {
-        require(address(loarToken) != address(0), "Set loar token first");
+        if (address(loarToken) == address(0)) revert LoarTokenNotSet();
         loarTokenLocked = true;
     }
 

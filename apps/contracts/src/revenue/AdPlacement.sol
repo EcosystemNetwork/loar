@@ -93,6 +93,10 @@ contract AdPlacement is
     error EpisodesMustBePositive();
     /// @dev AD-02: slot creator's `episodes` cap exceeds the safety ceiling.
     error EpisodesAboveMax();
+    /// @dev M9: batch impression count for a slot exceeds its remaining budget.
+    ///      Fail loud so the off-chain aggregator must reconcile, instead of
+    ///      silently clamping and over-promising delivery to the sponsor.
+    error BatchImpressionCapExceeded(uint256 sponsorshipId, uint256 requested, uint256 remaining);
 
     uint256 public constant BID_CANCEL_COOLDOWN = 3 days;
     uint256 public constant BID_EXPIRY = 30 days;
@@ -357,9 +361,11 @@ contract AdPlacement is
             AdSlot storage slot = adSlots[sp.adSlotId];
             if (!sp.active || slot.episodesRemaining == 0) continue;
 
-            uint256 applied = add > slot.episodesRemaining ? slot.episodesRemaining : add;
-            sp.impressions += applied;
-            slot.episodesRemaining -= applied;
+            if (add > slot.episodesRemaining) {
+                revert BatchImpressionCapExceeded(sId, add, slot.episodesRemaining);
+            }
+            sp.impressions += add;
+            slot.episodesRemaining -= add;
             if (slot.episodesRemaining == 0) {
                 sp.active = false;
             }

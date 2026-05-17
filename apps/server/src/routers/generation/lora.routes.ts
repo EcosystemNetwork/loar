@@ -14,6 +14,7 @@ import {
 } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { TRPCError } from '@trpc/server';
+import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 import { FieldValue } from 'firebase-admin/firestore';
 import { logFailedRefund } from '../../lib/refund-audit';
 import { reserveClientToken } from '../../lib/jobIdempotency';
@@ -57,6 +58,16 @@ export const loraRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      for (const u of input.referenceImageUrls) {
+        try {
+          assertSafeExternalUrl(u);
+        } catch (err) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: err instanceof Error ? err.message : 'referenceImageUrl rejected',
+          });
+        }
+      }
       // Idempotency — training is expensive (75 credits + long-running), so
       // retry safety matters. Reserve the slot BEFORE credit deduction.
       const plannedJobId = `planned-${ctx.user.uid}-${Date.now()}`;

@@ -182,14 +182,16 @@ export default function Header() {
                   )}
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-52">
-                {moreGroups.map((group, gi) => {
+              <DropdownMenuContent
+                align="end"
+                className="w-[640px] grid grid-cols-3 gap-x-2 gap-y-1 p-2"
+              >
+                {moreGroups.map((group) => {
                   const visibleLinks = group.links.filter((l) => !HIDDEN_ROUTES.has(l.to));
                   if (!visibleLinks.length) return null;
                   return (
-                    <DropdownMenuGroup key={group.label}>
-                      {gi > 0 && <DropdownMenuSeparator />}
-                      <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/70">
+                    <DropdownMenuGroup key={group.label} className="min-w-0">
+                      <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/70 px-2 pb-0.5">
                         {group.label}
                       </DropdownMenuLabel>
                       {visibleLinks.map((link) => (
@@ -198,11 +200,11 @@ export default function Header() {
                             to={link.to as any}
                             activeProps={{ className: 'text-primary font-medium' }}
                             inactiveProps={{ className: 'text-foreground' }}
-                            className="w-full cursor-pointer flex items-center justify-between text-[13px]"
+                            className="w-full cursor-pointer flex items-center justify-between text-[13px] py-1"
                           >
-                            {link.label}
+                            <span className="truncate">{link.label}</span>
                             {'beta' in link && link.beta && (
-                              <span className="text-[9px] font-semibold bg-primary/10 text-primary/80 px-1.5 py-0.5 rounded leading-none uppercase tracking-wider">
+                              <span className="ml-2 shrink-0 text-[9px] font-semibold bg-primary/10 text-primary/80 px-1.5 py-0.5 rounded leading-none uppercase tracking-wider">
                                 Beta
                               </span>
                             )}

@@ -69,6 +69,9 @@
       "ignoreGhsas": [
         "GHSA-r5fr-rjxr-66jc"
       ]
+    },
+    "patchedDependencies": {
+      "@noble/hashes@2.2.0": "patches/@noble__hashes@2.2.0.patch"
     }
   }
 }

@@ -311,7 +311,7 @@ contract StoryBountiesTest is Test {
         uint256 bountyId = _createDefaultBounty();
 
         StoryBounties.Bounty memory b = sb.getBounty(bountyId);
-        vm.warp(b.deadline + 1);
+        vm.warp(b.deadline + sb.AWARD_GRACE_PERIOD() + 1);
 
         vm.prank(anyone);
         sb.expireBounty(bountyId);
@@ -441,7 +441,7 @@ contract StoryBountiesTest is Test {
         uint256 posterBalBefore = loar.balanceOf(poster);
 
         StoryBounties.Bounty memory b = sb.getBounty(bountyId);
-        vm.warp(b.deadline + 1);
+        vm.warp(b.deadline + sb.AWARD_GRACE_PERIOD() + 1);
 
         vm.prank(anyone);
         sb.expireBounty(bountyId);
@@ -458,7 +458,7 @@ contract StoryBountiesTest is Test {
     function test_expireBounty_emitsEvent() public {
         uint256 bountyId = _createDefaultBounty();
         StoryBounties.Bounty memory b = sb.getBounty(bountyId);
-        vm.warp(b.deadline + 1);
+        vm.warp(b.deadline + sb.AWARD_GRACE_PERIOD() + 1);
 
         vm.expectEmit(true, false, false, false);
         emit BountyExpired(bountyId);
@@ -490,7 +490,7 @@ contract StoryBountiesTest is Test {
         uint256 bountyId = _createDefaultBounty();
 
         StoryBounties.Bounty memory b = sb.getBounty(bountyId);
-        vm.warp(b.deadline + 1);
+        vm.warp(b.deadline + sb.AWARD_GRACE_PERIOD() + 1);
 
         sb.expireBounty(bountyId);
 
@@ -502,7 +502,7 @@ contract StoryBountiesTest is Test {
         uint256 bountyId = _createDefaultBounty();
 
         StoryBounties.Bounty memory b = sb.getBounty(bountyId);
-        vm.warp(b.deadline + 1);
+        vm.warp(b.deadline + sb.AWARD_GRACE_PERIOD() + 1);
 
         // Random address can expire it
         address randomUser = makeAddr("random");
@@ -569,7 +569,7 @@ contract StoryBountiesTest is Test {
 
         // Expire #2
         StoryBounties.Bounty memory b2 = sb.getBounty(id2);
-        vm.warp(b2.deadline + 1);
+        vm.warp(b2.deadline + sb.AWARD_GRACE_PERIOD() + 1);
         sb.expireBounty(id2);
 
         assertEq(uint8(sb.getBounty(id0).status), uint8(StoryBounties.BountyStatus.CLAIMED));
@@ -698,7 +698,7 @@ contract StoryBountiesTest is Test {
 
     function test_setPlatformFee_revert_tooHigh() public {
         vm.prank(deployer);
-        vm.expectRevert("Max 20%");
+        vm.expectRevert(StoryBounties.FeeTooHigh.selector);
         sb.setPlatformFee(2001);
     }
 
@@ -724,7 +724,7 @@ contract StoryBountiesTest is Test {
 
     function test_setCancellationFee_revert_tooHigh() public {
         vm.prank(deployer);
-        vm.expectRevert("Max 10%");
+        vm.expectRevert(StoryBounties.FeeTooHigh.selector);
         sb.setCancellationFee(1001);
     }
 

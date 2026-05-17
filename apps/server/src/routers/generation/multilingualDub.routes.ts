@@ -28,6 +28,7 @@ import { firebaseStorageService } from '../../services/firebase-storage';
 import { logFailedRefund } from '../../lib/refund-audit';
 import { FieldValue } from 'firebase-admin/firestore';
 import { TRPCError } from '@trpc/server';
+import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 import { getPlatformConfig } from '../../services/platformConfig';
 
 // ── Pricing ──────────────────────────────────────────────────────────
@@ -165,6 +166,14 @@ export const multilingualDubRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      try {
+        assertSafeExternalUrl(input.sourceVideoUrl);
+      } catch (err) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: err instanceof Error ? err.message : 'sourceVideoUrl rejected',
+        });
+      }
       // De-dupe target langs (and drop source-lang if accidentally included).
       const targets = [...new Set(input.targetLangs)].filter((l) => l !== input.sourceLang);
       if (targets.length === 0) {

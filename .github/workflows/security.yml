@@ -125,10 +125,50 @@ jobs:
           for contract in PaymentRouter RightsRegistry CanonMarketplace CreditManager \
                           AdPlacement SubscriptionManager LicensingRegistry CollabManager \
                           AnalyticsRegistry LaunchpadStaking StoryBounties Escrow \
-                          LoarBurner RemixFees ContentLicensing; do
-            forge inspect "$contract" storage-layout > "storage-layouts/$contract.json" 2>/dev/null \
+                          PremiumActions RemixFees ContentLicensing; do
+            forge inspect "$contract" storage-layout --json > "storage-layouts/$contract.json" 2>/dev/null \
               || echo "::warning::Could not inspect $contract"
           done
+
+      - name: UPGRADE-01 follow-on — Diff against committed baseline
+        # The committed baseline in storage-layouts/baseline/ is the snapshot
+        # at which storage layouts were last reviewed. Any drift means a slot
+        # was renamed/reordered/inserted, which is upgrade-unsafe unless the
+        # change is intentional. To accept a drift, regenerate the baseline:
+        #   FOUNDRY_PROFILE=test forge inspect <Contract> storage-layout --json \
+        #     > storage-layouts/baseline/<Contract>.json
+        # and commit the result alongside the contract change.
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          if [ ! -d storage-layouts/baseline ]; then
+            echo "::error::baseline dir missing — apps/contracts/storage-layouts/baseline/ must be committed"
+            exit 1
+          fi
+          DRIFT=0
+          BASELINE_FILES=(storage-layouts/baseline/*.json)
+          if [ "${#BASELINE_FILES[@]}" -eq 0 ]; then
+            echo "::error::baseline dir contains no *.json files — refusing to fail-open"
+            exit 1
+          fi
+          for f in "${BASELINE_FILES[@]}"; do
+            name=$(basename "$f")
+            if [ ! -f "storage-layouts/$name" ]; then
+              echo "::error file=storage-layouts/baseline/$name::Baseline contract not built — missing storage-layouts/$name"
+              DRIFT=1
+              continue
+            fi
+            if ! diff -q "storage-layouts/baseline/$name" "storage-layouts/$name" > /dev/null; then
+              echo "::error file=apps/contracts/storage-layouts/baseline/$name::Storage layout drift from committed baseline"
+              diff -u "storage-layouts/baseline/$name" "storage-layouts/$name" | head -60 || true
+              DRIFT=1
+            fi
+          done
+          if [ "$DRIFT" -ne 0 ]; then
+            echo "::error::At least one UUPS contract drifted from its committed storage-layout baseline. If the change is intentional, regenerate the baseline file and commit it with the contract change."
+            exit 1
+          fi
+          echo "All committed storage-layout baselines match current build."
 
       - name: Upload storage-layout artifacts
         if: always()
