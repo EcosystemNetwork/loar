@@ -47,8 +47,10 @@ export async function resolveProviderKey(userId: string, provider: string): Prom
     }
   }
 
-  // Server pool fallback
-  const serverKey = process.env[entry.serverPoolEnvVar];
+  // Server pool fallback. Trim because `FOO_API_KEY=" "` from a misconfigured
+  // deploy would otherwise resolve "server" and the dispatcher would ship a
+  // literal space to the provider, taking up a cost-ledger slot before 401.
+  const serverKey = process.env[entry.serverPoolEnvVar]?.trim();
   if (serverKey && serverKey.length > 0) {
     return { apiKey: serverKey, source: 'server', provider };
   }

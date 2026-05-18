@@ -12,6 +12,8 @@
  * Required env var: ELEVENLABS_API_KEY
  */
 
+import { redactSecrets } from '../lib/redact-secrets';
+
 const BASE_URL = 'https://api.elevenlabs.io/v1';
 
 export type ElevenLabsVoiceModel =
@@ -258,7 +260,9 @@ class ElevenLabsService {
 
     if (!response.ok) {
       const text = await response.text().catch(() => response.statusText);
-      throw new Error(`ElevenLabs API error ${response.status}: ${text}`);
+      throw new Error(
+        `ElevenLabs API error ${response.status}: ${redactSecrets(text).slice(0, 500)}`
+      );
     }
 
     const contentType = response.headers.get('content-type') || 'audio/mpeg';
@@ -345,7 +349,9 @@ class ElevenLabsService {
 
     if (!response.ok) {
       const text = await response.text().catch(() => response.statusText);
-      throw new Error(`ElevenLabs voice changer error ${response.status}: ${text}`);
+      throw new Error(
+        `ElevenLabs voice changer error ${response.status}: ${redactSecrets(text).slice(0, 500)}`
+      );
     }
 
     const contentType = response.headers.get('content-type') || 'audio/mpeg';
@@ -415,7 +421,9 @@ class ElevenLabsService {
 
     if (!genResponse.ok) {
       const text = await genResponse.text().catch(() => genResponse.statusText);
-      throw new Error(`ElevenLabs voice design error ${genResponse.status}: ${text}`);
+      throw new Error(
+        `ElevenLabs voice design error ${genResponse.status}: ${redactSecrets(text).slice(0, 500)}`
+      );
     }
 
     const genData = await genResponse.json();
@@ -435,7 +443,9 @@ class ElevenLabsService {
 
     if (!saveResponse.ok) {
       const text = await saveResponse.text().catch(() => saveResponse.statusText);
-      throw new Error(`ElevenLabs save voice error ${saveResponse.status}: ${text}`);
+      throw new Error(
+        `ElevenLabs save voice error ${saveResponse.status}: ${redactSecrets(text).slice(0, 500)}`
+      );
     }
 
     const saveData = await saveResponse.json();
@@ -474,7 +484,9 @@ class ElevenLabsService {
 
     if (!response.ok) {
       const text = await response.text().catch(() => response.statusText);
-      throw new Error(`ElevenLabs clone voice error ${response.status}: ${text}`);
+      throw new Error(
+        `ElevenLabs clone voice error ${response.status}: ${redactSecrets(text).slice(0, 500)}`
+      );
     }
 
     const data = await response.json();
@@ -518,7 +530,9 @@ class ElevenLabsService {
 
     if (!response.ok) {
       const text = await response.text().catch(() => response.statusText);
-      throw new Error(`ElevenLabs dubbing create error ${response.status}: ${text}`);
+      throw new Error(
+        `ElevenLabs dubbing create error ${response.status}: ${redactSecrets(text).slice(0, 500)}`
+      );
     }
 
     const data = await response.json();
@@ -536,7 +550,9 @@ class ElevenLabsService {
 
     if (!response.ok) {
       const text = await response.text().catch(() => response.statusText);
-      throw new Error(`ElevenLabs dubbing status error ${response.status}: ${text}`);
+      throw new Error(
+        `ElevenLabs dubbing status error ${response.status}: ${redactSecrets(text).slice(0, 500)}`
+      );
     }
 
     const data = await response.json();
@@ -560,7 +576,9 @@ class ElevenLabsService {
 
     if (!response.ok) {
       const text = await response.text().catch(() => response.statusText);
-      throw new Error(`ElevenLabs dubbing audio fetch error ${response.status}: ${text}`);
+      throw new Error(
+        `ElevenLabs dubbing audio fetch error ${response.status}: ${redactSecrets(text).slice(0, 500)}`
+      );
     }
 
     const contentType = response.headers.get('content-type') || 'audio/mpeg';
@@ -580,7 +598,9 @@ class ElevenLabsService {
 
     if (!response.ok) {
       const text = await response.text().catch(() => response.statusText);
-      throw new Error(`ElevenLabs dubbing video fetch error ${response.status}: ${text}`);
+      throw new Error(
+        `ElevenLabs dubbing video fetch error ${response.status}: ${redactSecrets(text).slice(0, 500)}`
+      );
     }
 
     const contentType = response.headers.get('content-type') || 'video/mp4';
@@ -614,7 +634,9 @@ class ElevenLabsService {
 
     if (!response.ok) {
       const errText = await response.text().catch(() => response.statusText);
-      throw new Error(`ElevenLabs forced alignment error ${response.status}: ${errText}`);
+      throw new Error(
+        `ElevenLabs forced alignment error ${response.status}: ${redactSecrets(errText).slice(0, 500)}`
+      );
     }
 
     const data = await response.json();
@@ -665,7 +687,9 @@ class ElevenLabsService {
 
     if (!response.ok) {
       const errText = await response.text().catch(() => response.statusText);
-      throw new Error(`ElevenLabs scribe error ${response.status}: ${errText}`);
+      throw new Error(
+        `ElevenLabs scribe error ${response.status}: ${redactSecrets(errText).slice(0, 500)}`
+      );
     }
 
     const data = await response.json();
@@ -703,7 +727,9 @@ class ElevenLabsService {
 
     if (!response.ok) {
       const text = await response.text().catch(() => response.statusText);
-      throw new Error(`ElevenLabs list voices error ${response.status}: ${text}`);
+      throw new Error(
+        `ElevenLabs list voices error ${response.status}: ${redactSecrets(text).slice(0, 500)}`
+      );
     }
 
     const data = await response.json();

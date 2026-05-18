@@ -17,6 +17,7 @@
  */
 import type { CaptionSegment, CaptionWord } from '../../lib/captions-format';
 import type { CaptionBackend, CaptionBackendInput, CaptionBackendResult } from './types';
+import { redactSecrets } from '../../lib/redact-secrets';
 
 const AAI_BASE = 'https://api.assemblyai.com/v2';
 const POLL_INTERVAL_MS = 3_000;
@@ -145,7 +146,7 @@ function buildAssemblyAIBackend(modelId: string, speechModel: string): CaptionBa
           status: 'failed',
           hasWordTimings: false,
           hasSpeakers: false,
-          error: `AssemblyAI submission rejected (${create.status}): ${errText.slice(0, 200)}`,
+          error: `AssemblyAI submission rejected (${create.status}): ${redactSecrets(errText).slice(0, 200)}`,
         };
       }
       const created = (await create.json()) as AAITranscript;

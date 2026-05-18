@@ -247,12 +247,14 @@ export async function dispatchThreed(input: ThreedDispatchInput): Promise<Threed
         }
       }
     } catch (err) {
-      return {
-        ...baseOut,
-        taskId: '',
-        status: 'failed',
-        error: err instanceof Error ? err.message : 'Meshy task failed',
-      };
+      // Re-throw so `withReservation` (3d.routes) cancels the credit hold
+      // instead of reconciling the full charge for a failed task. Returning
+      // `{ status: 'failed' }` would let withReservation read success.
+      if (err instanceof TRPCError) throw err;
+      throw new TRPCError({
+        code: 'BAD_GATEWAY',
+        message: err instanceof Error ? err.message : 'Meshy task failed',
+      });
     }
   }
 

@@ -16,6 +16,7 @@
 import type { CaptionSegment, CaptionWord } from '../../lib/captions-format';
 import type { CaptionBackend, CaptionBackendInput, CaptionBackendResult } from './types';
 import { redactSecrets } from '../../lib/redact-secrets';
+import { validateUploadUrl } from '../../lib/url-validator';
 
 const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/audio/transcriptions';
 const GROQ_MAX_BYTES = 25 * 1024 * 1024;
@@ -106,6 +107,8 @@ function buildGroqBackend(modelId: string, groqModel: string): CaptionBackend {
       let audioBuf: ArrayBuffer;
       let mimeType: string;
       try {
+        // SSRF guard: reject internal/loopback/blocked hosts before fetching.
+        await validateUploadUrl(input.audioUrl);
         const audioRes = await fetch(input.audioUrl, {
           signal: AbortSignal.timeout(120_000),
         });

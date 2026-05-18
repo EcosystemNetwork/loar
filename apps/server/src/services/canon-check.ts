@@ -32,6 +32,7 @@ import { routeLlmModel } from './llm-models/router';
 import { resolveProviderKey } from '../lib/byok';
 import type { SecretProvider } from '../lib/byok';
 import { sanitizePrompt } from '../lib/prompt-sanitize';
+import { redactSecrets } from '../lib/redact-secrets';
 
 export interface CanonCheckResult {
   score: number;
@@ -146,7 +147,13 @@ Look at the attached frame from a candidate canon episode. Score 0-100 how well 
       },
     ],
   }).catch((err) => {
-    console.warn(`[canon-check] dispatchLlm (${resolvedModelId}) failed`, err);
+    // Don't log the full Error (stack + `cause` chain could carry a key
+    // if a future adapter regression bubbles raw response context).
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[canon-check] dispatchLlm (${resolvedModelId}) failed:`,
+      redactSecrets(msg).slice(0, 300)
+    );
     return null;
   });
 

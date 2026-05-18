@@ -24,8 +24,10 @@ const PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bsk[-_](?:proj[-_]|ant[-_]|live[-_]|test[-_])?[A-Za-z0-9-_]{16,}\b/g, 'sk-***'],
   // Google API keys.
   [/\bAIza[A-Za-z0-9-_]{20,}\b/g, 'AIza***'],
-  // Stripe live/test keys (pk_… / sk_… / rk_…).
-  [/\b(?:pk|sk|rk)_(?:live|test)_[A-Za-z0-9]{20,}\b/g, '$&_REDACTED'],
+  // Stripe live/test keys (pk_… / sk_… / rk_…). Earlier draft used
+  // `'$&_REDACTED'` which (since `$&` IS the match itself) left the full
+  // key in place. Use a literal replacement so the key is truly stripped.
+  [/\b(?:pk|sk|rk)_(?:live|test)_[A-Za-z0-9]{20,}\b/g, 'stripe_***_REDACTED'],
   // Bearer / Token authorization tails.
   [/(Authorization\s*:\s*)?Bearer\s+[A-Za-z0-9._\-+/=]{8,}/gi, 'Bearer ***'],
   [/(Authorization\s*:\s*)?Token\s+[A-Za-z0-9._\-+/=]{8,}/gi, 'Token ***'],

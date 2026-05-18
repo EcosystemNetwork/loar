@@ -96,10 +96,13 @@ async function testOpenAIKey(key: string): Promise<boolean> {
 }
 
 async function testGoogleKey(key: string): Promise<boolean> {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`,
-    { method: 'GET', signal: AbortSignal.timeout(8_000) }
-  );
+  // Key goes in the `x-goog-api-key` header, NOT the URL query string —
+  // URL keys land in load-balancer access logs / outbound proxy logs.
+  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
+    method: 'GET',
+    headers: { 'x-goog-api-key': key },
+    signal: AbortSignal.timeout(8_000),
+  });
   if (res.status === 401 || res.status === 403 || res.status === 400) return false;
   return res.ok;
 }
