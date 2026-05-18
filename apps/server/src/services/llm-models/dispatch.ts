@@ -17,10 +17,35 @@ import type { LlmModelConfig } from './types';
 import {
   recordProviderCost,
   assertProviderAllowed,
+  ProviderPausedError,
+  CostCapExceededError,
   llmFallbackHopTotal,
+  providerCallFailureTotal,
   type CostProvider,
   type CostKind,
 } from '../cost-tracker';
+
+function classifyDispatchError(
+  err: unknown
+): 'paused' | 'cap' | 'rate_limit' | 'timeout' | 'auth' | 'bad_request' | 'other' {
+  if (err instanceof ProviderPausedError) return 'paused';
+  if (err instanceof CostCapExceededError) return 'cap';
+  if (err instanceof TRPCError) {
+    if (err.code === 'TOO_MANY_REQUESTS') return 'rate_limit';
+    if (err.code === 'TIMEOUT') return 'timeout';
+    if (err.code === 'UNAUTHORIZED' || err.code === 'FORBIDDEN') return 'auth';
+    if (err.code === 'BAD_REQUEST') return 'bad_request';
+    return 'other';
+  }
+  if (err instanceof Error) {
+    const msg = err.message.toLowerCase();
+    if (msg.includes('429') || msg.includes('rate limit')) return 'rate_limit';
+    if (msg.includes('timeout') || msg.includes('etimedout')) return 'timeout';
+    if (msg.includes('401') || msg.includes('unauthorized') || msg.includes('invalid api key'))
+      return 'auth';
+  }
+  return 'other';
+}
 
 // LlmModelConfig.provider → CostProvider for the ledger.
 function costProviderFor(p: LlmModelConfig['provider']): CostProvider {
@@ -196,15 +221,41 @@ export async function dispatchLlm(input: LlmDispatchInput): Promise<LlmDispatchR
 
   // Admin kill-switch + platform cost cap preflight. Throws
   // ProviderPausedError / CostCapExceededError before we burn a real call.
-  await assertProviderAllowed({ provider: costProviderFor(model.provider) });
+  try {
+    await assertProviderAllowed({ provider: costProviderFor(model.provider) });
+  } catch (err) {
+    providerCallFailureTotal
+      .labels(
+        costProviderFor(model.provider),
+        model.capabilities.includes('vision') ? 'vlm' : 'llm',
+        model.id,
+        classifyDispatchError(err)
+      )
+      .inc();
+    throw err;
+  }
 
   // Per-provider concurrency gate — prevents 429 storms on shared keys at
   // scale. Caps are env-tunable; see lib/rate-limit.ts.
-  const result = await withProviderRateLimit(costProviderFor(model.provider), () =>
-    dispatchLlmInner(model, input)
-  );
-  await recordDispatchCost(model, result.usage);
-  return result;
+  try {
+    const result = await withProviderRateLimit(costProviderFor(model.provider), () =>
+      dispatchLlmInner(model, input)
+    );
+    await recordDispatchCost(model, result.usage);
+    return result;
+  } catch (err) {
+    // Failure path — bump the failure counter so ops can graph error rate
+    // per provider/model without scraping logs.
+    providerCallFailureTotal
+      .labels(
+        costProviderFor(model.provider),
+        model.capabilities.includes('vision') ? 'vlm' : 'llm',
+        model.id,
+        classifyDispatchError(err)
+      )
+      .inc();
+    throw err;
+  }
 }
 
 async function dispatchLlmInner(
@@ -466,6 +517,10 @@ async function dispatchLlmInner(
  * fail again on a different model with the same input.
  */
 function isRetryableProviderError(err: unknown): boolean {
+  // Admin paused this provider — try the next one in the chain rather than
+  // erroring the user. CostCapExceededError is *not* retryable (the cap is
+  // already breached; another provider would just deepen the bill).
+  if (err instanceof ProviderPausedError) return true;
   if (err instanceof TRPCError) {
     return (
       err.code === 'BAD_GATEWAY' || err.code === 'TIMEOUT' || err.code === 'INTERNAL_SERVER_ERROR'

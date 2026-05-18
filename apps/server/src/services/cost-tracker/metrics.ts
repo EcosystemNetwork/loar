@@ -17,6 +17,34 @@ export const providerTokensTotal = new Counter({
   labelNames: ['provider', 'kind', 'model', 'direction'] as const,
 });
 
+// LLM router decisions: lets ops graph autoroute drift over time, spot
+// providers that suddenly never win (key missing? all rate-limited?), and
+// confirm that cost-tier flips translate into real call mix shifts.
+export const llmRouterDecisionTotal = new Counter({
+  name: 'loar_llm_router_decision_total',
+  help: 'Count of routeLlmModel decisions, labelled by chosen model + reason + cost budget + quality target.',
+  labelNames: ['chosen_model', 'provider', 'reason_code', 'cost_budget', 'quality_target'] as const,
+});
+
+// Fallback hops: every time dispatchLlmWithFallback walks past the primary
+// to a fallback. Spike = provider degradation; sustained nonzero = the
+// primary is genuinely overcommitted and needs cap tuning.
+export const llmFallbackHopTotal = new Counter({
+  name: 'loar_llm_fallback_hop_total',
+  help: 'Count of fallback hops in dispatchLlmWithFallback, labelled by primary → fallback model.',
+  labelNames: ['primary_model', 'fallback_model'] as const,
+});
+
+// Provider-call failure counter — emitted on any thrown dispatch path so
+// admins can graph fail rate per provider/kind without scanning logs. The
+// reason label is coarse (paused, cap, rate_limit, timeout, auth, other) —
+// see classifyDispatchError() in dispatch.ts for the mapping.
+export const providerCallFailureTotal = new Counter({
+  name: 'loar_provider_call_failure_total',
+  help: 'Count of failed provider API calls.',
+  labelNames: ['provider', 'kind', 'model', 'reason'] as const,
+});
+
 export const platformMarginRatio = new Gauge({
   name: 'loar_platform_margin_ratio',
   help: 'Rolling gross margin: (revenueUsd - costUsd) / revenueUsd. Target >= 0.30.',

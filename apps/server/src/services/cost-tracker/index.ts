@@ -39,16 +39,22 @@ export {
   providerTokensTotal,
   platformMarginRatio,
   platformRevenueUsdTotal,
+  llmRouterDecisionTotal,
+  llmFallbackHopTotal,
+  providerCallFailureTotal,
 } from './metrics';
 
-// Controls (kill-switches + per-scope caps)
+// Controls (kill-switches + per-scope caps + per-call ceilings)
 export {
   getControls,
   setControls,
   invalidateControlsCache,
   assertProviderAllowed,
+  assertCostCeiling,
+  getPerCallCeilings,
   ProviderPausedError,
   CostCapExceededError,
+  CostCeilingExceededError,
   DEFAULT_CONTROLS,
 } from './controls';
 export type { CostControls, AssertArgs } from './controls';

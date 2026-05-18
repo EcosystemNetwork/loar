@@ -60,6 +60,28 @@ import { publishToGallery, buildGalleryDoc } from '../../lib/gallery-publish';
 import { recordAssetEventAsync } from '../../services/lineage';
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { enqueueWebhook, validateWebhookUrl } from '../../lib/webhooks';
+import { withProviderRateLimit } from '../../lib/rate-limit';
+import type { CostProvider } from '../../services/cost-tracker';
+
+/** VideoModelConfig.provider → CostProvider for the rate-limit gate. */
+function videoCostProviderFor(p: string): CostProvider {
+  switch (p) {
+    case 'openai':
+      return 'openai';
+    case 'google':
+      return 'gemini';
+    case 'bytedance':
+      return 'bytedance';
+    case 'zai':
+      return 'zai';
+    case 'minimax':
+      return 'minimax';
+    case 'fal':
+      return 'fal';
+    default:
+      return 'other';
+  }
+}
 
 const generationsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -225,6 +247,27 @@ function buildByteDanceInput(
 
 /** Dispatch video generation to the correct provider */
 export async function dispatchGeneration(
+  model: NonNullable<ReturnType<typeof getModelById>>,
+  input: z.infer<typeof generateInputSchema>,
+  resolvedCastUrls?: string[],
+  callerUid?: string,
+  callerSignal?: AbortSignal
+): Promise<{ id: string; status: string; videoUrl?: string; error?: string }> {
+  // Per-call cost ceiling — refuse a $25 4k Sora-pro call if
+  // MAX_VIDEO_CALL_USD is set to $10. Throws CostCeilingExceededError.
+  {
+    const { assertCostCeiling } = await import('../../services/cost-tracker');
+    assertCostCeiling('video_gen', model.providerCostUsd);
+  }
+
+  // Per-provider concurrency gate — wraps the entire branch so Sora's
+  // 10-min poll loop counts against the OpenAI semaphore for its full life.
+  return withProviderRateLimit(videoCostProviderFor(model.provider), () =>
+    dispatchGenerationInner(model, input, resolvedCastUrls, callerUid, callerSignal)
+  );
+}
+
+async function dispatchGenerationInner(
   model: NonNullable<ReturnType<typeof getModelById>>,
   input: z.infer<typeof generateInputSchema>,
   resolvedCastUrls?: string[],
@@ -453,6 +496,20 @@ export async function dispatchGeneration(
       withAudio: model.supportsAudio && input.audio,
       userId: callerUid,
     });
+    if (result.status === 'completed') {
+      const { recordProviderCost } = await import('../../services/cost-tracker');
+      recordProviderCost({
+        provider: 'zai',
+        model: model.id,
+        kind: 'video_gen',
+        costUsd: model.providerCostUsd,
+        extra: {
+          durationSec: input.durationSec ?? 5,
+          resolution: input.resolution === '1080p' ? '1080p' : '720p',
+          taskId: result.id,
+        },
+      }).catch((err) => console.warn('[zai] recordProviderCost failed:', (err as Error).message));
+    }
     return {
       id: result.id,
       status: result.status,
@@ -472,6 +529,22 @@ export async function dispatchGeneration(
       duration: input.durationSec,
       resolution: input.resolution === '1080p' ? '1080P' : '768P',
     });
+    if (result.status === 'completed') {
+      const { recordProviderCost } = await import('../../services/cost-tracker');
+      recordProviderCost({
+        provider: 'minimax',
+        model: model.id,
+        kind: 'video_gen',
+        costUsd: model.providerCostUsd,
+        extra: {
+          durationSec: input.durationSec ?? 6,
+          resolution: input.resolution === '1080p' ? '1080P' : '768P',
+          taskId: result.id,
+        },
+      }).catch((err) =>
+        console.warn('[minimax] recordProviderCost failed:', (err as Error).message)
+      );
+    }
     return {
       id: result.id,
       status: result.status,

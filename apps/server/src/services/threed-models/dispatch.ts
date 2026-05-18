@@ -10,7 +10,12 @@
 import { TRPCError } from '@trpc/server';
 import { resolveProviderKey } from '../../lib/byok';
 import { withProviderRateLimit } from '../../lib/rate-limit';
-import { recordProviderCost, assertProviderAllowed, type CostProvider } from '../cost-tracker';
+import {
+  recordProviderCost,
+  assertProviderAllowed,
+  assertCostCeiling,
+  type CostProvider,
+} from '../cost-tracker';
 import { getThreedModelById } from './registry';
 import type { ThreedModelConfig, ThreedTask } from './types';
 
@@ -114,6 +119,9 @@ export async function dispatchThreed(input: ThreedDispatchInput): Promise<Threed
 
   // Admin kill-switch + platform cost-cap preflight.
   await assertProviderAllowed({ provider: threedCostProviderFor(model.provider) });
+
+  // Per-call cost ceiling — refuse if MAX_THREED_CALL_USD is set and exceeded.
+  assertCostCeiling('threed_gen', model.providerCostUsd);
 
   // Per-provider concurrency gate around the actual dispatch + cost record.
   const startedAt = Date.now();

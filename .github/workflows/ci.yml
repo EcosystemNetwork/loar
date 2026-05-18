@@ -53,6 +53,24 @@ jobs:
       - name: Type check
         run: pnpm check-types
 
+      - name: Verify docs/pricing.md matches registries
+        # docs/pricing.md is generated from apps/server/src/services/*-models/
+        # registries. If a registry changes, the doc must be regenerated and
+        # committed. This step regenerates and fails if anything drifted.
+        run: |
+          pnpm docs:pricing
+          if ! git diff --exit-code -- docs/pricing.md; then
+            echo ""
+            echo "::error::docs/pricing.md is out of date."
+            echo "A model registry under apps/server/src/services/*-models/registry.ts"
+            echo "was changed without regenerating the pricing doc."
+            echo ""
+            echo "Run:    pnpm docs:pricing"
+            echo "Commit: git add docs/pricing.md && git commit"
+            exit 1
+          fi
+          echo "docs/pricing.md is in sync."
+
   build:
     name: Build
     needs: quality
@@ -236,11 +254,46 @@ jobs:
           path: apps/contracts/forge-test-output.txt
           retention-days: 14
 
+  # Hermetic model-matrix smoke — exercises every registry, dispatcher import,
+  # and adapter wiring. No external network, no provider keys, no Firestore.
+  # Catches registry-id drift, missing CostProvider entries, broken dispatcher
+  # branches, and BYOK provider gaps without burning a single API call.
+  model-matrix-smoke:
+    name: Model Matrix Smoke
+    needs: [quality]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run model-matrix smoke
+        run: pnpm smoke:matrix
+
   # Single required status check — require this in branch protection settings.
   # It only passes when every parallel job above passes.
   ci-gate:
     name: CI Gate
-    needs: [build, web, server-tests, address-registry, indexer-validate, contracts]
+    needs:
+      [
+        build,
+        web,
+        server-tests,
+        address-registry,
+        indexer-validate,
+        contracts,
+        model-matrix-smoke,
+      ]
     runs-on: ubuntu-latest
     if: always()
     steps:

@@ -42,6 +42,62 @@ export class CostCapExceededError extends Error {
   }
 }
 
+/**
+ * Single-call cost ceiling — refuses a paid request whose modeled unit cost
+ * exceeds the per-kind admin ceiling. Different from CostCapExceededError
+ * (which is *daily* aggregate spend); this gate stops a single $20 video
+ * before it leaves the building.
+ */
+export class CostCeilingExceededError extends Error {
+  readonly kind = 'ceiling';
+  constructor(
+    readonly callKind: string,
+    readonly ceilingUsd: number,
+    readonly attemptedUsd: number
+  ) {
+    super(
+      `Per-call cost ceiling exceeded for ${callKind}: $${attemptedUsd.toFixed(4)} exceeds $${ceilingUsd.toFixed(4)} ceiling`
+    );
+  }
+}
+
+/**
+ * Per-call cost ceilings — read once at boot from env. Setting any of
+ *   MAX_LLM_CALL_USD, MAX_VLM_CALL_USD, MAX_IMAGE_CALL_USD,
+ *   MAX_VIDEO_CALL_USD, MAX_AUDIO_CALL_USD, MAX_THREED_CALL_USD
+ * causes assertCostCeiling() to throw CostCeilingExceededError before the
+ * provider call goes out. Use to catch fat-fingered tier bumps, runaway
+ * duration loops, or accidental 4k requests on a budget tier.
+ */
+type CallKind = 'llm' | 'vlm' | 'image_gen' | 'video_gen' | 'audio_gen' | 'threed_gen';
+
+function envCeiling(name: string): number | null {
+  const v = Number(process.env[name] ?? '');
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+
+const PER_CALL_CEILINGS: Readonly<Record<CallKind, number | null>> = Object.freeze({
+  llm: envCeiling('MAX_LLM_CALL_USD'),
+  vlm: envCeiling('MAX_VLM_CALL_USD'),
+  image_gen: envCeiling('MAX_IMAGE_CALL_USD'),
+  video_gen: envCeiling('MAX_VIDEO_CALL_USD'),
+  audio_gen: envCeiling('MAX_AUDIO_CALL_USD'),
+  threed_gen: envCeiling('MAX_THREED_CALL_USD'),
+});
+
+export function assertCostCeiling(callKind: CallKind, attemptedUsd: number): void {
+  const ceiling = PER_CALL_CEILINGS[callKind];
+  if (!ceiling) return;
+  if (!Number.isFinite(attemptedUsd) || attemptedUsd <= 0) return;
+  if (attemptedUsd > ceiling) {
+    throw new CostCeilingExceededError(callKind, ceiling, attemptedUsd);
+  }
+}
+
+export function getPerCallCeilings(): Readonly<Record<CallKind, number | null>> {
+  return PER_CALL_CEILINGS;
+}
+
 export interface CostControls {
   pausedProviders: string[];
   caps: {
@@ -180,9 +236,16 @@ function periodKeys() {
 
 async function readAggregate(scope: string, key: string): Promise<number> {
   if (!firebaseAvailable) return 0;
-  const { day } = periodKeys();
-  const doc = await db.collection('costAggregates').doc(`${day}__${scope}__${key}`).get();
-  return Number(doc.data()?.costUsd ?? 0);
+  try {
+    const { day } = periodKeys();
+    const doc = await db.collection('costAggregates').doc(`${day}__${scope}__${key}`).get();
+    return Number(doc.data()?.costUsd ?? 0);
+  } catch (err) {
+    // Fail-open: caps are advisory — never block a paid call because the
+    // aggregate read transiently failed. The kill-switch is the hard gate.
+    console.warn('[cost-controls] readAggregate failed, allowing call:', (err as Error).message);
+    return 0;
+  }
 }
 
 export interface AssertArgs {

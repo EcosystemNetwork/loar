@@ -26,6 +26,12 @@ export type CostProvider =
   | 'firebase_storage'
   | 'stripe_fee'
   | 'unstoppable_domains'
+  | 'groq'
+  | 'zai'
+  | 'assemblyai'
+  | 'deepgram'
+  | 'tripo'
+  | 'minimax'
   | 'other';
 
 export type CostKind =

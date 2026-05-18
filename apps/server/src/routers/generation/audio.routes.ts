@@ -239,6 +239,19 @@ export const audioRouter = router({
       const credits = toCredits(providerCost, fiatMargin);
       const model = getModelById(modelId)!;
 
+      // Per-call cost ceiling — refuse if MAX_AUDIO_CALL_USD is exceeded.
+      // ElevenLabs Music scales by duration; the recorded cost is also scaled
+      // post-call (see line 373), so apply the same multiplier here.
+      {
+        const referenceDurationSec = model.provider === 'elevenlabs' ? 60 : 1;
+        const scaledCost =
+          model.provider === 'elevenlabs'
+            ? providerCost * ((input.durationSec ?? 30) / referenceDurationSec)
+            : providerCost;
+        const { assertCostCeiling } = await import('../../services/cost-tracker');
+        assertCostCeiling('audio_gen', scaledCost);
+      }
+
       // Save initial record
       await audioGenerationsCol()
         .doc(genId)
@@ -289,63 +302,77 @@ export const audioRouter = router({
             if (input.style) fullPrompt = `${input.style} style. ${fullPrompt}`;
 
             const { resolveProviderKey } = await import('../../lib/byok');
-            let audioBuffer: Buffer;
-
-            if (model.provider === 'google') {
-              const googleKey = await resolveProviderKey(ctx.user.uid, 'google');
-              if (!googleKey) {
-                throw new Error('GOOGLE_API_KEY is not configured — set one in /settings/api-keys');
-              }
-              const { lyriaGenerate } = await import('../../services/gemini');
-              const lyria = await lyriaGenerate({
-                apiKey: googleKey,
-                model: model.googleModelId ?? 'lyria-3-clip-preview',
-                prompt: fullPrompt,
-              });
-              audioBuffer = lyria.audioBuffer;
-            } else if (model.provider === 'elevenlabs') {
-              const elevenKey = await resolveProviderKey(ctx.user.uid, 'elevenlabs');
-              if (!elevenKey) {
-                throw new Error(
-                  'ELEVENLABS_API_KEY is not configured — set one in /settings/api-keys'
-                );
-              }
-              const { elevenLabsService } = await import('../../services/elevenlabs');
-              if (input.mode === 'text_to_sound') {
-                const sfx = await elevenLabsService.soundEffect({
-                  text: fullPrompt,
-                  durationSeconds: Math.min(Math.max(input.durationSec ?? 5, 0.5), 22),
-                  apiKey: elevenKey,
-                });
-                audioBuffer = sfx.audioBuffer;
-              } else {
-                const music = await elevenLabsService.composeMusic({
+            const { withProviderRateLimit } = await import('../../lib/rate-limit');
+            const audioRateProvider =
+              model.provider === 'google'
+                ? 'gemini'
+                : model.provider === 'elevenlabs'
+                  ? 'elevenlabs'
+                  : 'fal';
+            // Per-provider concurrency gate around the actual API call.
+            const audioBuffer: Buffer = await withProviderRateLimit(
+              audioRateProvider,
+              async (): Promise<Buffer> => {
+                if (model.provider === 'google') {
+                  const googleKey = await resolveProviderKey(ctx.user.uid, 'google');
+                  if (!googleKey) {
+                    throw new Error(
+                      'GOOGLE_API_KEY is not configured — set one in /settings/api-keys'
+                    );
+                  }
+                  const { lyriaGenerate } = await import('../../services/gemini');
+                  const lyria = await lyriaGenerate({
+                    apiKey: googleKey,
+                    model: model.googleModelId ?? 'lyria-3-clip-preview',
+                    prompt: fullPrompt,
+                  });
+                  return lyria.audioBuffer;
+                }
+                if (model.provider === 'elevenlabs') {
+                  const elevenKey = await resolveProviderKey(ctx.user.uid, 'elevenlabs');
+                  if (!elevenKey) {
+                    throw new Error(
+                      'ELEVENLABS_API_KEY is not configured — set one in /settings/api-keys'
+                    );
+                  }
+                  const { elevenLabsService } = await import('../../services/elevenlabs');
+                  if (input.mode === 'text_to_sound') {
+                    const sfx = await elevenLabsService.soundEffect({
+                      text: fullPrompt,
+                      durationSeconds: Math.min(Math.max(input.durationSec ?? 5, 0.5), 22),
+                      apiKey: elevenKey,
+                    });
+                    return sfx.audioBuffer;
+                  }
+                  const music = await elevenLabsService.composeMusic({
+                    prompt: fullPrompt,
+                    musicLengthMs: Math.min(
+                      Math.max((input.durationSec ?? 30) * 1000, 3000),
+                      600_000
+                    ),
+                    apiKey: elevenKey,
+                  });
+                  return music.audioBuffer;
+                }
+                // Default: FAL
+                const falModelId = toFalModel(modelId);
+                const apiKey = await resolveProviderKey(ctx.user.uid, 'fal');
+                const result = await falService.generateAudio({
                   prompt: fullPrompt,
-                  musicLengthMs: Math.min(
-                    Math.max((input.durationSec ?? 30) * 1000, 3000),
-                    600_000
-                  ),
-                  apiKey: elevenKey,
+                  model: falModelId as any,
+                  durationSec: input.durationSec,
+                  apiKey,
                 });
-                audioBuffer = music.audioBuffer;
+                if (result.status === 'failed' || !result.audioUrl) {
+                  throw new Error(result.error || 'Audio generation failed — no audio returned');
+                }
+                const audioRes = await fetch(result.audioUrl);
+                if (!audioRes.ok) {
+                  throw new Error('Failed to download generated audio from provider');
+                }
+                return Buffer.from(await audioRes.arrayBuffer());
               }
-            } else {
-              // Default: FAL
-              const falModelId = toFalModel(modelId);
-              const apiKey = await resolveProviderKey(ctx.user.uid, 'fal');
-              const result = await falService.generateAudio({
-                prompt: fullPrompt,
-                model: falModelId as any,
-                durationSec: input.durationSec,
-                apiKey,
-              });
-              if (result.status === 'failed' || !result.audioUrl) {
-                throw new Error(result.error || 'Audio generation failed — no audio returned');
-              }
-              const audioRes = await fetch(result.audioUrl);
-              if (!audioRes.ok) throw new Error('Failed to download generated audio from provider');
-              audioBuffer = Buffer.from(await audioRes.arrayBuffer());
-            }
+            );
 
             const filename = `music-${genId}.mp3`;
             const permanentUrl = await uploadAudio(audioBuffer, filename);

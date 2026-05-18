@@ -16,7 +16,12 @@ import { resolveProviderKey } from '../../lib/byok';
 import { redactSecrets } from '../../lib/redact-secrets';
 import { withProviderRateLimit } from '../../lib/rate-limit';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
-import { recordProviderCost, assertProviderAllowed, type CostProvider } from '../cost-tracker';
+import {
+  recordProviderCost,
+  assertProviderAllowed,
+  assertCostCeiling,
+  type CostProvider,
+} from '../cost-tracker';
 import { getTtsModelById } from './registry';
 import type { TtsModelConfig } from './types';
 
@@ -151,8 +156,11 @@ export async function dispatchTts(input: TtsDispatchInput): Promise<TtsDispatchR
   // CostCapExceededError before we burn a real call.
   await assertProviderAllowed({ provider: ttsCostProviderFor(model.provider) });
 
-  // Per-provider concurrency gate.
+  // Per-call cost ceiling — refuse if MAX_AUDIO_CALL_USD is set and exceeded.
   const charCount = sanitized.text.length;
+  assertCostCeiling('audio_gen', computeTtsCostUsd(model, charCount));
+
+  // Per-provider concurrency gate.
   const startedAt = Date.now();
   const result = await withProviderRateLimit(ttsCostProviderFor(model.provider), () =>
     dispatchTtsInner(model, sanitized)

@@ -54,7 +54,26 @@ import type { ImageGenerationRecord, ImageModelConfig } from '../../services/ima
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { buildGenerationContext } from '../../services/wiki-context';
 import { recordProviderCost, type CostProvider } from '../../services/cost-tracker';
+import { withProviderRateLimit } from '../../lib/rate-limit';
 import { publishToGallery } from '../../lib/gallery-publish';
+
+/** ImageModelConfig.provider → CostProvider for the rate-limit + ledger. */
+function imageCostProviderFor(p: ImageModelConfig['provider']): CostProvider {
+  switch (p) {
+    case 'fal':
+      return 'fal';
+    case 'bytedance':
+      return 'bytedance';
+    case 'google':
+      return 'gemini';
+    case 'openai':
+      return 'openai';
+    case 'zai':
+      return 'zai';
+    case 'comfyui':
+      return 'other';
+  }
+}
 
 /**
  * Atomically deduct `cost` credits from `userCredits/{uid}.balance`.
@@ -247,8 +266,22 @@ interface DispatchResult {
  * Single dispatch path for all image providers. For Google, base64 results
  * are uploaded to permanent storage synchronously so the return value is a
  * URL just like FAL/ByteDance.
+ *
+ * Wrapped in withProviderRateLimit so concurrent generations from a single
+ * user (or N users sharing one platform key) queue at the per-provider cap
+ * instead of stampeding the upstream API.
  */
 async function dispatchImageGen(
+  model: ImageModelConfig,
+  input: z.infer<typeof generateSchema>,
+  ctx: { userId: string; generationId: string }
+): Promise<DispatchResult> {
+  return withProviderRateLimit(imageCostProviderFor(model.provider), () =>
+    dispatchImageGenInner(model, input, ctx)
+  );
+}
+
+async function dispatchImageGenInner(
   model: ImageModelConfig,
   input: z.infer<typeof generateSchema>,
   ctx: { userId: string; generationId: string }
@@ -933,6 +966,14 @@ export const imageRouter = router({
           throw new TRPCError({ code: 'PRECONDITION_FAILED', message });
         }
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message });
+      }
+
+      // ── Per-call cost ceiling ────────────────────────────────────────
+      // Refuse a $50 batch (e.g. 20× nano-banana 2 at $2.50 ea) when
+      // MAX_IMAGE_CALL_USD is set lower. Catches fat-fingered numImages.
+      {
+        const { assertCostCeiling } = await import('../../services/cost-tracker');
+        assertCostCeiling('image_gen', totalProvider);
       }
 
       // ── Generate ─────────────────────────────────────────────────────
