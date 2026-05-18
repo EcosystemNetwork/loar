@@ -11,6 +11,7 @@ import { TRPCError } from '@trpc/server';
 import { resolveProviderKey } from '../../lib/byok';
 import { withProviderRateLimit } from '../../lib/rate-limit';
 import { redactSecrets } from '../../lib/redact-secrets';
+import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { getLlmModelById } from './registry';
 import type { LlmModelConfig } from './types';
 import {
@@ -160,6 +161,24 @@ export async function dispatchLlm(input: LlmDispatchInput): Promise<LlmDispatchR
       message: `LLM model ${model.id} is disabled`,
     });
   }
+
+  // Centralized prompt-injection sanitization. Direct callers (canon-check,
+  // wikia, future internal callers) inherit the defense without each
+  // having to remember `sanitizePrompt` at their own entry point.
+  input = {
+    ...input,
+    messages: input.messages.map((m) => {
+      if (typeof m.content === 'string') {
+        return { ...m, content: sanitizePrompt(m.content) };
+      }
+      return {
+        ...m,
+        content: m.content.map((c) =>
+          c.type === 'text' ? { ...c, text: sanitizePrompt(c.text) } : c
+        ),
+      };
+    }),
+  };
 
   // Vision capability gate — if any message carries image_url parts and the
   // chosen model lacks 'vision', fail fast with an actionable error instead

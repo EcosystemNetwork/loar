@@ -14,8 +14,60 @@
 import { TRPCError } from '@trpc/server';
 import { resolveProviderKey } from '../../lib/byok';
 import { redactSecrets } from '../../lib/redact-secrets';
+import { withProviderRateLimit } from '../../lib/rate-limit';
+import { sanitizePrompt } from '../../lib/prompt-sanitize';
+import { recordProviderCost, assertProviderAllowed, type CostProvider } from '../cost-tracker';
 import { getTtsModelById } from './registry';
 import type { TtsModelConfig } from './types';
+
+/** TtsModelConfig.provider → CostProvider for the ledger. */
+function ttsCostProviderFor(p: TtsModelConfig['provider']): CostProvider {
+  switch (p) {
+    case 'openai':
+      return 'openai';
+    case 'google':
+      return 'gemini';
+    case 'zai':
+      return 'zai';
+    case 'bytedance':
+      return 'bytedance';
+    case 'groq':
+      return 'groq';
+    case 'elevenlabs':
+      return 'elevenlabs';
+    case 'deepgram':
+      return 'deepgram';
+    case 'fal':
+      return 'fal';
+  }
+}
+
+/**
+ * Cost in USD for a TTS call. TTS providers all bill per character (some
+ * per million chars, some per 1k chars) — both flavours map cleanly to
+ * `providerCostUsdPerMillionChars`.
+ */
+function computeTtsCostUsd(model: TtsModelConfig, charCount: number): number {
+  return (charCount / 1_000_000) * model.providerCostUsdPerMillionChars;
+}
+
+async function recordTtsDispatchCost(
+  model: TtsModelConfig,
+  charCount: number,
+  latencyMs?: number
+): Promise<void> {
+  if (charCount === 0) return;
+  const costUsd = computeTtsCostUsd(model, charCount);
+  await recordProviderCost({
+    provider: ttsCostProviderFor(model.provider),
+    model: model.id,
+    kind: 'audio_gen',
+    costUsd,
+    extra: { tts: true, chars: charCount, latencyMs: latencyMs ?? null },
+  }).catch((err) => {
+    console.warn('[tts-dispatch] cost record failed:', (err as Error).message);
+  });
+}
 
 export interface TtsDispatchInput {
   modelId: string;
@@ -85,6 +137,34 @@ export async function dispatchTts(input: TtsDispatchInput): Promise<TtsDispatchR
     });
   }
 
+  // Centralized prompt-injection sanitization — direct callers bypassing
+  // the tts.routes wrapper are still defended. Mirrors the dispatchLlm
+  // pattern. `instructions` is steerable for gpt-4o-mini-tts / Gemini TTS,
+  // so voice-cloning impersonation attempts hit the same filter.
+  const sanitized: TtsDispatchInput = {
+    ...input,
+    text: sanitizePrompt(input.text),
+    instructions: input.instructions ? sanitizePrompt(input.instructions) : undefined,
+  };
+
+  // Kill-switch + platform cost-cap preflight. Throws ProviderPausedError /
+  // CostCapExceededError before we burn a real call.
+  await assertProviderAllowed({ provider: ttsCostProviderFor(model.provider) });
+
+  // Per-provider concurrency gate.
+  const charCount = sanitized.text.length;
+  const startedAt = Date.now();
+  const result = await withProviderRateLimit(ttsCostProviderFor(model.provider), () =>
+    dispatchTtsInner(model, sanitized)
+  );
+  await recordTtsDispatchCost(model, charCount, Date.now() - startedAt);
+  return result;
+}
+
+async function dispatchTtsInner(
+  model: TtsModelConfig,
+  input: TtsDispatchInput
+): Promise<TtsDispatchResult> {
   const format = input.format ?? 'mp3';
 
   // ── ElevenLabs ─────────────────────────────────────────────────────

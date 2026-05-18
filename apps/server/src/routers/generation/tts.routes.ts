@@ -8,13 +8,22 @@
  * users can pick OpenAI gpt-4o-mini-tts, Deepgram Aura-2, Doubao
  * Seed-TTS, Z.AI GLM-TTS, etc., not just ElevenLabs.
  */
-import { router, protectedProcedure, publicProcedure, requirePermission } from '../../lib/trpc';
+import { router, publicProcedure, expensiveProcedure, requirePermission } from '../../lib/trpc';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { firebaseStorageService } from '../../services/firebase-storage';
 import { dispatchTts, getVisibleTtsModels, getTtsModelById } from '../../services/tts-models';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
+import { withReservation } from '../../services/credits';
 import { TRPCError } from '@trpc/server';
+
+export interface TtsSynthesizeOutput {
+  modelId: string;
+  provider: string;
+  contentType: string;
+  url: string | null;
+  audioBase64: string | null;
+}
 
 async function uploadAudio(buffer: Buffer, filename: string): Promise<string> {
   const key = await firebaseStorageService.upload(buffer, filename);
@@ -75,43 +84,74 @@ export const ttsRouter = router({
   }),
 
   // ── Synthesize ────────────────────────────────────────────────────
-  synthesize: protectedProcedure
+  synthesize: expensiveProcedure
     .use(requirePermission('generation.audio'))
     .input(synthesizeSchema)
     .mutation(async ({ input, ctx }) => {
       const text = sanitizePrompt(input.text);
-      const result = await dispatchTts({
-        modelId: input.modelId,
-        text,
-        voiceId: input.voiceId,
-        instructions: input.instructions,
-        language: input.language,
-        format: input.format,
-        userId: ctx.user.uid,
-      });
-
-      if (!input.persist) {
-        // Return raw base64 — caller handles persistence (preview flows, etc.)
-        return {
-          modelId: result.modelId,
-          provider: result.provider,
-          contentType: result.contentType,
-          audioBase64: result.audioBuffer.toString('base64'),
-          url: null,
-        };
+      const model = getTtsModelById(input.modelId);
+      if (!model) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: `Unknown TTS model: ${input.modelId}` });
+      }
+      if (!model.isEnabled) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `TTS model is disabled: ${input.modelId}`,
+        });
       }
 
-      const ext = input.format === 'wav' ? 'wav' : input.format === 'opus' ? 'opus' : 'mp3';
-      const url = await uploadAudio(
-        result.audioBuffer,
-        `tts/${ctx.user.uid}/${randomUUID()}.${ext}`
+      // Reserve credits by character count (TTS providers all bill per char).
+      // `creditCostPer1kChars` lives on the registry row; charged via withReservation.
+      const kchars = Math.max(1, Math.ceil(text.length / 1000));
+      const estimatedCredits = kchars * model.creditCostPer1kChars;
+
+      return await withReservation(
+        {
+          userId: ctx.user.uid,
+          modelId: model.id,
+          provider: model.provider,
+          estimatedCredits,
+          byok: false,
+          meta: {
+            chars: text.length,
+            format: input.format,
+            persist: input.persist,
+          },
+        },
+        async (): Promise<{ result: TtsSynthesizeOutput; actualCredits: number }> => {
+          const result = await dispatchTts({
+            modelId: input.modelId,
+            text,
+            voiceId: input.voiceId,
+            instructions: input.instructions,
+            language: input.language,
+            format: input.format,
+            userId: ctx.user.uid,
+          });
+
+          let url: string | null = null;
+          let audioBase64: string | null = null;
+          if (input.persist) {
+            const ext = input.format === 'wav' ? 'wav' : input.format === 'opus' ? 'opus' : 'mp3';
+            url = await uploadAudio(
+              result.audioBuffer,
+              `tts/${ctx.user.uid}/${randomUUID()}.${ext}`
+            );
+          } else {
+            audioBase64 = result.audioBuffer.toString('base64');
+          }
+
+          return {
+            result: {
+              modelId: result.modelId,
+              provider: result.provider,
+              contentType: result.contentType,
+              url,
+              audioBase64,
+            },
+            actualCredits: estimatedCredits,
+          };
+        }
       );
-      return {
-        modelId: result.modelId,
-        provider: result.provider,
-        contentType: result.contentType,
-        url,
-        audioBase64: null,
-      };
     }),
 });

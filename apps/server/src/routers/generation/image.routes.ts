@@ -53,6 +53,7 @@ import { signWithProvenance } from '../../services/provenance';
 import type { ImageGenerationRecord, ImageModelConfig } from '../../services/image-models/types';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { buildGenerationContext } from '../../services/wiki-context';
+import { recordProviderCost, type CostProvider } from '../../services/cost-tracker';
 import { publishToGallery } from '../../lib/gallery-publish';
 
 /**
@@ -1065,6 +1066,39 @@ export const imageRouter = router({
         } catch (err: any) {
           console.error('[image] quest tracking failed:', err.message);
         }
+
+        // Record platform-side cost in the central ledger. Per-returned
+        // image (not per-requested) so safety-filtered drops don't
+        // over-attribute. The credit-billing path still uses the
+        // pre-computed `totalCredits` (refunded on full failure above).
+        const actualReturned = imageUrls.length;
+        const actualProviderUsd = model.providerCostUsd * actualReturned;
+        const costProvider: CostProvider =
+          model.provider === 'google'
+            ? 'gemini'
+            : model.provider === 'openai'
+              ? 'openai'
+              : model.provider === 'bytedance'
+                ? 'bytedance'
+                : model.provider === 'zai'
+                  ? 'zai'
+                  : model.provider === 'fal'
+                    ? 'fal'
+                    : 'other';
+        recordProviderCost({
+          provider: costProvider,
+          model: finalModelId,
+          kind: 'image_gen',
+          costUsd: actualProviderUsd,
+          extra: {
+            generationId: genId,
+            requested: input.numImages,
+            returned: actualReturned,
+            latencyMs,
+          },
+        }).catch((err: unknown) =>
+          console.warn('[image] recordProviderCost failed:', (err as Error).message)
+        );
 
         await imageGenerationsCol().doc(genId).update({
           status: 'completed',

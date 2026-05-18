@@ -342,6 +342,25 @@ export async function dispatchGeneration(
           error: `Sora polling timed out after ${(maxAttempts * intervalMs) / 1000}s`,
         };
       }
+      // Record platform-side cost in the ledger on completion. The
+      // existing generation doc carries `providerCostUsd` for user-facing
+      // accounting; this separate call powers admin dashboards + caps.
+      if (current.status === 'completed') {
+        const { recordProviderCost } = await import('../../services/cost-tracker');
+        recordProviderCost({
+          provider: 'openai',
+          model: model.id,
+          kind: 'video_gen',
+          costUsd: model.providerCostUsd,
+          extra: {
+            durationSec: input.durationSec ?? 8,
+            resolution: input.resolution ?? '720p',
+            taskId: current.id,
+          },
+        }).catch((err) =>
+          console.warn('[sora] recordProviderCost failed:', (err as Error).message)
+        );
+      }
       return {
         id: current.id,
         status: current.status,
@@ -384,6 +403,20 @@ export async function dispatchGeneration(
         withAudio: model.supportsAudio && input.audio,
         signal: callerSignal,
       });
+      if (result.status === 'completed') {
+        const { recordProviderCost } = await import('../../services/cost-tracker');
+        recordProviderCost({
+          provider: 'gemini',
+          model: model.id,
+          kind: 'video_gen',
+          costUsd: model.providerCostUsd,
+          extra: {
+            durationSec: Math.min(input.durationSec ?? 8, 8),
+            resolution: reso,
+            taskName: result.name ?? null,
+          },
+        }).catch((err) => console.warn('[veo] recordProviderCost failed:', (err as Error).message));
+      }
       return {
         id: result.name ?? '',
         status: result.status,

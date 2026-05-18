@@ -356,6 +356,37 @@ export const audioRouter = router({
 
             trackQuests(ctx.user.uid, [{ questId: 'first_music_generation' }]);
 
+            // Record platform-side cost. ElevenLabs Music + FAL music are
+            // length-billed (per-minute on ElevenLabs; per-call on others).
+            // Scale by duration when the provider charges by duration.
+            const { recordProviderCost } = await import('../../services/cost-tracker');
+            const audioCostProvider =
+              model.provider === 'google'
+                ? 'gemini'
+                : model.provider === 'elevenlabs'
+                  ? 'elevenlabs'
+                  : 'fal';
+            // ElevenLabs Music is per-minute — scale by requested duration.
+            const isElevenMusic = model.provider === 'elevenlabs' && input.mode === 'text_to_music';
+            const referenceDurationSec = isElevenMusic ? 60 : 1; // ElevenLabs registry $/minute
+            const scaledCostUsd = isElevenMusic
+              ? model.providerCostUsd * ((input.durationSec ?? 30) / referenceDurationSec)
+              : model.providerCostUsd;
+            recordProviderCost({
+              provider: audioCostProvider,
+              model: modelId,
+              kind: 'audio_gen',
+              costUsd: scaledCostUsd,
+              extra: {
+                generationId: genId,
+                mode: input.mode,
+                durationSec: input.durationSec ?? null,
+                latencyMs,
+              },
+            }).catch((err) =>
+              console.warn('[audio] recordProviderCost failed:', (err as Error).message)
+            );
+
             await audioGenerationsCol().doc(genId).update({
               status: 'completed',
               audioUrl: permanentUrl,

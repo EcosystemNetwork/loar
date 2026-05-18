@@ -9,8 +9,34 @@
  */
 import { TRPCError } from '@trpc/server';
 import { resolveProviderKey } from '../../lib/byok';
+import { withProviderRateLimit } from '../../lib/rate-limit';
+import { recordProviderCost, assertProviderAllowed, type CostProvider } from '../cost-tracker';
 import { getThreedModelById } from './registry';
 import type { ThreedModelConfig, ThreedTask } from './types';
+
+function threedCostProviderFor(p: ThreedModelConfig['provider']): CostProvider {
+  switch (p) {
+    case 'meshy':
+      return 'meshy';
+    case 'fal':
+      return 'fal';
+  }
+}
+
+async function recordThreedDispatchCost(
+  model: ThreedModelConfig,
+  latencyMs?: number
+): Promise<void> {
+  await recordProviderCost({
+    provider: threedCostProviderFor(model.provider),
+    model: model.id,
+    kind: 'threed_gen',
+    costUsd: model.providerCostUsd,
+    extra: { task: model.task, latencyMs: latencyMs ?? null },
+  }).catch((err) => {
+    console.warn('[threed-dispatch] cost record failed:', (err as Error).message);
+  });
+}
 
 export interface ThreedDispatchInput {
   modelId: string;
@@ -86,6 +112,22 @@ export async function dispatchThreed(input: ThreedDispatchInput): Promise<Threed
     });
   }
 
+  // Admin kill-switch + platform cost-cap preflight.
+  await assertProviderAllowed({ provider: threedCostProviderFor(model.provider) });
+
+  // Per-provider concurrency gate around the actual dispatch + cost record.
+  const startedAt = Date.now();
+  const result = await withProviderRateLimit(threedCostProviderFor(model.provider), () =>
+    dispatchThreedInner(model, input)
+  );
+  await recordThreedDispatchCost(model, Date.now() - startedAt);
+  return result;
+}
+
+async function dispatchThreedInner(
+  model: NonNullable<ReturnType<typeof getThreedModelById>>,
+  input: ThreedDispatchInput
+): Promise<ThreedDispatchResult> {
   // ── Meshy ──────────────────────────────────────────────────────────
   if (model.provider === 'meshy') {
     const apiKey = await resolveProviderKey(input.userId ?? null, 'meshy');
