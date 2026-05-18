@@ -370,6 +370,12 @@ class ElevenLabsService {
 
   async composeMusic(options: MusicComposeOptions): Promise<MusicResult> {
     const apiKey = this.resolveKey(options.apiKey);
+    // `prompt` and `compositionPlan` are mutually exclusive per ElevenLabs
+    // — `compositionPlan` accepts section-level structure, `prompt` is the
+    // simple mode. Reject up-front instead of silently dropping one.
+    if (options.prompt && options.compositionPlan) {
+      throw new Error('composeMusic: prompt and compositionPlan are mutually exclusive');
+    }
     const body: Record<string, unknown> = {};
     if (options.prompt) {
       body.prompt = options.prompt;

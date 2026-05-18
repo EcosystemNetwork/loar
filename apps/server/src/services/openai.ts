@@ -24,15 +24,28 @@ const BASE_URL = 'https://api.openai.com/v1';
 
 // ── Common ──────────────────────────────────────────────────────────────
 
+/**
+ * Every method on `openAIService` REQUIRES an explicit `apiKey`. There is
+ * no `process.env.OPENAI_API_KEY` fallback — callers must route through
+ * `resolveProviderKey(userId, 'openai')` (or `provider-keys`'s richer
+ * dispatcher) so BYOK lookup runs and the server-pool key only resolves
+ * via that audited path.
+ *
+ * Auditor note (M5): allowing an env fallback here let any internal
+ * caller (workers, maintenance scripts) silently spend the platform key
+ * with no metering — closed by making the option required.
+ */
 export interface OpenAICallOptions {
-  /** If set, this single API key is used (no env fallback). */
-  apiKey?: string;
+  /** Required — user-supplied BYOK key or server-pool key from `resolveProviderKey`. */
+  apiKey: string;
 }
 
 function resolveKey(opts: OpenAICallOptions): string {
-  const key = opts.apiKey ?? process.env.OPENAI_API_KEY?.trim();
+  const key = opts.apiKey?.trim();
   if (!key) {
-    throw new Error('OpenAI API key missing — set OPENAI_API_KEY or pass apiKey for BYOK');
+    throw new Error(
+      'OpenAI API key missing — resolveProviderKey(userId, "openai") and pass the result as apiKey'
+    );
   }
   return key;
 }
@@ -577,7 +590,7 @@ class OpenAIService {
     >;
     prompt: string;
     imageUrls: string[];
-    apiKey?: string;
+    apiKey: string;
     maxTokens?: number;
     jsonMode?: boolean;
     responseSchema?: Record<string, unknown>;
@@ -643,7 +656,7 @@ class OpenAIService {
     };
   }
 
-  async getSoraTask(taskId: string, apiKey?: string): Promise<SoraTask> {
+  async getSoraTask(taskId: string, apiKey: string): Promise<SoraTask> {
     const key = resolveKey({ apiKey });
     interface SoraGetResp {
       id: string;

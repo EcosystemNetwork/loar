@@ -235,6 +235,16 @@ export async function dispatchThreed(input: ThreedDispatchInput): Promise<Threed
             thumbnailUrl: task.thumbnailUrl ?? task.thumbnail_url,
           };
         }
+        default: {
+          // Exhaustiveness guard — if a new ThreedTask is added without a
+          // case here, TS will complain at compile-time (the `never` cast)
+          // and the runtime will throw instead of silently returning undefined.
+          const _exhaustive: never = model.task;
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Unhandled 3D task: ${String(_exhaustive)}`,
+          });
+        }
       }
     } catch (err) {
       return {

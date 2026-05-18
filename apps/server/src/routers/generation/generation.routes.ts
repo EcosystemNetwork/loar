@@ -300,7 +300,9 @@ export async function dispatchGeneration(
         prompt: input.prompt,
         durationSec: input.durationSec ?? 8,
         resolution: input.resolution === '1080p' ? '1080p' : '720p',
-        aspectRatio: (input.aspectRatio as '16:9' | '9:16' | undefined) ?? '16:9',
+        // Sora 2 only accepts 16:9 / 9:16 — coerce anything else (1:1, 4:3, etc)
+        // to 16:9 instead of force-casting and getting a 400.
+        aspectRatio: input.aspectRatio === '9:16' ? '9:16' : '16:9',
       });
       // Poll up to ~10 minutes — Sora-2-Pro can take several minutes per clip.
       const maxAttempts = 60;
@@ -358,7 +360,8 @@ export async function dispatchGeneration(
         imageUrl: input.imageUrl ?? (resolvedCastUrls && resolvedCastUrls[0]) ?? undefined,
         durationSec: Math.min(input.durationSec ?? 8, 8),
         resolution: reso,
-        aspectRatio: (input.aspectRatio as '16:9' | '9:16' | undefined) ?? '16:9',
+        // Veo only supports 16:9 / 9:16 — coerce other aspect ratios.
+        aspectRatio: input.aspectRatio === '9:16' ? '9:16' : '16:9',
         withAudio: model.supportsAudio && input.audio,
       });
       return {
@@ -396,6 +399,25 @@ export async function dispatchGeneration(
       aspectRatio: (input.aspectRatio as '16:9' | '9:16' | '1:1' | undefined) ?? '16:9',
       withAudio: model.supportsAudio && input.audio,
       userId: callerUid,
+    });
+    return {
+      id: result.id,
+      status: result.status,
+      videoUrl: result.videoUrl,
+      error: result.error,
+    };
+  }
+
+  if (model.provider === 'minimax') {
+    // MiniMax Hailuo direct integration — calls api.minimax.io REST.
+    // Platform key only for v1 (BYOK can be added later via resolveProviderKey).
+    const { minimaxService } = await import('../../services/minimax');
+    const result = await minimaxService.generateVideo({
+      model: model.minimaxModelId || 'MiniMax-Hailuo-02',
+      prompt: input.prompt,
+      firstFrameImageUrl: input.imageUrl ?? (resolvedCastUrls && resolvedCastUrls[0]) ?? undefined,
+      duration: input.durationSec,
+      resolution: input.resolution === '1080p' ? '1080P' : '768P',
     });
     return {
       id: result.id,

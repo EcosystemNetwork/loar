@@ -881,6 +881,10 @@ export async function geminiChat(opts: GeminiChatOptions): Promise<GeminiChatRes
       content?: { parts?: Array<{ text?: string }> };
       finishReason?: string;
     }>;
+    promptFeedback?: {
+      blockReason?: string;
+      safetyRatings?: Array<{ category: string; probability: string; blocked?: boolean }>;
+    };
     usageMetadata?: {
       promptTokenCount?: number;
       candidatesTokenCount?: number;
@@ -888,6 +892,24 @@ export async function geminiChat(opts: GeminiChatOptions): Promise<GeminiChatRes
     };
   }
   const data = (await res.json()) as GeminiResp;
+  // Gemini frequently returns HTTP 200 with promptFeedback.blockReason and
+  // no candidates (safety / recitation / PII filters). Surface as an actionable
+  // error rather than letting the caller see an empty `text` and assume success.
+  if (data.promptFeedback?.blockReason) {
+    throw new Error(`Gemini blocked the prompt: ${data.promptFeedback.blockReason}`);
+  }
+  const finishReason = data.candidates?.[0]?.finishReason;
+  if (
+    finishReason &&
+    finishReason !== 'STOP' &&
+    finishReason !== 'MAX_TOKENS' &&
+    finishReason !== 'TOOL_CALLS' &&
+    finishReason !== 'FINISH_REASON_STOP'
+  ) {
+    throw new Error(
+      `Gemini returned no usable text (finishReason=${finishReason}) — safety, recitation, or another non-completion stop.`
+    );
+  }
   const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
   return {
     text,
@@ -896,7 +918,7 @@ export async function geminiChat(opts: GeminiChatOptions): Promise<GeminiChatRes
       completionTokens: data.usageMetadata?.candidatesTokenCount,
       totalTokens: data.usageMetadata?.totalTokenCount,
     },
-    finishReason: data.candidates?.[0]?.finishReason,
+    finishReason,
   };
 }
 
