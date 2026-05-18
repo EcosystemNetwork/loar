@@ -938,6 +938,8 @@ export interface VeoGenerateOptions {
   aspectRatio?: '16:9' | '9:16';
   /** Generate native audio (3.x only). */
   withAudio?: boolean;
+  /** Optional cancellation — propagates to both the create fetch and poll loop. */
+  signal?: AbortSignal;
 }
 
 export interface VeoTask {
@@ -1008,13 +1010,32 @@ export async function veoCreate(opts: VeoGenerateOptions): Promise<VeoTask> {
   };
 }
 
-export async function veoPoll(operationName: string, apiKey?: string): Promise<VeoTask> {
+export async function veoPoll(
+  operationName: string,
+  apiKey?: string,
+  signal?: AbortSignal
+): Promise<VeoTask> {
   const key = resolveGeminiKey(apiKey);
-  const res = await fetch(`${GEMINI_REST}/${operationName}`, {
-    method: 'GET',
-    headers: { 'x-goog-api-key': key },
-    signal: AbortSignal.timeout(30_000),
-  });
+  // Compose caller-supplied signal with our per-call 30s timeout so a
+  // cancelled tRPC request aborts the in-flight poll fetch immediately.
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(new Error('Veo poll timeout')), 30_000);
+  const onCallerAbort = () => ac.abort(signal?.reason);
+  if (signal) {
+    if (signal.aborted) ac.abort(signal.reason);
+    else signal.addEventListener('abort', onCallerAbort, { once: true });
+  }
+  let res: Response;
+  try {
+    res = await fetch(`${GEMINI_REST}/${operationName}`, {
+      method: 'GET',
+      headers: { 'x-goog-api-key': key },
+      signal: ac.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', onCallerAbort);
+  }
   if (!res.ok) {
     const err = await res.text().catch(() => '');
     throw new Error(`Veo poll ${res.status}: ${redactSecrets(err).slice(0, 500)}`);
@@ -1058,13 +1079,14 @@ export async function veoGenerate(
   if (task.status === 'failed' || task.status === 'completed') {
     return { status: task.status, videoUrl: task.videoUrl, error: task.error, name: task.name };
   }
+  const { abortableSleep } = await import('../lib/abortable-sleep');
   const maxAttempts = 60;
   const intervalMs = 10_000;
   let current = task;
   for (let i = 0; i < maxAttempts; i++) {
     if (current.status === 'completed' || current.status === 'failed') break;
-    await new Promise((r) => setTimeout(r, intervalMs));
-    current = await veoPoll(task.name, opts.apiKey);
+    await abortableSleep(intervalMs, opts.signal);
+    current = await veoPoll(task.name, opts.apiKey, opts.signal);
   }
   // If still in-progress after the wall budget, treat as failed so callers
   // don't persist an empty videoUrl as "completed".

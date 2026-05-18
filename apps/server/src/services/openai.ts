@@ -329,6 +329,29 @@ export interface ChatResult {
   finishReason: string;
 }
 
+// ── Files API ─────────────────────────────────────────────────────────
+
+export type OpenAIFilePurpose = 'vision' | 'assistants' | 'batch' | 'fine-tune' | 'evals';
+
+export interface UploadFileOptions extends OpenAICallOptions {
+  /** Image bytes (PNG/JPEG/WebP for vision; other types for other purposes). */
+  bytes: Uint8Array;
+  /** Original filename — used as `Content-Disposition` filename in multipart. */
+  filename: string;
+  /** Default `'vision'`. For Sora image-to-video reference frames. */
+  purpose?: OpenAIFilePurpose;
+  /** Override the inferred content-type. */
+  contentType?: string;
+}
+
+export interface UploadedFile {
+  id: string;
+  bytes: number;
+  purpose: OpenAIFilePurpose;
+  filename: string;
+  created_at: number;
+}
+
 // ── Video (Sora 2) — async ──────────────────────────────────────────────
 
 export type OpenAISoraModel = 'sora-2' | 'sora-2-pro';
@@ -350,6 +373,8 @@ export interface SoraGenerateOptions extends OpenAICallOptions {
    * the source frame to the Files API first and pass the returned id here.
    */
   inputReferenceFileId?: string;
+  /** Optional cancellation signal — propagated to the underlying fetch. */
+  signal?: AbortSignal;
 }
 
 export interface SoraTask {
@@ -616,6 +641,50 @@ class OpenAIService {
     });
   }
 
+  // ── Files API ──────────────────────────────────────────────────────
+  /**
+   * Upload bytes to `POST /v1/files`. Used by `uploadImageReferenceForSora`
+   * to convert an https image URL into a file_id Sora's JSON Videos API
+   * will accept as `input_reference`. The default purpose is `'vision'`.
+   */
+  async uploadFile(opts: UploadFileOptions): Promise<UploadedFile> {
+    const apiKey = resolveKey(opts);
+    const form = new FormData();
+    const ct = opts.contentType ?? 'image/png';
+    form.append('file', new Blob([opts.bytes as BlobPart], { type: ct }), opts.filename);
+    form.append('purpose', opts.purpose ?? 'vision');
+    return await postForm<UploadedFile>('/files', form, apiKey);
+  }
+
+  /**
+   * Convenience: fetch an https image URL (with SSRF guard), upload to
+   * the Files API, return the resulting file id. Sora's JSON Videos API
+   * accepts this id as `input_reference` for image-to-video.
+   */
+  async uploadImageReferenceForSora(opts: { apiKey: string; imageUrl: string }): Promise<string> {
+    const { validateUploadUrl } = await import('../lib/url-validator');
+    await validateUploadUrl(opts.imageUrl);
+    const fetched = await fetch(opts.imageUrl, { signal: AbortSignal.timeout(30_000) });
+    if (!fetched.ok) {
+      throw new Error(`Sora: failed to fetch reference image (${fetched.status})`);
+    }
+    const contentType = fetched.headers.get('content-type') ?? 'image/png';
+    const bytes = new Uint8Array(await fetched.arrayBuffer());
+    const ext = contentType.includes('jpeg')
+      ? 'jpg'
+      : contentType.includes('webp')
+        ? 'webp'
+        : 'png';
+    const uploaded = await this.uploadFile({
+      apiKey: opts.apiKey,
+      bytes,
+      filename: `sora-input.${ext}`,
+      contentType,
+      purpose: 'vision',
+    });
+    return uploaded.id;
+  }
+
   // ── Sora 2 (async, poll-based) ─────────────────────────────────────
   async createSoraTask(opts: SoraGenerateOptions): Promise<SoraTask> {
     const apiKey = resolveKey(opts);
@@ -656,7 +725,7 @@ class OpenAIService {
     };
   }
 
-  async getSoraTask(taskId: string, apiKey: string): Promise<SoraTask> {
+  async getSoraTask(taskId: string, apiKey: string, signal?: AbortSignal): Promise<SoraTask> {
     const key = resolveKey({ apiKey });
     interface SoraGetResp {
       id: string;
@@ -665,7 +734,32 @@ class OpenAIService {
       error?: string;
       model: OpenAISoraModel;
     }
-    const data = await getJson<SoraGetResp>(`/videos/${encodeURIComponent(taskId)}`, key);
+    // Inline fetch so the caller's signal composes with our per-call timeout.
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(new Error('Sora poll timeout')), 60_000);
+    const onCallerAbort = () => ac.abort(signal?.reason);
+    if (signal) {
+      if (signal.aborted) ac.abort(signal.reason);
+      else signal.addEventListener('abort', onCallerAbort, { once: true });
+    }
+    let data: SoraGetResp;
+    try {
+      const res = await fetch(`${BASE_URL}/videos/${encodeURIComponent(taskId)}`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${key}` },
+        signal: ac.signal,
+      });
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => '');
+        throw new Error(
+          `OpenAI /videos/${taskId} ${res.status}: ${redactSecrets(errBody).slice(0, 500)}`
+        );
+      }
+      data = (await res.json()) as SoraGetResp;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onCallerAbort);
+    }
     return {
       id: data.id,
       status: data.status,

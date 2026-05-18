@@ -228,7 +228,8 @@ export async function dispatchGeneration(
   model: NonNullable<ReturnType<typeof getModelById>>,
   input: z.infer<typeof generateInputSchema>,
   resolvedCastUrls?: string[],
-  callerUid?: string
+  callerUid?: string,
+  callerSignal?: AbortSignal
 ): Promise<{ id: string; status: string; videoUrl?: string; error?: string }> {
   // ── Scene Controls: Apply style preset to prompt ────────────────
   if (input.stylePreset) {
@@ -289,11 +290,25 @@ export async function dispatchGeneration(
       };
     }
     try {
-      // Note: Sora 2's JSON Videos API does NOT accept a public image URL —
-      // image-to-video requires uploading the reference frame via /v1/files
-      // first and passing the returned `file_id` as `input_reference`. Until
-      // that upload flow is wired here, we drop the imageUrl on the floor
-      // for Sora and fall through to text-to-video.
+      // Image-to-video: Sora 2's JSON Videos API does NOT accept https URLs
+      // for image references. Upload the reference frame to `/v1/files` and
+      // pass the returned id as `input_reference`. Falls back to text-to-video
+      // if the upload fails — better to ship a clip than 5xx the whole call.
+      const refImageUrl = input.imageUrl ?? (resolvedCastUrls && resolvedCastUrls[0]) ?? undefined;
+      let inputReferenceFileId: string | undefined;
+      if (refImageUrl) {
+        try {
+          inputReferenceFileId = await openAIService.uploadImageReferenceForSora({
+            apiKey: userKey,
+            imageUrl: refImageUrl,
+          });
+        } catch (err) {
+          console.warn(
+            '[sora] uploadImageReferenceForSora failed; falling back to text-to-video:',
+            err instanceof Error ? err.message : err
+          );
+        }
+      }
       const task = await openAIService.createSoraTask({
         apiKey: userKey,
         model: (model.openaiModelId as 'sora-2' | 'sora-2-pro') || 'sora-2',
@@ -303,15 +318,19 @@ export async function dispatchGeneration(
         // Sora 2 only accepts 16:9 / 9:16 — coerce anything else (1:1, 4:3, etc)
         // to 16:9 instead of force-casting and getting a 400.
         aspectRatio: input.aspectRatio === '9:16' ? '9:16' : '16:9',
+        inputReferenceFileId,
       });
       // Poll up to ~10 minutes — Sora-2-Pro can take several minutes per clip.
+      // The sleep + the inner fetch both react to `callerSignal` so a dropped
+      // tRPC request abandons the poll instead of pinning a worker for 10 min.
+      const { abortableSleep } = await import('../../lib/abortable-sleep');
       const maxAttempts = 60;
       const intervalMs = 10_000;
       let current = task;
       for (let i = 0; i < maxAttempts; i++) {
         if (current.status === 'completed' || current.status === 'failed') break;
-        await new Promise((r) => setTimeout(r, intervalMs));
-        current = await openAIService.getSoraTask(task.id, userKey);
+        await abortableSleep(intervalMs, callerSignal);
+        current = await openAIService.getSoraTask(task.id, userKey, callerSignal);
       }
       // Polling exhaustion → explicit failed so downstream doesn't persist
       // an empty videoUrl with status=in_progress as "completed".
@@ -363,6 +382,7 @@ export async function dispatchGeneration(
         // Veo only supports 16:9 / 9:16 — coerce other aspect ratios.
         aspectRatio: input.aspectRatio === '9:16' ? '9:16' : '16:9',
         withAudio: model.supportsAudio && input.audio,
+        signal: callerSignal,
       });
       return {
         id: result.name ?? '',

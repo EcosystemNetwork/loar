@@ -16,6 +16,7 @@ import type { LlmModelConfig } from './types';
 import {
   recordProviderCost,
   assertProviderAllowed,
+  llmFallbackHopTotal,
   type CostProvider,
   type CostKind,
 } from '../cost-tracker';
@@ -330,73 +331,29 @@ async function dispatchLlmInner(
         message: 'Groq key missing — set GROQ_API_KEY or BYOK',
       });
     }
-    const body: Record<string, unknown> = {
+    const { callOpenAICompatChat } = await import('./openai-compat');
+    const r = await callOpenAICompatChat({
+      baseUrl: 'https://api.groq.com/openai/v1',
+      apiKey,
       model: model.providerModelId,
       messages: input.messages,
-    };
-    if (input.temperature != null) body.temperature = input.temperature;
-    if (input.topP != null) body.top_p = input.topP;
-    if (input.maxTokens != null) body.max_tokens = input.maxTokens;
-    if (input.tools) body.tools = input.tools;
-    if (input.toolChoice) body.tool_choice = input.toolChoice;
-    if (input.jsonMode && !input.responseSchema) {
-      body.response_format = { type: 'json_object' };
-    }
-    if (input.responseSchema) {
-      body.response_format = {
-        type: 'json_schema',
-        json_schema: { name: 'response', schema: input.responseSchema, strict: true },
-      };
-    }
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(120_000),
+      temperature: input.temperature,
+      topP: input.topP,
+      maxTokens: input.maxTokens,
+      jsonMode: input.jsonMode,
+      // Groq's chat completions rejects `response_format: json_schema`
+      // — coerce to `json_object` via skipResponseSchema.
+      responseSchema: input.responseSchema,
+      skipResponseSchema: true,
+      tools: input.tools,
+      toolChoice: input.toolChoice,
+      providerLabel: 'Groq',
     });
-    if (!res.ok) {
-      const err = await res.text().catch(() => '');
-      throw new TRPCError({
-        code: 'BAD_GATEWAY',
-        message: `Groq chat ${res.status}: ${redactSecrets(err).slice(0, 200)}`,
-      });
-    }
-    interface GroqResp {
-      choices: Array<{
-        message: {
-          content: string | null;
-          tool_calls?: Array<{
-            id: string;
-            function: { name: string; arguments: string };
-          }>;
-        };
-        finish_reason: string;
-      }>;
-      usage?: {
-        prompt_tokens?: number;
-        completion_tokens?: number;
-        total_tokens?: number;
-      };
-    }
-    const data = (await res.json()) as GroqResp;
-    const choice = data.choices[0];
-    const toolCalls = choice?.message.tool_calls?.map((tc) => ({
-      id: tc.id,
-      name: tc.function.name,
-      arguments: safeJsonParse(tc.function.arguments),
-    }));
     return {
-      text: choice?.message.content ?? '',
-      toolCalls,
-      usage: {
-        promptTokens: data.usage?.prompt_tokens,
-        completionTokens: data.usage?.completion_tokens,
-        totalTokens: data.usage?.total_tokens,
-      },
-      finishReason: choice?.finish_reason,
+      text: r.text,
+      toolCalls: r.toolCalls,
+      usage: r.usage,
+      finishReason: r.finishReason,
       modelId: model.id,
       provider: model.provider,
     };
@@ -542,6 +499,7 @@ export async function dispatchLlmWithFallback(
         console.warn(
           `[llm-dispatch] primary=${input.primaryModelId} failed, succeeded on fallback=${modelId} after ${attempted.length - 1} hop(s)`
         );
+        llmFallbackHopTotal.labels(input.primaryModelId, modelId).inc();
       }
       return { ...r, attemptedModelIds: attempted };
     } catch (err) {
