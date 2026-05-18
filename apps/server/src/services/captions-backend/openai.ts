@@ -16,6 +16,7 @@
  */
 import type { CaptionSegment, CaptionWord } from '../../lib/captions-format';
 import type { CaptionBackend, CaptionBackendInput, CaptionBackendResult } from './types';
+import { validateUploadUrl } from '../../lib/url-validator';
 
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/audio/transcriptions';
 const OPENAI_MAX_BYTES = 25 * 1024 * 1024;
@@ -105,6 +106,8 @@ function buildBackend(spec: OpenAIModelSpec): CaptionBackend {
       let audioBuf: ArrayBuffer;
       let mimeType: string;
       try {
+        // SSRF guard before server-side audio fetch.
+        await validateUploadUrl(input.audioUrl);
         const audioRes = await fetch(input.audioUrl, { signal: AbortSignal.timeout(120_000) });
         if (!audioRes.ok) {
           return {
@@ -136,12 +139,18 @@ function buildBackend(spec: OpenAIModelSpec): CaptionBackend {
       const form = new FormData();
       form.append('file', new Blob([audioBuf], { type: mimeType }), 'audio');
       form.append('model', spec.openaiModelId);
-      form.append('response_format', 'verbose_json');
-      form.append('timestamp_granularities[]', 'word');
-      form.append('timestamp_granularities[]', 'segment');
-      if (input.language) form.append('language', input.language);
-      if (spec.diarize && input.numSpeakers != null) {
-        form.append('num_speakers', String(input.numSpeakers));
+      if (spec.diarize) {
+        // The diarize model rejects verbose_json + timestamp_granularities
+        // and uses chunking_strategy for audio >30s. Speaker labels arrive
+        // on segments/words by default; no per-call flag needed.
+        form.append('response_format', 'json');
+        form.append('chunking_strategy', 'auto');
+        if (input.language) form.append('language', input.language);
+      } else {
+        form.append('response_format', 'verbose_json');
+        form.append('timestamp_granularities[]', 'word');
+        form.append('timestamp_granularities[]', 'segment');
+        if (input.language) form.append('language', input.language);
       }
 
       let res: Response;

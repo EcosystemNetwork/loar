@@ -59,6 +59,7 @@ import { adminRouter } from './admin/admin.routes';
 import { portfolioRouter } from './portfolio/portfolio.routes';
 import { mediaRouter } from './media/media.routes';
 import { voiceRouter } from './generation/voice.routes';
+import { ttsRouter } from './generation/tts.routes';
 import { threedRouter } from './generation/threed.routes';
 import { audioRouter } from './generation/audio.routes';
 import { editingRouter } from './generation/editing.routes';
@@ -93,6 +94,7 @@ import { tokenSocialRouter } from './tokenSocial/tokenSocial.routes';
 import { platformSubscriptionsRouter } from './platformSubscriptions/platformSubscriptions.routes';
 import { castRouter } from './cast/cast.routes';
 import { sceneControlsRouter } from './sceneControls/sceneControls.routes';
+import { seriesArcRouter } from './seriesArc/seriesArc.routes';
 import { sceneTemplatesRouter } from './sceneTemplates/sceneTemplates.routes';
 import { cinematicReferencesRouter } from './cinematicReferences/cinematicReferences.routes';
 import { residenciesRouter } from './residencies/residencies.routes';
@@ -124,6 +126,7 @@ import { zaiRouter } from './zai/zai.routes';
 import { watchSessionsRouter } from './watchSessions/watchSessions.routes';
 import { providersRouter } from './providers/providers.routes';
 import { recommendationsRouter } from './recommendations/recommendations.routes';
+import { entitlementsRouter } from './entitlements/entitlements.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
@@ -232,6 +235,7 @@ export const appRouter = router({
   generation: generationRouter,
   image: imageRouter,
   voice: voiceRouter,
+  tts: ttsRouter,
   audio: audioRouter,
   threed: threedRouter,
   characterPipeline: characterPipelineRouter,
@@ -339,6 +343,7 @@ export const appRouter = router({
   // ── Node Editor Expansion (v1) ────────────────────────────────────
   cast: castRouter,
   sceneControls: sceneControlsRouter,
+  seriesArc: seriesArcRouter,
   sceneTemplates: sceneTemplatesRouter,
   cinematicReferences: cinematicReferencesRouter,
   residencies: residenciesRouter,
@@ -392,6 +397,9 @@ export const appRouter = router({
 
   // ── BYOK provider keys (bring-your-own-key for AI generation) ─────
   providers: providersRouter,
+
+  // ── BYOK fee-waiver entitlement ($25 unlock or admin-minted code) ──
+  entitlements: entitlementsRouter,
 
   // ── Personalized recommendations + Continue Watching ──────────────
   recommendations: recommendationsRouter,

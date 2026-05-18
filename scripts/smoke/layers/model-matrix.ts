@@ -424,6 +424,26 @@ export async function runModelMatrixLayer(): Promise<ModelMatrixLayerResult> {
     );
   }
 
+  // ── 6b. Every transcription row has a caption backend ───────────────
+  checks.push(
+    await check('every transcription row has a caption backend', async () => {
+      const { TRANSCRIPTION_MODELS } = (await import(
+        `${SERVER}/services/transcription-models/registry`
+      )) as { TRANSCRIPTION_MODELS: Array<{ id: string; isEnabled?: boolean }> };
+      const { listBackendIds } = (await import(`${SERVER}/services/captions-backend/dispatch`)) as {
+        listBackendIds: () => string[];
+      };
+      const known = new Set(listBackendIds());
+      const stranded = TRANSCRIPTION_MODELS.filter((m) => m.isEnabled !== false).filter(
+        (m) => !known.has(m.id)
+      );
+      if (stranded.length > 0) {
+        throw new Error(`stranded: ${stranded.map((r) => r.id).join(', ')}`);
+      }
+      return `${TRANSCRIPTION_MODELS.length} rows ✓`;
+    })
+  );
+
   // ── 7. Nano Banana correctness regression ──────────────────────────
   checks.push(
     await check('Nano Banana naming follows Google docs', async () => {

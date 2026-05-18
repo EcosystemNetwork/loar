@@ -156,6 +156,9 @@ export interface ImageEditOptions extends OpenAICallOptions {
 
 async function urlOrBytesToBlob(input: Uint8Array | string): Promise<Blob> {
   if (typeof input === 'string') {
+    // SSRF guard: never let a caller-supplied URL hit an internal IP / loopback.
+    const { validateUploadUrl } = await import('../lib/url-validator');
+    await validateUploadUrl(input);
     const r = await fetch(input);
     if (!r.ok) throw new Error(`Failed to fetch image source: ${r.status}`);
     return await r.blob();
@@ -320,10 +323,18 @@ export interface SoraGenerateOptions extends OpenAICallOptions {
   prompt: string;
   /** 4–25 seconds for sora-2-pro, 4–12 for sora-2. */
   durationSec?: number;
-  resolution?: '720p' | '1024p';
+  /**
+   * Sora 2 accepts `'720p' | '1080p'` (Pro adds `'1080p'` natively). Maps to
+   * an explicit pixel `size` string at request time (`1280x720` / `1920x1080`).
+   */
+  resolution?: '720p' | '1080p';
   aspectRatio?: '16:9' | '9:16';
-  /** For image-to-video: a public URL. */
-  imageUrl?: string;
+  /**
+   * For image-to-video: a file id from `/v1/files` (the JSON Videos API
+   * does not accept https URLs for image references). Callers must upload
+   * the source frame to the Files API first and pass the returned id here.
+   */
+  inputReferenceFileId?: string;
 }
 
 export interface SoraTask {
@@ -366,8 +377,13 @@ class OpenAIService {
       prompt: opts.prompt,
       n: opts.n ?? 1,
       size: opts.size ?? '1024x1024',
-      response_format: opts.responseFormat ?? 'url',
     };
+    // `response_format` is only valid for the DALL-E line; gpt-image-1*
+    // always returns b64_json and rejects the field. Gate accordingly.
+    const isDallE = opts.model.startsWith('dall-e');
+    if (isDallE) {
+      body.response_format = opts.responseFormat ?? 'url';
+    }
     if (opts.quality) body.quality = opts.quality;
     if (opts.user) body.user = opts.user;
     const data = await postJson<ImagesApiResponse>('/images/generations', body, apiKey);
@@ -429,11 +445,24 @@ class OpenAIService {
     const apiKey = resolveKey(opts);
     const form = new FormData();
     form.append('model', opts.model);
-    form.append('response_format', opts.responseFormat ?? 'verbose_json');
-    if (opts.language) form.append('language', opts.language);
-    if (opts.prompt) form.append('prompt', opts.prompt);
-    if (opts.temperature != null) form.append('temperature', String(opts.temperature));
-    if (opts.numSpeakers != null) form.append('num_speakers', String(opts.numSpeakers));
+
+    const isDiarize = opts.model === 'gpt-4o-transcribe-diarize';
+    if (isDiarize) {
+      // The diarize model rejects `prompt`, `temperature`, `num_speakers`,
+      // `timestamp_granularities[]`, and `response_format: verbose_json`.
+      // It expects `chunking_strategy=auto` for audio >30s. The optional
+      // `known_speaker_names[]` / `known_speaker_references[]` pair is not
+      // surfaced through `TranscribeOptions` yet.
+      form.append('response_format', 'json');
+      form.append('chunking_strategy', 'auto');
+      if (opts.language) form.append('language', opts.language);
+    } else {
+      form.append('response_format', opts.responseFormat ?? 'verbose_json');
+      if (opts.language) form.append('language', opts.language);
+      if (opts.prompt) form.append('prompt', opts.prompt);
+      if (opts.temperature != null) form.append('temperature', String(opts.temperature));
+      if (opts.numSpeakers != null) form.append('num_speakers', String(opts.numSpeakers));
+    }
 
     const audioBlob = await urlOrBytesToBlob(opts.audio);
     const fileName = opts.filename ?? 'audio.mp3';
@@ -575,14 +604,27 @@ class OpenAIService {
   // ── Sora 2 (async, poll-based) ─────────────────────────────────────
   async createSoraTask(opts: SoraGenerateOptions): Promise<SoraTask> {
     const apiKey = resolveKey(opts);
+    // Sora 2 expects `seconds` (string) + `size` (pixel string like
+    // "1280x720"), NOT `duration_seconds` / `resolution` / `aspect_ratio`.
+    // Image-to-video uses `input_reference` referencing a file id from
+    // `/v1/files` — public URLs are not accepted on the JSON Videos API.
+    const seconds = String(opts.durationSec ?? 8);
+    const reso = opts.resolution ?? '720p';
+    const aspect = opts.aspectRatio ?? '16:9';
+    const sizeMap: Record<string, string> = {
+      '720p:16:9': '1280x720',
+      '720p:9:16': '720x1280',
+      '1080p:16:9': '1920x1080',
+      '1080p:9:16': '1080x1920',
+    };
+    const size = sizeMap[`${reso}:${aspect}`] ?? '1280x720';
     const body: Record<string, unknown> = {
       model: opts.model,
       prompt: opts.prompt,
-      duration_seconds: opts.durationSec ?? 8,
-      resolution: opts.resolution ?? '720p',
-      aspect_ratio: opts.aspectRatio ?? '16:9',
+      seconds,
+      size,
     };
-    if (opts.imageUrl) body.image_url = opts.imageUrl;
+    if (opts.inputReferenceFileId) body.input_reference = opts.inputReferenceFileId;
     interface SoraCreateResp {
       id: string;
       status: SoraTask['status'];

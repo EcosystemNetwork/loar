@@ -289,14 +289,18 @@ export async function dispatchGeneration(
       };
     }
     try {
+      // Note: Sora 2's JSON Videos API does NOT accept a public image URL —
+      // image-to-video requires uploading the reference frame via /v1/files
+      // first and passing the returned `file_id` as `input_reference`. Until
+      // that upload flow is wired here, we drop the imageUrl on the floor
+      // for Sora and fall through to text-to-video.
       const task = await openAIService.createSoraTask({
         apiKey: userKey,
         model: (model.openaiModelId as 'sora-2' | 'sora-2-pro') || 'sora-2',
         prompt: input.prompt,
         durationSec: input.durationSec ?? 8,
-        resolution: input.resolution === '1080p' ? '1024p' : '720p',
+        resolution: input.resolution === '1080p' ? '1080p' : '720p',
         aspectRatio: (input.aspectRatio as '16:9' | '9:16' | undefined) ?? '16:9',
-        imageUrl: input.imageUrl ?? (resolvedCastUrls && resolvedCastUrls[0]) ?? undefined,
       });
       // Poll up to ~10 minutes — Sora-2-Pro can take several minutes per clip.
       const maxAttempts = 60;
@@ -306,6 +310,16 @@ export async function dispatchGeneration(
         if (current.status === 'completed' || current.status === 'failed') break;
         await new Promise((r) => setTimeout(r, intervalMs));
         current = await openAIService.getSoraTask(task.id, userKey);
+      }
+      // Polling exhaustion → explicit failed so downstream doesn't persist
+      // an empty videoUrl with status=in_progress as "completed".
+      if (current.status !== 'completed' && current.status !== 'failed') {
+        return {
+          id: current.id,
+          status: 'failed',
+          videoUrl: undefined,
+          error: `Sora polling timed out after ${(maxAttempts * intervalMs) / 1000}s`,
+        };
       }
       return {
         id: current.id,

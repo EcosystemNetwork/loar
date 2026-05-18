@@ -864,6 +864,8 @@ export async function geminiChat(opts: GeminiChatOptions): Promise<GeminiChatRes
     for (const p of m.content) {
       if (p.type === 'text' && p.text) parts.push({ text: p.text });
       if (p.type === 'image_url' && p.imageUrl) {
+        // SSRF guard: reject internal/private/blocked hosts before fetching.
+        await validateUploadUrl(p.imageUrl);
         const fetched = await fetch(p.imageUrl, { signal: AbortSignal.timeout(20_000) });
         if (!fetched.ok) throw new Error(`Failed to fetch image: ${fetched.status}`);
         const mime = fetched.headers.get('content-type') ?? 'image/png';
@@ -892,10 +894,13 @@ export async function geminiChat(opts: GeminiChatOptions): Promise<GeminiChatRes
   }
 
   const res = await fetch(
-    `${GEMINI_REST}/models/${encodeURIComponent(opts.model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    `${GEMINI_REST}/models/${encodeURIComponent(opts.model)}:generateContent`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(120_000),
     }
@@ -958,7 +963,24 @@ export interface VeoTask {
 export async function veoCreate(opts: VeoGenerateOptions): Promise<VeoTask> {
   const apiKey = resolveGeminiKey(opts.apiKey);
   const instance: Record<string, unknown> = { prompt: opts.prompt };
-  if (opts.imageUrl) instance.image = { gcsUri: opts.imageUrl };
+  // Veo on the Gemini API surface (generativelanguage.googleapis.com) only
+  // reliably accepts `bytesBase64Encoded`; the `gcsUri` variant is Vertex-only
+  // and 400s on AI-Studio-allow-listed keys. Convert https:// URLs to b64.
+  if (opts.imageUrl) {
+    if (opts.imageUrl.startsWith('gs://')) {
+      instance.image = { gcsUri: opts.imageUrl };
+    } else {
+      // SSRF guard: validate before server-side fetch.
+      await validateUploadUrl(opts.imageUrl);
+      const fetched = await fetch(opts.imageUrl, { signal: AbortSignal.timeout(30_000) });
+      if (!fetched.ok) {
+        throw new Error(`Veo: failed to fetch source image (${fetched.status})`);
+      }
+      const mime = fetched.headers.get('content-type') ?? 'image/png';
+      const buf = Buffer.from(await fetched.arrayBuffer());
+      instance.image = { bytesBase64Encoded: buf.toString('base64'), mimeType: mime };
+    }
+  }
   const parameters: Record<string, unknown> = {
     durationSeconds: opts.durationSec ?? 8,
     aspectRatio: opts.aspectRatio ?? '16:9',
@@ -968,10 +990,13 @@ export async function veoCreate(opts: VeoGenerateOptions): Promise<VeoTask> {
 
   const body = { instances: [instance], parameters };
   const res = await fetch(
-    `${GEMINI_REST}/models/${encodeURIComponent(opts.model)}:predictLongRunning?key=${encodeURIComponent(apiKey)}`,
+    `${GEMINI_REST}/models/${encodeURIComponent(opts.model)}:predictLongRunning`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(60_000),
     }
@@ -996,8 +1021,9 @@ export async function veoCreate(opts: VeoGenerateOptions): Promise<VeoTask> {
 
 export async function veoPoll(operationName: string, apiKey?: string): Promise<VeoTask> {
   const key = resolveGeminiKey(apiKey);
-  const res = await fetch(`${GEMINI_REST}/${operationName}?key=${encodeURIComponent(key)}`, {
+  const res = await fetch(`${GEMINI_REST}/${operationName}`, {
     method: 'GET',
+    headers: { 'x-goog-api-key': key },
     signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) {
@@ -1051,6 +1077,16 @@ export async function veoGenerate(
     await new Promise((r) => setTimeout(r, intervalMs));
     current = await veoPoll(task.name, opts.apiKey);
   }
+  // If still in-progress after the wall budget, treat as failed so callers
+  // don't persist an empty videoUrl as "completed".
+  if (current.status !== 'completed' && current.status !== 'failed') {
+    return {
+      status: 'failed',
+      videoUrl: undefined,
+      error: `Veo polling timed out after ${(maxAttempts * intervalMs) / 1000}s`,
+      name: current.name,
+    };
+  }
   return {
     status: current.status,
     videoUrl: current.videoUrl,
@@ -1084,30 +1120,39 @@ export async function lyriaGenerate(opts: LyriaGenerateOptions): Promise<LyriaRe
   if (opts.negativePrompt) instance.negative_prompt = opts.negativePrompt;
   if (opts.seed != null) instance.seed = opts.seed;
   const body = { instances: [instance] };
-  const res = await fetch(
-    `${GEMINI_REST}/models/${encodeURIComponent(opts.model)}:predict?key=${encodeURIComponent(apiKey)}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(180_000),
-    }
-  );
+  const res = await fetch(`${GEMINI_REST}/models/${encodeURIComponent(opts.model)}:predict`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(180_000),
+  });
   if (!res.ok) {
     const err = await res.text().catch(() => '');
     throw new Error(`Lyria predict ${res.status}: ${err.slice(0, 500)}`);
   }
+  // Lyria's documented response field is `audioContent` (base64), not
+  // `bytesBase64Encoded`. Some preview versions also return the older
+  // name — accept either.
   interface LyriaResp {
-    predictions?: Array<{ bytesBase64Encoded?: string; mimeType?: string }>;
+    predictions?: Array<{
+      audioContent?: string;
+      bytesBase64Encoded?: string;
+      mimeType?: string;
+    }>;
   }
   const data = (await res.json()) as LyriaResp;
   const pred = data.predictions?.[0];
-  if (!pred?.bytesBase64Encoded) {
+  const audioB64 = pred?.audioContent ?? pred?.bytesBase64Encoded;
+  if (!audioB64) {
     throw new Error('Lyria returned no audio payload');
   }
   return {
-    audioBuffer: Buffer.from(pred.bytesBase64Encoded, 'base64'),
-    contentType: pred.mimeType ?? 'audio/mpeg',
+    audioBuffer: Buffer.from(audioB64, 'base64'),
+    // Lyria typically returns 48 kHz WAV — default to wav when unset.
+    contentType: pred?.mimeType ?? 'audio/wav',
     model: opts.model,
   };
 }

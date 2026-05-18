@@ -97,96 +97,106 @@ function chunkWordsIntoSegments(
   return out;
 }
 
-export const groqBackend: CaptionBackend = {
-  modelId: 'whisper-large-v3-groq',
-  provider: 'groq',
-  async transcribe(input: CaptionBackendInput): Promise<CaptionBackendResult> {
-    // Pull the audio bytes server-side. The fetch hits the same URL the
-    // user provided; SSRF guard runs upstream in the caption router.
-    let audioBuf: ArrayBuffer;
-    let mimeType: string;
-    try {
-      const audioRes = await fetch(input.audioUrl, {
-        signal: AbortSignal.timeout(120_000),
-      });
-      if (!audioRes.ok) {
+function buildGroqBackend(modelId: string, groqModel: string): CaptionBackend {
+  return {
+    modelId,
+    provider: 'groq',
+    async transcribe(input: CaptionBackendInput): Promise<CaptionBackendResult> {
+      let audioBuf: ArrayBuffer;
+      let mimeType: string;
+      try {
+        const audioRes = await fetch(input.audioUrl, {
+          signal: AbortSignal.timeout(120_000),
+        });
+        if (!audioRes.ok) {
+          return {
+            status: 'failed',
+            hasWordTimings: false,
+            hasSpeakers: false,
+            error: `Audio fetch failed (${audioRes.status})`,
+          };
+        }
+        mimeType = audioRes.headers.get('content-type') ?? 'audio/mpeg';
+        audioBuf = await audioRes.arrayBuffer();
+      } catch (err) {
         return {
           status: 'failed',
           hasWordTimings: false,
           hasSpeakers: false,
-          error: `Audio fetch failed (${audioRes.status})`,
+          error: `Audio fetch failed: ${err instanceof Error ? err.message : 'network error'}`,
         };
       }
-      mimeType = audioRes.headers.get('content-type') ?? 'audio/mpeg';
-      audioBuf = await audioRes.arrayBuffer();
-    } catch (err) {
-      return {
-        status: 'failed',
-        hasWordTimings: false,
-        hasSpeakers: false,
-        error: `Audio fetch failed: ${err instanceof Error ? err.message : 'network error'}`,
-      };
-    }
-    if (audioBuf.byteLength > GROQ_MAX_BYTES) {
-      return {
-        status: 'failed',
-        hasWordTimings: false,
-        hasSpeakers: false,
-        error: `Audio too large for Groq (${(audioBuf.byteLength / 1024 / 1024).toFixed(1)} MB > 25 MB). Pick a different backend.`,
-      };
-    }
+      if (audioBuf.byteLength > GROQ_MAX_BYTES) {
+        return {
+          status: 'failed',
+          hasWordTimings: false,
+          hasSpeakers: false,
+          error: `Audio too large for Groq (${(audioBuf.byteLength / 1024 / 1024).toFixed(1)} MB > 25 MB). Pick a different backend.`,
+        };
+      }
 
-    const form = new FormData();
-    form.append('file', new Blob([audioBuf], { type: mimeType }), 'audio');
-    form.append('model', 'whisper-large-v3');
-    form.append('response_format', 'verbose_json');
-    form.append('timestamp_granularities[]', 'word');
-    form.append('timestamp_granularities[]', 'segment');
-    if (input.language) form.append('language', input.language);
+      const form = new FormData();
+      form.append('file', new Blob([audioBuf], { type: mimeType }), 'audio');
+      form.append('model', groqModel);
+      form.append('response_format', 'verbose_json');
+      form.append('timestamp_granularities[]', 'word');
+      form.append('timestamp_granularities[]', 'segment');
+      if (input.language) form.append('language', input.language);
 
-    let res: Response;
-    try {
-      res = await fetch(GROQ_ENDPOINT, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${input.apiKey}` },
-        body: form,
-        signal: AbortSignal.timeout(180_000),
-      });
-    } catch (err) {
-      return {
-        status: 'failed',
-        hasWordTimings: false,
-        hasSpeakers: false,
-        error: `Groq request failed: ${err instanceof Error ? err.message : 'network error'}`,
-      };
-    }
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      return {
-        status: 'failed',
-        hasWordTimings: false,
-        hasSpeakers: false,
-        error: `Groq rejected (${res.status}): ${text.slice(0, 200)}`,
-      };
-    }
+      let res: Response;
+      try {
+        res = await fetch(GROQ_ENDPOINT, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${input.apiKey}` },
+          body: form,
+          signal: AbortSignal.timeout(180_000),
+        });
+      } catch (err) {
+        return {
+          status: 'failed',
+          hasWordTimings: false,
+          hasSpeakers: false,
+          error: `Groq request failed: ${err instanceof Error ? err.message : 'network error'}`,
+        };
+      }
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        return {
+          status: 'failed',
+          hasWordTimings: false,
+          hasSpeakers: false,
+          error: `Groq rejected (${res.status}): ${text.slice(0, 200)}`,
+        };
+      }
 
-    const json = (await res.json()) as GroqResponse;
-    if (json.error) {
+      const json = (await res.json()) as GroqResponse;
+      if (json.error) {
+        return {
+          status: 'failed',
+          hasWordTimings: false,
+          hasSpeakers: false,
+          error: `Groq error: ${json.error.message ?? 'unknown'}`,
+        };
+      }
+      const segments = chunkWordsIntoSegments(json.words ?? [], json.segments ?? []);
       return {
-        status: 'failed',
-        hasWordTimings: false,
+        status: 'completed',
+        text: json.text,
+        segments,
+        language: json.language,
+        hasWordTimings: (json.words?.length ?? 0) > 0,
         hasSpeakers: false,
-        error: `Groq error: ${json.error.message ?? 'unknown'}`,
       };
-    }
-    const segments = chunkWordsIntoSegments(json.words ?? [], json.segments ?? []);
-    return {
-      status: 'completed',
-      text: json.text,
-      segments,
-      language: json.language,
-      hasWordTimings: (json.words?.length ?? 0) > 0,
-      hasSpeakers: false,
-    };
-  },
-};
+    },
+  };
+}
+
+export const groqBackend = buildGroqBackend('whisper-large-v3-groq', 'whisper-large-v3');
+export const groqWhisperTurboBackend = buildGroqBackend(
+  'whisper-large-v3-turbo-groq',
+  'whisper-large-v3-turbo'
+);
+export const groqDistilWhisperBackend = buildGroqBackend(
+  'distil-whisper-large-v3-en-groq',
+  'distil-whisper-large-v3-en'
+);

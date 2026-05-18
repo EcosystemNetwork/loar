@@ -98,92 +98,100 @@ function wordsToSegments(words: AAIWord[]): CaptionSegment[] {
   return segs;
 }
 
-export const assemblyAIBackend: CaptionBackend = {
-  modelId: 'universal-2-assemblyai',
-  provider: 'assemblyai',
-  async transcribe(input: CaptionBackendInput): Promise<CaptionBackendResult> {
-    const body: Record<string, unknown> = {
-      audio_url: input.audioUrl,
-      speech_model: 'universal-2',
-      punctuate: true,
-      format_text: true,
-    };
-    if (input.language) body.language_code = input.language;
-    else body.language_detection = true;
-    if (input.diarize) {
-      body.speaker_labels = true;
-      if (input.numSpeakers) body.speakers_expected = input.numSpeakers;
-    }
-    // Word-level timings are on by default for Universal-2.
-
-    let create: Response;
-    try {
-      create = await fetch(`${AAI_BASE}/transcript`, {
-        method: 'POST',
-        headers: {
-          Authorization: input.apiKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(30_000),
-      });
-    } catch (err) {
-      return {
-        status: 'failed',
-        hasWordTimings: false,
-        hasSpeakers: false,
-        error: `AssemblyAI submission failed: ${err instanceof Error ? err.message : 'network error'}`,
+/**
+ * AAI backend factory — `universal-2` is the GA tier; `slam_1` and `nano`
+ * are sibling speech_models exposed via the same endpoint.
+ */
+function buildAssemblyAIBackend(modelId: string, speechModel: string): CaptionBackend {
+  return {
+    modelId,
+    provider: 'assemblyai',
+    async transcribe(input: CaptionBackendInput): Promise<CaptionBackendResult> {
+      const body: Record<string, unknown> = {
+        audio_url: input.audioUrl,
+        speech_model: speechModel,
+        punctuate: true,
+        format_text: true,
       };
-    }
-    if (!create.ok) {
-      const errText = await create.text().catch(() => '');
-      return {
-        status: 'failed',
-        hasWordTimings: false,
-        hasSpeakers: false,
-        error: `AssemblyAI submission rejected (${create.status}): ${errText.slice(0, 200)}`,
-      };
-    }
-    const created = (await create.json()) as AAITranscript;
-
-    // Poll for completion.
-    for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
-      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-      const pollRes = await fetch(`${AAI_BASE}/transcript/${created.id}`, {
-        headers: { Authorization: input.apiKey },
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (!pollRes.ok) continue;
-      const t = (await pollRes.json()) as AAITranscript;
-      if (t.status === 'completed') {
-        const segments =
-          t.utterances && t.utterances.length > 0
-            ? t.utterances.map(utteranceToSegment)
-            : wordsToSegments(t.words ?? []);
-        return {
-          status: 'completed',
-          text: t.text,
-          segments,
-          language: t.language_code,
-          hasWordTimings: (t.words?.length ?? 0) > 0,
-          hasSpeakers: !!(t.utterances && t.utterances.length > 0),
-        };
+      if (input.language) body.language_code = input.language;
+      else body.language_detection = true;
+      if (input.diarize) {
+        body.speaker_labels = true;
+        if (input.numSpeakers) body.speakers_expected = input.numSpeakers;
       }
-      if (t.status === 'error') {
+
+      let create: Response;
+      try {
+        create = await fetch(`${AAI_BASE}/transcript`, {
+          method: 'POST',
+          headers: {
+            Authorization: input.apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(30_000),
+        });
+      } catch (err) {
         return {
           status: 'failed',
           hasWordTimings: false,
           hasSpeakers: false,
-          error: `AssemblyAI: ${t.error ?? 'unknown error'}`,
+          error: `AssemblyAI submission failed: ${err instanceof Error ? err.message : 'network error'}`,
         };
       }
-    }
+      if (!create.ok) {
+        const errText = await create.text().catch(() => '');
+        return {
+          status: 'failed',
+          hasWordTimings: false,
+          hasSpeakers: false,
+          error: `AssemblyAI submission rejected (${create.status}): ${errText.slice(0, 200)}`,
+        };
+      }
+      const created = (await create.json()) as AAITranscript;
 
-    return {
-      status: 'failed',
-      hasWordTimings: false,
-      hasSpeakers: false,
-      error: 'AssemblyAI: polling exceeded 3 minutes — try shorter audio',
-    };
-  },
-};
+      for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        const pollRes = await fetch(`${AAI_BASE}/transcript/${created.id}`, {
+          headers: { Authorization: input.apiKey },
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (!pollRes.ok) continue;
+        const t = (await pollRes.json()) as AAITranscript;
+        if (t.status === 'completed') {
+          const segments =
+            t.utterances && t.utterances.length > 0
+              ? t.utterances.map(utteranceToSegment)
+              : wordsToSegments(t.words ?? []);
+          return {
+            status: 'completed',
+            text: t.text,
+            segments,
+            language: t.language_code,
+            hasWordTimings: (t.words?.length ?? 0) > 0,
+            hasSpeakers: !!(t.utterances && t.utterances.length > 0),
+          };
+        }
+        if (t.status === 'error') {
+          return {
+            status: 'failed',
+            hasWordTimings: false,
+            hasSpeakers: false,
+            error: `AssemblyAI: ${t.error ?? 'unknown error'}`,
+          };
+        }
+      }
+
+      return {
+        status: 'failed',
+        hasWordTimings: false,
+        hasSpeakers: false,
+        error: 'AssemblyAI: polling exceeded 3 minutes — try shorter audio',
+      };
+    },
+  };
+}
+
+export const assemblyAIBackend = buildAssemblyAIBackend('universal-2-assemblyai', 'universal-2');
+export const assemblyAISlam1Backend = buildAssemblyAIBackend('slam-1-assemblyai', 'slam_1');
+export const assemblyAINanoBackend = buildAssemblyAIBackend('nano-assemblyai', 'nano');

@@ -383,7 +383,9 @@ class ElevenLabsService {
     if (options.seed != null) body.seed = options.seed;
     if (options.outputFormat) body.output_format = options.outputFormat;
 
-    const { buffer, contentType } = await this.fetchBuffer('/music/compose', body, apiKey);
+    // ElevenLabs Music — the documented path is `/v1/music` (the older
+    // `/v1/music/compose` 404s on current API). Body shape is unchanged.
+    const { buffer, contentType } = await this.fetchBuffer('/music', body, apiKey);
     return { audioBuffer: buffer, contentType };
   }
 
