@@ -92,6 +92,39 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional(),
   MESHY_API_KEY: z.string().optional(),
   ELEVENLABS_API_KEY: z.string().optional(),
+  BYTEDANCE_API_KEY: z.string().optional(),
+  ZAI_API_KEY: z.string().optional(),
+  GROQ_API_KEY: z.string().optional(),
+  TRIPO_API_KEY: z.string().optional(),
+  DEEPGRAM_API_KEY: z.string().optional(),
+  ASSEMBLYAI_API_KEY: z.string().optional(),
+  MINIMAX_API_KEY: z.string().optional(),
+
+  // ── Per-call cost ceilings (USD; admin can set per modality) ────────────
+  MAX_LLM_CALL_USD: z.string().optional(),
+  MAX_VLM_CALL_USD: z.string().optional(),
+  MAX_IMAGE_CALL_USD: z.string().optional(),
+  MAX_VIDEO_CALL_USD: z.string().optional(),
+  MAX_AUDIO_CALL_USD: z.string().optional(),
+  MAX_THREED_CALL_USD: z.string().optional(),
+
+  // ── Per-provider concurrency caps (semaphore depths) ────────────────────
+  OPENAI_CONCURRENCY: z.string().optional(),
+  GEMINI_CONCURRENCY: z.string().optional(),
+  ELEVENLABS_CONCURRENCY: z.string().optional(),
+  BYTEDANCE_CONCURRENCY: z.string().optional(),
+  ZAI_CONCURRENCY: z.string().optional(),
+  FAL_CONCURRENCY: z.string().optional(),
+  GROQ_CONCURRENCY: z.string().optional(),
+  DEEPGRAM_CONCURRENCY: z.string().optional(),
+  ASSEMBLYAI_CONCURRENCY: z.string().optional(),
+  MESHY_CONCURRENCY: z.string().optional(),
+  TRIPO_CONCURRENCY: z.string().optional(),
+  MINIMAX_CONCURRENCY: z.string().optional(),
+
+  // ── Smoke harness opt-ins (default off) ──────────────────────────────────
+  SMOKE_LIVE: z.string().optional(),
+  SMOKE_LIVE_PAID: z.string().optional(),
 
   // ── Cost tracker / margin monitoring (admin-only) ───────────────────────
   /** Target gross margin (revenue - cost)/revenue. Default 0.30 (30%). */

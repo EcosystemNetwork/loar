@@ -27,6 +27,13 @@ import {
 } from '../../services/provider-keys';
 import { TRANSCRIPTION_MODELS, getVisibleModels } from '../../services/transcription-models';
 import { db } from '../../lib/firebase';
+import { getControls, getPerCallCeilings } from '../../services/cost-tracker';
+import { VIDEO_MODELS } from '../../services/video-models';
+import { IMAGE_MODELS } from '../../services/image-models';
+import { AUDIO_MODELS } from '../../services/audio-models';
+import { TTS_MODELS } from '../../services/tts-models';
+import { LLM_MODELS } from '../../services/llm-models';
+import { THREED_MODELS } from '../../services/threed-models';
 
 const providerIdSchema = z.enum(KNOWN_PROVIDERS as [string, ...string[]]);
 
@@ -167,6 +174,39 @@ export const providersRouter = router({
         provider,
         ...stats,
       })),
+    };
+  }),
+
+  // ── Health probe ─────────────────────────────────────────────────
+  // Single ops endpoint that surfaces registry counts, server-pool key
+  // availability per provider, current admin kill-switch state, and the
+  // per-call cost ceilings. Used by monitoring + readiness checks so ops
+  // can confirm "model matrix is healthy" without scraping logs.
+
+  health: protectedProcedure.query(async () => {
+    const controls = await getControls();
+    const ceilings = getPerCallCeilings();
+    return {
+      registries: {
+        video: VIDEO_MODELS.length,
+        image: IMAGE_MODELS.length,
+        audio: AUDIO_MODELS.length,
+        transcription: TRANSCRIPTION_MODELS.length,
+        tts: TTS_MODELS.length,
+        llm: LLM_MODELS.length,
+        threed: THREED_MODELS.length,
+      },
+      providers: KNOWN_PROVIDERS.map((id) => ({
+        id,
+        serverPoolAvailable: serverPoolAvailable(id),
+        paused: controls.pausedProviders.includes(id),
+      })),
+      controls: {
+        pausedProviders: controls.pausedProviders,
+        platformDailyCapUsd: controls.caps.platformDailyUsd,
+      },
+      perCallCeilingsUsd: ceilings,
+      ts: new Date().toISOString(),
     };
   }),
 });

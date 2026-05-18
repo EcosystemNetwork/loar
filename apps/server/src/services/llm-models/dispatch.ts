@@ -342,6 +342,7 @@ async function dispatchLlmInner(
       usage: {
         promptTokens: r.usage?.promptTokens,
         completionTokens: r.usage?.completionTokens,
+        cachedInputTokens: r.usage?.cachedInputTokens,
         totalTokens: r.usage?.totalTokens,
       },
       finishReason: r.finishReason,

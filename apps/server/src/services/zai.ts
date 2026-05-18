@@ -76,7 +76,13 @@ export interface ZaiChatResult {
   reasoningContent?: string;
   toolCalls?: ZaiChatToolCall[];
   finishReason?: string;
-  usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    /** Subset of promptTokens that hit Z.AI's prompt cache (~10× cheaper). */
+    cachedInputTokens?: number;
+    totalTokens?: number;
+  };
   raw?: unknown;
 }
 
@@ -292,7 +298,16 @@ class ZaiServiceImpl {
         };
         finish_reason?: string;
       }>;
-      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+      usage?: {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        total_tokens?: number;
+        // OpenAI-compat cached-prompt accounting — GLM-4.6 charges
+        // ~$0.11/M for cached vs $1.10/M for fresh prompt tokens (10×
+        // discount). Capturing this is required for accurate billing
+        // attribution on long system prompts + retrieval contexts.
+        prompt_tokens_details?: { cached_tokens?: number };
+      };
     }>('/chat/completions', { method: 'POST', body: JSON.stringify(body) }, opts.apiKey);
 
     const choice = raw.choices?.[0];
@@ -304,6 +319,7 @@ class ZaiServiceImpl {
       usage: {
         promptTokens: raw.usage?.prompt_tokens,
         completionTokens: raw.usage?.completion_tokens,
+        cachedInputTokens: raw.usage?.prompt_tokens_details?.cached_tokens,
         totalTokens: raw.usage?.total_tokens,
       },
       raw,
