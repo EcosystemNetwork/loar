@@ -48,6 +48,8 @@ import { runEditingLayer } from './layers/editing.ts';
 import { runLaunchpadLayer } from './layers/launchpad.ts';
 import { runVoiceStudioLayer } from './layers/voice-studio.ts';
 import { runByokLayer } from './layers/byok.ts';
+import { runModelMatrixLayer } from './layers/model-matrix.ts';
+import { runModelMatrixLiveLayer } from './layers/model-matrix-live.ts';
 
 async function main() {
   const cfg = loadConfig();
@@ -207,6 +209,36 @@ async function main() {
     reporter.recordLayer({
       layer: 'byok',
       title: 'providers + watchSessions + recommendations + captions translate',
+      checks: result.checks,
+      skipped: false,
+    });
+  }
+
+  // ── Layer 13: model-matrix (registries + dispatchers + adapters) ─────────
+  if (!only || only === 'model-matrix' || only === 'matrix') {
+    reporter.beginLayer('model-matrix', 'registries + dispatchers + adapters integrity');
+    const result = await runModelMatrixLayer();
+    reporter.recordLayer({
+      layer: 'model-matrix',
+      title: 'registries + dispatchers + adapters integrity',
+      checks: result.checks,
+      skipped: false,
+    });
+  }
+
+  // ── Layer 14: model-matrix-live (real provider round-trips, opt-in) ──────
+  // Only runs when SMOKE_LAYER targets it explicitly OR when the full suite
+  // runs AND SMOKE_LIVE=1 is set. Defaults to no-op so `pnpm smoke` is safe.
+  if (
+    only === 'model-matrix-live' ||
+    only === 'matrix-live' ||
+    (!only && (process.env.SMOKE_LIVE === '1' || process.env.SMOKE_LIVE_PAID === '1'))
+  ) {
+    reporter.beginLayer('model-matrix-live', 'real provider round-trips (opt-in)');
+    const result = await runModelMatrixLiveLayer();
+    reporter.recordLayer({
+      layer: 'model-matrix-live',
+      title: 'real provider round-trips (opt-in)',
       checks: result.checks,
       skipped: false,
     });
