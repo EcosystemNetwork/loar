@@ -10,3 +10,5 @@ export {
   getThreedModelIds,
   getModelsByTask,
 } from './registry';
+export { dispatchThreed } from './dispatch';
+export type { ThreedDispatchInput, ThreedDispatchResult } from './dispatch';

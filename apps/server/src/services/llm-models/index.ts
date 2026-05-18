@@ -9,3 +9,6 @@ export {
   getVisibleLlmModels,
   getLlmModelIds,
 } from './registry';
+export { dispatchLlm } from './dispatch';
+export type { LlmDispatchInput, LlmDispatchResult, LlmMessage, LlmTool } from './dispatch';
+export { routeLlmModel } from './router';

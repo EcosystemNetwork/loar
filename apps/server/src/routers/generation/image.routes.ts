@@ -325,6 +325,62 @@ async function dispatchImageGen(
     return { status: 'failed', error: result.error || 'ByteDance returned no images' };
   }
 
+  if (model.provider === 'openai') {
+    const { resolveProviderKey } = await import('../../lib/byok');
+    const { openAIService } = await import('../../services/openai');
+    const userKey = ctx.userId ? await resolveProviderKey(ctx.userId, 'openai') : undefined;
+    if (!userKey) {
+      return {
+        status: 'failed',
+        error: 'OPENAI_API_KEY is not configured — set one in /settings/api-keys',
+      };
+    }
+    const sizeMap: Record<string, '1024x1024' | '1024x1536' | '1536x1024'> = {
+      square_hd: '1024x1024',
+      square: '1024x1024',
+      portrait_4_3: '1024x1536',
+      portrait_16_9: '1024x1536',
+      landscape_4_3: '1536x1024',
+      landscape_16_9: '1536x1024',
+    };
+    try {
+      const result = await openAIService.generateImage({
+        apiKey: userKey,
+        model: (model.openaiModelId as any) || 'gpt-image-1.5',
+        prompt: input.prompt,
+        n: input.numImages ?? 1,
+        size: sizeMap[input.imageSize] ?? '1024x1024',
+        responseFormat: 'b64_json',
+      });
+      const manager = getStorageManager();
+      const images: Array<{ url: string }> = [];
+      for (let i = 0; i < result.all.length; i++) {
+        const entry = result.all[i];
+        if (!entry?.b64_json) continue;
+        const filename = `generation-${ctx.generationId}-${i}.png`;
+        const buf = Buffer.from(entry.b64_json, 'base64');
+        const signed = await signWithProvenance(buf, filename, {
+          model: model.openaiModelId || 'gpt-image-1.5',
+          prompt: input.prompt,
+          generatedAt: new Date().toISOString(),
+          mimeType: 'image/png',
+        });
+        const manifest = await manager.upload(signed, filename, 'image/png', ctx.userId);
+        const url = manifest.uploads[0]?.url;
+        if (url) images.push({ url });
+      }
+      if (images.length === 0) {
+        return { status: 'failed', error: 'OpenAI returned no images (storage upload failed)' };
+      }
+      return { status: 'completed', images };
+    } catch (err) {
+      return {
+        status: 'failed',
+        error: err instanceof Error ? err.message : 'OpenAI API error',
+      };
+    }
+  }
+
   if (model.provider === 'zai') {
     // BYOK Z.AI — falls back to platform ZAI_API_KEY when no user key is set.
     const { resolveProviderKey } = await import('../../lib/byok');

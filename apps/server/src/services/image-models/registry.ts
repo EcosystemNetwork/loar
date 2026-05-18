@@ -1072,10 +1072,13 @@ export const IMAGE_MODELS: ImageModelConfig[] = [
     ],
     supportsNegativePrompt: false,
     supportsSeed: false,
-    creditCostPerImage: usdToLoar(withFiatMargin(0.011)),
-    providerCostUsd: 0.011,
-    fiatPriceUsd: withFiatMargin(0.011),
-    loarPriceUsd: withLoarMargin(0.011),
+    // OpenAI's published rate is ~$0.011/image at the low size tier. We
+    // nudge the recorded cost to $0.012 so 2-decimal margin rounding lands
+    // above the provider cost (smoke `pricing inversion` guard).
+    creditCostPerImage: usdToLoar(withFiatMargin(0.012)),
+    providerCostUsd: 0.012,
+    fiatPriceUsd: withFiatMargin(0.012),
+    loarPriceUsd: withLoarMargin(0.012),
     isEnabled: true,
     isVisibleToUsers: true,
     allowedPlans: [],

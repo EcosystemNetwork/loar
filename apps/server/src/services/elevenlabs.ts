@@ -43,6 +43,39 @@ export interface SoundEffectOptions {
   apiKey?: string;
 }
 
+/** Section of a structured ElevenLabs music composition plan. */
+export interface MusicSection {
+  section_name: string;
+  positive_local_styles: string[];
+  negative_local_styles?: string[];
+  duration_ms: number; // 3,000 to 120,000
+  lines?: Array<{ role?: string; text: string }>;
+}
+
+export interface MusicComposeOptions {
+  /** Simple-mode prompt. Mutually exclusive with `compositionPlan`. */
+  prompt?: string;
+  /** Length in ms when using `prompt` mode (3,000 to 600,000). */
+  musicLengthMs?: number;
+  /** Structured plan. Mutually exclusive with `prompt`. */
+  compositionPlan?: {
+    positive_global_styles: string[];
+    negative_global_styles?: string[];
+    sections: MusicSection[];
+  };
+  forceInstrumental?: boolean;
+  seed?: number;
+  /** e.g. `mp3_44100_128`, `pcm_44100`, `opus_48000_128`. */
+  outputFormat?: string;
+  /** BYOK override — user-supplied ElevenLabs key. */
+  apiKey?: string;
+}
+
+export interface MusicResult {
+  audioBuffer: Buffer;
+  contentType: string;
+}
+
 export interface VoiceDesignOptions {
   name: string;
   description: string;
@@ -330,6 +363,27 @@ class ElevenLabsService {
     if (durationSeconds !== undefined) body.duration_seconds = durationSeconds;
 
     const { buffer, contentType } = await this.fetchBuffer('/sound-generation', body, apiKey);
+    return { audioBuffer: buffer, contentType };
+  }
+
+  // ── Music (compose) ───────────────────────────────────────────────────
+
+  async composeMusic(options: MusicComposeOptions): Promise<MusicResult> {
+    const apiKey = this.resolveKey(options.apiKey);
+    const body: Record<string, unknown> = {};
+    if (options.prompt) {
+      body.prompt = options.prompt;
+      if (options.musicLengthMs) body.music_length_ms = options.musicLengthMs;
+    } else if (options.compositionPlan) {
+      body.composition_plan = options.compositionPlan;
+    } else {
+      throw new Error('composeMusic requires either prompt or compositionPlan');
+    }
+    if (options.forceInstrumental != null) body.force_instrumental = options.forceInstrumental;
+    if (options.seed != null) body.seed = options.seed;
+    if (options.outputFormat) body.output_format = options.outputFormat;
+
+    const { buffer, contentType } = await this.fetchBuffer('/music/compose', body, apiKey);
     return { audioBuffer: buffer, contentType };
   }
 

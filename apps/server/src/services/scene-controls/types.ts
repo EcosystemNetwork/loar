@@ -12,29 +12,29 @@ export const CAMERA_PRESETS = {
   // Static
   locked: { label: 'Locked', category: 'static', description: 'Camera is completely still' },
   handheld_subtle: {
-    label: 'Handheld Subtle',
+    label: 'Handheld',
     category: 'static',
     description: 'Slight natural shake, as if held by a person',
   },
 
   // Dolly
   dolly_in_slow: {
-    label: 'Dolly In Slow',
+    label: 'Slow Push',
     category: 'dolly',
     description: 'Camera slowly moves toward the subject',
   },
   dolly_in_fast: {
-    label: 'Dolly In Fast',
+    label: 'Fast Push',
     category: 'dolly',
     description: 'Camera quickly pushes toward the subject',
   },
   dolly_out_slow: {
-    label: 'Dolly Out Slow',
+    label: 'Slow Pull-Back',
     category: 'dolly',
     description: 'Camera slowly pulls back from the subject',
   },
   dolly_out_fast: {
-    label: 'Dolly Out Fast',
+    label: 'Fast Pull-Back',
     category: 'dolly',
     description: 'Camera quickly pulls back from the subject',
   },
@@ -53,48 +53,48 @@ export const CAMERA_PRESETS = {
 
   // Orbit
   orbit_left_slow: {
-    label: 'Orbit Left Slow',
+    label: 'Slow Orbit Left',
     category: 'orbit',
     description: 'Camera orbits slowly around the subject to the left',
   },
   orbit_right_slow: {
-    label: 'Orbit Right Slow',
+    label: 'Slow Orbit Right',
     category: 'orbit',
     description: 'Camera orbits slowly around the subject to the right',
   },
   orbit_right_fast: {
-    label: 'Orbit Right Fast',
+    label: 'Fast Orbit',
     category: 'orbit',
     description: 'Camera orbits quickly around the subject to the right',
   },
 
   // Crane
   crane_up: {
-    label: 'Crane Up',
+    label: 'Crane Lift',
     category: 'crane',
     description: 'Camera rises vertically, looking down',
   },
   crane_down: {
-    label: 'Crane Down',
+    label: 'Crane Drop',
     category: 'crane',
     description: 'Camera descends vertically, looking up',
   },
 
   // Push
   whip_pan_right: {
-    label: 'Whip Pan Right',
+    label: 'Whip Pan',
     category: 'push',
     description: 'Extremely fast horizontal pan to the right',
   },
 
   // PRD 8 motion presets
   crash_zoom: {
-    label: 'Crash Zoom',
+    label: 'Snap Zoom',
     category: 'dolly',
     description: 'Aggressive snap-zoom toward subject — comedic / shock framing',
   },
   walk_up: {
-    label: 'Walk Up',
+    label: 'Walk-Up',
     category: 'dolly',
     description: 'Camera walks toward subject at human pace — POV approach',
   },
@@ -403,14 +403,6 @@ export const STYLE_PRESETS = {
     promptSuffix: 'Aerochrome look, dreamlike spectral inversion',
     color: '#ff4dd2',
   },
-  tilt_shift: {
-    label: 'Tilt-Shift',
-    category: 'photo',
-    promptPrefix:
-      'Tilt-shift photography, miniature-effect selective focus, narrow plane of sharpness,',
-    promptSuffix: 'toy-diorama scale illusion, saturated colors',
-    color: '#6fc3df',
-  },
   golden_hour: {
     label: 'Golden Hour',
     category: 'photo',
@@ -524,6 +516,14 @@ export const STYLE_PRESETS = {
       'Photojournalism, Magnum-style street reportage, 35mm grain, candid decisive-moment framing,',
     promptSuffix: 'black-and-white, available light only, unposed humanity',
     color: '#3f3f3f',
+  },
+  tilt_shift: {
+    label: 'Tilt-Shift',
+    category: 'cinematic',
+    promptPrefix:
+      'Tilt-shift photography, miniature-world effect, shallow plane of focus, candy-bright saturation,',
+    promptSuffix: 'crisp focus band with soft falloff above and below, toy-like scale illusion',
+    color: '#9bd9ff',
   },
 } as const;
 

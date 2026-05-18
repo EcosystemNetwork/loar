@@ -14,12 +14,22 @@ import { falWhisperBackend } from './fal-whisper';
 import { assemblyAIBackend } from './assemblyai';
 import { deepgramBackend } from './deepgram';
 import { groqBackend } from './groq';
+import {
+  openaiGpt4oTranscribeBackend,
+  openaiGpt4oMiniTranscribeBackend,
+  openaiGpt4oTranscribeDiarizeBackend,
+  openaiWhisper1Backend,
+} from './openai';
 
 const BACKENDS: Record<string, CaptionBackend> = {
   [falWhisperBackend.modelId]: falWhisperBackend,
   [assemblyAIBackend.modelId]: assemblyAIBackend,
   [deepgramBackend.modelId]: deepgramBackend,
   [groqBackend.modelId]: groqBackend,
+  [openaiGpt4oTranscribeBackend.modelId]: openaiGpt4oTranscribeBackend,
+  [openaiGpt4oMiniTranscribeBackend.modelId]: openaiGpt4oMiniTranscribeBackend,
+  [openaiGpt4oTranscribeDiarizeBackend.modelId]: openaiGpt4oTranscribeDiarizeBackend,
+  [openaiWhisper1Backend.modelId]: openaiWhisper1Backend,
 };
 
 export function getBackend(modelId: string): CaptionBackend {

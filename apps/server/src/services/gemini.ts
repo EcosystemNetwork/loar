@@ -778,6 +778,340 @@ RULES:
   };
 }
 
+// ── Raw-fetch BYOK adapters (generic chat / Veo video / Lyria music) ───
+//
+// The SDK-bound helpers above bake the env key at module init, which is
+// fine for the wiki / lore generators. For the model-matrix dispatchers
+// we need per-call BYOK — the surfaces below speak the REST API directly
+// so a caller can pass any user-supplied key.
+
+const GEMINI_REST = 'https://generativelanguage.googleapis.com/v1beta';
+
+function resolveGeminiKey(apiKey?: string): string {
+  const key = apiKey ?? GOOGLE_API_KEY;
+  if (!key) {
+    throw new Error('Google API key missing — set GOOGLE_API_KEY or pass apiKey for BYOK');
+  }
+  return key;
+}
+
+export interface GeminiChatPart {
+  type: 'text' | 'image_url';
+  text?: string;
+  imageUrl?: string;
+}
+
+export interface GeminiChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  /** Plain text or parts (text + inline image URLs). */
+  content: string | GeminiChatPart[];
+}
+
+export interface GeminiChatOptions {
+  apiKey?: string;
+  /** Gemini API model parameter, e.g. 'gemini-3.1-pro-preview'. */
+  model: string;
+  messages: GeminiChatMessage[];
+  temperature?: number;
+  topP?: number;
+  maxOutputTokens?: number;
+  /** Force JSON-only output. */
+  jsonMode?: boolean;
+  /** Structured response schema (Gemini-flavoured JSON Schema). */
+  responseSchema?: Record<string, unknown>;
+}
+
+export interface GeminiChatResult {
+  text: string;
+  usage: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  };
+  finishReason?: string;
+}
+
+function extractGeminiText(parts: GeminiChatPart[]): string {
+  return parts
+    .map((p) => (p.type === 'text' ? (p.text ?? '') : ''))
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+/**
+ * Generic chat completion via Gemini API. Maps OpenAI-style messages to
+ * Gemini's `contents` shape (with `system_instruction` extracted).
+ */
+export async function geminiChat(opts: GeminiChatOptions): Promise<GeminiChatResult> {
+  const apiKey = resolveGeminiKey(opts.apiKey);
+
+  type GeminiPart = { text?: string; inline_data?: { mime_type: string; data: string } };
+  type GeminiContent = { role: 'user' | 'model'; parts: GeminiPart[] };
+
+  const systemTexts: string[] = [];
+  const contents: GeminiContent[] = [];
+  for (const m of opts.messages) {
+    if (m.role === 'system') {
+      systemTexts.push(typeof m.content === 'string' ? m.content : extractGeminiText(m.content));
+      continue;
+    }
+    const role: GeminiContent['role'] = m.role === 'assistant' ? 'model' : 'user';
+    if (typeof m.content === 'string') {
+      contents.push({ role, parts: [{ text: m.content }] });
+      continue;
+    }
+    const parts: GeminiPart[] = [];
+    for (const p of m.content) {
+      if (p.type === 'text' && p.text) parts.push({ text: p.text });
+      if (p.type === 'image_url' && p.imageUrl) {
+        const fetched = await fetch(p.imageUrl, { signal: AbortSignal.timeout(20_000) });
+        if (!fetched.ok) throw new Error(`Failed to fetch image: ${fetched.status}`);
+        const mime = fetched.headers.get('content-type') ?? 'image/png';
+        const buf = Buffer.from(await fetched.arrayBuffer());
+        parts.push({ inline_data: { mime_type: mime, data: buf.toString('base64') } });
+      }
+    }
+    if (parts.length > 0) contents.push({ role, parts });
+  }
+
+  const body: Record<string, unknown> = { contents };
+  if (systemTexts.length > 0) {
+    body.system_instruction = { parts: [{ text: systemTexts.join('\n\n') }] };
+  }
+  const generationConfig: Record<string, unknown> = {};
+  if (opts.temperature != null) generationConfig.temperature = opts.temperature;
+  if (opts.topP != null) generationConfig.topP = opts.topP;
+  if (opts.maxOutputTokens != null) generationConfig.maxOutputTokens = opts.maxOutputTokens;
+  if (opts.jsonMode) generationConfig.responseMimeType = 'application/json';
+  if (opts.responseSchema) {
+    generationConfig.responseMimeType = 'application/json';
+    generationConfig.responseSchema = opts.responseSchema;
+  }
+  if (Object.keys(generationConfig).length > 0) {
+    body.generationConfig = generationConfig;
+  }
+
+  const res = await fetch(
+    `${GEMINI_REST}/models/${encodeURIComponent(opts.model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(120_000),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.text().catch(() => '');
+    throw new Error(`Gemini chat ${res.status}: ${err.slice(0, 500)}`);
+  }
+  interface GeminiResp {
+    candidates?: Array<{
+      content?: { parts?: Array<{ text?: string }> };
+      finishReason?: string;
+    }>;
+    usageMetadata?: {
+      promptTokenCount?: number;
+      candidatesTokenCount?: number;
+      totalTokenCount?: number;
+    };
+  }
+  const data = (await res.json()) as GeminiResp;
+  const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
+  return {
+    text,
+    usage: {
+      promptTokens: data.usageMetadata?.promptTokenCount,
+      completionTokens: data.usageMetadata?.candidatesTokenCount,
+      totalTokens: data.usageMetadata?.totalTokenCount,
+    },
+    finishReason: data.candidates?.[0]?.finishReason,
+  };
+}
+
+// ── Veo (video) — predictLongRunning + polling ──────────────────────────
+
+export interface VeoGenerateOptions {
+  apiKey?: string;
+  /** e.g. 'veo-3.1-generate-preview', 'veo-3.0-generate-001'. */
+  model: string;
+  prompt: string;
+  /** For image-to-video: a public URL the API will fetch. */
+  imageUrl?: string;
+  /** 4–8 seconds (Veo cap). */
+  durationSec?: number;
+  /** '720p' | '1080p' | '4k'. 4K is preview-only, only for 8s clips. */
+  resolution?: '720p' | '1080p' | '4k';
+  aspectRatio?: '16:9' | '9:16';
+  /** Generate native audio (3.x only). */
+  withAudio?: boolean;
+}
+
+export interface VeoTask {
+  /** Operation name from the LRO endpoint (`operations/...`). */
+  name: string;
+  status: 'queued' | 'in_progress' | 'completed' | 'failed';
+  videoUrl?: string;
+  error?: string;
+  model: string;
+}
+
+export async function veoCreate(opts: VeoGenerateOptions): Promise<VeoTask> {
+  const apiKey = resolveGeminiKey(opts.apiKey);
+  const instance: Record<string, unknown> = { prompt: opts.prompt };
+  if (opts.imageUrl) instance.image = { gcsUri: opts.imageUrl };
+  const parameters: Record<string, unknown> = {
+    durationSeconds: opts.durationSec ?? 8,
+    aspectRatio: opts.aspectRatio ?? '16:9',
+    resolution: opts.resolution ?? '720p',
+  };
+  if (opts.withAudio != null) parameters.generateAudio = opts.withAudio;
+
+  const body = { instances: [instance], parameters };
+  const res = await fetch(
+    `${GEMINI_REST}/models/${encodeURIComponent(opts.model)}:predictLongRunning?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(60_000),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.text().catch(() => '');
+    throw new Error(`Veo create ${res.status}: ${err.slice(0, 500)}`);
+  }
+  interface VeoCreateResp {
+    name: string;
+    done?: boolean;
+    error?: { message?: string };
+  }
+  const data = (await res.json()) as VeoCreateResp;
+  return {
+    name: data.name,
+    status: data.done ? 'completed' : 'in_progress',
+    error: data.error?.message,
+    model: opts.model,
+  };
+}
+
+export async function veoPoll(operationName: string, apiKey?: string): Promise<VeoTask> {
+  const key = resolveGeminiKey(apiKey);
+  const res = await fetch(`${GEMINI_REST}/${operationName}?key=${encodeURIComponent(key)}`, {
+    method: 'GET',
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) {
+    const err = await res.text().catch(() => '');
+    throw new Error(`Veo poll ${res.status}: ${err.slice(0, 500)}`);
+  }
+  interface VeoPollResp {
+    name: string;
+    done?: boolean;
+    error?: { message?: string };
+    response?: {
+      generateVideoResponse?: {
+        generatedSamples?: Array<{ video?: { uri?: string } }>;
+      };
+    };
+  }
+  const data = (await res.json()) as VeoPollResp;
+  if (data.error) {
+    return {
+      name: data.name,
+      status: 'failed',
+      error: data.error.message,
+      model: '',
+    };
+  }
+  if (data.done) {
+    const videoUrl = data.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri;
+    return {
+      name: data.name,
+      status: 'completed',
+      videoUrl,
+      model: '',
+    };
+  }
+  return { name: data.name, status: 'in_progress', model: '' };
+}
+
+/** Convenience: create + poll up to ~10 minutes. */
+export async function veoGenerate(
+  opts: VeoGenerateOptions
+): Promise<{ status: string; videoUrl?: string; error?: string; name?: string }> {
+  const task = await veoCreate(opts);
+  if (task.status === 'failed' || task.status === 'completed') {
+    return { status: task.status, videoUrl: task.videoUrl, error: task.error, name: task.name };
+  }
+  const maxAttempts = 60;
+  const intervalMs = 10_000;
+  let current = task;
+  for (let i = 0; i < maxAttempts; i++) {
+    if (current.status === 'completed' || current.status === 'failed') break;
+    await new Promise((r) => setTimeout(r, intervalMs));
+    current = await veoPoll(task.name, opts.apiKey);
+  }
+  return {
+    status: current.status,
+    videoUrl: current.videoUrl,
+    error: current.error,
+    name: current.name,
+  };
+}
+
+// ── Lyria (music) — predict endpoint ────────────────────────────────────
+
+export interface LyriaGenerateOptions {
+  apiKey?: string;
+  /** 'lyria-3-clip-preview' (30s clip) or 'lyria-3-pro-preview' (~2-min song). */
+  model: string;
+  prompt: string;
+  /** Optional negative-style prompt. */
+  negativePrompt?: string;
+  /** Generation seed. */
+  seed?: number;
+}
+
+export interface LyriaResult {
+  audioBuffer: Buffer;
+  contentType: string;
+  model: string;
+}
+
+export async function lyriaGenerate(opts: LyriaGenerateOptions): Promise<LyriaResult> {
+  const apiKey = resolveGeminiKey(opts.apiKey);
+  const instance: Record<string, unknown> = { prompt: opts.prompt };
+  if (opts.negativePrompt) instance.negative_prompt = opts.negativePrompt;
+  if (opts.seed != null) instance.seed = opts.seed;
+  const body = { instances: [instance] };
+  const res = await fetch(
+    `${GEMINI_REST}/models/${encodeURIComponent(opts.model)}:predict?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(180_000),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.text().catch(() => '');
+    throw new Error(`Lyria predict ${res.status}: ${err.slice(0, 500)}`);
+  }
+  interface LyriaResp {
+    predictions?: Array<{ bytesBase64Encoded?: string; mimeType?: string }>;
+  }
+  const data = (await res.json()) as LyriaResp;
+  const pred = data.predictions?.[0];
+  if (!pred?.bytesBase64Encoded) {
+    throw new Error('Lyria returned no audio payload');
+  }
+  return {
+    audioBuffer: Buffer.from(pred.bytesBase64Encoded, 'base64'),
+    contentType: pred.mimeType ?? 'audio/mpeg',
+    model: opts.model,
+  };
+}
+
 export const geminiService = {
   generateWikiFromVideo,
   analyzeCharacterImage,
@@ -785,4 +1119,9 @@ export const geminiService = {
   improveVideoPrompt,
   generateEntityLore,
   generateEntityProfile,
+  chat: geminiChat,
+  veoCreate,
+  veoPoll,
+  veoGenerate,
+  lyriaGenerate,
 };

@@ -22,16 +22,14 @@ import {
   NoKeyAvailableError,
   isKnownProvider,
 } from '../services/provider-keys';
+import type { ProviderId } from '../services/provider-keys/types';
 
-export type SecretProvider =
-  | 'bytedance'
-  | 'zai'
-  | 'openai'
-  | 'google'
-  | 'fal'
-  | 'elevenlabs'
-  | 'meshy'
-  | 'tripo';
+/**
+ * Mirrors `ProviderId` from `provider-keys/types`. Kept as a separate
+ * export so historic callers can continue to import `SecretProvider`
+ * from `lib/byok` without dragging in the provider-keys internals.
+ */
+export type SecretProvider = ProviderId;
 
 const ENV_VAR_BY_PROVIDER: Record<SecretProvider, string> = {
   bytedance: 'BYTEDANCE_API_KEY',
@@ -42,6 +40,9 @@ const ENV_VAR_BY_PROVIDER: Record<SecretProvider, string> = {
   elevenlabs: 'ELEVENLABS_API_KEY',
   meshy: 'MESHY_API_KEY',
   tripo: 'TRIPO_API_KEY',
+  assemblyai: 'ASSEMBLYAI_API_KEY',
+  deepgram: 'DEEPGRAM_API_KEY',
+  groq: 'GROQ_API_KEY',
 };
 
 export async function resolveProviderKey(

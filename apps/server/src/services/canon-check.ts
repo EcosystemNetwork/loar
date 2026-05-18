@@ -1,10 +1,14 @@
 /**
- * Z.AI-powered canon consistency check for episodes.
+ * Canon consistency check for episodes.
  *
  * Given an episode + its universe, extracts a representative frame from the
- * first clip and asks GLM-5V to score the visual against the universe's
- * lore summary. The score (0-100) and verdict ("canonical" | "borderline" |
- * "off-canon") feed both:
+ * first clip and asks a vision model to score the visual against the
+ * universe's lore summary. Defaults to GLM-4.6V (Z.AI) but routes through
+ * `dispatchLlm` so callers can swap in any vision-capable model from the
+ * `llm-models` registry (gpt-5, doubao-seed-1-6-vision, gemini-2.5-pro, …).
+ *
+ * The score (0-100) and verdict ("canonical" | "borderline" | "off-canon")
+ * feed both:
  *
  *   1. A pre-publish preview procedure (`zai.canonCheckEpisode`)
  *   2. An advisory gate inside `episodes.publishAsCanon` that records the
@@ -12,18 +16,21 @@
  *      "off-canon" with high-severity contradictions.
  *
  * Bypassed when:
- *   - No Z.AI key is configured (BYOK + platform both absent)
+ *   - No key is configured for the chosen vision model (BYOK + env both absent)
  *   - Episode has no playable first clip
  *   - First-clip thumbnail extraction fails
  *
- * Errors here NEVER block publish — they degrade to `null` so a Z.AI outage
- * cannot DOS canon submissions. The hard block comes from the verdict, not
- * from infrastructure.
+ * Errors here NEVER block publish — they degrade to `null` so a provider
+ * outage cannot DOS canon submissions. The hard block comes from the verdict,
+ * not from infrastructure.
  */
 import { db, firebaseAvailable } from '../lib/firebase';
 import { extractVideoThumbnail } from './video-thumbnail';
-import { zaiService } from './zai';
+import { dispatchLlm } from './llm-models/dispatch';
+import { getLlmModelById } from './llm-models/registry';
+import { routeLlmModel } from './llm-models/router';
 import { resolveProviderKey } from '../lib/byok';
+import type { SecretProvider } from '../lib/byok';
 
 export interface CanonCheckResult {
   score: number;
@@ -37,18 +44,39 @@ export interface CanonCheckResult {
  * Run the canon consistency check for a single episode against its universe.
  * Returns null when the check is skipped (no key, no playable clip, etc.) so
  * the caller can treat absence as "no advisory available".
+ *
+ * @param vlmModelId  Optional registry id to force a specific model. When
+ *                    omitted, the router picks the cheapest vision-capable
+ *                    model with a reachable key.
  */
 export async function runEpisodeCanonCheck(
   episodeId: string,
-  callerUid: string
+  callerUid: string,
+  vlmModelId?: string
 ): Promise<CanonCheckResult | null> {
   if (!firebaseAvailable) return null;
 
-  // Resolve user-bound or platform Z.AI key. If neither, skip silently.
-  const byok = await resolveProviderKey(callerUid, 'zai').catch(() => undefined);
-  if (!zaiService.isConfigured(byok)) {
-    return null;
+  // Resolve a model id either by explicit override or the cost-aware router.
+  let resolvedModelId: string;
+  if (vlmModelId) {
+    resolvedModelId = vlmModelId;
+  } else {
+    try {
+      resolvedModelId = routeLlmModel({
+        requires: { vision: true },
+        costBudget: 'low',
+      }).chosenModelId;
+    } catch {
+      return null;
+    }
   }
+
+  const model = getLlmModelById(resolvedModelId);
+  if (!model || !model.capabilities.includes('vision')) return null;
+  const providerKey = await resolveProviderKey(callerUid, model.provider as SecretProvider).catch(
+    () => undefined
+  );
+  if (!providerKey) return null;
 
   // Load episode + universe
   const epDoc = await db.collection('episodes').doc(episodeId).get();
@@ -80,12 +108,7 @@ export async function runEpisodeCanonCheck(
   });
   if (!thumbUrl) return null;
 
-  const visionResult = await zaiService
-    .vision({
-      apiKey: byok,
-      model: 'glm-4.6v',
-      maxTokens: 1200,
-      prompt: `You are LOAR's canon consistency reviewer for the universe "${universeName}".
+  const prompt = `You are LOAR's canon consistency reviewer for the universe "${universeName}".
 
 Lore summary:
 """
@@ -99,19 +122,32 @@ Look at the attached frame from a candidate canon episode. Score 0-100 how well 
   "verdict": "canonical" | "borderline" | "off-canon",
   "contradictions": Array<{ severity: "low" | "med" | "high", note: string }>,
   "summary": string                       // one short paragraph
-}`,
-      imageUrls: [thumbUrl],
-    })
-    .catch((err) => {
-      console.warn('[canon-check] zai.vision failed', err);
-      return null;
-    });
+}`;
+
+  const visionResult = await dispatchLlm({
+    modelId: resolvedModelId,
+    userId: callerUid,
+    maxTokens: 1200,
+    jsonMode: true,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: thumbUrl } },
+        ],
+      },
+    ],
+  }).catch((err) => {
+    console.warn(`[canon-check] dispatchLlm (${resolvedModelId}) failed`, err);
+    return null;
+  });
 
   if (!visionResult) return null;
 
   let parsed: Omit<CanonCheckResult, 'thumbUrl'>;
   try {
-    const stripped = visionResult.content
+    const stripped = visionResult.text
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```\s*$/, '')
       .trim();
@@ -121,7 +157,7 @@ Look at the attached frame from a candidate canon episode. Score 0-100 how well 
       score: 50,
       verdict: 'borderline',
       contradictions: [],
-      summary: visionResult.content.slice(0, 500),
+      summary: visionResult.text.slice(0, 500),
     };
   }
 

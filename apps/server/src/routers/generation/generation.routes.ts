@@ -276,6 +276,92 @@ export async function dispatchGeneration(
     return bytedanceService.generateVideo(bdInput);
   }
 
+  if (model.provider === 'openai') {
+    // Sora 2 / Sora 2 Pro — async task with polling.
+    const { resolveProviderKey } = await import('../../lib/byok');
+    const { openAIService } = await import('../../services/openai');
+    const userKey = callerUid ? await resolveProviderKey(callerUid, 'openai') : undefined;
+    if (!userKey) {
+      return {
+        id: '',
+        status: 'failed',
+        error: 'OPENAI_API_KEY is not configured — set one in /settings/api-keys',
+      };
+    }
+    try {
+      const task = await openAIService.createSoraTask({
+        apiKey: userKey,
+        model: (model.openaiModelId as 'sora-2' | 'sora-2-pro') || 'sora-2',
+        prompt: input.prompt,
+        durationSec: input.durationSec ?? 8,
+        resolution: input.resolution === '1080p' ? '1024p' : '720p',
+        aspectRatio: (input.aspectRatio as '16:9' | '9:16' | undefined) ?? '16:9',
+        imageUrl: input.imageUrl ?? (resolvedCastUrls && resolvedCastUrls[0]) ?? undefined,
+      });
+      // Poll up to ~10 minutes — Sora-2-Pro can take several minutes per clip.
+      const maxAttempts = 60;
+      const intervalMs = 10_000;
+      let current = task;
+      for (let i = 0; i < maxAttempts; i++) {
+        if (current.status === 'completed' || current.status === 'failed') break;
+        await new Promise((r) => setTimeout(r, intervalMs));
+        current = await openAIService.getSoraTask(task.id, userKey);
+      }
+      return {
+        id: current.id,
+        status: current.status,
+        videoUrl: current.videoUrl,
+        error: current.error,
+      };
+    } catch (err) {
+      return {
+        id: '',
+        status: 'failed',
+        error: err instanceof Error ? err.message : 'OpenAI Sora API error',
+      };
+    }
+  }
+
+  if (model.provider === 'google') {
+    // Veo 2 / 3 / 3.1 — async predict-long-running with polling.
+    const { resolveProviderKey } = await import('../../lib/byok');
+    const { veoGenerate } = await import('../../services/gemini');
+    const userKey = callerUid ? await resolveProviderKey(callerUid, 'google') : undefined;
+    if (!userKey) {
+      return {
+        id: '',
+        status: 'failed',
+        error: 'GOOGLE_API_KEY is not configured — set one in /settings/api-keys',
+      };
+    }
+    try {
+      const reso: '720p' | '1080p' | '4k' =
+        input.resolution === '4k' ? '4k' : input.resolution === '1080p' ? '1080p' : '720p';
+      const result = await veoGenerate({
+        apiKey: userKey,
+        model: model.googleModelId || 'veo-3.0-generate-001',
+        prompt: input.prompt,
+        imageUrl: input.imageUrl ?? (resolvedCastUrls && resolvedCastUrls[0]) ?? undefined,
+        durationSec: Math.min(input.durationSec ?? 8, 8),
+        resolution: reso,
+        aspectRatio: (input.aspectRatio as '16:9' | '9:16' | undefined) ?? '16:9',
+        withAudio: model.supportsAudio && input.audio,
+      });
+      return {
+        id: result.name ?? '',
+        status: result.status,
+        videoUrl: result.videoUrl,
+        error: result.error,
+      };
+    } catch (err) {
+      return {
+        id: '',
+        status: 'failed',
+        error: err instanceof Error ? err.message : 'Gemini Veo API error',
+      };
+    }
+  }
+
   if (model.provider === 'zai') {
     // Z.AI / Zhipu — CogVideoX-3 + Vidu Q1.
     const { zaiService } = await import('../../services/zai');

@@ -10,3 +10,6 @@ export {
   getTtsModelIds,
   quoteTtsCredits,
 } from './registry';
+export { routeTtsModel } from './router';
+export { dispatchTts } from './dispatch';
+export type { TtsDispatchInput, TtsDispatchResult } from './dispatch';
