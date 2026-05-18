@@ -12,6 +12,7 @@
 import type { CaptionSegment } from '../../lib/captions-format';
 import type { CaptionBackend, CaptionBackendInput, CaptionBackendResult } from './types';
 import { validateUploadUrl } from '../../lib/url-validator';
+import { redactSecrets } from '../../lib/redact-secrets';
 
 const ZAI_ENDPOINT = 'https://api.z.ai/api/paas/v4/audio/transcriptions';
 
@@ -85,7 +86,7 @@ export const zaiGlmAsrBackend: CaptionBackend = {
         status: 'failed',
         hasWordTimings: false,
         hasSpeakers: false,
-        error: `Z.AI rejected (${res.status}): ${text.slice(0, 200)}`,
+        error: `Z.AI rejected (${res.status}): ${redactSecrets(text).slice(0, 200)}`,
       };
     }
 

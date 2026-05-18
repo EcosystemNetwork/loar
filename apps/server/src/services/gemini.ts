@@ -1,7 +1,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GoogleAIFileManager } from '@google/generative-ai/server';
 import { validateUploadUrl } from '../lib/url-validator';
+import { redactSecrets } from '../lib/redact-secrets';
 import { recordProviderCost, assertProviderAllowed } from './cost-tracker';
+import { routeLlmModel, dispatchLlmWithFallback } from './llm-models';
 
 /**
  * Sanitize user-supplied text before interpolating into AI prompts.
@@ -449,10 +451,10 @@ export async function improveImagePrompt(
   userPrompt: string,
   characterContext?: Array<{ name: string; description: string }>
 ): Promise<string> {
-  await ensureGeminiAllowed();
-  console.log(`🎨 Improving image prompt with Gemini...`);
-
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+  // Pure-text prompt rewriting — route to cheapest standard-tier chat model
+  // (dispatchLlm handles cost tracking + admin kill-switch). Big win vs
+  // legacy Gemini Pro path (~$1.25/Mtok in → ~$0.05/Mtok in).
+  console.log(`🎨 Improving image prompt via router...`);
 
   let characterInfo = '';
   if (characterContext && characterContext.length > 0) {
@@ -495,38 +497,21 @@ ${characterContext ? '- Use the provided character names and descriptions' : ''}
 Generate the improved image prompt now:`;
 
   try {
-    const result = await model.generateContent([{ text: prompt }]);
-    const response = result.response;
-    const improvedPrompt = response.text().trim();
-
-    // Remove any markdown formatting if present
-    let cleanPrompt = improvedPrompt;
-    if (cleanPrompt.startsWith('```')) {
-      cleanPrompt = cleanPrompt.split('```')[1].trim();
-    }
-
-    // Calculate costs
-    const usage = response.usageMetadata;
-    const inputTokens = usage?.promptTokenCount || 0;
-    const outputTokens = usage?.candidatesTokenCount || 0;
-    const costUsd = (inputTokens / 1_000_000) * 1.25 + (outputTokens / 1_000_000) * 10.0;
-
-    console.log(`✅ Image prompt improved!`);
-    console.log(
-      `📊 Tokens: ${inputTokens + outputTokens} (in: ${inputTokens}, out: ${outputTokens})`
-    );
-    console.log(`💰 Cost: $${costUsd.toFixed(6)}`);
-
-    await recordProviderCost({
-      provider: 'gemini',
-      model: 'gemini-2.5-pro',
-      kind: 'llm',
-      costUsd,
-      inputTokens,
-      outputTokens,
-      extra: { label: 'image-prompt-improve' },
+    const decision = routeLlmModel({
+      requires: { chat: true },
+      qualityTarget: 'standard',
+      costBudget: 'low',
     });
-
+    const r = await dispatchLlmWithFallback({
+      primaryModelId: decision.chosenModelId,
+      fallbackModelIds: decision.fallbackModelIds.slice(0, 3),
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 1500,
+    });
+    let cleanPrompt = r.text.trim();
+    if (cleanPrompt.startsWith('```')) {
+      cleanPrompt = cleanPrompt.split('```')[1]?.trim() ?? cleanPrompt;
+    }
     return cleanPrompt;
   } catch (error) {
     console.error('❌ Image prompt improvement failed:', error);
@@ -546,10 +531,9 @@ export async function improveVideoPrompt(
     plot?: string;
   }
 ): Promise<string> {
-  await ensureGeminiAllowed();
-  console.log(`🎬 Improving video prompt with Gemini...`);
-
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+  // Pure-text shot-list rewriting — route to cheapest standard-tier chat
+  // model (dispatchLlm handles cost + kill-switch).
+  console.log(`🎬 Improving video prompt via router...`);
 
   let characterInfo = '';
   if (characterContext && characterContext.length > 0) {
@@ -607,38 +591,21 @@ ${characterContext ? '- Use the provided character names and descriptions' : ''}
 Generate the improved prompt now:`;
 
   try {
-    const result = await model.generateContent([{ text: prompt }]);
-    const response = result.response;
-    const improvedPrompt = response.text().trim();
-
-    // Remove any markdown formatting if present
-    let cleanPrompt = improvedPrompt;
-    if (cleanPrompt.startsWith('```')) {
-      cleanPrompt = cleanPrompt.split('```')[1].trim();
-    }
-
-    // Calculate costs
-    const usage = response.usageMetadata;
-    const inputTokens = usage?.promptTokenCount || 0;
-    const outputTokens = usage?.candidatesTokenCount || 0;
-    const costUsd = (inputTokens / 1_000_000) * 1.25 + (outputTokens / 1_000_000) * 10.0;
-
-    console.log(`✅ Prompt improved!`);
-    console.log(
-      `📊 Tokens: ${inputTokens + outputTokens} (in: ${inputTokens}, out: ${outputTokens})`
-    );
-    console.log(`💰 Cost: $${costUsd.toFixed(6)}`);
-
-    await recordProviderCost({
-      provider: 'gemini',
-      model: 'gemini-2.5-pro',
-      kind: 'llm',
-      costUsd,
-      inputTokens,
-      outputTokens,
-      extra: { label: 'video-prompt-improve' },
+    const decision = routeLlmModel({
+      requires: { chat: true },
+      qualityTarget: 'standard',
+      costBudget: 'low',
     });
-
+    const r = await dispatchLlmWithFallback({
+      primaryModelId: decision.chosenModelId,
+      fallbackModelIds: decision.fallbackModelIds.slice(0, 3),
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 2000,
+    });
+    let cleanPrompt = r.text.trim();
+    if (cleanPrompt.startsWith('```')) {
+      cleanPrompt = cleanPrompt.split('```')[1]?.trim() ?? cleanPrompt;
+    }
     return cleanPrompt;
   } catch (error) {
     console.error('❌ Prompt improvement failed:', error);
@@ -907,7 +874,7 @@ export async function geminiChat(opts: GeminiChatOptions): Promise<GeminiChatRes
   );
   if (!res.ok) {
     const err = await res.text().catch(() => '');
-    throw new Error(`Gemini chat ${res.status}: ${err.slice(0, 500)}`);
+    throw new Error(`Gemini chat ${res.status}: ${redactSecrets(err).slice(0, 500)}`);
   }
   interface GeminiResp {
     candidates?: Array<{
@@ -1003,7 +970,7 @@ export async function veoCreate(opts: VeoGenerateOptions): Promise<VeoTask> {
   );
   if (!res.ok) {
     const err = await res.text().catch(() => '');
-    throw new Error(`Veo create ${res.status}: ${err.slice(0, 500)}`);
+    throw new Error(`Veo create ${res.status}: ${redactSecrets(err).slice(0, 500)}`);
   }
   interface VeoCreateResp {
     name: string;
@@ -1028,7 +995,7 @@ export async function veoPoll(operationName: string, apiKey?: string): Promise<V
   });
   if (!res.ok) {
     const err = await res.text().catch(() => '');
-    throw new Error(`Veo poll ${res.status}: ${err.slice(0, 500)}`);
+    throw new Error(`Veo poll ${res.status}: ${redactSecrets(err).slice(0, 500)}`);
   }
   interface VeoPollResp {
     name: string;
@@ -1131,7 +1098,7 @@ export async function lyriaGenerate(opts: LyriaGenerateOptions): Promise<LyriaRe
   });
   if (!res.ok) {
     const err = await res.text().catch(() => '');
-    throw new Error(`Lyria predict ${res.status}: ${err.slice(0, 500)}`);
+    throw new Error(`Lyria predict ${res.status}: ${redactSecrets(err).slice(0, 500)}`);
   }
   // Lyria's documented response field is `audioContent` (base64), not
   // `bytesBase64Encoded`. Some preview versions also return the older

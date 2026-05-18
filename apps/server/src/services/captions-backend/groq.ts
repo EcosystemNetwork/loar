@@ -15,6 +15,7 @@
  */
 import type { CaptionSegment, CaptionWord } from '../../lib/captions-format';
 import type { CaptionBackend, CaptionBackendInput, CaptionBackendResult } from './types';
+import { redactSecrets } from '../../lib/redact-secrets';
 
 const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/audio/transcriptions';
 const GROQ_MAX_BYTES = 25 * 1024 * 1024;
@@ -165,7 +166,7 @@ function buildGroqBackend(modelId: string, groqModel: string): CaptionBackend {
           status: 'failed',
           hasWordTimings: false,
           hasSpeakers: false,
-          error: `Groq rejected (${res.status}): ${text.slice(0, 200)}`,
+          error: `Groq rejected (${res.status}): ${redactSecrets(text).slice(0, 200)}`,
         };
       }
 

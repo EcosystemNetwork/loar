@@ -114,6 +114,18 @@ async function testMeshyKey(key: string): Promise<boolean> {
   return true;
 }
 
+async function testMiniMaxKey(key: string): Promise<boolean> {
+  // MiniMax's lightest reachable endpoint — files list. 200 = valid,
+  // 401/403 = bad key.
+  const res = await fetch('https://api.minimaxi.chat/v1/files/list', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${key}` },
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (res.status === 401 || res.status === 403) return false;
+  return true;
+}
+
 async function testTripoKey(key: string): Promise<boolean> {
   // Tripo's lightest reachable endpoint — account balance. 200 == valid,
   // 401/403 == bad key, anything else we treat as transient (don't reject).
@@ -203,6 +215,14 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderRegistryEntry> = {
     apiKeyDocsUrl: 'https://platform.tripo3d.ai/api-keys',
     serverPoolEnvVar: 'TRIPO_API_KEY',
     testKey: testTripoKey,
+  },
+  minimax: {
+    id: 'minimax',
+    displayName: 'MiniMax (Hailuo)',
+    apiKeyDocsUrl:
+      'https://platform.minimaxi.com/document/Fast%20access?key=66719005a427f0c8a5701643',
+    serverPoolEnvVar: 'MINIMAX_API_KEY',
+    testKey: testMiniMaxKey,
   },
 };
 

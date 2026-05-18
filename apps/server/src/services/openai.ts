@@ -18,6 +18,8 @@
  * Docs: https://platform.openai.com/docs
  */
 
+import { redactSecrets } from '../lib/redact-secrets';
+
 const BASE_URL = 'https://api.openai.com/v1';
 
 // ── Common ──────────────────────────────────────────────────────────────
@@ -47,7 +49,7 @@ async function postJson<T>(path: string, body: unknown, apiKey: string): Promise
   });
   if (!res.ok) {
     const errBody = await res.text().catch(() => '');
-    throw new Error(`OpenAI ${path} ${res.status}: ${errBody.slice(0, 500)}`);
+    throw new Error(`OpenAI ${path} ${res.status}: ${redactSecrets(errBody).slice(0, 500)}`);
   }
   return (await res.json()) as T;
 }
@@ -61,7 +63,7 @@ async function postForm<T>(path: string, form: FormData, apiKey: string): Promis
   });
   if (!res.ok) {
     const errBody = await res.text().catch(() => '');
-    throw new Error(`OpenAI ${path} ${res.status}: ${errBody.slice(0, 500)}`);
+    throw new Error(`OpenAI ${path} ${res.status}: ${redactSecrets(errBody).slice(0, 500)}`);
   }
   return (await res.json()) as T;
 }
@@ -78,7 +80,7 @@ async function postFormBinary(path: string, body: unknown, apiKey: string): Prom
   });
   if (!res.ok) {
     const errBody = await res.text().catch(() => '');
-    throw new Error(`OpenAI ${path} ${res.status}: ${errBody.slice(0, 500)}`);
+    throw new Error(`OpenAI ${path} ${res.status}: ${redactSecrets(errBody).slice(0, 500)}`);
   }
   return await res.arrayBuffer();
 }
@@ -91,7 +93,7 @@ async function getJson<T>(path: string, apiKey: string): Promise<T> {
   });
   if (!res.ok) {
     const errBody = await res.text().catch(() => '');
-    throw new Error(`OpenAI ${path} ${res.status}: ${errBody.slice(0, 500)}`);
+    throw new Error(`OpenAI ${path} ${res.status}: ${redactSecrets(errBody).slice(0, 500)}`);
   }
   return (await res.json()) as T;
 }

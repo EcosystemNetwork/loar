@@ -13,6 +13,7 @@
  */
 import { TRPCError } from '@trpc/server';
 import { resolveProviderKey } from '../../lib/byok';
+import { redactSecrets } from '../../lib/redact-secrets';
 import { getTtsModelById } from './registry';
 import type { TtsModelConfig } from './types';
 
@@ -184,7 +185,7 @@ export async function dispatchTts(input: TtsDispatchInput): Promise<TtsDispatchR
       const err = await res.text().catch(() => '');
       throw new TRPCError({
         code: 'BAD_GATEWAY',
-        message: `Deepgram TTS ${res.status}: ${err.slice(0, 200)}`,
+        message: `Deepgram TTS ${res.status}: ${redactSecrets(err).slice(0, 200)}`,
       });
     }
     return {
@@ -223,7 +224,7 @@ export async function dispatchTts(input: TtsDispatchInput): Promise<TtsDispatchR
       const err = await res.text().catch(() => '');
       throw new TRPCError({
         code: 'BAD_GATEWAY',
-        message: `Groq TTS ${res.status}: ${err.slice(0, 200)}`,
+        message: `Groq TTS ${res.status}: ${redactSecrets(err).slice(0, 200)}`,
       });
     }
     return {
@@ -321,7 +322,7 @@ export async function dispatchTts(input: TtsDispatchInput): Promise<TtsDispatchR
       const err = await res.text().catch(() => '');
       throw new TRPCError({
         code: 'BAD_GATEWAY',
-        message: `Gemini TTS ${res.status}: ${err.slice(0, 200)}`,
+        message: `Gemini TTS ${res.status}: ${redactSecrets(err).slice(0, 200)}`,
       });
     }
     interface GeminiTtsResp {
@@ -377,7 +378,7 @@ export async function dispatchTts(input: TtsDispatchInput): Promise<TtsDispatchR
       const err = await res.text().catch(() => '');
       throw new TRPCError({
         code: 'BAD_GATEWAY',
-        message: `Z.AI TTS ${res.status}: ${err.slice(0, 200)}`,
+        message: `Z.AI TTS ${res.status}: ${redactSecrets(err).slice(0, 200)}`,
       });
     }
     return {

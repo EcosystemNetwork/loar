@@ -23,7 +23,8 @@ export type ProviderId =
   | 'openai'
   | 'google'
   | 'meshy'
-  | 'tripo';
+  | 'tripo'
+  | 'minimax';
 
 export interface ProviderKeyDoc {
   /** Doc id is `${userId}_${provider}`. */

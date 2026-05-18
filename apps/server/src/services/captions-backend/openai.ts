@@ -17,6 +17,7 @@
 import type { CaptionSegment, CaptionWord } from '../../lib/captions-format';
 import type { CaptionBackend, CaptionBackendInput, CaptionBackendResult } from './types';
 import { validateUploadUrl } from '../../lib/url-validator';
+import { redactSecrets } from '../../lib/redact-secrets';
 
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/audio/transcriptions';
 const OPENAI_MAX_BYTES = 25 * 1024 * 1024;
@@ -175,7 +176,7 @@ function buildBackend(spec: OpenAIModelSpec): CaptionBackend {
           status: 'failed',
           hasWordTimings: false,
           hasSpeakers: false,
-          error: `OpenAI rejected (${res.status}): ${text.slice(0, 200)}`,
+          error: `OpenAI rejected (${res.status}): ${redactSecrets(text).slice(0, 200)}`,
         };
       }
 

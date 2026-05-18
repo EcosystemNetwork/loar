@@ -43,6 +43,7 @@ const ENV_VAR_BY_PROVIDER: Record<SecretProvider, string> = {
   assemblyai: 'ASSEMBLYAI_API_KEY',
   deepgram: 'DEEPGRAM_API_KEY',
   groq: 'GROQ_API_KEY',
+  minimax: 'MINIMAX_API_KEY',
 };
 
 export async function resolveProviderKey(

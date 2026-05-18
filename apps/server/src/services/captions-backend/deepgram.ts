@@ -9,6 +9,7 @@
  */
 import type { CaptionSegment, CaptionWord } from '../../lib/captions-format';
 import type { CaptionBackend, CaptionBackendInput, CaptionBackendResult } from './types';
+import { redactSecrets } from '../../lib/redact-secrets';
 
 const DG_BASE = 'https://api.deepgram.com/v1/listen';
 
@@ -135,7 +136,7 @@ function buildDeepgramBackend(modelId: string, dgModel: string): CaptionBackend 
           status: 'failed',
           hasWordTimings: false,
           hasSpeakers: false,
-          error: `Deepgram rejected (${res.status}): ${text.slice(0, 200)}`,
+          error: `Deepgram rejected (${res.status}): ${redactSecrets(text).slice(0, 200)}`,
         };
       }
 

@@ -9,8 +9,73 @@
  */
 import { TRPCError } from '@trpc/server';
 import { resolveProviderKey } from '../../lib/byok';
+import { withProviderRateLimit } from '../../lib/rate-limit';
+import { redactSecrets } from '../../lib/redact-secrets';
 import { getLlmModelById } from './registry';
 import type { LlmModelConfig } from './types';
+import {
+  recordProviderCost,
+  assertProviderAllowed,
+  type CostProvider,
+  type CostKind,
+} from '../cost-tracker';
+
+// LlmModelConfig.provider → CostProvider for the ledger.
+function costProviderFor(p: LlmModelConfig['provider']): CostProvider {
+  switch (p) {
+    case 'openai':
+      return 'openai';
+    case 'google':
+      return 'gemini';
+    case 'zai':
+      return 'zai';
+    case 'bytedance':
+      return 'bytedance';
+    case 'groq':
+      return 'groq';
+    case 'anthropic-via-aai':
+      return 'other';
+  }
+}
+
+function computeCostUsd(
+  model: LlmModelConfig,
+  inputTokens: number,
+  outputTokens: number,
+  cachedInputTokens: number
+): number {
+  // Cached input is billed at the discounted rate; the rest at full input rate.
+  const billedInput = Math.max(0, inputTokens - cachedInputTokens);
+  const inputUsd = (billedInput / 1_000_000) * model.providerInputUsdPerMtok;
+  const cachedUsd = (cachedInputTokens / 1_000_000) * model.providerCachedInputUsdPerMtok;
+  const outputUsd = (outputTokens / 1_000_000) * model.providerOutputUsdPerMtok;
+  return inputUsd + cachedUsd + outputUsd;
+}
+
+async function recordDispatchCost(
+  model: LlmModelConfig,
+  usage: { promptTokens?: number; completionTokens?: number; cachedInputTokens?: number }
+): Promise<void> {
+  const inputTokens = usage.promptTokens ?? 0;
+  const outputTokens = usage.completionTokens ?? 0;
+  const cachedInputTokens = usage.cachedInputTokens ?? 0;
+  if (inputTokens === 0 && outputTokens === 0) return;
+  const costUsd = computeCostUsd(model, inputTokens, outputTokens, cachedInputTokens);
+  // VLM = vision-capable model; everything else billed as plain LLM.
+  const kind: CostKind = model.capabilities.includes('vision') ? 'vlm' : 'llm';
+  await recordProviderCost({
+    provider: costProviderFor(model.provider),
+    model: model.id,
+    kind,
+    costUsd,
+    inputTokens,
+    outputTokens,
+    tokensUsed: inputTokens + outputTokens,
+  }).catch((err) => {
+    // Cost-tracker must never break the dispatch path.
+    console.warn('[llm-dispatch] cost record failed:', (err as Error).message);
+  });
+}
 
 export interface LlmMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -95,6 +160,37 @@ export async function dispatchLlm(input: LlmDispatchInput): Promise<LlmDispatchR
     });
   }
 
+  // Vision capability gate — if any message carries image_url parts and the
+  // chosen model lacks 'vision', fail fast with an actionable error instead
+  // of either (a) silently stripping the image or (b) shipping it to the
+  // provider for a cryptic 400.
+  const hasImageParts = input.messages.some(
+    (m) => Array.isArray(m.content) && m.content.some((c) => c.type === 'image_url')
+  );
+  if (hasImageParts && !model.capabilities.includes('vision')) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Model ${model.id} does not support vision — pick a model with the 'vision' capability (e.g. gpt-5-mini, glm-4-6v, doubao-seed-1-6-vision)`,
+    });
+  }
+
+  // Admin kill-switch + platform cost cap preflight. Throws
+  // ProviderPausedError / CostCapExceededError before we burn a real call.
+  await assertProviderAllowed({ provider: costProviderFor(model.provider) });
+
+  // Per-provider concurrency gate — prevents 429 storms on shared keys at
+  // scale. Caps are env-tunable; see lib/rate-limit.ts.
+  const result = await withProviderRateLimit(costProviderFor(model.provider), () =>
+    dispatchLlmInner(model, input)
+  );
+  await recordDispatchCost(model, result.usage);
+  return result;
+}
+
+async function dispatchLlmInner(
+  model: LlmModelConfig,
+  input: LlmDispatchInput
+): Promise<LlmDispatchResult> {
   // ── OpenAI ─────────────────────────────────────────────────────────
   if (model.provider === 'openai') {
     const apiKey = await resolveProviderKey(input.userId ?? null, 'openai');
@@ -265,7 +361,7 @@ export async function dispatchLlm(input: LlmDispatchInput): Promise<LlmDispatchR
       const err = await res.text().catch(() => '');
       throw new TRPCError({
         code: 'BAD_GATEWAY',
-        message: `Groq chat ${res.status}: ${err.slice(0, 200)}`,
+        message: `Groq chat ${res.status}: ${redactSecrets(err).slice(0, 200)}`,
       });
     }
     interface GroqResp {
@@ -308,6 +404,22 @@ export async function dispatchLlm(input: LlmDispatchInput): Promise<LlmDispatchR
 
   // ── Google Gemini ──────────────────────────────────────────────────
   if (model.provider === 'google') {
+    // Fail loudly when callers request unsupported features instead of
+    // silently dropping them — Gemini's tool-call wiring is not yet
+    // bridged through this dispatcher, and tool messages can't be flattened
+    // into a model turn without corrupting multi-turn sessions.
+    if (input.tools && input.tools.length > 0) {
+      throw new TRPCError({
+        code: 'NOT_IMPLEMENTED',
+        message: `tools[] is not supported on the Gemini dispatcher yet — use an OpenAI / Z.AI / Doubao / Groq model for tool calls.`,
+      });
+    }
+    if (input.messages.some((m) => m.role === 'tool')) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `role:'tool' messages are not supported on Gemini — wrap the tool result into a 'user' message.`,
+      });
+    }
     const apiKey = await resolveProviderKey(input.userId ?? null, 'google');
     if (!apiKey) {
       throw new TRPCError({
@@ -369,4 +481,84 @@ export async function dispatchLlm(input: LlmDispatchInput): Promise<LlmDispatchR
     code: 'INTERNAL_SERVER_ERROR',
     message: `No LLM dispatcher for provider ${model.provider}`,
   });
+}
+
+/**
+ * Heuristic for "the provider is transiently sad" — rate limits, 5xx,
+ * network errors, model overload. These should trigger a fallback hop.
+ * BAD_REQUEST / 4xx-other / auth errors are *not* retryable — they'd just
+ * fail again on a different model with the same input.
+ */
+function isRetryableProviderError(err: unknown): boolean {
+  if (err instanceof TRPCError) {
+    return (
+      err.code === 'BAD_GATEWAY' || err.code === 'TIMEOUT' || err.code === 'INTERNAL_SERVER_ERROR'
+    );
+  }
+  if (err instanceof Error) {
+    const msg = err.message.toLowerCase();
+    return (
+      msg.includes('429') ||
+      msg.includes('rate limit') ||
+      msg.includes('overloaded') ||
+      msg.includes('timeout') ||
+      msg.includes('econnreset') ||
+      msg.includes('etimedout') ||
+      msg.includes('socket hang up') ||
+      /\b5\d\d\b/.test(msg) // any 5xx
+    );
+  }
+  return false;
+}
+
+/**
+ * Dispatch through a fallback chain. Tries `primaryModelId` first; on
+ * retryable provider errors (429 / 5xx / network / overload) walks
+ * `fallbackModelIds` in order until one succeeds. Auth / bad-request
+ * failures short-circuit immediately — they aren't going to fix themselves
+ * on a different model.
+ *
+ * Returns the successful result plus the model id that won, so callers can
+ * log "wanted X got Y" for observability.
+ */
+export interface LlmFallbackResult extends LlmDispatchResult {
+  attemptedModelIds: string[];
+}
+
+export async function dispatchLlmWithFallback(
+  input: Omit<LlmDispatchInput, 'modelId'> & {
+    primaryModelId: string;
+    fallbackModelIds: string[];
+  }
+): Promise<LlmFallbackResult> {
+  const chain = [input.primaryModelId, ...input.fallbackModelIds];
+  const attempted: string[] = [];
+  let lastErr: unknown;
+  for (const modelId of chain) {
+    attempted.push(modelId);
+    try {
+      const r = await dispatchLlm({ ...input, modelId });
+      if (attempted.length > 1) {
+        console.warn(
+          `[llm-dispatch] primary=${input.primaryModelId} failed, succeeded on fallback=${modelId} after ${attempted.length - 1} hop(s)`
+        );
+      }
+      return { ...r, attemptedModelIds: attempted };
+    } catch (err) {
+      lastErr = err;
+      if (!isRetryableProviderError(err)) {
+        // Non-retryable: bail out immediately rather than wasting other providers.
+        throw err;
+      }
+      console.warn(
+        `[llm-dispatch] model=${modelId} failed retryably (${(err as Error).message?.slice(0, 200)}); trying next fallback`
+      );
+    }
+  }
+  throw lastErr instanceof Error
+    ? lastErr
+    : new TRPCError({
+        code: 'BAD_GATEWAY',
+        message: `All LLM models failed for chain ${chain.join(' → ')}`,
+      });
 }
