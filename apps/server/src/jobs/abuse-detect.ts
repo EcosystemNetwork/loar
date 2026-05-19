@@ -85,7 +85,9 @@ export async function detectAbuseOnce(
     const uid = userDoc.id;
 
     // Count spend rows in the trailing 24h using the existing
-    // (uid ASC, createdAt DESC) composite index. We can't easily avoid
+    // (uid ASC, createdAt DESC) composite index. The explicit DESC orderBy
+    // is required — Firestore implicitly sorts ASC for range filters and
+    // would otherwise demand a second ASC index. We can't easily avoid
     // scanning every row (we need credits, not just count) because spend
     // volume is the signal we care about — two users with 100 rows could
     // have very different credit totals.
@@ -93,6 +95,7 @@ export async function detectAbuseOnce(
       .collection('creditTransactions')
       .where('uid', '==', uid)
       .where('createdAt', '>=', cutoff)
+      .orderBy('createdAt', 'desc')
       .get();
 
     let count = 0;

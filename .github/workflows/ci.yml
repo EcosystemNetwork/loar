@@ -285,15 +285,7 @@ jobs:
   ci-gate:
     name: CI Gate
     needs:
-      [
-        build,
-        web,
-        server-tests,
-        address-registry,
-        indexer-validate,
-        contracts,
-        model-matrix-smoke,
-      ]
+      [build, web, server-tests, address-registry, indexer-validate, contracts, model-matrix-smoke]
     runs-on: ubuntu-latest
     if: always()
     steps:

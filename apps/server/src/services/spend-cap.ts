@@ -50,7 +50,9 @@ export async function getMonthlySpend(uid: string): Promise<number> {
   const since = new Date(now - WINDOW_MS);
   let total = 0;
 
-  // Uses the existing (uid ASC, createdAt DESC) composite index.
+  // Uses the existing (uid ASC, createdAt DESC) composite index. The explicit
+  // orderBy is required — without it, Firestore implicitly sorts createdAt ASC
+  // and demands a second ASC index. Direction doesn't affect the result set.
   // Filter by `type == 'spend'` in memory — a normal user has ≤100 rows in
   // a 30-day window; adding a new composite index just for this is a waste.
   // No try/catch wrapper: a Firestore read failure must NOT silently disable
@@ -60,6 +62,7 @@ export async function getMonthlySpend(uid: string): Promise<number> {
     .collection('creditTransactions')
     .where('uid', '==', uid)
     .where('createdAt', '>=', since)
+    .orderBy('createdAt', 'desc')
     .get();
 
   for (const doc of snap.docs) {
@@ -85,10 +88,14 @@ export async function getDailySpend(uid: string): Promise<number> {
 
   const since = new Date(now - DAILY_WINDOW_MS);
   let total = 0;
+  // Same index reuse trick as getMonthlySpend — explicit DESC orderBy lets
+  // Firestore serve this from `(uid ASC, createdAt DESC)` instead of asking
+  // for a separate ASC composite index.
   const snap = await db
     .collection('creditTransactions')
     .where('uid', '==', uid)
     .where('createdAt', '>=', since)
+    .orderBy('createdAt', 'desc')
     .get();
   for (const doc of snap.docs) {
     const data = doc.data();
