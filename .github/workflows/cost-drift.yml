@@ -120,13 +120,11 @@ jobs:
             EXTRA+=("--provider-thresholds=$PROVIDER_THRESHOLDS")
           fi
 
-          # Print human-readable to log (exit 1 == flagged, exit 0 == clean).
-          # Don't fail-mask the script here — we still need its data below.
+          # Run JSON-mode only (the single source of truth for downstream
+          # logic). Skipping the text run means we don't have to reconcile
+          # two separate exit codes — the JSON output is parsed and printed
+          # below in human-readable form for the job log.
           set +e
-          pnpm cost:check-drift \
-            --window="$WINDOW" --baseline="$BASELINE" \
-            --threshold="$THRESHOLD" "${EXTRA[@]}"
-          TEXT_EXIT=$?
           pnpm cost:check-drift \
             --window="$WINDOW" --baseline="$BASELINE" \
             --threshold="$THRESHOLD" "${EXTRA[@]}" --json > drift.json
@@ -142,6 +140,12 @@ jobs:
             cat drift.json 2>/dev/null || echo "(file missing)"
             exit 1
           fi
+
+          # Pretty-print the flagged models for the job log (script's own
+          # output is identical to --json minus the JSON shell).
+          echo "Drift audit completed (exit=$JSON_EXIT)."
+          jq -r '"flagged=\(.flaggedCount) window=\(.windowDays)d baseline=\(.baselineDays)d threshold=\(.threshold)"' drift.json
+          jq -r '.flagged[] | "  ✗ " + .provider + "/" + .model + " " + .kind + " drift=" + ((.driftPct * 100)|tostring|.[0:5]) + "%"' drift.json || true
 
           FLAGGED_COUNT=$(jq -r '.flaggedCount' drift.json)
           echo "flagged_count=$FLAGGED_COUNT" >> "$GITHUB_OUTPUT"

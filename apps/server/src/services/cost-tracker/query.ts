@@ -37,8 +37,15 @@ export async function getOverview(period: string): Promise<{
   byProvider: AggregateRow[];
 }> {
   if (!firebaseAvailable) return { total: null, byProvider: [] };
-  const [totalDoc, providerSnap] = await Promise.all([
-    db.collection('costAggregates').doc(`${period}__platform__all`).get(),
+  // Platform total is sharded for write throughput (see record.ts) — sum
+  // the shards on read. Provider rollups stay un-sharded; each
+  // provider:kind doc is much lower volume.
+  const { PLATFORM_SHARD_COUNT } = await import('./record');
+  const platformShardRefs = Array.from({ length: PLATFORM_SHARD_COUNT }, (_, i) =>
+    db.collection('costAggregates').doc(`${period}__platform__all__shard${i}`)
+  );
+  const [platformSnaps, providerSnap] = await Promise.all([
+    db.getAll(...platformShardRefs),
     db
       .collection('costAggregates')
       .where('period', '==', period)
@@ -46,7 +53,27 @@ export async function getOverview(period: string): Promise<{
       .get(),
   ]);
   const byProvider = providerSnap.docs.map(row).sort((a, b) => b.costUsd - a.costUsd);
-  const totalRow = totalDoc.exists ? row(totalDoc as any) : null;
+  const platformAgg = platformSnaps.reduce(
+    (acc, s) => {
+      const data = s.data();
+      if (!data) return acc;
+      acc.costUsd += Number(data.costUsd ?? 0);
+      acc.calls += Number(data.calls ?? 0);
+      acc.tokensUsed += Number(data.tokensUsed ?? 0);
+      return acc;
+    },
+    { costUsd: 0, calls: 0, tokensUsed: 0 }
+  );
+  const totalRow: AggregateRow | null = platformSnaps.some((s) => s.exists)
+    ? {
+        period,
+        scope: 'platform',
+        key: 'all',
+        costUsd: platformAgg.costUsd,
+        calls: platformAgg.calls,
+        tokensUsed: platformAgg.tokensUsed,
+      }
+    : null;
   return { total: totalRow, byProvider };
 }
 

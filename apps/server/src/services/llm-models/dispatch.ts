@@ -21,11 +21,22 @@ import {
   CostCapExceededError,
   llmFallbackHopTotal,
   llmRequestFailureTotal,
+  llmDispatchLatencySeconds,
   providerCallFailureTotal,
   type CostProvider,
   type CostKind,
 } from '../cost-tracker';
 
+/**
+ * Coarse failure classification for the providerCallFailureTotal metric.
+ *
+ * For plain Error fallbacks we match on string fragments that are
+ * unambiguously *error-side* (HTTP status numbers as their own tokens,
+ * system errno strings, narrow auth phrases). We deliberately do NOT
+ * match the loose phrase "rate limit" because providers often echo the
+ * user's prompt in the error body — a user asking "what's the rate
+ * limit?" would have every error mis-tagged as `rate_limit`.
+ */
 function classifyDispatchError(
   err: unknown
 ): 'paused' | 'cap' | 'rate_limit' | 'timeout' | 'auth' | 'bad_request' | 'other' {
@@ -39,11 +50,29 @@ function classifyDispatchError(
     return 'other';
   }
   if (err instanceof Error) {
-    const msg = err.message.toLowerCase();
-    if (msg.includes('429') || msg.includes('rate limit')) return 'rate_limit';
-    if (msg.includes('timeout') || msg.includes('etimedout')) return 'timeout';
-    if (msg.includes('401') || msg.includes('unauthorized') || msg.includes('invalid api key'))
+    const msg = err.message;
+    // HTTP status as a whole token (`HTTP 429`, `: 429`, `status 429`)
+    // — not as a substring of arbitrary text.
+    if (/\b(?:HTTP\s+)?429\b/.test(msg) || /\b(?:status|code)[:\s]+429\b/i.test(msg)) {
+      return 'rate_limit';
+    }
+    // System errno timeouts. Don't match the bare word "timeout" because
+    // user prompts about app timeouts would false-positive.
+    if (/\bETIMEDOUT\b|\bECONNRESET\b|\bsocket hang up\b|Request timed out\b/i.test(msg)) {
+      return 'timeout';
+    }
+    // Narrow auth phrases that are unambiguously error-side. Covers
+    // OpenAI ("Incorrect API key"), AssemblyAI ("Authentication failed"),
+    // Anthropic ("invalid x-api-key"), generic 401 errors.
+    if (
+      /\b(?:HTTP\s+)?401\b/.test(msg) ||
+      /\bauthentication failed\b/i.test(msg) ||
+      /\binvalid api key\b/i.test(msg) ||
+      /\bincorrect api key\b/i.test(msg) ||
+      /\binvalid x-api-key\b/i.test(msg)
+    ) {
       return 'auth';
+    }
   }
   return 'other';
 }
@@ -245,28 +274,50 @@ export async function dispatchLlm(input: LlmDispatchInput): Promise<LlmDispatchR
     providerCallFailureTotal
       .labels(
         costProviderFor(model.provider),
-        model.capabilities.includes('vision') ? 'vlm' : 'llm',
+        classifyKind(model, input.messages),
         model.id,
         classifyDispatchError(err)
       )
       .inc();
+    // Translate control-plane errors into user-visible 4xx codes so the
+    // caller sees "provider paused" / "budget exhausted" instead of a
+    // generic 500. cost-tracker classes carry their own message + kind.
+    if (err instanceof ProviderPausedError) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: err.message, cause: err });
+    }
+    if (err instanceof CostCapExceededError) {
+      throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: err.message, cause: err });
+    }
     throw err;
   }
 
   // Per-provider concurrency gate — prevents 429 storms on shared keys at
   // scale. Caps are env-tunable; see lib/rate-limit.ts.
+  // Latency observation wraps dispatchLlmInner ONLY (excludes router +
+  // rate-limit wait + cost recording) so the histogram reflects true
+  // provider-side latency, not queueing time.
   try {
-    const result = await withProviderRateLimit(costProviderFor(model.provider), () =>
-      dispatchLlmInner(model, input)
-    );
+    const kindLabel = classifyKind(model, input.messages);
+    const providerLabel = costProviderFor(model.provider);
+    const result = await withProviderRateLimit(providerLabel, async () => {
+      const endTimer = llmDispatchLatencySeconds.startTimer({
+        provider: providerLabel,
+        kind: kindLabel,
+      });
+      try {
+        return await dispatchLlmInner(model, input);
+      } finally {
+        endTimer();
+      }
+    });
     await recordDispatchCost(model, input.messages, result.usage);
     return result;
   } catch (err) {
-    // Failure path — bump the per-attempt failure counter so ops can graph
-    // error rate per provider/model. Note this counts EVERY failed attempt
-    // including ones recovered by fallback. For user-visible failure rate,
-    // see llmRequestFailureTotal (fires only when the entire chain in
-    // dispatchLlmWithFallback exhausts).
+    // Per-attempt failure counter — this catches provider-side errors
+    // (rate-limit, timeout, 5xx, etc.) AFTER the kill-switch + cap
+    // preflight already passed. Control-plane errors are handled in the
+    // earlier catch block. Includes attempts recovered by fallback; for
+    // user-visible failure rate see llmRequestFailureTotal.
     providerCallFailureTotal
       .labels(
         costProviderFor(model.provider),
@@ -539,26 +590,32 @@ async function dispatchLlmInner(
  * fail again on a different model with the same input.
  */
 function isRetryableProviderError(err: unknown): boolean {
-  // Admin paused this provider — try the next one in the chain rather than
-  // erroring the user. CostCapExceededError is *not* retryable (the cap is
-  // already breached; another provider would just deepen the bill).
-  if (err instanceof ProviderPausedError) return true;
+  // Control-plane errors are NEVER retryable:
+  //   - ProviderPausedError: admin explicitly stopped this provider; routing
+  //     to another silently bypasses the kill-switch (defeats the purpose).
+  //   - CostCapExceededError: cap is already breached; falling back to
+  //     another provider would just deepen the bill.
+  // The user must see these errors directly so ops gets the alert.
+  if (err instanceof ProviderPausedError) return false;
+  if (err instanceof CostCapExceededError) return false;
   if (err instanceof TRPCError) {
+    // FORBIDDEN / TOO_MANY_REQUESTS we already wrapped from control errors —
+    // not retryable. Pure provider-side TRPC codes are retryable.
     return (
       err.code === 'BAD_GATEWAY' || err.code === 'TIMEOUT' || err.code === 'INTERNAL_SERVER_ERROR'
     );
   }
   if (err instanceof Error) {
-    const msg = err.message.toLowerCase();
+    const msg = err.message;
+    // Same tightened patterns as classifyDispatchError — match HTTP status
+    // tokens + system errnos, not loose substrings that could appear in
+    // user-prompt echoes.
     return (
-      msg.includes('429') ||
-      msg.includes('rate limit') ||
-      msg.includes('overloaded') ||
-      msg.includes('timeout') ||
-      msg.includes('econnreset') ||
-      msg.includes('etimedout') ||
-      msg.includes('socket hang up') ||
-      /\b5\d\d\b/.test(msg) // any 5xx
+      /\b(?:HTTP\s+)?429\b/.test(msg) ||
+      /\b(?:status|code)[:\s]+429\b/i.test(msg) ||
+      /\boverloaded\b/i.test(msg) ||
+      /\bETIMEDOUT\b|\bECONNRESET\b|\bsocket hang up\b|Request timed out\b/i.test(msg) ||
+      /\b(?:HTTP\s+)?(?:500|502|503|504)\b/.test(msg)
     );
   }
   return false;

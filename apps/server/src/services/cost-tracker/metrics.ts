@@ -3,7 +3,7 @@
  * Counters are additive — safe to emit on every record regardless of persistence.
  */
 
-import { Counter, Gauge } from 'prom-client';
+import { Counter, Gauge, Histogram } from 'prom-client';
 
 export const providerCostUsdTotal = new Counter({
   name: 'loar_provider_cost_usd_total',
@@ -20,10 +20,25 @@ export const providerTokensTotal = new Counter({
 // LLM router decisions: lets ops graph autoroute drift over time, spot
 // providers that suddenly never win (key missing? all rate-limited?), and
 // confirm that cost-tier flips translate into real call mix shifts.
+//
+// Cardinality intentionally kept small (~30 models × 5 reasons × 3 budgets ≈ 450
+// active series). `quality_target` was dropped: it's coarse and was often
+// undefined, contributing cardinality without much signal — `reason_code`
+// already captures intent (cheapest_eligible / best_quality_eligible / …).
 export const llmRouterDecisionTotal = new Counter({
   name: 'loar_llm_router_decision_total',
-  help: 'Count of routeLlmModel decisions, labelled by chosen model + reason + cost budget + quality target.',
-  labelNames: ['chosen_model', 'provider', 'reason_code', 'cost_budget', 'quality_target'] as const,
+  help: 'Count of routeLlmModel decisions, labelled by chosen model + provider + reason + cost budget.',
+  labelNames: ['chosen_model', 'provider', 'reason_code', 'cost_budget'] as const,
+});
+
+// Per-provider dispatch latency. Buckets span 100ms → 5min to cover both
+// fast chat (Groq, Gemini Flash) and slow video extraction (Gemini Pro,
+// Sora). Use rate() / histogram_quantile() in PromQL for p50/p95/p99.
+export const llmDispatchLatencySeconds = new Histogram({
+  name: 'loar_llm_dispatch_latency_seconds',
+  help: 'End-to-end dispatch latency in seconds, per provider/kind. Excludes router + rate-limit wait — measured around dispatchLlmInner only.',
+  labelNames: ['provider', 'kind'] as const,
+  buckets: [0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60, 120, 300],
 });
 
 // Fallback hops: every time dispatchLlmWithFallback walks past the primary

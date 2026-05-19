@@ -40,10 +40,11 @@ const DEFAULT_LIMITS: Record<string, number> = {
   default: 20,
 };
 
-const STALE_TTL_MS = 60_000;
+const STALE_TTL_MS = 600_000; // 10 min — covers long-running video/extraction calls
 const REDIS_RETRY_BACKOFF_MS = 50;
 const REDIS_RETRY_JITTER_MS = 100;
-const REDIS_KEY_TTL_SEC = 120;
+const REDIS_KEY_TTL_SEC = 660; // STALE_TTL_MS / 1000 + 1 min headroom
+const LOCAL_ACQUIRE_TIMEOUT_MS = 30_000; // matches Redis path's deadline
 
 function envCap(provider: string): number | undefined {
   const key = `LLM_CONCURRENCY_${provider.toUpperCase()}`;
@@ -84,7 +85,25 @@ async function acquireLocal(g: ProviderGate): Promise<void> {
     g.active += 1;
     return;
   }
-  await new Promise<void>((resolve) => g.queue.push(resolve));
+  // Queue with a deadline — without one, a desync between active counter
+  // and queue (e.g. a release that runs while no waiter is queued) would
+  // hang waiters forever. Mirrors the Redis path's 30s safety bound.
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const idx = g.queue.indexOf(slot);
+      if (idx >= 0) g.queue.splice(idx, 1);
+      reject(
+        new Error(
+          `rate-limit: in-process acquire timed out after ${LOCAL_ACQUIRE_TIMEOUT_MS}ms (cap=${g.cap}, active=${g.active}, queued=${g.queue.length})`
+        )
+      );
+    }, LOCAL_ACQUIRE_TIMEOUT_MS);
+    const slot = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    g.queue.push(slot);
+  });
 }
 
 function releaseLocal(g: ProviderGate): void {

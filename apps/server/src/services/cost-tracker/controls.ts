@@ -148,6 +148,62 @@ const CACHE_MS = Math.max(
 
 let cached: { at: number; controls: CostControls } | null = null;
 
+// Cross-instance cache invalidation channel. When admin updates controls
+// on instance A, setControls() publishes to this Redis channel; every
+// other instance subscribes and clears its local cache so paused
+// providers / new caps take effect fleet-wide within milliseconds
+// instead of waiting up to CACHE_MS for the cache to expire naturally.
+const CONTROLS_INVALIDATE_CHANNEL = 'cost-controls:invalidate';
+
+let subscriberStarted = false;
+
+function ensureSubscriberStarted(): void {
+  if (subscriberStarted) return;
+  subscriberStarted = true;
+  // Dynamic import to avoid pulling Redis into hot path when REDIS_URL is unset.
+  import('../../lib/redis')
+    .then(async ({ getRedisClientAsync }) => {
+      const client = await getRedisClientAsync();
+      if (!client) return;
+      // ioredis: duplicate() returns a fresh connection — required because a
+      // subscribing client can't issue commands. Same auth, same URL.
+      const sub = (client as any).duplicate?.();
+      if (!sub) return;
+      try {
+        await sub.connect?.().catch(() => undefined);
+        await sub.subscribe(CONTROLS_INVALIDATE_CHANNEL);
+        sub.on('message', (_channel: string) => {
+          cached = null;
+        });
+        sub.on('error', (err: Error) => {
+          console.warn('[cost-controls] subscriber error:', err.message);
+        });
+      } catch (err) {
+        console.warn(
+          '[cost-controls] subscribe failed (cache invalidation is local-only):',
+          (err as Error).message
+        );
+      }
+    })
+    .catch(() => {
+      // Redis module unavailable — local cache still works.
+    });
+}
+
+async function publishInvalidate(): Promise<void> {
+  try {
+    const { getRedisClient } = await import('../../lib/redis');
+    const client = getRedisClient();
+    if (!client) return;
+    await client.publish(CONTROLS_INVALIDATE_CHANNEL, '1');
+  } catch (err) {
+    console.warn(
+      '[cost-controls] publish invalidate failed (other instances will catch up via TTL):',
+      (err as Error).message
+    );
+  }
+}
+
 export function invalidateControlsCache(): void {
   cached = null;
 }
@@ -193,6 +249,11 @@ function merge(base: CostControls, patch: any): CostControls {
 }
 
 export async function getControls(): Promise<CostControls> {
+  // Lazy-start the cross-instance subscriber on first read so single-
+  // instance dev / test deployments don't pay any Redis cost when
+  // REDIS_URL is unset.
+  ensureSubscriberStarted();
+
   const now = Date.now();
   if (cached && now - cached.at < CACHE_MS) return cached.controls;
   if (!firebaseAvailable) {
@@ -224,6 +285,10 @@ export async function setControls(
     appliedAt: new Date(),
   });
   invalidateControlsCache();
+  // Fan out to the rest of the fleet so paused providers / new caps take
+  // effect within ~ms instead of waiting up to CACHE_MS for each
+  // instance's cache to expire naturally.
+  await publishInvalidate();
   return next;
 }
 
@@ -235,9 +300,33 @@ function periodKeys() {
 }
 
 async function readAggregate(scope: string, key: string): Promise<number> {
+  // Fast path: Redis-backed atomic spend counter (closes the cap stampede
+  // race window from seconds to microseconds). Falls back to Firestore
+  // aggregate when Redis is unavailable.
+  try {
+    const { readRedisSpend } = await import('./redis-spend');
+    const redisSpend = await readRedisSpend(scope, key);
+    if (redisSpend !== null) return redisSpend;
+  } catch (err) {
+    console.warn(
+      '[cost-controls] redis-spend read failed, falling through to Firestore:',
+      (err as Error).message
+    );
+  }
+
   if (!firebaseAvailable) return 0;
   try {
     const { day } = periodKeys();
+    // Platform aggregate is sharded across PLATFORM_SHARD_COUNT docs to
+    // escape the Firestore 1-op/sec-per-doc cap. Sum the shards on read.
+    if (scope === 'platform') {
+      const { PLATFORM_SHARD_COUNT } = await import('./record');
+      const refs = Array.from({ length: PLATFORM_SHARD_COUNT }, (_, i) =>
+        db.collection('costAggregates').doc(`${day}__platform__${key}__shard${i}`)
+      );
+      const snaps = await db.getAll(...refs);
+      return snaps.reduce((sum, s) => sum + Number(s.data()?.costUsd ?? 0), 0);
+    }
     const doc = await db.collection('costAggregates').doc(`${day}__${scope}__${key}`).get();
     return Number(doc.data()?.costUsd ?? 0);
   } catch (err) {
@@ -256,6 +345,27 @@ export interface AssertArgs {
  * Gate a paid-API call on (a) the provider kill-switch and (b) every scope
  * cap that applies. Throws `ProviderPausedError` or `CostCapExceededError`
  * when a gate fails; returns silently otherwise.
+ *
+ * Cap semantics — IMPORTANT for ops:
+ *
+ *   - **Caps are SOFT LIMITS, not hard quotas.** This function runs preflight
+ *     against the eventually-consistent `costAggregates` doc. Under burst
+ *     load the same "spent" value is observed by many concurrent callers
+ *     before any of them increments the aggregate, so all of them pass and
+ *     the daily total can exceed the cap.
+ *   - **A single call can exceed the cap.** If cap=$5 and current spend=$0,
+ *     a $10 video-gen call passes preflight and is billed in full.
+ *   - **Read errors fail OPEN.** If Firestore is unreachable while reading
+ *     the aggregate, `readAggregate` returns 0 so we don't block all paid
+ *     calls during a Firestore outage. Trade-off: during outages, caps are
+ *     unenforced.
+ *   - **Multi-instance pause has up to 30s lag.** The controls doc is cached
+ *     in-process for COST_CONTROLS_CACHE_MS. Calling `setControls()` only
+ *     invalidates the calling instance — other instances see the old
+ *     `pausedProviders` list until their cache expires.
+ *
+ * For hard reservations / atomic compare-and-decrement, see the per-user
+ * Redis-backed budget reserve (not implemented at this layer).
  */
 export async function assertProviderAllowed(args: AssertArgs): Promise<void> {
   const controls = await getControls();

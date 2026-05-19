@@ -1261,8 +1261,20 @@ console.log(`CORS origin: ${env.CORS_ORIGIN || 'http://localhost:5173 (default)'
 console.log(`Environment: ${env.NODE_ENV}`);
 
 // Pricing audit — surfaces $0-cost ByteDance entries on boot so silent
-// margin loss can't hide. Set LLM_PRICING_AUDIT_OFF=1 to suppress.
-import('./lib/pricing-audit').then(({ auditPricingOnBoot }) => auditPricingOnBoot());
+// margin loss can't hide. Set LLM_PRICING_AUDIT_OFF=1 to suppress. The
+// audit must never block server startup; any failure to load or run is
+// logged and swallowed.
+import('./lib/pricing-audit')
+  .then(({ auditPricingOnBoot }) => {
+    try {
+      auditPricingOnBoot();
+    } catch (err) {
+      console.warn('[pricing-audit] boot audit failed:', (err as Error).message);
+    }
+  })
+  .catch((err) => {
+    console.warn('[pricing-audit] module load failed:', (err as Error).message);
+  });
 
 const server = serve({ fetch: app.fetch, port }, (info) => {
   console.log(`Server listening on http://localhost:${info.port}`);

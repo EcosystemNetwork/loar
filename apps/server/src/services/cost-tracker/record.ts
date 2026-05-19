@@ -68,17 +68,55 @@ function periodKeys(now: Date) {
   return { day, month };
 }
 
+// Tracks routes that have already warned about missing scope so the log
+// doesn't get spammed at 1000 QPS. One warn per (route, runtime).
+const scopeWarnedFor = new Set<string>();
+
+// Sharding for hot aggregate writes. Firestore caps single-doc writes at
+// ~1/sec; the platform-wide aggregate doc gets a write on EVERY paid call
+// (~1000 QPS at scale). Round-robining writes across SHARD_COUNT replica
+// docs gives ~SHARD_COUNT× the write throughput. Reads sum across shards.
+//
+// We shard the platform total ONLY — per-provider:kind and per-user docs
+// don't get enough traffic to need it (a single openai:llm doc maxes at
+// the rate of openai:llm calls, not total platform calls). Adjust via
+// env if a specific provider becomes a hot bottleneck.
+export const PLATFORM_SHARD_COUNT = Math.max(
+  1,
+  Math.min(50, parseInt(process.env.COST_PLATFORM_SHARD_COUNT ?? '10', 10) || 10)
+);
+
+function pickShardSuffix(scope: string): string {
+  if (scope !== 'platform') return '';
+  const s = Math.floor(Math.random() * PLATFORM_SHARD_COUNT);
+  return `__shard${s}`;
+}
+
 function aggregateDocId(
   period: string,
-  scope: 'platform' | 'provider' | 'user' | 'apiKey' | 'universe',
-  key: string
+  scope: 'platform' | 'provider' | 'user' | 'apiKey' | 'universe' | 'model',
+  key: string,
+  shardSuffix = ''
 ) {
-  return `${period}__${scope}__${key || 'none'}`;
+  return `${period}__${scope}__${key || 'none'}${shardSuffix}`;
 }
 
 export async function recordProviderCost(input: RecordProviderCostInput): Promise<void> {
   const costUsd = Number.isFinite(input.costUsd) && input.costUsd > 0 ? input.costUsd : 0;
   const scope = { ...getCostScope(), ...(input.scopeOverride ?? {}) };
+
+  // Surface scope-missing on metered calls. AsyncLocalStorage doesn't cross
+  // worker process boundaries — if a BullMQ job forgets to wrap with
+  // withCostScope, ledger writes attribute to 'anon' silently. Warn once per
+  // route so per-user margin math doesn't degrade unnoticed.
+  if (costUsd > 0 && scope.userId == null && !scopeWarnedFor.has(scope.route ?? 'unknown')) {
+    scopeWarnedFor.add(scope.route ?? 'unknown');
+    console.warn(
+      `[cost-tracker] metered call recorded with no userId (provider=${input.provider} kind=${input.kind} model=${input.model ?? 'unknown'} route=${scope.route ?? 'unknown'}) — ` +
+        `wrap the caller with withCostScope({ userId, ... }) to restore attribution`
+    );
+  }
+
   // Always emit the Prometheus counter even when Firestore isn't configured —
   // dashboards should see cost regardless of persistence state.
   recordProviderCostMetric({
@@ -130,8 +168,9 @@ export async function recordProviderCost(input: RecordProviderCostInput): Promis
     ...(scope.apiKeyId ? [{ scope: 'apiKey', key: scope.apiKeyId }] : []),
     ...(scope.universeAddress ? [{ scope: 'universe', key: scope.universeAddress }] : []),
   ].flatMap(({ scope: s, key }) => {
-    const idDay = aggregateDocId(day, s as any, key);
-    const idMonth = aggregateDocId(month, s as any, key);
+    const shardSuffix = pickShardSuffix(s);
+    const idDay = aggregateDocId(day, s as any, key, shardSuffix);
+    const idMonth = aggregateDocId(month, s as any, key, shardSuffix);
     return [
       {
         ref: db.collection('costAggregates').doc(idDay),
@@ -174,5 +213,27 @@ export async function recordProviderCost(input: RecordProviderCostInput): Promis
   } catch (err) {
     // Log but never rethrow — cost tracking must not break business flows.
     console.error('[cost-tracker] record failed:', err);
+  }
+
+  // Write-through to Redis-backed atomic spend counters. Used by
+  // assertProviderAllowed for cap stampede mitigation (closes the
+  // read-vs-write race window from seconds → microseconds). Best-effort:
+  // the Firestore aggregate above is the source of truth.
+  try {
+    const { incrementRedisSpend } = await import('./redis-spend');
+    const incrementOps: Array<{ scope: string; key: string }> = [
+      { scope: 'platform', key: 'all' },
+      { scope: 'provider', key: `${input.provider}:${input.kind}` },
+    ];
+    if (scope.userId) incrementOps.push({ scope: 'user', key: scope.userId });
+    if (scope.apiKeyId) incrementOps.push({ scope: 'apiKey', key: scope.apiKeyId });
+    if (scope.universeAddress) {
+      incrementOps.push({ scope: 'universe', key: scope.universeAddress });
+    }
+    await Promise.all(
+      incrementOps.map(({ scope: s, key: k }) => incrementRedisSpend(s, k, costUsd))
+    );
+  } catch (err) {
+    console.warn('[cost-tracker] redis-spend write-through failed:', (err as Error).message);
   }
 }

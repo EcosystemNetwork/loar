@@ -159,15 +159,11 @@ export function routeLlmModel(input: LlmRoutingInput): LlmRoutingDecision {
   }
 
   // Prometheus: graph autoroute drift, spot stuck providers, confirm
-  // cost-tier flips translate to real call mix shifts.
+  // cost-tier flips translate to real call mix shifts. quality_target
+  // was dropped from labels (reason_code already captures intent and the
+  // extra dimension wasn't worth the cardinality).
   llmRouterDecisionTotal
-    .labels(
-      chosen.id,
-      chosen.provider,
-      reasonCode,
-      input.costBudget ?? 'any',
-      input.qualityTarget ?? 'any'
-    )
+    .labels(chosen.id, chosen.provider, reasonCode, input.costBudget ?? 'any')
     .inc();
 
   return decisionFor(chosen, reasonCode, fallbacks);

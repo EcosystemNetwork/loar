@@ -42,6 +42,7 @@ export {
   llmRouterDecisionTotal,
   llmFallbackHopTotal,
   llmRequestFailureTotal,
+  llmDispatchLatencySeconds,
   providerCallFailureTotal,
 } from './metrics';
 
