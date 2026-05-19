@@ -35,9 +35,13 @@ on:
         required: false
         default: '0.05'
       min_calls:
-        description: 'Minimum calls per window before flagging'
+        description: 'Minimum calls per window before flagging (overrides BOTH metric floors when set)'
         required: false
-        default: '50'
+        default: ''
+      provider_thresholds:
+        description: 'Per-provider threshold overrides — comma-separated, e.g. "bytedance=0.03,zai=0.03,openai=0.07"'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -102,15 +106,27 @@ jobs:
           WINDOW="${{ github.event.inputs.window_days || '7' }}"
           BASELINE="${{ github.event.inputs.baseline_days || '7' }}"
           THRESHOLD="${{ github.event.inputs.threshold || '0.05' }}"
-          MIN_CALLS="${{ github.event.inputs.min_calls || '50' }}"
+          MIN_CALLS_INPUT="${{ github.event.inputs.min_calls || '' }}"
+          PROVIDER_THRESHOLDS="${{ github.event.inputs.provider_thresholds || '' }}"
+
+          # Optional flags are only passed when the input is non-empty so the
+          # script's own defaults (asymmetric min-calls per metric, baked-in
+          # bytedance/zai = 3% override) apply by default.
+          EXTRA=()
+          if [ -n "$MIN_CALLS_INPUT" ]; then
+            EXTRA+=("--min-calls=$MIN_CALLS_INPUT")
+          fi
+          if [ -n "$PROVIDER_THRESHOLDS" ]; then
+            EXTRA+=("--provider-thresholds=$PROVIDER_THRESHOLDS")
+          fi
 
           # Print human-readable to log + dump JSON for issue body.
           pnpm cost:check-drift \
             --window="$WINDOW" --baseline="$BASELINE" \
-            --threshold="$THRESHOLD" --min-calls="$MIN_CALLS" || true
+            --threshold="$THRESHOLD" "${EXTRA[@]}" || true
           pnpm cost:check-drift \
             --window="$WINDOW" --baseline="$BASELINE" \
-            --threshold="$THRESHOLD" --min-calls="$MIN_CALLS" --json > drift.json || true
+            --threshold="$THRESHOLD" "${EXTRA[@]}" --json > drift.json || true
 
           FLAGGED_COUNT=$(jq -r '.flaggedCount' drift.json)
           echo "flagged_count=$FLAGGED_COUNT" >> "$GITHUB_OUTPUT"
