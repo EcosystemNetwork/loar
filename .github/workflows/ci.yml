@@ -148,6 +148,31 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # 3 server tests (likeness-marketplace, likeness-access, persona) hit a
+      # real Firestore via `./_real-firebase.ts`, which throws when the
+      # emulator at 127.0.0.1:8080 isn't reachable. Start it in the background
+      # before vitest runs.
+      - name: Set up Java for Firestore emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Start Firestore emulator
+        run: |
+          npm i -g firebase-tools@13
+          firebase emulators:start --only firestore --project loar-db &
+          # Poll until the emulator HTTP root is reachable (max 60s).
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8080/ >/dev/null 2>&1; then
+              echo "Firestore emulator is up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Firestore emulator failed to start within 60s"
+          exit 1
+
       - name: Run server tests
         run: pnpm --filter server run test -- --reporter=verbose --reporter=junit --outputFile=test-results/junit.xml
 
@@ -240,11 +265,19 @@ jobs:
           ln -sfn . dependencies/@openzeppelin-contracts-5.0.2/contracts
           ln -sfn . dependencies/@openzeppelin-contracts-upgradeable-5.0.2/contracts
 
+      # Default profile + Solc 0.8.30 trips an internal "Tag too large" IR
+      # optimizer bug on this codebase — see CLAUDE.md and apps/contracts/
+      # foundry.toml. The `test` profile (no via_ir, lower optimizer runs)
+      # builds and runs the same Solidity cleanly.
       - name: Forge build
         run: forge build --sizes
+        env:
+          FOUNDRY_PROFILE: test
 
       - name: Forge test
         run: forge test -vvv 2>&1 | tee forge-test-output.txt
+        env:
+          FOUNDRY_PROFILE: test
 
       - name: Upload forge test output
         if: always()
