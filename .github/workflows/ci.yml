@@ -267,10 +267,13 @@ jobs:
 
       # Default profile + Solc 0.8.30 trips an internal "Tag too large" IR
       # optimizer bug on this codebase — see CLAUDE.md and apps/contracts/
-      # foundry.toml. The `test` profile (no via_ir, lower optimizer runs)
-      # builds and runs the same Solidity cleanly.
+      # foundry.toml. The `test` profile disables the optimizer so it builds
+      # cleanly, but the resulting bytecode is larger than EIP-170 for some
+      # contracts (expected — test profile is not a deploy target). So we
+      # build without `--sizes` here; size enforcement happens at deploy time
+      # under the default profile.
       - name: Forge build
-        run: forge build --sizes
+        run: forge build
         env:
           FOUNDRY_PROFILE: test
 
