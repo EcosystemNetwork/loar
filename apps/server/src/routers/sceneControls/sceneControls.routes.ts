@@ -22,6 +22,7 @@ import {
 import { translateCameraPreset } from '../../services/scene-controls/camera';
 import { listStylePresets } from '../../services/scene-controls/styles';
 import { listVfxPresets, buildVfxFilterChain } from '../../services/scene-controls/vfx';
+import { listViralPresets, getViralPreset } from '../../services/scene-controls/viral-presets';
 
 // ── Collection refs ──────────────────────────────────────────────────
 
@@ -57,6 +58,37 @@ export const sceneControlsRouter = router({
    */
   listVfxPresets: publicProcedure.query(() => {
     return listVfxPresets();
+  }),
+
+  /**
+   * List all viral presets (camera + style + shot + VFX combos with branded names).
+   * Frontend renders these as a gallery; clicking a card resolves to the four
+   * primitives and feeds them into the existing generate pipeline.
+   */
+  listViralPresets: publicProcedure.query(() => {
+    return listViralPresets();
+  }),
+
+  /**
+   * Resolve a viral preset id to its underlying camera/style/shot/vfx primitives.
+   * Returns null if the id is unknown so the client can surface a clean error
+   * instead of crashing the generate request.
+   */
+  getViralPreset: publicProcedure.input(z.object({ id: z.string() })).query(({ input }) => {
+    const preset = getViralPreset(input.id);
+    if (!preset) return null;
+    return {
+      id: preset.id,
+      label: preset.label,
+      tagline: preset.tagline,
+      category: preset.category,
+      camera: preset.camera,
+      cameraIntensity: preset.cameraIntensity,
+      style: preset.style,
+      shot: preset.shot,
+      vfx: preset.vfx,
+      promptHint: preset.promptHint ?? null,
+    };
   }),
 
   /**
@@ -262,35 +294,115 @@ export const sceneControlsRouter = router({
     }),
 });
 
-// ── VFX Processing (inline for now — move to job queue in production) ─
+// ── VFX Processing — real ffmpeg pipeline ────────────────────────────
+//
+// Runs the composite inline in the server process. Same execFile-with-array-args
+// pattern as services/video-thumbnail.ts (no shell, protocol-whitelist on
+// ffmpeg). For higher throughput this is the obvious place to swap to a
+// dedicated worker queue (Cloud Tasks / Bull) without touching the API surface.
 
 async function processVfxJob(
   jobId: string,
   videoUrl: string,
-  presets: VfxPresetId[],
+  _presets: VfxPresetId[],
   filterChain: string
 ): Promise<void> {
   await vfxJobsCol().doc(jobId).update({ status: 'processing' });
 
-  // For the MVP, we mark the job as completed with the filter chain info
-  // but return the original video URL. Full ffmpeg processing requires
-  // a worker with ffmpeg installed (Cloud Run, Lambda, etc.)
-  //
-  // The filter chain is stored on the job and can be applied client-side
-  // with ffmpeg.wasm or server-side when a worker is available.
+  // Validate URL — ffmpeg's default protocol allowlist accepts `file:` /
+  // `concat:` / `subfile:` and HLS-with-nested-`file:`, all of which read
+  // local files into the encoded output when the URL is attacker-controlled.
+  let parsed: URL;
+  try {
+    parsed = new URL(videoUrl);
+  } catch {
+    await vfxJobsCol().doc(jobId).update({
+      status: 'failed',
+      error: 'Invalid video URL',
+      completedAt: new Date(),
+    });
+    return;
+  }
+  if (parsed.protocol !== 'https:') {
+    await vfxJobsCol().doc(jobId).update({
+      status: 'failed',
+      error: 'Only https:// video URLs are supported',
+      completedAt: new Date(),
+    });
+    return;
+  }
 
-  // TODO: Replace with actual ffmpeg processing when worker infra is ready
-  // const tmpInput = `/tmp/vfx-${jobId}-input.mp4`;
-  // const tmpOutput = `/tmp/vfx-${jobId}-output.mp4`;
-  // await downloadFile(videoUrl, tmpInput);
-  // const cmd = buildVfxCommand(tmpInput, tmpOutput, presets);
-  // await exec(cmd);
-  // const outputUrl = await uploadFile(tmpOutput);
+  const { execFile } = await import('child_process');
+  const { promisify } = await import('util');
+  const { tmpdir } = await import('os');
+  const { join } = await import('path');
+  const { readFile, unlink, stat } = await import('fs/promises');
+  const execFileAsync = promisify(execFile);
 
-  await vfxJobsCol().doc(jobId).update({
-    status: 'completed',
-    outputVideoUrl: videoUrl, // Placeholder until ffmpeg worker is live
-    filterChain,
-    completedAt: new Date(),
-  });
+  const outPath = join(tmpdir(), `vfx-${jobId}.mp4`);
+
+  try {
+    // Single-pass: read from the remote URL, apply the filter chain, write
+    // an mp4 to /tmp. `-vf <chain>` carries the composite; `-c:a copy`
+    // preserves the original audio track without re-encoding.
+    await execFileAsync(
+      'ffmpeg',
+      [
+        '-y',
+        '-protocol_whitelist',
+        'https,tls,tcp',
+        '-i',
+        videoUrl,
+        '-vf',
+        filterChain,
+        '-c:a',
+        'copy',
+        '-preset',
+        'fast',
+        '-movflags',
+        '+faststart',
+        outPath,
+      ],
+      { timeout: 5 * 60 * 1000 } // 5 min — 5-10s clip + chain shouldn't exceed
+    );
+
+    // Sanity check: ffmpeg can exit 0 with an empty file on certain errors.
+    const stats = await stat(outPath);
+    if (stats.size < 1024) {
+      throw new Error(`ffmpeg produced suspiciously small file (${stats.size} bytes)`);
+    }
+
+    const buffer = await readFile(outPath);
+    unlink(outPath).catch(() => {});
+
+    const { getStorageManager } = await import('../../services/storage');
+    const manager = getStorageManager();
+    const manifest = await manager.upload(
+      buffer,
+      `vfx-${jobId}.mp4`,
+      'video/mp4',
+      'system' // uploader uid; vfxJobs already track the requesting user
+    );
+    const outputVideoUrl = manifest.uploads[0]?.url ?? null;
+
+    if (!outputVideoUrl) {
+      throw new Error('Storage upload succeeded but returned no URL');
+    }
+
+    await vfxJobsCol().doc(jobId).update({
+      status: 'completed',
+      outputVideoUrl,
+      filterChain,
+      completedAt: new Date(),
+    });
+  } catch (err) {
+    unlink(outPath).catch(() => {});
+    const msg = err instanceof Error ? err.message : 'VFX processing failed';
+    console.error(`[VFX] Job ${jobId} ffmpeg/upload failed:`, msg);
+    await vfxJobsCol().doc(jobId).update({
+      status: 'failed',
+      error: msg,
+      completedAt: new Date(),
+    });
+  }
 }

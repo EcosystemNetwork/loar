@@ -324,4 +324,78 @@ export const wikiRouter = router({
         throw wrapError(error, 'Prompt improvement failed');
       }
     }),
+
+  /**
+   * Director-mode shot expansion. Given a logline + optional style/character
+   * notes, returns N shot descriptions ready to feed an image generator. Uses
+   * OpenAI structured output so the response shape is guaranteed.
+   */
+  expandStoryboard: protectedProcedure
+    .input(
+      z.object({
+        logline: z.string().min(1).max(2000),
+        shotCount: z.number().int().min(2).max(12).default(6),
+        styleNotes: z.string().max(500).optional(),
+        characterNotes: z.string().max(500).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { resolveProviderKey } = await import('../../lib/byok');
+      const { openAIService } = await import('../../services/openai');
+      const userKey = await resolveProviderKey(ctx.user.uid, 'openai');
+      if (!userKey) {
+        throw wrapError(
+          new Error('OPENAI_API_KEY is not configured — set one in /settings/api-keys'),
+          'Director mode requires an OpenAI key'
+        );
+      }
+      const directorPrompt = [
+        'You are a storyboard director. Break the following idea into a sequence of distinct visual shots.',
+        `Number of shots: ${input.shotCount}.`,
+        'Each shot prompt should: name the framing (wide / medium / close / over-shoulder / etc), the subject, the action, the lighting/mood, and a brief style hint. Keep each shot 25-60 words. Do not reference shot numbers in the prompt text.',
+        input.styleNotes ? `Style notes (apply to every shot): ${input.styleNotes}` : '',
+        input.characterNotes ? `Character notes: ${input.characterNotes}` : '',
+        `Idea: ${input.logline}`,
+      ]
+        .filter(Boolean)
+        .join('\n\n');
+
+      try {
+        const result = await openAIService.chat({
+          apiKey: userKey,
+          model: 'gpt-4.1-mini',
+          messages: [{ role: 'user', content: directorPrompt }],
+          responseSchema: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              shots: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  additionalProperties: false,
+                  properties: {
+                    framing: { type: 'string' },
+                    prompt: { type: 'string' },
+                  },
+                  required: ['framing', 'prompt'],
+                },
+              },
+            },
+            required: ['shots'],
+          },
+          maxTokens: 2000,
+        });
+        const parsed = JSON.parse(result.text || '{}') as {
+          shots?: Array<{ framing: string; prompt: string }>;
+        };
+        const shots = (parsed.shots ?? []).slice(0, input.shotCount);
+        if (shots.length === 0) {
+          throw new Error('Director returned no shots');
+        }
+        return { shots };
+      } catch (error) {
+        throw wrapError(error, 'Director-mode expansion failed');
+      }
+    }),
 });

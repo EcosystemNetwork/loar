@@ -19,6 +19,7 @@
  */
 import { TRPCError } from '@trpc/server';
 import { LLM_MODELS } from './registry';
+import { llmRouterDecisionTotal } from '../cost-tracker';
 import type { LlmCapability, LlmModelConfig, LlmRoutingDecision, LlmRoutingInput } from './types';
 
 function meetsCapability(model: LlmModelConfig, cap: LlmCapability): boolean {
@@ -148,5 +149,26 @@ export function routeLlmModel(input: LlmRoutingInput): LlmRoutingDecision {
         : input.qualityTarget === 'premium'
           ? 'best_quality_eligible'
           : 'default_model';
+
+  // Single line for log scrapers — grep for `[llm-router]` in prod to audit
+  // which models the autoroute is landing on under different traffic shapes.
+  if (process.env.LLM_ROUTER_LOG !== 'off') {
+    console.info(
+      `[llm-router] chose=${chosen.id} reason=${reasonCode} eligible=${filtered.length} costBudget=${input.costBudget ?? 'any'} quality=${input.qualityTarget ?? 'any'}`
+    );
+  }
+
+  // Prometheus: graph autoroute drift, spot stuck providers, confirm
+  // cost-tier flips translate to real call mix shifts.
+  llmRouterDecisionTotal
+    .labels(
+      chosen.id,
+      chosen.provider,
+      reasonCode,
+      input.costBudget ?? 'any',
+      input.qualityTarget ?? 'any'
+    )
+    .inc();
+
   return decisionFor(chosen, reasonCode, fallbacks);
 }

@@ -34,6 +34,7 @@ import { useVideoEditing } from '@/hooks/useVideoEditing';
 import { VideoEditingToolbar } from '@/components/editing/VideoEditingToolbar';
 import { InpaintCanvas } from '@/components/editing/InpaintCanvas';
 import { AnimateImagePanel } from '@/components/editing/AnimateImagePanel';
+import { ViralPresetsPanel } from '@/components/editing/ViralPresetsPanel';
 import { TalkingScenePanel } from '@/components/editing/TalkingScenePanel';
 import { VoiceModifyPanel } from '@/components/editing/VoiceModifyPanel';
 import { PublishEpisodeDialog } from '@/components/editing/PublishEpisodeDialog';
@@ -387,6 +388,9 @@ function EditorPage() {
         <div className="w-[380px] border-l border-border/40 bg-card/20 overflow-y-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
             <TabsList className="w-full rounded-none border-b border-border/40 bg-transparent h-10">
+              <TabsTrigger value="viral" className="text-xs flex-1">
+                Viral
+              </TabsTrigger>
               <TabsTrigger value="tools" className="text-xs flex-1">
                 Tools
               </TabsTrigger>
@@ -412,6 +416,17 @@ function EditorPage() {
                 History
               </TabsTrigger>
             </TabsList>
+
+            {/* Viral Tab — one-click branded camera/style/shot combos */}
+            <TabsContent value="viral" className="flex-1 p-4 m-0 overflow-y-auto">
+              <ViralPresetsPanel
+                imageUrl={imageUrl}
+                onComplete={(url) => {
+                  setVideoUrl(url);
+                  setActiveTab('tools');
+                }}
+              />
+            </TabsContent>
 
             {/* Animate Tab — PRD 8 image-to-video flow */}
             <TabsContent value="animate" className="flex-1 p-4 m-0 overflow-y-auto">

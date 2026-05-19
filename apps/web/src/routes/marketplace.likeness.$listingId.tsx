@@ -42,6 +42,7 @@ import {
   type LikenessDealType,
   type LikenessUseCase,
 } from '@/hooks/useEntities';
+import { RoyaltySplitPreview } from '@/components/royalty/RoyaltySplitPreview';
 
 export const Route = createFileRoute('/marketplace/likeness/$listingId')({
   component: ListingDetailPage,
@@ -530,6 +531,10 @@ function ListingDetailPage() {
           </div>
 
           <Separator />
+
+          {/* Royalty split preview — buyer sees exactly where the payment flows
+              given this listing's entity lineage. */}
+          {listing.entityId && <RoyaltySplitPreview assetId={listing.entityId} compact />}
 
           {/* Total + buy button */}
           <div className="flex items-center justify-between p-4 bg-muted rounded-lg">

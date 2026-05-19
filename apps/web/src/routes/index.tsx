@@ -68,6 +68,7 @@ import {
   ContinueWatchingRow,
   ForYouRow,
 } from '../components/home/HomeSections';
+import { TryItHero } from '../components/home/TryItHero';
 
 /* ──────────────────────────────────────────
  * Main Home Component
@@ -277,9 +278,15 @@ function HomeComponent() {
       {/* Hero: skeleton during load, real billboard once data arrives */}
       {universesLoading ? <HeroSkeleton /> : <HeroBillboard universes={universes} />}
 
+      {/* Anonymous-first "try it" CTA — sits between hero and content rows so
+          a first-time visitor sees a wallet-less path to value immediately. */}
+      <div className="-mt-12 relative z-10">
+        <TryItHero />
+      </div>
+
       {/* Content Rows — only render once we have real data */}
       {!universesLoading && (
-        <div className="-mt-16 relative z-10 pb-20 space-y-2">
+        <div className="relative z-10 pb-20 space-y-2">
           <ContinueWatchingRow />
           <Top10Strip universes={universes} />
           <ForYouRow />

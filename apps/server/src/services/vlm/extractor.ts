@@ -84,7 +84,12 @@ export async function runExtraction({
   // Cache lookup — VLM output is deterministic for (mediaUrl, model, promptVersion).
   // Skip cache when explicit force=true in options.
   const force = Boolean((input.options as any)?.force);
-  const model: VlmModel = (input.options as any)?.model ?? 'gemini-2.5-pro';
+  // Default to Flash at platform scale (~16× cheaper than Pro on Gemini). Power
+  // users opt back into Pro via `options.model = 'gemini-2.5-pro'`, and ops can
+  // flip the platform default via `VLM_EXTRACT_MODEL` env.
+  const defaultExtractModel: VlmModel =
+    (process.env.VLM_EXTRACT_MODEL as VlmModel | undefined) ?? 'gemini-2.5-flash';
+  const model: VlmModel = (input.options as any)?.model ?? defaultExtractModel;
   const key = cacheKey(input.mediaUrl, model);
   if (!force) {
     const cached = await db

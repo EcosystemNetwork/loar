@@ -11,7 +11,7 @@ import { db, firebaseAvailable } from '../../lib/firebase';
 import type { CanonCheckResult, CanonConflict, ExtractionResult } from './types';
 import { buildCanonCheckPrompt } from './prompts';
 import { canonCheckOutputSchema } from './schemas';
-import { callJson } from './gemini-client';
+import { dispatchLlmWithFallback, routeLlmModel } from '../llm-models';
 
 export interface CanonCheckArgs {
   extraction: ExtractionResult;
@@ -81,12 +81,34 @@ export async function runCanonCheck({
     recentBeats: beats,
   });
 
-  const { data } = await callJson({
-    model: 'gemini-2.5-flash',
-    prompt,
-    schema: canonCheckOutputSchema,
-    label: 'canon-check',
+  // Text-only consistency check — route to cheapest standard-tier chat model.
+  // Fallback chain shields against any one provider's rate-limit storm.
+  const decision = routeLlmModel({
+    requires: { chat: true },
+    qualityTarget: 'standard',
+    costBudget: 'low',
   });
+  const r = await dispatchLlmWithFallback({
+    primaryModelId: decision.chosenModelId,
+    fallbackModelIds: decision.fallbackModelIds.slice(0, 3),
+    messages: [{ role: 'user', content: prompt }],
+    jsonMode: true,
+    maxTokens: 4000,
+  });
+  const stripped = r.text
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim();
+  const parsed = canonCheckOutputSchema.safeParse(JSON.parse(stripped));
+  if (!parsed.success) {
+    throw new Error(
+      `canon-check schema invalid: ${parsed.error.issues
+        .slice(0, 3)
+        .map((i) => `${i.path.join('.')}: ${i.message}`)
+        .join('; ')}`
+    );
+  }
+  const data = parsed.data;
 
   // Resolve related entity NAMES back to IDs using the loaded map.
   const byName = new Map<string, string>();

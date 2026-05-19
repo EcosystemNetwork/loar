@@ -1,17 +1,43 @@
 /**
- * Wikia generation service — uses OpenAI GPT-4o-mini to generate rich narrative
- * wiki entries, storylines, and summaries for cinematic universe events.
+ * Wikia generation service — generates rich narrative wiki entries,
+ * storylines, and summaries for cinematic universe events.
+ *
+ * Routes through the LLM router so the cheapest standard-tier text model
+ * is picked at scale (typically Llama 3.1 8B / GLM-4.7 Flash / GPT-5 Nano
+ * at ~$0.05–0.10 per Mtok input rather than the legacy hardcoded
+ * gpt-4o-mini path).
  */
-import OpenAI from 'openai';
-import { resolveProviderKey } from '../lib/byok';
+import { dispatchLlm, type LlmMessage } from './llm-models';
+import { routeLlmModel } from './llm-models/router';
 
-// Resolves a per-user OpenAI client: BYOK key (from /settings/api-keys) takes
-// precedence, falling back to the platform OPENAI_API_KEY. Returns null when
-// neither is available so callers can degrade gracefully.
-async function getOpenAI(uid?: string | null): Promise<OpenAI | null> {
-  const apiKey = await resolveProviderKey(uid ?? null, 'openai');
-  if (!apiKey) return null;
-  return new OpenAI({ apiKey });
+interface WikiaCallOpts {
+  uid?: string | null;
+  systemPrompt: string;
+  userPrompt: string;
+  jsonMode?: boolean;
+  temperature: number;
+  maxTokens: number;
+}
+
+async function callWikiaModel(opts: WikiaCallOpts): Promise<string> {
+  const { chosenModelId } = routeLlmModel({
+    requires: { chat: true },
+    qualityTarget: 'standard',
+    costBudget: 'low',
+  });
+  const messages: LlmMessage[] = [
+    { role: 'system', content: opts.systemPrompt },
+    { role: 'user', content: opts.userPrompt },
+  ];
+  const result = await dispatchLlm({
+    modelId: chosenModelId,
+    userId: opts.uid ?? null,
+    messages,
+    temperature: opts.temperature,
+    maxTokens: opts.maxTokens,
+    jsonMode: opts.jsonMode,
+  });
+  return result.text;
 }
 
 export interface WikiaEntry {
@@ -26,8 +52,7 @@ export interface WikiaEntry {
 }
 
 /**
- * Generate a well-formatted wikia entry from a video node description
- * using OpenAI's GPT model
+ * Generate a well-formatted wikia entry from a video node description.
  */
 export async function generateWikiaEntry(
   nodeId: number,
@@ -79,39 +104,26 @@ Generate a wikia entry with the following structure (respond in JSON format):
 IMPORTANT: The "plot" field should be the heart of this wikia - a complete, engaging storyline that tells readers exactly what happens in this event from beginning to end. Write it like you're narrating a movie scene.`;
 
   try {
-    const openai = await getOpenAI(uid);
-    if (!openai)
-      throw new Error(
-        'OpenAI key required — paste one in /settings/api-keys or set OPENAI_API_KEY'
-      );
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.9, // Higher creativity for storytelling
-      max_tokens: 3000, // More tokens for detailed storylines
+    const content = await callWikiaModel({
+      uid,
+      systemPrompt,
+      userPrompt,
+      jsonMode: true,
+      temperature: 0.9,
+      maxTokens: 3000,
     });
-
-    const content = response.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error('No content returned from OpenAI');
-    }
+    if (!content) throw new Error('No content returned from model');
 
     const wikiaEntry = JSON.parse(content) as WikiaEntry;
 
-    // Validate the response has required fields
     if (!wikiaEntry.title || !wikiaEntry.plot) {
-      throw new Error('Invalid wikia entry format from OpenAI');
+      throw new Error('Invalid wikia entry format from model');
     }
 
     return wikiaEntry;
   } catch (error) {
     console.error('Error generating wikia entry:', error);
 
-    // Return a basic fallback entry if OpenAI fails
     return {
       title,
       summary: description.substring(0, 200),
@@ -203,32 +215,20 @@ Respond in JSON format:
 }`;
 
   try {
-    const openai = await getOpenAI(uid);
-    if (!openai)
-      throw new Error(
-        'OpenAI key required — paste one in /settings/api-keys or set OPENAI_API_KEY'
-      );
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: fullPrompt },
-      ],
-      response_format: { type: 'json_object' },
+    const content = await callWikiaModel({
+      uid,
+      systemPrompt,
+      userPrompt: fullPrompt,
+      jsonMode: true,
       temperature: 0.8,
-      max_tokens: 1000,
+      maxTokens: 1000,
     });
-
-    const content = response.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error('No content returned from OpenAI');
-    }
+    if (!content) throw new Error('No content returned from model');
 
     const result = JSON.parse(content) as { title: string; description: string };
     return result;
   } catch (error) {
     console.error('Error generating storyline from prompt:', error);
-    // Return the user's original input as fallback
     return {
       title: userPrompt.substring(0, 50),
       description: userPrompt,
@@ -254,22 +254,14 @@ Description: ${description}
 Return only the summary sentence, no additional text.`;
 
   try {
-    const openai = await getOpenAI(uid);
-    if (!openai)
-      throw new Error(
-        'OpenAI key required — paste one in /settings/api-keys or set OPENAI_API_KEY'
-      );
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
+    const content = await callWikiaModel({
+      uid,
+      systemPrompt,
+      userPrompt,
       temperature: 0.7,
-      max_tokens: 100,
+      maxTokens: 100,
     });
-
-    return response.choices[0]?.message?.content?.trim() || description.substring(0, 100);
+    return content.trim() || description.substring(0, 100);
   } catch (error) {
     console.error('Error generating summary:', error);
     return description.substring(0, 100);

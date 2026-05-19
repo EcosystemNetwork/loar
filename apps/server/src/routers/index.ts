@@ -127,6 +127,10 @@ import { watchSessionsRouter } from './watchSessions/watchSessions.routes';
 import { providersRouter } from './providers/providers.routes';
 import { recommendationsRouter } from './recommendations/recommendations.routes';
 import { entitlementsRouter } from './entitlements/entitlements.routes';
+import { viralityRouter } from './virality/virality.routes';
+import { marketingRouter } from './marketing/marketing.routes';
+import { royaltySplitsRouter } from './royaltySplits/royaltySplits.routes';
+import { mainnetReadinessRouter } from './mainnetReadiness/mainnetReadiness.routes';
 
 // ── Wallet login tracking (analytics domain) ───────────────────────────
 const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
@@ -394,6 +398,18 @@ export const appRouter = router({
 
   // ── Watch sessions (per-episode resume + analytics) ────────────────
   watchSessions: watchSessionsRouter,
+
+  // ── Virality Predictor (hook/hold/replay scoring over watch sessions) ──
+  virality: viralityRouter,
+
+  // ── Marketing Studio (ad format templates → generate pipeline) ────
+  marketing: marketingRouter,
+
+  // ── Royalty Splits (lineage-aware revenue distribution) ───────────
+  royaltySplits: royaltySplitsRouter,
+
+  // ── Mainnet Readiness (live scorecard of launch blockers) ─────────
+  mainnetReadiness: mainnetReadinessRouter,
 
   // ── BYOK provider keys (bring-your-own-key for AI generation) ─────
   providers: providersRouter,

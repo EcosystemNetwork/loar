@@ -15,7 +15,7 @@
 
 import { z } from 'zod';
 import { db, firebaseAvailable } from '../../lib/firebase';
-import { callJson } from './gemini-client';
+import { dispatchLlmWithFallback, routeLlmModel } from '../llm-models';
 import type { ExtractedEntityProposal } from './types';
 
 export interface EntityLinkMatch {
@@ -108,12 +108,36 @@ export async function linkProposalsToCanon(
   try {
     const canon = await loadCanonEntities(universeAddress);
     if (canon.length === 0) return {};
-    const { data } = await callJson({
-      model: 'gemini-2.5-flash',
-      prompt: buildPrompt(proposals, canon),
-      schema: linkerOutputSchema,
-      label: 'entity_link',
+
+    // Text-only entity-dedup — route to the cheapest standard-tier chat
+    // model. Cost recording + admin kill-switch already handled inside
+    // dispatchLlm. Fallback chain protects against rate-limit storms.
+    const decision = routeLlmModel({
+      requires: { chat: true },
+      qualityTarget: 'standard',
+      costBudget: 'low',
     });
+    const r = await dispatchLlmWithFallback({
+      primaryModelId: decision.chosenModelId,
+      fallbackModelIds: decision.fallbackModelIds.slice(0, 3),
+      messages: [{ role: 'user', content: buildPrompt(proposals, canon) }],
+      jsonMode: true,
+      maxTokens: 4000,
+    });
+    const stripped = r.text
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
+    const parsed = linkerOutputSchema.safeParse(JSON.parse(stripped));
+    if (!parsed.success) {
+      throw new Error(
+        `entity-linker schema invalid: ${parsed.error.issues
+          .slice(0, 3)
+          .map((i) => `${i.path.join('.')}: ${i.message}`)
+          .join('; ')}`
+      );
+    }
+    const data = parsed.data;
     const canonIds = new Set(canon.map((c) => c.id));
     const proposalIds = new Set(proposals.map((p) => p.proposalId));
     const out: EntityLinkMap = {};

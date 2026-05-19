@@ -8,7 +8,7 @@ import { db, firebaseAvailable } from '../../lib/firebase';
 import type { CanonProposalDraft, ExtractionResult } from './types';
 import { buildGovernanceDraftPrompt } from './prompts';
 import { governanceDraftOutputSchema } from './schemas';
-import { callJson } from './gemini-client';
+import { dispatchLlmWithFallback, routeLlmModel } from '../llm-models';
 
 export interface DraftArgs {
   extraction: ExtractionResult;
@@ -76,12 +76,35 @@ export async function runGovernanceDraft({
     affectedEntities: affectedEntities.map((e) => ({ name: e.name, kind: e.kind })),
   });
 
-  const { data } = await callJson({
-    model: 'gemini-2.5-pro',
-    prompt,
-    schema: governanceDraftOutputSchema,
-    label: 'governance-draft',
+  // Text-only governance draft — route to cheapest standard-tier chat model.
+  // dispatchLlm handles cost recording + admin kill-switch; fallback chain
+  // protects against any one provider's transient failures.
+  const decision = routeLlmModel({
+    requires: { chat: true },
+    qualityTarget: 'standard',
+    costBudget: 'low',
   });
+  const r = await dispatchLlmWithFallback({
+    primaryModelId: decision.chosenModelId,
+    fallbackModelIds: decision.fallbackModelIds.slice(0, 3),
+    messages: [{ role: 'user', content: prompt }],
+    jsonMode: true,
+    maxTokens: 4000,
+  });
+  const stripped = r.text
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim();
+  const parsed = governanceDraftOutputSchema.safeParse(JSON.parse(stripped));
+  if (!parsed.success) {
+    throw new Error(
+      `governance-draft schema invalid: ${parsed.error.issues
+        .slice(0, 3)
+        .map((i) => `${i.path.join('.')}: ${i.message}`)
+        .join('; ')}`
+    );
+  }
+  const data = parsed.data;
 
   const id = `cpd_${randomUUID()}`;
   const draft: CanonProposalDraft = {

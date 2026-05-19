@@ -1,0 +1,20 @@
+{
+  "period": "2026-04",
+  "providers": {
+    "openai": 0.0,
+    "gemini": 0.0,
+    "bytedance": 0.0,
+    "groq": 0.0,
+    "zai": 0.0,
+    "fal": 0.0,
+    "elevenlabs": 0.0,
+    "meshy": 0.0,
+    "tripo": 0.0,
+    "assemblyai": 0.0,
+    "deepgram": 0.0,
+    "pinata": 0.0,
+    "lighthouse": 0.0,
+    "firebase_storage": 0.0
+  },
+  "notes": "Replace each amount with the actual USD billed by that provider for this period. Provider keys must match the `provider` field used in costLedger (see CostProvider type in apps/server/src/services/cost-tracker/record.ts)."
+}

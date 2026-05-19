@@ -12,6 +12,7 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { verifySiwsSignature } from '../lib/siws';
 import { issueSessionToken, verifySessionToken } from '../lib/siwe';
 import { recordAuthEvent } from '../lib/metrics';
+import { lookupEvmForSolana, recordWalletLink } from '../lib/wallet-bridge';
 
 export const siwsAuthRoutes = new Hono();
 
@@ -89,10 +90,26 @@ siwsAuthRoutes.post('/verify', async (c) => {
 
   try {
     const address = await verifySiwsSignature(body.message, body.signature, originCheck.origin);
-    const token = await issueSessionToken(address, {
-      namespace: 'solana',
-      solanaAddress: address,
-    });
+
+    // If this Solana wallet is already linked to an EVM identity (via prior
+    // `/auth/solana/link` or Circle DCW provisioning), issue an EVM-primary
+    // JWT so `creatorUid`-keyed queries land on the canonical (lowercased
+    // hex) uid. Otherwise issue a Solana-primary JWT as before.
+    //
+    // The response body keeps `address` as the SIWS-signed base58 pubkey for
+    // backward compat with `apps/mobile/src/lib/solana-auth.ts` (which uses
+    // it for UI state). Callers that care about the canonical identity can
+    // read `evmAddress`.
+    const linkedEvm = await lookupEvmForSolana(address);
+    const token = linkedEvm
+      ? await issueSessionToken(linkedEvm, {
+          namespace: 'eip155',
+          solanaAddress: address,
+        })
+      : await issueSessionToken(address, {
+          namespace: 'solana',
+          solanaAddress: address,
+        });
 
     setSessionCookie(c, token);
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
@@ -102,6 +119,7 @@ siwsAuthRoutes.post('/verify', async (c) => {
       captureServerEvent('auth:siws_verified', {
         distinctId: address,
         chain: 'solana',
+        bridged: !!linkedEvm,
       })
     );
 
@@ -111,7 +129,8 @@ siwsAuthRoutes.post('/verify', async (c) => {
     const isMobile = c.req.header('x-mobile-client') === '1';
     return c.json({
       address,
-      chain: 'solana',
+      evmAddress: linkedEvm ?? null,
+      chain: linkedEvm ? 'eip155' : 'solana',
       expiresAt: payload.exp * 1000,
       ...(isMobile ? { token } : {}),
     });
@@ -161,6 +180,15 @@ siwsAuthRoutes.post('/link', async (c) => {
     solanaAddress,
   });
   setSessionCookie(c, newToken);
+
+  // Persist the link so future SIWS verifies — and `createContext` for any
+  // legacy Solana-primary session still within its 24h TTL — resolve the
+  // same EVM identity without re-prompting the user.
+  void recordWalletLink({
+    evmAddress: currentPayload.sub,
+    solanaAddress,
+    source: 'siws-link',
+  });
 
   void import('../lib/analytics').then(({ captureServerEvent }) =>
     captureServerEvent('auth:solana_linked', {

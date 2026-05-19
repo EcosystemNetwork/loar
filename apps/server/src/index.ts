@@ -190,6 +190,13 @@ app.use('/api/paymaster/*', rateLimiter({ windowMs: 60_000, max: 20 }));
 const { paymasterRoutes } = await import('./routes/paymaster');
 app.route('/api/paymaster', paymasterRoutes);
 
+// Anonymous preview generation (POST /api/preview/generate). Wallet-less
+// funnel-top "try it" endpoint. Per-IP quota lives inside the route handler.
+// Outer rate-limit here is a cheap circuit breaker against single-IP floods.
+app.use('/api/preview/*', rateLimiter({ windowMs: 60_000, max: 6 }));
+const { default: previewRoutes } = await import('./routes/preview');
+app.route('/api/preview', previewRoutes);
+
 /**
  * Sanitize a browser-supplied filename before it reaches any storage backend.
  * See SRV-6: path separators, NULs, leading dots, and oversized names can
@@ -1252,6 +1259,10 @@ const port = env.PORT;
 console.log(`Starting server on port ${port}`);
 console.log(`CORS origin: ${env.CORS_ORIGIN || 'http://localhost:5173 (default)'}`);
 console.log(`Environment: ${env.NODE_ENV}`);
+
+// Pricing audit — surfaces $0-cost ByteDance entries on boot so silent
+// margin loss can't hide. Set LLM_PRICING_AUDIT_OFF=1 to suppress.
+import('./lib/pricing-audit').then(({ auditPricingOnBoot }) => auditPricingOnBoot());
 
 const server = serve({ fetch: app.fetch, port }, (info) => {
   console.log(`Server listening on http://localhost:${info.port}`);

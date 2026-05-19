@@ -1,13 +1,21 @@
 /**
  * Trailer / recap / chapter / SEO generation from a video.
  * Reuses any existing extraction when available to save cost.
+ *
+ * Default model is Gemini Flash (~$0.075/Mtok in, $0.3/Mtok out) — recap is
+ * marketing/SEO copy and Flash is sufficient. Ops can force Pro per-call
+ * with `model: 'gemini-2.5-pro'` or flip the platform default via env
+ * `VLM_RECAP_MODEL`.
  */
 
 import { db, firebaseAvailable } from '../../lib/firebase';
-import type { ExtractionResult } from './types';
+import type { ExtractionResult, VlmModel } from './types';
 import { buildRecapPrompt } from './prompts';
 import { recapOutputSchema, type RecapOutput } from './schemas';
 import { callJson, mediaPartFromUrl } from './gemini-client';
+
+const DEFAULT_RECAP_MODEL: VlmModel =
+  (process.env.VLM_RECAP_MODEL as VlmModel | undefined) ?? 'gemini-2.5-flash';
 
 export interface RecapArgs {
   mediaUrl: string;
@@ -16,6 +24,8 @@ export interface RecapArgs {
   targetDurationSec?: number;
   audience?: string;
   extraction?: ExtractionResult;
+  /** Optional per-call override; falls back to VLM_RECAP_MODEL env default. */
+  model?: VlmModel;
 }
 
 export async function runRecap(input: RecapArgs): Promise<{
@@ -38,7 +48,7 @@ export async function runRecap(input: RecapArgs): Promise<{
     }) + extractionContext;
 
   const { data, cost } = await callJson<RecapOutput>({
-    model: 'gemini-2.5-pro',
+    model: input.model ?? DEFAULT_RECAP_MODEL,
     prompt,
     media: [media],
     schema: recapOutputSchema,

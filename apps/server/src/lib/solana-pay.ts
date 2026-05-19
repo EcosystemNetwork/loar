@@ -49,6 +49,10 @@ interface IntentDoc {
   createdAt: number; // ms epoch
   expiresAt: number;
   paidAt?: number;
+  /** Set when a downstream flow (e.g. BYOK unlock) has claimed the paid intent.
+   *  Bound to the original intent.userId so a leaked reference cannot be replayed. */
+  consumedBy?: string;
+  consumedAt?: number;
 }
 
 const memIntents = new Map<string, IntentDoc>();
@@ -277,4 +281,105 @@ export async function getPaymentStatus(reference: string): Promise<IntentStatus 
     }
     throw err;
   }
+}
+
+// ── Claim (server-internal, binds reference to its creator) ─────────────────
+
+export type ClaimResult =
+  | { status: 'pending' | 'expired' | 'invalid' }
+  | {
+      status: 'paid';
+      amount: string;
+      signature?: string;
+      alreadyConsumed: boolean;
+    };
+
+export class IntentNotOwnedError extends Error {
+  constructor() {
+    super('This Solana Pay reference was not created by your account.');
+    this.name = 'IntentNotOwnedError';
+  }
+}
+
+export class IntentAlreadyConsumedError extends Error {
+  constructor() {
+    super('This Solana Pay reference has already been claimed by a different account.');
+    this.name = 'IntentAlreadyConsumedError';
+  }
+}
+
+/**
+ * Settle a Solana Pay intent on-chain and atomically bind it to its creator
+ * for downstream consumption. Use this — not `getPaymentStatus` — whenever a
+ * paid reference is being redeemed for an account-bound entitlement.
+ *
+ * Guarantees:
+ *   - Rejects if `intent.userId !== userId` (a leaked reference cannot be
+ *     replayed against a different account).
+ *   - Sets `consumedBy = userId` inside a Firestore transaction; the same
+ *     reference cannot be granted to two different uids even under a race.
+ *   - Idempotent for the original payer — returning `alreadyConsumed: true`
+ *     when they retry.
+ */
+export async function claimPaymentForUnlock(args: {
+  reference: string;
+  userId: string;
+}): Promise<ClaimResult> {
+  // Phase 1: settle on-chain status. This is the existing idempotent path.
+  const status = await getPaymentStatus(args.reference);
+  if (!status) throw new Error('Solana Pay reference not found.');
+  if (status.status !== 'paid') return { status: status.status };
+
+  // Phase 2: bind to caller + mark consumed atomically.
+  const col = getCol();
+  if (col) {
+    const ref = col.doc(args.reference);
+    return await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new Error('Solana Pay reference not found.');
+      const intent = snap.data() as IntentDoc;
+      if (intent.status !== 'paid') return { status: intent.status };
+      if (intent.userId !== args.userId) {
+        throw new IntentNotOwnedError();
+      }
+      const consumedBy = intent.consumedBy;
+      if (consumedBy && consumedBy !== args.userId) {
+        throw new IntentAlreadyConsumedError();
+      }
+      const alreadyConsumed = consumedBy === args.userId;
+      if (!alreadyConsumed) {
+        tx.update(ref, { consumedBy: args.userId, consumedAt: Date.now() });
+      }
+      return {
+        status: 'paid' as const,
+        amount: intent.amount,
+        signature: intent.signature,
+        alreadyConsumed,
+      };
+    });
+  }
+
+  // In-memory fallback (dev without Firestore). Single-process, so Map ops are atomic.
+  const intent = memIntents.get(args.reference);
+  if (!intent) throw new Error('Solana Pay reference not found.');
+  if (intent.status !== 'paid') return { status: intent.status };
+  if (intent.userId !== args.userId) {
+    throw new IntentNotOwnedError();
+  }
+  const consumedBy = intent.consumedBy;
+  if (consumedBy && consumedBy !== args.userId) {
+    throw new IntentAlreadyConsumedError();
+  }
+  const alreadyConsumed = consumedBy === args.userId;
+  if (!alreadyConsumed) {
+    intent.consumedBy = args.userId;
+    intent.consumedAt = Date.now();
+    memIntents.set(args.reference, intent);
+  }
+  return {
+    status: 'paid',
+    amount: intent.amount,
+    signature: intent.signature,
+    alreadyConsumed,
+  };
 }

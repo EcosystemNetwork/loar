@@ -19,6 +19,7 @@ export interface VideoModelConfig {
   zaiModelId?: string; // Z.AI model id (used when provider='zai'), e.g. 'cogvideox-3'
   googleModelId?: string; // Gemini API model id (used when provider='google'), e.g. 'veo-3.1-generate-preview'
   openaiModelId?: string; // OpenAI model id (used when provider='openai'), e.g. 'sora-2-pro'
+  minimaxModelId?: string; // MiniMax model id (used when provider='minimax'), e.g. 'MiniMax-Hailuo-02'
   mode: VideoGenerationMode[];
   qualityTier: QualityTier;
   speedTier: SpeedTier;

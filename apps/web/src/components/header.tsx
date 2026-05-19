@@ -67,7 +67,10 @@ const moreGroupsBase: MoreGroup[] = [
     links: [
       { to: '/canvas', label: 'Canvas' },
       { to: '/editor', label: 'Clip Editor' },
+      { to: '/marketing', label: 'Marketing Studio', beta: true },
+      { to: '/ad-reference', label: 'Ad Reference', beta: true },
       { to: '/lab/zai', label: 'Model Lab' },
+      { to: '/lab/gpt-image', label: 'GPT Image Lab' },
       { to: '/lab/voice-studio', label: 'Voice Studio' },
     ],
   },
@@ -75,6 +78,9 @@ const moreGroupsBase: MoreGroup[] = [
     label: 'My Stuff',
     links: [
       { to: '/my-works', label: 'My Works' },
+      { to: '/series', label: 'Series Mode', beta: true },
+      { to: '/virality', label: 'Virality Predictor', beta: true },
+      { to: '/royalties', label: 'Royalty Splits', beta: true },
       { to: '/notifications', label: 'Notifications' },
       { to: '/credits', label: 'Credits' },
       { to: '/settings/api-keys', label: 'API Keys' },

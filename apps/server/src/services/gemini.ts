@@ -1168,6 +1168,135 @@ export async function lyriaGenerate(opts: LyriaGenerateOptions): Promise<LyriaRe
   };
 }
 
+// ── Ad Reference Decomposition ───────────────────────────────────────
+//
+// Takes a viral-ad video URL and returns a structured "recipe" — hook,
+// shot list, style cues, pacing — that the Marketing Studio Ad Reference
+// recreator uses to remix the ad with the caller's own product/IP.
+
+export interface AdDecompositionBeat {
+  /** What happens in this shot (factual, observed). */
+  description: string;
+  /** Approximate seconds the beat occupies. */
+  durationEstimateSec: number;
+  /** Camera move observed (free-form — we don't try to force preset IDs). */
+  cameraMove: string;
+  /** Framing observed (CU / MS / WS / OTS / POV…). */
+  framing: string;
+}
+
+export interface AdDecomposition {
+  /** First 1–2 seconds — the scroll-stop moment. */
+  hookDescription: string;
+  /** Ordered shot list. */
+  beats: AdDecompositionBeat[];
+  /** Style / lighting / color descriptors. */
+  styleCues: string[];
+  /** Dominant palette as free-form color names. */
+  palette: string[];
+  /** '9:16' | '1:1' | '16:9' | '4:5' inferred from the source. */
+  aspectRatio: string;
+  /** 'fast' | 'medium' | 'slow' pacing assessment. */
+  pacing: string;
+  /** One-line mood/vibe summary. */
+  mood: string;
+  /** Total runtime in seconds (clipped to 30s ceiling for context economy). */
+  totalDurationSec: number;
+}
+
+export async function decomposeAdVideo(videoUrl: string): Promise<AdDecomposition> {
+  await ensureGeminiAllowed();
+  await validateUploadUrl(videoUrl);
+
+  // Download video bytes — same pattern as generateWikiFromVideo above.
+  const ctl = new AbortController();
+  const tid = setTimeout(() => ctl.abort(), 60_000);
+  let videoResponse: Response;
+  try {
+    videoResponse = await fetch(videoUrl, { signal: ctl.signal, redirect: 'error' });
+  } finally {
+    clearTimeout(tid);
+  }
+  if (!videoResponse.ok) {
+    throw new Error(`Failed to download reference video: ${videoResponse.statusText}`);
+  }
+  const buffer = Buffer.from(await videoResponse.arrayBuffer());
+
+  // Gemini's free-tier file limit is 2GB, but ads are <10MB. Guardrail.
+  if (buffer.length > 50 * 1024 * 1024) {
+    throw new Error(`Reference video too large (${buffer.length} bytes; max 50MB)`);
+  }
+
+  const uploaded = await fileManager.uploadFile(buffer, {
+    mimeType: 'video/mp4',
+    displayName: `ad-ref-${Date.now()}.mp4`,
+  });
+
+  // Wait for Gemini to finish processing the file.
+  let file = uploaded.file;
+  const deadline = Date.now() + FILE_PROCESSING_TIMEOUT_MS;
+  while (file.state === 'PROCESSING') {
+    if (Date.now() > deadline) throw new Error('Reference video processing timed out');
+    await new Promise((r) => setTimeout(r, 2000));
+    file = await fileManager.getFile(file.name);
+  }
+  if (file.state === 'FAILED') throw new Error('Reference video processing failed');
+
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+
+  const prompt = `You are reverse-engineering a viral advertising video so it can be RECREATED with a different product. Watch the video carefully and produce a structured shot list.
+
+CRITICAL RULES:
+- Describe ONLY what you observe. No invented details.
+- Identify each visual beat as a distinct shot if the framing or camera move changes.
+- Camera move = free-form ("slow push", "whip pan left", "static handheld"). Don't try to use preset names.
+- Framing = standard cinematography labels (ECU, CU, MCU, MS, WS, EWS, OTS, POV, low angle, high angle, bird's eye).
+- Pacing must be one of: "fast" | "medium" | "slow".
+- Aspect ratio must be one of: "9:16" | "1:1" | "16:9" | "4:5".
+
+Return strict JSON with this exact shape (no markdown fences, no commentary):
+{
+  "hookDescription": "what the viewer sees in the first 1-2 seconds — the scroll-stop moment",
+  "beats": [
+    { "description": "factual shot description", "durationEstimateSec": 2, "cameraMove": "slow push", "framing": "MCU" }
+  ],
+  "styleCues": ["warm tungsten lighting", "shallow depth of field", "anamorphic flare"],
+  "palette": ["amber", "deep teal", "ivory"],
+  "aspectRatio": "9:16",
+  "pacing": "medium",
+  "mood": "premium quiet luxury",
+  "totalDurationSec": 8
+}`;
+
+  const result = await model.generateContent([
+    { fileData: { mimeType: file.mimeType, fileUri: file.uri } },
+    { text: prompt },
+  ]);
+  const text = result.response.text();
+
+  let parsed: AdDecomposition;
+  try {
+    // Strip any accidental code fences.
+    const cleaned = text
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/```\s*$/i, '')
+      .trim();
+    parsed = JSON.parse(cleaned) as AdDecomposition;
+  } catch (err) {
+    throw new Error(`Gemini returned non-JSON for ad decomposition: ${text.slice(0, 200)}`);
+  }
+
+  // Defensive: ensure the required arrays exist so downstream UI doesn't crash.
+  parsed.beats = Array.isArray(parsed.beats) ? parsed.beats : [];
+  parsed.styleCues = Array.isArray(parsed.styleCues) ? parsed.styleCues : [];
+  parsed.palette = Array.isArray(parsed.palette) ? parsed.palette : [];
+
+  // Clean up the uploaded file — best-effort.
+  fileManager.deleteFile(file.name).catch(() => {});
+
+  return parsed;
+}
+
 export const geminiService = {
   generateWikiFromVideo,
   analyzeCharacterImage,
@@ -1175,6 +1304,7 @@ export const geminiService = {
   improveVideoPrompt,
   generateEntityLore,
   generateEntityProfile,
+  decomposeAdVideo,
   chat: geminiChat,
   veoCreate,
   veoPoll,

@@ -31,6 +31,7 @@ import {
 import bs58 from 'bs58';
 import type { SolanaCluster } from '@loar/abis/chain';
 import { db, firebaseAvailable } from './firebase';
+import { recordWalletLink } from './wallet-bridge';
 
 // ── Client singleton (shared shape with circle-wallets.ts) ──────────────────
 
@@ -178,6 +179,17 @@ export async function createUserSolanaWallet(
   } else {
     memSolanaWallets.set(key, cw);
   }
+
+  // Persist the EVM ↔ Solana link so `creatorUid`-keyed queries find the
+  // user's content regardless of which chain they sign in via. The helper
+  // validates `userId` shape — system signer ids (e.g. `platform_bridge_signer_v1`)
+  // are skipped silently.
+  void recordWalletLink({
+    evmAddress: userId,
+    solanaAddress: wallet.address,
+    source: 'circle-provision',
+  });
+
   return cw;
 }
 

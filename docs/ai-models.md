@@ -7,6 +7,11 @@ model from `apps/server/src/services/fal/fal.ts`,
 `apps/server/src/routers/zai/zai.routes.ts`, or any router under
 `apps/server/src/routers/generation/`.
 
+> **Concrete pricing lives in [pricing.md](pricing.md)** — auto-generated from
+> the registries under `apps/server/src/services/*-models/registry.ts`. Lists
+> every model with provider cost, fiat price, $LOAR price, and credit cost.
+> Regenerate with `pnpm docs:pricing` after any registry change.
+
 **Headline:** ~70 distinct model IDs across 8 providers — fal AI (the bulk),
 Google (Vertex Imagen + Gemini), OpenAI, Anthropic, ElevenLabs, ByteDance
 (direct + via fal), Z.AI (BYOK), Meshy. Smart-auto picks the model per

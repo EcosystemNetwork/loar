@@ -1,0 +1,180 @@
+name: Cost drift
+
+# Daily walk of the cost ledger. Compares trailing 7 days of per-model
+# $/1k-token (or $/call for non-token providers) against the prior 7 days
+# and opens / updates a GitHub issue when any model drifts beyond ±5%.
+#
+# Catches the kinds of pricing fluctuations that scraping pages can't:
+#   - Provider quietly changed list rates (our ledger uses registry rates,
+#     so divergence shows up on reconciliation BUT shows up earlier here
+#     as cost-per-token shift if the registry hasn't been patched yet)
+#   - Model behavior change (longer responses → $/call up, $/1k-tok stable)
+#   - A routing change shifted traffic to a more expensive model
+#
+# Disabled by default until FIREBASE_SERVICE_ACCOUNT_JSON secret is set —
+# the job exits cleanly when the secret is absent so the workflow doesn't
+# fail noisily during initial setup.
+
+on:
+  schedule:
+    # 13:00 UTC daily (~06:00 PT / 15:00 CET) — runs before standup so
+    # ops sees the alert in time to discuss in the morning sync.
+    - cron: '0 13 * * *'
+  workflow_dispatch:
+    inputs:
+      window_days:
+        description: 'Current-window size in days'
+        required: false
+        default: '7'
+      baseline_days:
+        description: 'Baseline-window size in days'
+        required: false
+        default: '7'
+      threshold:
+        description: 'Drift threshold (0.05 = 5%)'
+        required: false
+        default: '0.05'
+      min_calls:
+        description: 'Minimum calls per window before flagging'
+        required: false
+        default: '50'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Audit per-model cost drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check service account secret
+        id: secret-check
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::warning::FIREBASE_SERVICE_ACCOUNT_JSON secret not set — skipping drift audit"
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write service account file
+        if: steps.secret-check.outputs.skip == '0'
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          echo "$SA" > firebase-service-account.json
+          chmod 600 firebase-service-account.json
+
+      - name: Diagnose Firebase credentials (fail-fast)
+        if: steps.secret-check.outputs.skip == '0'
+        run: |
+          # firebase-doctor pings Firestore with a trivial query and prints
+          # actionable hints (rotated key? Firestore API not enabled? wrong
+          # project?) before the real audit runs. Far better than a stack
+          # trace from the cost-drift script.
+          pnpm ops:firebase-doctor
+
+      - name: Run drift audit
+        if: steps.secret-check.outputs.skip == '0'
+        id: drift
+        run: |
+          WINDOW="${{ github.event.inputs.window_days || '7' }}"
+          BASELINE="${{ github.event.inputs.baseline_days || '7' }}"
+          THRESHOLD="${{ github.event.inputs.threshold || '0.05' }}"
+          MIN_CALLS="${{ github.event.inputs.min_calls || '50' }}"
+
+          # Print human-readable to log + dump JSON for issue body.
+          pnpm cost:check-drift \
+            --window="$WINDOW" --baseline="$BASELINE" \
+            --threshold="$THRESHOLD" --min-calls="$MIN_CALLS" || true
+          pnpm cost:check-drift \
+            --window="$WINDOW" --baseline="$BASELINE" \
+            --threshold="$THRESHOLD" --min-calls="$MIN_CALLS" --json > drift.json || true
+
+          FLAGGED_COUNT=$(jq -r '.flaggedCount' drift.json)
+          echo "flagged_count=$FLAGGED_COUNT" >> "$GITHUB_OUTPUT"
+          echo "Flagged models: $FLAGGED_COUNT"
+
+      - name: Build issue body
+        if: steps.secret-check.outputs.skip == '0' && steps.drift.outputs.flagged_count != '0'
+        run: |
+          {
+            FLAGGED=$(jq -r '.flaggedCount' drift.json)
+            WIN=$(jq -r '.windowDays' drift.json)
+            BASE=$(jq -r '.baselineDays' drift.json)
+            THR=$(jq -r '.threshold * 100' drift.json)
+            echo "Daily cost-drift audit flagged **$FLAGGED** model(s) whose unit cost shifted beyond ±${THR}% between the trailing ${WIN}d window and the prior ${BASE}d baseline."
+            echo
+            echo "### Flagged models"
+            echo
+            echo "| Provider | Model | Metric | Baseline | Current | Drift | Sample (cur / base calls) |"
+            echo "| --- | --- | --- | --- | --- | --- | --- |"
+            jq -r '.flagged[] | "| " + .provider + " | `" + .model + "` | " + .kind + " | $" + (.baselineValue|tostring) + " | $" + (.currentValue|tostring) + " | " + ((.driftPct * 100)|tostring|.[0:6]) + "% | " + (.current.calls|tostring) + " / " + (.baseline.calls|tostring) + " |"' drift.json
+            echo
+            echo "### Likely causes (top → most common)"
+            echo
+            echo "1. **Provider changed list pricing.** Verify on their dashboard and patch the registry in \`apps/server/src/services/*-models/registry.ts\`, then run \`pnpm docs:pricing\`."
+            echo "2. **Model behavior shift** (more output tokens per request). Confirms with \`gh repo view\` on provider release notes. No registry change needed; metric will normalize."
+            echo "3. **Routing change shifted volume.** Grep \`[llm-router]\` logs for chosen-model frequency around the drift window."
+            echo
+            echo "_Auto-generated by [.github/workflows/cost-drift.yml](../blob/main/.github/workflows/cost-drift.yml). This issue will auto-close once no model drifts._"
+          } > issue-body.md
+
+      - name: Open or update cost-drift issue
+        if: steps.secret-check.outputs.skip == '0' && steps.drift.outputs.flagged_count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXISTING=$(gh issue list --state open --search 'in:title "Cost drift detected"' --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            gh issue edit "$EXISTING" --body-file issue-body.md
+            echo "Updated #$EXISTING"
+          else
+            gh issue create \
+              --title "Cost drift detected — verify provider pricing or registry rates" \
+              --label "pricing,ops" \
+              --body-file issue-body.md
+          fi
+
+      - name: Close drift issue if nothing flagged
+        if: steps.secret-check.outputs.skip == '0' && steps.drift.outputs.flagged_count == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXISTING=$(gh issue list --state open --search 'in:title "Cost drift detected"' --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            gh issue close "$EXISTING" --comment "No models drift beyond threshold as of $(date -u +%Y-%m-%d). Closing automatically."
+          fi
+
+      - name: Upload drift JSON artifact
+        if: always() && steps.secret-check.outputs.skip == '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cost-drift-${{ github.run_id }}
+          path: drift.json
+          retention-days: 30
+
+      - name: Clean up service account
+        if: always()
+        run: rm -f firebase-sa-key.json

@@ -28,6 +28,7 @@
     "reconcile:spend": "tsx scripts/reconcile-provider-spend.ts",
     "registry:check-staleness": "tsx scripts/check-registry-staleness.ts",
     "cost:check-drift": "tsx scripts/check-cost-drift.ts",
+    "ops:firebase-doctor": "tsx scripts/firebase-doctor.ts",
     "smoke:chain": "SMOKE_LAYER=chain tsx scripts/smoke/index.ts",
     "smoke:server": "SMOKE_LAYER=server tsx scripts/smoke/index.ts",
     "smoke:launchpad": "SMOKE_LAYER=launchpad tsx scripts/smoke/index.ts",

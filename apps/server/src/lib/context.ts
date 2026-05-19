@@ -9,6 +9,7 @@ import { getCookie } from 'hono/cookie';
 import { getAddress } from 'viem';
 import { verifyAuth, type AuthUser } from './auth';
 import { getClientKey } from '../middleware/rate-limit';
+import { lookupEvmForSolana } from './wallet-bridge';
 
 export type CreateContextOptions = {
   context: HonoContext;
@@ -26,6 +27,27 @@ export async function createContext({ context }: CreateContextOptions) {
       user.uid = user.address.toLowerCase();
     } catch {
       // Invalid address — leave as-is
+    }
+  }
+
+  // Solana-primary sessions issued before walletLinks existed have no `evm`
+  // claim, so `user.address` is undefined and `user.uid` is the base58
+  // pubkey. That breaks any `creatorUid`-keyed query written under the
+  // user's EVM identity. Bridge once per request: if the linked EVM is
+  // known (via `walletLinks` or `circleSolanaWallets` fallback), promote it
+  // to the canonical uid so all downstream queries match the dominant
+  // identity. New SIWS sessions get the EVM claim baked into the JWT
+  // (see routes/siws-auth.ts), so this Firestore lookup is a one-time cost
+  // during the legacy-session drain window.
+  if (user && user.chainNamespace === 'solana' && !user.address && user.solanaAddress) {
+    const evm = await lookupEvmForSolana(user.solanaAddress);
+    if (evm) {
+      try {
+        user.address = getAddress(evm);
+        user.uid = user.address.toLowerCase();
+      } catch {
+        // Invalid evm shape — keep base58 uid as-is
+      }
     }
   }
 

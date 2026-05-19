@@ -51,6 +51,45 @@ import type { VideoSegment, MultiSegmentEvent } from '@/types/segments';
 import { migrateLegacyEvent, generateSegmentId, sortSegments } from '@/types/segments';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
+function VideoThumb({ src, iconClassName = 'h-8 w-8' }: { src?: string; iconClassName?: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-white">
+        <Film className={iconClassName} />
+      </div>
+    );
+  }
+  return (
+    <video
+      src={resolveIpfsUrl(src)}
+      className="w-full h-full object-cover"
+      muted
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+function CharacterThumb({ src, name }: { src?: string | null; name?: string }) {
+  const [failed, setFailed] = useState(false);
+  const resolved = src ? resolveIpfsUrl(src) : '';
+  if (!resolved || failed) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/15 to-primary/5 text-primary">
+        <LoarIcon name="hero" size={28} />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={resolved}
+      alt={name || ''}
+      className="w-full h-full object-cover"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 function EventPage() {
   const { universe: universeId, event: eventId } = useParams({ from: '/event/$universe/$event' });
   const navigate = useNavigate();
@@ -590,17 +629,7 @@ function EventPage() {
                   </div>
                   <div className="flex gap-3">
                     <div className="w-32 h-20 bg-black rounded overflow-hidden flex-shrink-0">
-                      {previousEventData.videoUrl ? (
-                        <video
-                          src={resolveIpfsUrl(previousEventData.videoUrl)}
-                          className="w-full h-full object-cover"
-                          muted
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-white">
-                          <Film className="h-8 w-8" />
-                        </div>
-                      )}
+                      <VideoThumb src={previousEventData.videoUrl} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium">Event #{previousEventData.id}</p>
@@ -637,17 +666,7 @@ function EventPage() {
                     </div>
                     <div className="flex gap-3">
                       <div className="w-32 h-20 bg-black rounded overflow-hidden flex-shrink-0">
-                        {nextEventData[0].videoUrl ? (
-                          <video
-                            src={resolveIpfsUrl(nextEventData[0].videoUrl)}
-                            className="w-full h-full object-cover"
-                            muted
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-white">
-                            <Film className="h-8 w-8" />
-                          </div>
-                        )}
+                        <VideoThumb src={nextEventData[0].videoUrl} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium">Event #{nextEventData[0].id}</p>
@@ -673,17 +692,7 @@ function EventPage() {
                           onClick={() => navigate({ to: `/event/${universeId}/${event.id}` })}
                         >
                           <div className="w-20 h-14 bg-black rounded overflow-hidden flex-shrink-0">
-                            {event.videoUrl ? (
-                              <video
-                                src={resolveIpfsUrl(event.videoUrl)}
-                                className="w-full h-full object-cover"
-                                muted
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-white">
-                                <Film className="h-5 w-5" />
-                              </div>
-                            )}
+                            <VideoThumb src={event.videoUrl} iconClassName="h-5 w-5" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium">
@@ -781,15 +790,12 @@ function EventPage() {
                           <div className="bg-gradient-to-r from-primary/5 via-transparent to-transparent border-l-4 border-primary/50 pl-4 py-3 rounded-r-xl hover:border-primary transition-all duration-300 hover:shadow-md">
                             <div className="flex items-start gap-4">
                               {/* Thumbnail */}
-                              {matchingCharacter?.image_url && (
-                                <div className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/10 to-primary/5">
-                                  <img
-                                    src={resolveIpfsUrl(matchingCharacter.image_url)}
-                                    alt={element.name}
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                              )}
+                              <div className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/10 to-primary/5">
+                                <CharacterThumb
+                                  src={matchingCharacter?.image_url}
+                                  name={element.name}
+                                />
+                              </div>
 
                               {/* Content */}
                               <div className="flex-1 min-w-0">

@@ -9,6 +9,8 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ViralityRouteImport } from './routes/virality'
+import { Route as RoyaltiesRouteImport } from './routes/royalties'
 import { Route as VideosRouteImport } from './routes/videos'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as TestnetRouteImport } from './routes/testnet'
@@ -18,6 +20,7 @@ import { Route as StudioControlledRouteImport } from './routes/studio-controlled
 import { Route as StudioRouteImport } from './routes/studio'
 import { Route as StatusRouteImport } from './routes/status'
 import { Route as SolanaRouteImport } from './routes/solana'
+import { Route as SeriesRouteImport } from './routes/series'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SandboxRouteImport } from './routes/sandbox'
 import { Route as ResidencyRouteImport } from './routes/residency'
@@ -27,6 +30,7 @@ import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as NotebookRouteImport } from './routes/notebook'
 import { Route as MyWorksRouteImport } from './routes/my-works'
+import { Route as MarketingRouteImport } from './routes/marketing'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
@@ -44,6 +48,7 @@ import { Route as CinematicUniverseCreateRouteImport } from './routes/cinematicU
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as CanvasRouteImport } from './routes/canvas'
 import { Route as BridgeRouteImport } from './routes/bridge'
+import { Route as AdReferenceRouteImport } from './routes/ad-reference'
 import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WikiIndexRouteImport } from './routes/wiki/index'
@@ -77,6 +82,7 @@ import { Route as MarketplaceLikenessRouteImport } from './routes/marketplace.li
 import { Route as LineageAssetIdRouteImport } from './routes/lineage.$assetId'
 import { Route as LabZaiRouteImport } from './routes/lab.zai'
 import { Route as LabVoiceStudioRouteImport } from './routes/lab.voice-studio'
+import { Route as LabGptImageRouteImport } from './routes/lab.gpt-image'
 import { Route as GovernanceUniverseIdRouteImport } from './routes/governance/$universeId'
 import { Route as ExtractJobIdRouteImport } from './routes/extract.$jobId'
 import { Route as EpisodeIdRouteImport } from './routes/episode.$id'
@@ -103,9 +109,11 @@ import { Route as AdplacementsSlotIdRouteImport } from './routes/adplacements/$s
 import { Route as AdminUniversesRouteImport } from './routes/admin/universes'
 import { Route as AdminResidencyRouteImport } from './routes/admin/residency'
 import { Route as AdminOpsRouteImport } from './routes/admin/ops'
+import { Route as AdminMainnetRouteImport } from './routes/admin/mainnet'
 import { Route as AdminModerationRouteImport } from './routes/admin/moderation'
 import { Route as AdminMcpUsageRouteImport } from './routes/admin/mcp-usage'
 import { Route as AdminCostRouteImport } from './routes/admin/cost'
+import { Route as AdminByokCodesRouteImport } from './routes/admin/byok-codes'
 import { Route as AdplacementsSeedsIndexRouteImport } from './routes/adplacements/seeds/index'
 import { Route as WikiEntityIdRouteImport } from './routes/wiki/entity/$id'
 import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
@@ -129,6 +137,16 @@ import { Route as AdplacementsSeedsSeedIdRouteImport } from './routes/adplacemen
 import { Route as LabZaiVideoJobIdRouteImport } from './routes/lab.zai.video.$jobId'
 import { Route as DashboardPersonasPersonaIdEditRouteImport } from './routes/dashboard.personas.$personaId.edit'
 
+const ViralityRoute = ViralityRouteImport.update({
+  id: '/virality',
+  path: '/virality',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RoyaltiesRoute = RoyaltiesRouteImport.update({
+  id: '/royalties',
+  path: '/royalties',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VideosRoute = VideosRouteImport.update({
   id: '/videos',
   path: '/videos',
@@ -174,6 +192,11 @@ const SolanaRoute = SolanaRouteImport.update({
   path: '/solana',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SeriesRoute = SeriesRouteImport.update({
+  id: '/series',
+  path: '/series',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
@@ -217,6 +240,11 @@ const NotebookRoute = NotebookRouteImport.update({
 const MyWorksRoute = MyWorksRouteImport.update({
   id: '/my-works',
   path: '/my-works',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MarketingRoute = MarketingRouteImport.update({
+  id: '/marketing',
+  path: '/marketing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MarketRoute = MarketRouteImport.update({
@@ -302,6 +330,11 @@ const CanvasRoute = CanvasRouteImport.update({
 const BridgeRoute = BridgeRouteImport.update({
   id: '/bridge',
   path: '/bridge',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdReferenceRoute = AdReferenceRouteImport.update({
+  id: '/ad-reference',
+  path: '/ad-reference',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ActivityRoute = ActivityRouteImport.update({
@@ -469,6 +502,11 @@ const LabVoiceStudioRoute = LabVoiceStudioRouteImport.update({
   path: '/lab/voice-studio',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LabGptImageRoute = LabGptImageRouteImport.update({
+  id: '/lab/gpt-image',
+  path: '/lab/gpt-image',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GovernanceUniverseIdRoute = GovernanceUniverseIdRouteImport.update({
   id: '/governance/$universeId',
   path: '/governance/$universeId',
@@ -599,6 +637,11 @@ const AdminOpsRoute = AdminOpsRouteImport.update({
   path: '/admin/ops',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminMainnetRoute = AdminMainnetRouteImport.update({
+  id: '/admin/mainnet',
+  path: '/admin/mainnet',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminModerationRoute = AdminModerationRouteImport.update({
   id: '/admin/moderation',
   path: '/admin/moderation',
@@ -612,6 +655,11 @@ const AdminMcpUsageRoute = AdminMcpUsageRouteImport.update({
 const AdminCostRoute = AdminCostRouteImport.update({
   id: '/admin/cost',
   path: '/admin/cost',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminByokCodesRoute = AdminByokCodesRouteImport.update({
+  id: '/admin/byok-codes',
+  path: '/admin/byok-codes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdplacementsSeedsIndexRoute = AdplacementsSeedsIndexRouteImport.update({
@@ -731,6 +779,7 @@ const DashboardPersonasPersonaIdEditRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/ad-reference': typeof AdReferenceRoute
   '/bridge': typeof BridgeRoute
   '/canvas': typeof CanvasRouteWithChildren
   '/checkout': typeof CheckoutRoute
@@ -748,6 +797,7 @@ export interface FileRoutesByFullPath {
   '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
+  '/marketing': typeof MarketingRoute
   '/my-works': typeof MyWorksRoute
   '/notebook': typeof NotebookRouteWithChildren
   '/notifications': typeof NotificationsRoute
@@ -757,6 +807,7 @@ export interface FileRoutesByFullPath {
   '/residency': typeof ResidencyRoute
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
+  '/series': typeof SeriesRoute
   '/solana': typeof SolanaRoute
   '/status': typeof StatusRoute
   '/studio': typeof StudioRouteWithChildren
@@ -766,10 +817,14 @@ export interface FileRoutesByFullPath {
   '/testnet': typeof TestnetRoute
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
+  '/virality': typeof ViralityRoute
+  '/royalties': typeof RoyaltiesRoute
+  '/admin/byok-codes': typeof AdminByokCodesRoute
   '/admin/cost': typeof AdminCostRoute
   '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/admin/ops': typeof AdminOpsRoute
+  '/admin/mainnet': typeof AdminMainnetRoute
   '/admin/residency': typeof AdminResidencyRoute
   '/admin/universes': typeof AdminUniversesRoute
   '/adplacements/$slotId': typeof AdplacementsSlotIdRoute
@@ -795,6 +850,7 @@ export interface FileRoutesByFullPath {
   '/episode/$id': typeof EpisodeIdRoute
   '/extract/$jobId': typeof ExtractJobIdRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
+  '/lab/gpt-image': typeof LabGptImageRoute
   '/lab/voice-studio': typeof LabVoiceStudioRoute
   '/lab/zai': typeof LabZaiRouteWithChildren
   '/lineage/$assetId': typeof LineageAssetIdRoute
@@ -852,6 +908,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/ad-reference': typeof AdReferenceRoute
   '/bridge': typeof BridgeRoute
   '/canvas': typeof CanvasRouteWithChildren
   '/checkout': typeof CheckoutRoute
@@ -869,6 +926,7 @@ export interface FileRoutesByTo {
   '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
+  '/marketing': typeof MarketingRoute
   '/my-works': typeof MyWorksRoute
   '/notebook': typeof NotebookRouteWithChildren
   '/notifications': typeof NotificationsRoute
@@ -878,6 +936,7 @@ export interface FileRoutesByTo {
   '/residency': typeof ResidencyRoute
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
+  '/series': typeof SeriesRoute
   '/solana': typeof SolanaRoute
   '/status': typeof StatusRoute
   '/studio': typeof StudioRouteWithChildren
@@ -887,10 +946,14 @@ export interface FileRoutesByTo {
   '/testnet': typeof TestnetRoute
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
+  '/virality': typeof ViralityRoute
+  '/royalties': typeof RoyaltiesRoute
+  '/admin/byok-codes': typeof AdminByokCodesRoute
   '/admin/cost': typeof AdminCostRoute
   '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/admin/ops': typeof AdminOpsRoute
+  '/admin/mainnet': typeof AdminMainnetRoute
   '/admin/residency': typeof AdminResidencyRoute
   '/admin/universes': typeof AdminUniversesRoute
   '/adplacements/$slotId': typeof AdplacementsSlotIdRoute
@@ -916,6 +979,7 @@ export interface FileRoutesByTo {
   '/episode/$id': typeof EpisodeIdRoute
   '/extract/$jobId': typeof ExtractJobIdRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
+  '/lab/gpt-image': typeof LabGptImageRoute
   '/lab/voice-studio': typeof LabVoiceStudioRoute
   '/lab/zai': typeof LabZaiRouteWithChildren
   '/lineage/$assetId': typeof LineageAssetIdRoute
@@ -974,6 +1038,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/ad-reference': typeof AdReferenceRoute
   '/bridge': typeof BridgeRoute
   '/canvas': typeof CanvasRouteWithChildren
   '/checkout': typeof CheckoutRoute
@@ -991,6 +1056,7 @@ export interface FileRoutesById {
   '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
+  '/marketing': typeof MarketingRoute
   '/my-works': typeof MyWorksRoute
   '/notebook': typeof NotebookRouteWithChildren
   '/notifications': typeof NotificationsRoute
@@ -1000,6 +1066,7 @@ export interface FileRoutesById {
   '/residency': typeof ResidencyRoute
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
+  '/series': typeof SeriesRoute
   '/solana': typeof SolanaRoute
   '/status': typeof StatusRoute
   '/studio': typeof StudioRouteWithChildren
@@ -1009,10 +1076,14 @@ export interface FileRoutesById {
   '/testnet': typeof TestnetRoute
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
+  '/virality': typeof ViralityRoute
+  '/royalties': typeof RoyaltiesRoute
+  '/admin/byok-codes': typeof AdminByokCodesRoute
   '/admin/cost': typeof AdminCostRoute
   '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/admin/ops': typeof AdminOpsRoute
+  '/admin/mainnet': typeof AdminMainnetRoute
   '/admin/residency': typeof AdminResidencyRoute
   '/admin/universes': typeof AdminUniversesRoute
   '/adplacements/$slotId': typeof AdplacementsSlotIdRoute
@@ -1038,6 +1109,7 @@ export interface FileRoutesById {
   '/episode/$id': typeof EpisodeIdRoute
   '/extract/$jobId': typeof ExtractJobIdRoute
   '/governance/$universeId': typeof GovernanceUniverseIdRoute
+  '/lab/gpt-image': typeof LabGptImageRoute
   '/lab/voice-studio': typeof LabVoiceStudioRoute
   '/lab/zai': typeof LabZaiRouteWithChildren
   '/lineage/$assetId': typeof LineageAssetIdRoute
@@ -1097,6 +1169,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/activity'
+    | '/ad-reference'
     | '/bridge'
     | '/canvas'
     | '/checkout'
@@ -1114,6 +1187,7 @@ export interface FileRouteTypes {
     | '/leaderboard'
     | '/login'
     | '/market'
+    | '/marketing'
     | '/my-works'
     | '/notebook'
     | '/notifications'
@@ -1123,6 +1197,7 @@ export interface FileRouteTypes {
     | '/residency'
     | '/sandbox'
     | '/search'
+    | '/series'
     | '/solana'
     | '/status'
     | '/studio'
@@ -1132,10 +1207,14 @@ export interface FileRouteTypes {
     | '/testnet'
     | '/upload'
     | '/videos'
+    | '/virality'
+    | '/royalties'
+    | '/admin/byok-codes'
     | '/admin/cost'
     | '/admin/mcp-usage'
     | '/admin/moderation'
     | '/admin/ops'
+    | '/admin/mainnet'
     | '/admin/residency'
     | '/admin/universes'
     | '/adplacements/$slotId'
@@ -1161,6 +1240,7 @@ export interface FileRouteTypes {
     | '/episode/$id'
     | '/extract/$jobId'
     | '/governance/$universeId'
+    | '/lab/gpt-image'
     | '/lab/voice-studio'
     | '/lab/zai'
     | '/lineage/$assetId'
@@ -1218,6 +1298,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/activity'
+    | '/ad-reference'
     | '/bridge'
     | '/canvas'
     | '/checkout'
@@ -1235,6 +1316,7 @@ export interface FileRouteTypes {
     | '/leaderboard'
     | '/login'
     | '/market'
+    | '/marketing'
     | '/my-works'
     | '/notebook'
     | '/notifications'
@@ -1244,6 +1326,7 @@ export interface FileRouteTypes {
     | '/residency'
     | '/sandbox'
     | '/search'
+    | '/series'
     | '/solana'
     | '/status'
     | '/studio'
@@ -1253,10 +1336,14 @@ export interface FileRouteTypes {
     | '/testnet'
     | '/upload'
     | '/videos'
+    | '/virality'
+    | '/royalties'
+    | '/admin/byok-codes'
     | '/admin/cost'
     | '/admin/mcp-usage'
     | '/admin/moderation'
     | '/admin/ops'
+    | '/admin/mainnet'
     | '/admin/residency'
     | '/admin/universes'
     | '/adplacements/$slotId'
@@ -1282,6 +1369,7 @@ export interface FileRouteTypes {
     | '/episode/$id'
     | '/extract/$jobId'
     | '/governance/$universeId'
+    | '/lab/gpt-image'
     | '/lab/voice-studio'
     | '/lab/zai'
     | '/lineage/$assetId'
@@ -1339,6 +1427,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/activity'
+    | '/ad-reference'
     | '/bridge'
     | '/canvas'
     | '/checkout'
@@ -1356,6 +1445,7 @@ export interface FileRouteTypes {
     | '/leaderboard'
     | '/login'
     | '/market'
+    | '/marketing'
     | '/my-works'
     | '/notebook'
     | '/notifications'
@@ -1365,6 +1455,7 @@ export interface FileRouteTypes {
     | '/residency'
     | '/sandbox'
     | '/search'
+    | '/series'
     | '/solana'
     | '/status'
     | '/studio'
@@ -1374,10 +1465,14 @@ export interface FileRouteTypes {
     | '/testnet'
     | '/upload'
     | '/videos'
+    | '/virality'
+    | '/royalties'
+    | '/admin/byok-codes'
     | '/admin/cost'
     | '/admin/mcp-usage'
     | '/admin/moderation'
     | '/admin/ops'
+    | '/admin/mainnet'
     | '/admin/residency'
     | '/admin/universes'
     | '/adplacements/$slotId'
@@ -1403,6 +1498,7 @@ export interface FileRouteTypes {
     | '/episode/$id'
     | '/extract/$jobId'
     | '/governance/$universeId'
+    | '/lab/gpt-image'
     | '/lab/voice-studio'
     | '/lab/zai'
     | '/lineage/$assetId'
@@ -1461,6 +1557,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActivityRoute: typeof ActivityRoute
+  AdReferenceRoute: typeof AdReferenceRoute
   BridgeRoute: typeof BridgeRoute
   CanvasRoute: typeof CanvasRouteWithChildren
   CheckoutRoute: typeof CheckoutRoute
@@ -1478,6 +1575,7 @@ export interface RootRouteChildren {
   LeaderboardRoute: typeof LeaderboardRoute
   LoginRoute: typeof LoginRoute
   MarketRoute: typeof MarketRoute
+  MarketingRoute: typeof MarketingRoute
   MyWorksRoute: typeof MyWorksRoute
   NotebookRoute: typeof NotebookRouteWithChildren
   NotificationsRoute: typeof NotificationsRoute
@@ -1487,6 +1585,7 @@ export interface RootRouteChildren {
   ResidencyRoute: typeof ResidencyRoute
   SandboxRoute: typeof SandboxRoute
   SearchRoute: typeof SearchRoute
+  SeriesRoute: typeof SeriesRoute
   SolanaRoute: typeof SolanaRoute
   StatusRoute: typeof StatusRoute
   StudioRoute: typeof StudioRouteWithChildren
@@ -1496,10 +1595,14 @@ export interface RootRouteChildren {
   TestnetRoute: typeof TestnetRoute
   UploadRoute: typeof UploadRoute
   VideosRoute: typeof VideosRoute
+  ViralityRoute: typeof ViralityRoute
+  RoyaltiesRoute: typeof RoyaltiesRoute
+  AdminByokCodesRoute: typeof AdminByokCodesRoute
   AdminCostRoute: typeof AdminCostRoute
   AdminMcpUsageRoute: typeof AdminMcpUsageRoute
   AdminModerationRoute: typeof AdminModerationRoute
   AdminOpsRoute: typeof AdminOpsRoute
+  AdminMainnetRoute: typeof AdminMainnetRoute
   AdminResidencyRoute: typeof AdminResidencyRoute
   AdminUniversesRoute: typeof AdminUniversesRoute
   AdplacementsSlotIdRoute: typeof AdplacementsSlotIdRoute
@@ -1522,6 +1625,7 @@ export interface RootRouteChildren {
   EpisodeIdRoute: typeof EpisodeIdRoute
   ExtractJobIdRoute: typeof ExtractJobIdRoute
   GovernanceUniverseIdRoute: typeof GovernanceUniverseIdRoute
+  LabGptImageRoute: typeof LabGptImageRoute
   LabVoiceStudioRoute: typeof LabVoiceStudioRoute
   LabZaiRoute: typeof LabZaiRouteWithChildren
   LineageAssetIdRoute: typeof LineageAssetIdRoute
@@ -1566,6 +1670,20 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/virality': {
+      id: '/virality'
+      path: '/virality'
+      fullPath: '/virality'
+      preLoaderRoute: typeof ViralityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/royalties': {
+      id: '/royalties'
+      path: '/royalties'
+      fullPath: '/royalties'
+      preLoaderRoute: typeof RoyaltiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/videos': {
       id: '/videos'
       path: '/videos'
@@ -1629,6 +1747,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SolanaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/series': {
+      id: '/series'
+      path: '/series'
+      fullPath: '/series'
+      preLoaderRoute: typeof SeriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/search': {
       id: '/search'
       path: '/search'
@@ -1690,6 +1815,13 @@ declare module '@tanstack/react-router' {
       path: '/my-works'
       fullPath: '/my-works'
       preLoaderRoute: typeof MyWorksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/marketing': {
+      id: '/marketing'
+      path: '/marketing'
+      fullPath: '/marketing'
+      preLoaderRoute: typeof MarketingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/market': {
@@ -1809,6 +1941,13 @@ declare module '@tanstack/react-router' {
       path: '/bridge'
       fullPath: '/bridge'
       preLoaderRoute: typeof BridgeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ad-reference': {
+      id: '/ad-reference'
+      path: '/ad-reference'
+      fullPath: '/ad-reference'
+      preLoaderRoute: typeof AdReferenceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/activity': {
@@ -2042,6 +2181,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LabVoiceStudioRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lab/gpt-image': {
+      id: '/lab/gpt-image'
+      path: '/lab/gpt-image'
+      fullPath: '/lab/gpt-image'
+      preLoaderRoute: typeof LabGptImageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/governance/$universeId': {
       id: '/governance/$universeId'
       path: '/governance/$universeId'
@@ -2224,6 +2370,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOpsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/mainnet': {
+      id: '/admin/mainnet'
+      path: '/admin/mainnet'
+      fullPath: '/admin/mainnet'
+      preLoaderRoute: typeof AdminMainnetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/moderation': {
       id: '/admin/moderation'
       path: '/admin/moderation'
@@ -2243,6 +2396,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/cost'
       fullPath: '/admin/cost'
       preLoaderRoute: typeof AdminCostRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/byok-codes': {
+      id: '/admin/byok-codes'
+      path: '/admin/byok-codes'
+      fullPath: '/admin/byok-codes'
+      preLoaderRoute: typeof AdminByokCodesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/adplacements/seeds/': {
@@ -2512,6 +2672,7 @@ const UniverseIdRouteWithChildren = UniverseIdRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivityRoute: ActivityRoute,
+  AdReferenceRoute: AdReferenceRoute,
   BridgeRoute: BridgeRoute,
   CanvasRoute: CanvasRouteWithChildren,
   CheckoutRoute: CheckoutRoute,
@@ -2529,6 +2690,7 @@ const rootRouteChildren: RootRouteChildren = {
   LeaderboardRoute: LeaderboardRoute,
   LoginRoute: LoginRoute,
   MarketRoute: MarketRoute,
+  MarketingRoute: MarketingRoute,
   MyWorksRoute: MyWorksRoute,
   NotebookRoute: NotebookRouteWithChildren,
   NotificationsRoute: NotificationsRoute,
@@ -2538,6 +2700,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResidencyRoute: ResidencyRoute,
   SandboxRoute: SandboxRoute,
   SearchRoute: SearchRoute,
+  SeriesRoute: SeriesRoute,
   SolanaRoute: SolanaRoute,
   StatusRoute: StatusRoute,
   StudioRoute: StudioRouteWithChildren,
@@ -2547,10 +2710,14 @@ const rootRouteChildren: RootRouteChildren = {
   TestnetRoute: TestnetRoute,
   UploadRoute: UploadRoute,
   VideosRoute: VideosRoute,
+  ViralityRoute: ViralityRoute,
+  RoyaltiesRoute: RoyaltiesRoute,
+  AdminByokCodesRoute: AdminByokCodesRoute,
   AdminCostRoute: AdminCostRoute,
   AdminMcpUsageRoute: AdminMcpUsageRoute,
   AdminModerationRoute: AdminModerationRoute,
   AdminOpsRoute: AdminOpsRoute,
+  AdminMainnetRoute: AdminMainnetRoute,
   AdminResidencyRoute: AdminResidencyRoute,
   AdminUniversesRoute: AdminUniversesRoute,
   AdplacementsSlotIdRoute: AdplacementsSlotIdRoute,
@@ -2573,6 +2740,7 @@ const rootRouteChildren: RootRouteChildren = {
   EpisodeIdRoute: EpisodeIdRoute,
   ExtractJobIdRoute: ExtractJobIdRoute,
   GovernanceUniverseIdRoute: GovernanceUniverseIdRoute,
+  LabGptImageRoute: LabGptImageRoute,
   LabVoiceStudioRoute: LabVoiceStudioRoute,
   LabZaiRoute: LabZaiRouteWithChildren,
   LineageAssetIdRoute: LineageAssetIdRoute,
