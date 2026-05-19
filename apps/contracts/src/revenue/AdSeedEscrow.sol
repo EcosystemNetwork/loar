@@ -58,16 +58,10 @@ contract AdSeedEscrow is
     // ── Events ──────────────────────────────────────────────────────────
 
     event SeedFunded(
-        bytes32 indexed seedId,
-        address indexed sponsor,
-        uint256 amount,
-        uint64 expiresAt
+        bytes32 indexed seedId, address indexed sponsor, uint256 amount, uint64 expiresAt
     );
     event PlacementApproved(
-        bytes32 indexed seedId,
-        address indexed creator,
-        uint256 amount,
-        bytes32 placementId
+        bytes32 indexed seedId, address indexed creator, uint256 amount, bytes32 placementId
     );
     event SeedRefunded(bytes32 indexed seedId, address indexed sponsor, uint256 amount);
     event PlatformChanged(address indexed oldPlatform, address indexed newPlatform);
@@ -166,12 +160,12 @@ contract AdSeedEscrow is
 
     /// @notice Approve a placement against a seed — releases `amount` of
     ///         $LOAR to the universe creator. Platform-only.
-    function approvePlacement(
-        bytes32 seedId,
-        bytes32 placementId,
-        address creator,
-        uint256 amount
-    ) external onlyPlatform nonReentrant whenNotPaused {
+    function approvePlacement(bytes32 seedId, bytes32 placementId, address creator, uint256 amount)
+        external
+        onlyPlatform
+        nonReentrant
+        whenNotPaused
+    {
         if (creator == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
 

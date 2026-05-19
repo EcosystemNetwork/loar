@@ -25,7 +25,9 @@ contract PremiumActionsTest is Test {
             address(
                 new ERC1967Proxy(
                     address(impl),
-                    abi.encodeCall(PremiumActions.initialize, (address(loar), treasury, lp, platform))
+                    abi.encodeCall(
+                        PremiumActions.initialize, (address(loar), treasury, lp, platform)
+                    )
                 )
             )
         );
@@ -48,7 +50,8 @@ contract PremiumActionsTest is Test {
         assertEq(premium.owner(), deployer);
 
         // Check default action costs
-        (uint256 cost, bool active,,) = premium.actions(PremiumActions.BurnAction.PRIORITY_GENERATION);
+        (uint256 cost, bool active,,) =
+            premium.actions(PremiumActions.BurnAction.PRIORITY_GENERATION);
         assertEq(cost, 50e18);
         assertTrue(active);
 
@@ -145,7 +148,8 @@ contract PremiumActionsTest is Test {
         vm.prank(deployer);
         premium.setActionConfig(PremiumActions.BurnAction.PRIORITY_GENERATION, 200e18, true);
 
-        (uint256 cost, bool active,,) = premium.actions(PremiumActions.BurnAction.PRIORITY_GENERATION);
+        (uint256 cost, bool active,,) =
+            premium.actions(PremiumActions.BurnAction.PRIORITY_GENERATION);
         assertEq(cost, 200e18);
         assertTrue(active);
     }
@@ -357,7 +361,8 @@ contract PremiumActionsTest is Test {
         vm.prank(user);
         premium.execute(PremiumActions.BurnAction.PRIORITY_GENERATION);
 
-        (,, totalBurned, totalCount) = premium.actions(PremiumActions.BurnAction.PRIORITY_GENERATION);
+        (,, totalBurned, totalCount) =
+            premium.actions(PremiumActions.BurnAction.PRIORITY_GENERATION);
         assertEq(totalBurned, 100e18);
         assertEq(totalCount, 2);
     }
@@ -613,7 +618,9 @@ contract PremiumActionsTest is Test {
 
     function test_emit_ActionConfigUpdated() public {
         vm.expectEmit(true, true, true, true);
-        emit PremiumActions.ActionConfigUpdated(PremiumActions.BurnAction.PRIORITY_GENERATION, 200e18, true);
+        emit PremiumActions.ActionConfigUpdated(
+            PremiumActions.BurnAction.PRIORITY_GENERATION, 200e18, true
+        );
 
         vm.prank(deployer);
         premium.setActionConfig(PremiumActions.BurnAction.PRIORITY_GENERATION, 200e18, true);

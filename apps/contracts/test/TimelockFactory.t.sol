@@ -276,9 +276,7 @@ contract TimelockFactoryTest is Test {
         uint256 defaultMinDelay = factory.DEFAULT_MIN_DELAY();
         vm.prank(authorizedDeployer);
         vm.expectEmit(false, true, true, true);
-        emit TimelockFactory.TimelockDeployed(
-            address(0), 40, defaultMinDelay, authorizedDeployer
-        );
+        emit TimelockFactory.TimelockDeployed(address(0), 40, defaultMinDelay, authorizedDeployer);
         factory.deployTimelock(40, 0);
     }
 

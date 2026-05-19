@@ -63,6 +63,9 @@ vi.mock('../lib/firebase', () => ({
       where: function wh() {
         return this;
       },
+      orderBy: function ob() {
+        return this;
+      },
       get: async () => ({
         docs: mockSpendRows.map((r) => ({ data: () => r })),
       }),

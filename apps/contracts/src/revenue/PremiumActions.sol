@@ -177,8 +177,7 @@ contract PremiumActions is
         ActionConfig storage config = actions[action];
         if (!config.active) revert ActionNotActive();
         uint256 cost = config.cost;
-        (uint256 received, uint256 toLp, uint256 toTreasury) =
-            _processPayment(msg.sender, cost);
+        (uint256 received, uint256 toLp, uint256 toTreasury) = _processPayment(msg.sender, cost);
         config.totalBurned += received;
         config.totalCount += 1;
         emit ActionExecuted(msg.sender, action, cost, received, toLp, toTreasury);
@@ -190,8 +189,7 @@ contract PremiumActions is
         ActionConfig storage config = actions[action];
         if (!config.active) revert ActionNotActive();
         uint256 cost = config.cost;
-        (uint256 received, uint256 toLp, uint256 toTreasury) =
-            _processPayment(user, cost);
+        (uint256 received, uint256 toLp, uint256 toTreasury) = _processPayment(user, cost);
         config.totalBurned += received;
         config.totalCount += 1;
         emit ActionExecuted(user, action, cost, received, toLp, toTreasury);
@@ -202,8 +200,7 @@ contract PremiumActions is
         ActionConfig storage config = customActions[actionName];
         if (!config.active) revert ActionNotActive();
         uint256 cost = config.cost;
-        (uint256 received, uint256 toLp, uint256 toTreasury) =
-            _processPayment(msg.sender, cost);
+        (uint256 received, uint256 toLp, uint256 toTreasury) = _processPayment(msg.sender, cost);
         config.totalBurned += received;
         config.totalCount += 1;
         emit CustomActionExecuted(msg.sender, actionName, cost, received, toLp, toTreasury);
