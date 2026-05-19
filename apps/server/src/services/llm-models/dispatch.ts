@@ -20,6 +20,7 @@ import {
   ProviderPausedError,
   CostCapExceededError,
   llmFallbackHopTotal,
+  llmRequestFailureTotal,
   providerCallFailureTotal,
   type CostProvider,
   type CostKind,
@@ -72,15 +73,33 @@ function computeCostUsd(
   cachedInputTokens: number
 ): number {
   // Cached input is billed at the discounted rate; the rest at full input rate.
-  const billedInput = Math.max(0, inputTokens - cachedInputTokens);
+  // Some providers (notably Anthropic-style caching) report cumulative cached
+  // counts across a session — clamp to inputTokens so we never undercount the
+  // billable portion when cached >= input.
+  const clampedCached = Math.min(Math.max(0, cachedInputTokens), inputTokens);
+  const billedInput = inputTokens - clampedCached;
   const inputUsd = (billedInput / 1_000_000) * model.providerInputUsdPerMtok;
-  const cachedUsd = (cachedInputTokens / 1_000_000) * model.providerCachedInputUsdPerMtok;
+  const cachedUsd = (clampedCached / 1_000_000) * model.providerCachedInputUsdPerMtok;
   const outputUsd = (outputTokens / 1_000_000) * model.providerOutputUsdPerMtok;
   return inputUsd + cachedUsd + outputUsd;
 }
 
+/**
+ * VLM ledger classification: only tag as `vlm` when the call actually carried
+ * image content. Using a vision-capable model for plain text shouldn't pollute
+ * the vision cost bucket — that defeats margin analysis on real vision work.
+ */
+function classifyKind(model: LlmModelConfig, messages: LlmMessage[]): CostKind {
+  if (!model.capabilities.includes('vision')) return 'llm';
+  const hasImageContent = messages.some(
+    (m) => Array.isArray(m.content) && m.content.some((c) => c.type === 'image_url')
+  );
+  return hasImageContent ? 'vlm' : 'llm';
+}
+
 async function recordDispatchCost(
   model: LlmModelConfig,
+  messages: LlmMessage[],
   usage: { promptTokens?: number; completionTokens?: number; cachedInputTokens?: number }
 ): Promise<void> {
   const inputTokens = usage.promptTokens ?? 0;
@@ -88,8 +107,7 @@ async function recordDispatchCost(
   const cachedInputTokens = usage.cachedInputTokens ?? 0;
   if (inputTokens === 0 && outputTokens === 0) return;
   const costUsd = computeCostUsd(model, inputTokens, outputTokens, cachedInputTokens);
-  // VLM = vision-capable model; everything else billed as plain LLM.
-  const kind: CostKind = model.capabilities.includes('vision') ? 'vlm' : 'llm';
+  const kind = classifyKind(model, messages);
   await recordProviderCost({
     provider: costProviderFor(model.provider),
     model: model.id,
@@ -241,15 +259,18 @@ export async function dispatchLlm(input: LlmDispatchInput): Promise<LlmDispatchR
     const result = await withProviderRateLimit(costProviderFor(model.provider), () =>
       dispatchLlmInner(model, input)
     );
-    await recordDispatchCost(model, result.usage);
+    await recordDispatchCost(model, input.messages, result.usage);
     return result;
   } catch (err) {
-    // Failure path — bump the failure counter so ops can graph error rate
-    // per provider/model without scraping logs.
+    // Failure path — bump the per-attempt failure counter so ops can graph
+    // error rate per provider/model. Note this counts EVERY failed attempt
+    // including ones recovered by fallback. For user-visible failure rate,
+    // see llmRequestFailureTotal (fires only when the entire chain in
+    // dispatchLlmWithFallback exhausts).
     providerCallFailureTotal
       .labels(
         costProviderFor(model.provider),
-        model.capabilities.includes('vision') ? 'vlm' : 'llm',
+        classifyKind(model, input.messages),
         model.id,
         classifyDispatchError(err)
       )
@@ -581,6 +602,9 @@ export async function dispatchLlmWithFallback(
       lastErr = err;
       if (!isRetryableProviderError(err)) {
         // Non-retryable: bail out immediately rather than wasting other providers.
+        // This is still a user-visible failure (the caller gets an error) so
+        // it counts toward the request-level failure rate.
+        llmRequestFailureTotal.labels(input.primaryModelId, classifyDispatchError(err)).inc();
         throw err;
       }
       console.warn(
@@ -588,6 +612,9 @@ export async function dispatchLlmWithFallback(
       );
     }
   }
+  // Chain exhausted — every model in the chain failed with retryable errors.
+  // This is also a user-visible failure.
+  llmRequestFailureTotal.labels(input.primaryModelId, classifyDispatchError(lastErr)).inc();
   throw lastErr instanceof Error
     ? lastErr
     : new TRPCError({

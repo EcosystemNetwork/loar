@@ -120,13 +120,28 @@ jobs:
             EXTRA+=("--provider-thresholds=$PROVIDER_THRESHOLDS")
           fi
 
-          # Print human-readable to log + dump JSON for issue body.
+          # Print human-readable to log (exit 1 == flagged, exit 0 == clean).
+          # Don't fail-mask the script here — we still need its data below.
+          set +e
           pnpm cost:check-drift \
             --window="$WINDOW" --baseline="$BASELINE" \
-            --threshold="$THRESHOLD" "${EXTRA[@]}" || true
+            --threshold="$THRESHOLD" "${EXTRA[@]}"
+          TEXT_EXIT=$?
           pnpm cost:check-drift \
             --window="$WINDOW" --baseline="$BASELINE" \
-            --threshold="$THRESHOLD" "${EXTRA[@]}" --json > drift.json || true
+            --threshold="$THRESHOLD" "${EXTRA[@]}" --json > drift.json
+          JSON_EXIT=$?
+          set -e
+
+          # Exit code 2 = setup error (no creds, bad period). Exit 1 = flagged
+          # models. Exit 0 = clean. Anything that doesn't write valid JSON is
+          # a setup error we must surface, not silently treat as "no drift."
+          if [ "$JSON_EXIT" -eq 2 ] || [ ! -s drift.json ] || ! jq -e '.flaggedCount' drift.json >/dev/null 2>&1; then
+            echo "::error::cost:check-drift failed to produce valid JSON (exit=$JSON_EXIT)."
+            echo "  See the doctor + script output above. drift.json contents:"
+            cat drift.json 2>/dev/null || echo "(file missing)"
+            exit 1
+          fi
 
           FLAGGED_COUNT=$(jq -r '.flaggedCount' drift.json)
           echo "flagged_count=$FLAGGED_COUNT" >> "$GITHUB_OUTPUT"
@@ -193,4 +208,4 @@ jobs:
 
       - name: Clean up service account
         if: always()
-        run: rm -f firebase-sa-key.json
+        run: rm -f firebase-service-account.json

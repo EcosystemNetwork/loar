@@ -211,6 +211,35 @@ the stable ones) reflect the difference in how often ByteDance / Z.AI
 move pricing vs OpenAI / Google / Anthropic. Tighten / loosen per
 operational experience.
 
+## Default-model flip cache-invalidation gotcha
+
+`apps/server/src/services/vlm/extractor.ts` defaults to `gemini-2.5-flash`
+(was `gemini-2.5-pro`). The extractor's deterministic cache key includes
+the model — so on first prod deploy after the flip, **every prior
+extraction is a cache miss** and the Flash model will re-extract every
+asset it processes. Expect:
+
+- A brief duplicate-work spike for ~24h after deploy as the new cache fills
+- Visibly different extraction quality for any heavy-grade scenes the old
+  Pro model handled (`recap.ts` similarly defaults to Flash; impact is
+  lower because recap output is marketing copy, not canonical metadata)
+- A net cost drop of ~16× on the affected calls
+
+If the quality degradation is unacceptable on day 1, force the old default
+back via env until the team re-tunes prompts for Flash:
+
+```bash
+# In server runtime env (Railway / Vercel / local .env):
+VLM_EXTRACT_MODEL=gemini-2.5-pro
+VLM_RECAP_MODEL=gemini-2.5-pro
+```
+
+The env override bypasses both the registry default AND the cache-miss
+storm (existing cached entries match the Pro key). Plan a deliberate
+cutover (announce in #ops, monitor `[llm-router]` logs + the
+`cost-drift.yml` workflow for the first 7 days post-flip) before removing
+the override.
+
 ## Secret rotation runbook
 
 When the ops SA key needs to rotate (annual cycle, suspected exposure,

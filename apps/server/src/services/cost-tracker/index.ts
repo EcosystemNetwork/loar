@@ -41,6 +41,7 @@ export {
   platformRevenueUsdTotal,
   llmRouterDecisionTotal,
   llmFallbackHopTotal,
+  llmRequestFailureTotal,
   providerCallFailureTotal,
 } from './metrics';
 

@@ -35,14 +35,28 @@ export const llmFallbackHopTotal = new Counter({
   labelNames: ['primary_model', 'fallback_model'] as const,
 });
 
-// Provider-call failure counter — emitted on any thrown dispatch path so
-// admins can graph fail rate per provider/kind without scanning logs. The
-// reason label is coarse (paused, cap, rate_limit, timeout, auth, other) —
-// see classifyDispatchError() in dispatch.ts for the mapping.
+// Provider-call failure counter — emitted on EVERY failed attempt, including
+// ones that were subsequently recovered by a fallback. Useful for per-provider
+// health graphs but does NOT measure user-visible failures. For that, see
+// `llmRequestFailureTotal` below. Reason label is coarse (paused, cap,
+// rate_limit, timeout, auth, other) — see classifyDispatchError() in
+// dispatch.ts for the mapping.
 export const providerCallFailureTotal = new Counter({
   name: 'loar_provider_call_failure_total',
-  help: 'Count of failed provider API calls.',
+  help: 'Count of failed provider API attempts (includes those recovered by fallback).',
   labelNames: ['provider', 'kind', 'model', 'reason'] as const,
+});
+
+// User-visible request failures — fires once per dispatchLlmWithFallback call
+// whose entire chain was exhausted. Divide by total LLM requests to get the
+// real "the model layer let me down" rate. If this is rising while
+// providerCallFailureTotal is flat, a single provider is degrading and the
+// fallback chain is doing its job; if both rise together, the entire chain
+// (and possibly the rate-limit gate) is undersized.
+export const llmRequestFailureTotal = new Counter({
+  name: 'loar_llm_request_failure_total',
+  help: 'Count of dispatchLlmWithFallback calls whose entire chain failed.',
+  labelNames: ['primary_model', 'reason'] as const,
 });
 
 export const platformMarginRatio = new Gauge({

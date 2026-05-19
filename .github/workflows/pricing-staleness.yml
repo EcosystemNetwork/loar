@@ -77,7 +77,7 @@ jobs:
             echo
             echo "### Stale registries"
             echo
-            jq -r '.stale[] | "**" + .name + "** — last touched " + (.lastCommitIso // "(unknown)") + " (" + ((.ageDays|tostring) // "?") + " days ago)\n\nProvider dashboards to verify:\n" + ([.providerHints[] | "- " + .] | join("\n")) + "\n\nFile: `" + .relPath + "`\n\n---"' staleness.json
+            jq -r '.stale[] | "**" + .name + "** — last touched " + (.lastCommitIso // "(unknown)") + " (" + ((.ageDays // "?") | tostring) + " days ago)\n\nProvider dashboards to verify:\n" + ([.providerHints[] | "- " + .] | join("\n")) + "\n\nFile: `" + .relPath + "`\n\n---"' staleness.json
             echo
             echo "After verifying, regenerate the pricing doc:"
             echo
