@@ -82,7 +82,31 @@ vi.mock('../lib/firebase', () => ({
         if (fixture.commitFail) throw new Error('firestore down');
       },
     }),
-    getAll: async (..._refs: any[]) => fixture.getAllResult,
+    getAll: async (...refs: any[]) => {
+      // `fixture.getAllResult` describes the desired value PER PERIOD (one
+      // entry per day for trend/comparison, one entry for single-period
+      // reads). Production code fans each period across PLATFORM_SHARD_COUNT
+      // shards, so refs.length = periods × shardCount. Fan the fixture out
+      // by placing the value in shard 0 of each period and padding the rest
+      // with empty docs — keeps test setups shard-agnostic.
+      const periodCount = fixture.getAllResult.length;
+      if (periodCount === 0 || refs.length === 0) {
+        return refs.map(() => ({ exists: false, data: () => null }));
+      }
+      const shardsPerPeriod = Math.max(1, Math.floor(refs.length / periodCount));
+      const empty = { exists: false, data: () => null };
+      const out: DocFixture[] = [];
+      for (let i = 0; i < refs.length; i++) {
+        const periodIdx = Math.floor(i / shardsPerPeriod);
+        const shardIdx = i % shardsPerPeriod;
+        if (shardIdx === 0 && periodIdx < periodCount) {
+          out.push(fixture.getAllResult[periodIdx]);
+        } else {
+          out.push(empty);
+        }
+      }
+      return out;
+    },
     runTransaction: async (fn: any) =>
       fn({
         get: vi.fn().mockResolvedValue({ exists: false, data: () => ({}) }),
@@ -146,11 +170,9 @@ describe('cost-tracker controls', () => {
         universeDailyUsd: null,
       },
     });
-    // Today's platform aggregate.
-    const day = new Date().toISOString().slice(0, 10);
-    fixture.docs.costAggregates = {
-      [`${day}__platform__all`]: makeDoc({ costUsd: 12 }),
-    };
+    // Today's platform aggregate is now read via db.getAll across shards;
+    // put the value in one shard fixture so the sum hits the cap.
+    fixture.getAllResult = [makeDoc({ costUsd: 12 })];
     invalidateControlsCache();
     await expect(assertProviderAllowed({ provider: 'fal' })).rejects.toBeInstanceOf(
       CostCapExceededError
@@ -210,10 +232,8 @@ describe('cost-tracker alerts', () => {
     setControlsDoc({
       alert: { enabled: true, marginThreshold: 0.3, cooldownMinutes: 30 },
     });
-    const day = new Date().toISOString().slice(0, 10);
-    fixture.docs.costAggregates = {
-      [`${day}__platform__all`]: makeDoc({ costUsd: 90 }),
-    };
+    // Platform aggregate is now read via db.getAll across shards.
+    fixture.getAllResult = [makeDoc({ costUsd: 90 })];
     fixture.purchases = {
       docs: [],
       forEach: (cb: any) => cb({ data: () => ({ usdAmount: 100 }) }),
@@ -235,10 +255,7 @@ describe('cost-tracker alerts', () => {
 
   it('returns null when margin is at or above threshold', async () => {
     setControlsDoc({ alert: { enabled: true, marginThreshold: 0.3, cooldownMinutes: 30 } });
-    const day = new Date().toISOString().slice(0, 10);
-    fixture.docs.costAggregates = {
-      [`${day}__platform__all`]: makeDoc({ costUsd: 70 }),
-    };
+    fixture.getAllResult = [makeDoc({ costUsd: 70 })];
     fixture.purchases = {
       docs: [],
       forEach: (cb: any) => cb({ data: () => ({ usdAmount: 100 }) }),

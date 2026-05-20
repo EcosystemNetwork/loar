@@ -68,6 +68,15 @@ vi.mock('../lib/firebase', () => ({
         update: vi.fn(),
       })
     ),
+    // `readPlatformAggregate` (used by computeMargin via margin.ts) now fans
+    // out across shards via db.getAll(...refs). Preserve single-value test
+    // semantics: put the ledgerDocGetMock result in shard 0 and pad the rest
+    // with empty docs so the sum equals the original mock value.
+    getAll: async (...refs: any[]) => {
+      const first = await ledgerDocGetMock();
+      const empty = { exists: false, data: () => null };
+      return [first, ...refs.slice(1).map(() => empty)];
+    },
   },
   firebaseAvailable: true,
 }));
