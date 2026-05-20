@@ -92,6 +92,84 @@ function pickShardSuffix(scope: string): string {
   return `__shard${s}`;
 }
 
+/**
+ * Build the document refs for every shard of `${period}__platform__${key}`.
+ * Public so consumers (alerts, margin, trend, query, redis-spend) can
+ * read the platform aggregate without each having to know the sharding
+ * scheme. Returns at most PLATFORM_SHARD_COUNT refs.
+ */
+export function platformShardRefs(
+  period: string,
+  key: string
+): FirebaseFirestore.DocumentReference[] {
+  return Array.from({ length: PLATFORM_SHARD_COUNT }, (_, i) =>
+    db.collection('costAggregates').doc(`${period}__platform__${key}__shard${i}`)
+  );
+}
+
+export interface PlatformAggregate {
+  costUsd: number;
+  calls: number;
+  tokensUsed: number;
+}
+
+/**
+ * Sum the platform aggregate for one period across all shards. Returns
+ * zeros when Firestore is unavailable or no shard has been written yet.
+ *
+ * Use this instead of reading `${period}__platform__all` directly — that
+ * doc no longer exists after the pass-2 sharding change.
+ */
+export async function readPlatformAggregate(
+  period: string,
+  key = 'all'
+): Promise<PlatformAggregate> {
+  if (!firebaseAvailable) return { costUsd: 0, calls: 0, tokensUsed: 0 };
+  const snaps = await db.getAll(...platformShardRefs(period, key));
+  return snaps.reduce(
+    (acc, s) => {
+      const data = s.data();
+      if (!data) return acc;
+      acc.costUsd += Number(data.costUsd ?? 0);
+      acc.calls += Number(data.calls ?? 0);
+      acc.tokensUsed += Number(data.tokensUsed ?? 0);
+      return acc;
+    },
+    { costUsd: 0, calls: 0, tokensUsed: 0 }
+  );
+}
+
+/**
+ * Sum platform aggregates for N periods (days or months) in a single
+ * Firestore batched read. Useful for trend charts. Returns one entry
+ * per input period, in the same order, with zeros for periods that have
+ * no data.
+ */
+export async function readPlatformAggregateBatch(
+  periods: string[],
+  key = 'all'
+): Promise<PlatformAggregate[]> {
+  if (!firebaseAvailable || periods.length === 0) {
+    return periods.map(() => ({ costUsd: 0, calls: 0, tokensUsed: 0 }));
+  }
+  const refs = periods.flatMap((p) => platformShardRefs(p, key));
+  const snaps = await db.getAll(...refs);
+  const byPeriod: PlatformAggregate[] = periods.map(() => ({
+    costUsd: 0,
+    calls: 0,
+    tokensUsed: 0,
+  }));
+  for (let i = 0; i < snaps.length; i++) {
+    const periodIdx = Math.floor(i / PLATFORM_SHARD_COUNT);
+    const data = snaps[i].data();
+    if (!data) continue;
+    byPeriod[periodIdx].costUsd += Number(data.costUsd ?? 0);
+    byPeriod[periodIdx].calls += Number(data.calls ?? 0);
+    byPeriod[periodIdx].tokensUsed += Number(data.tokensUsed ?? 0);
+  }
+  return byPeriod;
+}
+
 function aggregateDocId(
   period: string,
   scope: 'platform' | 'provider' | 'user' | 'apiKey' | 'universe' | 'model',

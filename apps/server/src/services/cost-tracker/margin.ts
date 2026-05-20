@@ -38,8 +38,10 @@ function todayKeys(now = new Date()) {
 
 async function loadCost(period: string): Promise<number> {
   if (!firebaseAvailable) return 0;
-  const doc = await db.collection('costAggregates').doc(`${period}__platform__all`).get();
-  return Number(doc.data()?.costUsd ?? 0);
+  // Sum the sharded platform aggregate.
+  const { readPlatformAggregate } = await import('./record');
+  const { costUsd } = await readPlatformAggregate(period);
+  return costUsd;
 }
 
 async function loadRevenue(period: string, kind: 'day' | 'month'): Promise<number> {

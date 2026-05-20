@@ -46,6 +46,8 @@ export {
   providerCallFailureTotal,
 } from './metrics';
 
+export { shutdownControlsSubscriber } from './controls';
+
 // Controls (kill-switches + per-scope caps + per-call ceilings)
 export {
   getControls,

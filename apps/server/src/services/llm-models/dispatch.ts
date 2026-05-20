@@ -51,9 +51,16 @@ function classifyDispatchError(
   }
   if (err instanceof Error) {
     const msg = err.message;
-    // HTTP status as a whole token (`HTTP 429`, `: 429`, `status 429`)
-    // — not as a substring of arbitrary text.
-    if (/\b(?:HTTP\s+)?429\b/.test(msg) || /\b(?:status|code)[:\s]+429\b/i.test(msg)) {
+    // HTTP status as a whole token (`HTTP 429`, `: 429`, `status 429`).
+    // ALSO match the explicit phrase "rate limit exceeded" — providers
+    // like AssemblyAI and Anthropic surface that without an HTTP code.
+    // The phrase is narrow enough that a user prompt asking about
+    // "rate limits" doesn't trip it (no `exceeded` keyword).
+    if (
+      /\b(?:HTTP\s+)?429\b/.test(msg) ||
+      /\b(?:status|code)[:\s]+429\b/i.test(msg) ||
+      /\brate[ \-_]?limit[ \-_]?(?:exceeded|reached|hit)\b/i.test(msg)
+    ) {
       return 'rate_limit';
     }
     // System errno timeouts. Don't match the bare word "timeout" because
@@ -609,10 +616,12 @@ function isRetryableProviderError(err: unknown): boolean {
     const msg = err.message;
     // Same tightened patterns as classifyDispatchError — match HTTP status
     // tokens + system errnos, not loose substrings that could appear in
-    // user-prompt echoes.
+    // user-prompt echoes. Also includes the narrow "rate limit exceeded"
+    // phrase for providers (AssemblyAI, Anthropic) that omit HTTP codes.
     return (
       /\b(?:HTTP\s+)?429\b/.test(msg) ||
       /\b(?:status|code)[:\s]+429\b/i.test(msg) ||
+      /\brate[ \-_]?limit[ \-_]?(?:exceeded|reached|hit)\b/i.test(msg) ||
       /\boverloaded\b/i.test(msg) ||
       /\bETIMEDOUT\b|\bECONNRESET\b|\bsocket hang up\b|Request timed out\b/i.test(msg) ||
       /\b(?:HTTP\s+)?(?:500|502|503|504)\b/.test(msg)

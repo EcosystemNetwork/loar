@@ -156,8 +156,12 @@ let cached: { at: number; controls: CostControls } | null = null;
 const CONTROLS_INVALIDATE_CHANNEL = 'cost-controls:invalidate';
 
 let subscriberStarted = false;
+let subscriberRef: any = null;
 
 function ensureSubscriberStarted(): void {
+  // Single-threaded JS: this read-then-write is atomic at the event-loop
+  // level. The async import below is fire-and-forget; nothing can
+  // interleave with the assignment.
   if (subscriberStarted) return;
   subscriberStarted = true;
   // Dynamic import to avoid pulling Redis into hot path when REDIS_URL is unset.
@@ -178,6 +182,9 @@ function ensureSubscriberStarted(): void {
         sub.on('error', (err: Error) => {
           console.warn('[cost-controls] subscriber error:', err.message);
         });
+        // Stash the reference so the server's SIGTERM handler can close
+        // it gracefully (see shutdownControlsSubscriber).
+        subscriberRef = sub;
       } catch (err) {
         console.warn(
           '[cost-controls] subscribe failed (cache invalidation is local-only):',
@@ -188,6 +195,32 @@ function ensureSubscriberStarted(): void {
     .catch(() => {
       // Redis module unavailable — local cache still works.
     });
+}
+
+/**
+ * Gracefully close the controls invalidation subscriber. Idempotent —
+ * safe to call multiple times. Wire into the main process's SIGTERM /
+ * SIGINT handler alongside `shutdownRedis()` so the long-lived
+ * subscriber connection doesn't leak on restart.
+ */
+export async function shutdownControlsSubscriber(): Promise<void> {
+  const sub = subscriberRef;
+  subscriberRef = null;
+  subscriberStarted = false;
+  if (!sub) return;
+  try {
+    await sub.quit();
+  } catch (err) {
+    console.warn(
+      '[cost-controls] subscriber graceful close failed, forcing disconnect:',
+      (err as Error).message
+    );
+    try {
+      sub.disconnect?.();
+    } catch {
+      /* already gone */
+    }
+  }
 }
 
 async function publishInvalidate(): Promise<void> {

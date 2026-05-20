@@ -2,7 +2,6 @@
 
 > Auto-generated from registries under `apps/server/src/services/*-models/registry.ts`.
 > Regenerate with `tsx scripts/generate-pricing-doc.ts`.
-> Generated: **2026-05-19**
 
 ## How to read this
 

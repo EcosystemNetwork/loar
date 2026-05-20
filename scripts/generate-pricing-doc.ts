@@ -348,13 +348,15 @@ function buildEditingSection(): string {
 // ── Top-level structure ──────────────────────────────────────────────────
 
 function buildDoc(): string {
-  const today = new Date().toISOString().slice(0, 10);
+  // Intentionally NO generated-on date — the CI drift gate does byte-exact
+  // comparison after regen, and embedding the current date would create a
+  // false positive every day. The git commit date of this file IS the
+  // generation date in practice.
   const sections = [
     `# Model Pricing`,
     '',
     `> Auto-generated from registries under \`apps/server/src/services/*-models/registry.ts\`.`,
     `> Regenerate with \`tsx scripts/generate-pricing-doc.ts\`.`,
-    `> Generated: **${today}**`,
     '',
     '## How to read this',
     '',

@@ -131,8 +131,10 @@ export async function checkAndFirePlatformCapAlert(): Promise<CostAlert | null> 
   if (!firebaseAvailable) return null;
 
   const day = new Date().toISOString().slice(0, 10);
-  const doc = await db.collection('costAggregates').doc(`${day}__platform__all`).get();
-  const spent = Number(doc.data()?.costUsd ?? 0);
+  // Platform aggregate is sharded across PLATFORM_SHARD_COUNT docs since
+  // pass-2 — read via the shared helper which sums them.
+  const { readPlatformAggregate } = await import('./record');
+  const { costUsd: spent } = await readPlatformAggregate(day);
   if (spent < cap) return null;
 
   const cooldownMs = controls.alert.cooldownMinutes * 60 * 1000;

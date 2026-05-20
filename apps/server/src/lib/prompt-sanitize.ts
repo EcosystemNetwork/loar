@@ -24,8 +24,12 @@ const ROLE_PREFIX_AT_LINE_START = /(^|\n)[ \t]*(system|assistant|user)\s*:\s*/gi
 // archetypal injection ("Ignore previous instructions and ...") without
 // mangling creative prose ("I had to ignore previous instructions when
 // the queen interrupted").
+//
+// The entire phrase (verb + qualifier + noun) gets replaced — replacing
+// only the verb would leave a suspicious tail like "[filtered] previous
+// instructions" that retains the original injection's noun phrase.
 const OVERRIDE_AT_LINE_START =
-  /(^|\n)[ \t]*(ignore|disregard|forget|override)\s+(all\s+)?(previous|above|prior|earlier|prior)\s+(instructions?|rules?|prompts?|directives?|guidelines?)/gi;
+  /(^|\n)[ \t]*(ignore|disregard|forget|override)\s+(all\s+)?(previous|above|prior|earlier)\s+(instructions?|rules?|prompts?|directives?|guidelines?)/gi;
 
 /**
  * Sanitize a user-supplied prompt to mitigate prompt injection.
@@ -35,6 +39,8 @@ const OVERRIDE_AT_LINE_START =
  */
 export function sanitizePrompt(prompt: string): string {
   const sanitized = prompt
+    // `$1` preserves the line-start anchor (`^` or `\n`); the rest of
+    // the match (verb + qualifier + noun) is replaced wholesale.
     .replace(OVERRIDE_AT_LINE_START, '$1[filtered]')
     .replace(ROLE_PREFIX_AT_LINE_START, '$1[filtered]: ')
     .trim();

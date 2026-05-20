@@ -59,21 +59,20 @@ export async function getPlatformTrend(days = 30): Promise<TrendPoint[]> {
       marginRatio: 0,
     }));
   }
-  const refs = series.map((d) => db.collection('costAggregates').doc(`${d}__platform__all`));
-  const [snaps, revenues] = await Promise.all([
-    db.getAll(...refs),
+  // Platform aggregate is sharded since pass-2 — sum across shards per day.
+  const { readPlatformAggregateBatch } = await import('./record');
+  const [aggs, revenues] = await Promise.all([
+    readPlatformAggregateBatch(series),
     Promise.all(series.map(loadRevenueForDay)),
   ]);
   return series.map((day, i) => {
-    const doc = snaps[i];
-    const data = doc?.exists ? (doc.data() ?? {}) : {};
-    const costUsd = Number(data.costUsd ?? 0);
+    const { costUsd, calls, tokensUsed } = aggs[i];
     const revenueUsd = revenues[i];
     return {
       day,
       costUsd,
-      calls: Number(data.calls ?? 0),
-      tokensUsed: Number(data.tokensUsed ?? 0),
+      calls,
+      tokensUsed,
       revenueUsd,
       marginRatio: revenueUsd > 0 ? (revenueUsd - costUsd) / revenueUsd : 0,
     };

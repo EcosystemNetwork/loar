@@ -1173,6 +1173,17 @@ async function gracefulShutdown(signal: string) {
   console.log(`\n[server] Received ${signal} — shutting down gracefully...`);
   const shutdownOps: Promise<void>[] = [];
 
+  // Close the cost-controls cache-invalidation subscriber BEFORE quitting
+  // the shared Redis client — quit() on the parent connection cascades to
+  // the duplicated subscriber, but doing it explicitly first means we
+  // flush any in-flight messages cleanly.
+  try {
+    const { shutdownControlsSubscriber } = await import('./services/cost-tracker');
+    shutdownOps.push(shutdownControlsSubscriber());
+  } catch {
+    // Cost-tracker optional in dev — skip if unavailable
+  }
+
   try {
     const { shutdownRedis } = await import('./lib/redis');
     shutdownOps.push(shutdownRedis());
