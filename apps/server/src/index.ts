@@ -190,13 +190,6 @@ app.use('/api/paymaster/*', rateLimiter({ windowMs: 60_000, max: 20 }));
 const { paymasterRoutes } = await import('./routes/paymaster');
 app.route('/api/paymaster', paymasterRoutes);
 
-// Anonymous preview generation (POST /api/preview/generate). Wallet-less
-// funnel-top "try it" endpoint. Per-IP quota lives inside the route handler.
-// Outer rate-limit here is a cheap circuit breaker against single-IP floods.
-app.use('/api/preview/*', rateLimiter({ windowMs: 60_000, max: 6 }));
-const { default: previewRoutes } = await import('./routes/preview');
-app.route('/api/preview', previewRoutes);
-
 /**
  * Sanitize a browser-supplied filename before it reaches any storage backend.
  * See SRV-6: path separators, NULs, leading dots, and oversized names can
