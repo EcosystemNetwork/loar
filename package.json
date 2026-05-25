@@ -74,7 +74,8 @@
       "fast-xml-builder@<=1.1.6": ">=1.1.7",
       "serialize-javascript@<=7.0.2": ">=7.0.3",
       "@babel/plugin-transform-modules-systemjs@>=7.12.0 <=7.29.3": ">=7.29.4",
-      "@noble/hashes": "1.8.0"
+      "@noble/hashes": "1.8.0",
+      "rpc-websockets": "^10.0.0"
     },
     "peerDependencyRules": {
       "allowedVersions": {
