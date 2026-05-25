@@ -20,9 +20,6 @@ COPY packages/abis/dist ./packages/abis/dist
 COPY packages/shared/package.json ./packages/shared/
 # @loar/shared exports straight from ./src/*.ts — no build step.
 COPY packages/shared/src ./packages/shared/src
-# pnpm.patchedDependencies in package.json references patches/*.patch —
-# they must exist at install time or `pnpm install` errors with ENOENT.
-COPY patches ./patches
 
 # Install dependencies
 # Create a fake .git so husky's prepare script doesn't fail, then clean up
