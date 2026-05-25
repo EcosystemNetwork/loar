@@ -20,6 +20,9 @@ COPY packages/abis/dist ./packages/abis/dist
 COPY packages/shared/package.json ./packages/shared/
 # @loar/shared exports straight from ./src/*.ts — no build step.
 COPY packages/shared/src ./packages/shared/src
+# pnpm.patchedDependencies in package.json references patches/*.patch —
+# they must exist at install time or `pnpm install` errors with ENOENT.
+COPY patches ./patches
 
 # Install dependencies
 # Create a fake .git so husky's prepare script doesn't fail, then clean up
@@ -58,6 +61,7 @@ COPY packages/abis/package.json ./packages/abis/
 COPY packages/abis/dist ./packages/abis/dist
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/shared/src ./packages/shared/src
+COPY patches ./patches
 
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 # Nuke the prepare script so pnpm doesn't try to run husky (a devDep not installed in --prod)
