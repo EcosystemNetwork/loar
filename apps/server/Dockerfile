@@ -58,7 +58,6 @@ COPY packages/abis/package.json ./packages/abis/
 COPY packages/abis/dist ./packages/abis/dist
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/shared/src ./packages/shared/src
-COPY patches ./patches
 
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 # Nuke the prepare script so pnpm doesn't try to run husky (a devDep not installed in --prod)
