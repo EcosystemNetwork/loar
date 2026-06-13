@@ -509,7 +509,7 @@ function LicenseCanonDialog({
       const approved = await confirmTx({
         title: 'License canon submission',
         description: 'Pay the ETH license fee to the CanonMarketplace.',
-        chainName: 'Base Sepolia',
+        chainName: 'Sepolia',
         functionName: 'licenseCanon',
         to: canonAddress,
         valueEth: ethAmount,

@@ -1372,6 +1372,108 @@ const uniswapSwapToLoar: ToolDefinition = {
   handler: async (client, args) => client.mutate('uniswap.swapToLoar', args),
 };
 
+// ── ENS (agent identity) ───────────────────────────────────────────────
+
+const ensResolve: ToolDefinition = {
+  name: 'loar_ens_resolve',
+  description:
+    'Resolve an ENS name to an address, or reverse-resolve an address to its primary ENS name. Provide exactly one of {name, address}.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'ENS name to resolve to an address' },
+      address: { type: 'string', description: '0x address to reverse-resolve to a name' },
+    },
+  },
+  handler: async (client, args) => {
+    if (args.address) return client.query('ens.reverse', { address: args.address });
+    return client.query('ens.resolve', { name: args.name });
+  },
+};
+
+const ensAgentCard: ToolDefinition = {
+  name: 'loar_ens_agent_card',
+  description:
+    'Read an ENS name as an AI-agent identity (ENSIP-25/26): its MCP / A2A endpoints, description, and address. Use to discover how to reach an agent by its ENS name.',
+  inputSchema: {
+    type: 'object',
+    properties: { name: { type: 'string', description: 'Agent ENS name' } },
+    required: ['name'],
+  },
+  handler: async (client, args) => client.query('ens.agentCard', args),
+};
+
+const ensClaimAgentSubname: ToolDefinition = {
+  name: 'loar_ens_claim_agent_subname',
+  description:
+    'Claim a gasless ENS subname for one of your AI agents (e.g. showrunner.agents.loar.eth). The name resolves to your wallet and advertises ENSIP-26 agent endpoints, making the agent discoverable via ENS.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      label: { type: 'string', description: 'Leftmost label, a–z 0–9 hyphen (e.g. "showrunner")' },
+      aiAgentId: { type: 'string', description: 'The LOAR AI agent id to attach the name to' },
+      description: { type: 'string', description: 'Short agent description (optional)' },
+      mcpEndpoint: { type: 'string', description: 'MCP endpoint URL (optional)' },
+    },
+    required: ['label', 'aiAgentId'],
+  },
+  handler: async (client, args) => client.mutate('ens.claimAgentSubname', args),
+};
+
+// ── Arc (USDC agent-to-agent payments) ─────────────────────────────────
+
+const arcPay: ToolDefinition = {
+  name: 'loar_arc_pay',
+  description:
+    'Pay another agent (or address) in USDC on Arc (Circle’s USDC-native L1). Use for agent-to-agent settlement — paying for a service, render, or data. Returns the on-chain tx hash + explorer URL.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      to: { type: 'string', description: 'Recipient 0x address' },
+      amountUsdc: { type: 'string', description: 'USDC amount, up to 6 decimals (e.g. "0.05")' },
+      memo: { type: 'string', description: 'Optional memo' },
+      toAgentId: { type: 'string', description: 'Optional recipient agent id' },
+    },
+    required: ['to', 'amountUsdc'],
+  },
+  handler: async (client, args) => client.mutate('arc.pay', args),
+};
+
+const arcBalance: ToolDefinition = {
+  name: 'loar_arc_balance',
+  description: 'Get the USDC balance of an address on Arc.',
+  inputSchema: {
+    type: 'object',
+    properties: { address: { type: 'string', description: '0x address' } },
+    required: ['address'],
+  },
+  handler: async (client, args) => client.query('arc.balance', args),
+};
+
+// ── Agent reputation (ERC-8004 via BigQuery) ───────────────────────────
+
+const agentRank: ToolDefinition = {
+  name: 'loar_agent_rank',
+  description:
+    'Rank on-chain AI agents by ERC-8004 reputation (feedback volume), computed from Ethereum mainnet via BigQuery. Use to discover trustworthy, payable agents.',
+  inputSchema: {
+    type: 'object',
+    properties: { limit: { type: 'number', description: 'Max agents to return (1–100)' } },
+  },
+  handler: async (client, args) => client.query('agentRegistry.rank', args),
+};
+
+const agentReputation: ToolDefinition = {
+  name: 'loar_agent_reputation',
+  description: 'Get the ERC-8004 reputation summary for a single agent id (on-chain identifier).',
+  inputSchema: {
+    type: 'object',
+    properties: { agentId: { type: 'string', description: 'ERC-8004 agent id (0x-hex)' } },
+    required: ['agentId'],
+  },
+  handler: async (client, args) => client.query('agentRegistry.reputation', args),
+};
+
 // ── Export All Tools ───────────────────────────────────────────────────
 
 export const ALL_TOOLS: ToolDefinition[] = [
@@ -1455,4 +1557,14 @@ export const ALL_TOOLS: ToolDefinition[] = [
   uniswapQuote,
   uniswapSwap,
   uniswapSwapToLoar,
+  // ENS (agent identity)
+  ensResolve,
+  ensAgentCard,
+  ensClaimAgentSubname,
+  // Arc (USDC agent-to-agent payments)
+  arcPay,
+  arcBalance,
+  // Agent reputation (ERC-8004 via BigQuery)
+  agentRank,
+  agentReputation,
 ];

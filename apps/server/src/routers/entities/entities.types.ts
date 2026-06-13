@@ -595,7 +595,7 @@ export interface LikenessListing {
   // ── Phase 1.5: on-chain ContentLicensing.sol mirror ────────────────────
   /** bytes32 contentHash registered with ContentLicensing.sol. Null until publishOnChain. */
   onChainContentHash: string | null;
-  /** Chain ID the registration lives on (11155111 = Sepolia, 84532 = Base Sepolia). */
+  /** Chain ID the registration lives on (11155111 = Sepolia, 1 = Ethereum mainnet). */
   onChainChainId: number | null;
   /** ContentLicensing contract address on `onChainChainId`. */
   onChainContentLicensingAddress: string | null;

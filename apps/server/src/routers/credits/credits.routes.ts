@@ -18,7 +18,7 @@ import { getPlatformConfig } from '../../services/platformConfig';
 import { verifyStripePayment } from './stripe.routes';
 import { reconcileSingleOrder, reconcileOrders } from '../../services/order-reconciliation';
 import { createPublicClient, http, parseUnits, type Hash } from 'viem';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { sepolia, mainnet } from 'viem/chains';
 
 // ── Chain clients for on-chain tx verification ───────────────────────
 //
@@ -45,13 +45,13 @@ const sepoliaClient = createPublicClient({
   transport: http(requireRpc('RPC_URL', process.env.RPC_URL, process.env.PONDER_RPC_URL_2)),
 });
 
-const baseSepoliaClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http(requireRpc('RPC_URL_BASE_SEPOLIA', process.env.RPC_URL_BASE_SEPOLIA)),
+const mainnetClient = createPublicClient({
+  chain: mainnet,
+  transport: http(requireRpc('RPC_URL_MAINNET', process.env.RPC_URL_MAINNET)),
 });
 
 /** Allowed chain IDs for on-chain payment verification. */
-const ALLOWED_CHAIN_IDS: Set<number> = new Set([sepolia.id, baseSepolia.id]);
+const ALLOWED_CHAIN_IDS: Set<number> = new Set([sepolia.id, mainnet.id]);
 
 /** Maximum age of a payment tx that can still be redeemed for credits (amplifies PAY-01). */
 const MAX_TX_AGE_SECONDS = 24 * 60 * 60; // 24 hours
@@ -84,16 +84,16 @@ function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T>
 function getChainClient(chainId?: number) {
   if (chainId !== undefined && !ALLOWED_CHAIN_IDS.has(chainId)) {
     throw new Error(
-      `Chain ID ${chainId} is not supported. Use Sepolia (${sepolia.id}) or Base Sepolia (${baseSepolia.id}).`
+      `Chain ID ${chainId} is not supported. Use Sepolia (${sepolia.id}) or Ethereum mainnet (${mainnet.id}).`
     );
   }
-  if (chainId === baseSepolia.id) return baseSepoliaClient;
+  if (chainId === mainnet.id) return mainnetClient;
   return sepoliaClient; // default
 }
 
 /** Chain name for error messages. */
 function getChainName(chainId?: number) {
-  if (chainId === baseSepolia.id) return 'Base Sepolia';
+  if (chainId === mainnet.id) return 'Ethereum';
   return 'Sepolia';
 }
 

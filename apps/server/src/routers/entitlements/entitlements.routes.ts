@@ -14,7 +14,7 @@
  *                              client never gets to set the amount.
  *   - `unlockWithEthTx`      — verifies an on-chain native ETH transfer to
  *                              the platform treasury for ≥ ($25 / ethUsd).
- *                              Sepolia + Base Sepolia supported.
+ *                              Sepolia + Ethereum mainnet supported.
  *   - `createSolanaPayIntent`/ `unlockWithSolanaPay` — Solana Pay flow,
  *                              accepts USDC-SPL at $25.
  *   - `redeemCode`           — admin-minted code, single- or multi-use.
@@ -26,7 +26,7 @@
  */
 import { z } from 'zod';
 import { createPublicClient, http, type Hash } from 'viem';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { sepolia, mainnet } from 'viem/chains';
 import { adminProcedure, protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { firebaseAvailable } from '../../lib/firebase';
 import { getStripe } from '../credits/stripe.routes';
@@ -62,13 +62,13 @@ function getUnlockPriceCents(): number {
 
 // ── EVM verification (native ETH) ─────────────────────────────────────
 
-const ALLOWED_EVM_CHAINS = new Set<number>([sepolia.id, baseSepolia.id]);
+const ALLOWED_EVM_CHAINS = new Set<number>([sepolia.id, mainnet.id]);
 
 function getEvmClient(chainId: number) {
-  if (chainId === baseSepolia.id) {
+  if (chainId === mainnet.id) {
     return createPublicClient({
-      chain: baseSepolia,
-      transport: http(process.env.RPC_URL_BASE_SEPOLIA || undefined),
+      chain: mainnet,
+      transport: http(process.env.RPC_URL_MAINNET || undefined),
     });
   }
   return createPublicClient({
@@ -80,7 +80,7 @@ function getEvmClient(chainId: number) {
 const TREASURY_ADDRESS = (process.env.TREASURY_ADDRESS ?? '').toLowerCase();
 const MAX_TX_AGE_SECONDS = 24 * 60 * 60;
 /** Minimum block confirmations before an unlock tx can be claimed. Roughly
- *  60s on Sepolia / Base Sepolia — well outside the typical reorg depth. */
+ *  60s on Sepolia / mainnet — well outside the typical reorg depth. */
 const MIN_CONFIRMATIONS = 6n;
 
 async function verifyEvmNativePayment(args: {
@@ -94,7 +94,7 @@ async function verifyEvmNativePayment(args: {
   }
   if (!ALLOWED_EVM_CHAINS.has(args.chainId)) {
     throw new Error(
-      `Chain ${args.chainId} is not supported. Use Sepolia (${sepolia.id}) or Base Sepolia (${baseSepolia.id}).`
+      `Chain ${args.chainId} is not supported. Use Sepolia (${sepolia.id}) or Ethereum mainnet (${mainnet.id}).`
     );
   }
   const client = getEvmClient(args.chainId);
@@ -169,7 +169,7 @@ export const entitlementsRouter = router({
       treasuryAddress: process.env.TREASURY_ADDRESS ?? null,
       solanaRecipient: process.env.SOLANA_PAY_RECIPIENT ?? null,
       solanaUsdcMint: process.env.SOLANA_USDC_MINT ?? null,
-      acceptedChainIds: [sepolia.id, baseSepolia.id],
+      acceptedChainIds: [sepolia.id, mainnet.id],
     };
   }),
 

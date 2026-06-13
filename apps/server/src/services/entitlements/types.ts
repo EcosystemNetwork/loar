@@ -5,7 +5,7 @@
  * v1 entitlement: `byokFeeWaived` — once unlocked, generations that use a
  * BYOK provider key skip the platform credit charge entirely. Acquired via:
  *   - Stripe payment ($25 default, all PMs Stripe supports)
- *   - On-chain crypto payment (native ETH on Sepolia/Base Sepolia, or
+ *   - On-chain crypto payment (native ETH on Sepolia/mainnet, or
  *     USDC via Solana Pay)
  *   - Admin-minted redeem code
  *

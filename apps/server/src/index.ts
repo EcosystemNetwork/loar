@@ -158,6 +158,14 @@ app.route('/images', imageRouter);
 const { unstoppableRoutes } = await import('./routes/unstoppable');
 app.route('/api/ud', unstoppableRoutes);
 
+// ENS — resolver helpers + CCIP-Read gateway for offchain agent subnames.
+const { ensRoutes } = await import('./routes/ens');
+app.route('/api/ens', ensRoutes);
+
+// x402 — pay-per-call demo settled in USDC on Arc.
+const { x402Routes } = await import('./routes/x402');
+app.route('/api/x402', x402Routes);
+
 // IPFS URL resolver — server-side Pinata gateway token stays on the server
 // (WEB-1). Clients pass an ipfs:// URL or known gateway URL and get back a
 // signed gateway URL they can use directly. Public, rate-limited by shared

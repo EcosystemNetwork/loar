@@ -175,7 +175,7 @@ function SandboxPage() {
 
   // Target chain — picks where generated items will eventually live (drafts get
   // a `targetChain` stamp, propagated on promote into content/universe). Stored
-  // as a CAIP-2 ChainOption.id ("eip155:84532" | "solana:devnet").
+  // as a CAIP-2 ChainOption.id ("eip155:11155111" | "solana:devnet").
   const [targetChainId, setTargetChainId] = useState<string>(() => {
     const stored = readLocal(TARGET_CHAIN_KEY, '');
     if (stored && SUPPORTED_CHAINS.some((c) => c.id === stored)) return stored;

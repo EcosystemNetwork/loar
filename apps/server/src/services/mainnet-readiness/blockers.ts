@@ -139,10 +139,11 @@ export const BLOCKERS: Blocker[] = [
     category: 'operational',
     title: 'Gnosis Safe (3/5) + Timelock',
     description:
-      'Deploy Safe + TimelockController(48h), run TransferToMultisig on Base mainnet to move admin off deployer EOA.',
+      'Deploy Safe + TimelockController(48h), run TransferToMultisig on Ethereum mainnet to move admin off deployer EOA.',
     owner: 'ops',
     effort: 'days',
-    nextStep: 'Pick signers, fund deployer, run script/TransferToMultisig.s.sol on Base mainnet.',
+    nextStep:
+      'Pick signers, fund deployer, run script/TransferToMultisig.s.sol on Ethereum mainnet.',
     docAnchor: 'O2',
   },
   {

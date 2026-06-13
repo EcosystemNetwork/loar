@@ -54,8 +54,6 @@ export function isNativeToken(addr: string): boolean {
 // chains/router versions: "chainId:0xrouter,chainId:0xrouter".
 const KNOWN_ROUTERS: Record<number, Set<string>> = {
   1: new Set(['0x66a9893cc07d91d95644aedd05d03f95e1dba8af']),
-  8453: new Set(['0x6ff5693b99212da76ad316178a184ab56d299b43']),
-  130: new Set(['0xef740bf23acae26f6492b10de645d6b98dc8eaf3']),
   11155111: new Set(['0x3a9d48ab9751398bbfa63ad67599bb04e4bdf98b']),
 };
 

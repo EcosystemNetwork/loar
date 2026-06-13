@@ -2,7 +2,7 @@
  * Wormhole NTT bridge — $LOAR cross-chain transfers (EVM ↔ Solana).
  *
  * Architecture (production):
- *   - **Canonical $LOAR**: stays on EVM (Sepolia for testnet, Base mainnet for prod).
+ *   - **Canonical $LOAR**: stays on EVM (Sepolia for testnet, Ethereum mainnet for prod).
  *   - **Bridged $LOAR**: SPL-token mint on Solana. NTT Manager holds mint authority.
  *   - **Burn-and-mint** semantics: source-chain tokens burn (or lock), destination
  *     chain mints (or unlocks). Total supply is unified across chains.

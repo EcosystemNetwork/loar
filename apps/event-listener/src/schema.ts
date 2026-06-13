@@ -15,7 +15,7 @@ import type { Timestamp } from 'firebase-admin/firestore';
 export type Hex = `0x${string}`;
 
 export interface EventEnvelope {
-  /** Chain id (11155111 sepolia, 84532 base-sepolia, 8453 base). */
+  /** Chain id (11155111 sepolia, 1 mainnet). */
   chainId: number;
   /** Block number the event was emitted in. */
   blockNumber: number;

@@ -99,7 +99,7 @@ function TestnetPage() {
           <div>
             <h1 className="text-3xl font-bold">You're on testnet</h1>
             <p className="text-sm text-muted-foreground">
-              LOAR is in public beta on Ethereum Sepolia and Base Sepolia.
+              LOAR is in public beta on Ethereum Sepolia (mainnet support coming).
             </p>
           </div>
         </div>

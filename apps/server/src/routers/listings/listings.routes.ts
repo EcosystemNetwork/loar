@@ -8,7 +8,7 @@ import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
 import { createPublicClient, http, parseEther, type Hash } from 'viem';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { sepolia, mainnet } from 'viem/chains';
 import { throwApiError } from '../../lib/errors';
 import { recordRevenueEvent } from '../../services/revenue-recorder';
 import { resolveActingUid } from '../../services/agentAuth';
@@ -18,12 +18,12 @@ const sepoliaClient = createPublicClient({
   chain: sepolia,
   transport: http(process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? ''),
 });
-const baseSepoliaClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http(process.env.RPC_URL_BASE_SEPOLIA ?? ''),
+const mainnetClient = createPublicClient({
+  chain: mainnet,
+  transport: http(process.env.RPC_URL_MAINNET ?? ''),
 });
 function getChainClient(chainId?: number) {
-  if (chainId === baseSepolia.id) return baseSepoliaClient;
+  if (chainId === mainnet.id) return mainnetClient;
   return sepoliaClient;
 }
 

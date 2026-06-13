@@ -2,7 +2,7 @@
  * Price — mode-aware monetary value display.
  *
  * Web2 mode: USD via CoinGecko ETH→USD rate ($12.45)
- * Web3 mode: native ETH with chain suffix (0.0042 ETH on Base Sepolia)
+ * Web3 mode: native ETH with chain suffix (0.0042 ETH on Sepolia)
  *
  * Falls back to ETH when the rate is unavailable so the UI never blocks.
  */

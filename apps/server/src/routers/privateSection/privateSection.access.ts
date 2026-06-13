@@ -8,7 +8,7 @@
  */
 import { db } from '../../lib/firebase';
 import { createPublicClient, http, erc20Abi } from 'viem';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { sepolia, mainnet } from 'viem/chains';
 import { isUniverseAdmin } from '../../lib/safe-admin';
 
 export type AccessLevel = 'admin' | 'team' | 'holders' | 'none';
@@ -19,13 +19,13 @@ const sepoliaClient = createPublicClient({
   transport: http(process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? ''),
 });
 
-const baseSepoliaClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http(process.env.RPC_URL_BASE_SEPOLIA ?? ''),
+const mainnetClient = createPublicClient({
+  chain: mainnet,
+  transport: http(process.env.RPC_URL_MAINNET ?? ''),
 });
 
 function getChainClient(chainId?: number) {
-  if (chainId === baseSepolia.id) return baseSepoliaClient;
+  if (chainId === mainnet.id) return mainnetClient;
   return sepoliaClient;
 }
 

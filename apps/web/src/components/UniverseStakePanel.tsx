@@ -22,9 +22,8 @@ import {
 } from '@/hooks/useUniverseStaking';
 import { useChainId } from 'wagmi';
 
-// Chains where LaunchpadStaking is deployed. Empty until deployed to Sepolia —
-// the panel stays hidden rather than pointing at a removed chain.
-const STAKING_CHAINS = new Set<number>();
+// Chains where LaunchpadStaking is deployed (Sepolia — see deployments/sepolia.json).
+const STAKING_CHAINS = new Set<number>([11155111]);
 import { useWalletAccount } from '@/hooks/useWalletAccount';
 import { toast } from 'sonner';
 import { parseEther } from 'viem';

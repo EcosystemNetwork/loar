@@ -23,9 +23,10 @@ function stakingChainName(id: number | undefined): string {
   }
 }
 
-// LaunchpadStaking deployment addresses per chain. Not yet deployed to Sepolia —
-// staking stays unavailable until an address is added here.
-const LAUNCHPAD_STAKING: Record<number, Address> = {};
+// LaunchpadStaking deployment addresses per chain (from deployments/sepolia.json).
+const LAUNCHPAD_STAKING: Record<number, Address> = {
+  11155111: '0x8696aaC70BAcD9b5ecFe0126322FD1fE46CD62Fa', // Sepolia
+};
 
 function useStakingAddress(): Address | undefined {
   const chainId = useChainId();

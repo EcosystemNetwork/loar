@@ -58,7 +58,7 @@ export const sandboxRouter = router({
         model: z.string().optional(),
         tags: z.array(z.string()).max(10).default([]),
         /**
-         * Target chain for this draft — CAIP-2 form ("eip155:84532" or
+         * Target chain for this draft — CAIP-2 form ("eip155:11155111" or
          * "solana:devnet"). Determines which chain the asset lands on when
          * the draft is promoted to a universe or minted. Optional for
          * backwards compatibility with older clients.

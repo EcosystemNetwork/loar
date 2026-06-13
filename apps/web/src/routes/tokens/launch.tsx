@@ -316,7 +316,7 @@ function LaunchTokenPage() {
             {!defaultsReady && (
               <div className="p-3 rounded-md bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
                 <AlertTriangle className="h-3.5 w-3.5" />
-                Current network is not supported. Switch to Sepolia or Base Sepolia.
+                Current network is not supported. Switch to Ethereum Sepolia or mainnet.
               </div>
             )}
 

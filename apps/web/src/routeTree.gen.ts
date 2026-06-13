@@ -103,6 +103,7 @@ import { Route as BountiesBountyIdRouteImport } from './routes/bounties/$bountyI
 import { Route as AnatomyUniverseRouteImport } from './routes/anatomy.$universe'
 import { Route as AnalyticsUniverseIdRouteImport } from './routes/analytics.$universeId'
 import { Route as AgentsRegisterRouteImport } from './routes/agents/register'
+import { Route as AgentsDiscoverRouteImport } from './routes/agents.discover'
 import { Route as AgentsDashboardRouteImport } from './routes/agents/dashboard'
 import { Route as AgentsUidRouteImport } from './routes/agents/$uid'
 import { Route as AdplacementsNewRouteImport } from './routes/adplacements/new'
@@ -608,6 +609,11 @@ const AgentsRegisterRoute = AgentsRegisterRouteImport.update({
   path: '/agents/register',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AgentsDiscoverRoute = AgentsDiscoverRouteImport.update({
+  id: '/agents/discover',
+  path: '/agents/discover',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AgentsDashboardRoute = AgentsDashboardRouteImport.update({
   id: '/agents/dashboard',
   path: '/agents/dashboard',
@@ -838,6 +844,7 @@ export interface FileRoutesByFullPath {
   '/adplacements/new': typeof AdplacementsNewRoute
   '/agents/$uid': typeof AgentsUidRoute
   '/agents/dashboard': typeof AgentsDashboardRoute
+  '/agents/discover': typeof AgentsDiscoverRoute
   '/agents/register': typeof AgentsRegisterRoute
   '/analytics/$universeId': typeof AnalyticsUniverseIdRoute
   '/anatomy/$universe': typeof AnatomyUniverseRoute
@@ -968,6 +975,7 @@ export interface FileRoutesByTo {
   '/adplacements/new': typeof AdplacementsNewRoute
   '/agents/$uid': typeof AgentsUidRoute
   '/agents/dashboard': typeof AgentsDashboardRoute
+  '/agents/discover': typeof AgentsDiscoverRoute
   '/agents/register': typeof AgentsRegisterRoute
   '/analytics/$universeId': typeof AnalyticsUniverseIdRoute
   '/anatomy/$universe': typeof AnatomyUniverseRoute
@@ -1099,6 +1107,7 @@ export interface FileRoutesById {
   '/adplacements/new': typeof AdplacementsNewRoute
   '/agents/$uid': typeof AgentsUidRoute
   '/agents/dashboard': typeof AgentsDashboardRoute
+  '/agents/discover': typeof AgentsDiscoverRoute
   '/agents/register': typeof AgentsRegisterRoute
   '/analytics/$universeId': typeof AnalyticsUniverseIdRoute
   '/anatomy/$universe': typeof AnatomyUniverseRoute
@@ -1231,6 +1240,7 @@ export interface FileRouteTypes {
     | '/adplacements/new'
     | '/agents/$uid'
     | '/agents/dashboard'
+    | '/agents/discover'
     | '/agents/register'
     | '/analytics/$universeId'
     | '/anatomy/$universe'
@@ -1361,6 +1371,7 @@ export interface FileRouteTypes {
     | '/adplacements/new'
     | '/agents/$uid'
     | '/agents/dashboard'
+    | '/agents/discover'
     | '/agents/register'
     | '/analytics/$universeId'
     | '/anatomy/$universe'
@@ -1491,6 +1502,7 @@ export interface FileRouteTypes {
     | '/adplacements/new'
     | '/agents/$uid'
     | '/agents/dashboard'
+    | '/agents/discover'
     | '/agents/register'
     | '/analytics/$universeId'
     | '/anatomy/$universe'
@@ -1622,6 +1634,7 @@ export interface RootRouteChildren {
   AdplacementsNewRoute: typeof AdplacementsNewRoute
   AgentsUidRoute: typeof AgentsUidRoute
   AgentsDashboardRoute: typeof AgentsDashboardRoute
+  AgentsDiscoverRoute: typeof AgentsDiscoverRoute
   AgentsRegisterRoute: typeof AgentsRegisterRoute
   AnalyticsUniverseIdRoute: typeof AnalyticsUniverseIdRoute
   AnatomyUniverseRoute: typeof AnatomyUniverseRoute
@@ -2341,6 +2354,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentsRegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/agents/discover': {
+      id: '/agents/discover'
+      path: '/agents/discover'
+      fullPath: '/agents/discover'
+      preLoaderRoute: typeof AgentsDiscoverRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/agents/dashboard': {
       id: '/agents/dashboard'
       path: '/agents/dashboard'
@@ -2745,6 +2765,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdplacementsNewRoute: AdplacementsNewRoute,
   AgentsUidRoute: AgentsUidRoute,
   AgentsDashboardRoute: AgentsDashboardRoute,
+  AgentsDiscoverRoute: AgentsDiscoverRoute,
   AgentsRegisterRoute: AgentsRegisterRoute,
   AnalyticsUniverseIdRoute: AnalyticsUniverseIdRoute,
   AnatomyUniverseRoute: AnatomyUniverseRoute,

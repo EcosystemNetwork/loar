@@ -38,7 +38,7 @@ const createUniverseSchema = z.object({
     .string()
     .regex(/^0x[a-fA-F0-9]{64}$/)
     .optional(),
-  /** Chain ID the universe was deployed on (e.g. 11155111 for Sepolia, 84532 for Base Sepolia). */
+  /** Chain ID the universe was deployed on (e.g. 11155111 for Sepolia, 1 for Ethereum mainnet). */
   chainId: z.number().int().positive().optional(),
   /** Optional Unstoppable Domains name for this universe (e.g. "myuniverse.crypto"). */
   unstoppableDomain: z.string().max(100).nullish(),
@@ -396,7 +396,7 @@ export const universesRouter = router({
    * Resolve admin info for a universe from the server-side Firestore record +
    * server RPC. Used by the web `useIsUniverseAdmin` hook so UI gating does
    * not depend on the user's wallet RPC provider (which is frequently rate
-   * limited on public Sepolia / Base Sepolia endpoints).
+   * limited on public Sepolia / mainnet endpoints).
    *
    * Returns a consistent shape for both EOA and Safe multi-sig admins. When
    * `address` is omitted, `isAdmin` is always false but the rest of the

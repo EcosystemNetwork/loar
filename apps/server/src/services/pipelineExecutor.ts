@@ -79,8 +79,8 @@ interface AgentContext {
    *  `useBYOK: true` so the downstream worker bills against the agent
    *  owner's stored API keys instead of platform credits. */
   useBYOK: boolean;
-  /** G1: which EVM chain on-chain actions should target. Default is Base
-   *  Sepolia (84532) for testnet; the agent owner's Circle DCW wallet is
+  /** G1: which EVM chain on-chain actions should target. Default is Ethereum
+   *  Sepolia (11155111) for testnet; the agent owner's Circle DCW wallet is
    *  resolved at execution time. */
   chainId: number;
 }

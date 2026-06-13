@@ -43,17 +43,12 @@ const envSchema = z.object({
   KMS_KEY_ID: z.string().optional(),
   KMS_REGION: z.string().default('us-east-1'),
 
-  // ── Base mainnet RPC ─────────────────────────────────────────────────
-  RPC_URL_BASE: z.string().url('RPC_URL_BASE must be a valid URL').optional(),
-
   // ── On-chain payment verification ─────────────────────────────────────────
   // Falls back to PONDER_RPC_URL_2 in credits.routes.ts if unset, but setting
   // this separately is recommended so server and indexer use independent RPCs.
   RPC_URL: z.string().url('RPC_URL must be a valid URL').optional(),
   // Ethereum mainnet RPC — used for chainId 1 (swaps/trading, tx verification).
   RPC_URL_MAINNET: z.string().url('RPC_URL_MAINNET must be a valid URL').optional(),
-  /** Base Sepolia RPC — required if multi-chain purchases or Base multi-sig universes are enabled */
-  RPC_URL_BASE_SEPOLIA: z.string().url('RPC_URL_BASE_SEPOLIA must be a valid URL').optional(),
   LOAR_TOKEN_ADDRESS: z
     .string()
     .regex(/^0x[0-9a-fA-F]{40}$/, 'LOAR_TOKEN_ADDRESS must be a valid Ethereum address')
@@ -100,6 +95,33 @@ const envSchema = z.object({
   UNISWAP_MAX_SWAP_WEI: z.string().regex(/^\d+$/).optional(),
   // Optional extra Universal Router allowlist: "chainId:0xrouter,chainId:0xrouter".
   UNISWAP_EXTRA_ROUTERS: z.string().optional(),
+
+  // ── ENS (identity layer for users + AI agents) ──────────────────────────
+  // (Mainnet RPC for ENS resolution is RPC_URL_MAINNET, defined above.)
+  // Parent name for offchain agent subnames (e.g. agents.loar.eth).
+  ENS_AGENT_PARENT: z.string().optional(),
+  // Public base URL used when composing agent MCP endpoints in ENS records.
+  PUBLIC_BASE_URL: z.string().url('PUBLIC_BASE_URL must be a valid URL').optional(),
+
+  // ── Arc (Circle USDC L1) + x402 agent payments ──────────────────────────
+  ARC_RPC_URL: z.string().url('ARC_RPC_URL must be a valid URL').optional(),
+  // Recipient + price for the x402 paid-call demo.
+  X402_PAY_TO: z
+    .string()
+    .regex(/^0x[0-9a-fA-F]{40}$/, 'X402_PAY_TO must be a valid address')
+    .optional(),
+  X402_PRICE_USDC: z
+    .string()
+    .regex(/^\d+(\.\d{1,6})?$/)
+    .optional(),
+
+  // ── Google Cloud BigQuery (ERC-8004 agent reputation) ───────────────────
+  GCP_PROJECT_ID: z.string().optional(),
+  GCP_SERVICE_ACCOUNT_JSON: z.string().optional(),
+  GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
+  ERC8004_IDENTITY_REGISTRY: z.string().optional(),
+  ERC8004_REPUTATION_REGISTRY: z.string().optional(),
+  ERC8004_VALIDATION_REGISTRY: z.string().optional(),
 
   // ── AI services ───────────────────────────────────────────────────────────
   FAL_KEY: z.string().optional(),
@@ -289,9 +311,8 @@ export function validateEnv(): Env {
       );
     }
 
-    // RPC_URL_BASE_SEPOLIA is no longer required — the app is single-chain
-    // (Ethereum Sepolia) until we launch to other chains. RPC_URL above covers
-    // all on-chain payment verification and multi-sig admin checks.
+    // The app is Ethereum-only (Sepolia default + mainnet). RPC_URL covers
+    // Sepolia; set RPC_URL_MAINNET to enable mainnet reads/verification.
 
     // Solana — only required when Circle DCW is configured (i.e. Solana flows
     // are reachable). If Circle isn't set up either, the Solana routes 503
@@ -344,8 +365,7 @@ export function validateEnv(): Env {
     // values that would stringify to an empty viem transport.
     for (const [name, value] of [
       ['RPC_URL', env.RPC_URL],
-      ['RPC_URL_BASE_SEPOLIA', env.RPC_URL_BASE_SEPOLIA],
-      ['RPC_URL_BASE', env.RPC_URL_BASE],
+      ['RPC_URL_MAINNET', env.RPC_URL_MAINNET],
     ] as const) {
       if (value !== undefined && value.trim() === '') {
         prodErrors.push(`${name} is set but empty — remove the variable or provide a real URL`);

@@ -48,6 +48,9 @@ import { storageRouter } from './storage/storage.routes';
 import { firebaseStorageRouter } from './storage/firebase.routes';
 import { synapseRouter } from './storage/synapse.routes';
 import { uniswapRouter } from './uniswap/uniswap.routes';
+import { ensRouter } from './ens/ens.routes';
+import { arcRouter } from './arc/arc.routes';
+import { agentRegistryRouter } from './agentRegistry/agentRegistry.routes';
 import { profilesRouter } from './profiles/profiles.routes';
 import { entitiesRouter } from './entities/entities.index';
 import { offChainNodesRouter } from './offChainNodes/offChainNodes.routes';
@@ -287,6 +290,15 @@ export const appRouter = router({
 
   // ── DeFi (Uniswap Trading API — swaps, swap-to-buy-credits) ──────────
   uniswap: uniswapRouter,
+
+  // ── Identity (ENS — names + agent subnames) ─────────────────────────
+  ens: ensRouter,
+
+  // ── Agent payments (Arc — USDC settlement + x402) ───────────────────
+  arc: arcRouter,
+
+  // ── Agent discovery + reputation (Google BigQuery / ERC-8004) ───────
+  agentRegistry: agentRegistryRouter,
 
   // ── User ────────────────────────────────────────────────────────────
   profiles: profilesRouter,

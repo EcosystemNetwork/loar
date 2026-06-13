@@ -13,23 +13,23 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { createPublicClient, http } from 'viem';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { sepolia, mainnet } from 'viem/chains';
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 
-const ALLOWED_CHAIN_IDS: Set<number> = new Set([sepolia.id, baseSepolia.id]);
+const ALLOWED_CHAIN_IDS: Set<number> = new Set([sepolia.id, mainnet.id]);
 
 // ── Chain clients for on-chain verification ─────────────────────────
 const sepoliaClient = createPublicClient({
   chain: sepolia,
   transport: http(process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? ''),
 });
-const baseSepoliaClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http(process.env.RPC_URL_BASE_SEPOLIA ?? ''),
+const mainnetClient = createPublicClient({
+  chain: mainnet,
+  transport: http(process.env.RPC_URL_MAINNET ?? ''),
 });
 function getChainClient(chainId?: number) {
-  if (chainId === baseSepolia.id) return baseSepoliaClient;
+  if (chainId === mainnet.id) return mainnetClient;
   return sepoliaClient;
 }
 

@@ -5,7 +5,7 @@
  * Four payment paths exposed:
  *   - Card (Stripe Elements; Stripe Checkout auto-enables Apple Pay /
  *     Google Pay / Link / bank debits via dashboard PMs)
- *   - Crypto (native ETH on Sepolia or Base Sepolia via Circle DCW)
+ *   - Crypto (native ETH on Sepolia or Ethereum mainnet via Circle DCW)
  *   - Solana Pay (USDC-SPL; QR + deep-link URL)
  *   - Redeem code
  *

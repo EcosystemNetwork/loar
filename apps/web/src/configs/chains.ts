@@ -104,7 +104,7 @@ export function chainOptionById(id: string): ChainOption | undefined {
   return SUPPORTED_CHAINS.find((c) => c.id === id);
 }
 
-/** EVM chainId → CAIP-2 selector id ("eip155:84532"). */
+/** EVM chainId → CAIP-2 selector id ("eip155:11155111"). */
 export function evmChainIdToSelectionId(chainId: number): string {
   return `eip155:${chainId}`;
 }

@@ -38,9 +38,13 @@ async function resolveAccount(): Promise<Account> {
   const kmsKeyId = process.env.KMS_KEY_ID;
 
   if (kmsKeyId) {
-    // Production: AWS KMS signing
+    // Production: AWS KMS signing. The specifier is held in a variable so TS
+    // doesn't statically pull kms-account.ts (and its optional, prod-only
+    // @aws-sdk/client-kms dep) into the type graph of every downstream
+    // consumer — notably the web app's tRPC AppRouter inference.
     try {
-      const { KmsAccount } = await import('./kms-account');
+      const kmsModulePath = './kms-account';
+      const { KmsAccount } = await import(kmsModulePath);
       return await KmsAccount.create(kmsKeyId, process.env.KMS_REGION || 'us-east-1');
     } catch (err) {
       throw new Error(
@@ -63,6 +67,17 @@ async function resolveAccount(): Promise<Account> {
 }
 
 let _cachedAccount: Account | null = null;
+
+/**
+ * Resolve (and cache) the platform signer account, independent of chain.
+ * Used by chains not in viem/chains (e.g. Arc) that build their own clients.
+ */
+export async function getSignerAccount(): Promise<Account> {
+  if (!_cachedAccount) {
+    _cachedAccount = await resolveAccount();
+  }
+  return _cachedAccount;
+}
 
 /**
  * Get a wallet client + account for the given chain.

@@ -106,7 +106,7 @@ function CinematicUniverseCreate() {
   const { switchChain } = useSwitchChain();
   const priceText = usePriceText();
 
-  // Chain selection — EVM (Sepolia / Base Sepolia / Base) or Solana (devnet / mainnet-beta).
+  // Chain selection — EVM (Sepolia / Ethereum mainnet); Solana removed.
   // Initial value mirrors the wallet's current chainId so the dropdown matches reality on
   // first render. The effect below keeps the two in sync when the wallet switches.
   const [chainSelection, setChainSelection] = useState<ChainSelection>(() => {
@@ -1129,7 +1129,7 @@ function CinematicUniverseCreate() {
                     )}
                 </div>
 
-                {/* Chain Selector — EVM (Sepolia / Base Sepolia / Base) + Solana clusters */}
+                {/* Chain Selector — EVM (Sepolia / Ethereum mainnet) */}
                 {SUPPORTED_CHAINS.length > 1 && (
                   <div>
                     <Label className="text-sm font-semibold mb-2 block">Deploy on</Label>
