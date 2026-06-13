@@ -127,7 +127,7 @@ txProxyRoutes.post('/write', async (c) => {
   // Allowlist enforcement — the server is a signing oracle, so callers can
   // only ask us to sign calls to contracts we know about. Anything else would
   // let a compromised session drain funds (e.g. approve to attacker-spender).
-  const chainId = body.chainId ?? 84532;
+  const chainId = body.chainId ?? 11155111;
   const allowed = await isContractAllowed(chainId, body.address);
   if (!allowed) {
     return c.json(

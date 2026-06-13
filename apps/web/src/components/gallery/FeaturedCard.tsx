@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { Film } from 'lucide-react';
 import { useVideoLoad } from '@/hooks/useVideoLoad';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { proxiedImage, proxiedSrcSet } from '@/utils/img-proxy';
 
 interface FeaturedCardProps {
   item: {
@@ -18,7 +18,12 @@ interface FeaturedCardProps {
 
 export function FeaturedCard({ item }: FeaturedCardProps) {
   const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
-  const { videoRef, ready, onLoaded } = useVideoLoad(isVideo ? item.mediaUrl : undefined);
+  const {
+    videoRef,
+    ready,
+    resolvedSrc: videoSrc,
+    onLoaded,
+  } = useVideoLoad(isVideo ? item.mediaUrl : undefined);
   const [loaded, setLoaded] = useState(false);
 
   return (
@@ -27,13 +32,13 @@ export function FeaturedCard({ item }: FeaturedCardProps) {
         <>
           <video
             ref={videoRef}
-            src={ready ? `${resolveIpfsUrl(item.mediaUrl)}#t=0.5` : undefined}
+            src={ready && videoSrc ? `${videoSrc}#t=0.5` : undefined}
             className={`w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
             muted
             loop
             playsInline
             preload="metadata"
-            poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
+            poster={proxiedImage(item.thumbnailUrl) || undefined}
             onLoadedData={() => {
               setLoaded(true);
               onLoaded();
@@ -60,7 +65,9 @@ export function FeaturedCard({ item }: FeaturedCardProps) {
         </>
       ) : (
         <img
-          src={resolveIpfsUrl(item.thumbnailUrl || item.mediaUrl || '/placeholder.jpg')}
+          src={proxiedImage(item.thumbnailUrl || item.mediaUrl || '/placeholder.jpg')}
+          srcSet={proxiedSrcSet(item.thumbnailUrl || item.mediaUrl)}
+          sizes="(max-width: 768px) 100vw, 640px"
           alt={item.title || 'Featured'}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           loading="lazy"

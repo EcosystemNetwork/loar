@@ -193,9 +193,9 @@ export const aiPipelinesRouter = router({
         // created before the field existed.
         useBYOK: (agent.useBYOK as boolean | undefined) ?? false,
         // G1: target chain for any on-chain action steps. Pipeline-level
-        // override via `chainId` config; otherwise falls back to Base Sepolia
-        // (84532) which is the current Circle DCW default.
-        chainId: (input.chainId as number | undefined) ?? 84532,
+        // override via `chainId` config; otherwise falls back to Ethereum
+        // Sepolia (11155111) which is the current Circle DCW default.
+        chainId: (input.chainId as number | undefined) ?? 11155111,
       };
 
       executePipeline(runId, steps, agentContext).catch((err) => {

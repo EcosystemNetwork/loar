@@ -28,8 +28,7 @@ const OperationType = { Call: 0, DelegateCall: 1 } as const;
 // Safe Transaction Service URLs per chain
 const TX_SERVICE_URLS: Record<number, string> = {
   11155111: 'https://safe-transaction-sepolia.safe.global',
-  8453: 'https://safe-transaction-base.safe.global',
-  84532: 'https://safe-transaction-base-sepolia.safe.global',
+  1: 'https://safe-transaction-mainnet.safe.global',
 };
 
 export interface SafeInfo {

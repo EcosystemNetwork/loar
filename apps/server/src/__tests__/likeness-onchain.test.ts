@@ -188,21 +188,19 @@ describe('getOnChainEnv', () => {
     expect(getOnChainEnv(11155111)).toBeNull();
   });
 
-  it('defaultOnChainChainId prefers Sepolia when both chains configured', () => {
+  it('defaultOnChainChainId resolves to Sepolia when configured', () => {
     process.env.CONTENT_LICENSING_ADDRESS_SEPOLIA = '0x' + 'a'.repeat(40);
     process.env.RIGHTS_REGISTRY_ADDRESS_SEPOLIA = '0x' + 'b'.repeat(40);
     process.env.RPC_URL = 'https://example/sepolia';
-    process.env.CONTENT_LICENSING_ADDRESS_BASE_SEPOLIA = '0x' + 'c'.repeat(40);
-    process.env.RIGHTS_REGISTRY_ADDRESS_BASE_SEPOLIA = '0x' + 'd'.repeat(40);
-    process.env.RPC_URL_BASE_SEPOLIA = 'https://example/base';
     expect(defaultOnChainChainId()).toBe(11155111);
   });
 
-  it('falls back to Base Sepolia when only Base is configured', () => {
+  it('ignores Base Sepolia config — Sepolia is the only supported chain', () => {
     process.env.CONTENT_LICENSING_ADDRESS_BASE_SEPOLIA = '0x' + 'c'.repeat(40);
     process.env.RIGHTS_REGISTRY_ADDRESS_BASE_SEPOLIA = '0x' + 'd'.repeat(40);
     process.env.RPC_URL_BASE_SEPOLIA = 'https://example/base';
-    expect(defaultOnChainChainId()).toBe(84532);
+    expect(getOnChainEnv(84532)).toBeNull();
+    expect(defaultOnChainChainId()).toBeNull();
   });
 });
 

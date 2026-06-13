@@ -13,12 +13,11 @@
  */
 import { createWalletClient, http, type Account, type WalletClient, type Chain } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { sepolia, baseSepolia, base } from 'viem/chains';
+import { mainnet, sepolia } from 'viem/chains';
 
 const CHAINS: Record<number, Chain> = {
   11155111: sepolia,
-  84532: baseSepolia,
-  8453: base,
+  1: mainnet,
 };
 
 export interface Signer {
@@ -82,11 +81,9 @@ export async function getSigner(chainId: number = 11155111): Promise<Signer> {
   }
 
   const rpcUrl =
-    chainId === 8453
-      ? process.env.RPC_URL_BASE
-      : chainId === 84532
-        ? process.env.RPC_URL_BASE_SEPOLIA
-        : process.env.RPC_URL || process.env.PONDER_RPC_URL_2;
+    chainId === 1
+      ? process.env.RPC_URL_MAINNET || process.env.RPC_URL
+      : process.env.RPC_URL || process.env.PONDER_RPC_URL_2;
 
   const client = createWalletClient({
     account: _cachedAccount,

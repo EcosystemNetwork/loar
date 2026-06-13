@@ -1,8 +1,8 @@
 /**
  * Ponder Indexer Configuration
  *
- * Configures Ponder to index LOAR protocol contracts on Ethereum Sepolia
- * or Base Sepolia (set PONDER_CHAIN env var). Uses the factory pattern to
+ * Configures Ponder to index LOAR protocol contracts on Ethereum Sepolia.
+ * Uses the factory pattern to
  * dynamically track Universe, Governor, and Token contracts spawned by
  * the UniverseManager factory. Also indexes Uniswap v4 PoolManager swap
  * events for token price tracking.
@@ -26,7 +26,7 @@ import {
 } from '@loar/abis/generated';
 import { PoolManagerAbi } from './abis/PoolManager';
 import { ERC20Abi } from './abis/ERC20Abi';
-import { sepolia, baseSepolia, base } from 'viem/chains';
+import { sepolia } from 'viem/chains';
 import { getAddress } from 'viem/utils';
 
 // ── Chain config (driven by PONDER_CHAIN env var) ───────────────────────────
@@ -36,18 +36,6 @@ const CHAIN_CONFIGS = {
     chain: sepolia,
     poolManager: '0xE03A1074c86CFeDd5C142C4F04F1a1536e203543' as `0x${string}`,
     deploymentFile: 'sepolia.json',
-  },
-  'base-sepolia': {
-    chainName: 'base-sepolia' as const,
-    chain: baseSepolia,
-    poolManager: '0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408' as `0x${string}`,
-    deploymentFile: 'base-sepolia.json',
-  },
-  base: {
-    chainName: 'base' as const,
-    chain: base,
-    poolManager: '0xE8E23e97Fa135823143d6b9Cba9c699040D51F70' as `0x${string}`, // Uniswap v4 PoolManager on Base
-    deploymentFile: 'base.json',
   },
 } as const;
 
@@ -123,8 +111,6 @@ export default createConfig({
       rpc: [env.PONDER_RPC_URL, ...env.PONDER_RPC_FALLBACKS].filter(Boolean),
       maxRequestsPerSecond: 25,
       pollingInterval: 2000,
-      maxBlockRange: 100,
-      finalityBlockCount: 15,
     },
   },
   contracts: {

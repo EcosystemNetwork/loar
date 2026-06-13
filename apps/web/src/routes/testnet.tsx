@@ -120,19 +120,12 @@ function TestnetPage() {
 
         <section className="space-y-3 mb-10">
           <h2 className="text-xl font-semibold">What's running where</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-1 gap-3 text-sm">
             <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
               <p className="font-semibold mb-1">Ethereum Sepolia</p>
               <p className="text-muted-foreground text-xs">Chain ID 11155111</p>
               <p className="text-muted-foreground text-xs mt-2">
                 Universe creation, governance tokens, $LOAR.
-              </p>
-            </div>
-            <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-              <p className="font-semibold mb-1">Base Sepolia</p>
-              <p className="text-muted-foreground text-xs">Chain ID 84532</p>
-              <p className="text-muted-foreground text-xs mt-2">
-                Secondary chain for cross-chain experiments.
               </p>
             </div>
           </div>

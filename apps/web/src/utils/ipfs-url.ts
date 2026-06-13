@@ -1,8 +1,13 @@
-// gateway.pinata.cloud is now Cloudflare-rate-limited per IP and 429s with a
-// long retry-after for unauthenticated traffic. We can't sign client URLs
-// (token is server-only after WEB-1), so the synchronous default is a public
-// IPFS gateway that actually serves anonymous range requests.
-const PUBLIC_GATEWAY = 'https://w3s.link';
+// Default public gateway for anonymous (client-side) reads.
+//
+// We use a PATH-STYLE gateway (ipfs.io) rather than a subdomain-redirect one
+// (w3s.link / dweb.link). Most LOAR content is pinned under CIDv0 (`Qm…`)
+// hashes, and subdomain gateways 307→`<cid>.ipfs.<host>` which only resolves
+// for CIDv1 — so w3s.link/dweb.link stall for ~15s+ on our CIDv0 content while
+// ipfs.io serves it path-style in well under a second. (Measured 2026-06-12.)
+// gateway.pinata.cloud also works but is rate-limited and slow (~8s ttfb)
+// unauthenticated, so it sits lower in the chain.
+const PUBLIC_GATEWAY = 'https://ipfs.io';
 // Pinata's public gateway is kept in the fallback chain — it sometimes
 // recovers — but is not used as the sync default.
 const PINATA_PUBLIC_GATEWAY = 'https://gateway.pinata.cloud';
@@ -75,11 +80,16 @@ export function resolveIpfsUrl(url?: string | null): string {
 // Public fallback chain. Pinata dedicated gateways and gateway.pinata.cloud
 // both 401/403/429 unauthenticated traffic; these resolve any CID that's live
 // on the IPFS network. We try multiple in case any single one is degraded.
+// Ordered fastest/most-reliable first for our CIDv0 content. Path-style
+// gateways lead; subdomain-redirect gateways (w3s.link/dweb.link) trail since
+// they stall on CIDv0. raceIpfsGateways() probes these in parallel anyway, so
+// a degraded leader can't block — but the order sets the sync-default and the
+// onError fallback sequence.
 const PUBLIC_FALLBACK_GATEWAYS = [
-  'https://w3s.link',
   'https://ipfs.io',
-  'https://dweb.link',
   PINATA_PUBLIC_GATEWAY,
+  'https://dweb.link',
+  'https://w3s.link',
 ];
 
 const KNOWN_GATEWAY_HOSTS = new Set<string>([

@@ -19,7 +19,7 @@ import { db } from '../../lib/firebase';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { createPublicClient, http, parseUnits, type Hash } from 'viem';
-import { base, sepolia, baseSepolia } from 'viem/chains';
+import { mainnet, sepolia } from 'viem/chains';
 import { DEFAULT_PACKAGES, buildPackagesFromConfig } from '../credits/credits.routes';
 import { verifyStripePayment } from '../credits/stripe.routes';
 import { getMembership } from '../universeTeam/universeTeam.routes';
@@ -31,7 +31,7 @@ const TRANSFER_TOPIC =
   '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' as const;
 
 /** Allowed chain IDs for treasury payment verification. */
-const ALLOWED_CHAIN_IDS: Set<number> = new Set([sepolia.id, baseSepolia.id, base.id]);
+const ALLOWED_CHAIN_IDS: Set<number> = new Set([sepolia.id, mainnet.id]);
 
 function getTreasuryChainClient(chainId?: number) {
   if (chainId !== undefined && !ALLOWED_CHAIN_IDS.has(chainId)) {
@@ -40,16 +40,10 @@ function getTreasuryChainClient(chainId?: number) {
       message: `Chain ID ${chainId} is not supported for treasury operations.`,
     });
   }
-  if (chainId === base.id) {
+  if (chainId === mainnet.id) {
     return createPublicClient({
-      chain: base,
-      transport: http(process.env.RPC_URL_BASE ?? ''),
-    });
-  }
-  if (chainId === baseSepolia.id) {
-    return createPublicClient({
-      chain: baseSepolia,
-      transport: http(process.env.RPC_URL_BASE_SEPOLIA ?? ''),
+      chain: mainnet,
+      transport: http(process.env.RPC_URL_MAINNET ?? ''),
     });
   }
   return createPublicClient({

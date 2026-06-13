@@ -10,11 +10,11 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ViralityRouteImport } from './routes/virality'
-import { Route as RoyaltiesRouteImport } from './routes/royalties'
 import { Route as VideosRouteImport } from './routes/videos'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as TestnetRouteImport } from './routes/testnet'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as SwapRouteImport } from './routes/swap'
 import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
 import { Route as StudioControlledRouteImport } from './routes/studio-controlled'
 import { Route as StudioRouteImport } from './routes/studio'
@@ -23,6 +23,7 @@ import { Route as SolanaRouteImport } from './routes/solana'
 import { Route as SeriesRouteImport } from './routes/series'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SandboxRouteImport } from './routes/sandbox'
+import { Route as RoyaltiesRouteImport } from './routes/royalties'
 import { Route as ResidencyRouteImport } from './routes/residency'
 import { Route as RelightRouteImport } from './routes/relight'
 import { Route as PrivacyRouteImport } from './routes/privacy'
@@ -109,9 +110,9 @@ import { Route as AdplacementsSlotIdRouteImport } from './routes/adplacements/$s
 import { Route as AdminUniversesRouteImport } from './routes/admin/universes'
 import { Route as AdminResidencyRouteImport } from './routes/admin/residency'
 import { Route as AdminOpsRouteImport } from './routes/admin/ops'
-import { Route as AdminMainnetRouteImport } from './routes/admin/mainnet'
 import { Route as AdminModerationRouteImport } from './routes/admin/moderation'
 import { Route as AdminMcpUsageRouteImport } from './routes/admin/mcp-usage'
+import { Route as AdminMainnetRouteImport } from './routes/admin/mainnet'
 import { Route as AdminCostRouteImport } from './routes/admin/cost'
 import { Route as AdminByokCodesRouteImport } from './routes/admin/byok-codes'
 import { Route as AdplacementsSeedsIndexRouteImport } from './routes/adplacements/seeds/index'
@@ -142,11 +143,6 @@ const ViralityRoute = ViralityRouteImport.update({
   path: '/virality',
   getParentRoute: () => rootRouteImport,
 } as any)
-const RoyaltiesRoute = RoyaltiesRouteImport.update({
-  id: '/royalties',
-  path: '/royalties',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const VideosRoute = VideosRouteImport.update({
   id: '/videos',
   path: '/videos',
@@ -165,6 +161,11 @@ const TestnetRoute = TestnetRouteImport.update({
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SwapRoute = SwapRouteImport.update({
+  id: '/swap',
+  path: '/swap',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SubscriptionsRoute = SubscriptionsRouteImport.update({
@@ -205,6 +206,11 @@ const SearchRoute = SearchRouteImport.update({
 const SandboxRoute = SandboxRouteImport.update({
   id: '/sandbox',
   path: '/sandbox',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RoyaltiesRoute = RoyaltiesRouteImport.update({
+  id: '/royalties',
+  path: '/royalties',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResidencyRoute = ResidencyRouteImport.update({
@@ -637,11 +643,6 @@ const AdminOpsRoute = AdminOpsRouteImport.update({
   path: '/admin/ops',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminMainnetRoute = AdminMainnetRouteImport.update({
-  id: '/admin/mainnet',
-  path: '/admin/mainnet',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AdminModerationRoute = AdminModerationRouteImport.update({
   id: '/admin/moderation',
   path: '/admin/moderation',
@@ -650,6 +651,11 @@ const AdminModerationRoute = AdminModerationRouteImport.update({
 const AdminMcpUsageRoute = AdminMcpUsageRouteImport.update({
   id: '/admin/mcp-usage',
   path: '/admin/mcp-usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminMainnetRoute = AdminMainnetRouteImport.update({
+  id: '/admin/mainnet',
+  path: '/admin/mainnet',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminCostRoute = AdminCostRouteImport.update({
@@ -805,6 +811,7 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/relight': typeof RelightRoute
   '/residency': typeof ResidencyRoute
+  '/royalties': typeof RoyaltiesRoute
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
   '/series': typeof SeriesRoute
@@ -813,18 +820,18 @@ export interface FileRoutesByFullPath {
   '/studio': typeof StudioRouteWithChildren
   '/studio-controlled': typeof StudioControlledRoute
   '/subscriptions': typeof SubscriptionsRoute
+  '/swap': typeof SwapRoute
   '/terms': typeof TermsRoute
   '/testnet': typeof TestnetRoute
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
   '/virality': typeof ViralityRoute
-  '/royalties': typeof RoyaltiesRoute
   '/admin/byok-codes': typeof AdminByokCodesRoute
   '/admin/cost': typeof AdminCostRoute
+  '/admin/mainnet': typeof AdminMainnetRoute
   '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/admin/ops': typeof AdminOpsRoute
-  '/admin/mainnet': typeof AdminMainnetRoute
   '/admin/residency': typeof AdminResidencyRoute
   '/admin/universes': typeof AdminUniversesRoute
   '/adplacements/$slotId': typeof AdplacementsSlotIdRoute
@@ -934,6 +941,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/relight': typeof RelightRoute
   '/residency': typeof ResidencyRoute
+  '/royalties': typeof RoyaltiesRoute
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
   '/series': typeof SeriesRoute
@@ -942,18 +950,18 @@ export interface FileRoutesByTo {
   '/studio': typeof StudioRouteWithChildren
   '/studio-controlled': typeof StudioControlledRoute
   '/subscriptions': typeof SubscriptionsRoute
+  '/swap': typeof SwapRoute
   '/terms': typeof TermsRoute
   '/testnet': typeof TestnetRoute
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
   '/virality': typeof ViralityRoute
-  '/royalties': typeof RoyaltiesRoute
   '/admin/byok-codes': typeof AdminByokCodesRoute
   '/admin/cost': typeof AdminCostRoute
+  '/admin/mainnet': typeof AdminMainnetRoute
   '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/admin/ops': typeof AdminOpsRoute
-  '/admin/mainnet': typeof AdminMainnetRoute
   '/admin/residency': typeof AdminResidencyRoute
   '/admin/universes': typeof AdminUniversesRoute
   '/adplacements/$slotId': typeof AdplacementsSlotIdRoute
@@ -1064,6 +1072,7 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/relight': typeof RelightRoute
   '/residency': typeof ResidencyRoute
+  '/royalties': typeof RoyaltiesRoute
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
   '/series': typeof SeriesRoute
@@ -1072,18 +1081,18 @@ export interface FileRoutesById {
   '/studio': typeof StudioRouteWithChildren
   '/studio-controlled': typeof StudioControlledRoute
   '/subscriptions': typeof SubscriptionsRoute
+  '/swap': typeof SwapRoute
   '/terms': typeof TermsRoute
   '/testnet': typeof TestnetRoute
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
   '/virality': typeof ViralityRoute
-  '/royalties': typeof RoyaltiesRoute
   '/admin/byok-codes': typeof AdminByokCodesRoute
   '/admin/cost': typeof AdminCostRoute
+  '/admin/mainnet': typeof AdminMainnetRoute
   '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/admin/ops': typeof AdminOpsRoute
-  '/admin/mainnet': typeof AdminMainnetRoute
   '/admin/residency': typeof AdminResidencyRoute
   '/admin/universes': typeof AdminUniversesRoute
   '/adplacements/$slotId': typeof AdplacementsSlotIdRoute
@@ -1195,6 +1204,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/relight'
     | '/residency'
+    | '/royalties'
     | '/sandbox'
     | '/search'
     | '/series'
@@ -1203,18 +1213,18 @@ export interface FileRouteTypes {
     | '/studio'
     | '/studio-controlled'
     | '/subscriptions'
+    | '/swap'
     | '/terms'
     | '/testnet'
     | '/upload'
     | '/videos'
     | '/virality'
-    | '/royalties'
     | '/admin/byok-codes'
     | '/admin/cost'
+    | '/admin/mainnet'
     | '/admin/mcp-usage'
     | '/admin/moderation'
     | '/admin/ops'
-    | '/admin/mainnet'
     | '/admin/residency'
     | '/admin/universes'
     | '/adplacements/$slotId'
@@ -1324,6 +1334,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/relight'
     | '/residency'
+    | '/royalties'
     | '/sandbox'
     | '/search'
     | '/series'
@@ -1332,18 +1343,18 @@ export interface FileRouteTypes {
     | '/studio'
     | '/studio-controlled'
     | '/subscriptions'
+    | '/swap'
     | '/terms'
     | '/testnet'
     | '/upload'
     | '/videos'
     | '/virality'
-    | '/royalties'
     | '/admin/byok-codes'
     | '/admin/cost'
+    | '/admin/mainnet'
     | '/admin/mcp-usage'
     | '/admin/moderation'
     | '/admin/ops'
-    | '/admin/mainnet'
     | '/admin/residency'
     | '/admin/universes'
     | '/adplacements/$slotId'
@@ -1453,6 +1464,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/relight'
     | '/residency'
+    | '/royalties'
     | '/sandbox'
     | '/search'
     | '/series'
@@ -1461,18 +1473,18 @@ export interface FileRouteTypes {
     | '/studio'
     | '/studio-controlled'
     | '/subscriptions'
+    | '/swap'
     | '/terms'
     | '/testnet'
     | '/upload'
     | '/videos'
     | '/virality'
-    | '/royalties'
     | '/admin/byok-codes'
     | '/admin/cost'
+    | '/admin/mainnet'
     | '/admin/mcp-usage'
     | '/admin/moderation'
     | '/admin/ops'
-    | '/admin/mainnet'
     | '/admin/residency'
     | '/admin/universes'
     | '/adplacements/$slotId'
@@ -1583,6 +1595,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   RelightRoute: typeof RelightRoute
   ResidencyRoute: typeof ResidencyRoute
+  RoyaltiesRoute: typeof RoyaltiesRoute
   SandboxRoute: typeof SandboxRoute
   SearchRoute: typeof SearchRoute
   SeriesRoute: typeof SeriesRoute
@@ -1591,18 +1604,18 @@ export interface RootRouteChildren {
   StudioRoute: typeof StudioRouteWithChildren
   StudioControlledRoute: typeof StudioControlledRoute
   SubscriptionsRoute: typeof SubscriptionsRoute
+  SwapRoute: typeof SwapRoute
   TermsRoute: typeof TermsRoute
   TestnetRoute: typeof TestnetRoute
   UploadRoute: typeof UploadRoute
   VideosRoute: typeof VideosRoute
   ViralityRoute: typeof ViralityRoute
-  RoyaltiesRoute: typeof RoyaltiesRoute
   AdminByokCodesRoute: typeof AdminByokCodesRoute
   AdminCostRoute: typeof AdminCostRoute
+  AdminMainnetRoute: typeof AdminMainnetRoute
   AdminMcpUsageRoute: typeof AdminMcpUsageRoute
   AdminModerationRoute: typeof AdminModerationRoute
   AdminOpsRoute: typeof AdminOpsRoute
-  AdminMainnetRoute: typeof AdminMainnetRoute
   AdminResidencyRoute: typeof AdminResidencyRoute
   AdminUniversesRoute: typeof AdminUniversesRoute
   AdplacementsSlotIdRoute: typeof AdplacementsSlotIdRoute
@@ -1677,13 +1690,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ViralityRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/royalties': {
-      id: '/royalties'
-      path: '/royalties'
-      fullPath: '/royalties'
-      preLoaderRoute: typeof RoyaltiesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/videos': {
       id: '/videos'
       path: '/videos'
@@ -1710,6 +1716,13 @@ declare module '@tanstack/react-router' {
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/swap': {
+      id: '/swap'
+      path: '/swap'
+      fullPath: '/swap'
+      preLoaderRoute: typeof SwapRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/subscriptions': {
@@ -1766,6 +1779,13 @@ declare module '@tanstack/react-router' {
       path: '/sandbox'
       fullPath: '/sandbox'
       preLoaderRoute: typeof SandboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/royalties': {
+      id: '/royalties'
+      path: '/royalties'
+      fullPath: '/royalties'
+      preLoaderRoute: typeof RoyaltiesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/residency': {
@@ -2370,13 +2390,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOpsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/mainnet': {
-      id: '/admin/mainnet'
-      path: '/admin/mainnet'
-      fullPath: '/admin/mainnet'
-      preLoaderRoute: typeof AdminMainnetRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/admin/moderation': {
       id: '/admin/moderation'
       path: '/admin/moderation'
@@ -2389,6 +2402,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/mcp-usage'
       fullPath: '/admin/mcp-usage'
       preLoaderRoute: typeof AdminMcpUsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/mainnet': {
+      id: '/admin/mainnet'
+      path: '/admin/mainnet'
+      fullPath: '/admin/mainnet'
+      preLoaderRoute: typeof AdminMainnetRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/cost': {
@@ -2698,6 +2718,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   RelightRoute: RelightRoute,
   ResidencyRoute: ResidencyRoute,
+  RoyaltiesRoute: RoyaltiesRoute,
   SandboxRoute: SandboxRoute,
   SearchRoute: SearchRoute,
   SeriesRoute: SeriesRoute,
@@ -2706,18 +2727,18 @@ const rootRouteChildren: RootRouteChildren = {
   StudioRoute: StudioRouteWithChildren,
   StudioControlledRoute: StudioControlledRoute,
   SubscriptionsRoute: SubscriptionsRoute,
+  SwapRoute: SwapRoute,
   TermsRoute: TermsRoute,
   TestnetRoute: TestnetRoute,
   UploadRoute: UploadRoute,
   VideosRoute: VideosRoute,
   ViralityRoute: ViralityRoute,
-  RoyaltiesRoute: RoyaltiesRoute,
   AdminByokCodesRoute: AdminByokCodesRoute,
   AdminCostRoute: AdminCostRoute,
+  AdminMainnetRoute: AdminMainnetRoute,
   AdminMcpUsageRoute: AdminMcpUsageRoute,
   AdminModerationRoute: AdminModerationRoute,
   AdminOpsRoute: AdminOpsRoute,
-  AdminMainnetRoute: AdminMainnetRoute,
   AdminResidencyRoute: AdminResidencyRoute,
   AdminUniversesRoute: AdminUniversesRoute,
   AdplacementsSlotIdRoute: AdplacementsSlotIdRoute,

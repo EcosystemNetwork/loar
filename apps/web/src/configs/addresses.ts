@@ -1,5 +1,9 @@
 /**
- * Contract Address Registry — Sepolia + Base Sepolia
+ * Contract Address Registry — Ethereum Sepolia (11155111).
+ *
+ * Mainnet (1) is a supported chain for swaps/trading but has no LOAR contract
+ * deploy yet — getEvmAddresses(1) returns null and contract-gated features
+ * no-op there. Add a `1: {...}` block here after a mainnet deploy.
  *
  * Auto-generated from deployment manifests. To update, run:
  *   pnpm sync:addresses
@@ -64,31 +68,6 @@ export const EVM_ADDRESSES: Partial<Record<SupportedEvmChainId, EvmAddresses>> =
     entityBeacon: '0xF951065C7d4d28805188F60a3F8bd398B7776EC8',
     entityEditionBeacon: '0xb3D7889c393b710edF2e087Cd2b7148a2556f47b',
     episodeNftBeacon: '0x3ebb4FFd384Fc971F445AA950055203916b749a5',
-  },
-  84532: {
-    universeManager: '0xE981454B4149BEA3a9018fa2ab77482F388ba01f',
-    loarToken: '0x1Ff9e293D6D4D564B99CFe57fe61f4DCdac4b5D5',
-    paymentRouter: '0x99DE0BCAEFA1ce760856a13A74De631c4b6695F4',
-    creditManager: '0x7E62116b9A889150e6d07830a179f3cf803C2908',
-    rightsRegistry: '0x982c153e41b8B78ca48D7A13e6766Ce85F039558',
-    revenueModuleFactory: '0xE15d941140E5504Af7C1b56Ac14da236963A99AE',
-    canonMarketplace: '0x152AdC8350ee69162989c0C52F5FFb2f8A09E17B',
-    adPlacement: '0x89c4b520319FDb6Cd23CB8DC5E6B023b110F23fc',
-    subscriptionManager: '0x4C617Ca52De2D2cA8bB0414F7F1Dd0A90a915031',
-    licensingRegistry: '0x4Ce3d82B3ab99ECF404f43aa5167C1E6BF52A3cF',
-    collabManager: '0x5BaAd71adD73E7748F1c1C2B67a2eB4040DcEB1c',
-    analyticsRegistry: '0xa6c4bd0256DA30780529bf3cF6D78BfEdACbcBB9',
-    loarHook: '0xe35adBBc6da1000BE4DCbf49ccBE3B9B70c9a8cC',
-    lpLocker: '0xa450Bde3120a23EE3AbB87fDa4fB0E9e9F6D0307',
-    feeLocker: '0x40e4e01735Be9e8cC5eF64E1f36188e1763e9740',
-    swapRouter: '0x69c2aA66B3bB3e5f6658Dc2a77022558e7022398',
-    tokenVesting: '0x36E25222f7E5C6f4dC8f918B68C61da83330C97F',
-    loarFaucet: '0x5Cc879CE26E38e4c9dAeecc0318f0EbdC22aa806',
-    episodeEditionBeacon: '0x7980622e335E72fc339b2FaA3d08DEE8CC745F4f',
-    characterBeacon: '0x52b42135703A0B4180F56323e01a75B7186dB3F9',
-    entityBeacon: '0x4EE8A6055270Ee5b9Cc4132c98CAd686bBb08Fc4',
-    entityEditionBeacon: '0x54CA19957b1Fa6114603f2ba0422584063fD2B02',
-    episodeNftBeacon: '0xEdD26a1870344789eb7b900875516AedAe04d102',
   },
 };
 

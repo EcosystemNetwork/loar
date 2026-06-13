@@ -81,7 +81,7 @@ function OAuthSiwePage() {
 
       const now = new Date();
       const expires = new Date(now.getTime() + 2 * 60 * 1000);
-      const chainId = chain?.id ?? 8453;
+      const chainId = chain?.id ?? 11155111;
       // WEB-3: pin the SIWE message `host` to the canonical gateway, not to
       // whatever origin was parsed out of `return_to`. The returnAllowed
       // check above rejects unknown hosts, but the signed message itself

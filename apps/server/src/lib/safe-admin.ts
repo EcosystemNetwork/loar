@@ -9,7 +9,7 @@
  * is an authorised signer.
  */
 import { createPublicClient, http } from 'viem';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { mainnet, sepolia } from 'viem/chains';
 import { db } from './firebase';
 import { isAdminAddress } from './trpc';
 
@@ -19,13 +19,13 @@ const sepoliaClient = createPublicClient({
   transport: http(process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? ''),
 });
 
-const baseSepoliaClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http(process.env.RPC_URL_BASE_SEPOLIA ?? ''),
+const mainnetClient = createPublicClient({
+  chain: mainnet,
+  transport: http(process.env.RPC_URL_MAINNET ?? ''),
 });
 
 export function getChainClient(chainId?: number) {
-  if (chainId === baseSepolia.id) return baseSepoliaClient;
+  if (chainId === mainnet.id) return mainnetClient;
   return sepoliaClient;
 }
 

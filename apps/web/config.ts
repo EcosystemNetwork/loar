@@ -6,13 +6,12 @@
  */
 
 import { createConfig, http } from 'wagmi';
-import { sepolia, base, baseSepolia } from 'wagmi/chains';
+import { mainnet, sepolia } from 'wagmi/chains';
 import { SUPPORTED_EVM_CHAIN_IDS } from './src/configs/chains';
 
 const allChains = {
   [sepolia.id]: sepolia,
-  [base.id]: base,
-  [baseSepolia.id]: baseSepolia,
+  [mainnet.id]: mainnet,
 } as const;
 
 const chains = SUPPORTED_EVM_CHAIN_IDS.map((id) => allChains[id]);

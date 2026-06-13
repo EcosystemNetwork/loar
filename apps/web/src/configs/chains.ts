@@ -1,27 +1,19 @@
 /**
  * Supported Chains Configuration
  *
- * LOAR is an EVM-canonical + Solana-distribution hybrid. Both EVM (Base / Sepolia)
- * and Solana (devnet / mainnet-beta) are first-class targets when creating
- * universes and stamping sandbox drafts.
- *
- * The active set is controlled by VITE_CHAIN_ENV:
- *   "mainnet" → Base + Solana mainnet-beta
- *   "testnet" → Sepolia + Base Sepolia + Solana devnet (default)
+ * LOAR targets Ethereum only: Sepolia (11155111, default — where the LOAR
+ * contracts are deployed) and mainnet (1, for swaps / trading). Base, Base
+ * Sepolia, and Solana were removed 2026-06-12. Sepolia is first so it stays
+ * the default selection; mainnet has no LOAR contract deploy yet, so
+ * contract-gated features no-op there until addresses.ts lists them.
  */
-import { sepolia, base, baseSepolia } from 'viem/chains';
-
-const CHAIN_ENV = (import.meta.env.VITE_CHAIN_ENV ?? 'testnet') as 'mainnet' | 'testnet';
+import { mainnet, sepolia } from 'viem/chains';
 
 // ---------------------------------------------------------------------------
 // EVM Chains
 // ---------------------------------------------------------------------------
 
-const TESTNET_CHAIN_IDS = [sepolia.id, baseSepolia.id] as const;
-const MAINNET_CHAIN_IDS = [base.id] as const;
-
-export const SUPPORTED_EVM_CHAIN_IDS =
-  CHAIN_ENV === 'mainnet' ? MAINNET_CHAIN_IDS : TESTNET_CHAIN_IDS;
+export const SUPPORTED_EVM_CHAIN_IDS = [sepolia.id, mainnet.id] as const;
 
 export type SupportedEvmChainId = (typeof SUPPORTED_EVM_CHAIN_IDS)[number];
 
@@ -40,11 +32,10 @@ export const isSupportedChain = isSupportedEvmChain;
 
 export type SolanaCluster = 'devnet' | 'mainnet-beta' | 'testnet';
 
-const TESTNET_SOLANA_CLUSTERS = ['devnet'] as const satisfies readonly SolanaCluster[];
-const MAINNET_SOLANA_CLUSTERS = ['mainnet-beta'] as const satisfies readonly SolanaCluster[];
-
-export const SUPPORTED_SOLANA_CLUSTERS: readonly SolanaCluster[] =
-  CHAIN_ENV === 'mainnet' ? MAINNET_SOLANA_CLUSTERS : TESTNET_SOLANA_CLUSTERS;
+// Solana is removed from the chain picker (2026-06-12). The cluster type and
+// explorer helpers below are kept so dormant Solana code paths still compile;
+// the empty set just means no Solana options surface in the UI.
+export const SUPPORTED_SOLANA_CLUSTERS: readonly SolanaCluster[] = [];
 
 export function isSupportedSolanaCluster(cluster: string): cluster is SolanaCluster {
   return (SUPPORTED_SOLANA_CLUSTERS as readonly string[]).includes(cluster);
@@ -59,20 +50,17 @@ export function isSupportedSolanaCluster(cluster: string): cluster is SolanaClus
 
 export const BLOCK_EXPLORER_URLS: Record<number, string> = {
   [sepolia.id]: 'https://sepolia.etherscan.io',
-  [base.id]: 'https://basescan.org',
-  [baseSepolia.id]: 'https://sepolia.basescan.org',
+  [mainnet.id]: 'https://etherscan.io',
 };
 
 export const CHAIN_NAMES: Record<number, string> = {
   [sepolia.id]: 'Sepolia',
-  [base.id]: 'Base',
-  [baseSepolia.id]: 'Base Sepolia',
+  [mainnet.id]: 'Ethereum',
 };
 
 export const EXPLORER_NAMES: Record<number, string> = {
   [sepolia.id]: 'Etherscan',
-  [base.id]: 'Basescan',
-  [baseSepolia.id]: 'Basescan',
+  [mainnet.id]: 'Etherscan',
 };
 
 // ---------------------------------------------------------------------------

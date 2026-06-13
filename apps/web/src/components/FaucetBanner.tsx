@@ -1,5 +1,5 @@
 /**
- * FaucetBanner — tells fresh Circle wallets where to get Base-Sepolia ETH.
+ * FaucetBanner — tells fresh Circle wallets where to get Sepolia ETH.
  *
  * Circle Developer Controlled Wallets ship empty. Every on-chain write
  * costs gas. Until Circle Gas Station sponsorship is wired, the user has
@@ -21,21 +21,10 @@ import { useWeb3Mode } from '@/lib/web3-mode';
 // beyond a wallet connect / GitHub/Twitter for some.
 const FAUCETS: { chainId: number; name: string; url: string; note?: string }[] = [
   {
-    chainId: 84532,
-    name: 'Alchemy Base Sepolia Faucet',
-    url: 'https://www.alchemy.com/faucets/base-sepolia',
-    note: 'No login required for 0.1 ETH/day',
-  },
-  {
-    chainId: 84532,
-    name: 'Coinbase Base Sepolia Faucet',
-    url: 'https://portal.cdp.coinbase.com/products/faucet',
-    note: 'CDP login required',
-  },
-  {
     chainId: 11155111,
     name: 'Alchemy Sepolia Faucet',
     url: 'https://www.alchemy.com/faucets/ethereum-sepolia',
+    note: 'No login required for 0.1 ETH/day',
   },
   {
     chainId: 11155111,
@@ -85,7 +74,7 @@ export function FaucetBanner({ address }: { address: `0x${string}` | undefined }
               <div>
                 <h3 className="text-sm font-semibold text-foreground">Fund your wallet to start</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Your LOAR wallet needs Base-Sepolia ETH before you can mint, create, or trade.
+                  Your LOAR wallet needs Sepolia ETH before you can mint, create, or trade.
                   It&apos;s free — grab some from a faucet below.
                 </p>
               </div>

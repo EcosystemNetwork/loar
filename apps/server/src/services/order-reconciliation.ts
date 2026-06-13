@@ -16,7 +16,7 @@
 
 import { db } from '../lib/firebase';
 import { createPublicClient, http, type Hash } from 'viem';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { mainnet, sepolia } from 'viem/chains';
 
 // ── Chain clients ────────────────────────────────────────────────────
 
@@ -25,20 +25,19 @@ const sepoliaClient = createPublicClient({
   transport: http(process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? ''),
 });
 
-const baseSepoliaClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http(process.env.RPC_URL_BASE_SEPOLIA ?? ''),
+const mainnetClient = createPublicClient({
+  chain: mainnet,
+  transport: http(process.env.RPC_URL_MAINNET ?? ''),
 });
 
 function getChainClient(chainId: number) {
-  if (chainId === baseSepolia.id) return baseSepoliaClient;
+  if (chainId === mainnet.id) return mainnetClient;
   if (chainId === sepolia.id) return sepoliaClient;
   throw new Error(`Unsupported chain ID: ${chainId}`);
 }
 
 function getChainName(chainId: number): string {
-  if (chainId === baseSepolia.id) return 'Base Sepolia';
-  return 'Sepolia';
+  return chainId === mainnet.id ? 'Ethereum' : 'Sepolia';
 }
 
 // ── Collection helpers ───────────────────────────────────────────────

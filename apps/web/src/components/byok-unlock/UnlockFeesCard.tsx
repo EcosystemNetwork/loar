@@ -379,7 +379,7 @@ function EthTab({
             size="sm"
             onClick={() => setChainId(id)}
           >
-            {id === 11155111 ? 'Sepolia' : id === 84532 ? 'Base Sepolia' : `Chain ${id}`}
+            {id === 11155111 ? 'Sepolia' : id === 1 ? 'Ethereum' : `Chain ${id}`}
           </Button>
         ))}
       </div>

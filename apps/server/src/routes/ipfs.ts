@@ -16,7 +16,9 @@ import { Hono } from 'hono';
 
 const router = new Hono();
 
-const PUBLIC_GATEWAY = 'https://gateway.pinata.cloud';
+// Path-style default — fast for our CIDv0 content. A dedicated
+// PINATA_GATEWAY_URL (+ token) overrides this when configured.
+const PUBLIC_GATEWAY = 'https://ipfs.io';
 
 function gatewayBase(): string {
   return (process.env.PINATA_GATEWAY_URL || PUBLIC_GATEWAY).trim().replace(/\/$/, '');

@@ -31,8 +31,8 @@ function registryAddress(): Hex | null {
 }
 
 function platformChainId(): number {
-  // Default to Base Sepolia (matches Circle DCW default in circle-wallets.ts).
-  return Number(process.env.PLATFORM_CHAIN_ID ?? '84532');
+  // Default to Ethereum Sepolia (matches Circle DCW default in circle-wallets.ts).
+  return Number(process.env.PLATFORM_CHAIN_ID ?? '11155111');
 }
 
 /** The Circle DCW wallet uid used as the registry's trusted `platform`

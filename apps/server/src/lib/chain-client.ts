@@ -5,7 +5,7 @@
  * Replaces duplicated client creation in credits, staking, treasury, etc.
  */
 import { createPublicClient, http } from 'viem';
-import { sepolia, baseSepolia, base } from 'viem/chains';
+import { mainnet, sepolia } from 'viem/chains';
 
 const SUPPORTED_CHAINS = {
   [sepolia.id]: {
@@ -15,13 +15,9 @@ const SUPPORTED_CHAINS = {
       process.env.PONDER_RPC_URL_2 ||
       'https://ethereum-sepolia-rpc.publicnode.com',
   },
-  [baseSepolia.id]: {
-    chain: baseSepolia,
-    rpcUrl: process.env.RPC_URL_BASE_SEPOLIA || 'https://base-sepolia-rpc.publicnode.com',
-  },
-  [base.id]: {
-    chain: base,
-    rpcUrl: process.env.RPC_URL_BASE || 'https://mainnet.base.org',
+  [mainnet.id]: {
+    chain: mainnet,
+    rpcUrl: process.env.RPC_URL_MAINNET || 'https://ethereum-rpc.publicnode.com',
   },
 } as const;
 
@@ -66,8 +62,7 @@ export function getChainClient(chainId?: number): ChainClient {
 export function getChainName(chainId?: number): string {
   const names: Record<number, string> = {
     [sepolia.id]: 'Sepolia',
-    [baseSepolia.id]: 'Base Sepolia',
-    [base.id]: 'Base',
+    [mainnet.id]: 'Ethereum',
   };
   return names[chainId ?? sepolia.id] ?? `Chain ${chainId}`;
 }

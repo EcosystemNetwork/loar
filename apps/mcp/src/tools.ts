@@ -1288,6 +1288,90 @@ const solanaRouteSplits: ToolDefinition = {
   handler: async (client, args) => client.rawPost('/api/solana/split-router/route', args),
 };
 
+// ── Uniswap (DeFi swaps for agents) ────────────────────────────────────
+// Lets an AI agent price and execute on-chain swaps through the Uniswap
+// Trading API, settled via the user's Circle DCW wallet. Native ETH is the
+// zero address 0x0000000000000000000000000000000000000000.
+
+const uniswapQuote: ToolDefinition = {
+  name: 'loar_uniswap_quote',
+  description:
+    'Get a Uniswap price quote + route for swapping one token to another (read-only, no transaction). Use the zero address for native ETH. Returns the expected output amount, gas estimate, and whether an ERC20 approval is required.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      tokenIn: {
+        type: 'string',
+        description: 'Input token address (0x0000…0000 for native ETH)',
+      },
+      tokenOut: { type: 'string', description: 'Output token address' },
+      amount: {
+        type: 'string',
+        description: 'Amount of tokenIn in wei (base-10 string), for EXACT_INPUT',
+      },
+      chainId: {
+        type: 'number',
+        description: 'Chain id: 11155111 (Sepolia, default) or 1 (Ethereum mainnet)',
+      },
+    },
+    required: ['tokenIn', 'tokenOut', 'amount'],
+  },
+  handler: async (client, args) => client.query('uniswap.quote', args),
+};
+
+const uniswapSwap: ToolDefinition = {
+  name: 'loar_uniswap_swap',
+  description:
+    'Execute a token swap on-chain via Uniswap, signed by the agent owner’s Circle wallet. Use the zero address for native ETH. Returns the on-chain transaction hash. For ERC20 inputs, approval + Permit2 are handled automatically.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      tokenIn: {
+        type: 'string',
+        description: 'Input token address (0x0000…0000 for native ETH)',
+      },
+      tokenOut: { type: 'string', description: 'Output token address' },
+      amount: { type: 'string', description: 'Amount of tokenIn in wei (base-10 string)' },
+      chainId: {
+        type: 'number',
+        description: 'Chain id: 11155111 (Sepolia, default) or 1 (Ethereum mainnet)',
+      },
+      slippageTolerance: {
+        type: 'string',
+        description: 'Optional slippage percent, e.g. "0.5". Omit for auto.',
+      },
+    },
+    required: ['tokenIn', 'tokenOut', 'amount'],
+  },
+  handler: async (client, args) => client.mutate('uniswap.swap', args),
+};
+
+const uniswapSwapToLoar: ToolDefinition = {
+  name: 'loar_uniswap_swap_to_loar',
+  description:
+    'Swap any token (default native ETH) into $LOAR — the LOAR credit/discount currency — via Uniswap, signed by the agent owner’s Circle wallet. The on-ramp for buying platform credits with crypto. Returns the on-chain transaction hash.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      tokenIn: {
+        type: 'string',
+        description: 'Input token (default 0x0000…0000 = native ETH)',
+      },
+      amount: { type: 'string', description: 'Amount of tokenIn in wei (base-10 string)' },
+      chainId: {
+        type: 'number',
+        description: 'Chain id where $LOAR is deployed: 11155111 (Sepolia, default)',
+      },
+      slippageTolerance: {
+        type: 'string',
+        description: 'Optional slippage percent, e.g. "0.5". Omit for auto.',
+      },
+    },
+    required: ['amount'],
+  },
+  handler: async (client, args) => client.mutate('uniswap.swapToLoar', args),
+};
+
 // ── Export All Tools ───────────────────────────────────────────────────
 
 export const ALL_TOOLS: ToolDefinition[] = [
@@ -1367,4 +1451,8 @@ export const ALL_TOOLS: ToolDefinition[] = [
   solanaPremiumAction,
   solanaChargeRemixFee,
   solanaRouteSplits,
+  // Uniswap (DeFi swaps + swap-to-buy-credits on-ramp for agents)
+  uniswapQuote,
+  uniswapSwap,
+  uniswapSwapToLoar,
 ];

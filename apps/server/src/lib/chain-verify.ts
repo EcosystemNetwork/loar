@@ -15,12 +15,12 @@
  */
 
 import { createPublicClient, http, type Address } from 'viem';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { mainnet, sepolia } from 'viem/chains';
 
 function rpcForChain(chainId: number): string {
   const url =
-    chainId === baseSepolia.id
-      ? process.env.RPC_URL_BASE_SEPOLIA
+    chainId === mainnet.id
+      ? (process.env.RPC_URL_MAINNET ?? process.env.RPC_URL)
       : (process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2);
   if (!url || url.trim() === '') {
     throw new Error(
@@ -31,10 +31,9 @@ function rpcForChain(chainId: number): string {
 }
 
 function clientFor(chainId: number) {
-  // Build fresh per call — low call volume, simpler types. If this becomes
-  // hot, memoize via per-chain `let` bindings above.
-  if (chainId === baseSepolia.id) {
-    return createPublicClient({ chain: baseSepolia, transport: http(rpcForChain(chainId)) });
+  // Build fresh per call — low call volume, simpler types.
+  if (chainId === mainnet.id) {
+    return createPublicClient({ chain: mainnet, transport: http(rpcForChain(mainnet.id)) });
   }
   return createPublicClient({ chain: sepolia, transport: http(rpcForChain(sepolia.id)) });
 }

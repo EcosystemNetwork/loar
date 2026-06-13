@@ -35,7 +35,7 @@ import {
   type Hex,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { mainnet, sepolia } from 'viem/chains';
 import { rightsRegistryAbi, contentLicensingAbi } from '@loar/abis/generated';
 
 // ── Configuration ─────────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ export const ContractDealType = {
   LICENSE: 2,
 } as const;
 
-const SUPPORTED_CHAIN_IDS = new Set<number>([sepolia.id, baseSepolia.id]);
+const SUPPORTED_CHAIN_IDS = new Set<number>([sepolia.id, mainnet.id]);
 
 interface OnChainEnv {
   chainId: number;
@@ -83,14 +83,12 @@ export function getOnChainEnv(chainId: number): OnChainEnv | null {
     if (!contentLicensing || !rightsRegistry || !rpcUrl) return null;
     return { chainId, contentLicensing, rightsRegistry, rpcUrl, chainLabel: 'Sepolia' };
   }
-  if (chainId === baseSepolia.id) {
-    const contentLicensing = process.env.CONTENT_LICENSING_ADDRESS_BASE_SEPOLIA as
-      | Address
-      | undefined;
-    const rightsRegistry = process.env.RIGHTS_REGISTRY_ADDRESS_BASE_SEPOLIA as Address | undefined;
-    const rpcUrl = process.env.RPC_URL_BASE_SEPOLIA;
+  if (chainId === mainnet.id) {
+    const contentLicensing = process.env.CONTENT_LICENSING_ADDRESS_MAINNET as Address | undefined;
+    const rightsRegistry = process.env.RIGHTS_REGISTRY_ADDRESS_MAINNET as Address | undefined;
+    const rpcUrl = process.env.RPC_URL_MAINNET;
     if (!contentLicensing || !rightsRegistry || !rpcUrl) return null;
-    return { chainId, contentLicensing, rightsRegistry, rpcUrl, chainLabel: 'Base Sepolia' };
+    return { chainId, contentLicensing, rightsRegistry, rpcUrl, chainLabel: 'Ethereum' };
   }
   return null;
 }
@@ -103,16 +101,16 @@ export function isOnChainAvailable(): boolean {
   return false;
 }
 
-/** Pick a default chain for new on-chain listings — Sepolia preferred, then Base Sepolia. */
+/** Pick a default chain for new on-chain listings — Sepolia preferred, then mainnet. */
 export function defaultOnChainChainId(): number | null {
   if (getOnChainEnv(sepolia.id)) return sepolia.id;
-  if (getOnChainEnv(baseSepolia.id)) return baseSepolia.id;
+  if (getOnChainEnv(mainnet.id)) return mainnet.id;
   return null;
 }
 
 function viemChain(chainId: number) {
   if (chainId === sepolia.id) return sepolia;
-  if (chainId === baseSepolia.id) return baseSepolia;
+  if (chainId === mainnet.id) return mainnet;
   throw new Error(`Unsupported on-chain chainId: ${chainId}`);
 }
 

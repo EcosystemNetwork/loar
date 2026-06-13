@@ -113,7 +113,7 @@ function adPlacementAddress(): Hex | null {
 }
 
 function platformChainId(): number {
-  return Number(process.env.PLATFORM_CHAIN_ID ?? '84532');
+  return Number(process.env.PLATFORM_CHAIN_ID ?? '11155111');
 }
 
 function platformWalletUid(): string {

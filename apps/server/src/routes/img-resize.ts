@@ -8,9 +8,20 @@
  *
  * SSRF-safe: only honors URLs that resolve to a recognized IPFS gateway host.
  * Anything else is rejected with 400.
+ *
+ * Cold-load behavior: the URL the client sends is normalized to our dedicated
+ * Pinata gateway (PINATA_GATEWAY_URL + PINATA_GATEWAY_TOKEN) before fetching,
+ * so the upstream pull is fast and pinned regardless of which public gateway
+ * the client URL happened to point at. Renditions are content-addressed
+ * (`url|w|format`) and cached both in-memory and on disk, so the slow first
+ * fetch is paid once per CID and survives a process restart.
  */
 import { Hono } from 'hono';
 import sharp from 'sharp';
+import { createHash } from 'node:crypto';
+import { promises as fs } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 const router = new Hono();
 
@@ -28,6 +39,20 @@ const KNOWN_GATEWAY_HOSTS = new Set<string>([
   'nftstorage.link',
 ]);
 
+// Default upstream for the proxy fetch. ipfs.io is path-style and serves our
+// CIDv0 content fast; gateway.pinata.cloud is rate-limited/slow unauthenticated
+// and subdomain gateways stall on CIDv0 (see apps/web ipfs-url.ts). When a
+// dedicated PINATA_GATEWAY_URL + token are configured, that takes precedence.
+const PUBLIC_GATEWAY = 'https://ipfs.io';
+
+function gatewayBase(): string {
+  return (process.env.PINATA_GATEWAY_URL || PUBLIC_GATEWAY).trim().replace(/\/$/, '');
+}
+
+function gatewayToken(): string {
+  return (process.env.PINATA_GATEWAY_TOKEN || '').trim();
+}
+
 function isAcceptableSourceUrl(raw: string): boolean {
   try {
     const u = new URL(raw);
@@ -40,6 +65,46 @@ function isAcceptableSourceUrl(raw: string): boolean {
   } catch {
     return false;
   }
+}
+
+// Pull the "<cid>[/sub/path]" portion out of any recognized gateway URL so we
+// can re-point the fetch at our fast dedicated gateway.
+function extractCidPath(raw: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return null;
+  }
+  const subdomainMatch = parsed.host.match(/^([^.]+)\.ipfs\./);
+  if (subdomainMatch) {
+    const cid = subdomainMatch[1];
+    const rest = parsed.pathname.replace(/^\//, '');
+    return rest ? `${cid}/${rest}` : cid;
+  }
+  const pathMatch = parsed.pathname.match(/^\/ipfs\/(.+)$/);
+  if (pathMatch) return pathMatch[1];
+  return null;
+}
+
+// Given the (already SSRF-validated) client URL, return the URL we actually
+// fetch upstream: our dedicated gateway + token when the CID is recoverable,
+// otherwise the original URL unchanged.
+function upstreamFetchUrl(raw: string): string {
+  const cidPath = extractCidPath(raw);
+  if (!cidPath) return raw;
+  const base = gatewayBase();
+  let url: URL;
+  try {
+    url = new URL(`${base}/ipfs/${cidPath}`);
+  } catch {
+    return raw;
+  }
+  const token = gatewayToken();
+  if (token && url.host.endsWith('.mypinata.cloud')) {
+    url.searchParams.set('pinataGatewayToken', token);
+  }
+  return url.toString();
 }
 
 function pickWidth(raw: string | undefined): number {
@@ -103,6 +168,76 @@ function cachePut(key: string, body: Buffer, contentType: string) {
   }
 }
 
+// ── Disk cache ────────────────────────────────────────────────────────────
+// Renditions are content-addressed by `url|w|format`, so they're safe to
+// persist. The in-memory LRU above is the hot tier (256MB, dies on restart);
+// disk is the durable tier so the slow first IPFS fetch survives deploys.
+// Disabled by setting IMG_CACHE_DIR="" (or "off") for ephemeral hosts.
+const DISK_CACHE_DIR = (() => {
+  const raw = process.env.IMG_CACHE_DIR;
+  if (raw === '' || raw?.toLowerCase() === 'off') return null;
+  return raw?.trim() || path.join(os.tmpdir(), 'loar-img-cache');
+})();
+
+const EXT_BY_CONTENT_TYPE: Record<string, string> = {
+  'image/avif': 'avif',
+  'image/webp': 'webp',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+};
+const CONTENT_TYPE_BY_EXT: Record<string, string> = {
+  avif: 'image/avif',
+  webp: 'image/webp',
+  jpg: 'image/jpeg',
+  png: 'image/png',
+};
+
+let diskCacheReady: Promise<boolean> | null = null;
+function ensureDiskCache(): Promise<boolean> {
+  if (!DISK_CACHE_DIR) return Promise.resolve(false);
+  if (!diskCacheReady) {
+    diskCacheReady = fs
+      .mkdir(DISK_CACHE_DIR, { recursive: true })
+      .then(() => true)
+      .catch(() => false);
+  }
+  return diskCacheReady;
+}
+
+function diskPathFor(key: string, contentType: string): string {
+  const hash = createHash('sha256').update(key).digest('hex');
+  const ext = EXT_BY_CONTENT_TYPE[contentType] || 'bin';
+  return path.join(DISK_CACHE_DIR as string, `${hash}.${ext}`);
+}
+
+async function diskGet(key: string): Promise<CacheEntry | undefined> {
+  if (!(await ensureDiskCache())) return undefined;
+  const hash = createHash('sha256').update(key).digest('hex');
+  for (const ext of Object.keys(CONTENT_TYPE_BY_EXT)) {
+    try {
+      const body = await fs.readFile(path.join(DISK_CACHE_DIR as string, `${hash}.${ext}`));
+      return { body, contentType: CONTENT_TYPE_BY_EXT[ext], insertedAt: 0 };
+    } catch {
+      /* miss — try next ext */
+    }
+  }
+  return undefined;
+}
+
+async function diskPut(key: string, body: Buffer, contentType: string): Promise<void> {
+  if (!(await ensureDiskCache())) return;
+  const file = diskPathFor(key, contentType);
+  try {
+    // Write to a temp file then rename so concurrent readers never see a
+    // partial rendition.
+    const tmp = `${file}.${process.pid}.tmp`;
+    await fs.writeFile(tmp, body);
+    await fs.rename(tmp, file);
+  } catch {
+    /* disk full / read-only fs — degrade to memory-only silently */
+  }
+}
+
 router.get('/', async (c) => {
   const rawUrl = c.req.query('url') || '';
   if (!rawUrl || rawUrl.length > 2048) return c.json({ error: 'invalid url' }, 400);
@@ -114,20 +249,36 @@ router.get('/', async (c) => {
     header: (k) => c.req.header(k),
   });
 
-  const cacheKey = `${rawUrl}|${width}|${format}`;
+  // Cache key is the CID-normalized upstream URL (sans token) so the same CID
+  // requested via different public gateways shares one rendition.
+  const upstreamUrl = upstreamFetchUrl(rawUrl);
+  const cidPath = extractCidPath(rawUrl) ?? rawUrl;
+  const cacheKey = `${cidPath}|${width}|${format}`;
+
   const hit = cacheGet(cacheKey);
   if (hit) {
     c.header('Content-Type', hit.contentType);
     c.header('Cache-Control', 'public, max-age=31536000, immutable');
+    c.header('Vary', 'Accept');
     c.header('X-Img-Cache', 'hit');
     return c.body(new Uint8Array(hit.body));
+  }
+
+  const onDisk = await diskGet(cacheKey);
+  if (onDisk) {
+    cachePut(cacheKey, onDisk.body, onDisk.contentType);
+    c.header('Content-Type', onDisk.contentType);
+    c.header('Cache-Control', 'public, max-age=31536000, immutable');
+    c.header('Vary', 'Accept');
+    c.header('X-Img-Cache', 'disk');
+    return c.body(new Uint8Array(onDisk.body));
   }
 
   let sourceBuffer: Buffer;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(rawUrl, { signal: controller.signal });
+    const res = await fetch(upstreamUrl, { signal: controller.signal });
     clearTimeout(timeout);
     if (!res.ok) return c.json({ error: 'upstream error', status: res.status }, 502);
     const lenHeader = Number(res.headers.get('content-length') || 0);
@@ -173,6 +324,7 @@ router.get('/', async (c) => {
   }
 
   cachePut(cacheKey, output, contentType);
+  void diskPut(cacheKey, output, contentType);
   c.header('Content-Type', contentType);
   // Image renditions are content-addressed by `url|w|format`; safe to cache forever.
   c.header('Cache-Control', 'public, max-age=31536000, immutable');

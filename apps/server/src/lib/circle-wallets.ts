@@ -52,16 +52,12 @@ export function isCircleConfigured(): boolean {
 /** Map our chain IDs to Circle's blockchain identifiers. */
 function circleBlockchain(chainId: number): string {
   switch (chainId) {
-    case 84532:
-      return 'BASE-SEPOLIA';
-    case 8453:
-      return 'BASE';
-    case 11155111:
-      return 'ETH-SEPOLIA';
     case 1:
       return 'ETH';
+    case 11155111:
+      return 'ETH-SEPOLIA';
     default:
-      return 'BASE-SEPOLIA';
+      return 'ETH-SEPOLIA';
   }
 }
 
@@ -96,7 +92,12 @@ export async function getUserWallet(userId: string): Promise<CircleWallet | null
  * Create a new Circle wallet for a user.
  * Creates an EOA on the configured blockchain.
  */
-export async function createUserWallet(userId: string, chainId = 84532): Promise<CircleWallet> {
+/**
+ * Create a Circle EOA on the given chain WITHOUT persisting any Firestore
+ * mapping. Callers decide which doc key to store it under (default per-userId,
+ * or chain-scoped). Keeps the raw Circle API call in one place.
+ */
+async function createCircleWalletRaw(chainId: number): Promise<CircleWallet> {
   const client = getClient();
   const walletSetId = process.env.CIRCLE_WALLET_SET_ID;
 
@@ -118,11 +119,19 @@ export async function createUserWallet(userId: string, chainId = 84532): Promise
     throw new Error('Circle wallet creation failed — no wallet returned');
   }
 
-  const circleWallet: CircleWallet = {
+  return {
     walletId: wallet.id,
     address: wallet.address!,
     blockchain: wallet.blockchain!,
   };
+}
+
+/**
+ * Create a new Circle wallet for a user and persist it under doc(userId)
+ * (the default-chain mapping). Creates an EOA on the configured blockchain.
+ */
+export async function createUserWallet(userId: string, chainId = 11155111): Promise<CircleWallet> {
+  const circleWallet = await createCircleWalletRaw(chainId);
 
   // Persist the mapping
   const col = getUserWalletsCol();
@@ -140,6 +149,46 @@ export async function createUserWallet(userId: string, chainId = 84532): Promise
 }
 
 /**
+ * Resolve a Circle wallet by its on-chain address (not the userId doc key).
+ *
+ * Circle wallet docs are keyed by an opaque userId (e.g. `email:foo@bar.com`),
+ * so address-keyed callers — the tx proxy, the Uniswap swap orchestrator —
+ * can't `getUserWallet(uid)`. Look up the wallet via the two collections that
+ * record the address: `userAccounts.walletAddress` and `circleWallets.address`.
+ * Case-insensitive on the address.
+ */
+export async function resolveWalletByAddress(address: string): Promise<CircleWallet | null> {
+  if (!address) return null;
+  if (firebaseAvailable) {
+    const accountSnap = await db
+      .collection('userAccounts')
+      .where('walletAddress', '==', address)
+      .limit(1)
+      .get();
+    if (!accountSnap.empty) {
+      const data = accountSnap.docs[0].data();
+      if (data.walletId) {
+        return { walletId: data.walletId, address: data.walletAddress, blockchain: '' };
+      }
+    }
+    const walletSnap = await db
+      .collection('circleWallets')
+      .where('address', '==', address)
+      .limit(1)
+      .get();
+    if (!walletSnap.empty) {
+      return walletSnap.docs[0].data() as CircleWallet;
+    }
+    return null;
+  }
+  // Dev fallback — scan the in-memory map by address.
+  for (const w of memWallets.values()) {
+    if (w.address.toLowerCase() === address.toLowerCase()) return w;
+  }
+  return null;
+}
+
+/**
  * Get or create a wallet for a user.
  *
  * Idempotent across concurrent calls — two parallel register/verify requests
@@ -152,7 +201,7 @@ export async function createUserWallet(userId: string, chainId = 84532): Promise
  */
 const _inflight = new Map<string, Promise<CircleWallet>>();
 
-export async function getOrCreateWallet(userId: string, chainId = 84532): Promise<CircleWallet> {
+export async function getOrCreateWallet(userId: string, chainId = 11155111): Promise<CircleWallet> {
   const existing = await getUserWallet(userId);
   if (existing) return existing;
 
@@ -181,6 +230,66 @@ export async function getOrCreateWallet(userId: string, chainId = 84532): Promis
   });
 
   _inflight.set(userId, promise);
+  return promise;
+}
+
+/**
+ * Get or create a user's Circle wallet *on a specific chain*.
+ *
+ * The legacy `getOrCreateWallet` stores one doc per userId (doc(userId)) and
+ * overwrites its `blockchain` field, so it can't hold wallets for more than one
+ * chain at a time. Some flows (Uniswap Trading API swaps) must execute on a
+ * chain other than the default Sepolia — and `executeTransaction` rejects
+ * a tx whose chainId doesn't match the wallet's bound blockchain. This helper
+ * keeps per-chain wallets without disturbing the primary one:
+ *   - default chain (11155111) → legacy doc(userId), shared with getOrCreateWallet
+ *   - any other chain          → doc(`${userId}:${chainId}`)
+ * Both are stored in `circleWallets` with an `address` field, so
+ * `resolveWalletByAddress` finds them too.
+ */
+const DEFAULT_WALLET_CHAIN = 11155111;
+const _inflightByChain = new Map<string, Promise<CircleWallet>>();
+
+export async function getOrCreateWalletForChain(
+  userId: string,
+  chainId: number
+): Promise<CircleWallet> {
+  if (chainId === DEFAULT_WALLET_CHAIN) return getOrCreateWallet(userId, chainId);
+
+  const docKey = `${userId}:${chainId}`;
+  const col = getUserWalletsCol();
+
+  if (col) {
+    const existing = await col.doc(docKey).get();
+    if (existing.exists) return existing.data() as CircleWallet;
+  } else {
+    const mem = memWallets.get(docKey);
+    if (mem) return mem;
+  }
+
+  const pending = _inflightByChain.get(docKey);
+  if (pending) return pending;
+
+  const promise = (async (): Promise<CircleWallet> => {
+    // Raw create (no doc(userId) write) so we never clobber the user's
+    // default-chain wallet record — store only under the chain-scoped key.
+    const wallet = await createCircleWalletRaw(chainId);
+    if (col) {
+      await col.doc(docKey).set({
+        ...wallet,
+        userId,
+        chainId,
+        createdAt: new Date(),
+      });
+    } else {
+      memWallets.set(docKey, wallet);
+    }
+    return wallet;
+  })().finally(() => {
+    _inflightByChain.delete(docKey);
+  });
+
+  _inflightByChain.set(docKey, promise);
   return promise;
 }
 
@@ -308,4 +417,23 @@ export async function getWalletBalances(walletId: string) {
   const client = getClient();
   const resp = await client.getWalletTokenBalance({ id: walletId });
   return resp.data?.tokenBalances ?? [];
+}
+
+/**
+ * Sign EIP-712 typed data with a Circle wallet (server-side, via KMS).
+ * Used for off-chain authorizations such as Uniswap Permit2 swap permits.
+ * `data` must be the JSON-stringified typed-data object.
+ */
+export async function signTypedData(
+  walletId: string,
+  data: string,
+  memo?: string
+): Promise<string> {
+  const client = getClient();
+  const resp = await client.signTypedData({ walletId, data, ...(memo ? { memo } : {}) });
+  const signature = resp.data?.signature;
+  if (!signature) {
+    throw new Error('Circle signTypedData returned no signature');
+  }
+  return signature;
 }

@@ -55,7 +55,7 @@ import {
   type Hex,
   type Hash,
 } from 'viem';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { mainnet, sepolia } from 'viem/chains';
 import { syncRightsHashToSolana } from '../../services/rights-bridge';
 import { createEntity, getEntity, updateEntity } from '../entities/entities.handlers';
 import {
@@ -660,8 +660,7 @@ export const likenessMarketplaceRouter = router({
     return {
       available: chainId !== null,
       chainId,
-      chainLabel:
-        chainId === sepolia.id ? 'Sepolia' : chainId === baseSepolia.id ? 'Base Sepolia' : null,
+      chainLabel: chainId === sepolia.id ? 'Sepolia' : chainId === mainnet.id ? 'Ethereum' : null,
     };
   }),
 
@@ -882,7 +881,7 @@ export const likenessMarketplaceRouter = router({
       // Block until confirmed so the client can immediately call registerContent
       // (which would revert with ContentNotMonetizable otherwise).
       const rpc = createPublicClient({
-        chain: env.chainId === sepolia.id ? sepolia : baseSepolia,
+        chain: env.chainId === mainnet.id ? mainnet : sepolia,
         transport: http(env.rpcUrl),
       });
       const receipt = await rpc.waitForTransactionReceipt({

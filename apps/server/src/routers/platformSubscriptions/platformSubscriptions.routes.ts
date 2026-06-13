@@ -17,7 +17,7 @@ import { db } from '../../lib/firebase';
 import { getStripe } from '../credits/stripe.routes';
 import { getPlatformConfig } from '../../services/platformConfig';
 import { createPublicClient, http, parseUnits, type Hash } from 'viem';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { mainnet, sepolia } from 'viem/chains';
 
 // ── $LOAR pricing ────────────────────────────────────────────────────
 // Each $LOAR = $0.0025 (0.25 cents)
@@ -29,10 +29,10 @@ const TRANSFER_TOPIC =
   '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' as const;
 
 function getChainClient(chainId?: number) {
-  if (chainId === baseSepolia.id) {
+  if (chainId === mainnet.id) {
     return createPublicClient({
-      chain: baseSepolia,
-      transport: http(process.env.RPC_URL_BASE_SEPOLIA ?? ''),
+      chain: mainnet,
+      transport: http(process.env.RPC_URL_MAINNET ?? ''),
     });
   }
   return createPublicClient({

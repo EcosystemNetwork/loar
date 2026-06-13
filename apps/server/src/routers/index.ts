@@ -47,6 +47,7 @@ import { editorDraftsRouter } from './editorDrafts/editorDrafts.routes';
 import { storageRouter } from './storage/storage.routes';
 import { firebaseStorageRouter } from './storage/firebase.routes';
 import { synapseRouter } from './storage/synapse.routes';
+import { uniswapRouter } from './uniswap/uniswap.routes';
 import { profilesRouter } from './profiles/profiles.routes';
 import { entitiesRouter } from './entities/entities.index';
 import { offChainNodesRouter } from './offChainNodes/offChainNodes.routes';
@@ -283,6 +284,9 @@ export const appRouter = router({
   storage: storageRouter,
   firebaseStorage: firebaseStorageRouter,
   synapse: synapseRouter,
+
+  // ── DeFi (Uniswap Trading API — swaps, swap-to-buy-credits) ──────────
+  uniswap: uniswapRouter,
 
   // ── User ────────────────────────────────────────────────────────────
   profiles: profilesRouter,

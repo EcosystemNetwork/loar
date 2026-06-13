@@ -11,8 +11,7 @@ import { encodeAbiParameters } from 'viem';
 // other pairedToken with "Paired token must be WETH" (UniverseManager.sol:317).
 const WETH: Partial<Record<number, `0x${string}`>> = {
   11155111: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14', // Sepolia (Uniswap v4 WETH; prior value 0x7b79…E7f9 was wrong)
-  84532: '0x4200000000000000000000000000000000000006', // Base Sepolia
-  8453: '0x4200000000000000000000000000000000000006', // Base Mainnet
+  1: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // Ethereum mainnet (canonical WETH9)
 };
 
 /**

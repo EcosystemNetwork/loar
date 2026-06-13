@@ -164,12 +164,12 @@ export const splitsRouter = router({
     .mutation(async ({ input }) => {
       // Verify on-chain
       const { createPublicClient: createClient, http: httpTransport } = await import('viem');
-      const { sepolia: sep, baseSepolia: baseSep } = await import('viem/chains');
+      const { mainnet: mainnetChain, sepolia: sep } = await import('viem/chains');
       const client = createClient({
-        chain: input.chainId === 84532 ? baseSep : sep,
+        chain: input.chainId === 1 ? mainnetChain : sep,
         transport: httpTransport(
-          input.chainId === 84532
-            ? (process.env.RPC_URL_BASE_SEPOLIA ?? '')
+          input.chainId === 1
+            ? (process.env.RPC_URL_MAINNET ?? '')
             : (process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? '')
         ),
       });

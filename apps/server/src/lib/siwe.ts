@@ -106,9 +106,8 @@ const ALLOWED_DOMAINS = new Set(
   })()
 );
 
-/** Allowed Chain IDs. Base mainnet (8453) + testnets + anvil in dev only.
- *  Production defaults lock to 8453 to prevent cross-env replay (a SIWE
- *  signature from a test dApp on Sepolia must not auth to prod). */
+/** Allowed Chain IDs — Ethereum mainnet (1) + Sepolia (11155111) + anvil in
+ *  dev. Override with SIWE_ALLOWED_CHAIN_IDS (comma-separated). */
 const ALLOWED_CHAIN_IDS = new Set(
   (() => {
     const raw = process.env.SIWE_ALLOWED_CHAIN_IDS;
@@ -117,9 +116,7 @@ const ALLOWED_CHAIN_IDS = new Set(
         .split(',')
         .map((id) => id.trim())
         .filter(Boolean);
-    return process.env.NODE_ENV === 'production'
-      ? ['8453']
-      : ['8453', '84532', '11155111', '31337'];
+    return process.env.NODE_ENV === 'production' ? ['1', '11155111'] : ['1', '11155111', '31337'];
   })()
 );
 

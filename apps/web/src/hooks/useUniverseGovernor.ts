@@ -9,10 +9,6 @@ function governorChainName(id: number | undefined): string {
   switch (id) {
     case 11155111:
       return 'Sepolia';
-    case 84532:
-      return 'Base Sepolia';
-    case 8453:
-      return 'Base';
     case 1:
       return 'Ethereum';
     default:

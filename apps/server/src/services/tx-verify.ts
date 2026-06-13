@@ -8,7 +8,7 @@
  * Pattern borrowed from credits.routes.ts verifyEthPayment().
  */
 import { createPublicClient, http, type Hash } from 'viem';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { mainnet, sepolia } from 'viem/chains';
 import { db } from '../lib/firebase';
 
 // ── Chain clients ──────────────────────────────────────────────────────
@@ -17,18 +17,18 @@ const sepoliaClient = createPublicClient({
   transport: http(process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? ''),
 });
 
-const baseSepoliaClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http(process.env.RPC_URL_BASE_SEPOLIA ?? ''),
+const mainnetClient = createPublicClient({
+  chain: mainnet,
+  transport: http(process.env.RPC_URL_MAINNET ?? ''),
 });
 
-const ALLOWED_CHAIN_IDS: Set<number> = new Set([sepolia.id, baseSepolia.id]);
+const ALLOWED_CHAIN_IDS: Set<number> = new Set([sepolia.id, mainnet.id]);
 
 function getChainClient(chainId?: number) {
   if (chainId !== undefined && !ALLOWED_CHAIN_IDS.has(chainId)) {
     throw new Error(`Chain ID ${chainId} is not supported.`);
   }
-  if (chainId === baseSepolia.id) return baseSepoliaClient;
+  if (chainId === mainnet.id) return mainnetClient;
   return sepoliaClient;
 }
 
@@ -113,7 +113,7 @@ export async function verifyAndClaimTx(
 
   // 2. On-chain verification — tx must exist and succeed
   const client = getChainClient(chainId);
-  const chainName = chainId === baseSepolia.id ? 'Base Sepolia' : 'Sepolia';
+  const chainName = chainId === 1 ? 'Ethereum' : 'Sepolia';
 
   let receipt: any;
   let tx: any;
@@ -182,7 +182,7 @@ export async function verifyTxReceipt(txHash: string, chainId?: number): Promise
   }
 
   const client = getChainClient(chainId);
-  const chainName = chainId === baseSepolia.id ? 'Base Sepolia' : 'Sepolia';
+  const chainName = chainId === 1 ? 'Ethereum' : 'Sepolia';
 
   let receipt: any;
   try {

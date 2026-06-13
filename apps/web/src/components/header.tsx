@@ -82,6 +82,7 @@ const moreGroupsBase: MoreGroup[] = [
       { to: '/virality', label: 'Virality Predictor', beta: true },
       { to: '/royalties', label: 'Royalty Splits', beta: true },
       { to: '/notifications', label: 'Notifications' },
+      { to: '/swap', label: 'Swap' },
       { to: '/credits', label: 'Credits' },
       { to: '/settings/api-keys', label: 'API Keys' },
     ],

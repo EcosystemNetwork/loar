@@ -31,7 +31,7 @@ const DAILY_SPONSOR_LIMIT = parseInt(process.env.PAYMASTER_DAILY_LIMIT || '50', 
 // networks that Pimlico/Biconomy happen to support.
 const ALLOWED_CHAIN_IDS = new Set<number>([
   11155111, // Sepolia
-  84532, // Base Sepolia
+  1, // Ethereum mainnet
 ]);
 
 // Optional allowlist of ERC-4337 function selectors the paymaster will sponsor,
@@ -50,7 +50,7 @@ type Provider =
 
 function resolveProvider(): Provider {
   // Default chain id — can be overridden per request via body.chainId
-  const chainId = parseInt(process.env.PAYMASTER_DEFAULT_CHAIN_ID || '84532', 10);
+  const chainId = parseInt(process.env.PAYMASTER_DEFAULT_CHAIN_ID || '11155111', 10);
 
   if (process.env.PIMLICO_API_KEY) {
     return { kind: 'pimlico', key: process.env.PIMLICO_API_KEY, chainId };
@@ -96,7 +96,8 @@ paymasterRoutes.post('/sponsor', async (c) => {
   // Pin chainId to the protocol's allowlist. Without this, an attacker can
   // ask the paymaster to sponsor a transaction on any EVM chain the vendor
   // supports, draining the paymaster balance against arbitrary targets.
-  const chainId = body.chainId ?? parseInt(process.env.PAYMASTER_DEFAULT_CHAIN_ID || '84532', 10);
+  const chainId =
+    body.chainId ?? parseInt(process.env.PAYMASTER_DEFAULT_CHAIN_ID || '11155111', 10);
   if (!ALLOWED_CHAIN_IDS.has(chainId)) {
     return c.json(
       {
@@ -192,7 +193,8 @@ async function dispatch(provider: Provider, body: SponsorBody) {
 // ── Pimlico v2 ─────────────────────────────────────────────────────────
 
 async function sponsorWithPimlico(key: string, body: SponsorBody) {
-  const chainId = body.chainId ?? parseInt(process.env.PAYMASTER_DEFAULT_CHAIN_ID || '84532', 10);
+  const chainId =
+    body.chainId ?? parseInt(process.env.PAYMASTER_DEFAULT_CHAIN_ID || '11155111', 10);
   const url = `https://api.pimlico.io/v2/${chainId}/rpc?apikey=${key}`;
   const res = await fetch(url, {
     method: 'POST',
@@ -213,7 +215,8 @@ async function sponsorWithPimlico(key: string, body: SponsorBody) {
 // ── Biconomy v2 ────────────────────────────────────────────────────────
 
 async function sponsorWithBiconomy(key: string, body: SponsorBody) {
-  const chainId = body.chainId ?? parseInt(process.env.PAYMASTER_DEFAULT_CHAIN_ID || '84532', 10);
+  const chainId =
+    body.chainId ?? parseInt(process.env.PAYMASTER_DEFAULT_CHAIN_ID || '11155111', 10);
   const url = `https://paymaster.biconomy.io/api/v2/${chainId}/${key}`;
   const res = await fetch(url, {
     method: 'POST',

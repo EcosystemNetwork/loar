@@ -13,14 +13,12 @@ import {
   type Chain,
   type HttpTransport,
 } from 'viem';
-import { sepolia, baseSepolia, base } from 'viem/chains';
+import { sepolia } from 'viem/chains';
 import { env } from './env.js';
 import { logger } from './logger.js';
 
 const CHAIN_BY_NAME: Record<typeof env.LISTENER_CHAIN, Chain> = {
   sepolia,
-  'base-sepolia': baseSepolia,
-  base,
 };
 
 const chain = CHAIN_BY_NAME[env.LISTENER_CHAIN];

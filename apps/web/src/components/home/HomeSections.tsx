@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { proxiedImage, proxiedSrcSet } from '@/utils/img-proxy';
 
 import {
   Play,
@@ -168,9 +169,13 @@ export function UniverseCard({ universe }: { universe: EnrichedUniverse }) {
       <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-xl group-hover:shadow-primary/20">
         {universe.portraitImageURL || universe.imageURL || universe.tokenData?.imageURL ? (
           <img
-            src={resolveIpfsUrl(
+            src={proxiedImage(
               universe.portraitImageURL || universe.imageURL || universe.tokenData?.imageURL
             )}
+            srcSet={proxiedSrcSet(
+              universe.portraitImageURL || universe.imageURL || universe.tokenData?.imageURL
+            )}
+            sizes="200px"
             alt=""
             loading="lazy"
             className="w-full h-full object-cover"
@@ -247,7 +252,9 @@ export function WideCard({ universe }: { universe: EnrichedUniverse }) {
       <div className="relative aspect-video rounded-xl overflow-hidden bg-muted ring-1 ring-white/5 group-hover:ring-primary/60 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl group-hover:shadow-primary/20">
         {universe.imageURL || universe.tokenData?.imageURL ? (
           <img
-            src={resolveIpfsUrl(universe.imageURL || universe.tokenData?.imageURL)}
+            src={proxiedImage(universe.imageURL || universe.tokenData?.imageURL)}
+            srcSet={proxiedSrcSet(universe.imageURL || universe.tokenData?.imageURL)}
+            sizes="(max-width: 768px) 50vw, 320px"
             alt=""
             loading="lazy"
             className="w-full h-full object-cover"
@@ -398,7 +405,10 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
         >
           {u.imageURL || u.tokenData?.imageURL ? (
             <img
-              src={resolveIpfsUrl(u.imageURL || u.tokenData?.imageURL)}
+              src={proxiedImage(u.imageURL || u.tokenData?.imageURL, 1600)}
+              srcSet={proxiedSrcSet(u.imageURL || u.tokenData?.imageURL)}
+              sizes="100vw"
+              fetchPriority={i === currentIndex ? 'high' : 'low'}
               alt=""
               className="w-full h-full object-cover scale-105"
               style={{
@@ -687,7 +697,7 @@ export function RecentEpisodes() {
                   <>
                     <video
                       src={`${resolveIpfsUrl(ep.videoUrl)}#t=0.1`}
-                      poster={resolveIpfsUrl(ep.thumbnailUrl) || undefined}
+                      poster={proxiedImage(ep.thumbnailUrl) || undefined}
                       className="w-full h-full object-cover"
                       muted
                       loop
@@ -732,7 +742,7 @@ export function RecentEpisodes() {
               <div className="flex gap-2 items-start px-0.5">
                 {ep.universe.imageURL ? (
                   <img
-                    src={resolveIpfsUrl(ep.universe.imageURL)}
+                    src={proxiedImage(ep.universe.imageURL, 96)}
                     alt=""
                     loading="lazy"
                     className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5"
@@ -1006,7 +1016,7 @@ export function ContentCard({ item }: { item: any }) {
           isVideo && item.mediaUrl ? (
             <video
               src={`${resolveIpfsUrl(item.mediaUrl)}#t=0.1`}
-              poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
+              poster={proxiedImage(item.thumbnailUrl) || undefined}
               className="w-full h-full object-cover"
               muted
               loop
@@ -1023,7 +1033,9 @@ export function ContentCard({ item }: { item: any }) {
             />
           ) : (
             <img
-              src={resolveIpfsUrl(item.thumbnailUrl || item.mediaUrl)}
+              src={proxiedImage(item.thumbnailUrl || item.mediaUrl)}
+              srcSet={proxiedSrcSet(item.thumbnailUrl || item.mediaUrl)}
+              sizes="(max-width: 768px) 50vw, 320px"
               alt=""
               loading="lazy"
               className="w-full h-full object-cover"
@@ -1199,10 +1211,12 @@ export function SearchOverlay({
                       <div className="w-10 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-600 to-purple-600">
                         {(u.portraitImageURL || u.imageURL || u.tokenData?.imageURL) && (
                           <img
-                            src={resolveIpfsUrl(
-                              u.portraitImageURL || u.imageURL || u.tokenData?.imageURL
+                            src={proxiedImage(
+                              u.portraitImageURL || u.imageURL || u.tokenData?.imageURL,
+                              240
                             )}
                             alt=""
+                            loading="lazy"
                             className="w-full h-full object-cover"
                           />
                         )}
@@ -1256,8 +1270,9 @@ export function SearchOverlay({
                       <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-600 to-purple-600">
                         {(u.imageURL || u.tokenData?.imageURL) && (
                           <img
-                            src={resolveIpfsUrl(u.imageURL || u.tokenData?.imageURL)}
+                            src={proxiedImage(u.imageURL || u.tokenData?.imageURL, 96)}
                             alt=""
+                            loading="lazy"
                             className="w-full h-full object-cover"
                           />
                         )}
@@ -1312,7 +1327,7 @@ export function ContinueWatchingRow() {
                 {ep.videoUrl ? (
                   <video
                     src={`${resolveIpfsUrl(ep.videoUrl)}#t=${Math.max(0, resume - 1)}`}
-                    poster={resolveIpfsUrl(ep.thumbnailUrl) || undefined}
+                    poster={proxiedImage(ep.thumbnailUrl) || undefined}
                     className="w-full h-full object-cover"
                     muted
                     playsInline
@@ -1333,7 +1348,7 @@ export function ContinueWatchingRow() {
               <div className="flex gap-2 items-start px-0.5">
                 {ep.universe.imageURL ? (
                   <img
-                    src={resolveIpfsUrl(ep.universe.imageURL)}
+                    src={proxiedImage(ep.universe.imageURL, 96)}
                     alt=""
                     loading="lazy"
                     className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5"
@@ -1392,7 +1407,7 @@ export function ForYouRow() {
               {ep.videoUrl ? (
                 <video
                   src={`${resolveIpfsUrl(ep.videoUrl)}#t=0.1`}
-                  poster={resolveIpfsUrl(ep.thumbnailUrl) || undefined}
+                  poster={proxiedImage(ep.thumbnailUrl) || undefined}
                   className="w-full h-full object-cover"
                   muted
                   loop
@@ -1419,7 +1434,7 @@ export function ForYouRow() {
             <div className="flex gap-2 items-start px-0.5">
               {ep.universe.imageURL ? (
                 <img
-                  src={resolveIpfsUrl(ep.universe.imageURL)}
+                  src={proxiedImage(ep.universe.imageURL, 96)}
                   alt=""
                   loading="lazy"
                   className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5"

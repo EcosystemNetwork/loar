@@ -50,6 +50,8 @@ const envSchema = z.object({
   // Falls back to PONDER_RPC_URL_2 in credits.routes.ts if unset, but setting
   // this separately is recommended so server and indexer use independent RPCs.
   RPC_URL: z.string().url('RPC_URL must be a valid URL').optional(),
+  // Ethereum mainnet RPC — used for chainId 1 (swaps/trading, tx verification).
+  RPC_URL_MAINNET: z.string().url('RPC_URL_MAINNET must be a valid URL').optional(),
   /** Base Sepolia RPC — required if multi-chain purchases or Base multi-sig universes are enabled */
   RPC_URL_BASE_SEPOLIA: z.string().url('RPC_URL_BASE_SEPOLIA must be a valid URL').optional(),
   LOAR_TOKEN_ADDRESS: z
@@ -85,6 +87,19 @@ const envSchema = z.object({
     .string()
     .default('5000')
     .transform((v) => parseInt(v, 10)),
+
+  // ── Uniswap Trading API (swap-to-buy-credits, agent-to-agent swaps) ──────
+  // Developer Platform key (x-api-key). https://developers.uniswap.org
+  UNISWAP_API_KEY: z.string().optional(),
+  // Optional base override (defaults to the public gateway in the adapter).
+  UNISWAP_TRADING_API_BASE: z
+    .string()
+    .url('UNISWAP_TRADING_API_BASE must be a valid URL')
+    .optional(),
+  // Optional absolute per-swap input cap in wei (bounds custodial blast radius).
+  UNISWAP_MAX_SWAP_WEI: z.string().regex(/^\d+$/).optional(),
+  // Optional extra Universal Router allowlist: "chainId:0xrouter,chainId:0xrouter".
+  UNISWAP_EXTRA_ROUTERS: z.string().optional(),
 
   // ── AI services ───────────────────────────────────────────────────────────
   FAL_KEY: z.string().optional(),
@@ -274,11 +289,9 @@ export function validateEnv(): Env {
       );
     }
 
-    if (!env.RPC_URL_BASE_SEPOLIA) {
-      prodErrors.push(
-        'RPC_URL_BASE_SEPOLIA is required in production for multi-chain payment verification and Base multi-sig admin checks'
-      );
-    }
+    // RPC_URL_BASE_SEPOLIA is no longer required — the app is single-chain
+    // (Ethereum Sepolia) until we launch to other chains. RPC_URL above covers
+    // all on-chain payment verification and multi-sig admin checks.
 
     // Solana — only required when Circle DCW is configured (i.e. Solana flows
     // are reachable). If Circle isn't set up either, the Solana routes 503

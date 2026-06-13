@@ -28,7 +28,7 @@ import { Link } from '@tanstack/react-router';
 import { useVideoLoad } from '@/hooks/useVideoLoad';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { ClaimToUniverseDialog } from './ClaimToUniverseDialog';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { proxiedImage, proxiedSrcSet } from '@/utils/img-proxy';
 import { Price } from '@/components/Price';
 
 interface ContentCardProps {
@@ -87,11 +87,15 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
   const {
     videoRef,
     ready: videoReady,
+    resolvedSrc: videoSrc,
     onLoaded: onVideoSlotDone,
   } = useVideoLoad(isVideo ? content.mediaUrl : undefined);
   const rawThumbnail =
     content.thumbnailUrl || content.imageUrl || content.mediaUrl || '/placeholder.jpg';
-  const thumbnail = resolveIpfsUrl(rawThumbnail) || rawThumbnail;
+  // Route the still thumbnail through the resize proxy (small AVIF/WebP)
+  // instead of pulling the full-resolution original for a grid tile.
+  const thumbnail = proxiedImage(rawThumbnail) || rawThumbnail;
+  const thumbnailSrcSet = proxiedSrcSet(rawThumbnail);
   const hasLicensing =
     content.licensing &&
     (content.licensing.buyPrice !== '0' ||
@@ -110,13 +114,13 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
           <>
             <video
               ref={videoRef}
-              src={videoReady ? `${resolveIpfsUrl(content.mediaUrl)}#t=0.5` : undefined}
+              src={videoReady && videoSrc ? `${videoSrc}#t=0.5` : undefined}
               className={`w-full h-full object-cover transition-opacity duration-500 ${videoLoaded ? 'opacity-100' : 'opacity-0'}`}
               muted
               loop
               playsInline
               preload="metadata"
-              poster={resolveIpfsUrl(content.thumbnailUrl || content.imageUrl) || undefined}
+              poster={proxiedImage(content.thumbnailUrl || content.imageUrl) || undefined}
               onLoadedData={() => {
                 setVideoLoaded(true);
                 onVideoSlotDone();
@@ -165,7 +169,9 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
           // 3D: prefer Meshy's rendered thumbnail; fall back to a cube glyph.
           content.thumbnailUrl ? (
             <img
-              src={resolveIpfsUrl(content.thumbnailUrl) || content.thumbnailUrl}
+              src={proxiedImage(content.thumbnailUrl) || content.thumbnailUrl}
+              srcSet={proxiedSrcSet(content.thumbnailUrl)}
+              sizes="(max-width: 768px) 50vw, 320px"
               alt={content.title || '3D model'}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               loading="lazy"
@@ -182,6 +188,8 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
         ) : (
           <img
             src={thumbnail}
+            srcSet={thumbnailSrcSet}
+            sizes="(max-width: 768px) 50vw, 320px"
             alt={content.title || 'Content'}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             loading="lazy"

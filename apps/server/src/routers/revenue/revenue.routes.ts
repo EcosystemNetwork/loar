@@ -7,7 +7,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { createPublicClient, http } from 'viem';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { sepolia } from 'viem/chains';
 import { protectedProcedure, adminProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -15,10 +15,6 @@ import { FieldValue } from 'firebase-admin/firestore';
 const sepoliaClient = createPublicClient({
   chain: sepolia,
   transport: http(process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? ''),
-});
-const baseSepoliaClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http(process.env.RPC_URL_BASE_SEPOLIA ?? ''),
 });
 
 const snapshotsCol = () => {

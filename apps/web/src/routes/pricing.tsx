@@ -110,7 +110,7 @@ function PricingPage() {
       // Dynamically import viem for encoding
       const { encodeFunctionData, parseUnits: pu } = await import('viem');
 
-      const chainId = walletChainId || Number(import.meta.env.VITE_CHAIN_ID ?? 84532);
+      const chainId = walletChainId || Number(import.meta.env.VITE_CHAIN_ID ?? 11155111);
       const loarAddress = getEvmAddresses(chainId)?.loarToken;
       const treasuryAddress = import.meta.env.VITE_TREASURY_ADDRESS as `0x${string}` | undefined;
       if (!loarAddress || isZeroAddress(loarAddress)) {

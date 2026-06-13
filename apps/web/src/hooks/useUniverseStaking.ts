@@ -16,10 +16,6 @@ function stakingChainName(id: number | undefined): string {
   switch (id) {
     case 11155111:
       return 'Sepolia';
-    case 84532:
-      return 'Base Sepolia';
-    case 8453:
-      return 'Base';
     case 1:
       return 'Ethereum';
     default:
@@ -27,10 +23,9 @@ function stakingChainName(id: number | undefined): string {
   }
 }
 
-// LaunchpadStaking deployment addresses per chain
-const LAUNCHPAD_STAKING: Record<number, Address> = {
-  84532: '0x17250A23fA2E2deB1e695589FF272559d8bEb5bc', // Base Sepolia
-};
+// LaunchpadStaking deployment addresses per chain. Not yet deployed to Sepolia —
+// staking stays unavailable until an address is added here.
+const LAUNCHPAD_STAKING: Record<number, Address> = {};
 
 function useStakingAddress(): Address | undefined {
   const chainId = useChainId();

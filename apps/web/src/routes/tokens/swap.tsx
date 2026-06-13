@@ -564,13 +564,11 @@ function SwapPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Network</span>
                   <span>
-                    {chainId === 8453
-                      ? 'Base'
-                      : chainId === 84532
-                        ? 'Base Sepolia'
-                        : chainId === 11155111
-                          ? 'Sepolia'
-                          : `Chain ${chainId}`}
+                    {chainId === 11155111
+                      ? 'Sepolia'
+                      : chainId === 1
+                        ? 'Ethereum'
+                        : `Chain ${chainId}`}
                   </span>
                 </div>
               </div>

@@ -53,7 +53,7 @@ export function useTokenPool(universeAddress: string | undefined) {
 /**
  * Build Uniswap swap URL for a universe token.
  */
-export function getSwapUrl(tokenAddress: string, chainId: number): string {
-  const chainName = chainId === 11155111 ? 'sepolia' : chainId === 8453 ? 'base' : 'mainnet';
+export function getSwapUrl(tokenAddress: string, chainId?: number): string {
+  const chainName = chainId === 1 ? 'mainnet' : 'sepolia';
   return `https://app.uniswap.org/swap?inputCurrency=ETH&outputCurrency=${tokenAddress}&chain=${chainName}`;
 }
