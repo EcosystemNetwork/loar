@@ -314,38 +314,70 @@ function TrendingTile({ item }: { item: any }) {
     isAudio || is3D
       ? item.thumbnailUrl || item.imageUrl || null
       : item.thumbnailUrl || item.imageUrl || item.mediaUrl || '/placeholder.jpg';
-  const { videoRef, ready, onLoaded } = useVideoLoad(isVideo ? item.mediaUrl : undefined);
+  const posterUrl = resolveIpfsUrl(item.thumbnailUrl || item.imageUrl || '') || null;
+  // Hover-to-play tiles: when a poster exists it's the preview, so we defer the
+  // video load to hover instead of eager-loading every tile's metadata.
+  const [hovered, setHovered] = useState(false);
+  const hoveredRef = useRef(false);
+  const eagerLoad = isVideo && !!item.mediaUrl && !posterUrl;
+  const { videoRef, ready, onLoaded } = useVideoLoad(eagerLoad ? item.mediaUrl : undefined);
   const [loaded, setLoaded] = useState(false);
+  const loadVideo = ready || hovered;
   return (
     <div className="relative aspect-video rounded-lg overflow-hidden group cursor-pointer bg-gradient-to-br from-zinc-900 via-zinc-900/95 to-zinc-800">
       {isVideo && item.mediaUrl ? (
         <>
+          {/* Poster base — fills the tile immediately so the trending row loads
+              evenly; the video fades in on top once its frame is ready. */}
+          {posterUrl ? (
+            <img
+              src={posterUrl}
+              alt={item.title || 'Trending'}
+              className="absolute inset-0 w-full h-full object-cover"
+              loading="lazy"
+              decoding="async"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          ) : (
+            !loaded && (
+              <div className="absolute inset-0 bg-[linear-gradient(110deg,transparent_25%,rgba(255,255,255,0.04)_50%,transparent_75%)] bg-[length:200%_100%] animate-shimmer pointer-events-none" />
+            )
+          )}
           <video
             ref={videoRef}
-            src={ready ? `${resolveIpfsUrl(item.mediaUrl)}#t=0.5` : undefined}
-            className={`w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+            src={loadVideo ? `${resolveIpfsUrl(item.mediaUrl)}#t=0.5` : undefined}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
             muted
             loop
             playsInline
             preload="metadata"
-            poster={resolveIpfsUrl(item.thumbnailUrl || item.imageUrl) || undefined}
-            onLoadedData={() => {
+            onLoadedData={(e) => {
               setLoaded(true);
               onLoaded();
+              if (hoveredRef.current) {
+                const p = e.currentTarget.play();
+                if (p) p.catch(() => {});
+              }
             }}
             onError={() => onLoaded()}
             onMouseEnter={(e) => {
+              hoveredRef.current = true;
+              setHovered(true);
               const p = e.currentTarget.play();
               if (p) p.catch(() => {});
             }}
             onMouseLeave={(e) => {
+              hoveredRef.current = false;
               e.currentTarget.pause();
               e.currentTarget.currentTime = 0;
+              if (posterUrl) {
+                setHovered(false);
+                setLoaded(false);
+              }
             }}
           />
-          {!loaded && (
-            <div className="absolute inset-0 bg-[linear-gradient(110deg,transparent_25%,rgba(255,255,255,0.04)_50%,transparent_75%)] bg-[length:200%_100%] animate-shimmer pointer-events-none" />
-          )}
         </>
       ) : visualThumbnail ? (
         <img

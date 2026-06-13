@@ -21,11 +21,18 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { videoLoadQueue } from '@/lib/videoLoadQueue';
 
+// If a video reports neither `loadeddata` nor `error` within this window — common
+// over a slow/flaky IPFS gateway where the element just hangs — we release its
+// queue slot anyway. Otherwise a few stuck videos hold all the slots and the
+// rest of the grid never gets to load at all ("not all videos load").
+const SLOT_WATCHDOG_MS = 8000;
+
 export function useVideoLoad(src: string | undefined) {
   const id = useId();
   const [ready, setReady] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const slotAcquired = useRef(false);
+  const watchdog = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     if (!src) return;
@@ -45,6 +52,15 @@ export function useVideoLoad(src: string | undefined) {
         }
         slotAcquired.current = true;
         setReady(true);
+        // Watchdog — hand the slot back if the video hasn't loaded in time. The
+        // src stays set so it can still finish + fade in later; it just stops
+        // blocking the queue. Released exactly once (guarded by slotAcquired).
+        watchdog.current = setTimeout(() => {
+          if (slotAcquired.current) {
+            slotAcquired.current = false;
+            videoLoadQueue.done(id);
+          }
+        }, SLOT_WATCHDOG_MS);
       });
     };
 
@@ -53,6 +69,7 @@ export function useVideoLoad(src: string | undefined) {
       startLoading();
       return () => {
         cancelled = true;
+        if (watchdog.current) clearTimeout(watchdog.current);
         if (slotAcquired.current) videoLoadQueue.done(id);
         else if (enqueued) videoLoadQueue.cancel(id);
       };
@@ -72,12 +89,17 @@ export function useVideoLoad(src: string | undefined) {
     return () => {
       cancelled = true;
       observer.disconnect();
+      if (watchdog.current) clearTimeout(watchdog.current);
       if (slotAcquired.current) videoLoadQueue.done(id);
       else if (enqueued) videoLoadQueue.cancel(id);
     };
   }, [id, src]);
 
   const onLoaded = () => {
+    if (watchdog.current) {
+      clearTimeout(watchdog.current);
+      watchdog.current = undefined;
+    }
     if (slotAcquired.current) {
       slotAcquired.current = false;
       videoLoadQueue.done(id);

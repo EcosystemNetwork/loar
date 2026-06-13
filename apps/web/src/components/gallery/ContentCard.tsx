@@ -1,7 +1,7 @@
 /**
  * Content Card — Gallery item display with thumbnail, pricing, and creator info.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -84,14 +84,27 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
     content.sourceAudioGenerationId
   );
   const classification = content.classification ?? 'original';
+  const rawThumbnail =
+    content.thumbnailUrl || content.imageUrl || content.mediaUrl || '/placeholder.jpg';
+  const thumbnail = resolveIpfsUrl(rawThumbnail) || rawThumbnail;
+  // Poster shown immediately beneath the video so every video tile is filled
+  // the instant the grid paints — the video fades in on top once its own frame
+  // is ready, instead of each tile popping in one-by-one as it finishes loading.
+  const posterUrl = resolveIpfsUrl(content.thumbnailUrl || content.imageUrl || '') || null;
+  // These are hover-to-play tiles, so the poster IS the preview. When a poster
+  // exists we DON'T eager-load the video — that's what made a full grid take
+  // ~30s (40 videos × metadata fetch over IPFS, 6 at a time). We load the video
+  // only on hover. Posterless videos still eager-load (via the shared queue) so
+  // they show a first frame instead of an empty tile.
+  const [hovered, setHovered] = useState(false);
+  const hoveredRef = useRef(false);
+  const eagerLoad = isVideo && !!content.mediaUrl && !posterUrl;
   const {
     videoRef,
     ready: videoReady,
     onLoaded: onVideoSlotDone,
-  } = useVideoLoad(isVideo ? content.mediaUrl : undefined);
-  const rawThumbnail =
-    content.thumbnailUrl || content.imageUrl || content.mediaUrl || '/placeholder.jpg';
-  const thumbnail = resolveIpfsUrl(rawThumbnail) || rawThumbnail;
+  } = useVideoLoad(eagerLoad ? content.mediaUrl : undefined);
+  const loadVideo = videoReady || hovered;
   const hasLicensing =
     content.licensing &&
     (content.licensing.buyPrice !== '0' ||
@@ -108,40 +121,70 @@ export function ContentCard({ content, onBuy, onRent, onLicense, onClick }: Cont
       <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-zinc-900 via-zinc-900/95 to-zinc-800">
         {isVideo && content.mediaUrl ? (
           <>
+            {/* Base layer — the poster shows immediately and uniformly across
+                the grid. When a video has no poster we fall back to a shimmer.
+                Either way the tile is never empty while the video loads. */}
+            {posterUrl ? (
+              <img
+                src={posterUrl}
+                alt={content.title || 'Video'}
+                className="absolute inset-0 w-full h-full object-cover"
+                loading="lazy"
+                decoding="async"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            ) : (
+              !videoLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="absolute inset-0 bg-[linear-gradient(110deg,transparent_25%,rgba(255,255,255,0.04)_50%,transparent_75%)] bg-[length:200%_100%] animate-shimmer" />
+                  <Film className="h-8 w-8 text-white/30" />
+                </div>
+              )
+            )}
             <video
               ref={videoRef}
-              src={videoReady ? `${resolveIpfsUrl(content.mediaUrl)}#t=0.5` : undefined}
-              className={`w-full h-full object-cover transition-opacity duration-500 ${videoLoaded ? 'opacity-100' : 'opacity-0'}`}
+              src={loadVideo ? `${resolveIpfsUrl(content.mediaUrl)}#t=0.5` : undefined}
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${videoLoaded ? 'opacity-100' : 'opacity-0'}`}
               muted
               loop
               playsInline
               preload="metadata"
-              poster={resolveIpfsUrl(content.thumbnailUrl || content.imageUrl) || undefined}
-              onLoadedData={() => {
+              onLoadedData={(e) => {
                 setVideoLoaded(true);
                 onVideoSlotDone();
+                // Hover may have triggered the load — start playing now that the
+                // first frame is in, but only if the pointer is still over the tile.
+                if (hoveredRef.current) {
+                  const p = e.currentTarget.play();
+                  if (p) p.catch(() => {});
+                }
               }}
               onError={() => onVideoSlotDone()}
               onMouseEnter={(e) => {
+                hoveredRef.current = true;
+                setHovered(true);
+                // If the src is already loaded (posterless eager-load case) this
+                // plays immediately; otherwise onLoadedData plays once it arrives.
                 const playPromise = e.currentTarget.play();
                 if (playPromise)
                   playPromise.catch(() => {
-                    /* AbortError — hover cancelled before play resolved */
+                    /* AbortError — hover cancelled before play resolved, or src not ready yet */
                   });
               }}
               onMouseLeave={(e) => {
+                hoveredRef.current = false;
                 e.currentTarget.pause();
                 e.currentTarget.currentTime = 0;
+                // For poster-backed tiles, drop the src so the video unloads and
+                // the poster shows through again (frees memory + bandwidth).
+                if (posterUrl) {
+                  setHovered(false);
+                  setVideoLoaded(false);
+                }
               }}
             />
-            {/* Skeleton shimmer behind every video tile — covered once the
-                first frame paints (videoLoaded → opacity-0). */}
-            {!videoLoaded && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="absolute inset-0 bg-[linear-gradient(110deg,transparent_25%,rgba(255,255,255,0.04)_50%,transparent_75%)] bg-[length:200%_100%] animate-shimmer" />
-                <Film className="h-8 w-8 text-white/30" />
-              </div>
-            )}
           </>
         ) : isAudio ? (
           // Audio has no visual preview — animated bars over the shared dark base.
