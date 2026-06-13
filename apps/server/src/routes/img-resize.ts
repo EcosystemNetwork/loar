@@ -1,20 +1,27 @@
 /**
- * Image resize proxy — fetches an image from a known IPFS gateway, resizes
- * with sharp, and serves it with content negotiation (webp/avif when the
- * client supports it). Used by SmartImage's srcset to avoid downloading
- * full-resolution originals on every viewport.
+ * Image proxy — returns a resized, format-negotiated rendition of an IPFS
+ * image. Used by the web app's srcset to avoid shipping full-resolution
+ * originals to every viewport.
  *
  * GET /api/img?url=<gateway-url>&w=<width>&format=auto|webp|avif|jpeg
  *
  * SSRF-safe: only honors URLs that resolve to a recognized IPFS gateway host.
- * Anything else is rejected with 400.
  *
- * Cold-load behavior: the URL the client sends is normalized to our dedicated
- * Pinata gateway (PINATA_GATEWAY_URL + PINATA_GATEWAY_TOKEN) before fetching,
- * so the upstream pull is fast and pinned regardless of which public gateway
- * the client URL happened to point at. Renditions are content-addressed
- * (`url|w|format`) and cached both in-memory and on disk, so the slow first
- * fetch is paid once per CID and survives a process restart.
+ * Two paths, in priority order:
+ *  1. DELEGATE (production): when a dedicated Pinata gateway + token is
+ *     configured (PINATA_GATEWAY_URL on *.mypinata.cloud), the resize is done
+ *     by Pinata's CDN-side image optimization (img-width/img-format) and the
+ *     bytes are streamed through. No origin CPU, no per-instance cache —
+ *     Pinata's Cloudflare edge caches the rendition globally. The token stays
+ *     server-side. This is the horizontally-scalable path; front /api/img with
+ *     a CDN and the origin is barely touched.
+ *  2. FALLBACK: no dedicated gateway (dev) or Pinata optimization unavailable
+ *     → fetch the original and resize with sharp on the origin. Concurrency-
+ *     capped (IMG_MAX_CONCURRENT_TRANSCODES) and cached in-memory + on disk
+ *     (IMG_CACHE_DIR) so the cost is paid once per CID and survives restarts.
+ *
+ * All responses are immutable + `Vary: Accept` so any fronting CDN can cache
+ * them safely per content-negotiated format.
  */
 import { Hono } from 'hono';
 import sharp from 'sharp';
@@ -105,6 +112,55 @@ function upstreamFetchUrl(raw: string): string {
     url.searchParams.set('pinataGatewayToken', token);
   }
   return url.toString();
+}
+
+// Build the dedicated-gateway URL with Pinata's CDN-side image-optimization
+// params so the resize happens on Pinata's (Cloudflare-backed) edge instead of
+// our origin. Returns null when the upstream isn't a dedicated `.mypinata.cloud`
+// gateway (then we fall back to origin-side sharp).
+// Pinata supports img-format=avif|webp; for jpeg/png we omit it and just resize
+// (keeping the source format), and img-fit=scale-down never upscales.
+function pinataOptimizedUrl(upstream: string, width: number, format: OutputFormat): string | null {
+  let url: URL;
+  try {
+    url = new URL(upstream);
+  } catch {
+    return null;
+  }
+  if (!url.host.endsWith('.mypinata.cloud')) return null;
+  url.searchParams.set('img-width', String(width));
+  url.searchParams.set('img-fit', 'scale-down');
+  if (format === 'avif' || format === 'webp') url.searchParams.set('img-format', format);
+  return url.toString();
+}
+
+// ── Origin transcode concurrency gate ─────────────────────────────────────
+// Only the sharp FALLBACK path uses this (the Pinata path does no origin CPU
+// work). sharp transcodes are CPU + memory heavy; an unbounded burst under a
+// traffic spike can pin the event loop and OOM the container. Cap concurrent
+// transcodes and queue the rest. Slots are handed directly to the next waiter
+// so the in-flight count never drifts.
+const MAX_CONCURRENT_TRANSCODES = Math.max(
+  1,
+  Number(process.env.IMG_MAX_CONCURRENT_TRANSCODES) || 4
+);
+let activeTranscodes = 0;
+const transcodeWaiters: Array<() => void> = [];
+
+async function acquireTranscodeSlot(): Promise<void> {
+  if (activeTranscodes < MAX_CONCURRENT_TRANSCODES) {
+    activeTranscodes++;
+    return;
+  }
+  await new Promise<void>((resolve) => transcodeWaiters.push(resolve));
+  // Slot was handed to us by releaseTranscodeSlot without decrementing, so the
+  // owned-slot count is already correct — don't increment again.
+}
+
+function releaseTranscodeSlot(): void {
+  const next = transcodeWaiters.shift();
+  if (next) next();
+  else activeTranscodes--;
 }
 
 function pickWidth(raw: string | undefined): number {
@@ -249,9 +305,44 @@ router.get('/', async (c) => {
     header: (k) => c.req.header(k),
   });
 
-  // Cache key is the CID-normalized upstream URL (sans token) so the same CID
-  // requested via different public gateways shares one rendition.
   const upstreamUrl = upstreamFetchUrl(rawUrl);
+
+  // ── Production path: delegate the resize to the dedicated gateway's CDN ──
+  // Pinata performs the resize + format negotiation on its Cloudflare edge and
+  // caches the rendition globally (cf-cache HIT), so the origin does ZERO image
+  // CPU and holds no per-instance cache. We just stream the bytes through with
+  // the token kept server-side. This is what makes /api/img horizontally
+  // scalable — front it with a CDN and the origin is barely touched. Falls
+  // through to origin-side sharp on any non-2xx / network error.
+  const optimizedUrl = pinataOptimizedUrl(upstreamUrl, width, format);
+  if (optimizedUrl) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const accept = c.req.header('accept');
+      const upstream = await fetch(optimizedUrl, {
+        signal: ctrl.signal,
+        headers: accept ? { accept } : undefined,
+      });
+      clearTimeout(t);
+      if (upstream.ok && upstream.body) {
+        c.header('Content-Type', upstream.headers.get('content-type') || `image/${format}`);
+        c.header('Cache-Control', 'public, max-age=31536000, immutable');
+        c.header('Vary', 'Accept');
+        c.header('X-Img-Cache', 'pinata');
+        return c.body(upstream.body);
+      }
+      // Non-2xx (e.g. optimization unavailable for this asset) → sharp fallback.
+    } catch {
+      clearTimeout(t);
+      // Network/timeout → sharp fallback.
+    }
+  }
+
+  // ── Fallback path: origin-side sharp transcode (no dedicated gateway, or
+  // Pinata optimization unavailable). Cached in-memory + on disk and rate-
+  // limited via the transcode gate. Cache key is the CID-normalized path (sans
+  // token) so the same CID via different gateways shares one rendition.
   const cidPath = extractCidPath(rawUrl) ?? rawUrl;
   const cacheKey = `${cidPath}|${width}|${format}`;
 
@@ -317,10 +408,13 @@ router.get('/', async (c) => {
   }
 
   let output: Buffer;
+  await acquireTranscodeSlot();
   try {
     output = await pipeline.toBuffer();
   } catch (err) {
     return c.json({ error: 'transcode failed', message: (err as Error).message }, 500);
+  } finally {
+    releaseTranscodeSlot();
   }
 
   cachePut(cacheKey, output, contentType);
