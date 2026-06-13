@@ -46,6 +46,7 @@ import {
 } from '@/utils/ponder-api';
 import { trpc, trpcClient } from '@/utils/trpc';
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 
 /* ──────────────────────────────────────────
  * Utility: horizontal scroll row with arrows
@@ -1123,6 +1124,7 @@ export function SearchOverlay({
 }) {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
     if (!query) return [];
@@ -1147,6 +1149,25 @@ export function SearchOverlay({
     if (!open) setQuery('');
   }, [open]);
 
+  // Focus the input once the overlay mounts. An explicit ref focus (in a
+  // microtask after paint) is more reliable than the `autoFocus` attribute,
+  // which silently no-ops if focus is contended during the open transition.
+  useEffect(() => {
+    if (!open) return;
+    const id = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [open]);
+
+  // Lock background scroll while the overlay is open.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   // Keyboard shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -1158,20 +1179,30 @@ export function SearchOverlay({
 
   if (!open) return null;
 
-  return (
+  // Render in a portal at document.body so the overlay is never a descendant
+  // of homepage content that may become inert / pointer-events-none / a new
+  // stacking context (e.g. when another modal or dropdown opens). As an inline
+  // child it inherited those states and the input could not receive focus or
+  // keystrokes — the "can't type in search" bug.
+  return createPortal(
     <>
-      <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-x-0 top-0 z-[101] flex justify-center pt-20 px-4">
-        <div className="w-full max-w-2xl bg-background/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
+      {/* NOTE: z-[10000] is intentional. A global rule in index.css —
+          `[class*='backdrop'] { z-index: 9998 !important }` — accidentally
+          matches Tailwind's `backdrop-blur-*` utilities, forcing the backdrop
+          div below to z-9998. The panel must sit above that or it gets covered
+          (the "blur shows but can't type" bug). */}
+      <div className="fixed inset-0 z-[9990] bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-x-0 top-0 z-[10000] flex justify-center pt-20 px-4">
+        <div className="w-full max-w-2xl bg-background/95 rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
           {/* Input */}
           <div className="flex items-center gap-3 px-6 py-4 border-b border-white/5">
             <Search className="h-5 w-5 text-muted-foreground flex-shrink-0" />
             <Input
+              ref={inputRef}
               type="text"
               placeholder="Search universes, tokens, creators..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              autoFocus
               className="flex-1 bg-transparent border-0 focus-visible:ring-0 text-base placeholder:text-muted-foreground/50"
             />
             <button
@@ -1272,7 +1303,8 @@ export function SearchOverlay({
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 

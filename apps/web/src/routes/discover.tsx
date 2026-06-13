@@ -104,10 +104,12 @@ function DiscoverPage() {
                 Explore universes, creators, and AI-generated stories.
               </p>
             </div>
-            <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
-              <Flame className="h-4 w-4 text-orange-500" />
+            <Link
+              to="/leaderboard"
+              className="hidden md:flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
               Trending Now
-            </div>
+            </Link>
           </div>
 
           {/* Search */}
@@ -128,6 +130,7 @@ function DiscoverPage() {
                 <Link
                   key={item.id || item.contentId || i}
                   to="/gallery"
+                  search={item.universeId ? { universe: item.universeId } : {}}
                   className="group relative rounded-xl overflow-hidden bg-muted aspect-[3/4] hover:ring-2 hover:ring-primary/50 transition-all"
                 >
                   {item.thumbnailUrl || item.mediaUrl ? (
