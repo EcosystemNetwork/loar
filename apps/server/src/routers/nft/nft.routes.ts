@@ -17,33 +17,26 @@ import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { createPublicClient, http } from 'viem';
-import { sepolia, mainnet } from 'viem/chains';
+import { sepolia } from 'viem/chains';
 import { getStorageManager } from '../../services/storage';
 import { throwApiError } from '../../lib/errors';
 import { recordRevenueEvent } from '../../services/revenue-recorder';
 import { resolveActingUid } from '../../services/agentAuth';
+import { verifyAndClaimTx } from '../../services/tx-verify';
+import {
+  EpisodeEditionCollection,
+  CharacterNFT,
+  type EpisodeEditionCollectionChainId,
+  type CharacterNFTChainId,
+} from '@loar/abis/addresses';
 import {
   assertContentOperable,
   assertContentHashOperable,
   assertCanonReadyForMonetization,
 } from '../../lib/content-status';
 
-// ── Chain clients for on-chain TX verification ──────────────────────
-const sepoliaClient = createPublicClient({
-  chain: sepolia,
-  transport: http(process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? ''),
-});
-
-const mainnetClient = createPublicClient({
-  chain: mainnet,
-  transport: http(process.env.RPC_URL_MAINNET ?? ''),
-});
-
-function getChainClient(chainId?: number) {
-  if (chainId === mainnet.id) return mainnetClient;
-  return sepoliaClient;
-}
+// On-chain TX verification (receipt fetch + from/to/value binding + dedup) is
+// delegated to verifyAndClaimTx, which owns the {1, 11155111} chain allowlist.
 
 const episodesCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -506,33 +499,45 @@ export const nftRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // Verify on-chain TX succeeded (outside transaction to avoid holding locks during RPC)
-      const client = getChainClient(input.chainId);
-      try {
-        const receipt = await client.getTransactionReceipt({
-          hash: input.txHash as `0x${string}`,
-        });
-        if (receipt.status !== 'success') {
-          throwApiError('BAD_REQUEST', 'Mint transaction was reverted on-chain');
-        }
-      } catch (err: any) {
-        if (err?.code) throw err;
-        throwApiError('BAD_REQUEST', 'Mint transaction not found on-chain');
+      if (!ctx.user.address) {
+        throwApiError('BAD_REQUEST', 'Connected wallet required to purchase an episode');
       }
 
-      // Atomic: dedup by txHash doc ID + episode update in one transaction
-      const purchaseRef = nftMintsCol().doc(input.txHash);
+      // Load the episode first to learn the required mint price (bound below).
       const epRef = episodesCol().doc(input.episodeId);
+      const epDocPre = await epRef.get();
+      if (!epDocPre.exists) throwApiError('NOT_FOUND', 'Episode not found');
+      const episodePre = epDocPre.data()!;
+      if (!episodePre.active) throwApiError('BAD_REQUEST', 'Episode is not active');
+      if (episodePre.maxSupply > 0 && episodePre.minted >= episodePre.maxSupply) {
+        throwApiError('BAD_REQUEST', 'Sold out');
+      }
+
+      // Resolve the on-chain edition collection that the mint must target.
+      const chainKey = String(input.chainId ?? sepolia.id) as EpisodeEditionCollectionChainId;
+      const expectedTo = EpisodeEditionCollection[chainKey] as string | undefined;
+
+      // Bind the tx: sender must be the authenticated buyer, recipient must be
+      // the episode edition collection, and value must cover the mint price.
+      // verifyAndClaimTx also atomically claims the txHash (replay protection).
+      const { receipt } = await verifyAndClaimTx(
+        input.txHash,
+        `nft:episode:${input.episodeId}`,
+        ctx.user.uid,
+        {
+          expectedFrom: ctx.user.address,
+          expectedTo,
+          minValueWei: episodePre.mintPrice || '0',
+          chainId: input.chainId,
+        }
+      );
+
+      // Atomic: episode counter update + mint record in one transaction.
+      // Dedup is owned by verifyAndClaimTx; this records the mint.
+      const purchaseRef = nftMintsCol().doc(input.txHash);
 
       const result = await db.runTransaction(async (transaction) => {
-        const [existingPurchase, epDoc] = await Promise.all([
-          transaction.get(purchaseRef),
-          transaction.get(epRef),
-        ]);
-
-        if (existingPurchase.exists) {
-          throw new Error('This transaction has already been recorded');
-        }
+        const epDoc = await transaction.get(epRef);
         if (!epDoc.exists) throw new Error('Episode not found');
 
         const episode = epDoc.data()!;
@@ -551,6 +556,7 @@ export const nftRouter = router({
           buyerUid: ctx.user.uid,
           buyerAddress: ctx.user.address || null,
           mintedAt: now,
+          blockNumber: receipt?.blockNumber?.toString?.() ?? null,
         };
 
         transaction.set(purchaseRef, mintData);
@@ -589,33 +595,40 @@ export const nftRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // Verify on-chain TX (outside transaction to avoid holding locks during RPC)
-      const client = getChainClient(input.chainId);
-      try {
-        const receipt = await client.getTransactionReceipt({
-          hash: input.txHash as `0x${string}`,
-        });
-        if (receipt.status !== 'success') {
-          throwApiError('BAD_REQUEST', 'Mint transaction was reverted on-chain');
-        }
-      } catch (err: any) {
-        if (err?.code) throw err;
-        throwApiError('BAD_REQUEST', 'Mint transaction not found on-chain');
+      if (!ctx.user.address) {
+        throwApiError('BAD_REQUEST', 'Connected wallet required to purchase a character NFT');
       }
 
-      // Atomic: dedup by txHash doc ID + character validation in one transaction
-      const purchaseRef = nftMintsCol().doc(input.txHash);
       const charRef = characterNFTsCol().doc(input.characterId);
+      const charDocPre = await charRef.get();
+      if (!charDocPre.exists) throwApiError('NOT_FOUND', 'Character not found');
+      const characterPre = charDocPre.data()!;
+      if (!characterPre.active) throwApiError('BAD_REQUEST', 'Character is not active');
+
+      // Resolve the on-chain CharacterNFT collection the mint must target.
+      const chainKey = String(input.chainId ?? sepolia.id) as CharacterNFTChainId;
+      const expectedTo = CharacterNFT[chainKey] as string | undefined;
+
+      // Bind the tx: sender must be the authenticated buyer, recipient must be
+      // the CharacterNFT collection, and value must cover the quoted price.
+      // verifyAndClaimTx also atomically claims the txHash (replay protection).
+      const { receipt } = await verifyAndClaimTx(
+        input.txHash,
+        `nft:character:${input.characterId}`,
+        ctx.user.uid,
+        {
+          expectedFrom: ctx.user.address,
+          expectedTo,
+          minValueWei: input.price || '0',
+          chainId: input.chainId,
+        }
+      );
+
+      // Atomic: record the mint. Dedup is owned by verifyAndClaimTx.
+      const purchaseRef = nftMintsCol().doc(input.txHash);
 
       const result = await db.runTransaction(async (transaction) => {
-        const [existingPurchase, charDoc] = await Promise.all([
-          transaction.get(purchaseRef),
-          transaction.get(charRef),
-        ]);
-
-        if (existingPurchase.exists) {
-          throw new Error('This transaction has already been recorded');
-        }
+        const charDoc = await transaction.get(charRef);
         if (!charDoc.exists) throw new Error('Character not found');
 
         const character = charDoc.data()!;
@@ -629,6 +642,7 @@ export const nftRouter = router({
           buyerUid: ctx.user.uid,
           buyerAddress: ctx.user.address || null,
           mintedAt: now,
+          blockNumber: receipt?.blockNumber?.toString?.() ?? null,
         };
 
         transaction.set(purchaseRef, mintData);

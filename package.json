@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "dev": "turbo dev",
-    "build": "turbo build --filter=!@loar/programs",
+    "build": "turbo build",
     "check-types": "turbo check-types",
     "lint": "turbo lint",
     "format": "prettier --write .",

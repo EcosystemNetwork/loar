@@ -7,25 +7,15 @@
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
-import { createPublicClient, http, parseEther, type Hash } from 'viem';
+import { parseEther } from 'viem';
 import { sepolia, mainnet } from 'viem/chains';
 import { throwApiError } from '../../lib/errors';
 import { recordRevenueEvent } from '../../services/revenue-recorder';
 import { resolveActingUid } from '../../services/agentAuth';
 import { assertContentOperable, assertCanonReadyForMonetization } from '../../lib/content-status';
+import { verifyAndClaimTx } from '../../services/tx-verify';
 
-const sepoliaClient = createPublicClient({
-  chain: sepolia,
-  transport: http(process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? ''),
-});
-const mainnetClient = createPublicClient({
-  chain: mainnet,
-  transport: http(process.env.RPC_URL_MAINNET ?? ''),
-});
-function getChainClient(chainId?: number) {
-  if (chainId === mainnet.id) return mainnetClient;
-  return sepoliaClient;
-}
+const ALLOWED_CHAIN_IDS: Set<number> = new Set([sepolia.id, mainnet.id]);
 
 export const PRODUCT_TYPES = [
   'EPISODE_NFT',
@@ -275,45 +265,58 @@ export const listingsRouter = router({
       }
 
       // Verify on-chain payment for ETH-denominated listings
-      if (listing.currency === 'ETH' && input.txHash) {
-        // Dedup: reject if this txHash was already used for another order
-        const existingOrder = await ordersCol().where('txHash', '==', input.txHash).limit(1).get();
-        if (!existingOrder.empty) {
-          throwApiError('BAD_REQUEST', 'This transaction has already been used for a purchase');
+      if (listing.currency === 'ETH') {
+        if (!input.txHash) {
+          throwApiError('BAD_REQUEST', 'ETH purchases require a transaction hash');
         }
 
+        // The chain the payment was made on must be one we actually support;
+        // an unknown chainId must NOT silently fall back to Sepolia.
+        if (input.chainId !== undefined && !ALLOWED_CHAIN_IDS.has(input.chainId)) {
+          throwApiError('BAD_REQUEST', `Unsupported chainId: ${input.chainId}`);
+        }
+
+        // The buyer must have an on-chain address so we can bind tx.from to them;
+        // without it, anyone could submit a payment that went to this seller.
+        const buyerAddress = ctx.user.address;
+        if (!buyerAddress || !/^0x[0-9a-fA-F]{40}$/.test(buyerAddress)) {
+          throwApiError(
+            'BAD_REQUEST',
+            'A connected wallet address is required to purchase with ETH'
+          );
+        }
+
+        // Require a real on-chain seller address. We must never fall back to
+        // sellerUid (a Firestore uid, not an address) for recipient binding.
+        const sellerAddress =
+          typeof listing.sellerAddress === 'string' ? listing.sellerAddress : null;
+        if (!sellerAddress || !/^0x[0-9a-fA-F]{40}$/.test(sellerAddress)) {
+          throwApiError(
+            'BAD_REQUEST',
+            'This listing has no valid on-chain seller address and cannot accept ETH payments.'
+          );
+        }
+
+        // Compute expected wei with BigInt — never JS float math on the price.
+        const priceStr = String(listing.price ?? '');
+        if (!/^\d+(\.\d+)?$/.test(priceStr)) {
+          throwApiError('BAD_REQUEST', 'Listing price is not a valid numeric amount');
+        }
+        const expectedWei = parseEther(priceStr) * BigInt(input.quantity);
+
+        // verifyAndClaimTx enforces from/to/value bindings AND atomically dedups
+        // the txHash (throws on mismatch or reuse). This is the sole guard now.
         try {
-          const client = getChainClient(input.chainId);
-          const tx = await client.getTransaction({ hash: input.txHash as Hash });
-          const receipt = await client.getTransactionReceipt({ hash: input.txHash as Hash });
-
-          if (receipt.status !== 'success') {
-            throwApiError('BAD_REQUEST', 'Payment transaction was reverted on-chain');
-          }
-
-          // Verify the seller received the payment (seller address or listing-specified recipient)
-          const expectedRecipient = (listing.sellerAddress ?? listing.sellerUid)?.toLowerCase();
-          if (expectedRecipient && tx.to?.toLowerCase() !== expectedRecipient) {
-            throwApiError('BAD_REQUEST', 'Payment was not sent to the expected recipient');
-          }
-
-          // Verify minimum amount (listing price × quantity, 1% tolerance for gas)
-          if (listing.price > 0) {
-            const expectedWei = parseEther(String(listing.price * input.quantity));
-            const minRequired = (expectedWei * 99n) / 100n;
-            if (tx.value < minRequired) {
-              throwApiError(
-                'BAD_REQUEST',
-                `Insufficient payment. Expected ~${expectedWei.toString()} wei, got ${tx.value.toString()} wei`
-              );
-            }
-          }
+          await verifyAndClaimTx(input.txHash, `listing:${input.listingId}`, ctx.user.uid, {
+            expectedFrom: buyerAddress,
+            expectedTo: sellerAddress,
+            minValueWei: expectedWei.toString(),
+            chainId: input.chainId,
+          });
         } catch (err: any) {
           if (err?.code) throw err; // Re-throw our own API errors
-          throwApiError('BAD_REQUEST', 'Payment transaction not found on-chain');
+          throwApiError('BAD_REQUEST', err?.message ?? 'Payment verification failed');
         }
-      } else if (listing.currency === 'ETH' && !input.txHash) {
-        throwApiError('BAD_REQUEST', 'ETH purchases require a transaction hash');
       }
 
       // Atomic: re-validate listing state + create order + update sold counter

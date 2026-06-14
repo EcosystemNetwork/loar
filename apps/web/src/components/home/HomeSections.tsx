@@ -395,7 +395,7 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
   if (!current) return null;
 
   return (
-    <div className="relative h-[40vh] min-h-[240px] max-h-[420px] overflow-hidden">
+    <div className="relative isolate h-[40vh] min-h-[240px] max-h-[420px] overflow-hidden">
       {/* Background image with Ken Burns effect */}
       {featured.map((u, i) => (
         <div

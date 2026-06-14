@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ApiKeyManager } from '@/components/agents/ApiKeyManager';
 import { ArrowRight, Bot, ExternalLink, KeyRound, ShieldCheck, Trash2 } from 'lucide-react';
 
 export const Route = createFileRoute('/settings/api-keys')({
@@ -133,27 +134,47 @@ function ApiKeysPage() {
         </p>
       </div>
 
-      {/* Disambiguation callout: this is NOT the agent-control key page. */}
-      <Card className="bg-zinc-950/40 border-white/5">
-        <CardContent className="pt-6 text-sm text-muted-foreground">
-          <p className="flex items-start gap-2">
-            <Bot className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
-            <span>
-              Trying to give <strong className="text-foreground">an agent</strong> (a Hermes agent,
-              the MCP server, a script) a key so it can control LOAR for you? That's the opposite
-              direction — go to{' '}
-              <Link
-                to="/settings/agent-keys"
-                className="text-amber-300 hover:text-amber-200 inline-flex items-center gap-1"
-              >
-                Agent API Keys
-                <ArrowRight className="h-3 w-3" />
-              </Link>
-              .
-            </span>
+      {/* Agent API keys — issue a loar_ key for an external agent to control LOAR.
+          Surfaced inline here (not just at /settings/agent-keys) because users
+          land on "api-keys" expecting exactly this. Same generator, same backend. */}
+      <Card className="border-amber-500/30 bg-amber-500/[0.03]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-amber-300">
+            <Bot className="h-5 w-5" />
+            Agent API Keys
+          </CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            Want a key to <strong className="text-foreground">hand to an agent</strong> (a Hermes
+            agent, the MCP server, a script) so it can control LOAR on your behalf — create
+            entities, generate media, mint, submit canon? Mint one here. Each{' '}
+            <code className="text-amber-300">loar_</code> key is scoped to the permissions and rate
+            limit you pick, and the secret is shown{' '}
+            <strong className="text-foreground">once</strong> at creation. Full page:{' '}
+            <Link
+              to="/settings/agent-keys"
+              className="text-amber-300 hover:text-amber-200 inline-flex items-center gap-1"
+            >
+              Agent API Keys
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+            .
           </p>
+        </CardHeader>
+        <CardContent>
+          <ApiKeyManager />
         </CardContent>
       </Card>
+
+      <div className="border-t border-white/5 pt-2">
+        <h2 className="text-lg font-semibold flex items-center gap-2">
+          <KeyRound className="h-5 w-5 text-violet-400" />
+          Provider Keys (BYOK)
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          The opposite direction: plug in <strong className="text-foreground">your own</strong>{' '}
+          third-party provider keys so LOAR runs models on your quota.
+        </p>
+      </div>
 
       <ProviderCard provider="bytedance" />
       <ProviderCard provider="zai" />

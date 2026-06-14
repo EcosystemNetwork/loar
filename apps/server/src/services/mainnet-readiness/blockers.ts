@@ -169,16 +169,6 @@ export const BLOCKERS: Blocker[] = [
     docAnchor: 'X6',
   },
   {
-    id: 'SOL-AUDIT-01',
-    category: 'external',
-    title: 'Solana Anchor audit',
-    description: 'External audit of Anchor programs (universe / episode / payment).',
-    owner: 'audit_firm',
-    effort: 'months',
-    nextStep: 'Send Solana-specific outreach package from docs/external-audit-engagement.md.',
-    docAnchor: 'X7',
-  },
-  {
     id: 'BUG-BOUNTY',
     category: 'external',
     title: 'Code4rena / Sherlock bug bounty',
@@ -187,17 +177,6 @@ export const BLOCKERS: Blocker[] = [
     effort: 'weeks',
     nextStep: '2-week setup on Code4rena or Sherlock.',
     docAnchor: 'X8',
-  },
-  {
-    id: 'SOL-NTT-01',
-    category: 'external',
-    title: 'Wormhole NTT bridge migration',
-    description:
-      'Deploy NTT manager + transceiver on Solana + Sepolia/Base, retire custodial bridge.',
-    owner: 'platform',
-    effort: 'weeks',
-    nextStep: 'Wormhole integration — coordinate with Wormhole devrel.',
-    docAnchor: 'X13',
   },
 
   // ── Operational — non-blocking but recommended ─────────────────────

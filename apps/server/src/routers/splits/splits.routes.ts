@@ -18,6 +18,11 @@ import {
   recordContentSplit,
 } from '../../services/split-orchestrator';
 import { assertContentOperable } from '../../lib/content-status';
+import { verifyAndClaimTx } from '../../services/tx-verify';
+import { SplitRouter, type SplitRouterChainId } from '@loar/abis/addresses';
+import { sepolia, mainnet } from 'viem/chains';
+
+const ALLOWED_CHAIN_IDS: Set<number> = new Set([sepolia.id, mainnet.id]);
 
 const splitConfigsCol = () => {
   if (!db)
@@ -161,42 +166,68 @@ export const splitsRouter = router({
         chainId: z.number().optional(),
       })
     )
-    .mutation(async ({ input }) => {
-      // Verify on-chain
-      const { createPublicClient: createClient, http: httpTransport } = await import('viem');
-      const { mainnet: mainnetChain, sepolia: sep } = await import('viem/chains');
-      const client = createClient({
-        chain: input.chainId === 1 ? mainnetChain : sep,
-        transport: httpTransport(
-          input.chainId === 1
-            ? (process.env.RPC_URL_MAINNET ?? '')
-            : (process.env.RPC_URL ?? process.env.PONDER_RPC_URL_2 ?? '')
-        ),
-      });
-
-      try {
-        const receipt = await client.getTransactionReceipt({
-          hash: input.txHash as `0x${string}`,
+    .mutation(async ({ input, ctx }) => {
+      if (!ctx.user.address) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Connected wallet required to confirm splits',
         });
-        if (receipt.status !== 'success') {
-          throw new TRPCError({ code: 'BAD_REQUEST', message: 'setSplits TX was reverted' });
-        }
-      } catch (err: any) {
-        if (err?.code) throw err;
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'TX not found on-chain' });
       }
 
-      // Mark as configured
-      const ref = splitConfigsCol().doc(input.contentId);
+      // Reject unsupported chains up-front (mirror tx-verify allowlist).
+      if (input.chainId !== undefined && !ALLOWED_CHAIN_IDS.has(input.chainId)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Chain ID ${input.chainId} is not supported.`,
+        });
+      }
+
+      // Load the pending split record to learn which universe this content
+      // belongs to, then authorize the caller as that universe's admin.
       const contentSplitRef = db.collection('contentSplits').doc(input.contentId);
       const doc = await contentSplitRef.get();
-      if (doc.exists) {
-        await contentSplitRef.update({
-          configured: true,
-          txHash: input.txHash,
-          confirmedAt: new Date(),
+      if (!doc.exists) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'No pending split found for this content. Call prepareSplits first.',
         });
       }
+      const splitDoc = doc.data()!;
+      const universeId = splitDoc.universeId as string | undefined;
+      if (universeId) {
+        const isAdmin = await isUniverseAdmin(universeId, ctx.user.uid);
+        if (!isAdmin) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only the universe admin can configure splits',
+          });
+        }
+      }
+
+      // Resolve the SplitRouter the setSplits TX must target for this chain.
+      const chainKey = String(input.chainId ?? sepolia.id) as SplitRouterChainId;
+      const expectedTo = SplitRouter[chainKey] as string | undefined;
+
+      // Verify the TX: sender must be the authenticated caller and recipient
+      // must be the SplitRouter. verifyAndClaimTx also atomically claims the
+      // txHash, preventing an unrelated/replayed tx from being credited.
+      await verifyAndClaimTx(
+        input.txHash,
+        `splits:${splitDoc.entityHash ?? input.contentId}`,
+        ctx.user.uid,
+        {
+          expectedFrom: ctx.user.address,
+          expectedTo,
+          chainId: input.chainId,
+        }
+      );
+
+      // Mark as configured
+      await contentSplitRef.update({
+        configured: true,
+        txHash: input.txHash,
+        confirmedAt: new Date(),
+      });
 
       return { ok: true, configured: true };
     }),

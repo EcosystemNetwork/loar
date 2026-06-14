@@ -41,6 +41,9 @@ const primaryLinksBase = [
   { to: '/tokens', label: 'Launchpad' },
   { to: '/wiki', label: 'Wiki' },
   { to: '/dashboard', label: 'Dashboard' },
+  // Promoted out of More → Developer so agent integrators can find their keys
+  // without digging through the dropdown.
+  { to: '/settings/agent-keys', label: 'API Keys' },
 ] as const;
 
 /** Surfaced inline only for users who own universes — Studio is the entry
@@ -89,7 +92,7 @@ const moreGroupsBase: MoreGroup[] = [
   {
     label: 'Developer',
     links: [
-      { to: '/settings/agent-keys', label: 'Agent API Keys' },
+      // 'Agent API Keys' is promoted to the primary nav (see primaryLinksBase).
       { to: '/settings/api-keys', label: 'Provider Keys (BYOK)' },
       { to: '/docs', label: 'Docs' },
     ],
