@@ -1376,9 +1376,13 @@ export const generationRouter = router({
       // ── Admission control ────────────────────────────────────────────
       // Check if queue can accept new jobs (prevents overload)
       let useQueue = !!process.env.REDIS_URL;
+      // True when we reserved an in-process inline slot (Redis-down degraded
+      // mode). Must be released in the inline path's finally so the bounded
+      // concurrency cap doesn't leak slots.
+      let inlineSlotHeld = false;
       if (useQueue) {
         try {
-          const { checkAdmission } = await import('../../lib/queue');
+          const { checkAdmission, acquireInlineSlot } = await import('../../lib/queue');
           const admission = await checkAdmission();
           if (!admission.allowed) {
             // Refund credits before rejecting
@@ -1399,9 +1403,57 @@ export const generationRouter = router({
               message: admission.reason || 'Server at capacity. Please try again shortly.',
             });
           }
+          // Redis is up but BullMQ couldn't be reached (degraded). Do NOT fail
+          // open into an uncapped inline run — bound it with the in-process
+          // semaphore. If the cap is saturated, reject with a retryable error
+          // rather than overloading this replica.
+          if (admission.degraded) {
+            if (!acquireInlineSlot()) {
+              if (creditsCharged > 0) {
+                await userCreditsRef.update({
+                  balance: FieldValue.increment(creditsCharged),
+                  totalSpent: FieldValue.increment(-creditsCharged),
+                  updatedAt: new Date(),
+                });
+              }
+              await generationsCol().doc(generationId).update({
+                status: 'failed',
+                failureReason: 'Generation backend degraded and at capacity',
+                completedAt: new Date(),
+              });
+              throw new TRPCError({
+                code: 'TOO_MANY_REQUESTS',
+                message:
+                  'Generation backend is temporarily degraded and at capacity. Please try again shortly.',
+              });
+            }
+            inlineSlotHeld = true;
+            useQueue = false; // queue is unreliable — process inline under the cap
+          }
         } catch (err) {
           if (err instanceof TRPCError) throw err;
-          // Queue check failed — fall back to inline processing
+          // Queue check failed entirely — fall back to bounded inline processing.
+          const { acquireInlineSlot } = await import('../../lib/queue');
+          if (!acquireInlineSlot()) {
+            if (creditsCharged > 0) {
+              await userCreditsRef.update({
+                balance: FieldValue.increment(creditsCharged),
+                totalSpent: FieldValue.increment(-creditsCharged),
+                updatedAt: new Date(),
+              });
+            }
+            await generationsCol().doc(generationId).update({
+              status: 'failed',
+              failureReason: 'Generation backend unavailable and at capacity',
+              completedAt: new Date(),
+            });
+            throw new TRPCError({
+              code: 'TOO_MANY_REQUESTS',
+              message:
+                'Generation backend is temporarily unavailable and at capacity. Please try again shortly.',
+            });
+          }
+          inlineSlotHeld = true;
           useQueue = false;
         }
       }
@@ -1710,6 +1762,13 @@ export const generationRouter = router({
         }
 
         throw error;
+      } finally {
+        // Release the bounded inline slot reserved under Redis-down degraded
+        // mode so the in-process concurrency cap doesn't leak.
+        if (inlineSlotHeld) {
+          const { releaseInlineSlot } = await import('../../lib/queue');
+          releaseInlineSlot();
+        }
       }
     }),
 

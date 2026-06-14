@@ -71,15 +71,41 @@ async function walletClient() {
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
+// ── balanceOf cache ───────────────────────────────────────────────────────────
+// `getUsdcBalance` backs the PUBLIC `arc.balance` query over a fully user-
+// controlled address. Without a cache an attacker rotating addresses defeats any
+// per-IP limit and turns each request into an uncached `balanceOf` RPC. Short
+// TTL keeps the data fresh enough for a wallet UI; the size cap + oldest-entry
+// eviction stop the cache itself from becoming an unbounded memory sink under
+// address rotation.
+const BALANCE_TTL_MS = 20_000;
+const BALANCE_CACHE_MAX = 5_000;
+const _balanceCache = new Map<string, { value: string; expires: number }>();
+
 /** USDC balance (human string, 6 decimals) for an address on Arc. */
 export async function getUsdcBalance(address: string): Promise<string> {
+  const key = address.toLowerCase();
+  const now = Date.now();
+
+  const hit = _balanceCache.get(key);
+  if (hit && hit.expires > now) return hit.value;
+
   const raw = await publicClient().readContract({
     address: ARC_USDC,
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: [address as Hex],
   });
-  return formatUnits(raw as bigint, USDC_DECIMALS);
+  const value = formatUnits(raw as bigint, USDC_DECIMALS);
+
+  // Evict the oldest entry (insertion order) when at capacity, so cache-defeating
+  // address rotation can't grow the map without bound.
+  if (!_balanceCache.has(key) && _balanceCache.size >= BALANCE_CACHE_MAX) {
+    const oldest = _balanceCache.keys().next().value;
+    if (oldest !== undefined) _balanceCache.delete(oldest);
+  }
+  _balanceCache.set(key, { value, expires: now + BALANCE_TTL_MS });
+  return value;
 }
 
 // ── Payment ─────────────────────────────────────────────────────────────────

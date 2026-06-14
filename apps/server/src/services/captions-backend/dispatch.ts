@@ -27,6 +27,12 @@ import {
   openaiWhisper1Backend,
 } from './openai';
 import { zaiGlmAsrBackend } from './zai';
+import {
+  geminiFlashTranscribeBackend,
+  geminiProTranscribeBackend,
+  geminiFlashLiteTranscribeBackend,
+  gemini31ProTranscribeBackend,
+} from './gemini';
 
 const BACKENDS: Record<string, CaptionBackend> = {
   [falWhisperBackend.modelId]: falWhisperBackend,
@@ -46,6 +52,10 @@ const BACKENDS: Record<string, CaptionBackend> = {
   [openaiGpt4oTranscribeDiarizeBackend.modelId]: openaiGpt4oTranscribeDiarizeBackend,
   [openaiWhisper1Backend.modelId]: openaiWhisper1Backend,
   [zaiGlmAsrBackend.modelId]: zaiGlmAsrBackend,
+  [geminiFlashTranscribeBackend.modelId]: geminiFlashTranscribeBackend,
+  [geminiProTranscribeBackend.modelId]: geminiProTranscribeBackend,
+  [geminiFlashLiteTranscribeBackend.modelId]: geminiFlashLiteTranscribeBackend,
+  [gemini31ProTranscribeBackend.modelId]: gemini31ProTranscribeBackend,
 };
 
 export function getBackend(modelId: string): CaptionBackend {

@@ -256,12 +256,44 @@ export function getWebhookQueue(): Queue<WebhookJobData, WebhookJobResult> {
 const MAX_CONCURRENT_GENERATIONS = parseInt(process.env.MAX_CONCURRENT_GENERATIONS || '50', 10);
 const MAX_QUEUED_GENERATIONS = parseInt(process.env.MAX_QUEUED_GENERATIONS || '200', 10);
 
+// ── Degraded-mode (Redis-down) inline admission bound ───────────────────
+// When Redis is unavailable BullMQ can't track active/waiting jobs, so
+// admission would otherwise fail fully open and generation.routes.ts would run
+// generations inline with NO concurrency cap — a trivial overload vector.
+// Instead of failing open, we bound the inline path with an in-process counter.
+// This is the least-disruptive option: a single replica can still serve work
+// (no hard 503), but only up to a small concurrency ceiling, after which
+// callers get a "try again" signal. The counter is per-process and lost on
+// restart, which is fine — it only guards the transient Redis-outage window.
+const INLINE_DEGRADED_MAX = parseInt(process.env.MAX_INLINE_GENERATIONS_DEGRADED || '5', 10);
+let inlineDegradedActive = 0;
+
+/**
+ * Try to reserve an inline-generation slot for the degraded (Redis-down) path.
+ * Returns true if a slot was acquired (caller MUST call releaseInlineSlot()
+ * in a finally block), false if the in-process cap is already saturated.
+ */
+export function acquireInlineSlot(): boolean {
+  if (inlineDegradedActive >= INLINE_DEGRADED_MAX) return false;
+  inlineDegradedActive++;
+  return true;
+}
+
+/** Release a slot previously acquired via acquireInlineSlot(). */
+export function releaseInlineSlot(): void {
+  if (inlineDegradedActive > 0) inlineDegradedActive--;
+}
+
 /**
  * Check if the generation queue can accept a new job.
  * Returns { allowed, position, reason }.
+ *
+ * `degraded` is set when Redis/BullMQ could not be reached: the caller is then
+ * responsible for bounding the inline path via acquireInlineSlot().
  */
 export async function checkAdmission(): Promise<{
   allowed: boolean;
+  degraded?: boolean;
   position?: number;
   queueDepth: number;
   activeCount: number;
@@ -289,8 +321,9 @@ export async function checkAdmission(): Promise<{
       activeCount: active,
     };
   } catch {
-    // If Redis is down, allow with degraded mode
-    return { allowed: true, queueDepth: -1, activeCount: -1 };
+    // Redis is down: do NOT fail fully open. Signal degraded mode so the
+    // caller bounds the inline path with an in-process concurrency cap.
+    return { allowed: true, degraded: true, queueDepth: -1, activeCount: -1 };
   }
 }
 

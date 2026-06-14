@@ -28,6 +28,19 @@ interface CacheEntry {
 }
 
 const cache = new Map<string, CacheEntry>();
+// The key is the request-supplied address (attacker-controlled). Cap the Map
+// and evict the oldest entry when exceeded so flooding distinct addresses can't
+// grow it without bound (memory DoS).
+const CACHE_MAX = 10_000;
+
+function setCache(address: string, entry: CacheEntry) {
+  if (cache.has(address)) cache.delete(address); // refresh insertion order
+  cache.set(address, entry);
+  if (cache.size > CACHE_MAX) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+}
 
 function setCachedHeaders(c: any) {
   // Allow shared caches (CDN, browser) to hold the response so we don't
@@ -64,7 +77,7 @@ unstoppableRoutes.get('/reverse/:address', async (c) => {
 
     // 404 == no reverse record set; treat as a successful negative result.
     if (res.status === 404) {
-      cache.set(address, { name: null, avatar: null, expiresAt: now + CACHE_TTL_MS });
+      setCache(address, { name: null, avatar: null, expiresAt: now + CACHE_TTL_MS });
       setCachedHeaders(c);
       return c.json({ name: null, avatar: null });
     }
@@ -73,7 +86,7 @@ unstoppableRoutes.get('/reverse/:address', async (c) => {
       const text = await res.text().catch(() => '');
       console.warn(`[ud] upstream ${res.status} for ${address}: ${text.slice(0, 200)}`);
       // Negative cache for a short window so repeated failures don't hammer UD.
-      cache.set(address, { name: null, avatar: null, expiresAt: now + 60_000 });
+      setCache(address, { name: null, avatar: null, expiresAt: now + 60_000 });
       return c.json({ name: null, avatar: null });
     }
 
@@ -84,7 +97,7 @@ unstoppableRoutes.get('/reverse/:address', async (c) => {
     const name = data?.meta?.domain ?? null;
     const avatar = data?.records?.['social.picture.value'] ?? null;
 
-    cache.set(address, { name, avatar, expiresAt: now + CACHE_TTL_MS });
+    setCache(address, { name, avatar, expiresAt: now + CACHE_TTL_MS });
     setCachedHeaders(c);
     return c.json({ name, avatar });
   } catch (err) {

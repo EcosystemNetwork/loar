@@ -62,6 +62,22 @@ export function initFirebase() {
       'No valid Firebase credentials — running in degraded mode (in-memory nonces, no Firestore)'
     );
   }
+
+  // In production, a DB-less ("degraded") boot is never acceptable: the env
+  // check only verifies the credential var is *set*, not that it parses /
+  // points at a readable, non-placeholder service account. If init left us
+  // without Firestore here, fail fast rather than silently serving a server
+  // backed only by in-memory state (which loses data on restart and breaks
+  // every persistence path). Dev/test keep degraded mode for offline work.
+  if (process.env.NODE_ENV === 'production' && !firebaseAvailable) {
+    console.error(
+      '❌ FATAL: Firebase is unavailable in production. ' +
+        'FIREBASE_SERVICE_ACCOUNT / FIREBASE_SERVICE_ACCOUNT_PATH is missing, ' +
+        'a placeholder, malformed, unreadable, or the SDK failed to initialize. ' +
+        'Refusing to boot a database-less server.'
+    );
+    process.exit(1);
+  }
 }
 
 export { db, firebaseAvailable };

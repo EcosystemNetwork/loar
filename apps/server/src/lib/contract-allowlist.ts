@@ -60,8 +60,23 @@ if (process.env.CONTRACT_ALLOWLIST_EXTRA) {
 
 // ── Dynamic allowlist (per-universe tokens) ─────────────────────────────────
 // LRU-ish cache so we don't hit Firestore on every tx.
+// The key is `chainId:address` where the address is attacker-controlled (it
+// comes straight from the tx-write request body). Without a cap, an attacker
+// can flood distinct addresses and grow this Map unboundedly (memory DoS).
+// Cap entries and evict the oldest (insertion-ordered Map) when exceeded.
 const DYNAMIC_TTL_MS = 60_000;
+const DYNAMIC_CACHE_MAX = 5_000;
 const dynamicCache = new Map<string, { allowed: boolean; expiresAt: number }>();
+
+function setDynamicCache(key: string, value: { allowed: boolean; expiresAt: number }) {
+  // Refresh insertion order on update.
+  if (dynamicCache.has(key)) dynamicCache.delete(key);
+  dynamicCache.set(key, value);
+  if (dynamicCache.size > DYNAMIC_CACHE_MAX) {
+    const oldest = dynamicCache.keys().next().value;
+    if (oldest !== undefined) dynamicCache.delete(oldest);
+  }
+}
 
 function cacheKey(chainId: number, address: string) {
   return `${chainId}:${LOWER(address)}`;
@@ -88,7 +103,7 @@ async function lookupDynamic(chainId: number, address: string): Promise<boolean>
     .get();
 
   const allowed = !snap.empty;
-  dynamicCache.set(key, { allowed, expiresAt: Date.now() + DYNAMIC_TTL_MS });
+  setDynamicCache(key, { allowed, expiresAt: Date.now() + DYNAMIC_TTL_MS });
   return allowed;
 }
 

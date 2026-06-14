@@ -111,6 +111,32 @@ function defaultVoiceFor(model: TtsModelConfig, requested?: string): string {
   return first.id;
 }
 
+/**
+ * Wrap raw little-endian 16-bit PCM in a minimal WAV (RIFF) container so the
+ * output is playable by a browser <audio> element. Used for Gemini TTS, which
+ * only emits headerless PCM.
+ */
+function pcmToWav(pcm: Buffer, sampleRate: number, channels: number): Buffer {
+  const bitsPerSample = 16;
+  const byteRate = (sampleRate * channels * bitsPerSample) / 8;
+  const blockAlign = (channels * bitsPerSample) / 8;
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + pcm.length, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16); // PCM fmt chunk size
+  header.writeUInt16LE(1, 20); // audio format = PCM
+  header.writeUInt16LE(channels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(bitsPerSample, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([header, pcm]);
+}
+
 function audioMime(format: TtsDispatchInput['format']): string {
   switch (format) {
     case 'wav':
@@ -431,9 +457,24 @@ async function dispatchTtsInner(
         message: 'Gemini TTS returned no audio payload',
       });
     }
+    const raw = Buffer.from(inline.data, 'base64');
+    const mime = inline.mimeType ?? '';
+    // Gemini TTS always returns headerless little-endian 16-bit PCM
+    // (e.g. "audio/L16;codec=pcm;rate=24000"). A bare PCM blob won't play in
+    // a browser <audio> tag, so wrap it in a minimal WAV container. Sample
+    // rate is parsed from the mime when present, else defaults to 24kHz mono.
+    if (/L16|pcm/i.test(mime)) {
+      const rate = Number(/rate=(\d+)/i.exec(mime)?.[1]) || 24_000;
+      return {
+        audioBuffer: pcmToWav(raw, rate, 1),
+        contentType: 'audio/wav',
+        modelId: model.id,
+        provider: model.provider,
+      };
+    }
     return {
-      audioBuffer: Buffer.from(inline.data, 'base64'),
-      contentType: inline.mimeType ?? audioMime(format),
+      audioBuffer: raw,
+      contentType: mime || audioMime(format),
       modelId: model.id,
       provider: model.provider,
     };

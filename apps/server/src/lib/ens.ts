@@ -20,7 +20,11 @@ import { getChainClient } from './chain-client';
 const MAINNET = 1;
 
 // 10-minute in-process cache (mirrors the Unstoppable Domains resolver TTL).
+// Keys derive from attacker-controlled input (arbitrary addresses / ENS names
+// from API callers), so the Map is capped + oldest-evicted to prevent an
+// unbounded-memory DoS via flooding distinct lookups.
 const TTL_MS = 10 * 60_000;
+const CACHE_MAX = 10_000;
 type CacheEntry<T> = { value: T; expiresAt: number };
 const cache = new Map<string, CacheEntry<unknown>>();
 
@@ -31,7 +35,12 @@ function cached<T>(key: string): T | undefined {
   return undefined;
 }
 function put<T>(key: string, value: T): T {
+  if (cache.has(key)) cache.delete(key); // refresh insertion order
   cache.set(key, { value, expiresAt: Date.now() + TTL_MS });
+  if (cache.size > CACHE_MAX) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
   return value;
 }
 

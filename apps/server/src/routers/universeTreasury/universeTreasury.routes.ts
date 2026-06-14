@@ -34,6 +34,42 @@ const TRANSFER_TOPIC =
 /** Allowed chain IDs for treasury payment verification. */
 const ALLOWED_CHAIN_IDS: Set<number> = new Set([sepolia.id, mainnet.id]);
 
+/**
+ * Minimum block confirmations before a treasury payment / revenue deposit can be
+ * credited. Closes the reorg gap (audit M3): a fresh (0–1 conf) receipt can be
+ * reorged out, so we wait ~6 blocks (mirrors entitlements + credits).
+ */
+const MIN_CONFIRMATIONS = 6n;
+
+/**
+ * Fail-closed confirmation guard for value paths. Throws a clear, retryable
+ * error if the tx has fewer than MIN_CONFIRMATIONS confirmations. Per audit M3,
+ * an RPC failure reading the latest block is a HARD failure here (throws) — we
+ * never credit a tx whose finality we couldn't establish.
+ */
+async function assertEnoughConfirmations(
+  client: ReturnType<typeof getTreasuryChainClient>,
+  receipt: { blockNumber: bigint }
+): Promise<void> {
+  let latestBlock: bigint;
+  try {
+    latestBlock = await client.getBlockNumber();
+  } catch {
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message:
+        'Could not confirm transaction finality (RPC error reading latest block). Please retry shortly.',
+    });
+  }
+  const confirmations = latestBlock - receipt.blockNumber;
+  if (confirmations < MIN_CONFIRMATIONS) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Transaction has only ${confirmations} confirmation(s); need ≥ ${MIN_CONFIRMATIONS}. Retry shortly.`,
+    });
+  }
+}
+
 function getTreasuryChainClient(chainId?: number) {
   if (chainId !== undefined && !ALLOWED_CHAIN_IDS.has(chainId)) {
     throw new TRPCError({
@@ -93,6 +129,9 @@ async function verifyTreasuryEthPayment(
   if (receipt.status !== 'success') {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Transaction was reverted on-chain.' });
   }
+
+  // Reorg guard (audit M3) — fail closed before crediting.
+  await assertEnoughConfirmations(client, receipt);
 
   if (tx.to?.toLowerCase() !== TREASURY_ADDRESS.toLowerCase()) {
     throw new TRPCError({
@@ -167,6 +206,9 @@ async function verifyTreasuryLoarPayment(
   if (receipt.status !== 'success') {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Transaction was reverted on-chain.' });
   }
+
+  // Reorg guard (audit M3) — fail closed before crediting.
+  await assertEnoughConfirmations(client, receipt);
 
   const transferLog = receipt.logs.find(
     (log) =>
@@ -721,6 +763,8 @@ export const universeTreasuryRouter = router({
           message: 'Deposit transaction was reverted on-chain.',
         });
       }
+      // Reorg guard (audit M3) — fail closed before minting credits.
+      await assertEnoughConfirmations(client, receipt);
       if (tx.to?.toLowerCase() !== TREASURY_ADDRESS.toLowerCase()) {
         throw new TRPCError({
           code: 'BAD_REQUEST',

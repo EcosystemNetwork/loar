@@ -166,35 +166,96 @@ export async function getAllUniverses(options?: {
 }
 
 /**
+ * Short-TTL in-process cache for the raw hidden/private universe scan.
+ *
+ * `getExcludedUniverseIds` is called on EVERY public content/gallery/entities
+ * request, and each call is an O(N) `select().get()` over the whole universe
+ * collection — a DoS / Firestore-cost amplifier at scale. We cache the raw
+ * per-doc visibility facts (id → {creator, hidden, isPrivate}) for a few
+ * seconds so a burst of public reads collapses to a single scan. The viewer
+ * exemption is applied per-call against the cached facts, so per-viewer
+ * correctness is preserved without keying the cache by viewer.
+ *
+ * Correctness is bounded by TTL: a newly hidden/unhidden/privated universe
+ * becomes visible/invisible within EXCLUSION_CACHE_TTL_MS. The owner-side
+ * write paths (setUniverseHidden/setUniversePrivate) proactively bust the
+ * cache so the actor sees their own change immediately.
+ */
+interface ExcludedUniverseFact {
+  creator: string | null;
+  hidden: boolean;
+  isPrivate: boolean;
+}
+const EXCLUSION_CACHE_TTL_MS = Number(process.env.EXCLUSION_CACHE_TTL_MS ?? '45000');
+let exclusionCache: { facts: ExcludedUniverseFact[]; byId: string[]; ts: number } | null = null;
+let exclusionCacheInflight: Promise<{ facts: ExcludedUniverseFact[]; byId: string[] }> | null =
+  null;
+
+/** Invalidate the exclusion cache (called by visibility write paths). */
+export function invalidateExcludedUniverseCache(): void {
+  exclusionCache = null;
+}
+
+async function loadExcludedUniverseFacts(): Promise<{
+  facts: ExcludedUniverseFact[];
+  byId: string[];
+}> {
+  const now = Date.now();
+  if (exclusionCache && now - exclusionCache.ts < EXCLUSION_CACHE_TTL_MS) {
+    return { facts: exclusionCache.facts, byId: exclusionCache.byId };
+  }
+  // Collapse concurrent misses onto a single scan.
+  if (exclusionCacheInflight) return exclusionCacheInflight;
+
+  exclusionCacheInflight = (async () => {
+    try {
+      const snapshot = await collection().select('creator', 'isHidden', 'isPrivate').get();
+      const facts: ExcludedUniverseFact[] = [];
+      const byId: string[] = [];
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        facts.push({
+          creator: (data.creator as string | undefined)?.toLowerCase() ?? null,
+          hidden: Boolean(data.isHidden),
+          isPrivate: Boolean(data.isPrivate),
+        });
+        byId.push(doc.id);
+      }
+      exclusionCache = { facts, byId, ts: Date.now() };
+      return { facts, byId };
+    } finally {
+      exclusionCacheInflight = null;
+    }
+  })();
+
+  return exclusionCacheInflight;
+}
+
+/**
  * Returns the set of universe IDs (lowercase addresses) whose content must
  * NOT surface on public listing endpoints — union of admin-hidden and
  * owner-private universes. Callers can pass a `viewerAddress` to exempt
  * universes the viewer owns, so creators always see their own content.
  *
  * This is the single chokepoint every public content endpoint calls before
- * returning a list. It's an O(N) scan of the universe collection, which is
- * bounded (few hundred docs today). If it grows: denormalize or add an index.
+ * returning a list. The underlying O(N) scan is cached for a short TTL
+ * (see `loadExcludedUniverseFacts`) so repeated public reads don't each
+ * trigger a full-collection read. The viewer exemption is applied per-call,
+ * so cached facts stay viewer-agnostic.
  */
 export async function getExcludedUniverseIds(options?: {
   viewerAddress?: string;
 }): Promise<Set<string>> {
-  const snapshot = await collection().select('creator', 'isHidden', 'isPrivate').get();
+  const { facts, byId } = await loadExcludedUniverseFacts();
   const viewer = options?.viewerAddress?.toLowerCase();
   const excluded = new Set<string>();
-  for (const doc of snapshot.docs) {
-    const data = doc.data();
-    const hidden = Boolean(data.isHidden);
-    const isPrivate = Boolean(data.isPrivate);
+  for (let i = 0; i < facts.length; i++) {
+    const { creator, hidden, isPrivate } = facts[i];
     if (!hidden && !isPrivate) continue;
-    if (
-      isPrivate &&
-      !hidden &&
-      viewer &&
-      (data.creator as string | undefined)?.toLowerCase() === viewer
-    ) {
+    if (isPrivate && !hidden && viewer && creator === viewer) {
       continue; // owner sees their own private universe content
     }
-    excluded.add(doc.id);
+    excluded.add(byId[i]);
   }
   return excluded;
 }
@@ -231,6 +292,7 @@ export async function setUniverseHidden(
     createdAt: now.toISOString(),
   });
   await batch.commit();
+  invalidateExcludedUniverseCache();
 
   return { id, isHidden };
 }
@@ -268,6 +330,7 @@ export async function setUniversePrivate(
     createdAt: now.toISOString(),
   });
   await batch.commit();
+  invalidateExcludedUniverseCache();
 
   return { id, isPrivate };
 }
@@ -306,6 +369,7 @@ export async function deleteUniverse(
     createdAt: now.toISOString(),
   });
   await batch.commit();
+  invalidateExcludedUniverseCache();
 
   return { id, deleted: true };
 }

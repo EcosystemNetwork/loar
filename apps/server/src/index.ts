@@ -154,7 +154,11 @@ app.route('/api/ud', unstoppableRoutes);
 const { ensRoutes } = await import('./routes/ens');
 app.route('/api/ens', ensRoutes);
 
-// x402 — pay-per-call demo settled in USDC on Arc.
+// x402 — pay-per-call demo settled in USDC on Arc. Each settle is an on-chain
+// `transferWithAuthorization` (RPC + gas paid by the platform signer) on an
+// UNAUTHENTICATED request. An attacker rotating IPs/addresses on the shared
+// 100/min IP bucket could burn RPC quota + gas, so cap /api/x402/* tightly.
+app.use('/api/x402/*', rateLimiter({ windowMs: 60_000, max: 15 }));
 const { x402Routes } = await import('./routes/x402');
 app.route('/api/x402', x402Routes);
 

@@ -83,6 +83,68 @@ const ELEVENLABS_PRESETS: TtsVoicePreset[] = [
   { id: 'yoZ06aMxZJJ28mfd3POQ', name: 'Sam', language: 'multi', gender: 'male', style: 'raspy' },
 ];
 
+// Gemini TTS exposes a fixed set of ~30 prebuilt voices, shared across every
+// Gemini TTS model (`gemini-*-tts*`). Voice is passed via
+// speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName — the `id` here IS
+// that voiceName. Genders are Google's published descriptors; every voice is
+// multilingual (100+ languages, auto-detected from the input text).
+const GEMINI_VOICES: TtsVoicePreset[] = [
+  { id: 'Zephyr', name: 'Zephyr', language: 'multi', gender: 'female', style: 'bright' },
+  { id: 'Puck', name: 'Puck', language: 'multi', gender: 'male', style: 'upbeat' },
+  { id: 'Charon', name: 'Charon', language: 'multi', gender: 'male', style: 'informative' },
+  { id: 'Kore', name: 'Kore', language: 'multi', gender: 'female', style: 'firm' },
+  { id: 'Fenrir', name: 'Fenrir', language: 'multi', gender: 'male', style: 'excitable' },
+  { id: 'Leda', name: 'Leda', language: 'multi', gender: 'female', style: 'youthful' },
+  { id: 'Orus', name: 'Orus', language: 'multi', gender: 'male', style: 'firm' },
+  { id: 'Aoede', name: 'Aoede', language: 'multi', gender: 'female', style: 'breezy' },
+  {
+    id: 'Callirrhoe',
+    name: 'Callirrhoe',
+    language: 'multi',
+    gender: 'female',
+    style: 'easy-going',
+  },
+  { id: 'Autonoe', name: 'Autonoe', language: 'multi', gender: 'female', style: 'bright' },
+  { id: 'Enceladus', name: 'Enceladus', language: 'multi', gender: 'male', style: 'breathy' },
+  { id: 'Iapetus', name: 'Iapetus', language: 'multi', gender: 'male', style: 'clear' },
+  { id: 'Umbriel', name: 'Umbriel', language: 'multi', gender: 'male', style: 'easy-going' },
+  { id: 'Algieba', name: 'Algieba', language: 'multi', gender: 'male', style: 'smooth' },
+  { id: 'Despina', name: 'Despina', language: 'multi', gender: 'female', style: 'smooth' },
+  { id: 'Erinome', name: 'Erinome', language: 'multi', gender: 'female', style: 'clear' },
+  { id: 'Algenib', name: 'Algenib', language: 'multi', gender: 'male', style: 'gravelly' },
+  { id: 'Rasalgethi', name: 'Rasalgethi', language: 'multi', gender: 'male', style: 'informative' },
+  { id: 'Laomedeia', name: 'Laomedeia', language: 'multi', gender: 'female', style: 'upbeat' },
+  { id: 'Achernar', name: 'Achernar', language: 'multi', gender: 'female', style: 'soft' },
+  { id: 'Alnilam', name: 'Alnilam', language: 'multi', gender: 'male', style: 'firm' },
+  { id: 'Schedar', name: 'Schedar', language: 'multi', gender: 'male', style: 'even' },
+  { id: 'Gacrux', name: 'Gacrux', language: 'multi', gender: 'female', style: 'mature' },
+  { id: 'Pulcherrima', name: 'Pulcherrima', language: 'multi', gender: 'female', style: 'forward' },
+  { id: 'Achird', name: 'Achird', language: 'multi', gender: 'male', style: 'friendly' },
+  {
+    id: 'Zubenelgenubi',
+    name: 'Zubenelgenubi',
+    language: 'multi',
+    gender: 'male',
+    style: 'casual',
+  },
+  {
+    id: 'Vindemiatrix',
+    name: 'Vindemiatrix',
+    language: 'multi',
+    gender: 'female',
+    style: 'gentle',
+  },
+  { id: 'Sadachbia', name: 'Sadachbia', language: 'multi', gender: 'male', style: 'lively' },
+  {
+    id: 'Sadaltager',
+    name: 'Sadaltager',
+    language: 'multi',
+    gender: 'male',
+    style: 'knowledgeable',
+  },
+  { id: 'Sulafat', name: 'Sulafat', language: 'multi', gender: 'female', style: 'warm' },
+];
+
 const DEEPGRAM_AURA2_VOICES: TtsVoicePreset[] = [
   { id: 'aura-2-thalia-en', name: 'Thalia', language: 'en', gender: 'female' },
   { id: 'aura-2-andromeda-en', name: 'Andromeda', language: 'en', gender: 'female' },
@@ -409,7 +471,7 @@ export const TTS_MODELS: TtsModelConfig[] = [
     maxChars: 32000,
     supportedFormats: ['mp3', 'wav', 'pcm'],
     supportedLanguages: [],
-    voices: [], // populated by listVoices() at runtime
+    voices: GEMINI_VOICES,
     supportsVoiceClone: false,
     supportsStyleSteer: true,
     supportsStreaming: true,
@@ -438,7 +500,7 @@ export const TTS_MODELS: TtsModelConfig[] = [
     maxChars: 32000,
     supportedFormats: ['mp3', 'wav', 'pcm'],
     supportedLanguages: [],
-    voices: [],
+    voices: GEMINI_VOICES,
     supportsVoiceClone: false,
     supportsStyleSteer: true,
     supportsStreaming: true,
@@ -467,7 +529,7 @@ export const TTS_MODELS: TtsModelConfig[] = [
     maxChars: 32000,
     supportedFormats: ['mp3', 'wav', 'pcm'],
     supportedLanguages: [],
-    voices: [],
+    voices: GEMINI_VOICES,
     supportsVoiceClone: false,
     supportsStyleSteer: true,
     supportsStreaming: true,
