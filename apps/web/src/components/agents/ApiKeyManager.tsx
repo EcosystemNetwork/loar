@@ -13,7 +13,28 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useState } from 'react';
-import { Key, Plus, Trash2, Copy, Eye, EyeOff, Shield } from 'lucide-react';
+import { Key, Plus, Trash2, Copy, Eye, EyeOff, Shield, Terminal } from 'lucide-react';
+
+const LOAR_SERVER_URL = (import.meta as any).env?.VITE_API_URL || 'https://api.loar.fun';
+
+function hermesMcpConfig(rawKey: string) {
+  return JSON.stringify(
+    {
+      mcpServers: {
+        loar: {
+          command: 'npx',
+          args: ['@loar/mcp-server'],
+          env: {
+            LOAR_API_KEY: rawKey,
+            LOAR_SERVER_URL,
+          },
+        },
+      },
+    },
+    null,
+    2
+  );
+}
 
 interface Props {
   aiAgentId?: string;
@@ -43,6 +64,17 @@ export function ApiKeyManager({ aiAgentId }: Props) {
       permissions: prev.permissions.includes(p)
         ? prev.permissions.filter((x) => x !== p)
         : [...prev.permissions, p],
+    }));
+  };
+
+  const allPermissionValues = ((availablePermissions as any[]) ?? []).map((p: any) => p.value);
+  const allSelected =
+    allPermissionValues.length > 0 && form.permissions.length === allPermissionValues.length;
+
+  const toggleSelectAll = () => {
+    setForm((prev) => ({
+      ...prev,
+      permissions: allSelected ? [] : allPermissionValues,
     }));
   };
 
@@ -109,6 +141,25 @@ export function ApiKeyManager({ aiAgentId }: Props) {
               <Copy className="h-4 w-4" />
             </Button>
           </div>
+          <div className="mt-4 border-t border-amber-500/20 pt-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="flex items-center gap-1.5 text-xs font-medium text-amber-400">
+                <Terminal className="h-3.5 w-3.5" />
+                Connect to Hermes (MCP)
+              </p>
+              <Button size="sm" variant="outline" onClick={() => copyKey(hermesMcpConfig(newKey))}>
+                <Copy className="mr-1 h-3 w-3" />
+                Copy config
+              </Button>
+            </div>
+            <p className="mb-2 text-xs text-zinc-400">
+              Paste into your Hermes agent's MCP config (or any MCP client) to give it LOAR tools.
+            </p>
+            <pre className="overflow-x-auto rounded bg-zinc-900 px-3 py-2 font-mono text-[11px] leading-relaxed text-zinc-300">
+              {hermesMcpConfig(newKey)}
+            </pre>
+          </div>
+
           <Button
             size="sm"
             variant="ghost"
@@ -130,7 +181,17 @@ export function ApiKeyManager({ aiAgentId }: Props) {
           />
 
           <div>
-            <p className="mb-2 text-xs text-zinc-400">Permissions</p>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs text-zinc-400">Permissions</p>
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                disabled={allPermissionValues.length === 0}
+                className="text-xs font-medium text-amber-400 hover:text-amber-300 disabled:opacity-40"
+              >
+                {allSelected ? 'Clear all' : 'Select all'}
+              </button>
+            </div>
             <div className="flex flex-wrap gap-1">
               {(availablePermissions as any[])?.map((p: any) => (
                 <Badge

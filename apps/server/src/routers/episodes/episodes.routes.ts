@@ -56,9 +56,26 @@ const EPISODE_CANONIZED_EVENT_ABI = [
 const controlRate = new Map<string, number[]>();
 const CONTROL_WINDOW_MS = 60_000;
 const CONTROL_MAX = 30; // per user per minute
+// Bound the map: it's keyed per distinct uid, so without a cap + sweep it grows
+// for every user that ever hits a control endpoint and never shrinks. Sweep
+// expired buckets opportunistically and hard-cap the entry count.
+const CONTROL_RATE_MAX_KEYS = 50_000;
+let lastControlSweep = 0;
+const CONTROL_SWEEP_INTERVAL_MS = 60_000;
+
+function sweepControlRate(now: number): void {
+  if (now - lastControlSweep < CONTROL_SWEEP_INTERVAL_MS) return;
+  lastControlSweep = now;
+  for (const [uid, arr] of controlRate) {
+    const fresh = arr.filter((t) => now - t < CONTROL_WINDOW_MS);
+    if (fresh.length === 0) controlRate.delete(uid);
+    else if (fresh.length !== arr.length) controlRate.set(uid, fresh);
+  }
+}
 
 function checkControlRate(uid: string): void {
   const now = Date.now();
+  sweepControlRate(now);
   const arr = (controlRate.get(uid) ?? []).filter((t) => now - t < CONTROL_WINDOW_MS);
   if (arr.length >= CONTROL_MAX) {
     throw new TRPCError({
@@ -67,7 +84,13 @@ function checkControlRate(uid: string): void {
     });
   }
   arr.push(now);
+  // Refresh insertion order, then hard-cap by evicting the oldest key.
+  if (controlRate.has(uid)) controlRate.delete(uid);
   controlRate.set(uid, arr);
+  if (controlRate.size > CONTROL_RATE_MAX_KEYS) {
+    const oldest = controlRate.keys().next().value;
+    if (oldest !== undefined) controlRate.delete(oldest);
+  }
 }
 
 const episodesCol = () => {

@@ -17,7 +17,7 @@ import { AssetRow } from '../../src/components/portfolio/AssetRow';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { SectionHeader } from '../../src/components/ui/SectionHeader';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { trpc } from '../../src/lib/trpc';
+import { trpc, type RouterOutputs } from '../../src/lib/trpc';
 import type { PortfolioSummary } from '../../src/types';
 
 export default function PortfolioHomeScreen() {
@@ -30,7 +30,7 @@ export default function PortfolioHomeScreen() {
   const isLoading = portfolioQuery.isLoading;
   const refetch = () => portfolioQuery.refetch();
 
-  const data = portfolioQuery.data;
+  const data = portfolioQuery.data as RouterOutputs['portfolio']['summary'] | undefined;
   const universes = data?.universes ?? [];
 
   const summary: PortfolioSummary = {

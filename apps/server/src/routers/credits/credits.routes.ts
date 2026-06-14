@@ -57,6 +57,13 @@ const ALLOWED_CHAIN_IDS: Set<number> = new Set([sepolia.id, mainnet.id]);
 /** Maximum age of a payment tx that can still be redeemed for credits (amplifies PAY-01). */
 const MAX_TX_AGE_SECONDS = 24 * 60 * 60; // 24 hours
 
+/**
+ * Minimum block confirmations before an ETH payment can be redeemed for credits.
+ * Closes the reorg gap (audit M3/M4): a 0–1 conf receipt can be reorged out and
+ * the funds returned to the payer, so we wait ~6 blocks (mirrors entitlements).
+ */
+const MIN_CONFIRMATIONS = 6n;
+
 // ── RPC response cache (prevents DoS via repeated verification calls) ───
 const TX_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const TX_CACHE_MAX = 500;
@@ -165,8 +172,31 @@ async function verifyEthPayment(
     );
   }
 
+  // Confirmation guard (audit M3/M4): refuse to credit a tx that has not yet
+  // accumulated enough confirmations — a fresh receipt can be reorged out and
+  // the ETH returned to the payer. This is a HARD, fail-closed check: if the
+  // latest-block lookup fails we throw rather than silently crediting.
+  let latestBlock: bigint;
+  try {
+    latestBlock = await getCachedOrFetch(`latestblock-${cacheChain}`, () =>
+      client.getBlockNumber()
+    );
+  } catch {
+    throw new Error(
+      'Could not confirm payment finality (RPC error reading latest block). Please retry shortly.'
+    );
+  }
+  const confirmations = latestBlock - receipt.blockNumber;
+  if (confirmations < MIN_CONFIRMATIONS) {
+    throw new Error(
+      `Transaction has only ${confirmations} confirmation(s); need ≥ ${MIN_CONFIRMATIONS}. Retry shortly.`
+    );
+  }
+
   // Amplifies PAY-01: reject txs older than MAX_TX_AGE_SECONDS. Combined with dedup
-  // this shrinks the window in which a leaked tx hash is replayable.
+  // this shrinks the window in which a leaked tx hash is replayable. This age check
+  // stays best-effort — an RPC hiccup here falls through (dedup + confirmations
+  // above still protect us); only confirmations are fail-closed.
   try {
     const block = await getCachedOrFetch(
       `block-${cacheChain}-${receipt.blockNumber.toString()}`,

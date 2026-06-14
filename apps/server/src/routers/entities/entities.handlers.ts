@@ -155,6 +155,14 @@ export async function getEntity(first: string, second?: string): Promise<Entity 
   return { id: doc.id, ...doc.data() } as Entity;
 }
 
+/**
+ * Default page size applied when a caller omits `limit`. Previously an omitted
+ * limit meant "read the entire universe's entities" — an unbounded scan that
+ * grows with the universe. We now always bound the read; callers wanting more
+ * page forward via `nextCursorId`.
+ */
+const DEFAULT_ENTITY_PAGE_LIMIT = 100;
+
 export async function getEntitiesByUniverse(
   universeAddress: string,
   kind?: EntityKind,
@@ -162,6 +170,7 @@ export async function getEntitiesByUniverse(
   cursorId?: string
 ): Promise<{ entities: Entity[]; nextCursorId: string | null }> {
   const col = entitiesCol();
+  const pageLimit = limit ?? DEFAULT_ENTITY_PAGE_LIMIT;
   let query: FirebaseFirestore.Query = col.where(
     'universeAddress',
     '==',
@@ -181,14 +190,12 @@ export async function getEntitiesByUniverse(
     }
   }
 
-  if (limit) {
-    query = query.limit(limit);
-  }
+  query = query.limit(pageLimit);
 
   const snapshot = await query.get();
   const entities = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Entity);
   const nextCursorId =
-    limit && snapshot.docs.length === limit ? snapshot.docs[snapshot.docs.length - 1].id : null;
+    snapshot.docs.length === pageLimit ? snapshot.docs[snapshot.docs.length - 1].id : null;
   return { entities, nextCursorId };
 }
 
@@ -537,32 +544,77 @@ export async function deleteRelation(relationId: string, caller: string): Promis
   await ref.delete();
 }
 
-/** Get all relationships where entity is source OR target. */
-export async function getEntityRelations(entityId: string): Promise<
-  Array<
-    EntityRelation & {
-      sourceName: string;
-      targetName: string;
-      sourceKind: string;
-      targetKind: string;
-      sourceImageUrl: string | null;
-      targetImageUrl: string | null;
+type HydratedEntityRelation = EntityRelation & {
+  sourceName: string;
+  targetName: string;
+  sourceKind: string;
+  targetKind: string;
+  sourceImageUrl: string | null;
+  targetImageUrl: string | null;
+};
+
+/** Default cap on relations returned per call (per direction, then merged). */
+const DEFAULT_RELATIONS_LIMIT = 100;
+
+/**
+ * Get relationships where entity is source OR target.
+ *
+ * Firestore can't OR across two fields, so we run two queries. Each direction
+ * is now bounded by `limit` (default 100) instead of reading the entire
+ * matching set unbounded. An optional `cursorId` (id of the last item from a
+ * previous page) is applied to BOTH sub-queries via `startAfter`, so paging is
+ * monotonic. `nextCursorId` is returned alongside the rows; it is non-null only
+ * when a sub-query was saturated (i.e. more may exist).
+ */
+export async function getEntityRelations(
+  entityId: string,
+  opts?: { limit?: number; cursorId?: string }
+): Promise<{ relations: HydratedEntityRelation[]; nextCursorId: string | null }> {
+  const limit = opts?.limit ?? DEFAULT_RELATIONS_LIMIT;
+  const rcol = relationsCol();
+
+  const buildQuery = (field: 'sourceId' | 'targetId') =>
+    rcol
+      .where(field, '==', entityId)
+      .orderBy('createdAt', 'desc')
+      .orderBy('__name__', 'desc')
+      .limit(limit);
+
+  let sourceQuery: FirebaseFirestore.Query = buildQuery('sourceId');
+  let targetQuery: FirebaseFirestore.Query = buildQuery('targetId');
+
+  if (opts?.cursorId) {
+    const cursorDoc = await rcol.doc(opts.cursorId).get();
+    if (cursorDoc.exists) {
+      sourceQuery = sourceQuery.startAfter(cursorDoc);
+      targetQuery = targetQuery.startAfter(cursorDoc);
     }
-  >
-> {
+  }
+
   // Firestore doesn't support OR queries across different fields,
-  // so we run two queries in parallel
-  const [asSourceSnap, asTargetSnap] = await Promise.all([
-    relationsCol().where('sourceId', '==', entityId).get(),
-    relationsCol().where('targetId', '==', entityId).get(),
-  ]);
+  // so we run two bounded queries in parallel.
+  const [asSourceSnap, asTargetSnap] = await Promise.all([sourceQuery.get(), targetQuery.get()]);
 
-  const relations = [
-    ...asSourceSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as EntityRelation),
-    ...asTargetSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as EntityRelation),
-  ];
+  const saturated = asSourceSnap.docs.length === limit || asTargetSnap.docs.length === limit;
 
-  if (relations.length === 0) return [];
+  // Merge, de-dupe (an entity related to itself can't happen, but a doc can't
+  // appear in both sets anyway), sort by createdAt desc, and cap to `limit`.
+  const merged = new Map<string, EntityRelation>();
+  for (const doc of [...asSourceSnap.docs, ...asTargetSnap.docs]) {
+    merged.set(doc.id, { id: doc.id, ...doc.data() } as EntityRelation);
+  }
+  const relations = Array.from(merged.values())
+    .sort((a, b) => {
+      const at = (a.createdAt as any)?.toMillis?.() ?? new Date(a.createdAt as any).getTime() ?? 0;
+      const bt = (b.createdAt as any)?.toMillis?.() ?? new Date(b.createdAt as any).getTime() ?? 0;
+      return bt - at;
+    })
+    .slice(0, limit);
+
+  const nextCursorId =
+    saturated && relations.length > 0 ? relations[relations.length - 1].id : null;
+
+  if (relations.length === 0) return { relations: [], nextCursorId: null };
 
   // Batch-fetch related entity names to avoid N+1
   const relatedIds = new Set<string>();
@@ -580,7 +632,7 @@ export async function getEntityRelations(entityId: string): Promise<
     }
   }
 
-  return relations.map((rel) => ({
+  const hydrated: HydratedEntityRelation[] = relations.map((rel) => ({
     ...rel,
     sourceName: entityMap.get(rel.sourceId)?.name ?? 'Unknown',
     targetName: entityMap.get(rel.targetId)?.name ?? 'Unknown',
@@ -589,6 +641,8 @@ export async function getEntityRelations(entityId: string): Promise<
     sourceImageUrl: entityMap.get(rel.sourceId)?.imageUrl ?? null,
     targetImageUrl: entityMap.get(rel.targetId)?.imageUrl ?? null,
   }));
+
+  return { relations: hydrated, nextCursorId };
 }
 
 /** Get all relationships within a universe. */

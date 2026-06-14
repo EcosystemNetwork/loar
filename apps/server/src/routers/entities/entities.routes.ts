@@ -447,12 +447,26 @@ export const entitiesRouter = router({
 
   // ── Relationships ──────────────────────────────────────────────────
 
-  /** Get all relationships for a specific entity. */
+  /**
+   * Get relationships for a specific entity. Cursor-paginated (default 100)
+   * so an entity with a huge web of relations can't trigger an unbounded
+   * two-query scan. `relations` shape is unchanged for existing callers;
+   * `nextCursor` is additive.
+   */
   relations: publicProcedure
-    .input(z.object({ entityId: z.string().min(1) }))
+    .input(
+      z.object({
+        entityId: z.string().min(1),
+        limit: z.number().int().positive().max(200).default(100),
+        cursor: z.string().optional(),
+      })
+    )
     .query(async ({ input }) => {
-      const relations = await getEntityRelations(input.entityId);
-      return { relations };
+      const { relations, nextCursorId } = await getEntityRelations(input.entityId, {
+        limit: input.limit,
+        cursorId: input.cursor,
+      });
+      return { relations, nextCursor: nextCursorId };
     }),
 
   /** Get all relationships within a universe. */

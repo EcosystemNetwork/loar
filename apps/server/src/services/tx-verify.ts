@@ -113,6 +113,15 @@ export async function claimTxHash(params: {
   });
 }
 
+/**
+ * Default minimum block confirmations required before a value-bearing tx can be
+ * claimed. Closes the reorg gap (audit M3): a freshly-mined (0–1 conf) receipt
+ * can still be reorged out, so we wait a few blocks before crediting. This is
+ * the shared default for verifyAndClaimTx (nft / listings / splits). The bespoke
+ * credits/treasury flows use a higher MIN_CONFIRMATIONS = 6 in their own files.
+ */
+export const VERIFY_TX_MIN_CONFIRMATIONS = 3;
+
 export interface VerifyTxBinding {
   /** Require `tx.from` to equal this address (lowercase-compared). */
   expectedFrom?: string;
@@ -122,6 +131,11 @@ export interface VerifyTxBinding {
   minValueWei?: string;
   /** Chain ID (defaults to Sepolia). */
   chainId?: number;
+  /**
+   * Minimum block confirmations before this tx may be claimed. Defaults to
+   * VERIFY_TX_MIN_CONFIRMATIONS (3). Set to 0 to disable (non-value paths only).
+   */
+  minConfirmations?: number;
 }
 
 /**
@@ -188,6 +202,36 @@ export async function verifyAndClaimTx(
 
   if (receipt.status !== 'success') {
     throw new Error('Transaction was reverted on-chain.');
+  }
+
+  // 2b. Confirmation guard (audit M3) — a tx that has just been mined can still
+  // be reorged out, so refuse to claim until it has enough confirmations.
+  // Per M3 this is a HARD gate on the value path: if the block-number lookup
+  // itself fails (RPC hiccup) we throw rather than silently proceeding, because
+  // proceeding would credit a tx whose finality we couldn't establish.
+  const minConfirmations = binding.minConfirmations ?? VERIFY_TX_MIN_CONFIRMATIONS;
+  if (minConfirmations > 0) {
+    // A receipt without a usable blockNumber can't be confirmation-checked;
+    // treat that as not-yet-final (retryable) rather than assuming finality.
+    if (receipt.blockNumber === undefined || receipt.blockNumber === null) {
+      throw new Error(
+        `Transaction has no block number yet; need ≥ ${minConfirmations} confirmation(s). Retry shortly.`
+      );
+    }
+    let latestBlock: bigint;
+    try {
+      latestBlock = await client.getBlockNumber();
+    } catch {
+      throw new Error(
+        'Could not confirm transaction finality (RPC error reading latest block). Retry shortly.'
+      );
+    }
+    const confirmations = latestBlock - BigInt(receipt.blockNumber);
+    if (confirmations < BigInt(minConfirmations)) {
+      throw new Error(
+        `Transaction has only ${confirmations} confirmation(s); need ≥ ${minConfirmations}. Retry shortly.`
+      );
+    }
   }
 
   // 3. Binding checks — reject if the tx doesn't match the expected principals.

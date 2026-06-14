@@ -13,9 +13,57 @@
  *   X402_PRICE_USDC — price per call (defaults to "0.01")
  */
 import { Hono } from 'hono';
-import { buildPaymentRequired, settlePayment, encodePaymentResponse } from '../lib/x402';
+import { parseUnits } from 'viem';
+import { USDC_DECIMALS } from '../lib/arc';
+import {
+  buildPaymentRequired,
+  settlePayment,
+  encodePaymentResponse,
+  parsePaymentHeader,
+} from '../lib/x402';
 
 export const x402Routes = new Hono();
+
+/**
+ * Cheap, RPC-free pre-validation of the X-PAYMENT header. Rejects malformed,
+ * misdirected, underpaid, or expired authorizations BEFORE settlePayment does
+ * any on-chain work (signature recovery domain read, nonce read, and the gas-
+ * paying broadcast). Returns a human reason on failure, or null when the
+ * payload passes these local checks and is worth settling on-chain.
+ *
+ * Deliberately does NOT recover the signature here — that needs the token's
+ * EIP-712 domain (an RPC on cold start) and is performed by settlePayment.
+ * The goal is to drop the obvious garbage an attacker can spray for free.
+ */
+function localPaymentPrecheck(args: {
+  header: string | undefined | null;
+  payTo: string;
+  amountUsdc: string;
+}): string | null {
+  const payload = parsePaymentHeader(args.header);
+  if (!payload) return 'missing or malformed X-PAYMENT header';
+
+  const a = payload.payload.authorization;
+  if (!a?.to || a.to.toLowerCase() !== args.payTo.toLowerCase()) {
+    return 'authorization `to` != payTo';
+  }
+
+  let required: bigint;
+  let value: bigint;
+  try {
+    required = parseUnits(args.amountUsdc, USDC_DECIMALS);
+    value = BigInt(a.value);
+  } catch {
+    return 'bad value';
+  }
+  if (value < required) return 'amount below required';
+
+  const now = Math.floor(Date.now() / 1000);
+  if (Number(a.validAfter) > now) return 'not yet valid';
+  if (Number(a.validBefore) <= now) return 'authorization expired';
+
+  return null;
+}
 
 function payTo(): string | null {
   return process.env.X402_PAY_TO || process.env.TREASURY_ADDRESS || null;
@@ -39,6 +87,24 @@ x402Routes.post('/echo', async (c) => {
         payTo: recipient,
         resource,
         description: 'Echo service — pay-per-call demo',
+      }),
+      402
+    );
+  }
+
+  // Cheap local pre-check — reject obviously-bad payloads before any RPC/gas.
+  const precheckError = localPaymentPrecheck({
+    header: payment,
+    payTo: recipient,
+    amountUsdc: price(),
+  });
+  if (precheckError) {
+    return c.json(
+      await buildPaymentRequired({
+        amountUsdc: price(),
+        payTo: recipient,
+        resource,
+        error: precheckError,
       }),
       402
     );

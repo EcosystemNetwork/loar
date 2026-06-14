@@ -21,25 +21,53 @@ const eventWikisCol = () => {
 };
 
 export const wikiRouter = router({
-  /** List characters from the wiki database, optionally filtered by universe. */
+  /**
+   * List characters from the wiki database, optionally filtered by universe.
+   *
+   * When `universeId` is omitted this used to read the ENTIRE `characters`
+   * collection (unbounded full-collection scan / DoS + cost vector). It is now
+   * always bounded: filtered queries page by `universe_id`; the unfiltered
+   * "all characters" path is capped at `limit` (default 50) with an opaque
+   * doc-id `cursor` for follow-up pages. `nextCursor` is null on the last page.
+   */
   characters: publicProcedure
-    .input(z.object({ universeId: z.string().optional() }).optional())
+    .input(
+      z
+        .object({
+          universeId: z.string().optional(),
+          limit: z.number().int().positive().max(200).default(50),
+          cursor: z.string().optional(),
+        })
+        .optional()
+    )
     .query(async ({ input }) => {
+      const limit = input?.limit ?? 50;
       try {
         const col = charactersCol();
-        const query = input?.universeId ? col.where('universe_id', '==', input.universeId) : col;
-        const snapshot = await query.get();
+        let query: FirebaseFirestore.Query = input?.universeId
+          ? col.where('universe_id', '==', input.universeId)
+          : col;
+        query = query.orderBy('__name__');
+        if (input?.cursor) {
+          const cursorDoc = await col.doc(input.cursor).get();
+          if (cursorDoc.exists) query = query.startAfter(cursorDoc);
+        }
+        const snapshot = await query.limit(limit).get();
         const result = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
+        const nextCursor =
+          snapshot.docs.length === limit ? snapshot.docs[snapshot.docs.length - 1].id : null;
         return {
           metadata: {
             version: '5.0',
             created_at: new Date().toISOString(),
             total_characters: result.length,
             last_updated: new Date().toISOString(),
+            nextCursor,
           },
+          nextCursor,
           characters: result.map((char: any) => ({
             id: char.id,
             character_name: char.character_name,
@@ -256,26 +284,47 @@ export const wikiRouter = router({
       };
     }),
 
-  /** Get all wiki entries for a universe. */
+  /**
+   * Get wiki entries for a universe. Previously read the whole
+   * `universeId`-filtered set with no cap; now cursor-paginated (default 50,
+   * opaque doc-id `cursor`) so a universe with thousands of event wikis can't
+   * return everything in one request. `nextCursor` is null on the last page.
+   */
   getUniverseWikis: publicProcedure
-    .input(z.object({ universeId: z.string() }))
+    .input(
+      z.object({
+        universeId: z.string(),
+        limit: z.number().int().positive().max(200).default(50),
+        cursor: z.string().optional(),
+      })
+    )
     .query(async ({ input }) => {
-      const snapshot = await eventWikisCol().where('universeId', '==', input.universeId).get();
+      const col = eventWikisCol();
+      let query: FirebaseFirestore.Query = col
+        .where('universeId', '==', input.universeId)
+        .orderBy('generatedAt', 'asc')
+        .orderBy('__name__', 'asc');
 
-      return snapshot.docs
-        .map((doc) => {
-          const data = doc.data()!;
-          return {
-            id: doc.id,
-            universeId: data.universeId as string,
-            eventId: data.eventId as string,
-            wikiData: data.wikiData as any,
-            generatedAt: data.generatedAt?.toDate?.()?.toISOString?.() ?? null,
-          };
-        })
-        .sort(
-          (a, b) => new Date(a.generatedAt ?? 0).getTime() - new Date(b.generatedAt ?? 0).getTime()
-        );
+      if (input.cursor) {
+        const cursorDoc = await col.doc(input.cursor).get();
+        if (cursorDoc.exists) query = query.startAfter(cursorDoc);
+      }
+
+      const snapshot = await query.limit(input.limit).get();
+      const items = snapshot.docs.map((doc) => {
+        const data = doc.data()!;
+        return {
+          id: doc.id,
+          universeId: data.universeId as string,
+          eventId: data.eventId as string,
+          wikiData: data.wikiData as any,
+          generatedAt: data.generatedAt?.toDate?.()?.toISOString?.() ?? null,
+        };
+      });
+      const nextCursor =
+        snapshot.docs.length === input.limit ? snapshot.docs[snapshot.docs.length - 1].id : null;
+
+      return { items, nextCursor };
     }),
 
   /** Improve a user's video prompt using Gemini. */

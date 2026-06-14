@@ -346,15 +346,34 @@ export const marketplaceRouter = router({
       return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     }),
 
-  getCanon: publicProcedure.input(z.object({ universeId: z.string() })).query(async ({ input }) => {
-    const snapshot = await submissionsCol()
-      .where('universeId', '==', input.universeId)
-      .where('status', '==', 'ACCEPTED')
-      .orderBy('finalizedAt', 'desc')
-      .get();
+  getCanon: publicProcedure
+    .input(
+      z.object({
+        universeId: z.string(),
+        limit: z.number().min(1).max(100).default(50),
+        /** Opaque doc-id cursor from a previous page's `nextCursor`. */
+        cursor: z.string().optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      let query: FirebaseFirestore.Query = submissionsCol()
+        .where('universeId', '==', input.universeId)
+        .where('status', '==', 'ACCEPTED')
+        .orderBy('finalizedAt', 'desc')
+        .orderBy('__name__', 'desc');
 
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  }),
+      if (input.cursor) {
+        const cursorDoc = await submissionsCol().doc(input.cursor).get();
+        if (cursorDoc.exists) query = query.startAfter(cursorDoc);
+      }
+
+      const snapshot = await query.limit(input.limit).get();
+
+      // Output shape kept as a bare array for backward compatibility (existing
+      // web `useCanon` + MCP `getCanon` consumers iterate it directly). To page,
+      // pass the `id` of the last returned item as `cursor` on the next call.
+      return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    }),
 
   // ---- Licensing ----
 
