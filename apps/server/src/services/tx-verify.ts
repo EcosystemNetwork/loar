@@ -61,6 +61,58 @@ const usedTxCol = () => {
   return db.collection('usedTransactionHashes');
 };
 
+/** Dedup doc id — chain-scoped so the same hash on two chains is distinct, but
+ *  one hash on a given chain can only ever be claimed once across ALL flows. */
+function txClaimDocId(chainId: number | undefined, normalizedHash: string): string {
+  return `${chainId ?? sepolia.id}:${normalizedHash}`;
+}
+
+/**
+ * Atomically claim a txHash so it can never be redeemed twice — the single
+ * cross-flow dedup authority. credits, entitlements, treasury, and NFT /
+ * listing / split purchases ALL claim here, so one on-chain payment to the
+ * platform treasury can't be cashed in for multiple products (PAY-01).
+ *
+ * Throws if the hash was already claimed for a DIFFERENT purpose or by a
+ * different user (the cross-product / cross-user replay the audit flagged).
+ * A same-user + same-purpose repeat is treated as an idempotent re-submit and
+ * returns silently, so legit client double-submits (page refresh, double-tap)
+ * don't error.
+ *
+ * Does NOT verify the tx on-chain — pair with verifyTxReceipt / verifyAndClaimTx
+ * (which call this) or call after your own receipt verification.
+ */
+export async function claimTxHash(params: {
+  txHash: string;
+  purpose: string;
+  callerUid: string;
+  chainId?: number;
+}): Promise<void> {
+  if (!params.txHash || !params.txHash.startsWith('0x') || params.txHash.length !== 66) {
+    throw new Error('Invalid transaction hash format');
+  }
+  const normalizedHash = params.txHash.toLowerCase();
+  const ref = usedTxCol().doc(txClaimDocId(params.chainId, normalizedHash));
+  await db.runTransaction(async (t) => {
+    const snap = await t.get(ref);
+    if (snap.exists) {
+      const data = snap.data()!;
+      // Idempotent: the original payer re-submitting for the SAME purpose is OK.
+      // Anything else (different product/purpose or different user) is replay.
+      if (data.callerUid === params.callerUid && data.purpose === params.purpose) return;
+      throw new Error(
+        `Transaction ${params.txHash} has already been used for "${data.purpose}". Each transaction can only be claimed once.`
+      );
+    }
+    t.set(ref, {
+      purpose: params.purpose,
+      callerUid: params.callerUid,
+      chainId: params.chainId ?? sepolia.id,
+      claimedAt: new Date(),
+    });
+  });
+}
+
 export interface VerifyTxBinding {
   /** Require `tx.from` to equal this address (lowercase-compared). */
   expectedFrom?: string;
@@ -102,8 +154,8 @@ export async function verifyAndClaimTx(
 
   const normalizedHash = txHash.toLowerCase();
 
-  // 1. Deduplication — check if this txHash was already used
-  const existingDoc = await usedTxCol().doc(normalizedHash).get();
+  // 1. Deduplication — cheap pre-check (the authoritative atomic claim is step 4)
+  const existingDoc = await usedTxCol().doc(txClaimDocId(chainId, normalizedHash)).get();
   if (existingDoc.exists) {
     const data = existingDoc.data()!;
     throw new Error(
@@ -159,15 +211,8 @@ export async function verifyAndClaimTx(
     }
   }
 
-  // 4. Mark txHash as claimed (atomic write)
-  await usedTxCol()
-    .doc(normalizedHash)
-    .set({
-      purpose,
-      callerUid,
-      chainId: chainId ?? sepolia.id,
-      claimedAt: new Date(),
-    });
+  // 4. Atomically claim the txHash (cross-flow dedup authority).
+  await claimTxHash({ txHash, purpose, callerUid, chainId });
 
   return { receipt, tx };
 }

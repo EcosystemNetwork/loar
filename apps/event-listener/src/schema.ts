@@ -33,7 +33,7 @@ export interface EventEnvelope {
 
 /** Doc stored per-chain at `indexerCheckpoints/{chain}`. */
 export interface IndexerCheckpoint {
-  chain: string; // 'sepolia' | 'base-sepolia' | 'base'
+  chain: string; // 'sepolia' (testnet) | 'mainnet'
   chainId: number;
   lastBlockIndexed: number;
   lastBlockFinalized: number;

@@ -16,6 +16,7 @@ import { randomUUID } from 'crypto';
 import { FIAT_MARGIN, LOAR_MARGIN, LOAR_TO_USD } from '../../services/video-models';
 import { getPlatformConfig } from '../../services/platformConfig';
 import { verifyStripePayment } from './stripe.routes';
+import { claimTxHash } from '../../services/tx-verify';
 import { reconcileSingleOrder, reconcileOrders } from '../../services/order-reconciliation';
 import { createPublicClient, http, parseUnits, type Hash } from 'viem';
 import { sepolia, mainnet } from 'viem/chains';
@@ -465,6 +466,15 @@ export const creditsRouter = router({
           throw new Error('ETH pricing is not configured. Cannot verify payment amount.');
         }
         await verifyEthPayment(input.paymentRef, input.chainId, pkg.ethPriceWei, ctx.user.address);
+        // Cross-flow dedup (PAY-01): burn this txHash in the shared ledger so the
+        // same on-chain payment can't ALSO be redeemed via entitlements/treasury.
+        // Idempotent for the same user+purpose, so legit re-submits still work.
+        await claimTxHash({
+          txHash: input.paymentRef,
+          purpose: `credits:${input.packageId}`,
+          callerUid: ctx.user.uid,
+          chainId: input.chainId,
+        });
       } else {
         // card: Verify Stripe PaymentIntent succeeded with correct package and amount
         const expectedCents = Math.round(pkg.fiatPriceUsd * 100);

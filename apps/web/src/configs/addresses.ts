@@ -1,9 +1,5 @@
 /**
- * Contract Address Registry — Ethereum Sepolia (11155111).
- *
- * Mainnet (1) is a supported chain for swaps/trading but has no LOAR contract
- * deploy yet — getEvmAddresses(1) returns null and contract-gated features
- * no-op there. Add a `1: {...}` block here after a mainnet deploy.
+ * Contract Address Registry — Sepolia + Base Sepolia
  *
  * Auto-generated from deployment manifests. To update, run:
  *   pnpm sync:addresses

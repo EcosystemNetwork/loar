@@ -29,6 +29,7 @@ import { adminProcedure, protectedProcedure, publicProcedure, router } from '../
 import { firebaseAvailable } from '../../lib/firebase';
 import { getStripe } from '../credits/stripe.routes';
 import { getPlatformConfig } from '../../services/platformConfig';
+import { claimTxHash } from '../../services/tx-verify';
 import {
   EntitlementAlreadyActiveError,
   getEntitlement,
@@ -311,6 +312,16 @@ export const entitlementsRouter = router({
         chainId: input.chainId,
         expectedSender: ctx.user.address,
         expectedMinWei,
+      });
+
+      // Cross-flow dedup (PAY-01): one on-chain payment funds exactly one
+      // product. Burns the txHash in the shared ledger so it can't also be
+      // redeemed for credits / treasury. Idempotent for the same user+purpose.
+      await claimTxHash({
+        txHash: input.txHash,
+        purpose: 'byok-unlock:eth',
+        callerUid: ctx.user.uid,
+        chainId: input.chainId,
       });
 
       try {

@@ -19,7 +19,7 @@ import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import { createPublicClient, http, getAddress, type Address } from 'viem';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { sepolia } from 'viem/chains';
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 interface ChainCfg {
@@ -27,9 +27,11 @@ interface ChainCfg {
   environment: string;
   manifestFile: string;
   rpc: string;
-  chain: typeof sepolia | typeof baseSepolia;
+  chain: typeof sepolia;
 }
 
+// ETH-only: Sepolia is the sole supported deployment target. (Base/Solana
+// deprecated — see docs/evm-mainnet-cutover.md.)
 const CHAINS: Record<string, ChainCfg> = {
   sepolia: {
     chainId: 11155111,
@@ -41,21 +43,11 @@ const CHAINS: Record<string, ChainCfg> = {
       'https://ethereum-sepolia-rpc.publicnode.com',
     chain: sepolia,
   },
-  'base-sepolia': {
-    chainId: 84532,
-    environment: 'base-sepolia',
-    manifestFile: 'deployments/base-sepolia.json',
-    rpc:
-      process.env.RPC_84532 ??
-      process.env.RPC_URL_BASE_SEPOLIA ??
-      'https://base-sepolia-rpc.publicnode.com',
-    chain: baseSepolia,
-  },
 };
 
 const APPLY = process.argv.includes('--apply');
 const chainArg = process.argv.find((a) => a.startsWith('--chain='))?.split('=')[1];
-const CHAINS_TO_RUN = chainArg ? [chainArg] : ['sepolia', 'base-sepolia'];
+const CHAINS_TO_RUN = chainArg ? [chainArg] : ['sepolia'];
 
 // UpgradeableBeacon entries are still skipped — the beacon address itself isn't
 // the user-facing contract. ERC1967Proxy entries are NO LONGER skipped: every
@@ -413,7 +405,7 @@ async function main() {
     loarFaucet: 'LoarFaucet',
   };
   const ZERO = '0x0000000000000000000000000000000000000000';
-  const webChains = [11155111, 84532] as const;
+  const webChains = [11155111] as const;
   const webMap: Record<number, Record<string, string>> = {};
   for (const chainId of webChains) {
     const manifest = allManifests.find((m) => m.chainId === chainId);

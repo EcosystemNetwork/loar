@@ -85,19 +85,11 @@ export const LicensingRegistry = {
 
 export type LicensingRegistryChainId = keyof typeof LicensingRegistry;
 
-export const LoarFaucet = {} as const;
-
-export type LoarFaucetChainId = keyof typeof LoarFaucet;
-
 export const LoarFeeLocker = {
   '11155111': '0x965f5C192E38b86Fa4a79A561E695C48B1DC3582',
 } as const;
 
 export type LoarFeeLockerChainId = keyof typeof LoarFeeLocker;
-
-export const LoarHookStaticFee = {} as const;
-
-export type LoarHookStaticFeeChainId = keyof typeof LoarHookStaticFee;
 
 export const LoarLpLockerMultiple = {
   '11155111': '0x7d30fd57e44aB0ca407D312976816E7052905E0A',
@@ -123,10 +115,6 @@ export const PaymentRouter = {
 
 export type PaymentRouterChainId = keyof typeof PaymentRouter;
 
-export const PositionManager = {} as const;
-
-export type PositionManagerChainId = keyof typeof PositionManager;
-
 export const RevenueModuleFactory = {
   '11155111': '0x6D5CEf09F044224A51bd59EB841769255070e5dA',
 } as const;
@@ -144,10 +132,6 @@ export const SplitRouter = {
 } as const;
 
 export type SplitRouterChainId = keyof typeof SplitRouter;
-
-export const StoryBounties = {} as const;
-
-export type StoryBountiesChainId = keyof typeof StoryBounties;
 
 export const SubscriptionManager = {
   '11155111': '0x53542bA1e3445804D9a225C967E2677F017D1d47',
