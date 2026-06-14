@@ -30,6 +30,15 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
+
+  // CRITICAL: only ever intercept media that could be in the offline video
+  // cache. Navigations, the app shell, CSS/JS/fonts, and API calls MUST fall
+  // through to default browser behaviour — otherwise a transient network blip
+  // makes this worker substitute a synthetic 504 for the whole page/assets and
+  // breaks the app (stale shell, missing images, "504 offline" on routes).
+  if (req.mode === 'navigate') return;
+  if (req.destination !== 'video' && req.destination !== 'audio') return;
+
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
