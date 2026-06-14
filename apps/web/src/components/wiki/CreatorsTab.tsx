@@ -8,6 +8,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { WikiEntity, EntityKind } from './types';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { AddressDisplay } from '@/components/tokens/AddressDisplay';
+
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
 const KINDS: EntityKind[] = [
   'person',
@@ -120,7 +123,13 @@ export function CreatorsTab() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold truncate">
-                    {p.displayName || p.username || `${p.uid.slice(0, 6)}…`}
+                    {p.displayName ||
+                      p.username ||
+                      (ADDRESS_RE.test(p.uid) ? (
+                        <AddressDisplay address={p.uid} />
+                      ) : (
+                        `${p.uid.slice(0, 6)}…`
+                      ))}
                   </p>
                   {p.username && p.displayName && (
                     <p className="text-xs text-muted-foreground truncate">@{p.username}</p>

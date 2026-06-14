@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 import { Loader2, Search, Trophy, Zap, Fingerprint } from 'lucide-react';
 
 export const Route = createFileRoute('/agents/discover')({
@@ -173,7 +174,7 @@ function X402Agents() {
             {agents.data.map((a) => (
               <div key={a.name} className="flex items-center gap-2 text-sm py-1">
                 <span className="font-medium flex-1">{a.name}</span>
-                <span className="font-mono text-xs text-muted-foreground">{short(a.address)}</span>
+                <AddressDisplay address={a.address} className="text-xs text-muted-foreground" />
                 <Badge variant="outline" className="gap-1">
                   <Zap className="h-3 w-3" /> x402
                 </Badge>

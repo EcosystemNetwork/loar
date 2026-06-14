@@ -14,6 +14,16 @@ import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import { MessageSquare, Heart, Trash2, Reply, Send, Loader2 } from 'lucide-react';
 import { UserText } from '@/components/user-text';
+import { AddressDisplay } from '@/components/tokens/AddressDisplay';
+
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+
+/** Show the author's set display name, else resolve their address (ENS/UD). */
+function AuthorName({ displayName, uid }: { displayName: string; uid: string }) {
+  if (displayName && displayName !== uid) return <>{displayName}</>;
+  if (ADDRESS_RE.test(uid)) return <AddressDisplay address={uid} className="text-inherit" />;
+  return <>{uid}</>;
+}
 
 interface CommentSectionProps {
   targetId: string;
@@ -139,11 +149,6 @@ export function CommentSection({ targetId, targetType }: CommentSectionProps) {
     return d.toLocaleDateString();
   };
 
-  const truncateAddress = (addr: string) => {
-    if (addr.length <= 12) return addr;
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-  };
-
   // ── Render ───────────────────────────────────────────────────────────
 
   const comments = data?.comments ?? [];
@@ -207,9 +212,7 @@ export function CommentSection({ targetId, targetType }: CommentSectionProps) {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-xs text-zinc-400">
                   <span className="font-medium text-zinc-200">
-                    {comment.authorDisplayName !== comment.authorUid
-                      ? comment.authorDisplayName
-                      : truncateAddress(comment.authorUid)}
+                    <AuthorName displayName={comment.authorDisplayName} uid={comment.authorUid} />
                   </span>
                   <span>{formatTime(comment.createdAt)}</span>
                 </div>
@@ -292,9 +295,10 @@ export function CommentSection({ targetId, targetType }: CommentSectionProps) {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 text-xs text-zinc-400">
                           <span className="font-medium text-zinc-200">
-                            {reply.authorDisplayName !== reply.authorUid
-                              ? reply.authorDisplayName
-                              : truncateAddress(reply.authorUid)}
+                            <AuthorName
+                              displayName={reply.authorDisplayName}
+                              uid={reply.authorUid}
+                            />
                           </span>
                           <span>{formatTime(reply.createdAt)}</span>
                         </div>
