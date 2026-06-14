@@ -26,16 +26,27 @@ import {
 } from '@loar/abis/generated';
 import { PoolManagerAbi } from './abis/PoolManager';
 import { ERC20Abi } from './abis/ERC20Abi';
-import { sepolia } from 'viem/chains';
+import { sepolia, mainnet } from 'viem/chains';
 import { getAddress } from 'viem/utils';
 
 // ── Chain config (driven by PONDER_CHAIN env var) ───────────────────────────
+// Sepolia is live. `mainnet` is scaffolded as a drop-in: it activates only when
+// PONDER_CHAIN=mainnet, which in turn requires deployments/mainnet.json (created
+// at deploy time). Until then the default (sepolia) path is unaffected.
 const CHAIN_CONFIGS = {
   sepolia: {
     chainName: 'sepolia' as const,
     chain: sepolia,
     poolManager: '0xE03A1074c86CFeDd5C142C4F04F1a1536e203543' as `0x${string}`,
     deploymentFile: 'sepolia.json',
+  },
+  mainnet: {
+    chainName: 'mainnet' as const,
+    chain: mainnet,
+    // Uniswap v4 PoolManager (canonical mainnet address) — VERIFY on-chain
+    // before the mainnet indexer goes live.
+    poolManager: '0x000000000004444c5dc75cB358380D2e3dE08A90' as `0x${string}`,
+    deploymentFile: 'mainnet.json',
   },
 } as const;
 

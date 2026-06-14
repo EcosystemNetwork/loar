@@ -104,12 +104,12 @@ describe('buildRightsAttestationDigest', () => {
   });
 
   it('changes when the chain id changes (replay protection)', () => {
-    // Critical for cross-chain replay: a signature valid for Sepolia must
-    // not authorize anything on Base Sepolia. The deployed RightsRegistry
-    // rebuilds the digest with its own block.chainid so any mismatch reverts.
+    // Critical for cross-chain replay: a signature valid for Sepolia must not
+    // authorize anything on mainnet. The deployed RightsRegistry rebuilds the
+    // digest with its own block.chainid so any mismatch reverts.
     const sep = buildRightsAttestationDigest({ ...baseArgs, chainId: 11155111 });
-    const base = buildRightsAttestationDigest({ ...baseArgs, chainId: 84532 });
-    expect(sep).not.toBe(base);
+    const mainnet = buildRightsAttestationDigest({ ...baseArgs, chainId: 1 });
+    expect(sep).not.toBe(mainnet);
   });
 
   it('changes when the rightsRegistry address changes (replay protection)', () => {

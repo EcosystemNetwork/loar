@@ -56,7 +56,6 @@ import {
   type Hash,
 } from 'viem';
 import { mainnet, sepolia } from 'viem/chains';
-import { syncRightsHashToSolana } from '../../services/rights-bridge';
 import { createEntity, getEntity, updateEntity } from '../entities/entities.handlers';
 import {
   LIKENESS_MODALITIES,
@@ -887,25 +886,6 @@ export const likenessMarketplaceRouter = router({
       const receipt = await rpc.waitForTransactionReceipt({
         hash: rightsTxHash,
         timeout: 90_000,
-      });
-
-      // Fire-and-forget cross-chain sync: mirror the new rights classification
-      // to the Solana attestation cache so downstream Solana monetization
-      // programs see the same state. EVM remains canonical — a Solana push
-      // failure here is logged but never blocks the EVM write or the route
-      // response. Monotonic version is derived from EVM block + log index, so
-      // retries are idempotent.
-      void syncRightsHashToSolana({
-        contentHash,
-        chainId: env.chainId,
-        evmBlock: receipt.blockNumber,
-        evmLogIndex: receipt.logs[0]?.logIndex ?? 0,
-        evmTxHash: rightsTxHash,
-      }).catch((err) => {
-        console.error(
-          '[rights-bridge] EVM→Solana sync failed (non-fatal, will retry on next mutation)',
-          { contentHash, chainId: env.chainId, error: err instanceof Error ? err.message : err }
-        );
       });
 
       await listingsCol().doc(input.listingId).update({

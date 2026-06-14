@@ -38,6 +38,67 @@ function usdToLoar(usd: number): number {
 }
 
 export const VIDEO_MODELS: VideoModelConfig[] = [
+  // ── Local / Self-hosted (ComfyUI) — $0, runs on your own GPU ─────────
+  // Requires a ComfyUI server reachable at COMFYUI_BASE_URL (default
+  // http://127.0.0.1:8188). Nothing leaves your machine and there is no
+  // provider cost — these are genuinely free to run.
+  {
+    id: 'comfy-ltx-t2v',
+    provider: 'comfyui',
+    displayName: 'LTX Video (Local)',
+    shortDescription: 'Free local text-to-video on your own GPU',
+    falModelId: '',
+    comfyModelId: 'ltx-video',
+    mode: ['text_to_video'],
+    qualityTier: 'standard',
+    speedTier: 'fast',
+    priceTier: 'low',
+    supportsAudio: false,
+    supports1080p: false,
+    supports4k: false,
+    maxDurationSec: 8,
+    supportedDurations: [3, 4, 5, 6, 8],
+    supportedAspectRatios: ['16:9', '9:16', '1:1'],
+    supportedResolutions: ['512p', '720p'],
+    creditCost: 0,
+    providerCostUsd: 0,
+    fiatPriceUsd: 0,
+    loarPriceUsd: 0,
+    isEnabled: true,
+    isVisibleToUsers: true,
+    allowedPlans: [],
+    tags: ['local', 'free', 'self-hosted', 'comfyui', 'ltx'],
+    bestFor: 'Free, private text-to-video rendered on your own GPU',
+  },
+  {
+    id: 'comfy-ltx-i2v',
+    provider: 'comfyui',
+    displayName: 'LTX Video (Local)',
+    shortDescription: 'Free local image-to-video on your own GPU',
+    falModelId: '',
+    comfyModelId: 'ltx-video',
+    mode: ['image_to_video'],
+    qualityTier: 'standard',
+    speedTier: 'fast',
+    priceTier: 'low',
+    supportsAudio: false,
+    supports1080p: false,
+    supports4k: false,
+    maxDurationSec: 8,
+    supportedDurations: [3, 4, 5, 6, 8],
+    supportedAspectRatios: ['16:9', '9:16', '1:1'],
+    supportedResolutions: ['512p', '720p'],
+    creditCost: 0,
+    providerCostUsd: 0,
+    fiatPriceUsd: 0,
+    loarPriceUsd: 0,
+    isEnabled: true,
+    isVisibleToUsers: true,
+    allowedPlans: [],
+    tags: ['local', 'free', 'self-hosted', 'comfyui', 'ltx', 'image-animation'],
+    bestFor: 'Free, private image animation rendered on your own GPU',
+  },
+
   // ── Draft / Fast / Cheap ────────────────────────────────────────────
   {
     id: 'ltx-video',

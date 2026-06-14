@@ -2214,9 +2214,7 @@ function SandboxPage() {
                       </SelectContent>
                     </Select>
                     <p className="text-[10px] text-muted-foreground leading-relaxed">
-                      {targetChainSelection.kind === 'solana'
-                        ? 'Saved generations stamp this chain; minting lands on Solana.'
-                        : 'Saved generations stamp this chain; minting lands on EVM.'}
+                      Saved generations stamp this chain; minting lands on EVM.
                     </p>
                   </CardContent>
                 </Card>

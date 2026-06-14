@@ -15,8 +15,6 @@
  *   - `unlockWithEthTx`      — verifies an on-chain native ETH transfer to
  *                              the platform treasury for ≥ ($25 / ethUsd).
  *                              Sepolia + Ethereum mainnet supported.
- *   - `createSolanaPayIntent`/ `unlockWithSolanaPay` — Solana Pay flow,
- *                              accepts USDC-SPL at $25.
  *   - `redeemCode`           — admin-minted code, single- or multi-use.
  *
  * Admin sub-router exposes `mintCode`, `listCodes`, `revokeCode`.
@@ -31,12 +29,6 @@ import { adminProcedure, protectedProcedure, publicProcedure, router } from '../
 import { firebaseAvailable } from '../../lib/firebase';
 import { getStripe } from '../credits/stripe.routes';
 import { getPlatformConfig } from '../../services/platformConfig';
-import {
-  createPaymentIntent as createSolanaIntent,
-  claimPaymentForUnlock as claimSolanaPayForUnlock,
-  IntentAlreadyConsumedError,
-  IntentNotOwnedError,
-} from '../../lib/solana-pay';
 import {
   EntitlementAlreadyActiveError,
   getEntitlement,
@@ -160,15 +152,12 @@ export const entitlementsRouter = router({
       paymentMethods: {
         stripe: Boolean(process.env.STRIPE_SECRET_KEY),
         eth: Boolean(process.env.TREASURY_ADDRESS),
-        solana: Boolean(process.env.SOLANA_PAY_RECIPIENT),
         code: true,
       },
       ethPriceUsd,
       /** Approximate ETH amount user must transfer (display only — server enforces wei). */
       expectedEth,
       treasuryAddress: process.env.TREASURY_ADDRESS ?? null,
-      solanaRecipient: process.env.SOLANA_PAY_RECIPIENT ?? null,
-      solanaUsdcMint: process.env.SOLANA_USDC_MINT ?? null,
       acceptedChainIds: [sepolia.id, mainnet.id],
     };
   }),
@@ -338,79 +327,6 @@ export const entitlementsRouter = router({
         throw err;
       }
       return { ok: true, alreadyActive: false as const };
-    }),
-
-  // ── Solana Pay (USDC-SPL) ─────────────────────────────────────────
-
-  /** Create a Solana Pay intent for $25 USDC-SPL. */
-  createSolanaPayIntent: protectedProcedure.mutation(async ({ ctx }) => {
-    if (await isByokFeeWaived(ctx.user.uid)) {
-      throw new EntitlementAlreadyActiveError(ctx.user.uid);
-    }
-    const splToken = process.env.SOLANA_USDC_MINT;
-    if (!splToken) {
-      throw new Error('Solana USDC mint is not configured on this server.');
-    }
-    const amountUsd = (getUnlockPriceCents() / 100).toFixed(2);
-    const intent = await createSolanaIntent({
-      userId: ctx.user.uid,
-      amount: amountUsd,
-      splToken,
-      label: 'LOAR BYOK Unlock',
-      memo: `byok-unlock:${ctx.user.uid}`,
-      ttlMs: 30 * 60 * 1000,
-    });
-    return intent;
-  }),
-
-  /**
-   * Poll a Solana Pay reference; when `status === 'paid'` AND the intent was
-   * created by the caller, atomically marks the reference as consumed and
-   * grants the waiver. A leaked reference cannot be replayed against a
-   * different account, and the same reference cannot grant the waiver twice.
-   * Frontend polls this until the card flips. Idempotent for the original payer.
-   */
-  unlockWithSolanaPay: protectedProcedure
-    .input(
-      z.object({
-        reference: z
-          .string()
-          .regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, 'Invalid Solana Pay reference'),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      let result;
-      try {
-        result = await claimSolanaPayForUnlock({
-          reference: input.reference,
-          userId: ctx.user.uid,
-        });
-      } catch (err) {
-        if (err instanceof IntentNotOwnedError || err instanceof IntentAlreadyConsumedError) {
-          throw new Error(err.message);
-        }
-        throw err;
-      }
-      if (result.status === 'pending') {
-        return { ok: false as const, status: 'pending' as const };
-      }
-      if (result.status !== 'paid') {
-        return { ok: false as const, status: result.status };
-      }
-      try {
-        await grantFeeWaiver({
-          uid: ctx.user.uid,
-          unlockedVia: 'usdc-sol',
-          sourceRef: input.reference,
-          amountPaid: result.amount,
-        });
-      } catch (err) {
-        if (err instanceof EntitlementAlreadyActiveError) {
-          return { ok: true as const, status: 'paid' as const, alreadyActive: true as const };
-        }
-        throw err;
-      }
-      return { ok: true as const, status: 'paid' as const, alreadyActive: false as const };
     }),
 
   // ── Redeem code ───────────────────────────────────────────────────

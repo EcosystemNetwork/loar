@@ -144,6 +144,12 @@ function RootComponent() {
     select: (s) => s.isLoading,
   });
 
+  // Home (`/`) is a locked single-viewport experience — hide the footer there
+  // so the page never needs to scroll vertically.
+  const isHome = useRouterState({
+    select: (s) => s.location.pathname === '/',
+  });
+
   return (
     <ErrorBoundary>
       <HeadContent />
@@ -161,26 +167,28 @@ function RootComponent() {
           <main className="flex-1">
             <Outlet />
           </main>
-          <footer className="border-t py-6 px-4 pb-bottom-nav md:pb-6">
-            <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
-              <span>&copy; {new Date().getFullYear()} LOAR</span>
-              <Link to="/terms" className="hover:text-foreground transition-colors">
-                Terms of Service
-              </Link>
-              <Link to="/privacy" className="hover:text-foreground transition-colors">
-                Privacy Policy
-              </Link>
-              <Link to="/dmca" className="hover:text-foreground transition-colors">
-                DMCA
-              </Link>
-              <Link to="/status" className="hover:text-foreground transition-colors">
-                Status
-              </Link>
-              <Link to="/testnet" className="hover:text-foreground transition-colors">
-                Testnet
-              </Link>
-            </div>
-          </footer>
+          {!isHome && (
+            <footer className="border-t py-6 px-4 pb-bottom-nav md:pb-6">
+              <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
+                <span>&copy; {new Date().getFullYear()} LOAR</span>
+                <Link to="/terms" className="hover:text-foreground transition-colors">
+                  Terms of Service
+                </Link>
+                <Link to="/privacy" className="hover:text-foreground transition-colors">
+                  Privacy Policy
+                </Link>
+                <Link to="/dmca" className="hover:text-foreground transition-colors">
+                  DMCA
+                </Link>
+                <Link to="/status" className="hover:text-foreground transition-colors">
+                  Status
+                </Link>
+                <Link to="/testnet" className="hover:text-foreground transition-colors">
+                  Testnet
+                </Link>
+              </div>
+            </footer>
+          )}
           <MobileBottomNav />
         </div>
         <Toaster richColors position="top-right" toastOptions={{ duration: 5000 }} />

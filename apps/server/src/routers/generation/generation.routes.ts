@@ -553,6 +553,39 @@ async function dispatchGenerationInner(
     };
   }
 
+  if (model.provider === 'comfyui') {
+    // Local, self-hosted ComfyUI — $0 inference on the operator's own GPU.
+    // No API key, no provider-cost ledger entry (it's free). The returned
+    // videoUrl points at the local /view endpoint; persistVideoToStorage
+    // fetches it server-side and pins it to IPFS like any other clip.
+    const { comfyUIService } = await import('../../services/comfyui');
+    const [arW, arH] = (() => {
+      switch (input.aspectRatio) {
+        case '9:16':
+          return [512, 768];
+        case '1:1':
+          return [640, 640];
+        default:
+          return [768, 512]; // 16:9-ish, 12GB-friendly
+      }
+    })();
+    const result = await comfyUIService.generateVideo({
+      prompt: input.prompt,
+      negativePrompt: input.negativePrompt,
+      imageUrl: input.imageUrl ?? (resolvedCastUrls && resolvedCastUrls[0]) ?? undefined,
+      mode: input.imageUrl || resolvedCastUrls?.[0] ? 'image_to_video' : 'text_to_video',
+      durationSec: input.durationSec,
+      width: input.resolution === '720p' ? Math.round((arW * 720) / 512) : arW,
+      height: input.resolution === '720p' ? Math.round((arH * 720) / 512) : arH,
+    });
+    return {
+      id: result.id,
+      status: result.status,
+      videoUrl: result.videoUrl,
+      error: result.error,
+    };
+  }
+
   // Default: FAL
   const falInput = buildFalInput(model, input);
   const { resolveProviderKey } = await import('../../lib/byok');

@@ -16,7 +16,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 loadDotenv({ path: resolve(__dirname, '../../../.env') });
 
 const schema = z.object({
-  LISTENER_CHAIN: z.enum(['sepolia']),
+  LISTENER_CHAIN: z.enum(['sepolia', 'mainnet']),
   LISTENER_RPC_URL: z.string().url(),
   LISTENER_RPC_FALLBACKS: z
     .string()

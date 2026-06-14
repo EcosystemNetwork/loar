@@ -57,8 +57,6 @@ import { MediaGallery } from '@/components/MediaGallery';
 import { useMediaAttachments } from '@/hooks/useMediaAttachments';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
 import { MintContentDialog } from '@/components/MintContentDialog';
-import { SolanaMintDialog } from '@/components/SolanaMintDialog';
-import { PayAndMintButton } from '@/components/PayAndMintButton';
 import { CollaborativeEntityEditor } from '@/components/collaboration/CollaborativeEntityEditor';
 import { VoiceProfileCard } from '@/components/VoiceProfileCard';
 import { ReferenceBundleEditor } from '@/components/ReferenceBundleEditor';
@@ -706,7 +704,6 @@ function EntityPage() {
   const [showMintDialog, setShowMintDialog] = useState(false);
   const [mintContentId, setMintContentId] = useState<string | null>(null);
   const [findingContent, setFindingContent] = useState(false);
-  const [showSolanaMint, setShowSolanaMint] = useState(false);
 
   const {
     data: entity,
@@ -1069,28 +1066,6 @@ function EntityPage() {
                         {findingContent ? 'Preparing...' : 'Mint as NFT'}
                       </Button>
                     )}
-                    {/* Solana cNFT mint — independent of the EVM "Mint as NFT" path.
-                        Available to anyone (no canMint gate) since cNFTs are
-                        ~$0.0001 — there's no economic reason to restrict. */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowSolanaMint(true)}
-                      className="border-purple-700 text-purple-300 hover:bg-purple-950/40"
-                    >
-                      ◎ Mint on Solana
-                    </Button>
-                    {/* Composed Solana Pay → cNFT mint pipeline — pays a small
-                        SOL amount and auto-mints; the cNFT's lineage references
-                        the payment tx for a verifiable cross-chain receipt. */}
-                    <PayAndMintButton
-                      entityName={entity.name}
-                      metadataUri={entity.imageUrl || 'https://loar.fun/og/entity.json'}
-                      lineage={{
-                        entityId: entity.id,
-                        evmUniverseAddress: entity.universeAddress ?? undefined,
-                      }}
-                    />
                     {isOwner && isPipelineEligible && !hasPipeline && (
                       <Button
                         variant="default"
@@ -1258,22 +1233,6 @@ function EntityPage() {
           }}
         />
       )}
-
-      {/* Solana cNFT mint dialog — uses VITE_SOLANA_DEMO_UNIVERSE for v1.
-          Metadata URI falls back to entity image or a platform default.
-          Lineage carries the wiki entity id + EVM universe address so the
-          server's solanaEpisodeLineage doc joins cNFT → LOAR entity → VLM
-          scene index off-chain. */}
-      <SolanaMintDialog
-        open={showSolanaMint}
-        onClose={() => setShowSolanaMint(false)}
-        entityName={entity.name}
-        metadataUri={entity.imageUrl || 'https://loar.fun/og/entity.json'}
-        lineage={{
-          entityId: entity.id,
-          evmUniverseAddress: entity.universeAddress ?? undefined,
-        }}
-      />
     </div>
   );
 }

@@ -18,7 +18,7 @@ import {
   ARC_TESTNET_ID,
   ARC_USDC,
 } from '../../lib/arc';
-import { paymentRequiredBody } from '../../lib/x402';
+import { buildPaymentRequired } from '../../lib/x402';
 import { consumeRateLimit } from '../../middleware/rate-limit';
 import { captureServerEvent } from '../../lib/analytics';
 import { db, firebaseAvailable } from '../../lib/firebase';
@@ -117,11 +117,12 @@ export const arcRouter = router({
         );
     }),
 
-  /** Payment requirements an agent must satisfy to call a paid resource. */
+  /** Payment requirements an agent must satisfy to call a paid resource
+   *  (includes the USDC EIP-712 domain so the agent can sign the authorization). */
   x402Quote: publicProcedure
     .input(z.object({ resource: z.string(), amountUsdc: USDC_AMT, payTo: ADDR }))
     .query(({ input }) =>
-      paymentRequiredBody({
+      buildPaymentRequired({
         amountUsdc: input.amountUsdc,
         payTo: input.payTo,
         resource: input.resource,

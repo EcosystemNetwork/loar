@@ -316,8 +316,8 @@ export function IndexerBanner() {
  * ────────────────────────────────────────── */
 export function HeroSkeleton() {
   return (
-    <div className="relative h-[70vh] min-h-[440px] md:min-h-[500px] max-h-[800px] bg-gradient-to-b from-primary/5 via-background to-background flex items-end">
-      <div className="w-full px-4 md:px-12 pb-32 md:pb-32 max-w-3xl space-y-4 animate-pulse">
+    <div className="relative h-[40vh] min-h-[240px] max-h-[420px] bg-gradient-to-b from-primary/5 via-background to-background flex items-end">
+      <div className="w-full px-4 md:px-12 pb-8 md:pb-10 max-w-3xl space-y-4 animate-pulse">
         <div className="h-4 w-24 rounded bg-white/10" />
         <div className="h-12 sm:h-14 w-3/4 max-w-80 rounded bg-white/10" />
         <div className="h-4 w-full max-w-96 rounded bg-white/10" />
@@ -370,7 +370,7 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
 
   if (featured.length === 0) {
     return (
-      <div className="relative h-[70vh] min-h-[440px] md:min-h-[500px] max-h-[800px] flex items-center justify-center bg-gradient-to-b from-primary/10 via-background to-background">
+      <div className="relative h-[40vh] min-h-[240px] max-h-[420px] flex items-center justify-center bg-gradient-to-b from-primary/10 via-background to-background">
         <div className="text-center px-4">
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-display italic text-white mb-4 tracking-tight">
             Your universe awaits
@@ -395,7 +395,7 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
   if (!current) return null;
 
   return (
-    <div className="relative h-[70vh] min-h-[440px] md:min-h-[500px] max-h-[800px] overflow-hidden">
+    <div className="relative h-[40vh] min-h-[240px] max-h-[420px] overflow-hidden">
       {/* Background image with Ken Burns effect */}
       {featured.map((u, i) => (
         <div
@@ -428,7 +428,7 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
 
       {/* Content */}
       <div className="absolute inset-0 flex items-end">
-        <div className="w-full px-4 md:px-12 pb-32 md:pb-32 max-w-3xl">
+        <div className="w-full px-4 md:px-12 pb-8 md:pb-10 max-w-3xl">
           {/* Badges */}
           <div className="flex items-center gap-2 mb-3 md:mb-4 flex-wrap">
             <Badge className="bg-primary text-white border-0 text-xs">

@@ -13,7 +13,7 @@
  *   X402_PRICE_USDC — price per call (defaults to "0.01")
  */
 import { Hono } from 'hono';
-import { paymentRequiredBody, settlePayment } from '../lib/x402';
+import { buildPaymentRequired, settlePayment, encodePaymentResponse } from '../lib/x402';
 
 export const x402Routes = new Hono();
 
@@ -34,7 +34,7 @@ x402Routes.post('/echo', async (c) => {
   const payment = c.req.header('X-PAYMENT');
   if (!payment) {
     return c.json(
-      paymentRequiredBody({
+      await buildPaymentRequired({
         amountUsdc: price(),
         payTo: recipient,
         resource,
@@ -52,7 +52,7 @@ x402Routes.post('/echo', async (c) => {
   });
   if (!settled.ok) {
     return c.json(
-      paymentRequiredBody({
+      await buildPaymentRequired({
         amountUsdc: price(),
         payTo: recipient,
         resource,
@@ -62,11 +62,14 @@ x402Routes.post('/echo', async (c) => {
     );
   }
 
-  // Payment confirmed — do the (paid) work.
+  // Payment confirmed + settled on-chain — do the (paid) work.
+  c.header('X-PAYMENT-RESPONSE', encodePaymentResponse(settled));
   const body = await c.req.json().catch(() => ({}));
   return c.json({
     paid: true,
-    txHash: settled.txHash,
+    transaction: settled.transaction,
+    payer: settled.payer,
+    network: settled.network,
     echo: body,
     servedAt: new Date().toISOString(),
   });

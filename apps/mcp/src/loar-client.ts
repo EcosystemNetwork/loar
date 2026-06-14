@@ -112,7 +112,7 @@ export class LoarClient {
   }
 
   /**
-   * Raw GET against a non-tRPC HTTP route (e.g. /api/solana/activity).
+   * Raw GET against a non-tRPC HTTP route (e.g. a Hono endpoint).
    * Used by tools that target Hono routes outside the tRPC router.
    */
   async rawGet<T = unknown>(path: string, query?: Record<string, string | number>): Promise<T> {
@@ -131,7 +131,7 @@ export class LoarClient {
   }
 
   /**
-   * Raw POST against a non-tRPC HTTP route (e.g. /api/solana/episode/mint).
+   * Raw POST against a non-tRPC HTTP route (e.g. a Hono endpoint).
    */
   async rawPost<T = unknown>(path: string, body: Record<string, unknown>): Promise<T> {
     const url = `${this.serverUrl}${path.startsWith('/') ? path : '/' + path}`;

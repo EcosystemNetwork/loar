@@ -55,15 +55,7 @@ import {
   HeroSkeleton,
   HeroBillboard,
   ActivityTicker,
-  Top10Strip,
   TrendingRow,
-  RecentEpisodes,
-  NewArrivalsRow,
-  AllUniversesRow,
-  MostEpisodesRow,
-  CommunityCreations,
-  TokenPoweredRow,
-  CreateBanner,
   SearchOverlay,
   ContinueWatchingRow,
   ForYouRow,
@@ -230,7 +222,7 @@ function HomeComponent() {
   }, [firestoreUniverses, ponderUniverses, tokensData, swapsData, holdersData]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-[calc(100svh-3.5rem)] overflow-hidden flex flex-col bg-background">
       {/* Ken Burns animation */}
       <style>{`
         @keyframes kenburns {
@@ -239,7 +231,11 @@ function HomeComponent() {
         }
       `}</style>
 
-      {ponderOnline && <ActivityTicker />}
+      {ponderOnline && (
+        <div className="shrink-0">
+          <ActivityTicker />
+        </div>
+      )}
 
       {/* Floating search button — sits above the mobile bottom nav. */}
       <button
@@ -275,22 +271,30 @@ function HomeComponent() {
       <GettingStartedPopup />
 
       {/* Hero: skeleton during load, real billboard once data arrives */}
-      {universesLoading ? <HeroSkeleton /> : <HeroBillboard universes={universes} />}
+      <div className="shrink-0">
+        {universesLoading ? <HeroSkeleton /> : <HeroBillboard universes={universes} />}
+      </div>
 
-      {/* Content Rows — only render once we have real data */}
+      {/*
+        Single-viewport content area — horizontal rows only, no vertical scroll.
+        We keep the 3 priority rails (Continue Watching, Trending, For You) and
+        compress section/header/card sizing via arbitrary variants so all three
+        fit the remaining height. `overflow-hidden` clips gracefully on short
+        viewports rather than introducing a scrollbar.
+      */}
       {!universesLoading && (
-        <div className="relative z-10 pb-20 space-y-2">
+        <div
+          className="flex-1 min-h-0 overflow-hidden flex flex-col justify-evenly
+            pb-bottom-nav md:pb-0
+            [&_section]:py-0!
+            [&_section>div:first-child]:mb-1.5!
+            [&_section_h2]:text-base!
+            [&_section_p.font-light]:hidden!
+            [&_.group.flex-shrink-0]:w-[200px]! md:[&_.group.flex-shrink-0]:w-[230px]!"
+        >
           <ContinueWatchingRow />
-          <Top10Strip universes={universes} />
-          <ForYouRow />
           <TrendingRow universes={universes} />
-          <RecentEpisodes />
-          <NewArrivalsRow universes={universes} />
-          <AllUniversesRow universes={universes} />
-          <MostEpisodesRow universes={universes} />
-          <CommunityCreations />
-          <TokenPoweredRow universes={universes} />
-          <CreateBanner />
+          <ForYouRow />
         </div>
       )}
     </div>

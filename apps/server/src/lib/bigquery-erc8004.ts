@@ -23,18 +23,39 @@
 import { GoogleAuth } from 'google-auth-library';
 import fs from 'fs';
 
-// EF ERC-8004 mainnet registries (the 0x8004… vanity prefix encodes the ERC #).
+// ERC-8004 registries — canonical CREATE2 singletons (same address per chain).
+// Defaults are the ETHEREUM MAINNET deployment (the 0x8004… vanity prefix
+// encodes the ERC #). NOTE: 0x8004A818…/0x8004B663… is the *Sepolia* pair —
+// mainnet uses 0x8004A169…/0x8004BAa1…. ValidationRegistry has no canonical
+// mainnet deployment yet (spec in flux), so it defaults empty.
 export const ERC8004 = {
   identity: (
-    process.env.ERC8004_IDENTITY_REGISTRY || '0x8004A818BFB912233c491871b3d84c89A494BD9e'
+    process.env.ERC8004_IDENTITY_REGISTRY || '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432'
   ).toLowerCase(),
   reputation: (
-    process.env.ERC8004_REPUTATION_REGISTRY || '0x8004B663056A597Dffe9eCcC1965A193B7388713'
+    process.env.ERC8004_REPUTATION_REGISTRY || '0x8004BAa17C55a88189AE136b182e5fdA19dE9b63'
   ).toLowerCase(),
   validation: (process.env.ERC8004_VALIDATION_REGISTRY || '').toLowerCase(),
 };
 
+// Exact event topic0 hashes — count only the events we mean, not every log.
+const TOPIC = {
+  // ReputationRegistry.NewFeedback(uint256 indexed agentId, address indexed client, …)
+  newFeedback: '0x6a4a61743519c9d648a14e6493f47dbe3ff1aa29e7785c96c8326a205e58febc',
+  // IdentityRegistry.Registered(uint256 indexed agentId, string uri, address indexed owner)
+  registered: '0xca52e62c367d81bb2e328eb795f7c7ba24afb478408a26c0e201d155c449bc4a',
+};
+
 const PUBLIC_LOGS = 'bigquery-public-data.crypto_ethereum.logs';
+
+/** topics[1] is a 32-byte hex word holding the uint256 agentId → decimal string. */
+function agentIdToDecimal(topic1: string): string {
+  try {
+    return BigInt(topic1).toString();
+  } catch {
+    return topic1;
+  }
+}
 
 // ── Auth / config ─────────────────────────────────────────────────────────────
 
@@ -140,7 +161,10 @@ export async function runQuery<T = Record<string, string>>(
 // ── ERC-8004 reputation queries ──────────────────────────────────────────────
 
 export interface RankedAgent {
+  /** Hex agentId (32-byte topic word). */
   agentId: string;
+  /** Decimal agentId (the ERC-721 tokenId in the IdentityRegistry). */
+  agentIdDecimal: string;
   feedbackCount: number;
   lastFeedbackAt: string | null;
   registeredAt: string | null;
@@ -148,9 +172,10 @@ export interface RankedAgent {
 }
 
 /**
- * Rank agents by on-chain reputation feedback volume. Joins the Reputation
- * registry (feedback events) against the Identity registry (registration) by
- * the agent identifier in topics[1].
+ * Rank agents by on-chain reputation feedback volume. Counts ReputationRegistry
+ * `NewFeedback` events (agentId in topics[1]) and joins IdentityRegistry
+ * `Registered` events for registration time. Filtered by exact event topic0 so
+ * we don't miscount URIUpdated / Transfer / MetadataSet logs.
  */
 export async function rankAgents(limit = 25): Promise<RankedAgent[]> {
   const sql = `
@@ -159,14 +184,18 @@ export async function rankAgents(limit = 25): Promise<RankedAgent[]> {
              COUNT(*) AS feedback_count,
              MAX(block_timestamp) AS last_feedback_at
       FROM \`${PUBLIC_LOGS}\`
-      WHERE address = @reputation AND ARRAY_LENGTH(topics) >= 2
+      WHERE address = @reputation
+        AND topics[SAFE_OFFSET(0)] = @newFeedback
+        AND ARRAY_LENGTH(topics) >= 2
       GROUP BY agent_id
     ),
     ident AS (
       SELECT topics[SAFE_OFFSET(1)] AS agent_id,
              MIN(block_timestamp) AS registered_at
       FROM \`${PUBLIC_LOGS}\`
-      WHERE address = @identity AND ARRAY_LENGTH(topics) >= 2
+      WHERE address = @identity
+        AND topics[SAFE_OFFSET(0)] = @registered
+        AND ARRAY_LENGTH(topics) >= 2
       GROUP BY agent_id
     )
     SELECT rep.agent_id AS agentId,
@@ -181,6 +210,8 @@ export async function rankAgents(limit = 25): Promise<RankedAgent[]> {
   const rows = await runQuery<Record<string, string>>(sql, [
     { name: 'reputation', type: 'STRING', value: ERC8004.reputation },
     { name: 'identity', type: 'STRING', value: ERC8004.identity },
+    { name: 'newFeedback', type: 'STRING', value: TOPIC.newFeedback },
+    { name: 'registered', type: 'STRING', value: TOPIC.registered },
     { name: 'limit', type: 'INT64', value: String(limit) },
   ]);
 
@@ -188,6 +219,7 @@ export async function rankAgents(limit = 25): Promise<RankedAgent[]> {
     const feedbackCount = Number(r.feedbackCount ?? 0);
     return {
       agentId: r.agentId,
+      agentIdDecimal: agentIdToDecimal(r.agentId),
       feedbackCount,
       lastFeedbackAt: r.lastFeedbackAt ?? null,
       registeredAt: r.registeredAt ?? null,
@@ -197,37 +229,34 @@ export async function rankAgents(limit = 25): Promise<RankedAgent[]> {
   });
 }
 
-/** Reputation summary for a single agent id (topics[1] hex, 0x + 64 hex). */
+/** Reputation summary for a single agent id (hex topic word, 0x + 64 hex). */
 export async function getAgentReputation(agentId: string): Promise<RankedAgent | null> {
-  // Registry addresses come from a controlled allowlist (env/defaults), each
-  // already validated as lowercase 0x-hex — safe to inline as SQL literals.
-  const addresses = [ERC8004.reputation, ERC8004.identity, ERC8004.validation]
-    .filter((a) => /^0x[0-9a-f]{40}$/.test(a))
-    .map((a) => `'${a}'`)
-    .join(', ');
-  if (!addresses) return null;
+  const rep = ERC8004.reputation;
+  if (!/^0x[0-9a-f]{40}$/.test(rep)) return null;
 
   const sql = `
-    SELECT @agentId AS agentId,
-           COUNT(*) AS feedbackCount,
-           CAST(MAX(block_timestamp) AS STRING) AS lastFeedbackAt,
-           CAST(MIN(block_timestamp) AS STRING) AS registeredAt
+    SELECT COUNT(*) AS feedbackCount,
+           CAST(MAX(block_timestamp) AS STRING) AS lastFeedbackAt
     FROM \`${PUBLIC_LOGS}\`
-    WHERE address IN (${addresses})
+    WHERE address = @reputation
+      AND topics[SAFE_OFFSET(0)] = @newFeedback
       AND ARRAY_LENGTH(topics) >= 2
       AND topics[SAFE_OFFSET(1)] = @agentId`;
 
   const rows = await runQuery<Record<string, string>>(sql, [
+    { name: 'reputation', type: 'STRING', value: rep },
+    { name: 'newFeedback', type: 'STRING', value: TOPIC.newFeedback },
     { name: 'agentId', type: 'STRING', value: agentId.toLowerCase() },
   ]);
   const r = rows[0];
   if (!r || Number(r.feedbackCount ?? 0) === 0) return null;
   const feedbackCount = Number(r.feedbackCount);
   return {
-    agentId,
+    agentId: agentId.toLowerCase(),
+    agentIdDecimal: agentIdToDecimal(agentId),
     feedbackCount,
     lastFeedbackAt: r.lastFeedbackAt ?? null,
-    registeredAt: r.registeredAt ?? null,
+    registeredAt: null,
     reputationScore: Math.round(Math.log10(feedbackCount + 1) * 100) / 100,
   };
 }

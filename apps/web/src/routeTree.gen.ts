@@ -19,7 +19,6 @@ import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
 import { Route as StudioControlledRouteImport } from './routes/studio-controlled'
 import { Route as StudioRouteImport } from './routes/studio'
 import { Route as StatusRouteImport } from './routes/status'
-import { Route as SolanaRouteImport } from './routes/solana'
 import { Route as SeriesRouteImport } from './routes/series'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SandboxRouteImport } from './routes/sandbox'
@@ -48,7 +47,6 @@ import { Route as ComingSoonRouteImport } from './routes/coming-soon'
 import { Route as CinematicUniverseCreateRouteImport } from './routes/cinematicUniverseCreate'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as CanvasRouteImport } from './routes/canvas'
-import { Route as BridgeRouteImport } from './routes/bridge'
 import { Route as AdReferenceRouteImport } from './routes/ad-reference'
 import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as IndexRouteImport } from './routes/index'
@@ -70,6 +68,7 @@ import { Route as ShopUniverseIdRouteImport } from './routes/shop/$universeId'
 import { Route as SettingsWalletsRouteImport } from './routes/settings.wallets'
 import { Route as SettingsUsageRouteImport } from './routes/settings.usage'
 import { Route as SettingsApiKeysRouteImport } from './routes/settings.api-keys'
+import { Route as SettingsAgentKeysRouteImport } from './routes/settings.agent-keys'
 import { Route as SellNewRouteImport } from './routes/sell/new'
 import { Route as SellEarningsRouteImport } from './routes/sell/earnings'
 import { Route as ProfileEditRouteImport } from './routes/profile/edit'
@@ -187,11 +186,6 @@ const StudioRoute = StudioRouteImport.update({
 const StatusRoute = StatusRouteImport.update({
   id: '/status',
   path: '/status',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SolanaRoute = SolanaRouteImport.update({
-  id: '/solana',
-  path: '/solana',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SeriesRoute = SeriesRouteImport.update({
@@ -334,11 +328,6 @@ const CanvasRoute = CanvasRouteImport.update({
   path: '/canvas',
   getParentRoute: () => rootRouteImport,
 } as any)
-const BridgeRoute = BridgeRouteImport.update({
-  id: '/bridge',
-  path: '/bridge',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AdReferenceRoute = AdReferenceRouteImport.update({
   id: '/ad-reference',
   path: '/ad-reference',
@@ -442,6 +431,11 @@ const SettingsUsageRoute = SettingsUsageRouteImport.update({
 const SettingsApiKeysRoute = SettingsApiKeysRouteImport.update({
   id: '/settings/api-keys',
   path: '/settings/api-keys',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsAgentKeysRoute = SettingsAgentKeysRouteImport.update({
+  id: '/settings/agent-keys',
+  path: '/settings/agent-keys',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SellNewRoute = SellNewRouteImport.update({
@@ -792,7 +786,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
   '/ad-reference': typeof AdReferenceRoute
-  '/bridge': typeof BridgeRoute
   '/canvas': typeof CanvasRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
@@ -821,7 +814,6 @@ export interface FileRoutesByFullPath {
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
   '/series': typeof SeriesRoute
-  '/solana': typeof SolanaRoute
   '/status': typeof StatusRoute
   '/studio': typeof StudioRouteWithChildren
   '/studio-controlled': typeof StudioControlledRoute
@@ -878,6 +870,7 @@ export interface FileRoutesByFullPath {
   '/profile/edit': typeof ProfileEditRoute
   '/sell/earnings': typeof SellEarningsRoute
   '/sell/new': typeof SellNewRoute
+  '/settings/agent-keys': typeof SettingsAgentKeysRoute
   '/settings/api-keys': typeof SettingsApiKeysRoute
   '/settings/usage': typeof SettingsUsageRoute
   '/settings/wallets': typeof SettingsWalletsRoute
@@ -923,7 +916,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
   '/ad-reference': typeof AdReferenceRoute
-  '/bridge': typeof BridgeRoute
   '/canvas': typeof CanvasRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
@@ -952,7 +944,6 @@ export interface FileRoutesByTo {
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
   '/series': typeof SeriesRoute
-  '/solana': typeof SolanaRoute
   '/status': typeof StatusRoute
   '/studio': typeof StudioRouteWithChildren
   '/studio-controlled': typeof StudioControlledRoute
@@ -1009,6 +1000,7 @@ export interface FileRoutesByTo {
   '/profile/edit': typeof ProfileEditRoute
   '/sell/earnings': typeof SellEarningsRoute
   '/sell/new': typeof SellNewRoute
+  '/settings/agent-keys': typeof SettingsAgentKeysRoute
   '/settings/api-keys': typeof SettingsApiKeysRoute
   '/settings/usage': typeof SettingsUsageRoute
   '/settings/wallets': typeof SettingsWalletsRoute
@@ -1055,7 +1047,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
   '/ad-reference': typeof AdReferenceRoute
-  '/bridge': typeof BridgeRoute
   '/canvas': typeof CanvasRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
@@ -1084,7 +1075,6 @@ export interface FileRoutesById {
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
   '/series': typeof SeriesRoute
-  '/solana': typeof SolanaRoute
   '/status': typeof StatusRoute
   '/studio': typeof StudioRouteWithChildren
   '/studio-controlled': typeof StudioControlledRoute
@@ -1141,6 +1131,7 @@ export interface FileRoutesById {
   '/profile/edit': typeof ProfileEditRoute
   '/sell/earnings': typeof SellEarningsRoute
   '/sell/new': typeof SellNewRoute
+  '/settings/agent-keys': typeof SettingsAgentKeysRoute
   '/settings/api-keys': typeof SettingsApiKeysRoute
   '/settings/usage': typeof SettingsUsageRoute
   '/settings/wallets': typeof SettingsWalletsRoute
@@ -1188,7 +1179,6 @@ export interface FileRouteTypes {
     | '/'
     | '/activity'
     | '/ad-reference'
-    | '/bridge'
     | '/canvas'
     | '/checkout'
     | '/cinematicUniverseCreate'
@@ -1217,7 +1207,6 @@ export interface FileRouteTypes {
     | '/sandbox'
     | '/search'
     | '/series'
-    | '/solana'
     | '/status'
     | '/studio'
     | '/studio-controlled'
@@ -1274,6 +1263,7 @@ export interface FileRouteTypes {
     | '/profile/edit'
     | '/sell/earnings'
     | '/sell/new'
+    | '/settings/agent-keys'
     | '/settings/api-keys'
     | '/settings/usage'
     | '/settings/wallets'
@@ -1319,7 +1309,6 @@ export interface FileRouteTypes {
     | '/'
     | '/activity'
     | '/ad-reference'
-    | '/bridge'
     | '/canvas'
     | '/checkout'
     | '/cinematicUniverseCreate'
@@ -1348,7 +1337,6 @@ export interface FileRouteTypes {
     | '/sandbox'
     | '/search'
     | '/series'
-    | '/solana'
     | '/status'
     | '/studio'
     | '/studio-controlled'
@@ -1405,6 +1393,7 @@ export interface FileRouteTypes {
     | '/profile/edit'
     | '/sell/earnings'
     | '/sell/new'
+    | '/settings/agent-keys'
     | '/settings/api-keys'
     | '/settings/usage'
     | '/settings/wallets'
@@ -1450,7 +1439,6 @@ export interface FileRouteTypes {
     | '/'
     | '/activity'
     | '/ad-reference'
-    | '/bridge'
     | '/canvas'
     | '/checkout'
     | '/cinematicUniverseCreate'
@@ -1479,7 +1467,6 @@ export interface FileRouteTypes {
     | '/sandbox'
     | '/search'
     | '/series'
-    | '/solana'
     | '/status'
     | '/studio'
     | '/studio-controlled'
@@ -1536,6 +1523,7 @@ export interface FileRouteTypes {
     | '/profile/edit'
     | '/sell/earnings'
     | '/sell/new'
+    | '/settings/agent-keys'
     | '/settings/api-keys'
     | '/settings/usage'
     | '/settings/wallets'
@@ -1582,7 +1570,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActivityRoute: typeof ActivityRoute
   AdReferenceRoute: typeof AdReferenceRoute
-  BridgeRoute: typeof BridgeRoute
   CanvasRoute: typeof CanvasRouteWithChildren
   CheckoutRoute: typeof CheckoutRoute
   CinematicUniverseCreateRoute: typeof CinematicUniverseCreateRoute
@@ -1611,7 +1598,6 @@ export interface RootRouteChildren {
   SandboxRoute: typeof SandboxRoute
   SearchRoute: typeof SearchRoute
   SeriesRoute: typeof SeriesRoute
-  SolanaRoute: typeof SolanaRoute
   StatusRoute: typeof StatusRoute
   StudioRoute: typeof StudioRouteWithChildren
   StudioControlledRoute: typeof StudioControlledRoute
@@ -1664,6 +1650,7 @@ export interface RootRouteChildren {
   ProfileEditRoute: typeof ProfileEditRoute
   SellEarningsRoute: typeof SellEarningsRoute
   SellNewRoute: typeof SellNewRoute
+  SettingsAgentKeysRoute: typeof SettingsAgentKeysRoute
   SettingsApiKeysRoute: typeof SettingsApiKeysRoute
   SettingsUsageRoute: typeof SettingsUsageRoute
   SettingsWalletsRoute: typeof SettingsWalletsRoute
@@ -1764,13 +1751,6 @@ declare module '@tanstack/react-router' {
       path: '/status'
       fullPath: '/status'
       preLoaderRoute: typeof StatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/solana': {
-      id: '/solana'
-      path: '/solana'
-      fullPath: '/solana'
-      preLoaderRoute: typeof SolanaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/series': {
@@ -1969,13 +1949,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CanvasRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/bridge': {
-      id: '/bridge'
-      path: '/bridge'
-      fullPath: '/bridge'
-      preLoaderRoute: typeof BridgeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/ad-reference': {
       id: '/ad-reference'
       path: '/ad-reference'
@@ -2121,6 +2094,13 @@ declare module '@tanstack/react-router' {
       path: '/settings/api-keys'
       fullPath: '/settings/api-keys'
       preLoaderRoute: typeof SettingsApiKeysRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/agent-keys': {
+      id: '/settings/agent-keys'
+      path: '/settings/agent-keys'
+      fullPath: '/settings/agent-keys'
+      preLoaderRoute: typeof SettingsAgentKeysRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sell/new': {
@@ -2713,7 +2693,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivityRoute: ActivityRoute,
   AdReferenceRoute: AdReferenceRoute,
-  BridgeRoute: BridgeRoute,
   CanvasRoute: CanvasRouteWithChildren,
   CheckoutRoute: CheckoutRoute,
   CinematicUniverseCreateRoute: CinematicUniverseCreateRoute,
@@ -2742,7 +2721,6 @@ const rootRouteChildren: RootRouteChildren = {
   SandboxRoute: SandboxRoute,
   SearchRoute: SearchRoute,
   SeriesRoute: SeriesRoute,
-  SolanaRoute: SolanaRoute,
   StatusRoute: StatusRoute,
   StudioRoute: StudioRouteWithChildren,
   StudioControlledRoute: StudioControlledRoute,
@@ -2795,6 +2773,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProfileEditRoute: ProfileEditRoute,
   SellEarningsRoute: SellEarningsRoute,
   SellNewRoute: SellNewRoute,
+  SettingsAgentKeysRoute: SettingsAgentKeysRoute,
   SettingsApiKeysRoute: SettingsApiKeysRoute,
   SettingsUsageRoute: SettingsUsageRoute,
   SettingsWalletsRoute: SettingsWalletsRoute,

@@ -20,6 +20,7 @@ export interface VideoModelConfig {
   googleModelId?: string; // Gemini API model id (used when provider='google'), e.g. 'veo-3.1-generate-preview'
   openaiModelId?: string; // OpenAI model id (used when provider='openai'), e.g. 'sora-2-pro'
   minimaxModelId?: string; // MiniMax model id (used when provider='minimax'), e.g. 'MiniMax-Hailuo-02'
+  comfyModelId?: string; // ComfyUI workflow hint (used when provider='comfyui'), e.g. 'ltx-video'
   mode: VideoGenerationMode[];
   qualityTier: QualityTier;
   speedTier: SpeedTier;

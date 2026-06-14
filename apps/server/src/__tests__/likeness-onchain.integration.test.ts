@@ -1,9 +1,8 @@
 /**
  * Live on-chain integration tests against the DEPLOYED Phase 1.5 contracts.
  *
- * NO MOCKS: real viem `createPublicClient` → public Sepolia + Base Sepolia
- * RPC endpoints → the actual proxies the marketplace router talks to in
- * production.
+ * NO MOCKS: real viem `createPublicClient` → public Sepolia RPC endpoints →
+ * the actual proxies the marketplace router talks to in production.
  *
  * These tests catch regressions like:
  *   - Address drift in `packages/abis/src/addresses.ts` vs what's actually
@@ -24,44 +23,35 @@ import { describe, it, expect, beforeAll, vi } from 'vitest';
 vi.unmock('viem');
 
 import { createPublicClient, http, type Address } from 'viem';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { sepolia } from 'viem/chains';
 import { rightsRegistryAbi, contentLicensingAbi } from '@loar/abis/generated';
 import { RightsRegistry, ContentLicensing, PaymentRouter, SplitRouter } from '@loar/abis/addresses';
 
 const SEPOLIA_RPC = 'https://ethereum-sepolia-rpc.publicnode.com';
-const BASE_SEPOLIA_RPC = 'https://sepolia.base.org';
 
 // Skip these tests when offline / RPC down so CI doesn't false-fail.
 let onlineSepolia = false;
-let onlineBase = false;
 
 beforeAll(async () => {
-  for (const [url, setOnline] of [
-    [SEPOLIA_RPC, (v: boolean) => (onlineSepolia = v)],
-    [BASE_SEPOLIA_RPC, (v: boolean) => (onlineBase = v)],
-  ] as const) {
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_chainId', params: [], id: 1 }),
-        signal: AbortSignal.timeout(5_000),
-      });
-      setOnline(res.ok);
-    } catch {
-      setOnline(false);
-    }
+  try {
+    const res = await fetch(SEPOLIA_RPC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_chainId', params: [], id: 1 }),
+      signal: AbortSignal.timeout(5_000),
+    });
+    onlineSepolia = res.ok;
+  } catch {
+    onlineSepolia = false;
   }
 });
 
-// Return type omitted intentionally: each branch produces a `PublicClient`
-// generic over a different `chain`, and naming the wider `PublicClient` here
-// trips TS2719 when viem types appear under multiple resolutions in the
-// workspace. Inference unions the two correctly without the conflict.
-function chainClient(chainId: 11155111 | 84532) {
-  return chainId === 11155111
-    ? createPublicClient({ chain: sepolia, transport: http(SEPOLIA_RPC) })
-    : createPublicClient({ chain: baseSepolia, transport: http(BASE_SEPOLIA_RPC) });
+// Return type omitted intentionally: naming the wider `PublicClient` here trips
+// TS2719 when viem types appear under multiple resolutions in the workspace.
+// Inference produces the correct type without the conflict.
+function chainClient(chainId: 11155111) {
+  void chainId;
+  return createPublicClient({ chain: sepolia, transport: http(SEPOLIA_RPC) });
 }
 
 const ZERO = '0x0000000000000000000000000000000000000000';
@@ -242,59 +232,5 @@ describe('SplitRouter — Sepolia (newly deployed)', () => {
       functionName: 'paymentRouter',
     });
     expect((pr as string).toLowerCase()).toBe(PaymentRouter['11155111'].toLowerCase());
-  });
-});
-
-describe('RightsRegistry — Base Sepolia (hardened impl)', () => {
-  const proxy = RightsRegistry['84532'] as Address;
-
-  it('isMonetizable(unset hash) returns FALSE post-upgrade', async () => {
-    if (!onlineBase) return;
-    const client = chainClient(84532);
-    const result = await client.readContract({
-      address: proxy,
-      abi: rightsRegistryAbi,
-      functionName: 'isMonetizable',
-      args: ['0x' + 'f'.repeat(64)] as never,
-    });
-    expect(result).toBe(false);
-  });
-
-  it('operators(deployer) returns true', async () => {
-    if (!onlineBase) return;
-    const client = chainClient(84532);
-    const isOp = await client.readContract({
-      address: proxy,
-      abi: rightsRegistryAbi,
-      functionName: 'operators',
-      args: [SELLER as Address],
-    });
-    expect(isOp).toBe(true);
-  });
-});
-
-describe('ContentLicensing — Base Sepolia (wired to canonical proxies)', () => {
-  const proxy = ContentLicensing['84532'] as Address;
-
-  it('rightsRegistry() points at the canonical Base Sepolia RightsRegistry proxy', async () => {
-    if (!onlineBase) return;
-    const client = chainClient(84532);
-    const rr = await client.readContract({
-      address: proxy,
-      abi: contentLicensingAbi,
-      functionName: 'rightsRegistry',
-    });
-    expect((rr as string).toLowerCase()).toBe(RightsRegistry['84532'].toLowerCase());
-  });
-
-  it('splitRouter() points at the existing Base Sepolia SplitRouter', async () => {
-    if (!onlineBase) return;
-    const client = chainClient(84532);
-    const sr = await client.readContract({
-      address: proxy,
-      abi: contentLicensingAbi,
-      functionName: 'splitRouter',
-    });
-    expect((sr as string).toLowerCase()).toBe(SplitRouter['84532'].toLowerCase());
   });
 });

@@ -1,0 +1,84 @@
+{
+  "8": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": { "ckpt_name": "ltx-video-2b-v0.9.5.safetensors" }
+  },
+  "38": {
+    "class_type": "CLIPLoader",
+    "inputs": { "clip_name": "t5xxl_fp16.safetensors", "type": "ltxv" }
+  },
+  "77": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "%image%" }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "%prompt%", "clip": ["38", 0] }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "%negative_prompt%", "clip": ["38", 0] }
+  },
+  "78": {
+    "class_type": "LTXVImgToVideo",
+    "inputs": {
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "vae": ["8", 2],
+      "image": ["77", 0],
+      "width": %width%,
+      "height": %height%,
+      "length": %length%,
+      "batch_size": 1
+    }
+  },
+  "71": {
+    "class_type": "LTXVConditioning",
+    "inputs": { "positive": ["78", 0], "negative": ["78", 1], "frame_rate": 25 }
+  },
+  "72": {
+    "class_type": "LTXVScheduler",
+    "inputs": {
+      "steps": 30,
+      "max_shift": 2.05,
+      "base_shift": 0.95,
+      "stretch": true,
+      "terminal": 0.1,
+      "latent": ["78", 2]
+    }
+  },
+  "74": {
+    "class_type": "KSamplerSelect",
+    "inputs": { "sampler_name": "euler" }
+  },
+  "73": {
+    "class_type": "SamplerCustom",
+    "inputs": {
+      "add_noise": true,
+      "noise_seed": %seed%,
+      "cfg": 3,
+      "model": ["8", 0],
+      "positive": ["71", 0],
+      "negative": ["71", 1],
+      "sampler": ["74", 0],
+      "sigmas": ["72", 0],
+      "latent_image": ["78", 2]
+    }
+  },
+  "75": {
+    "class_type": "VAEDecode",
+    "inputs": { "samples": ["73", 0], "vae": ["8", 2] }
+  },
+  "76": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "images": ["75", 0],
+      "frame_rate": 25,
+      "loop_count": 0,
+      "filename_prefix": "loar/ltx-i2v",
+      "format": "video/h264-mp4",
+      "pingpong": false,
+      "save_output": true
+    }
+  }
+}

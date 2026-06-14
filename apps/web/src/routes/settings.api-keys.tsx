@@ -5,7 +5,7 @@
  * Keys are encrypted at rest server-side; never returned to the client. UI
  * shows only the trailing 4 chars of a stored key for confirmation.
  */
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLink, KeyRound, ShieldCheck, Trash2 } from 'lucide-react';
+import { ArrowRight, Bot, ExternalLink, KeyRound, ShieldCheck, Trash2 } from 'lucide-react';
 
 export const Route = createFileRoute('/settings/api-keys')({
   component: ApiKeysPage,
@@ -111,7 +111,7 @@ function ApiKeysPage() {
   if (!address) {
     return (
       <div className="container mx-auto max-w-2xl px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold">API Keys</h1>
+        <h1 className="text-2xl font-bold">Provider Keys (BYOK)</h1>
         <p className="text-muted-foreground mt-2">
           Connect a wallet to manage your bring-your-own-key settings.
         </p>
@@ -124,13 +124,36 @@ function ApiKeysPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
           <KeyRound className="h-7 w-7 text-violet-400" />
-          API Keys
+          Provider Keys (BYOK)
         </h1>
         <p className="text-muted-foreground text-sm mt-2">
-          Plug in your own provider keys and the platform routes your generation calls through them.
-          Keys are encrypted at rest with AES-256-GCM and never returned to the browser.
+          Plug in <strong className="text-foreground">your own</strong> third-party provider keys
+          (OpenAI, Google, fal, …) and the platform routes your generation calls through them. Keys
+          are encrypted at rest with AES-256-GCM and never returned to the browser.
         </p>
       </div>
+
+      {/* Disambiguation callout: this is NOT the agent-control key page. */}
+      <Card className="bg-zinc-950/40 border-white/5">
+        <CardContent className="pt-6 text-sm text-muted-foreground">
+          <p className="flex items-start gap-2">
+            <Bot className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+            <span>
+              Trying to give <strong className="text-foreground">an agent</strong> (a Hermes agent,
+              the MCP server, a script) a key so it can control LOAR for you? That's the opposite
+              direction — go to{' '}
+              <Link
+                to="/settings/agent-keys"
+                className="text-amber-300 hover:text-amber-200 inline-flex items-center gap-1"
+              >
+                Agent API Keys
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+              .
+            </span>
+          </p>
+        </CardContent>
+      </Card>
 
       <ProviderCard provider="bytedance" />
       <ProviderCard provider="zai" />

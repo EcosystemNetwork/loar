@@ -2,16 +2,15 @@
  * UnlockFeesCard — One-time $25 unlock that waives platform credit charges
  * on any generation made with a user-supplied (BYOK) provider key.
  *
- * Four payment paths exposed:
+ * Three payment paths exposed:
  *   - Card (Stripe Elements; Stripe Checkout auto-enables Apple Pay /
  *     Google Pay / Link / bank debits via dashboard PMs)
  *   - Crypto (native ETH on Sepolia or Ethereum mainnet via Circle DCW)
- *   - Solana Pay (USDC-SPL; QR + deep-link URL)
  *   - Redeem code
  *
  * Surface lives at the top of /settings/api-keys.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { loadStripe } from '@stripe/stripe-js';
@@ -109,7 +108,7 @@ export function UnlockFeesCard() {
         </p>
 
         <Tabs defaultValue="card" className="w-full">
-          <TabsList className="grid grid-cols-4 w-full">
+          <TabsList className="grid grid-cols-3 w-full">
             <TabsTrigger value="card" disabled={!config?.paymentMethods.stripe}>
               <CreditCard className="h-3.5 w-3.5 mr-1.5" />
               Card
@@ -117,10 +116,6 @@ export function UnlockFeesCard() {
             <TabsTrigger value="eth" disabled={!config?.paymentMethods.eth}>
               <Coins className="h-3.5 w-3.5 mr-1.5" />
               ETH
-            </TabsTrigger>
-            <TabsTrigger value="usdc" disabled={!config?.paymentMethods.solana}>
-              <Coins className="h-3.5 w-3.5 mr-1.5" />
-              Solana
             </TabsTrigger>
             <TabsTrigger value="code">
               <KeyRound className="h-3.5 w-3.5 mr-1.5" />
@@ -139,9 +134,6 @@ export function UnlockFeesCard() {
               acceptedChainIds={config?.acceptedChainIds ?? []}
               onSuccess={invalidate}
             />
-          </TabsContent>
-          <TabsContent value="usdc" className="pt-4">
-            <SolanaTab onSuccess={invalidate} />
           </TabsContent>
           <TabsContent value="code" className="pt-4">
             <CodeTab onSuccess={invalidate} />
@@ -398,109 +390,6 @@ function EthTab({
         priceLabel={`~${sendEth.toFixed(6)} ETH`}
         method="ETH"
         onConfirm={pay}
-      />
-    </div>
-  );
-}
-
-// ── Solana Pay tab ─────────────────────────────────────────────────────
-
-function SolanaTab({ onSuccess }: { onSuccess: () => void }) {
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [intent, setIntent] = useState<{ reference: string; url: string; amount: string } | null>(
-    null
-  );
-  const [polling, setPolling] = useState(false);
-
-  const start = async () => {
-    setConfirmOpen(false);
-    try {
-      const i = await trpcClient.entitlements.createSolanaPayIntent.mutate();
-      setIntent({ reference: i.reference, url: i.url, amount: i.amount });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not create payment intent');
-    }
-  };
-
-  useEffect(() => {
-    if (!intent) return;
-    let cancelled = false;
-    setPolling(true);
-    const interval = setInterval(async () => {
-      if (cancelled) return;
-      try {
-        const res = await trpcClient.entitlements.unlockWithSolanaPay.mutate({
-          reference: intent.reference,
-        });
-        if (res.ok && res.status === 'paid') {
-          clearInterval(interval);
-          setPolling(false);
-          setIntent(null);
-          toast.success('Platform fees waived. Welcome to BYOK pricing.');
-          onSuccess();
-        }
-        if (!res.ok && res.status === 'expired') {
-          clearInterval(interval);
-          setPolling(false);
-          toast.error('Payment intent expired. Please try again.');
-          setIntent(null);
-        }
-      } catch {
-        // network blip — keep polling
-      }
-    }, 4000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [intent, onSuccess]);
-
-  if (intent) {
-    return (
-      <div className="space-y-3">
-        <p className="text-xs text-muted-foreground">
-          Open the URL below in Phantom / Solflare / any Solana Pay wallet, or scan as a QR. Waiting
-          for on-chain settlement…
-        </p>
-        <a
-          href={intent.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block break-all rounded-md border border-violet-500/30 bg-zinc-950/40 p-2 text-xs font-mono text-violet-300 hover:bg-zinc-900/40"
-        >
-          {intent.url}
-        </a>
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">
-            {polling ? 'Polling for payment…' : 'Waiting…'}
-          </span>
-          <Button variant="ghost" size="sm" onClick={() => setIntent(null)}>
-            Cancel
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">
-        Pay with USDC on Solana via Solana Pay. Works with any Solana wallet (Phantom, Solflare,
-        Backpack…).
-      </p>
-      <Button
-        onClick={() => setConfirmOpen(true)}
-        className="bg-violet-600 hover:bg-violet-500 w-full sm:w-auto"
-      >
-        Generate Solana Pay link
-      </Button>
-
-      <ConfirmDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        priceLabel="$25 USDC"
-        method="Solana USDC"
-        onConfirm={start}
       />
     </div>
   );

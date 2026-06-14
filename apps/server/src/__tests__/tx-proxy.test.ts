@@ -124,7 +124,7 @@ describe('/api/tx/write', () => {
           address: '0x000000000000000000000000000000000000dead',
           abi: [],
           functionName: 'foo',
-          chainId: 84532,
+          chainId: 11155111,
         }),
       })
     );
@@ -138,7 +138,7 @@ describe('/api/tx/write', () => {
     const app = await loadApp();
     stubUserWalletLookup('w-1', SESSION_ADDR);
     const cookie = await makeSessionCookie(SESSION_ADDR);
-    const allowed = (addresses as any).UniverseFactory['84532'];
+    const allowed = (addresses as any).UniverseFactory['11155111'];
     const res = await app.fetch(
       new Request('http://x/api/tx/write', {
         method: 'POST',
@@ -146,7 +146,7 @@ describe('/api/tx/write', () => {
         body: JSON.stringify({
           address: allowed,
           data: '0xabc', // odd-length
-          chainId: 84532,
+          chainId: 11155111,
         }),
       })
     );
@@ -160,7 +160,7 @@ describe('/api/tx/write', () => {
     const app = await loadApp();
     stubUserWalletLookup('w-1', SESSION_ADDR);
     const cookie = await makeSessionCookie(SESSION_ADDR);
-    const allowed = (addresses as any).PaymentRouter['84532'];
+    const allowed = (addresses as any).PaymentRouter['11155111'];
 
     const res = await app.fetch(
       new Request('http://x/api/tx/write', {
@@ -180,7 +180,7 @@ describe('/api/tx/write', () => {
           functionName: 'ping',
           args: [],
           value: '1000000000000000000', // 1 ETH in wei
-          chainId: 84532,
+          chainId: 11155111,
         }),
       })
     );
@@ -191,7 +191,7 @@ describe('/api/tx/write', () => {
     const call = executeMock.mock.calls[0][0];
     expect(call.walletId).toBe('w-1');
     expect(call.contractAddress).toBe(allowed);
-    expect(call.chainId).toBe(84532);
+    expect(call.chainId).toBe(11155111);
     expect(call.value).toBe('1000000000000000000');
     // calldata is the encoded `ping()` selector (4 bytes)
     expect(call.calldata).toMatch(/^0x[0-9a-fA-F]{8}$/);
@@ -206,7 +206,7 @@ describe('/api/tx/write', () => {
     const app = await loadApp();
     stubUserWalletLookup('w-1', SESSION_ADDR);
     const cookie = await makeSessionCookie(SESSION_ADDR);
-    const allowed = (addresses as any).PaymentRouter['84532'];
+    const allowed = (addresses as any).PaymentRouter['11155111'];
 
     const writeRes = await app.fetch(
       new Request('http://x/api/tx/write', {
@@ -219,7 +219,7 @@ describe('/api/tx/write', () => {
           ],
           functionName: 'ping',
           async: true,
-          chainId: 84532,
+          chainId: 11155111,
         }),
       })
     );
@@ -249,7 +249,7 @@ describe('/api/tx/write', () => {
     const app = await loadApp();
     stubUserWalletLookup('w-1', SESSION_ADDR);
     const submitCookie = await makeSessionCookie(SESSION_ADDR);
-    const allowed = (addresses as any).PaymentRouter['84532'];
+    const allowed = (addresses as any).PaymentRouter['11155111'];
 
     await app.fetch(
       new Request('http://x/api/tx/write', {
@@ -259,7 +259,7 @@ describe('/api/tx/write', () => {
           address: allowed,
           data: '0xabcdef00',
           async: true,
-          chainId: 84532,
+          chainId: 11155111,
         }),
       })
     );

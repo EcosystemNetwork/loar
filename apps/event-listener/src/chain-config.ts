@@ -45,8 +45,13 @@ export const chainConfig = {
   staticAddresses: {
     UniverseManager: lc(deployment.contracts.UniverseManager),
     // PoolManager is Uniswap v4 — address is not in the deployment file but
-    // hardcoded (same source as apps/indexer/ponder.config.ts). Sepolia only.
-    PoolManager: lc('0xE03A1074c86CFeDd5C142C4F04F1a1536e203543'),
+    // hardcoded per chain (same source as apps/indexer/ponder.config.ts).
+    // Mainnet uses the canonical v4 PoolManager — VERIFY on-chain before launch.
+    PoolManager: lc(
+      env.LISTENER_CHAIN === 'mainnet'
+        ? '0x000000000004444c5dc75cB358380D2e3dE08A90'
+        : '0xE03A1074c86CFeDd5C142C4F04F1a1536e203543'
+    ),
     CanonMarketplace: lc(deployment.contracts.CanonMarketplace),
     AdPlacement: lc(deployment.contracts.AdPlacement),
     LicensingRegistry: lc(deployment.contracts.LicensingRegistry),

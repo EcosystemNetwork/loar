@@ -13,11 +13,6 @@ import { Hono } from 'hono';
 import { setCookie } from 'hono/cookie';
 import { issueSessionToken } from '../lib/siwe';
 import { getOrCreateWallet, isCircleConfigured, type CircleWallet } from '../lib/circle-wallets';
-import {
-  getOrCreateSolanaWallet,
-  isCircleSolanaConfigured,
-  type CircleSolanaWallet,
-} from '../lib/circle-solana';
 import { verifyGoogleIdToken, isGoogleOAuthConfigured } from '../lib/oauth-verify';
 import { sendOtpEmail, isEmailConfigured } from '../lib/email';
 import { recordAuthEvent } from '../lib/metrics';
@@ -213,34 +208,12 @@ interface UserAccount {
  * with ALREADY_EXISTS (gRPC code 6) on race, in which case we read the
  * winner's doc and return that.
  */
-/**
- * Provision the user's Circle Solana wallet alongside the EVM one.
- *
- * Best-effort: a failure here does NOT block sign-in. Solana support gates
- * on `isCircleSolanaConfigured()` so single-chain deploys (EVM-only) skip
- * cleanly. The address is surfaced as a JWT `sol` claim so AuthUser carries
- * both chains' identities for the rest of the request lifecycle.
- */
-async function provisionSolanaWallet(userId: string): Promise<CircleSolanaWallet | null> {
-  if (!isCircleSolanaConfigured()) return null;
-  try {
-    return await getOrCreateSolanaWallet(userId);
-  } catch (err) {
-    console.warn(
-      `[circle-auth] Solana wallet provisioning failed for ${userId} — continuing with EVM-only session:`,
-      err instanceof Error ? err.message : err
-    );
-    return null;
-  }
-}
-
 async function getOrCreateUserAccount(
   email: string,
   provider: 'email' | 'google' = 'email'
 ): Promise<{
   account: UserAccount;
   wallet: CircleWallet;
-  solanaWallet: CircleSolanaWallet | null;
 }> {
   const normalizedEmail = email.toLowerCase().trim();
   const userId = `email:${normalizedEmail}`;
@@ -250,18 +223,11 @@ async function getOrCreateUserAccount(
     const existing = await ref.get();
     if (existing.exists) {
       const account = existing.data() as UserAccount;
-      // EVM + Solana provisioning runs in parallel; both are idempotent.
-      const [wallet, solanaWallet] = await Promise.all([
-        getOrCreateWallet(userId),
-        provisionSolanaWallet(userId),
-      ]);
-      return { account, wallet, solanaWallet };
+      const wallet = await getOrCreateWallet(userId);
+      return { account, wallet };
     }
 
-    const [wallet, solanaWallet] = await Promise.all([
-      getOrCreateWallet(userId),
-      provisionSolanaWallet(userId),
-    ]);
+    const wallet = await getOrCreateWallet(userId);
     const account: UserAccount = {
       email: normalizedEmail,
       walletAddress: wallet.address,
@@ -272,13 +238,13 @@ async function getOrCreateUserAccount(
 
     try {
       await ref.create(account);
-      return { account, wallet, solanaWallet };
+      return { account, wallet };
     } catch (err: unknown) {
       const code = (err as { code?: number })?.code;
       if (code === 6) {
         const winner = await ref.get();
         if (winner.exists) {
-          return { account: winner.data() as UserAccount, wallet, solanaWallet };
+          return { account: winner.data() as UserAccount, wallet };
         }
       }
       throw err;
@@ -286,10 +252,7 @@ async function getOrCreateUserAccount(
   }
 
   // Dev/test fallback — no Firestore, no cross-request race.
-  const [wallet, solanaWallet] = await Promise.all([
-    getOrCreateWallet(userId),
-    provisionSolanaWallet(userId),
-  ]);
+  const wallet = await getOrCreateWallet(userId);
   const account: UserAccount = {
     email: normalizedEmail,
     walletAddress: wallet.address,
@@ -297,7 +260,7 @@ async function getOrCreateUserAccount(
     provider,
     createdAt: new Date(),
   };
-  return { account, wallet, solanaWallet };
+  return { account, wallet };
 }
 
 // ── Cookie helpers ──────────────────────────────────────────────────────────
@@ -402,15 +365,11 @@ circleAuthRoutes.post('/verify-otp', async (c) => {
       return c.json({ error: 'Invalid or expired verification code' }, 401);
     }
 
-    // Create or retrieve wallet — also provisions the user's Circle Solana
-    // wallet in parallel when Solana is configured.
-    const { account, wallet, solanaWallet } = await getOrCreateUserAccount(email, 'email');
+    // Create or retrieve the user's Circle EVM wallet.
+    const { account, wallet } = await getOrCreateUserAccount(email, 'email');
 
-    // Issue JWT — EVM address as primary sub, Solana address as `sol` claim
-    // so AuthUser carries both chains' identities downstream.
-    const token = await issueSessionToken(wallet.address, {
-      solanaAddress: solanaWallet?.address,
-    });
+    // Issue JWT — EVM address as the session subject.
+    const token = await issueSessionToken(wallet.address);
     setSessionCookie(c, token);
 
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
@@ -493,10 +452,8 @@ circleAuthRoutes.post('/social', async (c) => {
   const email = verified.email;
 
   try {
-    const { account, wallet, solanaWallet } = await getOrCreateUserAccount(email, provider);
-    const token = await issueSessionToken(wallet.address, {
-      solanaAddress: solanaWallet?.address,
-    });
+    const { account, wallet } = await getOrCreateUserAccount(email, provider);
+    const token = await issueSessionToken(wallet.address);
     setSessionCookie(c, token);
 
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());

@@ -50,14 +50,20 @@ the platform signer address; set it as the resolver for `agents.loar.eth`.
 | tRPC `arc.*`                     | [routers/arc/arc.routes.ts](../apps/server/src/routers/arc/arc.routes.ts)   |
 | MCP tools                        | `loar_arc_pay`, `loar_arc_balance`                                          |
 
-- **Agent-to-agent USDC** on Arc (chain `5042002`, native USDC at `0x3600…0000`),
-  signed by the platform key for the paying agent — LOAR's custodial model.
-- **x402 (HTTP 402) pay-per-call:** an agent hits a paid resource → `402` +
-  `accepts` (price, payTo, asset) → pays USDC on Arc → retries with `X-PAYMENT`
-  (tx hash) → we verify the transfer on-chain and grant access once per tx
-  (replay-protected). This is "AI agents paying for API calls per-use."
-- **Tested:** x402 encode/handshake unit tests (3/3,
-  [`__tests__/x402.test.ts`](../apps/server/src/__tests__/x402.test.ts)).
+- **Agent-to-agent USDC** on Arc (chain `5042002`, native USDC at `0x3600…0000`).
+  Payment verification handles **both** ways USDC moves on Arc: ERC-20 `transfer()`
+  (6-dec `Transfer` on `0x3600…`) **and** native value sends (`Transfer` on the
+  EIP-7708 emitter `0xffff…fe`, 18-dec ÷10¹²) — the #1 Arc integration footgun.
+- **Canonical x402 (HTTP 402), "exact" EVM scheme:** an agent hits a paid resource
+  → `402` + `accepts` (price, payTo, asset, **EIP-712 domain in `extra`**) → the
+  agent **signs an EIP-3009 `TransferWithAuthorization` off-chain** (never
+  broadcasts) → retries with `X-PAYMENT` (base64 `{signature, authorization}`) →
+  the **facilitator (our server) verifies the signature and submits
+  `transferWithAuthorization`, paying gas** → returns `X-PAYMENT-RESPONSE`.
+  Confirmed live: Arc USDC implements EIP-3009 (`authorizationState` present).
+- **Tested:** x402 encode/handshake unit (3/3) **+ live EIP-3009 verify against
+  Arc's real USDC domain** (6/6, [`scripts/test-arc-x402-live.ts`](../apps/server/scripts/test-arc-x402-live.ts)):
+  a genuine EIP-712 signature verifies and over-charge / wrong-recipient are rejected.
 
 ## Google Cloud — ERC-8004 reputation via BigQuery
 
@@ -69,8 +75,10 @@ the platform signer address; set it as the resolver for `agents.loar.eth`.
 | MCP tools                          | `loar_agent_rank`, `loar_agent_reputation`                                                                        |
 
 - **BigQuery is the core**, as required: queries `bigquery-public-data.crypto_ethereum.logs`
-  filtered to the **EF ERC-8004** registries (Identity `0x8004A818…`, Reputation
-  `0x8004B663…`) to rank agents by on-chain feedback.
+  filtered to the **ERC-8004 mainnet** registries (Identity `0x8004A169…`, Reputation
+  `0x8004BAa1…`) **and the exact event topic0** (`NewFeedback`, `Registered`) — so it
+  counts real feedback per `agentId` (topics[1]), not every emitted log. (Live since
+  the ERC-8004 mainnet launch; ValidationRegistry has no canonical mainnet deploy yet.)
 - **Frontend** at `/agents/discover` pairs the BigQuery backend with a lightweight
   UI (ENS resolver + leaderboard + **x402-agent flagging**).
 - Auth reuses the existing GCP service account (no new dependency — uses
@@ -89,11 +97,45 @@ Arc:    ARC_RPC_URL  X402_PAY_TO  X402_PRICE_USDC   (signing via PRIVATE_KEY/KMS
 GCloud: GCP_PROJECT_ID  GCP_SERVICE_ACCOUNT_JSON  ERC8004_*_REGISTRY
 ```
 
+## Producing the testnet transactions (capture-ready)
+
+Each pillar has a one-command demo script. Each runs against live infra and
+exits with a clear "needs X" message until its creds/funds are present, then
+broadcasts/queries and prints the hash/output.
+
+```bash
+cd apps/server
+
+# Arc — direct USDC payment + canonical x402 EIP-3009 settle.
+#   Needs: PRIVATE_KEY (auto-generated, wired) funded with Arc testnet USDC.
+#   Faucet: https://faucet.circle.com → Arc Testnet
+#   Relayer to fund: 0xbb5d1b3178dED12Dbfab41edc697F6c8279df8f6
+npx tsx scripts/arc-demo.ts
+
+# Uniswap — real Sepolia ETH→$LOAR swap via Trading API + Circle DCW.
+#   Needs: CIRCLE_API_KEY/ENTITY_SECRET/WALLET_SET_ID + a Sepolia-funded Circle wallet
+#   (the script prints the wallet address to fund on first run).
+npx tsx scripts/uniswap-demo.ts
+
+# Google Cloud — live ERC-8004 ranking over Ethereum mainnet via BigQuery.
+#   Needs: GCP_PROJECT_ID + a service account with the BigQuery Job User role.
+npx tsx scripts/bigquery-demo.ts
+
+# ENS — deploy the (already-compiled) CCIP-Read resolver to Sepolia.
+#   Needs: a Sepolia-funded key. forge is installed.
+cd ../contracts
+forge create src/ens/LoarAgentResolver.sol:LoarAgentResolver \
+  --rpc-url "$RPC_URL" --private-key 0x$PRIVATE_KEY \
+  --constructor-args '["https://loar.fun/api/ens/ccip/{sender}/{data}.json"]' <signer-address>
+```
+
 ## Status
 
 - ✅ All server code typechecks (`tsc -b`); MCP + web typecheck.
-- ✅ ENS resolution verified live (mainnet). x402 logic unit-tested.
-- ⏳ Live on-chain demos need creds + funds (ops): an Arc-funded wallet (USDC
-  faucet) for payments; a GCP project with BigQuery for the leaderboard; the
-  `LoarAgentResolver` deploy + `agents.loar.eth` resolver set for CCIP subnames.
+- ✅ Verified live: ENS resolution (mainnet, 5/5), Arc EIP-3009 support + canonical
+  x402 signature verify against the real USDC domain (6/6). x402 encoding unit-tested.
+- ✅ `LoarAgentResolver.sol` compiles (forge): 10,118-byte bytecode + ABI.
+- ⏳ Live on-chain txs need creds + funds (the commands above): Arc-funded relayer,
+  Circle creds + Sepolia-funded wallet, a GCP/BigQuery project, and the resolver
+  deploy + `agents.loar.eth` resolver set for CCIP subnames.
 - ⏳ Per-sponsor: demo video + booth presentation (ENS, Sunday AM).

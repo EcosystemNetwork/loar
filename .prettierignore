@@ -1,6 +1,10 @@
 dist
 node_modules
 .turbo
+
+# ComfyUI workflow templates contain %placeholder% tokens substituted at
+# runtime — not valid JSON, so prettier can't parse them.
+apps/server/src/services/comfyui-workflows
 *.gen.ts
 apps/contracts
 pnpm-lock.yaml
