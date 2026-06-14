@@ -2434,7 +2434,13 @@ export const generationRouter = router({
                 ...cameraParams,
                 apiKey: bdApiKey,
               })
-            : await falService.generateVideo({ ...input, prompt, apiKey: falApiKey });
+            : await falService.generateVideo({
+                ...input,
+                // Google ids are handled in the isGoogle branch above; never reach FAL.
+                model: input.model as Exclude<typeof input.model, `${string}-google`>,
+                prompt,
+                apiKey: falApiKey,
+              });
         }
       } catch (genError) {
         await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);

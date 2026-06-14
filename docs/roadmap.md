@@ -75,7 +75,7 @@ A non-team wallet can: create a universe, generate AI content, list an episode N
 - [ ] **KYC/AML** — For high-value transactions (licensing, large NFT sales)
 - [x] ~~**Social Layer**~~ — Follows, comments, activity feed, notifications (fully implemented)
 - [ ] **Mainnet Deployment** — Ethereum Mainnet (chain 1; wired for swaps/auth, contracts pending audit)
-- [ ] **Future chains: Solana & Base** — planned post-Ethereum-mainnet; see [🚧 Coming Soon](#-coming-soon-future-chains) below
+- [ ] **Future chains: Solana & Base** — planned post-Ethereum-mainnet; see [Coming Soon: Future Chains](#coming-soon-future-chains) below
 - [ ] **Multi-Sig Governance Migration** — Transfer contract ownership from single EOA to Gnosis Safe + timelock
 - [ ] **Pausable Guards** — Add Pausable to 14 revenue-handling contracts (currently missing)
 - [ ] **Creator SDK / API** — Third-party apps can read universe data, embed episodes
@@ -87,7 +87,7 @@ First fiat payment processed. 100+ DAU. Platform passes security audit. One lice
 
 ---
 
-## 🚧 Coming Soon (Future Chains)
+## Coming Soon: Future Chains 🚧
 
 > **Status: planned, not active.** LOAR runs on **Ethereum only** today — Sepolia (contracts live + verified) with Ethereum Mainnet wired for swaps/auth. Solana and Base are **planned future chains**, sequenced **after** Ethereum Mainnet launch. Both were prototyped and then **removed from the active codebase and archived for restore** — branch `archive/solana-base-support`, tag `solana-base-snapshot`. Anything marked "✅ devnet" / "wired" in the linked docs describes the **archived prototype**, not live code.
 

@@ -16,7 +16,13 @@ export type VideoModel =
   | 'fal-wan25'
   | 'fal-sora'
   | 'seedance'
-  | 'seedance-fast';
+  | 'seedance-fast'
+  // Google-direct Veo (Google API via GOOGLE_API_KEY — never FAL). Ids match the server registry.
+  | 'veo-31-preview-google'
+  | 'veo-31-fast-preview-google'
+  | 'veo-31-lite-preview-google'
+  | 'veo-30-google'
+  | 'veo-30-fast-google';
 export type VideoRatio = '16:9' | '9:16' | '1:1';
 
 export interface StatusMessage {
@@ -142,6 +148,20 @@ export function useVideoGeneration({
           duration: selectedVideoDuration,
           aspectRatio: videoRatio === '1:1' ? '1:1' : videoRatio,
           resolution: '720p',
+          generateAudio: true,
+          negativePrompt: negativePrompt || undefined,
+          universeId,
+        });
+        return { videoUrl: result.videoUrl };
+      } else if (selectedVideoModel.endsWith('-google')) {
+        // Google-direct Veo (image-to-video): registry id routes to the Google API; the
+        // server picks i2v from imageUrl presence. Veo supports 16:9 / 9:16 only.
+        const result = await trpcClient.generation.generateVideo.mutate({
+          prompt: finalPrompt,
+          imageUrl,
+          model: selectedVideoModel as any,
+          duration: selectedVideoDuration,
+          aspectRatio: videoRatio === '1:1' ? '16:9' : videoRatio,
           generateAudio: true,
           negativePrompt: negativePrompt || undefined,
           universeId,
@@ -297,6 +317,12 @@ ${videoRatio === '1:1' ? "[!] ISSUE: You selected 1:1 which Sora doesn't support
             'fal-wan25': 'fal-ai/wan-25-preview/text-to-video',
             seedance: 'bytedance/seedance-2.0/text-to-video',
             'seedance-fast': 'bytedance/seedance-2.0/fast/text-to-video',
+            // Google-direct Veo: the registry id IS the server enum value (Google API, never FAL).
+            'veo-31-preview-google': 'veo-31-preview-google',
+            'veo-31-fast-preview-google': 'veo-31-fast-preview-google',
+            'veo-31-lite-preview-google': 'veo-31-lite-preview-google',
+            'veo-30-google': 'veo-30-google',
+            'veo-30-fast-google': 'veo-30-fast-google',
           };
 
           const modelNames: Record<string, string> = {
@@ -306,6 +332,11 @@ ${videoRatio === '1:1' ? "[!] ISSUE: You selected 1:1 which Sora doesn't support
             'fal-sora': 'Sora 2',
             seedance: 'Seedance 2.0',
             'seedance-fast': 'Seedance 2.0 Fast',
+            'veo-31-preview-google': 'Veo 3.1 (Google)',
+            'veo-31-fast-preview-google': 'Veo 3.1 Fast (Google)',
+            'veo-31-lite-preview-google': 'Veo 3.1 Lite (Google)',
+            'veo-30-google': 'Veo 3.0 (Google)',
+            'veo-30-fast-google': 'Veo 3.0 Fast (Google)',
           };
 
           const textToVideoModel = modelMap[selectedVideoModel] || 'fal-ai/veo3.1/fast';

@@ -800,6 +800,20 @@ export function FlowCreationPanel({
                       {duration}s
                     </button>
                   ))}
+                {selectedVideoModel.endsWith('-google') &&
+                  [4, 6, 8].map((duration) => (
+                    <button
+                      key={duration}
+                      onClick={() => setSelectedVideoDuration(duration)}
+                      className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                        selectedVideoDuration === duration
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-input bg-background hover:bg-muted'
+                      }`}
+                    >
+                      {duration}s
+                    </button>
+                  ))}
               </div>
             </div>
 
