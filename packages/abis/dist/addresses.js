@@ -42,11 +42,9 @@ export const LaunchpadStaking = {
 export const LicensingRegistry = {
     '11155111': '0xbF0Fed6125b1e05aA3Dc52B72B5cd7703990627C',
 };
-export const LoarFaucet = {};
 export const LoarFeeLocker = {
     '11155111': '0x965f5C192E38b86Fa4a79A561E695C48B1DC3582',
 };
-export const LoarHookStaticFee = {};
 export const LoarLpLockerMultiple = {
     '11155111': '0x7d30fd57e44aB0ca407D312976816E7052905E0A',
 };
@@ -59,7 +57,6 @@ export const LoarToken = {
 export const PaymentRouter = {
     '11155111': '0x920e9A9bac991554AEE2AB7c76c521e5FB3113b6',
 };
-export const PositionManager = {};
 export const RevenueModuleFactory = {
     '11155111': '0x6D5CEf09F044224A51bd59EB841769255070e5dA',
 };
@@ -69,7 +66,6 @@ export const RightsRegistry = {
 export const SplitRouter = {
     '11155111': '0x08081f6b215D0c34D081BfeB8163455CDb1E0Bdc',
 };
-export const StoryBounties = {};
 export const SubscriptionManager = {
     '11155111': '0x53542bA1e3445804D9a225C967E2677F017D1d47',
 };
@@ -91,3 +87,8 @@ export const UniverseMetadataRenderer = {
 export const UniverseTokenDeployer = {
     '11155111': '0x79Cc76AF00c97CA6C45E371940ee86b2376baaFC',
 };
+// Restored as empty maps — these contracts were Base-Sepolia-only and have no
+// Ethereum (Sepolia/mainnet) deployment yet. Exported so consumers' imports
+// resolve; callers guard on the missing address ("not deployed on chain").
+export const StoryBounties = {};
+export const LoarHookStaticFee = {};

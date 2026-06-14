@@ -54,14 +54,10 @@ export declare const LicensingRegistry: {
     readonly '11155111': "0xbF0Fed6125b1e05aA3Dc52B72B5cd7703990627C";
 };
 export type LicensingRegistryChainId = keyof typeof LicensingRegistry;
-export declare const LoarFaucet: {};
-export type LoarFaucetChainId = keyof typeof LoarFaucet;
 export declare const LoarFeeLocker: {
     readonly '11155111': "0x965f5C192E38b86Fa4a79A561E695C48B1DC3582";
 };
 export type LoarFeeLockerChainId = keyof typeof LoarFeeLocker;
-export declare const LoarHookStaticFee: {};
-export type LoarHookStaticFeeChainId = keyof typeof LoarHookStaticFee;
 export declare const LoarLpLockerMultiple: {
     readonly '11155111': "0x7d30fd57e44aB0ca407D312976816E7052905E0A";
 };
@@ -78,8 +74,6 @@ export declare const PaymentRouter: {
     readonly '11155111': "0x920e9A9bac991554AEE2AB7c76c521e5FB3113b6";
 };
 export type PaymentRouterChainId = keyof typeof PaymentRouter;
-export declare const PositionManager: {};
-export type PositionManagerChainId = keyof typeof PositionManager;
 export declare const RevenueModuleFactory: {
     readonly '11155111': "0x6D5CEf09F044224A51bd59EB841769255070e5dA";
 };
@@ -92,8 +86,6 @@ export declare const SplitRouter: {
     readonly '11155111': "0x08081f6b215D0c34D081BfeB8163455CDb1E0Bdc";
 };
 export type SplitRouterChainId = keyof typeof SplitRouter;
-export declare const StoryBounties: {};
-export type StoryBountiesChainId = keyof typeof StoryBounties;
 export declare const SubscriptionManager: {
     readonly '11155111': "0x53542bA1e3445804D9a225C967E2677F017D1d47";
 };
@@ -122,4 +114,8 @@ export declare const UniverseTokenDeployer: {
     readonly '11155111': "0x79Cc76AF00c97CA6C45E371940ee86b2376baaFC";
 };
 export type UniverseTokenDeployerChainId = keyof typeof UniverseTokenDeployer;
+export declare const StoryBounties: Record<string, `0x${string}`>;
+export type StoryBountiesChainId = keyof typeof StoryBounties;
+export declare const LoarHookStaticFee: Record<string, `0x${string}`>;
+export type LoarHookStaticFeeChainId = keyof typeof LoarHookStaticFee;
 //# sourceMappingURL=addresses.d.ts.map

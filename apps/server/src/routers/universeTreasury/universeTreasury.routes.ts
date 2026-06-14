@@ -22,6 +22,7 @@ import { createPublicClient, http, parseUnits, type Hash } from 'viem';
 import { mainnet, sepolia } from 'viem/chains';
 import { DEFAULT_PACKAGES, buildPackagesFromConfig } from '../credits/credits.routes';
 import { verifyStripePayment } from '../credits/stripe.routes';
+import { claimTxHash } from '../../services/tx-verify';
 import { getMembership } from '../universeTeam/universeTeam.routes';
 import { isUniverseAdmin, isUniverseAdminStrict } from '../../lib/safe-admin';
 
@@ -304,6 +305,12 @@ export const universeTreasuryRouter = router({
           input.chainId,
           ctx.user.address
         );
+        await claimTxHash({
+          txHash: input.paymentRef,
+          purpose: `treasury:fund:${input.universeId.toLowerCase()}`,
+          callerUid: ctx.user.uid,
+          chainId: input.chainId,
+        });
       } else if (input.paymentMethod === 'loar') {
         if (!input.loarAmount)
           throw new TRPCError({
@@ -317,6 +324,12 @@ export const universeTreasuryRouter = router({
           input.chainId,
           ctx.user.address
         );
+        await claimTxHash({
+          txHash: input.paymentRef,
+          purpose: `treasury:fund:${input.universeId.toLowerCase()}`,
+          callerUid: ctx.user.uid,
+          chainId: input.chainId,
+        });
       } else {
         // card: verify Stripe PaymentIntent
         const expectedCents = Math.round(pkg.fiatPriceUsd * 100);
@@ -659,6 +672,17 @@ export const universeTreasuryRouter = router({
         });
       }
 
+      // PAY-03: ETH→credits conversion mints real platform value at a fixed
+      // CREDITS_PER_ETH rate. Sepolia ETH is free from faucets, so allowing this
+      // on testnet lets any universe admin mint unlimited credits. Gate the
+      // value→credits conversion to Ethereum mainnet (chainId 1) only.
+      if (input.chainId !== 1) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Revenue deposits (ETH → credits) are only accepted on Ethereum mainnet.',
+        });
+      }
+
       // Dedup check
       const existing = await universeCreditTxCol()
         .where('txHash', '==', input.txHash)
@@ -726,6 +750,15 @@ export const universeTreasuryRouter = router({
           message: `Deposited ETH (${tx.value.toString()} wei) is less than the claimed amount (${claimedWei.toString()} wei).`,
         });
       }
+
+      // Cross-flow dedup (PAY-01): burn this txHash so the same deposit can't
+      // also be cashed in via credits/entitlements/fundPool.
+      await claimTxHash({
+        txHash: input.txHash,
+        purpose: `treasury:deposit:${universeId}`,
+        callerUid: ctx.user.uid,
+        chainId: input.chainId,
+      });
 
       // Convert ETH to credits using a rate
       // Base: 1 ETH ≈ 100,000 credits at current pricing ($0.008/credit, ~$3200/ETH)

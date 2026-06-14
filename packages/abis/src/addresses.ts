@@ -175,3 +175,12 @@ export const UniverseTokenDeployer = {
 
 export type UniverseTokenDeployerChainId = keyof typeof UniverseTokenDeployer;
 
+
+// Restored as empty maps — these contracts were Base-Sepolia-only and have no
+// Ethereum (Sepolia/mainnet) deployment yet. Exported so consumers' imports
+// resolve; callers guard on the missing address ("not deployed on chain").
+export const StoryBounties: Record<string, `0x${string}`> = {};
+export type StoryBountiesChainId = keyof typeof StoryBounties;
+
+export const LoarHookStaticFee: Record<string, `0x${string}`> = {};
+export type LoarHookStaticFeeChainId = keyof typeof LoarHookStaticFee;

@@ -284,7 +284,7 @@ export function useUniverseManager() {
  */
 export function useDefaultDeploymentConfig() {
   const chainId = useChainId();
-  const chainKey = String(chainId) as keyof typeof LoarHookStaticFee;
+  const chainKey = String(chainId);
 
   // Encode pool fee config: loarFee=3000 (0.3%), pairedFee=3000 (0.3%)
   const defaultPoolData = encodeAbiParameters(
@@ -301,8 +301,11 @@ export function useDefaultDeploymentConfig() {
   );
 
   return {
-    defaultHook: (LoarHookStaticFee[chainKey] ?? undefined) as `0x${string}` | undefined,
-    defaultLocker: (LoarLpLockerMultiple[chainKey] ?? undefined) as `0x${string}` | undefined,
+    defaultHook: ((LoarHookStaticFee as Record<string, `0x${string}`>)[chainKey] ?? undefined) as
+      | `0x${string}`
+      | undefined,
+    defaultLocker: ((LoarLpLockerMultiple as Record<string, `0x${string}`>)[chainKey] ??
+      undefined) as `0x${string}` | undefined,
     defaultPairedToken: WETH[chainId] as `0x${string}` | undefined, // undefined if chain not supported — caller must check
     defaultTickSpacing: 200,
     defaultTickIfToken0IsLoar: -230400, // Standard starting tick

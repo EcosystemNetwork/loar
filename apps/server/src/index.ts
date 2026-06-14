@@ -99,15 +99,40 @@ app.use('/*', csrfProtection(allowedOrigins));
 const { stripeWebhookRoutes } = await import('./routes/stripe-webhook');
 app.route('/api/stripe', stripeWebhookRoutes);
 
-// SIWE authentication routes — stricter rate limit (20 req/min per IP)
-// Each sign-in needs nonce + verify (2 reqs), plus /me checks and /refresh calls
-app.use('/auth/*', rateLimiter({ windowMs: 60_000, max: 20 }));
-// Extra-tight bucket on /auth/nonce specifically: each nonce is a Firestore
-// write, and the shared `/auth/*` bucket of 20/min lets an attacker pull ~29k
-// nonces/day per IP (burning Firestore quota + outrunning the 15-min cleanup
-// sweep). Legitimate clients call nonce once per login attempt, so 6/min is
-// generous.
+// ── Auth rate limiting ──────────────────────────────────────────────────────
+// Generous blanket backstop across ALL /auth/* routes. This is the ONLY bucket
+// the read-only/session endpoints (/auth/me, /auth/refresh, /auth/revoke) draw
+// from — sized high on purpose so session polling can never starve the login
+// endpoints. The real abuse caps live in the tight per-route buckets below;
+// a request consumes from BOTH the matching per-route bucket AND this blanket.
+//
+// History: this used to be a single 20/min bucket shared by everything, so a
+// transient backend 504 + a handful of failed-login retries emptied it and
+// locked the user out of logging in with a 429. Per-route isolation prevents
+// that cascade while keeping the sensitive endpoints tightly capped.
+app.use('/auth/*', rateLimiter({ windowMs: 60_000, max: 120 }));
+
+// Tight per-route buckets for the sensitive / expensive endpoints. These MUST
+// be registered before the route mounts below so the middleware wraps the
+// handlers (Hono matches handlers in registration order).
+//
+// nonce: each call is a Firestore write — an attacker on the shared bucket
+//   could otherwise pull ~29k nonces/day per IP, burning quota + outrunning the
+//   15-min cleanup sweep. Legit clients call it once per login, so 6/min is ample.
 app.use('/auth/nonce', rateLimiter({ windowMs: 60_000, max: 6 }));
+// verify: SIWE signature verification — wallet-auth entry point. Tighter than
+//   the old 20/min blanket; one honest login needs a single call.
+app.use('/auth/verify', rateLimiter({ windowMs: 60_000, max: 15 }));
+// register: sends an OTP email — IP backstop for the per-email 3-per-15min cap;
+//   blunts cross-email enumeration / mail-bombing from one source.
+app.use('/auth/circle/register', rateLimiter({ windowMs: 60_000, max: 5 }));
+// verify-otp: OTP brute-force backstop (the per-OTP 5-attempt cap also applies).
+app.use('/auth/circle/verify-otp', rateLimiter({ windowMs: 60_000, max: 15 }));
+// social: each call verifies a real Google idToken + provisions/looks-up a
+//   Circle wallet. 15/min leaves room for a few honest retries during a backend
+//   blip without the old lockout, while still capping token-replay abuse.
+app.use('/auth/circle/social', rateLimiter({ windowMs: 60_000, max: 15 }));
+
 app.route('/auth', authRoutes);
 
 // Circle Developer Controlled Wallet auth routes (email/social login)

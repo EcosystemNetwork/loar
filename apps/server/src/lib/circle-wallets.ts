@@ -57,7 +57,10 @@ function circleBlockchain(chainId: number): string {
     case 11155111:
       return 'ETH-SEPOLIA';
     default:
-      return 'ETH-SEPOLIA';
+      // Hard-reject unknown chains rather than silently defaulting to Sepolia —
+      // a wrong/typo chainId must never land a tx on the wrong network or pass
+      // the executeTransaction wallet-vs-chain cross-check by coincidence.
+      throw new Error(`Unsupported chainId ${chainId}: expected 1 (mainnet) or 11155111 (Sepolia)`);
   }
 }
 
