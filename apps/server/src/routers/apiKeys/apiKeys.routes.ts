@@ -4,29 +4,18 @@
 import { protectedProcedure, router } from '../../lib/trpc';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { generateApiKey, revokeApiKey, listApiKeys, getApiKeyUsage } from '../../lib/apiKeys';
+import {
+  generateApiKey,
+  revokeApiKey,
+  listApiKeys,
+  getApiKeyUsage,
+  API_KEY_SCOPES,
+} from '../../lib/apiKeys';
 
-const API_KEY_PERMISSIONS = [
-  'entities.create',
-  'entities.read',
-  'entities.update',
-  'generation.generate',
-  'image.generate',
-  'voice.generate',
-  'threed.generate',
-  'studio.createEntityPack',
-  'marketplace.submit',
-  'marketplace.read',
-  'collabs.propose',
-  'collabs.read',
-  'content.create',
-  'content.read',
-  'wiki.generate',
-  'profiles.read',
-  'universes.read',
-  'credits.read',
-  'analytics.read',
-] as const;
+// Scopes that should never be offered to external keys via the UI.
+// `admin.all` is internal-only; everything else in API_KEY_SCOPES is
+// fair game (including `mcp_server`, used by MCP relays like Hermes).
+const HIDDEN_SCOPES = new Set<string>(['admin.all']);
 
 export const apiKeysRouter = router({
   /**
@@ -118,10 +107,13 @@ export const apiKeysRouter = router({
    * Get available permissions for API key creation
    */
   availablePermissions: protectedProcedure.query(() => {
-    return API_KEY_PERMISSIONS.map((p) => ({
-      value: p,
-      label: p.replace('.', ' → '),
-      category: p.split('.')[0],
-    }));
+    return (Object.keys(API_KEY_SCOPES) as (keyof typeof API_KEY_SCOPES)[])
+      .filter((p) => !HIDDEN_SCOPES.has(p))
+      .map((p) => ({
+        value: p,
+        label: p.replace(/[._]/g, ' → '),
+        description: API_KEY_SCOPES[p],
+        category: p.split('.')[0],
+      }));
   }),
 });

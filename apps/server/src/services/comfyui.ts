@@ -37,7 +37,13 @@
  * match your ComfyUI.
  */
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// The server runs as ESM, where `__dirname` is undefined — derive it from the
+// module URL (same approach as lib/firebase.ts) so the bundled workflow
+// templates in ./comfyui-workflows/ resolve.
+const moduleDir = dirname(fileURLToPath(import.meta.url));
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:8188';
 const POLL_INTERVAL_MS = 3_000;
@@ -96,7 +102,7 @@ async function loadWorkflowTemplate(mode: ComfyVideoOptions['mode']): Promise<st
   // remain in ./comfyui-workflows/ as a lighter alternative — point the
   // COMFYUI_WORKFLOW_*_PATH env vars at them (or your own export) to switch.
   const bundled = mode === 'image_to_video' ? 'wan-i2v.json' : 'wan-t2v.json';
-  return readFile(join(__dirname, 'comfyui-workflows', bundled), 'utf8');
+  return readFile(join(moduleDir, 'comfyui-workflows', bundled), 'utf8');
 }
 
 /** Replace %token% placeholders. Numeric tokens are injected unquoted. */

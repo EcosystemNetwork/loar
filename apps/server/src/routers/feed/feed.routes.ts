@@ -23,6 +23,47 @@ const contentCol = () => {
   return db.collection('content');
 };
 
+const HIDDEN_STATUSES = ['flagged', 'under_review', 'hidden', 'removed'];
+
+/**
+ * Signal docs only carry trending metadata (score, views, genres) — no media
+ * URLs or title. Join each signal with its content doc so the feed can render
+ * thumbnails, and drop items whose content is missing or moderated.
+ */
+async function enrichWithContent(signals: any[]): Promise<any[]> {
+  if (signals.length === 0) return [];
+
+  const refs = signals.map((s) => contentCol().doc(s.contentId || s.id));
+  const contentDocs = await db!.getAll(...refs);
+  const byId = new Map(contentDocs.map((d) => [d.id, d]));
+
+  const enriched: any[] = [];
+  for (const signal of signals) {
+    const contentId = signal.contentId || signal.id;
+    const doc = byId.get(contentId);
+    if (!doc?.exists) continue;
+
+    const data = doc.data()!;
+    if (data.visibility && data.visibility !== 'public') continue;
+    if (data.contentStatus && HIDDEN_STATUSES.includes(data.contentStatus)) continue;
+
+    enriched.push({
+      ...signal,
+      title: data.title || null,
+      description: data.description || null,
+      mediaUrl: data.mediaUrl || null,
+      thumbnailUrl: data.thumbnailUrl || null,
+      mediaType: data.mediaType || null,
+      format: data.format || null,
+      classification: data.classification || null,
+      creatorUid: data.creatorUid || signal.creatorUid || null,
+      universeId: data.universeId ?? signal.universeId ?? null,
+      views: data.views ?? signal.totalViews ?? 0,
+    });
+  }
+  return enriched;
+}
+
 export const feedRouter = router({
   /** Get personalized "For You" feed */
   getForYou: protectedProcedure
@@ -89,6 +130,9 @@ export const feedRouter = router({
       // Take limit
       items = items.slice(0, input.limit);
 
+      // Join with content docs for media URLs/title (signals lack them)
+      items = await enrichWithContent(items);
+
       return {
         items,
         nextCursor:
@@ -113,8 +157,45 @@ export const feedRouter = router({
       }
 
       const snapshot = await query.get();
+      const signals = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[];
+
+      // Signals only store trending metadata (no media URLs). Join with the
+      // content collection so trending cards can actually render thumbnails.
+      let items = await enrichWithContent(signals);
+
+      // Fallback: contentSignals is admin-rebuilt and may be empty/stale. If we
+      // have nothing to show (and aren't paginating), surface recent public
+      // content directly so discovery is never blank.
+      if (items.length === 0 && !input.cursor) {
+        const recent = await contentCol()
+          .where('visibility', '==', 'public')
+          .orderBy('createdAt', 'desc')
+          .limit(input.limit * 3)
+          .get();
+        items = recent.docs
+          .map((doc) => ({ id: doc.id, contentId: doc.id, ...doc.data() }))
+          .filter((d: any) => !d.contentStatus || !HIDDEN_STATUSES.includes(d.contentStatus))
+          .filter((d: any) => d.mediaUrl || d.thumbnailUrl)
+          .slice(0, input.limit)
+          .map((d: any) => ({
+            id: d.id,
+            contentId: d.contentId,
+            title: d.title || null,
+            description: d.description || null,
+            mediaUrl: d.mediaUrl || null,
+            thumbnailUrl: d.thumbnailUrl || null,
+            mediaType: d.mediaType || null,
+            universeId: d.universeId ?? null,
+            creatorUid: d.creatorUid || null,
+            views: d.views ?? 0,
+            totalViews: d.views ?? 0,
+          }));
+
+        return { items, nextCursor: undefined };
+      }
+
       return {
-        items: snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+        items,
         nextCursor:
           snapshot.docs.length === input.limit
             ? snapshot.docs[snapshot.docs.length - 1]?.id
