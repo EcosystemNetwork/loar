@@ -16,10 +16,6 @@ const ETH_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 export interface AuthUser {
   uid: string;
   address?: string;
-  /** Base58 Solana pubkey, when the user has a linked or primary Solana wallet. */
-  solanaAddress?: string;
-  /** Chain namespace of the primary identity. Defaults to 'eip155' for legacy sessions. */
-  chainNamespace?: 'eip155' | 'solana';
   email?: string;
   /** Set when authenticated via API key */
   apiKeyId?: string;
@@ -101,35 +97,12 @@ export async function verifyAuth(headers: Headers, cookieToken?: string): Promis
 }
 
 /**
- * Build an AuthUser from a verified JWT payload. Handles both EVM-only
- * (legacy) tokens and tokens with extended Solana / chain-namespace claims.
+ * Build an AuthUser from a verified EVM JWT payload. `uid` stays lowercased for
+ * back-compat with Firestore documents keyed by EVM-address-lowercased uids.
  */
-function authUserFromPayload(payload: {
-  sub: string;
-  ns?: 'eip155' | 'solana';
-  evm?: string;
-  sol?: string;
-}): AuthUser {
-  const ns = payload.ns ?? 'eip155';
-  if (ns === 'solana') {
-    // sub is base58 (case-sensitive) — never lowercase Solana pubkeys.
-    // `address` is populated from payload.evm when the user has linked an EVM
-    // wallet via POST /auth/evm/link (mirror of the Solana-side /auth/solana/link).
-    // That reverse-link route doesn't exist yet — see TODO in routes/siws-auth.ts.
-    // Until it does, payload.evm is always undefined for ns='solana' sessions.
-    return {
-      uid: payload.sub,
-      address: payload.evm,
-      solanaAddress: payload.sub,
-      chainNamespace: 'solana',
-    };
-  }
-  // EVM path (legacy + dual-chain) — uid stays lowercased for back-compat
-  // with Firestore documents keyed by EVM-address-lowercased uids.
+function authUserFromPayload(payload: { sub: string }): AuthUser {
   return {
     uid: payload.sub.toLowerCase(),
     address: payload.sub,
-    solanaAddress: payload.sol,
-    chainNamespace: 'eip155',
   };
 }

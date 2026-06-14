@@ -92,7 +92,10 @@ async function loadWorkflowTemplate(mode: ComfyVideoOptions['mode']): Promise<st
     return readFile(envPath, 'utf8');
   }
 
-  const bundled = mode === 'image_to_video' ? 'ltx-i2v.json' : 'ltx-t2v.json';
+  // Default to Wan 2.2 TI2V-5B (verified working on a 16GB GPU). LTX templates
+  // remain in ./comfyui-workflows/ as a lighter alternative — point the
+  // COMFYUI_WORKFLOW_*_PATH env vars at them (or your own export) to switch.
+  const bundled = mode === 'image_to_video' ? 'wan-i2v.json' : 'wan-t2v.json';
   return readFile(join(__dirname, 'comfyui-workflows', bundled), 'utf8');
 }
 

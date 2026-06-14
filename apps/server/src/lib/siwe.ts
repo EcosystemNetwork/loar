@@ -126,14 +126,8 @@ const ALLOWED_CHAIN_IDS = new Set(
 const MAX_SIWE_LIFETIME_MS = 10 * 60 * 1000;
 
 export interface SiweSessionPayload extends JWTPayload {
-  sub: string; // checksummed wallet address (or Solana base58 address when ns='solana')
+  sub: string; // checksummed wallet address
   iat: number;
-  /** Chain namespace. Defaults to 'eip155' (EVM) when absent on legacy tokens. */
-  ns?: 'eip155' | 'solana';
-  /** Linked EVM address (when sub is Solana or both are linked). */
-  evm?: string;
-  /** Linked Solana address (base58). */
-  sol?: string;
 }
 
 /** Generate a cryptographically random nonce and store it with a 2-minute TTL. */
@@ -334,37 +328,19 @@ export async function verifySiweSignature(
   return address;
 }
 
-export interface IssueSessionOpts {
-  /** Chain namespace of the primary identity (`sub`). Defaults to 'eip155'. */
-  namespace?: 'eip155' | 'solana';
-  /** Linked EVM address (when sub is Solana). */
-  evmAddress?: string;
-  /** Linked Solana address (base58). */
-  solanaAddress?: string;
-}
-
 /**
- * Issue a signed JWT for the given wallet address.
+ * Issue a signed JWT for the given EVM wallet address.
  *
- * For EVM (default), `address` is checksummed via getAddress() and stored as `sub`.
- * For Solana (`opts.namespace='solana'`), `address` is the base58 pubkey and is
- * stored as-is — case matters for Solana addresses.
+ * `address` is checksummed via getAddress() and stored as `sub`.
  */
-export async function issueSessionToken(
-  address: string,
-  opts: IssueSessionOpts = {}
-): Promise<string> {
+export async function issueSessionToken(address: string): Promise<string> {
   const jti = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
     b.toString(16).padStart(2, '0')
   ).join('');
 
-  const ns = opts.namespace ?? 'eip155';
-  const sub = ns === 'eip155' ? getAddress(address) : address;
+  const sub = getAddress(address);
 
   const claims: Record<string, unknown> = { sub };
-  if (ns !== 'eip155') claims.ns = ns;
-  if (opts.evmAddress) claims.evm = getAddress(opts.evmAddress);
-  if (opts.solanaAddress) claims.sol = opts.solanaAddress;
 
   return new SignJWT(claims)
     .setProtectedHeader({ alg: 'HS256' })
@@ -476,11 +452,7 @@ export async function refreshSessionToken(token: string): Promise<string | null>
     await revokeToken(result.payload.jti);
   }
 
-  return issueSessionToken(result.payload.sub, {
-    namespace: result.payload.ns,
-    evmAddress: result.payload.evm,
-    solanaAddress: result.payload.sol,
-  });
+  return issueSessionToken(result.payload.sub);
 }
 
 /** Construct a SIWE-compliant message string. */

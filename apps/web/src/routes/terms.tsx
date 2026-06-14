@@ -82,8 +82,8 @@ function TermsPage() {
               LOAR is a decentralized narrative control suite that enables the creation, ownership,
               governance, and monetization of AI-generated and user-created content, including but
               not limited to images, videos, 3D models, voice content, and story universes. The
-              Platform operates on the Base Layer 2 network (an Ethereum rollup) and uses smart
-              contracts deployed on-chain for content registration, intellectual property
+              Platform operates on the Ethereum network (Sepolia testnet, with mainnet planned) and
+              uses smart contracts deployed on-chain for content registration, intellectual property
               management, governance token mechanics, and NFT minting and trading.
             </p>
             <p>
@@ -169,7 +169,7 @@ function TermsPage() {
             </h2>
             <p>
               Certain Platform features involve interactions with smart contracts deployed on the
-              Base L2 blockchain network. You acknowledge and agree that:
+              Ethereum blockchain network. You acknowledge and agree that:
             </p>
             <ul className="list-disc pl-6 space-y-2">
               <li>

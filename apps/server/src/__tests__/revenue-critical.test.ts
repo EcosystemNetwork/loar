@@ -337,14 +337,14 @@ describe('credits ETH purchase verification', () => {
     ).rejects.toThrow(); // RPC not available in tests → tx not found
   });
 
-  it('purchaseWithFiat with eth rejects for Base Sepolia when RPC is unavailable', async () => {
+  it('purchaseWithFiat with eth rejects for Sepolia when RPC is unavailable', async () => {
     const caller = createAuthCaller();
     await expect(
       caller.credits.purchaseWithFiat({
         packageId: 'starter',
         paymentMethod: 'eth',
         paymentRef: '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
-        chainId: 84532, // Base Sepolia
+        chainId: 11155111, // Ethereum Sepolia
       })
     ).rejects.toThrow();
   });
@@ -440,7 +440,7 @@ describe('universeTreasury router', () => {
         packageId: 'starter',
         paymentMethod: 'eth',
         paymentRef: '0xabc',
-        chainId: 84532, // Base Sepolia
+        chainId: 11155111, // Ethereum Sepolia
       })
     ).rejects.toThrow('Only the universe admin can fund');
   });
@@ -522,7 +522,7 @@ describe('universeTreasury router', () => {
         amountEth: '0.1',
         txHash: '0xabc',
         source: 'nft_sales',
-        chainId: 84532, // Base Sepolia
+        chainId: 11155111, // Ethereum Sepolia
       })
     ).rejects.toThrow();
   });

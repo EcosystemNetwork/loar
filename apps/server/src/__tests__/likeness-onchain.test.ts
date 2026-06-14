@@ -131,10 +131,10 @@ describe('getOnChainEnv', () => {
   const KEYS = [
     'CONTENT_LICENSING_ADDRESS_SEPOLIA',
     'RIGHTS_REGISTRY_ADDRESS_SEPOLIA',
-    'CONTENT_LICENSING_ADDRESS_BASE_SEPOLIA',
-    'RIGHTS_REGISTRY_ADDRESS_BASE_SEPOLIA',
+    'CONTENT_LICENSING_ADDRESS_MAINNET',
+    'RIGHTS_REGISTRY_ADDRESS_MAINNET',
     'RPC_URL',
-    'RPC_URL_BASE_SEPOLIA',
+    'RPC_URL_MAINNET',
     'PONDER_RPC_URL_2',
   ];
   beforeEach(() => {
@@ -152,13 +152,13 @@ describe('getOnChainEnv', () => {
 
   it('returns null when no env vars are set (default-deny)', () => {
     expect(getOnChainEnv(11155111)).toBeNull();
-    expect(getOnChainEnv(84532)).toBeNull();
+    expect(getOnChainEnv(1)).toBeNull();
     expect(isOnChainAvailable()).toBe(false);
     expect(defaultOnChainChainId()).toBeNull();
   });
 
   it('returns null for an unsupported chain id', () => {
-    expect(getOnChainEnv(1)).toBeNull(); // mainnet
+    expect(getOnChainEnv(84532)).toBeNull(); // Base Sepolia — deprecated, unsupported
     expect(getOnChainEnv(0)).toBeNull();
   });
 
@@ -195,12 +195,17 @@ describe('getOnChainEnv', () => {
     expect(defaultOnChainChainId()).toBe(11155111);
   });
 
-  it('ignores Base Sepolia config — Sepolia is the only supported chain', () => {
-    process.env.CONTENT_LICENSING_ADDRESS_BASE_SEPOLIA = '0x' + 'c'.repeat(40);
-    process.env.RIGHTS_REGISTRY_ADDRESS_BASE_SEPOLIA = '0x' + 'd'.repeat(40);
-    process.env.RPC_URL_BASE_SEPOLIA = 'https://example/base';
-    expect(getOnChainEnv(84532)).toBeNull();
-    expect(defaultOnChainChainId()).toBeNull();
+  it('returns the env when all three mainnet vars are set', () => {
+    process.env.CONTENT_LICENSING_ADDRESS_MAINNET = '0x' + 'c'.repeat(40);
+    process.env.RIGHTS_REGISTRY_ADDRESS_MAINNET = '0x' + 'd'.repeat(40);
+    process.env.RPC_URL_MAINNET = 'https://example/mainnet';
+    const env = getOnChainEnv(1);
+    expect(env).not.toBeNull();
+    expect(env?.chainId).toBe(1);
+    expect(env?.chainLabel).toBe('Ethereum');
+    expect(env?.contentLicensing.toLowerCase()).toBe('0x' + 'c'.repeat(40));
+    // Sepolia preferred, but with only mainnet configured it becomes the default.
+    expect(defaultOnChainChainId()).toBe(1);
   });
 });
 

@@ -84,8 +84,14 @@ const moreGroupsBase: MoreGroup[] = [
       { to: '/notifications', label: 'Notifications' },
       { to: '/swap', label: 'Swap' },
       { to: '/credits', label: 'Credits' },
-      { to: '/settings/api-keys', label: 'Provider Keys (BYOK)' },
+    ],
+  },
+  {
+    label: 'Developer',
+    links: [
       { to: '/settings/agent-keys', label: 'Agent API Keys' },
+      { to: '/settings/api-keys', label: 'Provider Keys (BYOK)' },
+      { to: '/docs', label: 'Docs' },
     ],
   },
   {
@@ -107,7 +113,6 @@ const moreGroupsBase: MoreGroup[] = [
       { to: '/subscriptions', label: 'Subscriptions' },
       { to: '/faucet', label: 'Faucet' },
       { to: '/pricing', label: 'Pricing' },
-      { to: '/docs', label: 'Docs' },
     ],
   },
 ];

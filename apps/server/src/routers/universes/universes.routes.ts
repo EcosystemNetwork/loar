@@ -103,7 +103,6 @@ export const universesRouter = router({
       mintTxHash: input.mintTxHash,
       unstoppableDomain: input.unstoppableDomain ?? null,
       chainId: input.chainId,
-      chainNamespace: 'eip155',
       universeType: input.universeType,
     });
 

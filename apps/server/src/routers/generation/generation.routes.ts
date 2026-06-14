@@ -559,14 +559,17 @@ async function dispatchGenerationInner(
     // videoUrl points at the local /view endpoint; persistVideoToStorage
     // fetches it server-side and pins it to IPFS like any other clip.
     const { comfyUIService } = await import('../../services/comfyui');
-    const [arW, arH] = (() => {
+    // Wan 2.2 5B dimensions. Native quality is 1280x704 (720p); we drop to a
+    // ~512p tier for faster drafts. All values are /32-aligned for the latent.
+    const hi = input.resolution === '720p';
+    const [width, height] = (() => {
       switch (input.aspectRatio) {
         case '9:16':
-          return [512, 768];
+          return hi ? [704, 1280] : [480, 832];
         case '1:1':
-          return [640, 640];
-        default:
-          return [768, 512]; // 16:9-ish, 12GB-friendly
+          return hi ? [960, 960] : [640, 640];
+        default: // 16:9
+          return hi ? [1280, 704] : [832, 480];
       }
     })();
     const result = await comfyUIService.generateVideo({
@@ -575,8 +578,9 @@ async function dispatchGenerationInner(
       imageUrl: input.imageUrl ?? (resolvedCastUrls && resolvedCastUrls[0]) ?? undefined,
       mode: input.imageUrl || resolvedCastUrls?.[0] ? 'image_to_video' : 'text_to_video',
       durationSec: input.durationSec,
-      width: input.resolution === '720p' ? Math.round((arW * 720) / 512) : arW,
-      height: input.resolution === '720p' ? Math.round((arH * 720) / 512) : arH,
+      fps: 24, // Wan 2.2 renders at 24fps (matches CreateVideo node)
+      width,
+      height,
     });
     return {
       id: result.id,

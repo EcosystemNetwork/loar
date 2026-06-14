@@ -116,7 +116,7 @@ describe('onChainAvailability (real env probe)', () => {
     // so the helper short-circuits to "not available". This is the real
     // env behaviour — no mocking of getOnChainEnv.
     delete process.env.CONTENT_LICENSING_ADDRESS_SEPOLIA;
-    delete process.env.CONTENT_LICENSING_ADDRESS_BASE_SEPOLIA;
+    delete process.env.CONTENT_LICENSING_ADDRESS_MAINNET;
     const caller = await createTestCaller();
     const result = await caller.likenessMarketplace.onChainAvailability();
     expect(result.available).toBe(false);
