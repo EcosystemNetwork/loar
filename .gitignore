@@ -35,3 +35,7 @@ docs/qa/visual-*/
 *-output/
 ingest-log.json
 repair-broken-urls-*.json
+
+# Redis dump files (accidental commits)
+*.rdb
+dump.rdb
