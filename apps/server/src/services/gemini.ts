@@ -977,7 +977,10 @@ export async function veoCreate(opts: VeoGenerateOptions): Promise<VeoTask> {
     aspectRatio: opts.aspectRatio ?? '16:9',
     resolution: opts.resolution ?? '720p',
   };
-  if (opts.withAudio != null) parameters.generateAudio = opts.withAudio;
+  // Only send `generateAudio` when audio is explicitly requested. Some Veo models
+  // (e.g. veo-3.0-fast-generate-001) reject the parameter entirely — even `false` —
+  // so omitting it on the audio-off path keeps every model working.
+  if (opts.withAudio === true) parameters.generateAudio = true;
 
   const body = { instances: [instance], parameters };
   const res = await fetch(

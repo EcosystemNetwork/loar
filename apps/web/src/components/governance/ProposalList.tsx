@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { useUniverseGovernor } from '../../hooks/useUniverseGovernor';
 import { useUniverseAddresses } from '../../hooks/useUniverseAddresses';
+import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 import { toast } from 'sonner';
 
 interface Proposal {
@@ -121,7 +122,7 @@ function ProposalCard({
             {proposal.description.split('\n')[0] || `Proposal #${proposal.proposalId.slice(0, 8)}`}
           </h3>
           <p className="text-sm text-zinc-500 mt-1">
-            by {proposal.proposer.slice(0, 6)}...{proposal.proposer.slice(-4)}
+            by <AddressDisplay address={proposal.proposer} className="text-inherit" />
           </p>
         </div>
         <span

@@ -10,7 +10,13 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure } from '../../lib/trpc';
-import { lookupAddress, resolveName, getProfile, getAgentCard } from '../../lib/ens';
+import {
+  lookupAddress,
+  lookupAddressProfile,
+  resolveName,
+  getProfile,
+  getAgentCard,
+} from '../../lib/ens';
 import {
   registerAgentSubname,
   listAgentSubnamesByOwner,
@@ -34,6 +40,11 @@ export const ensRouter = router({
   reverse: publicProcedure
     .input(z.object({ address: ADDR }))
     .query(({ input }) => lookupAddress(input.address)),
+
+  /** Reverse-resolve an address → primary ENS name + avatar (for display). */
+  reverseProfile: publicProcedure
+    .input(z.object({ address: ADDR }))
+    .query(({ input }) => lookupAddressProfile(input.address)),
 
   /** Forward-resolve a name → address. */
   resolve: publicProcedure

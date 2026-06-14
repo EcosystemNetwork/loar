@@ -1,31 +1,53 @@
 /**
- * AddressDisplay — Shows a wallet address with Unstoppable Domains resolution.
+ * AddressDisplay — show a wallet address as a human identity.
  *
- * If the address has a UD domain (.crypto, .x, .wallet, etc.), shows the domain
- * name instead of the hex address. Falls back to truncated address.
+ * Resolves ENS first (name + avatar, forward-verified), then Unstoppable
+ * Domains, then falls back to a truncated hex address. See
+ * {@link useAddressIdentity} for the resolution order.
  */
-import { useUnstoppableDomain, formatDisplayName } from '@/hooks/useUnstoppableDomain';
+import { useAddressIdentity, shortAddress } from '@/hooks/useAddressIdentity';
 
 interface AddressDisplayProps {
   address: string;
   className?: string;
-  /** Show full UD name or truncate long ones */
+  /** Truncate long resolved names (default: true). */
   truncate?: boolean;
+  /** Render the avatar (ENS/UD) alongside the name when one exists. */
+  showAvatar?: boolean;
 }
 
-export function AddressDisplay({ address, className = '', truncate = true }: AddressDisplayProps) {
-  const { name } = useUnstoppableDomain(address);
-  const display = formatDisplayName(address, name);
+export function AddressDisplay({
+  address,
+  className = '',
+  truncate = true,
+  showAvatar = false,
+}: AddressDisplayProps) {
+  const { name, avatar } = useAddressIdentity(address);
+  const display = name ?? shortAddress(address);
+  const text = truncate && display.length > 24 ? `${display.slice(0, 22)}…` : display;
 
   return (
-    <span className={`font-mono ${className}`} title={address}>
-      {truncate && display.length > 20 ? `${display.slice(0, 18)}...` : display}
+    <span
+      className={`inline-flex items-center gap-1.5 ${name ? '' : 'font-mono'} ${className}`}
+      title={name ? `${name} · ${address}` : address}
+    >
+      {showAvatar && avatar && (
+        <img
+          src={avatar}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="w-4 h-4 rounded-full object-cover shrink-0"
+        />
+      )}
+      <span className="truncate">{text}</span>
     </span>
   );
 }
 
 /**
- * Inline address with optional avatar dot for UD-resolved names.
+ * Inline address with avatar — same resolution as {@link AddressDisplay} but
+ * always reserves space for the avatar (ENS/UD).
  */
 export function AddressWithAvatar({
   address,
@@ -34,21 +56,5 @@ export function AddressWithAvatar({
   address: string;
   className?: string;
 }) {
-  const { name, avatar } = useUnstoppableDomain(address);
-  const display = formatDisplayName(address, name);
-
-  return (
-    <span className={`inline-flex items-center gap-1 ${className}`} title={address}>
-      {avatar && (
-        <img
-          src={avatar}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          className="w-3.5 h-3.5 rounded-full object-cover"
-        />
-      )}
-      <span className="font-mono">{display}</span>
-    </span>
-  );
+  return <AddressDisplay address={address} className={className} showAvatar />;
 }

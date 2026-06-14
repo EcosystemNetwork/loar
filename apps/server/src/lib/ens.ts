@@ -81,6 +81,35 @@ export async function lookupAddress(address: string): Promise<string | null> {
   }
 }
 
+export interface EnsReverseProfile {
+  /** Primary ENS name (forward-verified), or null. */
+  name: string | null;
+  /** Resolved avatar URL (ENS avatar record, NFT-URIs resolved), or null. */
+  avatar: string | null;
+}
+
+/**
+ * Reverse-resolve an address → its primary ENS name *and* avatar in one call.
+ * The name is forward-verified (see {@link lookupAddress}); the avatar is read
+ * with viem's `getEnsAvatar`, which resolves NFT/data URIs to a usable URL.
+ * Both legs are cached, so the common "no ENS" case costs one mainnet round-trip.
+ */
+export async function lookupAddressProfile(address: string): Promise<EnsReverseProfile> {
+  const name = await lookupAddress(address);
+  if (!name) return { name: null, avatar: null };
+
+  const key = `avt:${name.toLowerCase()}`;
+  const hit = cached<string | null>(key);
+  if (hit !== undefined) return { name, avatar: hit };
+
+  try {
+    const avatar = await mainnetClient().getEnsAvatar({ name: normalize(name) });
+    return { name, avatar: put(key, avatar ?? null) };
+  } catch {
+    return { name, avatar: put(key, null) };
+  }
+}
+
 /** Forward-resolve an ENS name → address. */
 export async function resolveName(name: string): Promise<string | null> {
   const key = `fwd:${name.toLowerCase()}`;

@@ -17,6 +17,7 @@ import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import { Shield, EyeOff, Eye, Loader2, Search, Trash2 } from 'lucide-react';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 
 export const Route = createFileRoute('/admin/universes')({
   beforeLoad: ({ context }) => {
@@ -190,7 +191,7 @@ function AdminUniversesDashboard() {
                   <p className="text-xs text-muted-foreground truncate font-mono">{u.id}</p>
                   {u.creator ? (
                     <p className="text-[10px] text-muted-foreground truncate">
-                      creator {u.creator}
+                      creator <AddressDisplay address={u.creator} className="text-[10px]" />
                     </p>
                   ) : null}
                 </div>

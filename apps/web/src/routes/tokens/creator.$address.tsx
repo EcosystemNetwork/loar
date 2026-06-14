@@ -24,6 +24,7 @@ import {
 import { useState } from 'react';
 import { useChainId } from 'wagmi';
 import { getExplorerAddressUrl } from '@/configs/chains';
+import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 
 export const Route = createFileRoute('/tokens/creator/$address')({
   component: CreatorProfilePage,
@@ -78,9 +79,7 @@ function CreatorProfilePage() {
           <div>
             <h1 className="text-2xl font-bold">Token Creator</h1>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="font-mono">
-                {creatorAddress.slice(0, 10)}...{creatorAddress.slice(-8)}
-              </span>
+              <AddressDisplay address={creatorAddress} showAvatar className="text-sm" />
               <button onClick={copyAddress} className="hover:text-foreground transition-colors">
                 {copied ? (
                   <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
