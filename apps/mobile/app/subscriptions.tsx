@@ -18,7 +18,7 @@ import { Button } from '../src/components/ui/Button';
 import { EmptyState } from '../src/components/ui/EmptyState';
 import { LoadingSpinner } from '../src/components/ui/LoadingSpinner';
 import { SectionHeader } from '../src/components/ui/SectionHeader';
-import { trpc, queryClient } from '../src/lib/trpc';
+import { trpc, queryClient, type RouterOutputs } from '../src/lib/trpc';
 
 const TIER_VARIANTS: Record<string, 'default' | 'primary' | 'success' | 'warning'> = {
   FREE: 'default',
@@ -38,7 +38,7 @@ export default function SubscriptionsScreen() {
     })
   );
 
-  const subs = subsQuery.data ?? [];
+  const subs = (subsQuery.data ?? []) as RouterOutputs['subscriptions']['mySubscriptions'];
   const active = subs.filter((s) => s.active);
   const expired = subs.filter((s) => !s.active);
 

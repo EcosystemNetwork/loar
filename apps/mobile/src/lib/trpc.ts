@@ -6,7 +6,16 @@ import type { AppRouter } from '@loar/shared/trpc';
 import { QueryClient } from '@tanstack/react-query';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
+import type { inferRouterOutputs } from '@trpc/server';
 import * as SecureStore from 'expo-secure-store';
+
+/**
+ * Inferred output types of every server procedure. Use these to type query
+ * results explicitly — mobile pins TypeScript 5.3.x, which is below the 5.7.2
+ * that `@trpc/tanstack-react-query` needs to infer `queryOptions()` data, so
+ * `.map`/`.filter` over query data otherwise trips `noImplicitAny`.
+ */
+export type RouterOutputs = inferRouterOutputs<AppRouter>;
 
 const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL || 'http://localhost:3000';
 
