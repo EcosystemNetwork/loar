@@ -75,7 +75,7 @@ A non-team wallet can: create a universe, generate AI content, list an episode N
 - [ ] **KYC/AML** — For high-value transactions (licensing, large NFT sales)
 - [x] ~~**Social Layer**~~ — Follows, comments, activity feed, notifications (fully implemented)
 - [ ] **Mainnet Deployment** — Ethereum Mainnet (chain 1; wired for swaps/auth, contracts pending audit)
-- [ ] **Future chains: Solana & Base** — both prototyped (Solana devnet programs, Base Sepolia deploys) and archived for restore (branch `archive/solana-base-support`). Planned as additional chains post-Ethereum-mainnet via the existing multi-chain address registry + chain-selector UI
+- [ ] **Future chains: Solana & Base** — planned post-Ethereum-mainnet; see [🚧 Coming Soon](#-coming-soon-future-chains) below
 - [ ] **Multi-Sig Governance Migration** — Transfer contract ownership from single EOA to Gnosis Safe + timelock
 - [ ] **Pausable Guards** — Add Pausable to 14 revenue-handling contracts (currently missing)
 - [ ] **Creator SDK / API** — Third-party apps can read universe data, embed episodes
@@ -84,6 +84,48 @@ A non-team wallet can: create a universe, generate AI content, list an episode N
 ### Success Signal
 
 First fiat payment processed. 100+ DAU. Platform passes security audit. One licensing deal signed.
+
+---
+
+## 🚧 Coming Soon (Future Chains)
+
+> **Status: planned, not active.** LOAR runs on **Ethereum only** today — Sepolia (contracts live + verified) with Ethereum Mainnet wired for swaps/auth. Solana and Base are **planned future chains**, sequenced **after** Ethereum Mainnet launch. Both were prototyped and then **removed from the active codebase and archived for restore** — branch `archive/solana-base-support`, tag `solana-base-snapshot`. Anything marked "✅ devnet" / "wired" in the linked docs describes the **archived prototype**, not live code.
+
+When these chains come online, they slot into the existing **multi-chain address registry** (`packages/abis`) + **chain-selector UI** — no architectural rework needed; a chain becomes available to contract-gated flows the moment its addresses are listed.
+
+### Solana
+
+Prototyped on **devnet** and archived. The prototype covered:
+
+- Anchor programs: universe / episode / payment
+- Compressed-NFT (cNFT) episode mints + canon promotion
+- $LOAR as a Token-2022 mint (mint authority locked)
+- Custodial EVM ↔ Solana bridge with per-tx + per-day caps
+- Helius-webhook indexer with `healthz`
+- Squads multisig handoff scripts
+- Circle DCW Solana signing + SIWS auth + `loar_solana_*` MCP tools
+
+| Doc                                                            | What it covers                                                                                                     |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| [solana-overview.md](solana-overview.md)                       | Architecture umbrella for the Solana stack                                                                         |
+| [prd-solana-parity.md](prd-solana-parity.md)                   | 28-week plan to lift Solana to full EVM parity (Anchor ports, native-SDK glue, audits, Wormhole NTT, mainnet-beta) |
+| [prd-solana-native-sdk-glue.md](prd-solana-native-sdk-glue.md) | The 10 native-SDK adapters (design spec for the glue layer)                                                        |
+| [solana-bridge.md](solana-bridge.md)                           | Custodial bridge design + caps                                                                                     |
+| [solana-mainnet-runbook.md](solana-mainnet-runbook.md)         | devnet → mainnet-beta ops + multisig handoff                                                                       |
+
+**Restore backlog (from [launch-readiness.md](launch-readiness.md)):** SOL-AUDIT-01 (external Anchor audit) and SOL-NTT-01 (migrate custodial bridge to Wormhole NTT). These are tracked as the future-chain backlog, **not** on the Ethereum Mainnet critical path.
+
+### Base
+
+Prototyped on **Base Sepolia (84532)** and archived alongside Solana in the same branch. **Base Mainnet (8453)** is the planned target. Base is an EVM chain, so bring-up is primarily a deploy-and-register exercise: deploy the contract suite, add the addresses to `packages/abis`, and Base appears in the chain selector via the same registry path as Sepolia/Mainnet.
+
+### Re-run when these go live
+
+The following runbooks/checklists are written to be re-run against Solana/Base when they're activated:
+
+- [safe-timelock-runbook.md](safe-timelock-runbook.md) — re-run governance wiring per network
+- [external-audit-engagement.md](external-audit-engagement.md) — Anchor-program audit shortlist + outreach
+- `SIWE_ALLOWED_CHAIN_IDS` ([environment.md](environment.md)) — add the new chain IDs once live
 
 ---
 

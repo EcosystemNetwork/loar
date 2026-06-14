@@ -7,7 +7,18 @@ import {
   OUTPAINT_ASPECTS,
 } from '../components/sandbox/constants';
 
-export type VideoModel = 'fal-kling' | 'fal-wan25' | 'fal-veo3' | 'seedance' | 'seedance-fast';
+export type VideoModel =
+  | 'fal-kling'
+  | 'fal-wan25'
+  | 'fal-veo3'
+  | 'seedance'
+  | 'seedance-fast'
+  // Google-direct Veo models (registry ids — single dual-mode id per model)
+  | 'veo-31-preview-google'
+  | 'veo-31-fast-preview-google'
+  | 'veo-31-lite-preview-google'
+  | 'veo-30-google'
+  | 'veo-30-fast-google';
 export type ImageSize = 'landscape_16_9' | 'portrait_16_9' | 'square_hd';
 export type AspectRatio = '16:9' | '9:16' | '1:1';
 

@@ -254,8 +254,10 @@ function EventPage() {
         // Image-to-video requires the main FlowCreationPanel flow (character selection → image gen → video)
         const result = await trpcClient.generation.generateVideo.mutate({
           prompt: config.prompt,
-          model:
-            config.model === 'fal-veo3'
+          model: config.model?.endsWith('-google')
+            ? // Google-direct Veo: the registry id IS the server enum value (routes to the Google API).
+              (config.model as any)
+            : config.model === 'fal-veo3'
               ? ('fal-ai/veo3.1/fast' as any)
               : config.model === 'fal-kling'
                 ? ('fal-ai/kling-video/v2.1/standard/text-to-video' as any)

@@ -274,7 +274,17 @@ function UniverseTimelineEditorInner() {
   const [sourceNodeId, setSourceNodeId] = useState<string | null>(null);
   const [additionType, setAdditionType] = useState<'after' | 'branch'>('after');
   const [selectedVideoModel, setSelectedVideoModel] = useState<
-    'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora' | 'seedance' | 'seedance-fast'
+    | 'fal-veo3'
+    | 'fal-kling'
+    | 'fal-wan25'
+    | 'fal-sora'
+    | 'seedance'
+    | 'seedance-fast'
+    | 'veo-31-preview-google'
+    | 'veo-31-fast-preview-google'
+    | 'veo-31-lite-preview-google'
+    | 'veo-30-google'
+    | 'veo-30-fast-google'
   >('seedance');
   const [selectedVideoDuration, setSelectedVideoDuration] = useState<number>(8);
   const [negativePrompt, setNegativePrompt] = useState('');
@@ -1382,6 +1392,13 @@ function UniverseTimelineEditorInner() {
           'seedance-fast': imageUrl
             ? 'bytedance/seedance-2.0/fast/image-to-video'
             : 'bytedance/seedance-2.0/fast/text-to-video',
+          // Google-direct Veo: the registry id IS the server enum value (routes to the Google API,
+          // never FAL). One dual-mode id; the server picks t2v/i2v from imageUrl presence.
+          'veo-31-preview-google': 'veo-31-preview-google',
+          'veo-31-fast-preview-google': 'veo-31-fast-preview-google',
+          'veo-31-lite-preview-google': 'veo-31-lite-preview-google',
+          'veo-30-google': 'veo-30-google',
+          'veo-30-fast-google': 'veo-30-fast-google',
         };
 
         const falModel = modelMap[model] || modelMap['seedance'];

@@ -132,11 +132,39 @@ export const VIDEO_MODELS: { value: VideoModel; label: string; badge?: string }[
   { value: 'seedance-fast', label: 'Seedance 2.0 Fast', badge: 'Free' },
   { value: 'fal-kling', label: 'Kling 2.5' },
   { value: 'fal-wan25', label: 'Wan 2.5' },
-  { value: 'fal-veo3', label: 'Veo 3' },
+  { value: 'fal-veo3', label: 'Veo 3 (via FAL)' },
+  // Google-direct Veo (native audio, up to 4K) — routed through generation.generate's google branch.
+  { value: 'veo-31-preview-google', label: 'Veo 3.1 (Google)', badge: '4K' },
+  { value: 'veo-31-fast-preview-google', label: 'Veo 3.1 Fast (Google)', badge: '4K' },
+  { value: 'veo-31-lite-preview-google', label: 'Veo 3.1 Lite (Google)' },
+  { value: 'veo-30-google', label: 'Veo 3.0 (Google)' },
+  { value: 'veo-30-fast-google', label: 'Veo 3.0 Fast (Google)' },
 ];
 
 export const VALID_VIDEO_MODELS = new Set<VideoModel>(VIDEO_MODELS.map((m) => m.value));
 export const SEEDANCE_MODELS = new Set<VideoModel>(['seedance', 'seedance-fast']);
+
+// Models that can run text-to-video without a reference image. Seedance + Google-direct
+// Veo all support native t2v; the FAL kling/wan/veo3 registry entries are i2v-only here.
+export const T2V_CAPABLE_MODELS = new Set<VideoModel>([
+  'seedance',
+  'seedance-fast',
+  'veo-31-preview-google',
+  'veo-31-fast-preview-google',
+  'veo-31-lite-preview-google',
+  'veo-30-google',
+  'veo-30-fast-google',
+]);
+
+// Google-direct models use a single dual-mode registry id (t2v === i2v); the server's
+// google branch picks the mode from imageUrl presence.
+export const GOOGLE_VIDEO_MODELS = new Set<VideoModel>([
+  'veo-31-preview-google',
+  'veo-31-fast-preview-google',
+  'veo-31-lite-preview-google',
+  'veo-30-google',
+  'veo-30-fast-google',
+]);
 
 export const IMAGE_SIZES = [
   { value: 'landscape_16_9', label: '16:9 Landscape' },
@@ -150,6 +178,18 @@ export const MODEL_REGISTRY_MAP: Record<VideoModel, { t2v: string; i2v: string }
   'fal-kling': { t2v: 'kling-t2v', i2v: 'kling-i2v' },
   'fal-wan25': { t2v: 'wan25-t2v', i2v: 'wan25-i2v' },
   'fal-veo3': { t2v: 'veo31-t2v', i2v: 'veo31-i2v' },
+  // Google-direct: one dual-mode registry id serves both t2v and i2v.
+  'veo-31-preview-google': { t2v: 'veo-31-preview-google', i2v: 'veo-31-preview-google' },
+  'veo-31-fast-preview-google': {
+    t2v: 'veo-31-fast-preview-google',
+    i2v: 'veo-31-fast-preview-google',
+  },
+  'veo-31-lite-preview-google': {
+    t2v: 'veo-31-lite-preview-google',
+    i2v: 'veo-31-lite-preview-google',
+  },
+  'veo-30-google': { t2v: 'veo-30-google', i2v: 'veo-30-google' },
+  'veo-30-fast-google': { t2v: 'veo-30-fast-google', i2v: 'veo-30-fast-google' },
 };
 
 export type EditOp =

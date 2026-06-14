@@ -95,6 +95,13 @@ export function AddSegmentDialog({
       case 'seedance':
       case 'seedance-fast':
         return [5, 8, 10];
+      case 'veo-31-preview-google':
+      case 'veo-31-fast-preview-google':
+      case 'veo-31-lite-preview-google':
+      case 'veo-30-google':
+      case 'veo-30-fast-google':
+        // Google-direct Veo supports a fixed set; the server snaps anything else.
+        return [4, 6, 8];
       case 'fal-veo3':
       default:
         return [4, 5, 8, 10];
@@ -225,10 +232,40 @@ export function AddSegmentDialog({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="veo-31-preview-google">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-sky-400" />
+                          Veo 3.1 (Google)
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="veo-31-fast-preview-google">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-sky-400" />
+                          Veo 3.1 Fast (Google)
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="veo-31-lite-preview-google">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-sky-400" />
+                          Veo 3.1 Lite (Google)
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="veo-30-google">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-sky-400" />
+                          Veo 3.0 (Google)
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="veo-30-fast-google">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-sky-400" />
+                          Veo 3.0 Fast (Google)
+                        </div>
+                      </SelectItem>
                       <SelectItem value="fal-veo3">
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full bg-blue-500" />
-                          Veo 3.1 (Fastest)
+                          Veo 3.1 (via FAL)
                         </div>
                       </SelectItem>
                       <SelectItem value="fal-kling">

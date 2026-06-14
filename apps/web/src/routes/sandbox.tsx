@@ -38,6 +38,7 @@ import {
   VIDEO_MODELS,
   VALID_VIDEO_MODELS,
   SEEDANCE_MODELS,
+  T2V_CAPABLE_MODELS,
   IMAGE_SIZES,
   MODEL_REGISTRY_MAP,
   MAX_CONCURRENT_GENS,
@@ -1107,8 +1108,9 @@ function SandboxPage() {
   });
 
   const canGenerate = prompt.trim().length > 0;
-  // Non-Seedance video models run image-to-video only in the registry, so they need a reference.
-  const videoNeedsImage = !SEEDANCE_MODELS.has(videoModel) && !referenceImage;
+  // Models without native text-to-video (FAL kling/wan/veo3) run image-to-video only, so
+  // they need a reference. Seedance + Google-direct Veo support text-to-video natively.
+  const videoNeedsImage = !T2V_CAPABLE_MODELS.has(videoModel) && !referenceImage;
   const activeCount = generations.filter((g) => g.status === 'generating').length;
   const hasDoneGens = generations.some((g) => g.status !== 'generating');
 

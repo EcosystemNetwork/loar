@@ -436,12 +436,13 @@ async function dispatchGenerationInner(
     try {
       const reso: '720p' | '1080p' | '4k' =
         input.resolution === '4k' ? '4k' : input.resolution === '1080p' ? '1080p' : '720p';
+      const veoDuration = snapToSupportedDuration(input.durationSec, model.supportedDurations);
       const result = await veoGenerate({
         apiKey: userKey,
         model: model.googleModelId || 'veo-3.0-generate-001',
         prompt: input.prompt,
         imageUrl: input.imageUrl ?? (resolvedCastUrls && resolvedCastUrls[0]) ?? undefined,
-        durationSec: Math.min(input.durationSec ?? 8, 8),
+        durationSec: veoDuration,
         resolution: reso,
         // Veo only supports 16:9 / 9:16 — coerce other aspect ratios.
         aspectRatio: input.aspectRatio === '9:16' ? '9:16' : '16:9',
@@ -456,7 +457,7 @@ async function dispatchGenerationInner(
           kind: 'video_gen',
           costUsd: model.providerCostUsd,
           extra: {
-            durationSec: Math.min(input.durationSec ?? 8, 8),
+            durationSec: veoDuration,
             resolution: reso,
             taskName: result.name ?? null,
           },
@@ -883,6 +884,20 @@ setInterval(() => {
     if (ts < cutoff) lastGenerationByUser.delete(key);
   }
 }, 5 * 60_000);
+
+/**
+ * Snap a requested duration to the model's nearest supported value. Veo only
+ * accepts a fixed set (e.g. [4, 6, 8]); the UIs offer 3/5/8/10s, so we coerce
+ * rather than let the provider API reject the request.
+ */
+function snapToSupportedDuration(want: number | undefined, supported?: number[]): number {
+  const opts = supported && supported.length ? supported : [8];
+  const target = want ?? opts[opts.length - 1];
+  return opts.reduce(
+    (best, d) => (Math.abs(d - target) < Math.abs(best - target) ? d : best),
+    opts[0]
+  );
+}
 
 // ── Router ────────────────────────────────────────────────────────────
 
@@ -2256,6 +2271,13 @@ export const generationRouter = router({
             'bytedance/seedance-2.0/fast/image-to-video',
             'bytedance/seedance-2.0/reference-to-video',
             'bytedance/seedance-2.0/fast/reference-to-video',
+            // Google-direct Veo (calls the Google API directly via GOOGLE_API_KEY — NOT FAL).
+            // Single dual-mode registry id; the branch picks t2v/i2v from imageUrl presence.
+            'veo-31-preview-google',
+            'veo-31-fast-preview-google',
+            'veo-31-lite-preview-google',
+            'veo-30-google',
+            'veo-30-fast-google',
           ])
           .optional(),
         imageUrl: z.string().url().optional(),
@@ -2321,7 +2343,8 @@ export const generationRouter = router({
 
       let result;
       try {
-        // Dispatch Seedance models to ByteDance direct API, everything else to FAL
+        // Dispatch: Google-direct Veo → Google API; Seedance → ByteDance; everything else → FAL.
+        const isGoogle = input.model?.endsWith('-google');
         const isByteDance = input.model?.startsWith('bytedance/');
 
         // Scene Controls: Camera preset translation
@@ -2351,39 +2374,68 @@ export const generationRouter = router({
           }
         }
 
-        // BYOK lookup — bytedance for ByteDance, fal for FAL
+        // BYOK lookup — google for Veo-direct, bytedance for ByteDance, fal for FAL
         let bdApiKey: string | undefined;
         let falApiKey: string | undefined;
         const { resolveProviderKey } = await import('../../lib/byok');
-        if (isByteDance) {
-          bdApiKey = await resolveProviderKey(ctx.user.uid, 'bytedance');
+        if (isGoogle) {
+          // resolveProviderKey falls back to process.env.GOOGLE_API_KEY when no BYOK key is set.
+          const googleKey = await resolveProviderKey(ctx.user.uid, 'google');
+          if (!googleKey) {
+            await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);
+            throw new Error('GOOGLE_API_KEY is not configured — set one in /settings/api-keys');
+          }
+          const gModel = getModelById(input.model!);
+          if (!gModel?.googleModelId) {
+            await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);
+            throw new Error(`Unknown Google video model: ${input.model}`);
+          }
+          const { veoGenerate } = await import('../../services/gemini');
+          const gReso: '720p' | '1080p' = input.resolution === '1080p' ? '1080p' : '720p';
+          const veoRes = await veoGenerate({
+            apiKey: googleKey,
+            model: gModel.googleModelId,
+            prompt,
+            imageUrl: input.imageUrl,
+            durationSec: snapToSupportedDuration(input.duration, gModel.supportedDurations),
+            resolution: gReso,
+            // Veo only supports 16:9 / 9:16 — coerce other aspect ratios.
+            aspectRatio: input.aspectRatio === '9:16' ? '9:16' : '16:9',
+            withAudio: !!(gModel.supportsAudio && input.generateAudio),
+          });
+          // Normalize to the { id, status, videoUrl, error } shape the rest of the route expects.
+          result = { ...veoRes, id: veoRes.name };
         } else {
-          falApiKey = await resolveProviderKey(ctx.user.uid, 'fal');
-        }
+          if (isByteDance) {
+            bdApiKey = await resolveProviderKey(ctx.user.uid, 'bytedance');
+          } else {
+            falApiKey = await resolveProviderKey(ctx.user.uid, 'fal');
+          }
 
-        result = isByteDance
-          ? await bytedanceService.generateVideo({
-              prompt,
-              model: input.model?.includes('fast')
-                ? 'dreamina-seedance-2-0-fast-260128'
-                : 'dreamina-seedance-2-0-260128',
-              mode: bdMode,
-              imageUrl: input.imageUrl,
-              endImageUrl: input.endImageUrl,
-              referenceImages:
-                castRefUrls.length > 0
-                  ? castRefUrls.map((url) => ({ url, role: 'subject' as const }))
-                  : undefined,
-              duration: input.duration,
-              aspectRatio: input.aspectRatio,
-              resolution: input.resolution,
-              audio: input.generateAudio,
-              negativePrompt: input.negativePrompt,
-              seed: input.seed,
-              ...cameraParams,
-              apiKey: bdApiKey,
-            })
-          : await falService.generateVideo({ ...input, prompt, apiKey: falApiKey });
+          result = isByteDance
+            ? await bytedanceService.generateVideo({
+                prompt,
+                model: input.model?.includes('fast')
+                  ? 'dreamina-seedance-2-0-fast-260128'
+                  : 'dreamina-seedance-2-0-260128',
+                mode: bdMode,
+                imageUrl: input.imageUrl,
+                endImageUrl: input.endImageUrl,
+                referenceImages:
+                  castRefUrls.length > 0
+                    ? castRefUrls.map((url) => ({ url, role: 'subject' as const }))
+                    : undefined,
+                duration: input.duration,
+                aspectRatio: input.aspectRatio,
+                resolution: input.resolution,
+                audio: input.generateAudio,
+                negativePrompt: input.negativePrompt,
+                seed: input.seed,
+                ...cameraParams,
+                apiKey: bdApiKey,
+              })
+            : await falService.generateVideo({ ...input, prompt, apiKey: falApiKey });
+        }
       } catch (genError) {
         await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);
         throw genError;

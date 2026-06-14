@@ -11,7 +11,14 @@ export type VideoModel =
   | 'fal-wan25'
   | 'fal-sora'
   | 'seedance'
-  | 'seedance-fast';
+  | 'seedance-fast'
+  // Google-direct Veo (calls the Google API directly via GOOGLE_API_KEY — never FAL).
+  // These ids match the server video-models registry + generateVideo enum.
+  | 'veo-31-preview-google'
+  | 'veo-31-fast-preview-google'
+  | 'veo-31-lite-preview-google'
+  | 'veo-30-google'
+  | 'veo-30-fast-google';
 export type AspectRatio = '16:9' | '9:16' | '1:1';
 export type GenerationMode = 'text-to-video' | 'image-to-video';
 

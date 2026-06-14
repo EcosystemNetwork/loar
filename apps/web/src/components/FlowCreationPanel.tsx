@@ -39,6 +39,7 @@ import {
 import { trpcClient } from '@/utils/trpc';
 import { ModelSelector } from '@/components/ModelSelector';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import type { VideoModel } from '@/types/segments';
 
 interface FlowCreationPanelProps {
   showVideoDialog: boolean;
@@ -89,16 +90,8 @@ interface FlowCreationPanelProps {
   setVideoPrompt: (prompt: string) => void;
   videoRatio: '16:9' | '9:16' | '1:1';
   setVideoRatio: (ratio: '16:9' | '9:16' | '1:1') => void;
-  selectedVideoModel:
-    | 'fal-veo3'
-    | 'fal-kling'
-    | 'fal-wan25'
-    | 'fal-sora'
-    | 'seedance'
-    | 'seedance-fast';
-  setSelectedVideoModel: (
-    model: 'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora' | 'seedance' | 'seedance-fast'
-  ) => void;
+  selectedVideoModel: VideoModel;
+  setSelectedVideoModel: (model: VideoModel) => void;
   selectedVideoDuration: number;
   setSelectedVideoDuration: (duration: number) => void;
   negativePrompt: string;
@@ -444,10 +437,15 @@ export function FlowCreationPanel({
   const modelNames: Record<string, string> = {
     seedance: 'Seedance 2.0',
     'seedance-fast': 'Seedance Fast',
-    'fal-veo3': 'Veo 3.1',
+    'fal-veo3': 'Veo 3.1 (FAL)',
     'fal-kling': 'Kling 2.5',
     'fal-wan25': 'Wan 2.5',
     'fal-sora': 'Sora 2',
+    'veo-31-preview-google': 'Veo 3.1 (Google)',
+    'veo-31-fast-preview-google': 'Veo 3.1 Fast (Google)',
+    'veo-31-lite-preview-google': 'Veo 3.1 Lite (Google)',
+    'veo-30-google': 'Veo 3.0 (Google)',
+    'veo-30-fast-google': 'Veo 3.0 Fast (Google)',
   };
 
   const modeNames = {
