@@ -688,6 +688,11 @@ export function FlowCreationPanel({
                   [
                     'seedance',
                     'seedance-fast',
+                    'veo-31-preview-google',
+                    'veo-31-fast-preview-google',
+                    'veo-31-lite-preview-google',
+                    'veo-30-google',
+                    'veo-30-fast-google',
                     'fal-veo3',
                     'fal-kling',
                     'fal-wan25',
