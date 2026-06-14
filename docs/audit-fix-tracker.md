@@ -33,7 +33,7 @@
 - **Sources**: A, B (C1), C (C-6)
 - **Contracts**: All Ownable/OwnableUpgradeable + NFT beacons
 - **Fix**: Deploy Safe (3/5) → TimelockController (48h) → transfer ownership.
-- **Status**: [op] Ready — `apps/contracts/script/TransferToMultisig.s.sol` performs the handoff (supports DRY_RUN). Blocker is operational: Safe must be deployed, Timelock roles wired, script executed on Base mainnet.
+- **Status**: [op] Ready — `apps/contracts/script/TransferToMultisig.s.sol` performs the handoff (supports DRY_RUN). Blocker is operational: Safe must be deployed, Timelock roles wired, script executed on Ethereum Mainnet.
 - **Notes**: No code change needed. Gate mainnet launch on verified on-chain ownership transfer.
 
 ### CANON-01: CanonMarketplace sockpuppet token
@@ -656,7 +656,7 @@ Independent fresh pass after the sixth-pass sign-off surfaced six new issues. Al
 
 ### Operational / deployment
 
-4. **GOV-01** — Deploy Safe (≥3/5), deploy TimelockController (48h delay), wire Safe as PROPOSER+EXECUTOR, run `TransferToMultisig.s.sol` on Base mainnet. Verify `owner()` returns Timelock for every contract.
+4. **GOV-01** — Deploy Safe (≥3/5), deploy TimelockController (48h delay), wire Safe as PROPOSER+EXECUTOR, run `TransferToMultisig.s.sol` on Ethereum Mainnet. Verify `owner()` returns Timelock for every contract.
 5. **INFRA-02** — Rotate `SIWE_JWT_SECRET`, move to secrets manager.
 6. **TOKEN-04 config** — Deploy a dedicated community-treasury address (DAO wallet / merkle distributor) and call `UniverseTokenDeployerV3.setCommunityRecipient(addr)` before first mainnet universe.
 7. **CURVE-02, LOCKER-01, VESTING-01, ESCROW-03** — All are `onlyOwner` paths that become materially safer after GOV-01 (48h timelock delay + Safe consent). No code change required beyond the ownership handoff; confirmed as acceptable mitigation.

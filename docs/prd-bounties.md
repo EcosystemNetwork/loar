@@ -61,7 +61,7 @@ The restored routes still call `useThirdwebWrite`-era patterns in places where t
 
 - `bounties/create` UI button calls `StoryBounties.postBounty()` — must route via `useCircleWrite` (server-signed)
 - `bounties/$id` "Submit" and "Award" buttons — same
-- Submission fee (small flat $LOAR amount to prevent spam) — must use `executeSolanaTransaction` / Circle DCW for sponsored UX
+- Submission fee (small flat $LOAR amount to prevent spam) — must use `useCircleWrite` → Circle DCW for sponsored UX
 
 **Files**: `apps/web/src/routes/bounties/index.tsx`, `$bountyId.tsx`, `mine.tsx`. Look for any direct `useContractWrite` / `useWriteContract` callsites and replace with `useCircleWrite`.
 

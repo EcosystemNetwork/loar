@@ -130,11 +130,13 @@ Code4rena/Sherlock bounty (`audit_firm`, months); LEGAL-01..03 + likeness policy
 
 **~8 of the 22 blockers are Solana-specific** (`SOL-MULTISIG-01`, `SOL-OPS-13/14/15`,
 `SOL-RUNBOOK-01`, `SOL-BRIDGE-ENV`, `HELIUS-WEBHOOK`, `SOL-AUDIT-01`, `SOL-NTT-01`).
-Since Solana was removed from the chain selection (programs/routers retained but
-dormant), **an EVM-only mainnet launch can drop these from the critical path.**
-If Solana is formally shelved for v1, prune them from `blockers.ts` +
-`launch-readiness.md` so the readiness % reflects reality. That leaves the true
-EVM gate as: **2 external (audit Pass 1+2) + 4 legal + 4 operational.**
+Since Solana is a **planned future chain** (its code was removed from the active
+build and archived to branch `archive/solana-base-support`), **an EVM-only
+mainnet launch can drop these from the critical path.** With Solana shelved for
+v1, prune them from `blockers.ts` + `launch-readiness.md` so the readiness %
+reflects reality. That leaves the true EVM gate as: \*\*2 external (audit Pass 1+2)
+
+- 4 legal + 4 operational.\*\*
 
 ---
 

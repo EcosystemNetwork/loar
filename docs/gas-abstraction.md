@@ -40,21 +40,22 @@ locked into one vendor — resolved in order:
 Per-user daily cap defaults to 50 sponsored ops, enforced through the shared
 rate limiter (Redis-backed). Configure with:
 
-| Variable                      | Purpose                                           |
-| ----------------------------- | ------------------------------------------------- |
-| `PIMLICO_API_KEY`             | Pimlico paymaster API key                         |
-| `BICONOMY_API_KEY`            | Biconomy paymaster API key                        |
-| `PAYMASTER_DAILY_LIMIT`       | Max sponsored ops per wallet per day (default 50) |
-| `PAYMASTER_DEFAULT_CHAIN_ID`  | Chain id when request omits one (default 84532)   |
-| `PAYMASTER_SPONSORED_ACTIONS` | Optional comma-separated function-name allowlist  |
+| Variable                      | Purpose                                            |
+| ----------------------------- | -------------------------------------------------- |
+| `PIMLICO_API_KEY`             | Pimlico paymaster API key                          |
+| `BICONOMY_API_KEY`            | Biconomy paymaster API key                         |
+| `PAYMASTER_DAILY_LIMIT`       | Max sponsored ops per wallet per day (default 50)  |
+| `PAYMASTER_DEFAULT_CHAIN_ID`  | Chain id when request omits one (default 11155111) |
+| `PAYMASTER_SPONSORED_ACTIONS` | Optional comma-separated function-name allowlist   |
 
 See [apps/server/src/routes/paymaster.ts](../apps/server/src/routes/paymaster.ts).
 
 ## Safety Rails
 
-- Allowed chain ids are pinned to Sepolia (11155111) + Base Sepolia (84532).
-  Calls on other chains are rejected so a caller cannot drain the paymaster
-  balance against unrelated networks.
+- Allowed chain ids are pinned to Ethereum Sepolia (11155111) — the only live
+  network. Calls on other chains are rejected so a caller cannot drain the
+  paymaster balance against unrelated networks. Base/Solana chain ids would be
+  added here when those planned future chains go live.
 - Auth required — only signed-in users get sponsored gas.
 - Quota is anchored to the authenticated session uid, with a secondary
   per-sender bucket so a compromised session cannot funnel all of its quota

@@ -28,12 +28,12 @@ The indexer validates `PONDER_RPC_URL_2` at config load time and exits with an e
 
 LOAR uses **SIWE (Sign-In With Ethereum)** for authentication — wallet-based login with JWT sessions. Firebase Auth is **not used**.
 
-| Variable                   | App    | Description                                                                                                                                                          | Example               |
-| -------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| `SIWE_JWT_SECRET`          | server | Secret for signing SIWE session JWTs (256-bit hex)                                                                                                                   | `a1b2c3d4e5f6...`     |
-| `SIWE_JWT_SECRET_PREVIOUS` | server | Optional. Previous JWT secret during a 24h rotation grace window. `verifySessionToken()` tries the current secret then falls back to this one. Remove after JWT TTL. | `<prior secret>`      |
-| `SIWE_ALLOWED_DOMAINS`     | server | Optional comma-separated allowed domains for SIWE messages. Defaults to `CORS_ORIGIN`.                                                                               | `loar.fun,staging...` |
-| `SIWE_ALLOWED_CHAIN_IDS`   | server | Optional comma-separated chain IDs accepted in SIWE messages. Defaults to `8453,84532,11155111,31337` (Base, Base Sepolia, Sepolia, Anvil).                          | `8453,84532`          |
+| Variable                   | App    | Description                                                                                                                                                                                                                   | Example               |
+| -------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| `SIWE_JWT_SECRET`          | server | Secret for signing SIWE session JWTs (256-bit hex)                                                                                                                                                                            | `a1b2c3d4e5f6...`     |
+| `SIWE_JWT_SECRET_PREVIOUS` | server | Optional. Previous JWT secret during a 24h rotation grace window. `verifySessionToken()` tries the current secret then falls back to this one. Remove after JWT TTL.                                                          | `<prior secret>`      |
+| `SIWE_ALLOWED_DOMAINS`     | server | Optional comma-separated allowed domains for SIWE messages. Defaults to `CORS_ORIGIN`.                                                                                                                                        | `loar.fun,staging...` |
+| `SIWE_ALLOWED_CHAIN_IDS`   | server | Optional comma-separated chain IDs accepted in SIWE messages. Defaults to `11155111,1,31337` (Ethereum Sepolia, Ethereum Mainnet, Anvil). Base/Solana chain IDs would be added here when those planned future chains go live. | `11155111,1`          |
 
 ### Firebase (Firestore — data storage only)
 
@@ -96,12 +96,12 @@ The server starts without these keys but AI features will throw errors when call
 
 Server-side gas sponsorship for sponsored meta-transactions (mint, vote, universe creation). Provider is resolved in order: Pimlico → Biconomy. Configure exactly **one** — when none are set, `/api/paymaster` returns 501 and sponsored actions silently fall back to user-paid gas. See [apps/server/src/routes/paymaster.ts](../apps/server/src/routes/paymaster.ts).
 
-| Variable                     | App    | Description                                                                                |
-| ---------------------------- | ------ | ------------------------------------------------------------------------------------------ |
-| `PIMLICO_API_KEY`            | server | Pimlico v2 bundler + paymaster RPC.                                                        |
-| `BICONOMY_API_KEY`           | server | Biconomy v2 bundler + paymaster RPC.                                                       |
-| `PAYMASTER_DAILY_LIMIT`      | server | Per-wallet sponsored operations per rolling 24h window. Default `50`.                      |
-| `PAYMASTER_DEFAULT_CHAIN_ID` | server | Fallback chain when a sponsorship request omits `chainId`. Default `84532` (Base Sepolia). |
+| Variable                     | App    | Description                                                                                       |
+| ---------------------------- | ------ | ------------------------------------------------------------------------------------------------- |
+| `PIMLICO_API_KEY`            | server | Pimlico v2 bundler + paymaster RPC.                                                               |
+| `BICONOMY_API_KEY`           | server | Biconomy v2 bundler + paymaster RPC.                                                              |
+| `PAYMASTER_DAILY_LIMIT`      | server | Per-wallet sponsored operations per rolling 24h window. Default `50`.                             |
+| `PAYMASTER_DEFAULT_CHAIN_ID` | server | Fallback chain when a sponsorship request omits `chainId`. Default `11155111` (Ethereum Sepolia). |
 
 ### CSAM / Hash-Matching Moderation
 

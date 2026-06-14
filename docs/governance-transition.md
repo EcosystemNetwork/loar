@@ -85,20 +85,20 @@ The beacon owner can upgrade the implementation for all beacon proxy instances.
 
 ### Prerequisites
 
-1. Deploy all platform contracts (via `DeployAll.s.sol` or `DeployBase.s.sol`)
+1. Deploy all platform contracts (via `DeployAll.s.sol`)
 2. Create a Gnosis Safe multisig at [app.safe.global](https://app.safe.global):
    - Add 5 signers (team members with hardware wallets preferred)
    - Set threshold to 3-of-5
-   - Deploy on Base mainnet
+   - Deploy on Ethereum Mainnet (chain 1)
 3. Record the Safe address in `.env` as `SAFE_ADDRESS`
-4. Ensure the deployer wallet has ETH for gas on Base
+4. Ensure the deployer wallet has ETH for gas on Ethereum Mainnet
 
 ### Step 1: Deploy TimelockController
 
 ```bash
 forge script script/DeployTimelock.s.sol \
-  --rpc-url base --broadcast --verify \
-  --etherscan-api-key $VERIFICATION_KEY_8453 \
+  --rpc-url mainnet --broadcast --verify \
+  --etherscan-api-key $VERIFICATION_KEY_1 \
   -vvv
 ```
 
@@ -110,7 +110,7 @@ Verify what will happen without sending any transactions:
 
 ```bash
 DRY_RUN=true forge script script/TransferToMultisig.s.sol \
-  --rpc-url base -vvv
+  --rpc-url mainnet -vvv
 ```
 
 Review the output carefully:
@@ -123,7 +123,7 @@ Review the output carefully:
 
 ```bash
 forge script script/TransferToMultisig.s.sol \
-  --rpc-url base --broadcast --verify -vvv
+  --rpc-url mainnet --broadcast --verify -vvv
 ```
 
 ### Step 4: Verify On-Chain
@@ -132,7 +132,7 @@ Run the verifier script — it loops every target address in env, calls `owner()
 
 ```bash
 TIMELOCK_ADDRESS=0x... SAFE_ADDRESS=0x... \
-  forge script script/VerifyMultisigTransfer.s.sol --rpc-url base -vv
+  forge script script/VerifyMultisigTransfer.s.sol --rpc-url mainnet -vv
 ```
 
 Expected output: every configured contract shows `OK`, summary prints `MISMATCHED: 0`. A non-zero `MISMATCHED` reverts the script with the list of drifting envs.
@@ -142,14 +142,14 @@ Expected output: every configured contract shows `OK`, summary prints `MISMATCHE
 For manual per-contract spot checks:
 
 ```bash
-cast call $UNIVERSE_MANAGER "owner()(address)" --rpc-url base
+cast call $UNIVERSE_MANAGER "owner()(address)" --rpc-url mainnet
 # Should return $TIMELOCK_ADDRESS
 
 cast call $TIMELOCK_ADDRESS \
   "hasRole(bytes32,address)(bool)" \
   $(cast keccak "PROPOSER_ROLE") \
   $SAFE_ADDRESS \
-  --rpc-url base
+  --rpc-url mainnet
 # Should return true
 ```
 
@@ -173,7 +173,7 @@ For fresh deployments, `DeployGovernance.s.sol` deploys the TimelockController A
 
 ```bash
 forge script script/DeployGovernance.s.sol \
-  --rpc-url base --broadcast --verify -vvv
+  --rpc-url mainnet --broadcast --verify -vvv
 ```
 
 ## Emergency Procedures
@@ -209,7 +209,7 @@ The TimelockController is OpenZeppelin's battle-tested `TimelockController.sol` 
 
 After completing the transition, verify each item:
 
-- [ ] TimelockController deployed and verified on BaseScan
+- [ ] TimelockController deployed and verified on Etherscan
 - [ ] `PROPOSER_ROLE` granted only to Safe multisig
 - [ ] `EXECUTOR_ROLE` granted only to Safe multisig
 - [ ] `DEFAULT_ADMIN_ROLE` not held by any address (renounced)

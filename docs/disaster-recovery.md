@@ -8,13 +8,13 @@ Firestore exports capture all documents and subcollections in the `(default)` da
 
 ## What is NOT backed up
 
-| Data                                     | Why                                               | Recovery path                                    |
-| ---------------------------------------- | ------------------------------------------------- | ------------------------------------------------ |
-| On-chain state (contracts, tokens, NFTs) | Immutable on Base L2 / Sepolia                    | Re-index from chain via Ponder                   |
-| Pinata-hosted files (images, videos)     | IPFS with Pinata pinning — redundant by design    | Re-pin from CIDs stored in Firestore             |
-| Lighthouse-hosted files                  | Filecoin deals — decentralized redundancy         | Retrieve via CID from any IPFS/Filecoin gateway  |
-| Firebase Storage blobs                   | Separate GCS bucket, not part of Firestore export | Use `gsutil` or GCS lifecycle policies for those |
-| Redis cache                              | Ephemeral by design                               | Rebuilds automatically on restart                |
+| Data                                     | Why                                                                  | Recovery path                                    |
+| ---------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------ |
+| On-chain state (contracts, tokens, NFTs) | Immutable on Ethereum Sepolia (Ethereum Mainnet once contracts ship) | Re-index from chain via Ponder                   |
+| Pinata-hosted files (images, videos)     | IPFS with Pinata pinning — redundant by design                       | Re-pin from CIDs stored in Firestore             |
+| Lighthouse-hosted files                  | Filecoin deals — decentralized redundancy                            | Retrieve via CID from any IPFS/Filecoin gateway  |
+| Firebase Storage blobs                   | Separate GCS bucket, not part of Firestore export                    | Use `gsutil` or GCS lifecycle policies for those |
+| Redis cache                              | Ephemeral by design                                                  | Rebuilds automatically on restart                |
 
 ## Prerequisites
 

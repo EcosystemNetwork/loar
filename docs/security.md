@@ -1,6 +1,6 @@
 # Security
 
-> **Status:** Testnet alpha (Sepolia 11155111 / Base Sepolia 84532). No real value is at risk.
+> **Status:** Testnet alpha (Ethereum Sepolia 11155111 — the only live network). No real value is at risk. Base and Solana are planned future chains; see the multi-chain roadmap.
 
 This document consolidates LOAR's security posture, deployed contract verification, and the roadmap from testnet to mainnet. For the full trust model, see [trust-model.md](./trust-model.md). For the pre-launch checklist, see [pre-launch-checklist.md](./pre-launch-checklist.md).
 
@@ -65,7 +65,9 @@ An architecture-level security review found **no critical or high-severity issue
 | -------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------- |
 | RevenueModuleFactory | `0x6D5CEf09F044224A51bd59EB841769255070e5dA` | [View](https://sepolia.etherscan.io/address/0x6D5CEf09F044224A51bd59EB841769255070e5dA) |
 
-### Base Sepolia (Chain 84532)
+### Base Sepolia (Chain 84532) — archived prototype (not active)
+
+> These addresses are from the archived Base prototype deployment. Base is a **planned future chain**, not currently live; the Base code path was removed from the active build and archived to branch `archive/solana-base-support`. Listed here for historical reference only.
 
 | Contract              | Address                                      | Etherscan                                                                               |
 | --------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -99,8 +101,8 @@ Broadcast artifacts containing deployment transactions and constructor arguments
 - `apps/contracts/broadcast/DeployProtocol.s.sol/11155111/run-latest.json`
 - `apps/contracts/broadcast/DeployRevenue.s.sol/11155111/run-latest.json`
 - `apps/contracts/broadcast/DeployLoarToken.s.sol/11155111/run-latest.json`
-- `apps/contracts/broadcast/DeployProtocol.s.sol/84532/run-latest.json`
-- `apps/contracts/broadcast/DeployLoarToken.s.sol/84532/run-latest.json`
+- `apps/contracts/broadcast/DeployProtocol.s.sol/84532/run-latest.json` _(archived Base prototype — not active)_
+- `apps/contracts/broadcast/DeployLoarToken.s.sol/84532/run-latest.json` _(archived Base prototype — not active)_
 
 ---
 
@@ -163,7 +165,7 @@ Filters out `lib/`, `dependencies/`, `test/` directories and informational findi
 
 ## Mainnet Security Requirements
 
-These items MUST be completed before deploying to Base mainnet (chain 8453):
+These items MUST be completed before deploying to Ethereum Mainnet (chain 1):
 
 ### 1. Professional Audit
 

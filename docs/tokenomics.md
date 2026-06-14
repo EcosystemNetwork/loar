@@ -4,7 +4,7 @@
 >
 > **Last updated**: 2026-05-15
 >
-> **Network**: Currently deployed on Sepolia / Base Sepolia testnet. Target mainnet is **Base L2** (chain 8453).
+> **Network**: Currently deployed on **Ethereum Sepolia** testnet (chain 11155111, the only live network). Target mainnet is **Ethereum Mainnet** (chain 1). Base and Solana are planned future chains (prototyped, archived in branch `archive/solana-base-support`).
 
 ---
 
@@ -292,12 +292,12 @@ Revenue share is proportional to your stake relative to total universe stake.
 
 ### Current State (Testnet)
 
-- $LOAR is deployed on **Sepolia** and **Base Sepolia** testnets
+- $LOAR is deployed on **Ethereum Sepolia** testnet (the only live network)
 - All token amounts are test tokens with no monetary value
 - Contract addresses are listed in `docs/security.md`
 - Smart contract test coverage has expanded considerably since the original 3.65% launch-audit baseline (130/157 audit findings closed across 8 passes; see `docs/audit-fix-tracker.md`). Refresh the exact coverage number with `forge coverage --report summary` before publishing.
 
-### Mainnet Migration (Base L2)
+### Mainnet Migration (Ethereum Mainnet)
 
 Before mainnet deployment:
 

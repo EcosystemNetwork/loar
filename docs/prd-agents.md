@@ -15,7 +15,7 @@ LOAR's content pipeline is human-operated end-to-end: a creator opens the studio
 
 The Agents surface answers both. **AI Agents** are autonomous executors that run pre-configured pipelines on a schedule with a budget. **Talent Agents** are human operators who sign contracts with creators to manage their universe (with on-chain commission terms). **Pipelines** are reusable multi-step recipes (generate → review → mint → list → tweet) that either kind of agent can execute. **API Keys** let external tools (Zapier, custom scripts, MCP servers) drive any of the above without holding the user's wallet.
 
-Restored May 16, 2026 after removal April 22. This PRD covers Phase 2 — wiring into Circle DCW (so AI agents can sign on behalf of users), BYOK (so agents pay with the universe owner's API keys, not platform credits), and Solana (so agents can act cross-chain).
+Restored May 16, 2026 after removal April 22. This PRD covers Phase 2 — wiring into Circle DCW (so AI agents can sign on behalf of users) and BYOK (so agents pay with the universe owner's API keys, not platform credits). Cross-chain agent execution (Solana — a planned future chain) is deferred to Phase 3; see G6.
 
 ---
 

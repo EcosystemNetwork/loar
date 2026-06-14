@@ -9,12 +9,13 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![pnpm 9.15.0](https://img.shields.io/badge/pnpm-9.15.0-orange)](https://pnpm.io/)
 [![Node 18+](https://img.shields.io/badge/Node.js-18%2B-green)](https://nodejs.org/)
-[![Sepolia + Base Sepolia](https://img.shields.io/badge/Network-Sepolia%20%2B%20Base%20Sepolia-blue)](https://sepolia.etherscan.io/)
-[![Base L2](https://img.shields.io/badge/Target-Base%20L2-0052FF)](https://basescan.org/)
+[![Ethereum Sepolia](https://img.shields.io/badge/Network-Ethereum%20Sepolia-blue)](https://sepolia.etherscan.io/)
+[![Target: Ethereum Mainnet](https://img.shields.io/badge/Target-Ethereum%20Mainnet-627EEA)](https://etherscan.io/)
+[![Coming soon: Solana + Base](https://img.shields.io/badge/Coming%20soon-Solana%20%2B%20Base-9945FF)](#-multi-chain-roadmap--solana--base-coming-soon)
 
 </div>
 
-> **Last updated:** May 17, 2026 | **Status:** Testnet Alpha (Sepolia + Base Sepolia + Solana Devnet)
+> **Last updated:** June 14, 2026 | **Status:** Testnet Alpha (Ethereum Sepolia — contracts live + verified; Ethereum Mainnet wired for swaps/auth). **Solana & Base are planned future chains** — see the [multi-chain roadmap](#-multi-chain-roadmap--solana--base-coming-soon).
 
 ---
 
@@ -35,47 +36,57 @@ See **[HACKATHON.md](HACKATHON.md)** for the 2-min demo script, architecture dia
 
 ---
 
-## ◎ Solana integration
+## 🛣️ Multi-chain roadmap — Solana & Base (coming soon)
 
-LOAR runs natively on Solana alongside the existing EVM stack. Circle Developer
-Controlled Wallets auto-provision **one server-custodied identity that signs on
-both chains** — no Phantom/Solflare adapter, no second seed phrase. The same
-SIWE session JWT authorizes EVM writes via `useCircleWrite` and Solana writes
-via dedicated `/api/solana/*` routes that build instructions server-side and
-sign through Circle KMS. $LOAR is bridged across chains; the 28-week parity
-plan tracks 12 Anchor program ports + Wormhole NTT before mainnet-beta.
+> **Today, LOAR runs on Ethereum only:** Sepolia testnet (contracts live + verified
+> on-chain) with Ethereum Mainnet wired for swaps/auth. **Solana and Base are
+> planned future chains — not yet active.** Both were prototyped end-to-end
+> (Solana devnet programs, Base Sepolia deploys) and have since been removed from
+> the active codebase and **archived for a future restore** (branch
+> `archive/solana-base-support`, tag `solana-base-snapshot`). The tables below
+> describe the intended design for when these chains come online — they do not
+> reflect anything live in the current build.
 
-| Feature                          | What it is                                                                                                                    |
+### Solana (planned)
+
+The intended model: Circle Developer-Controlled Wallets auto-provision **one
+server-custodied identity that signs on both chains** — no Phantom/Solflare
+adapter, no second seed phrase. The same SIWE session JWT would authorize EVM
+writes via `useCircleWrite` and Solana writes via dedicated `/api/solana/*`
+routes that build instructions server-side and sign through Circle KMS. $LOAR
+would be bridged across chains; the 28-week parity plan tracks 12 Anchor program
+ports + Wormhole NTT before mainnet-beta.
+
+| Planned feature                  | What it would be                                                                                                              |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | **Compressed-NFT episode mints** | Bubblegum cNFTs (~$0.0001/mint) via the `episode` Anchor program — atomic with the on-chain episode record                    |
 | **Canon promotion**              | Flips `is_canon` + mints a parallel Metaplex Core asset (marketplace-tradable, 5% royalty)                                    |
 | **$LOAR Token-2022**             | 1B supply, Pausable + Metadata extensions, mint **permanently locked** via one-way `lock_loar_mint`                           |
 | **Payment program**              | Solana sister of `PaymentRouter.sol` — pull-style accumulators per creator, two-step ownership, `transfer_checked` everywhere |
 | **Solana Pay → cNFT auto-mint**  | One button: scan QR → pay 0.01 SOL → cNFT lands in wallet, payment tx pinned into lineage                                     |
-| **Cross-chain bridge**           | Custodial lock-and-mint today (per-tx + per-user caps, idempotency keys, balance prechecks), Wormhole NTT for production      |
-| **Cross-chain attestation**      | Ed25519 receipt per mint linking Solana cNFT ↔ EVM Universe — verifiable offline via `/api/solana/attestation/key`            |
+| **Cross-chain bridge**           | Custodial lock-and-mint (per-tx + per-user caps, idempotency keys, balance prechecks), Wormhole NTT for production            |
+| **Cross-chain attestation**      | Ed25519 receipt per mint linking Solana cNFT ↔ EVM Universe — verifiable offline                                              |
 | **Squads multisig**              | Solana parity with Gnosis Safe for shared Universe ownership — `create` / `propose` / `approve` / `execute`                   |
 | **Unified Circle DCW auth**      | One SIWE session signs on both chains; Circle KMS provisions EVM + Solana addresses automatically (no Phantom/Solflare)       |
-| **Mobile parity**                | Mobile (Expo) uses the same Circle DCW server-side flow — no on-device wallet adapter required                                |
-| **MCP tools for AI agents**      | 6 Solana tools (`mint_episode`, `canonize`, `pay_intent`, `pay_status`, `activity`, `get_attestation`) — scope-gated          |
-| **Public activity dashboard**    | [`/solana`](apps/web/src/routes/solana.tsx) — auto-refreshing KPIs, recent activity, treasury balance                         |
+| **MCP tools for AI agents**      | Solana tools (`mint_episode`, `canonize`, `pay_intent`, `pay_status`, `activity`, `get_attestation`) — scope-gated            |
 
-**Live devnet deployments:**
+The prototype reached Solana **devnet** (universe / episode / payment programs +
+Token-2022 $LOAR + Squads + custodial bridge + attestation + MCP tools). Those
+deployments are **archived, not live** — they live on the `archive/solana-base-support`
+branch and will be restored and re-deployed when Solana support is brought back online.
 
-| Component             | Address                                                                                                                                           |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `universe` program    | [`6YTQVSeauk4x5gycMM2wzkR8mdHEnHAYsz3Ygg26UPtD`](https://explorer.solana.com/address/6YTQVSeauk4x5gycMM2wzkR8mdHEnHAYsz3Ygg26UPtD?cluster=devnet) |
-| `episode` program     | [`voLiAXoYbq8go1CUS9UshQRZnNu9Y44qNBZ6czgn8Bs`](https://explorer.solana.com/address/voLiAXoYbq8go1CUS9UshQRZnNu9Y44qNBZ6czgn8Bs?cluster=devnet)   |
-| `payment` program     | [`9xWo4djcHmGFkJnLQF9phdpsUhj6BQFW6yR8sHUsKVbj`](https://explorer.solana.com/address/9xWo4djcHmGFkJnLQF9phdpsUhj6BQFW6yR8sHUsKVbj?cluster=devnet) |
-| $LOAR Token-2022 mint | [`482ScJ9EffmyWRWhVsysrPBw3LPDdUXuRL1rXoAx1tez`](https://explorer.solana.com/address/482ScJ9EffmyWRWhVsysrPBw3LPDdUXuRL1rXoAx1tez?cluster=devnet) |
-| Bubblegum merkle tree | [`Dmn6X8ToDwG6VcawQ6prpm6rV3KYBdoV31RQQFrx1Tu2`](https://explorer.solana.com/address/Dmn6X8ToDwG6VcawQ6prpm6rV3KYBdoV31RQQFrx1Tu2?cluster=devnet) |
-
-**Docs:** [`docs/solana-overview.md`](docs/solana-overview.md) (umbrella),
+**Design docs (future work):** [`docs/solana-overview.md`](docs/solana-overview.md) (umbrella),
 [`docs/solana-bridge.md`](docs/solana-bridge.md) (bridge),
 [`docs/solana-mainnet-runbook.md`](docs/solana-mainnet-runbook.md) (devnet → mainnet),
 [`docs/prd-solana-parity.md`](docs/prd-solana-parity.md) (28-week EVM parity plan),
-[`docs/prd-solana-native-sdk-glue.md`](docs/prd-solana-native-sdk-glue.md) (native SDK glue layer),
-[`apps/programs/README.md`](apps/programs/README.md) (Anchor workspace — 16 programs).
+[`docs/prd-solana-native-sdk-glue.md`](docs/prd-solana-native-sdk-glue.md) (native SDK glue layer).
+
+### Base (planned)
+
+Base (Base Sepolia → Base Mainnet) was wired as a second EVM target via the same
+multi-chain contract address registry and chain-selector UI. It has been
+deprecated from the active build pending a future restore; Base contracts will be
+re-deployed and re-wired when the chain is brought back online.
 
 ---
 
@@ -85,7 +96,7 @@ LOAR is a platform where creators deploy cinematic universes as smart contracts,
 
 **One-liner:** "YouTube meets DAO meets AI studio" — creators own the IP, communities govern the canon, tokens capture the value.
 
-**Live testnet demo:** [loar.fun](https://loar.fun) (Sepolia + Base Sepolia)
+**Live testnet demo:** [loar.fun](https://loar.fun) (Ethereum Sepolia)
 
 ### Hybrid Architecture — What's On-Chain vs Off-Chain
 
@@ -118,7 +129,7 @@ We classify every feature by what actually works end-to-end today, not what has 
 | Feature                                | What Works Today                                                                                                                                                                                                                                                                                                                                         |
 | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Wallet Auth (SIWE)**                 | Circle DCW (email/social/passkey) provisions a server-custodied EVM wallet → SIWE signature → JWT. No browser key material, no seed phrase                                                                                                                                                                                                               |
-| **Universe Creation**                  | Atomic single-tx `createUniverseWithToken()` or two-step: Universe contract → token + Uniswap v4 pool. Supports multi-chain (Sepolia, Base Sepolia, Base Mainnet) with chain selector UI                                                                                                                                                                 |
+| **Universe Creation**                  | Atomic single-tx `createUniverseWithToken()` or two-step: Universe contract → token + Uniswap v4 pool. Runs on Ethereum Sepolia today (Mainnet wired); the chain-selector UI is built to add Solana + Base as future chains                                                                                                                              |
 | **Token Deployment**                   | Deploy governance token for existing universes via `/universe/$id/deploy-token`. Custom token symbol, configurable allocation splits (LP/creator/treasury/community), multi-recipient LP fee distribution                                                                                                                                                |
 | **LP Yield & Fee Management**          | On-chain fee collection from Uniswap v4 pools, multi-recipient BPS splits, claim UI in dashboard via `LPYieldManager` component. Anyone can trigger fee harvest; recipients claim their share                                                                                                                                                            |
 | **Narrative Timeline Editor**          | ReactFlow-based visual story builder with MiniMap, node search (Ctrl+K), undo/redo (Ctrl+Z), auto-layout, keyboard shortcuts, fullscreen mode, edge labels (Canon/Branch), and zoom controls. Tree layout positions nodes by depth and subtree size                                                                                                      |
@@ -129,7 +140,7 @@ We classify every feature by what actually works end-to-end today, not what has 
 | **AI Wiki Generation**                 | Gemini-powered character analysis, storyline generation, video-to-wiki extraction                                                                                                                                                                                                                                                                        |
 | **On-Chain Node Storage**              | Content hashes + plot hashes stored in Universe contract, indexed by Ponder                                                                                                                                                                                                                                                                              |
 | **Decentralized Storage**              | Multi-provider fallback: Pinata > Lighthouse/Filecoin > Firebase                                                                                                                                                                                                                                                                                         |
-| **Credit System (On-Chain)**           | ETH + $LOAR payment on-chain (Sepolia + Base Sepolia). Dual-margin pricing (35% card/ETH, 25% LOAR). CreditStore UI with package selection. Stripe card payments when `STRIPE_SECRET_KEY` is set                                                                                                                                                         |
+| **Credit System (On-Chain)**           | ETH + $LOAR payment on-chain (Ethereum Sepolia). Dual-margin pricing (35% card/ETH, 25% LOAR). CreditStore UI with package selection. Stripe card payments when `STRIPE_SECRET_KEY` is set                                                                                                                                                               |
 | **Creator Profiles**                   | Username, bio, themes (5 options), social links, privacy controls, public portfolios                                                                                                                                                                                                                                                                     |
 | **Content Upload**                     | IP classification (Fan vs Creator-Owned vs Rights-Cleared), copyright declarations, license selection                                                                                                                                                                                                                                                    |
 | **Content Discovery**                  | Search/filter by classification, media type, tags. Creator gallery + content feed                                                                                                                                                                                                                                                                        |
@@ -166,7 +177,6 @@ We classify every feature by what actually works end-to-end today, not what has 
 | **Model Metering (Reserve/Reconcile)** | Every metered AI call goes through `reserve` (atomic credit hold) → provider invocation → `reconcile` (settle on real cost). Replaces the older "spend then refund" pattern. 4-backend transcription registry, ~70 models routed. Usage dashboard at [`/settings/usage`](apps/web/src/routes/settings.usage.tsx)                                         |
 | **Editor v2 (E2–E7)**                  | Universe editor now includes E2/E3 dub + lipsync, E4 style & shot pickers, E5 cutdown auto-assembly panel, E7 editor drafts (resumable per-episode). See [docs/prd-editor.md](docs/prd-editor.md)                                                                                                                                                        |
 | **Character Rigging & Animation**      | Meshy character rigging pipeline (auto-rig from 3D mesh) + animation library; `threed` router exposes both Meshy and Tripo3D backends                                                                                                                                                                                                                    |
-| **Solana Anchor Programs (Devnet)**    | 16 deployed Anchor programs: universe, episode, payment, canon_market, licensing, staking, subscription, credit_manager, collab_manager, split_router, rights, fee_locker, bonding_curve, remix_fees, premium_actions. Custodial bridge (lock-and-mint) with caps + idempotency. See [`apps/programs/README.md`](apps/programs/README.md)                |
 | **Centralized Credit Reservation**     | All metered pipelines (image, video, audio, 3D, talking-scene, lipsync, dubbing) share a single `reserve → invoke → reconcile` service. No more bespoke credit math per route                                                                                                                                                                            |
 
 ### PARTIAL (Working but with gaps)
@@ -178,7 +188,7 @@ These features have working smart contracts, backend APIs, AND frontend UIs, but
 | **Episode NFTs**          | Contract: ERC721 + ERC2981 royalties. API: listing + mint recording + atomic `batchCreateEpisodeListing`. MintContentDialog: pin to IPFS + on-chain mint. BuyNFTDialog: purchase with revenue splits. BatchMintEpisodesDialog in RevenuePanel for multi-row listings (up to 50 per batch)                                                                                                   | —                                                                                   |
 | **Character NFTs**        | Contract: ownership + appearance royalties. API: full CRUD. MintContentDialog supports character minting. Dedicated gallery at `/characters/$universeId` with appearance/royalty chips, sort by top/newest/royalties, and per-universe totals                                                                                                                                               | —                                                                                   |
 | **Canon Marketplace**     | Contract: submit/vote/finalize/license. API: all operations including `onChainSubmissionId` + `finalizeTxHash` for audit. Full submit form + For/Against voting UI. On-chain finalize button appears after the voting deadline (CanonMarketplace.finalize) with Firestore mirror. License dialog accepts ETH amount and calls `CanonMarketplace.licenseCanon` with PaymentRouter routing    | —                                                                                   |
-| **Credit System**         | API: balance, tiers, purchase, spend, history. CreditStore UI with package selection. On-chain ETH + $LOAR payment verification (Sepolia + Base Sepolia). Stripe PaymentIntent creation + server-side verification                                                                                                                                                                          | Card payments require `STRIPE_SECRET_KEY` env var. Without it, card tab is disabled |
+| **Credit System**         | API: balance, tiers, purchase, spend, history. CreditStore UI with package selection. On-chain ETH + $LOAR payment verification (Ethereum Sepolia). Stripe PaymentIntent creation + server-side verification                                                                                                                                                                                | Card payments require `STRIPE_SECRET_KEY` env var. Without it, card tab is disabled |
 | **Subscriptions**         | API: configure tiers, subscribe, check access. 4-tier model. SubscribeDialog: tier selection + on-chain ETH payment. `/subscriptions` management page with cancel                                                                                                                                                                                                                           | No renewal reminders or tier downgrade UI                                           |
 | **Collabs**               | API: propose, accept, activate, record episodes, complete. `/collabs` hub with Active/Proposals/History tabs. `/collabs/new` creation form                                                                                                                                                                                                                                                  | No episode-level collab tracking in universe editor                                 |
 | **Ad Marketplace**        | Contract: slots, bidding, impressions. API: full CRUD. `/ads` hub with Browse & Campaigns tabs. `/ads/new` creation. `/ads/$slotId` detail + bidding. **Seed Dance**: `/ads/seeds` hub with Browse/My Seeds/My Gigs tabs, `/ads/seeds/new` creation wizard, `/ads/seeds/$seedId` detail + placement submissions                                                                             | No ad impression rendering during episode playback                                  |
@@ -195,12 +205,12 @@ These features have working smart contracts, backend APIs, AND frontend UIs, but
 
 ### PLANNED (Not implemented)
 
-| Feature                         | Notes                                                                                                                           |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **Mainnet Deployment**          | Contracts on Sepolia + Base Sepolia. Needs security audit before Base Mainnet. See [launch audit](docs/pre-launch-checklist.md) |
-| **Fiat On-Ramp**                | Stripe integration exists but requires `STRIPE_SECRET_KEY`. No other fiat on-ramp                                               |
-| **Merch Fulfillment**           | Backend CRUD exists. No fulfillment partner integration, no order management dashboard                                          |
-| **Mobile App Store Publishing** | Expo 52 app exists (iOS + Android). Not yet submitted to App Store / Play Store                                                 |
+| Feature                         | Notes                                                                                                                                                                                                                                                    |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Mainnet Deployment**          | Contracts live on Ethereum Sepolia. Needs security audit before Ethereum Mainnet. Solana + Base are planned future chains (see [multi-chain roadmap](#-multi-chain-roadmap--solana--base-coming-soon)). See [launch audit](docs/pre-launch-checklist.md) |
+| **Fiat On-Ramp**                | Stripe integration exists but requires `STRIPE_SECRET_KEY`. No other fiat on-ramp                                                                                                                                                                        |
+| **Merch Fulfillment**           | Backend CRUD exists. No fulfillment partner integration, no order management dashboard                                                                                                                                                                   |
+| **Mobile App Store Publishing** | Expo 52 app exists (iOS + Android). Not yet submitted to App Store / Play Store                                                                                                                                                                          |
 
 ---
 
@@ -215,7 +225,7 @@ These features have working smart contracts, backend APIs, AND frontend UIs, but
                             │ tRPC              │ wagmi
                             ▼                   ▼
               ┌─────────────────────┐  ┌──────────────────────┐
-              │   API Server        │  │  Sepolia/Base (EVM)  │
+              │   API Server        │  │  Ethereum (EVM)      │
               │   Hono + tRPC       │  │  69 contracts        │
               │   60+ routers       │  │  (proxied +          │
               │   400+ procedures   │  │  upgradeable)        │
@@ -232,19 +242,19 @@ These features have working smart contracts, backend APIs, AND frontend UIs, but
               └──────────────────┘
 ```
 
-| App              | Stack                                                    | Description                                              |
-| ---------------- | -------------------------------------------------------- | -------------------------------------------------------- |
-| `apps/web`       | React 18, Vite, TanStack Router/Query, wagmi, Circle DCW | Frontend SPA (65 routes)                                 |
-| `apps/server`    | Hono, tRPC, Firebase Admin (Firestore)                   | API server (60+ routers, 400+ procedures)                |
-| `apps/indexer`   | Ponder v0.15, GraphQL                                    | Blockchain event indexer (29 tables)                     |
-| `apps/contracts` | Foundry, Solidity ^0.8.30                                | EVM smart contracts (Sepolia/Base Sepolia, 69 contracts) |
-| `apps/mcp`       | MCP Server                                               | AI agent gateway (25 tools for MCP-compatible agents)    |
-| `apps/mobile`    | Expo 52, React Native, NativeWind                        | iOS + Android app                                        |
-| `packages/abis`  | Auto-generated wagmi hooks                               | Shared contract bindings                                 |
+| App              | Stack                                                    | Description                                           |
+| ---------------- | -------------------------------------------------------- | ----------------------------------------------------- |
+| `apps/web`       | React 18, Vite, TanStack Router/Query, wagmi, Circle DCW | Frontend SPA (65 routes)                              |
+| `apps/server`    | Hono, tRPC, Firebase Admin (Firestore)                   | API server (60+ routers, 400+ procedures)             |
+| `apps/indexer`   | Ponder v0.15, GraphQL                                    | Blockchain event indexer (29 tables)                  |
+| `apps/contracts` | Foundry, Solidity ^0.8.30                                | EVM smart contracts (Ethereum Sepolia, 69 contracts)  |
+| `apps/mcp`       | MCP Server                                               | AI agent gateway (25 tools for MCP-compatible agents) |
+| `apps/mobile`    | Expo 52, React Native, NativeWind                        | iOS + Android app                                     |
+| `packages/abis`  | Auto-generated wagmi hooks                               | Shared contract bindings                              |
 
 ### Key Flows
 
-**Auth:** Circle DCW (server-custodied EVM **and** Solana wallets) > SIWE Signature > Server JWT > Bearer Token > protectedProcedure. EVM writes via `useCircleWrite`; Solana writes via dedicated `/api/solana/*` routes signed through Circle KMS
+**Auth:** Circle DCW (server-custodied EVM wallets) > SIWE Signature > Server JWT > Bearer Token > protectedProcedure. EVM writes via `useCircleWrite`. _(Solana writes via dedicated `/api/solana/*` routes signed through Circle KMS are planned for the future Solana chain — see [multi-chain roadmap](#-multi-chain-roadmap--solana--base-coming-soon).)_
 
 **Content Creation:** AI Generate > Decentralized Storage (SHA-256 dedup) > On-Chain Hash > Ponder Index
 
@@ -258,9 +268,9 @@ These features have working smart contracts, backend APIs, AND frontend UIs, but
 
 ## Smart Contracts (Sepolia)
 
-69 EVM contracts are deployed on **Sepolia testnet** (chain ID 11155111) with multi-chain support for **Base Sepolia** (84532) and **Base Mainnet** (8453). Revenue contracts use an upgradeable proxy pattern: **UUPS** for singletons and **Beacon Proxy** for per-universe NFTs.
+69 EVM contracts are deployed and verified on **Ethereum Sepolia testnet** (chain ID 11155111). **Ethereum Mainnet** (chain ID 1) is wired for swaps/auth; no LOAR contracts are deployed there yet. Revenue contracts use an upgradeable proxy pattern: **UUPS** for singletons and **Beacon Proxy** for per-universe NFTs.
 
-**Target chain:** Base L2 (chain 8453). Contracts are currently deployed on Sepolia testnet and Base Sepolia for testing.
+**Target chain:** Ethereum Mainnet (chain 1). Contracts are currently deployed on Ethereum Sepolia for testing. **Solana and Base are planned future chains** — see the [multi-chain roadmap](#-multi-chain-roadmap--solana--base-coming-soon).
 
 ### Core Protocol
 
@@ -383,7 +393,7 @@ All apps read from a single `.env` at the repo root. Copy `.env.example` and fil
 - `PHOTODNA_*` / `HIVE_API_KEY` — CSAM moderation (required in production)
 - `POSTHOG_API_KEY`, `VITE_POSTHOG_KEY`, `EXPO_PUBLIC_POSTHOG_KEY` — product analytics
 - `WEBHOOK_SIGNING_SECRET` — outbound webhook delivery (HMAC signing)
-- `CIRCLE_API_KEY`, `CIRCLE_ENTITY_SECRET`, `CIRCLE_WALLET_SET_ID` — Circle DCW server-signed wallets (EVM + Solana)
+- `CIRCLE_API_KEY`, `CIRCLE_ENTITY_SECRET`, `CIRCLE_WALLET_SET_ID` — Circle DCW server-signed wallets (EVM)
 
 See [docs/environment.md](docs/environment.md) for the full reference.
 
@@ -415,7 +425,7 @@ pnpm -F indexer dev    # indexer only (port 42069)
 │  Hono + tRPC   │   │ Ponder v0.15 │   │   (data store)   │
 └───────┬────────┘   └──────┬───────┘   └─────────────────┘
         │                    │
-  Storage providers   Sepolia / Base RPC
+  Storage providers   Ethereum RPC
 ```
 
 | Service              | Deployed To             | Trigger                                 |
@@ -614,7 +624,7 @@ Required GitHub secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `WORK_DIR`.
 | `/lab/voice-studio`  | Voice Studio — tabbed UI: library, clone, designer, script editor, captions, multilingual dub |
 | `/settings/api-keys` | BYOK provider keys (FAL, AssemblyAI, Deepgram, Groq, ModelArk, OpenAI, Google, Anthropic)     |
 | `/settings/usage`    | Per-user generation usage dashboard (model metering, credit spend)                            |
-| `/settings/wallets`  | Wallet management (Circle DCW EVM + Solana addresses)                                         |
+| `/settings/wallets`  | Wallet management (Circle DCW EVM addresses)                                                  |
 
 ### Social & Community
 
@@ -672,9 +682,8 @@ loar/
 │   ├── web/             # React 18 SPA (Vite + TanStack Router, 65+ routes)
 │   ├── server/          # Hono + tRPC API (90+ routers, 500+ procedures)
 │   ├── indexer/         # Ponder v0.15 blockchain indexer (29 tables)
-│   ├── contracts/       # Foundry/Solidity EVM (69 contracts, upgradeable, Sepolia/Base)
-│   ├── programs/        # Anchor / Solana programs (16 programs on devnet)
-│   ├── mcp/             # MCP server — AI agent gateway (25+ tools, +6 Solana tools)
+│   ├── contracts/       # Foundry/Solidity EVM (69 contracts, upgradeable, Ethereum Sepolia)
+│   ├── mcp/             # MCP server — AI agent gateway (25+ tools)
 │   └── mobile/          # Expo 52 / React Native (iOS + Android, Circle DCW)
 ├── packages/
 │   └── abis/            # Generated wagmi hooks + contract ABIs + addresses

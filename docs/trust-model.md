@@ -1,6 +1,6 @@
 # Trust Model & Security Assumptions
 
-> **Scope:** Testnet alpha (Sepolia / Base Sepolia). This document describes the current centralization and trust assumptions. Users should read this before interacting with the contracts or depositing value.
+> **Scope:** Testnet alpha (Ethereum Sepolia — the only live network). This document describes the current centralization and trust assumptions. Users should read this before interacting with the contracts or depositing value. Base and Solana are planned future chains, not currently live.
 
 ## Contract Ownership (UniverseManager.sol)
 
@@ -94,7 +94,7 @@ All credit purchase paths verify payment before issuing credits:
 ## What This Means for Testnet Users
 
 1. **Do not treat testnet as production.** The owner wallet has significant unilateral power over the manager contract.
-2. **On-chain assets have real structure but testnet value.** Sepolia/Base Sepolia ETH is free. Universe tokens deployed here are for testing.
+2. **On-chain assets have real structure but testnet value.** Ethereum Sepolia ETH is free. Universe tokens deployed here are for testing.
 3. **Off-chain credit balances are centralized.** Credits live in Firestore, managed by the server. They are not on-chain assets.
 4. **The path to decentralization is:** owner → multisig → timelock → on-chain governance. This will happen before mainnet.
 

@@ -52,6 +52,8 @@ import { decodeEventLog } from 'viem';
 import { universeManagerAbi } from '@loar/abis/generated';
 import {
   isSupportedChain,
+  isDeployableChain,
+  DEFAULT_DEPLOYABLE_CHAIN_ID,
   getExplorerAddressUrl,
   CHAIN_NAMES,
   SUPPORTED_CHAIN_IDS,
@@ -254,15 +256,20 @@ function CinematicUniverseCreate() {
   // Track which tx hash each effect has already processed to prevent double-firing
   const processedUniverseHash = useRef<string | null>(null);
 
-  // Auto-switch to first supported chain when the user is on an unsupported EVM network.
+  // Auto-switch to a chain where the LOAR contracts are deployed whenever the
+  // user is on an unsupported network OR on a supported-but-not-deployable chain
+  // (e.g. mainnet, which has wallet/swap support but no UniverseManager deploy).
+  // Without this, the mintFee contract read returns undefined and the launch
+  // button silently never enables. The banner below is the fallback if the
+  // wallet prompt is declined.
   useEffect(() => {
-    if (isConnected && !isSupportedChain(chainId)) {
-      switchChain({ chainId: SUPPORTED_CHAIN_IDS[0] });
+    if (isConnected && !isDeployableChain(chainId)) {
+      switchChain({ chainId: DEFAULT_DEPLOYABLE_CHAIN_ID });
     }
   }, [isConnected, chainId, switchChain]);
 
   const handleSwitchNetwork = () => {
-    switchChain({ chainId: SUPPORTED_CHAIN_IDS[0] });
+    switchChain({ chainId: DEFAULT_DEPLOYABLE_CHAIN_ID });
   };
 
   // The Select uses the unified `ChainOption.id` ("eip155:11155111").
@@ -1626,6 +1633,35 @@ function CinematicUniverseCreate() {
 
                 {deploymentStep === DeploymentStep.IDLE && (
                   <>
+                    {/* Wrong-chain banner — fallback when the auto-switch effect
+                        was declined. LOAR contracts (UniverseManager) only exist
+                        on deployable chains, so creating is impossible elsewhere
+                        and the launch button stays disabled (mintFee is never
+                        read). Surface it instead of failing silently. */}
+                    {isConnected && !isDeployableChain(chainId) && (
+                      <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-sm">
+                        <AlertCircle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="font-medium text-amber-500">
+                            Switch to {CHAIN_NAMES[DEFAULT_DEPLOYABLE_CHAIN_ID]} to create
+                          </p>
+                          <p className="text-xs text-amber-400/90 mt-0.5">
+                            LOAR contracts aren&apos;t deployed on{' '}
+                            {CHAIN_NAMES[chainId] ?? `chain ${chainId}`}, so universe creation is
+                            unavailable here.
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-2 h-8"
+                            onClick={handleSwitchNetwork}
+                          >
+                            Switch to {CHAIN_NAMES[DEFAULT_DEPLOYABLE_CHAIN_ID]}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Mint fee info */}
                     {universeMode && (
                       <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border text-sm">

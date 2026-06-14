@@ -10,7 +10,7 @@
  * Session tokens are stored in httpOnly cookies (set by the server).
  * The client only stores the wallet address and session expiry for UI purposes.
  */
-import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
+import { useState, useEffect, useCallback, useSyncExternalStore } from 'react';
 import { queryClient } from '../utils/query-client';
 
 const ADDRESS_KEY = 'siwe-address';

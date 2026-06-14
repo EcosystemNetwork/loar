@@ -124,8 +124,11 @@ app.use('/auth/nonce', rateLimiter({ windowMs: 60_000, max: 6 }));
 //   the old 20/min blanket; one honest login needs a single call.
 app.use('/auth/verify', rateLimiter({ windowMs: 60_000, max: 15 }));
 // register: sends an OTP email — IP backstop for the per-email 3-per-15min cap;
-//   blunts cross-email enumeration / mail-bombing from one source.
-app.use('/auth/circle/register', rateLimiter({ windowMs: 60_000, max: 5 }));
+//   blunts cross-email enumeration / mail-bombing from one source. The per-email
+//   cap is the real mail-bomb guard, so keep this IP limit loose enough that a
+//   few honest retries — or several legit users behind one NAT/CGNAT IP — don't
+//   collide and get 429'd mid-signin.
+app.use('/auth/circle/register', rateLimiter({ windowMs: 60_000, max: 20 }));
 // verify-otp: OTP brute-force backstop (the per-OTP 5-attempt cap also applies).
 app.use('/auth/circle/verify-otp', rateLimiter({ windowMs: 60_000, max: 15 }));
 // social: each call verifies a real Google idToken + provisions/looks-up a

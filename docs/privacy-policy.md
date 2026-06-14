@@ -44,11 +44,11 @@ By using the Platform, you acknowledge that you have read and understood this Pr
 
 ### 2.3 Information from Third Parties
 
-| Source                                  | Data Received                                                       | Purpose                                            |
-| --------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------- |
-| Blockchain networks (Ethereum, Base L2) | Public transaction data, token balances, smart contract events      | Indexing on-chain activity related to your address |
-| Circle                                  | Server-custodied wallet metadata, KMS-signed transaction records    | Wallet provisioning and signing on your behalf     |
-| Stripe (if card payments enabled)       | Payment confirmation (we do not receive or store full card numbers) | Credit purchase fulfillment                        |
+| Source                            | Data Received                                                       | Purpose                                            |
+| --------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------- |
+| Blockchain networks (Ethereum)    | Public transaction data, token balances, smart contract events      | Indexing on-chain activity related to your address |
+| Circle                            | Server-custodied wallet metadata, KMS-signed transaction records    | Wallet provisioning and signing on your behalf     |
+| Stripe (if card payments enabled) | Payment confirmation (we do not receive or store full card numbers) | Credit purchase fulfillment                        |
 
 [LEGAL REVIEW REQUIRED] Verify completeness of data inventory. Conduct formal data mapping exercise. Determine whether any collected data qualifies as "sensitive" under GDPR Article 9 or equivalent frameworks.
 
@@ -99,10 +99,10 @@ FAL AI processes your prompts to generate content. We recommend reviewing FAL AI
 
 ### 4.4 Blockchain Networks
 
-| Network                                     | Data Published                                                                 | Nature                       |
-| ------------------------------------------- | ------------------------------------------------------------------------------ | ---------------------------- |
-| **Ethereum (Sepolia testnet)**              | Transaction data, smart contract interactions, token transfers, content hashes | Public, permanent, immutable |
-| **Base L2 (Base Sepolia / future mainnet)** | Same as above                                                                  | Public, permanent, immutable |
+| Network                        | Data Published                                                                 | Nature                       |
+| ------------------------------ | ------------------------------------------------------------------------------ | ---------------------------- |
+| **Ethereum (Sepolia testnet)** | Transaction data, smart contract interactions, token transfers, content hashes | Public, permanent, immutable |
+| **Ethereum Mainnet (future)**  | Same as above                                                                  | Public, permanent, immutable |
 
 See Section 5 for important disclosures about on-chain data.
 

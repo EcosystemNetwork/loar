@@ -78,8 +78,8 @@ the rest of the app is unaffected.
 ## Demo chain
 
 **Ethereum Sepolia (11155111)** — verified routable by the Trading API
-(`ETH→UNI`, `ETH→USDC`, `ETH→$LOAR`). Mainnet (1) and Base (8453) also supported.
-Base Sepolia is **not** routable (no Trading API liquidity).
+(`ETH→UNI`, `ETH→USDC`, `ETH→$LOAR`). Ethereum Mainnet (1) also supported.
+Base (8453) is a **planned future chain** (not currently active for LOAR).
 
 ## Recording submission transaction IDs
 

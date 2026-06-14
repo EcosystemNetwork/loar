@@ -24,7 +24,7 @@ Connect Wallet → Create Universe → Generate AI Content → Publish On-Chain 
 | 6    | **Get Discovered**   | LIVE    | Content feed + creator gallery with search/filters                                                                                        |
 | 7    | **Earn Revenue**     | PARTIAL | On-chain credit purchases (ETH/$LOAR) work. NFT minting and subscriptions not yet wired                                                   |
 
-**The MVP loop is partially closed at Step 7.** On-chain credit purchases (ETH and $LOAR) work end-to-end on Sepolia + Base Sepolia. NFT minting, subscriptions, and other marketplace transactions still need frontend wiring.
+**The MVP loop is partially closed at Step 7.** On-chain credit purchases (ETH and $LOAR) work end-to-end on Ethereum Sepolia. NFT minting, subscriptions, and other marketplace transactions still need frontend wiring.
 
 ---
 
@@ -44,7 +44,7 @@ Connect Wallet → Create Universe → Generate AI Content → Publish On-Chain 
 - Content and creator discovery with marketplace stats
 - Worldbuilding studio: `/create` hub with 10 entity kinds, tabbed wiki at `/wiki`
 - Blockchain event indexing (Ponder, 29 tables)
-- On-chain credit purchases (ETH + $LOAR, Sepolia + Base Sepolia)
+- On-chain credit purchases (ETH + $LOAR, Ethereum Sepolia)
 - LP yield management (fee collection, multi-recipient distribution, claim UI)
 - TimelockController governance (24h execution delay, Ponder indexes proposals/votes)
 - Identity NFTs (per-universe creator identity proof)

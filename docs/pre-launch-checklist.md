@@ -121,7 +121,7 @@ Current state: `LoarLpLockerMultiple` locks LP **permanently** (no time-based un
   - Per-IP limits still apply as a fallback when JWT parsing fails
   - See: `apps/server/src/middleware/rate-limit.ts`
 
-- [x] **#8 Multi-Chain Cleanup** — Removed Solana, SUI, and bridge scaffolding (Base L2 only)
+- [x] **#8 Multi-Chain Cleanup** — Removed Solana, SUI, Base, and bridge scaffolding (Ethereum only; Solana + Base are planned future chains, prototyped and archived in branch `archive/solana-base-support`)
 
 ---
 

@@ -627,7 +627,7 @@ export function ActivityTicker() {
 
   return (
     <div className="border-b border-white/5 bg-white/[0.02] overflow-hidden flex">
-      <div className="flex gap-6 px-4 py-2.5 whitespace-nowrap w-max animate-[ticker_40s_linear_infinite] hover:[animation-play-state:paused]">
+      <div className="flex gap-6 px-4 py-2.5 whitespace-nowrap w-max animate-[ticker_60s_linear_infinite] hover:[animation-play-state:paused]">
         {marqueeItems.map((a, i) => (
           <Link
             key={`${a.id}-${i}`}

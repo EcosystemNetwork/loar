@@ -48,7 +48,7 @@ Original gap (four UI elements). Current state:
 | Creator earnings summary                  | Missing       | Dashboard surfaces `analytics.getUniverseMetrics` (views / mints / subs / votes / revenue chips) |
 | Atomic batch listing                      | Not specified | `BatchMintEpisodesDialog` up to 50 per batch                                                     |
 
-The loop runs end-to-end on Sepolia + Base Sepolia today.
+The loop runs end-to-end on Ethereum Sepolia today.
 
 ---
 
@@ -88,7 +88,7 @@ The original GTM PRD listed six gates. Updated status:
 - 13 external dependencies (legal counsel, audit firms, BD partners, app store review)
 - 4 small internal code items (docs, design calls)
 
-None of these block testnet beta or current Sepolia + Base Sepolia operations.
+None of these block testnet beta or current Ethereum Sepolia operations.
 
 ---
 
@@ -98,7 +98,7 @@ None of these block testnet beta or current Sepolia + Base Sepolia operations.
 - **Do not tell creators "AI output belongs to you."** Correct language: "LOAR treats you as the rights claimant for content you generate on this platform, subject to applicable law and third-party rights." The distinction matters when challenged. Captured in `/terms`.
 - **Do not present the fan/parody lane as legally cleared.** Fair use is a case-by-case defense. The platform permits non-commercial fan work, doesn't promise fair use protection.
 - **Do not accept monetized third-party franchise content on a "transformative" claim.** That determination belongs to courts. The `licensed` lane requires documentary proof + manual review queue, not checkbox attestation.
-- **Do not deploy to Base mainnet before** the external audit Pass 1 + Pass 2, multisig handoff (GOV-01), DMCA agent registration, and TimelockFactory wiring (TIMELOCK-01). See [scorecard](./launch-readiness.md).
+- **Do not deploy to Ethereum Mainnet before** the external audit Pass 1 + Pass 2, multisig handoff (GOV-01), DMCA agent registration, and TimelockFactory wiring (TIMELOCK-01). See [scorecard](./launch-readiness.md).
 
 ---
 
@@ -134,5 +134,5 @@ Original Phase 1 metrics still applicable as KPIs for the public beta:
 - **For what's left** → [docs/launch-readiness.md](./launch-readiness.md)
 - **For per-finding audit status** → [docs/audit-fix-tracker.md](./audit-fix-tracker.md)
 - **For the Phase 1 / Phase 2 split with current code citations** → [docs/pre-launch-checklist.md](./pre-launch-checklist.md)
-- **For Solana mainnet sequencing** → [docs/solana-mainnet-runbook.md](./solana-mainnet-runbook.md)
+- **For Solana sequencing (planned future chain — prototyped on devnet, archived in branch `archive/solana-base-support`)** → [docs/solana-mainnet-runbook.md](./solana-mainnet-runbook.md)
 - **For rights classification UI** → [docs/rights-classification-ui.md](./rights-classification-ui.md)

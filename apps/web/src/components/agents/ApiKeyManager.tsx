@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useState } from 'react';
-import { Key, Plus, Trash2, Copy, Eye, EyeOff, Shield, Terminal } from 'lucide-react';
+import { Key, Plus, Trash2, Copy, Shield, Terminal } from 'lucide-react';
 
 const LOAR_SERVER_URL = (import.meta as any).env?.VITE_API_URL || 'https://api.loar.fun';
 

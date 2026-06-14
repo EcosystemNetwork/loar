@@ -16,14 +16,14 @@ security platform listing; update both in the same PR as this file.
 
 ### In-scope assets
 
-| Asset           | Surface                                         | Branch / Tag                                        |
-| --------------- | ----------------------------------------------- | --------------------------------------------------- |
-| Smart contracts | `apps/contracts/src/**` on Base (when deployed) | Latest deployed commit — see `deployments/base/`    |
-| Smart contracts | `apps/contracts/src/**` on Base Sepolia         | Testnet findings count if they reproduce on mainnet |
-| Server          | `apps/server/**` production deploy              | `main`                                              |
-| Web client      | `apps/web/**` production deploy                 | `main`                                              |
-| Indexer         | `apps/indexer/**` production deploy             | `main`                                              |
-| Mobile          | `apps/mobile/**` released builds                | Version in App Store / Play listing                 |
+| Asset           | Surface                                                     | Branch / Tag                                        |
+| --------------- | ----------------------------------------------------------- | --------------------------------------------------- |
+| Smart contracts | `apps/contracts/src/**` on Ethereum Mainnet (when deployed) | Latest deployed commit — see `deployments/mainnet/` |
+| Smart contracts | `apps/contracts/src/**` on Ethereum Sepolia                 | Testnet findings count if they reproduce on mainnet |
+| Server          | `apps/server/**` production deploy                          | `main`                                              |
+| Web client      | `apps/web/**` production deploy                             | `main`                                              |
+| Indexer         | `apps/indexer/**` production deploy                         | `main`                                              |
+| Mobile          | `apps/mobile/**` released builds                            | Version in App Store / Play listing                 |
 
 ### Out of scope
 
@@ -43,7 +43,7 @@ security platform listing; update both in the same PR as this file.
 
 ## Reward tiers
 
-Bounties are paid in USDC on Base. Amounts below are the **maximum** for each severity;
+Bounties are paid in USDC on Ethereum. Amounts below are the **maximum** for each severity;
 the actual payout is decided by the security committee using the Immunefi severity
 classification v2.3 as a reference.
 
@@ -141,7 +141,7 @@ large-scale fuzzing, or anything that could degrade service for other users is
    - Reproduction steps (exact URLs, tx hashes, request/response if HTTP)
    - Impact assessment — what could an attacker achieve?
    - Proof-of-concept code, screenshots, or tx hash
-   - Your payout address (USDC on Base) and optional name/handle for credit
+   - Your payout address (USDC on Ethereum) and optional name/handle for credit
 3. **Do not** open a public GitHub issue or post on social media.
 
 ---

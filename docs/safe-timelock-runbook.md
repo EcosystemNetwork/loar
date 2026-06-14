@@ -2,8 +2,10 @@
 
 Covers GOV-01 in `docs/audit-fix-tracker.md`: move ownership of all UUPS + Beacons + Ownable contracts from the deployer EOA to a `Safe → TimelockController` chain.
 
-> **Testnet target**: 2-of-3 Safe on Base Sepolia (per current plan).
-> **Mainnet target**: Re-sign as 3-of-5 Safe on Base mainnet before contract handoff there.
+> **Testnet target**: 2-of-3 Safe on Ethereum Sepolia (the only live network).
+> **Mainnet target**: Re-sign as 3-of-5 Safe on Ethereum Mainnet (chain 1) before contract handoff there.
+>
+> Base and Solana are planned future chains; when they go live, re-run this runbook against their networks.
 
 ---
 
@@ -13,14 +15,14 @@ Covers GOV-01 in `docs/audit-fix-tracker.md`: move ownership of all UUPS + Beaco
 - Deployer EOA (`0x116C28e6DCABCa363f83217C712d79DCE168d90e`) funded on target chain.
 - `PRIVATE_KEY` in `.env` (may need `0x` prefix for forge's `envUint`).
 - `SAFE_ADDRESS` known (see step 1).
-- Network-matching Basescan/Etherscan API key in `.env` (`VERIFICATION_KEY_84532` / `VERIFICATION_KEY_1` / `VERIFICATION_KEY_8453`).
+- Network-matching Etherscan API key in `.env` (`VERIFICATION_KEY_11155111` for Sepolia / `VERIFICATION_KEY_1` for Mainnet).
 
 ---
 
 ## 1. Create the Safe (manual, web flow)
 
 1. Go to <https://app.safe.global/new-safe/create>.
-2. Connect a signer wallet, pick network (Base Sepolia for testnet pass).
+2. Connect a signer wallet, pick network (Ethereum Sepolia for testnet pass).
 3. Owners:
    - Signer A: `0x…`
    - Signer B: `0x…`
@@ -43,12 +45,12 @@ set -a; source ../../.env; set +a
 PRIVATE_KEY="0x${PRIVATE_KEY#0x}" \
 SAFE_ADDRESS=$SAFE_ADDRESS \
 forge script script/DeployTimelock.s.sol \
-  --rpc-url $RPC_84532 --skip "test/**" \
+  --rpc-url $RPC_11155111 --skip "test/**" \
   --broadcast --verify \
-  --etherscan-api-key $VERIFICATION_KEY_84532
+  --etherscan-api-key $VERIFICATION_KEY_11155111
 ```
 
-Roles after deploy (verify on Basescan):
+Roles after deploy (verify on Etherscan):
 
 - `PROPOSER_ROLE` → Safe only
 - `EXECUTOR_ROLE` → Safe only
@@ -73,10 +75,10 @@ DRY_RUN=true \
 TIMELOCK_ADDRESS=$TIMELOCK_ADDRESS \
 PRIVATE_KEY="0x${PRIVATE_KEY#0x}" \
 forge script script/TransferToMultisig.s.sol \
-  --rpc-url $RPC_84532 --skip "test/**"
+  --rpc-url $RPC_11155111 --skip "test/**"
 ```
 
-Review the printed list. If any expected contract is missing, update the script or `deployments/base-sepolia.json` before broadcasting.
+Review the printed list. If any expected contract is missing, update the script or `deployments/sepolia.json` before broadcasting.
 
 ---
 
@@ -87,7 +89,7 @@ DRY_RUN=false \
 TIMELOCK_ADDRESS=$TIMELOCK_ADDRESS \
 PRIVATE_KEY="0x${PRIVATE_KEY#0x}" \
 forge script script/TransferToMultisig.s.sol \
-  --rpc-url $RPC_84532 --skip "test/**" \
+  --rpc-url $RPC_11155111 --skip "test/**" \
   --broadcast
 ```
 
@@ -97,17 +99,17 @@ forge script script/TransferToMultisig.s.sol \
 
 ```bash
 forge script script/VerifyMultisigTransfer.s.sol \
-  --rpc-url $RPC_84532 --skip "test/**"
+  --rpc-url $RPC_11155111 --skip "test/**"
 ```
 
-Expected: `owner()` returns `TIMELOCK_ADDRESS` for every Ownable/OwnableUpgradeable contract in `deployments/base-sepolia.json`.
+Expected: `owner()` returns `TIMELOCK_ADDRESS` for every Ownable/OwnableUpgradeable contract in `deployments/sepolia.json`.
 
 ---
 
 ## 6. Update environment + docs
 
 - `.env`: confirm `SAFE_ADDRESS` + `TIMELOCK_ADDRESS` set.
-- `deployments/base-sepolia.json`: add `"SafeMultisig"` + `"TimelockController"` entries.
+- `deployments/sepolia.json`: add `"SafeMultisig"` + `"TimelockController"` entries.
 - `docs/audit-fix-tracker.md`: flip GOV-01 status from `[op]` → `[x]`.
 - Update `CURVE-02, LOCKER-01, VESTING-01, ESCROW-03` notes — they're considered materially safer after the handoff.
 

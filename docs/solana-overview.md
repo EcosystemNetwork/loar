@@ -1,9 +1,13 @@
 # Solana on LOAR — Overview
 
-LOAR runs natively on Solana alongside its existing EVM stack. This page is
-the umbrella — what's deployed, what each piece does, and where to dive in.
+> **⚠️ STATUS: PLANNED / FUTURE CHAIN — NOT YET ACTIVE.** Solana is not part of the current LOAR build. LOAR runs on **Ethereum only** today (Sepolia testnet — contracts live + verified on-chain; Mainnet wired for swaps/auth, no LOAR contracts deployed there yet). The Solana integration described below was prototyped on **devnet** and has been **removed from the active codebase and archived for a future restore** (branch `archive/solana-base-support`, tag `solana-base-snapshot`). This document is the design spec for when Solana is brought back online as a future chain — it does not reflect anything currently deployed or running. File paths and devnet addresses below refer to the archived prototype, not live code.
+
+LOAR is planned to run natively on Solana alongside its EVM stack. This page is
+the umbrella — what was prototyped, what each piece does, and where to dive in.
 
 ## TL;DR
+
+Status reflects the **archived devnet prototype**, not live deployments.
 
 | Layer                                  | Status               | Devnet address                                                                                                                                    |
 | -------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -13,9 +17,9 @@ the umbrella — what's deployed, what each piece does, and where to dive in.
 | $LOAR (Token-2022)                     | ✅ live, mint locked | [`482ScJ9EffmyWRWhVsysrPBw3LPDdUXuRL1rXoAx1tez`](https://explorer.solana.com/address/482ScJ9EffmyWRWhVsysrPBw3LPDdUXuRL1rXoAx1tez?cluster=devnet) |
 | Bubblegum merkle tree                  | ✅ live, 16k slots   | [`Dmn6X8ToDwG6VcawQ6prpm6rV3KYBdoV31RQQFrx1Tu2`](https://explorer.solana.com/address/Dmn6X8ToDwG6VcawQ6prpm6rV3KYBdoV31RQQFrx1Tu2?cluster=devnet) |
 
-**Live dashboard:** [`/solana`](../apps/web/src/routes/solana.tsx) on the
-web app — auto-refreshes every 10s with totals + recent activity +
-treasury balance.
+**Prototype dashboard (archived):** [`/solana`](../apps/web/src/routes/solana.tsx) on the
+web app — the prototype auto-refreshed every 10s with totals + recent activity +
+treasury balance. This route was removed from the active build.
 
 ## Architecture
 
@@ -42,10 +46,10 @@ treasury balance.
                   testnet today, Wormhole NTT planned for mainnet
 ```
 
-Everything is **server-signed via Circle Developer Controlled Wallets** on
-both chains, so users only need email/social/wallet for auth — they never
+Everything is planned to be **server-signed via Circle Developer Controlled Wallets** on
+both chains, so users would only need email/social/wallet for auth — they never
 hold private keys to sign individual txs. This is the same custody model
-LOAR uses on EVM, extended to Solana.
+LOAR uses on EVM, extended to Solana once restored.
 
 ## What each component is for
 
@@ -105,9 +109,9 @@ multisig is recoverable. Race-retry on `transactionIndex` collisions.
 
 ### Cross-chain bridge
 
-Custodial lock-and-mint today, Wormhole NTT for production. Full setup +
+Custodial lock-and-mint in the prototype, Wormhole NTT planned for production. Full setup +
 trust model in [`docs/solana-bridge.md`](./solana-bridge.md). The bridge
-auto-picks the backend at runtime — no UI changes when NTT lands.
+is designed to auto-pick the backend at runtime — no UI changes when NTT lands.
 
 **Hardened against** (see [audit](../docs/audit-fix-tracker.md) entries B1-B20):
 
@@ -143,8 +147,8 @@ offline against the published signer pubkey at
 
 ### MCP tools
 
-[`apps/mcp/src/tools.ts`](../apps/mcp/src/tools.ts) — 6 Solana tools exposed
-to AI agents: `mint_episode`, `canonize_episode`, `pay_intent`,
+[`apps/mcp/src/tools.ts`](../apps/mcp/src/tools.ts) — the prototype exposed 6 Solana tools
+to AI agents (removed from the active build): `mint_episode`, `canonize_episode`, `pay_intent`,
 `pay_status`, `activity`, `get_attestation`. Scope-gated via new API key
 permissions: `solana.mint`, `solana.canonize`, `solana.pay`, `solana.bridge`.
 

@@ -19,7 +19,6 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { Menu, X, ChevronDown } from 'lucide-react';
@@ -41,9 +40,6 @@ const primaryLinksBase = [
   { to: '/tokens', label: 'Launchpad' },
   { to: '/wiki', label: 'Wiki' },
   { to: '/dashboard', label: 'Dashboard' },
-  // Promoted out of More → Developer so agent integrators can find their keys
-  // without digging through the dropdown.
-  { to: '/settings/agent-keys', label: 'API Keys' },
 ] as const;
 
 /** Surfaced inline only for users who own universes — Studio is the entry
@@ -54,8 +50,11 @@ type MoreLink = { to: string; label: string; beta?: boolean };
 type MoreGroup = { label: string; links: MoreLink[] };
 
 /** Grouped secondary links — organized by function with section headers.
- *  Studio + Gallery appear under "My Stuff" only when the caller has universes
- *  (appended at render time in `buildMoreGroups`). */
+ *  Each group is a single, non-overlapping concern so links are easy to find:
+ *  Explore (discovery), Studio (creation tools), My Stuff (owned content),
+ *  Wallet & Billing (all money/credits), Earn, Developer, Agents & Brands.
+ *  Gallery appears under "My Stuff" only when the caller has universes
+ *  (prepended at render time in `buildMoreGroups`). */
 const moreGroupsBase: MoreGroup[] = [
   {
     label: 'Explore',
@@ -66,35 +65,35 @@ const moreGroupsBase: MoreGroup[] = [
     ],
   },
   {
-    label: 'Tools',
+    label: 'Studio',
     links: [
       { to: '/canvas', label: 'Canvas' },
       { to: '/editor', label: 'Clip Editor' },
-      { to: '/marketing', label: 'Marketing Studio', beta: true },
-      { to: '/ad-reference', label: 'Ad Reference', beta: true },
+      { to: '/lab/voice-studio', label: 'Voice Studio' },
       { to: '/lab/zai', label: 'Model Lab' },
       { to: '/lab/gpt-image', label: 'GPT Image Lab' },
-      { to: '/lab/voice-studio', label: 'Voice Studio' },
+      { to: '/marketing', label: 'Marketing Studio', beta: true },
+      { to: '/ad-reference', label: 'Ad Reference', beta: true },
     ],
   },
   {
     label: 'My Stuff',
     links: [
       { to: '/my-works', label: 'My Works' },
+      { to: '/notifications', label: 'Notifications' },
       { to: '/series', label: 'Series Mode', beta: true },
       { to: '/virality', label: 'Virality Predictor', beta: true },
       { to: '/royalties', label: 'Royalty Splits', beta: true },
-      { to: '/notifications', label: 'Notifications' },
-      { to: '/swap', label: 'Swap' },
-      { to: '/credits', label: 'Credits' },
     ],
   },
   {
-    label: 'Developer',
+    label: 'Wallet & Billing',
     links: [
-      // 'Agent API Keys' is promoted to the primary nav (see primaryLinksBase).
-      { to: '/settings/api-keys', label: 'Provider Keys (BYOK)' },
-      { to: '/docs', label: 'Docs' },
+      { to: '/credits', label: 'Credits' },
+      { to: '/swap', label: 'Swap' },
+      { to: '/subscriptions', label: 'Subscriptions' },
+      { to: '/pricing', label: 'Pricing' },
+      { to: '/faucet', label: 'Faucet' },
     ],
   },
   {
@@ -106,16 +105,21 @@ const moreGroupsBase: MoreGroup[] = [
     ],
   },
   {
-    label: 'More',
+    label: 'Developer',
+    links: [
+      { to: '/settings/agent-keys', label: 'API Keys' },
+      { to: '/settings/api-keys', label: 'Provider Keys (BYOK)' },
+      { to: '/docs', label: 'Docs' },
+    ],
+  },
+  {
+    label: 'Agents & Brands',
     links: [
       { to: '/agents', label: 'Agents', beta: true },
       { to: '/agents/discover', label: 'Agent Economy', beta: true },
       { to: '/adplacements', label: 'Ads', beta: true },
       { to: '/brand/dashboard', label: 'Brand Dashboard', beta: true },
       // Sandbox is reachable from /create — no longer a standalone nav entry.
-      { to: '/subscriptions', label: 'Subscriptions' },
-      { to: '/faucet', label: 'Faucet' },
-      { to: '/pricing', label: 'Pricing' },
     ],
   },
 ];

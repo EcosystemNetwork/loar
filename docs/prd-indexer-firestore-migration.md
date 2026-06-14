@@ -4,7 +4,7 @@
 
 ## Problem
 
-The Ponder indexer holds all on-chain state in a Neon Postgres DB that has already hit its 512 MB free-tier cap once (forcing a Launch-plan upgrade). Storage grows unbounded because Ponder caches every raw RPC response alongside derived tables, and indexer DB size is proportional to chain activity — not useful rows. We also now run two indexer services (Sepolia + Base Sepolia) against the same Neon project, doubling the footprint.
+The Ponder indexer holds all on-chain state in a Neon Postgres DB that has already hit its 512 MB free-tier cap once (forcing a Launch-plan upgrade). Storage grows unbounded because Ponder caches every raw RPC response alongside derived tables, and indexer DB size is proportional to chain activity — not useful rows. The indexer runs a single Ethereum Sepolia service (the only live network); Base and Solana are planned future chains that would add services later.
 
 LOAR otherwise uses Firestore for all app state. Keeping Ponder means owning a second database, second deploy target, second failure mode, and paying Neon indefinitely.
 

@@ -12,7 +12,7 @@
 
 ## 1. Acceptance of Terms
 
-By accessing or using the LOAR platform ("Platform"), including the website at loar.fun, any associated smart contracts deployed on the Base L2 blockchain or testnets, and any APIs or services provided by LOAR ("Services"), you ("User", "you") agree to be bound by these Terms of Service ("Terms").
+By accessing or using the LOAR platform ("Platform"), including the website at loar.fun, any associated smart contracts deployed on the Ethereum blockchain or testnets, and any APIs or services provided by LOAR ("Services"), you ("User", "you") agree to be bound by these Terms of Service ("Terms").
 
 If you do not agree to these Terms, you must not access or use the Platform.
 
@@ -129,7 +129,7 @@ This license does not transfer ownership. You may request removal of off-chain c
 
 ### 6.1 Irreversibility
 
-Blockchain transactions are irreversible by design. Once a transaction is confirmed on the Ethereum network or Base L2, it cannot be undone, reversed, or modified. This includes but is not limited to:
+Blockchain transactions are irreversible by design. Once a transaction is confirmed on the Ethereum network, it cannot be undone, reversed, or modified. This includes but is not limited to:
 
 - NFT minting and transfers
 - Token purchases and swaps
@@ -143,7 +143,7 @@ You are responsible for all gas fees (network transaction costs) incurred when i
 
 ### 6.3 Testnet vs. Mainnet
 
-The Platform currently operates on Ethereum Sepolia and Base Sepolia testnets. Testnet tokens and assets have no monetary value. When the Platform migrates to Base L2 mainnet:
+The Platform currently operates on the Ethereum Sepolia testnet. Testnet tokens and assets have no monetary value. When the Platform migrates to Ethereum Mainnet:
 
 - Testnet assets will not automatically transfer to mainnet.
 - All mainnet transactions will involve real assets with monetary value.

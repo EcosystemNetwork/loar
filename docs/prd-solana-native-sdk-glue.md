@@ -1,6 +1,8 @@
 # PRD: Solana Native-SDK Glue Layer
 
-**Status**: All 10 adapters runtime-ready — 2026-05-17
+> **⚠️ STATUS: PLANNED / FUTURE CHAIN — NOT YET ACTIVE.** Solana is not part of the current LOAR build. LOAR runs on **Ethereum only** today (Sepolia testnet — contracts live; Mainnet wired). The native-SDK adapters described here were built and probed against **devnet** as part of the Solana prototype, which has since been **removed from the active codebase and archived for a future restore** (branch `archive/solana-base-support`, tag `solana-base-snapshot`). The "✅ runtime-ready" / "wired" markers below describe the **archived prototype**, not live or current code. This PRD remains the design spec for the future Solana glue layer once the chain is brought back online.
+
+**Status**: Planned / archived — all 10 adapters reached runtime-ready in the prototype (2026-05-17)
 **Decision**: Don't port Solana-native primitives that already exist; integrate them as **thin TS adapters** behind the same interface shape as the rest of the parity stack.
 
 **Implementation state**:
@@ -16,7 +18,7 @@
 | native-realms.ts           | ✅             | ✅ (`withCreateRealm` / `withCastVote` + PDA helpers)    | ✅ `@solana/spl-governance` + `bn.js`                                                                                  |
 | native-mpl-base.ts + 4 sub | ✅             | ✅ (Umi → web3.js → Circle DCW co-sign w/ asset Keypair) | ✅ `@metaplex-foundation/{mpl-core,umi,umi-bundle-defaults,umi-web3js-adapters}` + pnpm patch on `@noble/hashes@2.2.0` |
 
-**All 10 adapters now runtime-ready.** Runtime probes confirm every real SDK method called by the adapters exists.
+**All 10 adapters reached runtime-ready in the prototype.** Runtime probes confirmed every real SDK method called by the adapters existed. (Archived — not in the active build.)
 
 **mpl-core dep-tree fix (this session, 2026-05-17):** `@metaplex-foundation/mpl-core@1.10.0` imports `@noble/hashes/sha3` (no `.js`) but `@noble/hashes@2.x` only exposes `./sha3.js` in its `exports` map. Used `pnpm patch @noble/hashes@2.2.0` to inject extensionless aliases for the 16 missing `./<name>` → `./<name>.js` subpath entries. Patch committed at `patches/@noble__hashes@2.2.0.patch`, referenced from root `package.json`'s `pnpm.patchedDependencies`. Applies automatically on every `pnpm install`.
 

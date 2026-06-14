@@ -1,18 +1,20 @@
 # $LOAR Cross-chain Bridge
 
-Two backends, picked at runtime by env config:
+> **⚠️ STATUS: PLANNED / FUTURE CHAIN — NOT YET ACTIVE.** The Solana side of this bridge is not part of the current LOAR build. LOAR runs on **Ethereum only** today (Sepolia testnet — contracts live; Mainnet wired). This cross-chain bridge was prototyped on **devnet** and has been **removed from the active codebase and archived for a future restore** (branch `archive/solana-base-support`, tag `solana-base-snapshot`). This document is the design + trust-model spec for when the Solana bridge is brought back online — it does not describe anything currently running. Route and script paths below refer to the archived prototype.
+
+Two backends, designed to be picked at runtime by env config:
 
 | Backend                     | When                                                    | Trust                                               | Setup                                                                           |
 | --------------------------- | ------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------- |
 | **Wormhole NTT**            | `WORMHOLE_NTT_MANAGER_*` set for both chains            | Trustless (guardian quorum)                         | Deploy NTT Manager + Wormhole Transceiver per chain + peer-register. Multi-day. |
-| **Custodial lock-and-mint** | `SOL_BRIDGE_VAULT_ATA` + `EVM_BRIDGE_VAULT_ADDRESS` set | Server custodian holds mint authority on both sides | One-off vault setup; runs today.                                                |
+| **Custodial lock-and-mint** | `SOL_BRIDGE_VAULT_ATA` + `EVM_BRIDGE_VAULT_ADDRESS` set | Server custodian holds mint authority on both sides | One-off vault setup; ran in the devnet prototype.                               |
 
 The API in [routes/bridge.ts](../apps/server/src/routes/bridge.ts) is identical
 for both — frontend doesn't branch. `POST /api/bridge/quote` returns
 `backend: "wormhole_ntt" | "custodial"` so the UI can show a trust-model
 banner.
 
-## Custodial backend (current testnet path)
+## Custodial backend (prototype devnet/testnet path)
 
 ### Setup
 

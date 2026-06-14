@@ -165,7 +165,7 @@ Add this to "App Review Information → Notes":
 > LOAR Vault is a creator tool with an embedded Developer-Controlled
 > Wallet (provisioned via Circle) so users can sign in with email or
 > social login. We do not offer fiat on/off-ramps and do not act as a
-> broker. All token transactions happen on Base L2 and are signed by
+> broker. All token transactions happen on Ethereum and are signed by
 > Circle's KMS on the user's behalf. Crypto purchase flows link out to
 > third-party on-ramp providers in Safari, not in-app.
 

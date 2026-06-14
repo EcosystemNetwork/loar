@@ -1,6 +1,8 @@
 # PRD: Solana ↔ EVM Production Parity
 
-**Status**: Decided — 2026-05-15
+> **⚠️ STATUS: PLANNED / FUTURE CHAIN — NOT YET ACTIVE.** Solana is not part of the current LOAR build. LOAR runs on **Ethereum only** today (Sepolia testnet — contracts live; Mainnet wired). The entire Solana stack this PRD plans was prototyped on **devnet** and has since been **removed from the active codebase and archived for a future restore** (branch `archive/solana-base-support`, tag `solana-base-snapshot`). The "✅ devnet" markers below refer to **archived prototype deployments**, not live or current code. This PRD remains the design spec for the future Solana parity effort once the chain is brought back online.
+
+**Status**: Planned / archived — original decision 2026-05-15
 **Owner**: TBD (assign before Phase S0 kickoff)
 **Decision**: Move from "EVM canonical / Solana distribution" to **symmetric production-ready stacks on both chains**.
 
@@ -18,26 +20,29 @@ Bring the Solana stack to the same production-readiness bar as the EVM stack so 
 
 ---
 
-## 2. Current State (2026-05-15)
+## 2. Prototype State (as of 2026-05-15, now archived)
 
-### Already at parity or near-parity
+The table below captured the devnet prototype's state. None of it is currently
+deployed or running — it is preserved here as the restore baseline.
 
-| Capability              | EVM                                   | Solana                                                      |
-| ----------------------- | ------------------------------------- | ----------------------------------------------------------- |
-| Custody / signing       | Circle DCW + KMS                      | Circle DCW + KMS (same model)                               |
-| Auth                    | SIWE + JWT                            | SIWS + JWT (ns/evm/sol claims, linked sessions)             |
-| Universe primitive      | `Universe.sol`, `UniverseManager.sol` | `programs/universe` (PDA, hash-equivalent to EVM)           |
-| Episode mint            | `EpisodeNFT.sol`                      | `programs/episode` + Bubblegum cNFT                         |
-| Canon promotion         | `EpisodeCanonized` event              | `episode::canonize` → Metaplex Core asset                   |
-| Payment routing         | `PaymentRouter.sol`                   | `programs/payment` (pull accumulator, transfer_checked)     |
-| Multisig                | Safe                                  | Squads v4 (`lib/squads.ts`)                                 |
-| $LOAR token             | ERC20                                 | Token-2022 (mint locked on devnet, freeze nulled)           |
-| Indexer                 | Ponder                                | Helius webhook → Firestore + Anchor event decoder           |
-| Bridge                  | —                                     | Custodial v1 (live), Wormhole NTT path (code, not deployed) |
-| Mobile wallets          | RainbowKit / WalletConnect            | Mobile Wallet Adapter (Android), universal links (iOS)      |
-| MCP exposure            | —                                     | 6 tools (mint, canonize, pay, activity, attestation)        |
-| CI coverage             | Forge                                 | `anchor test` workflow                                      |
-| Cross-chain attestation | —                                     | Ed25519 over `{schema, mintedAt, solana, evm, lineage}`     |
+### Reached parity or near-parity in the prototype
+
+| Capability              | EVM                                   | Solana                                                           |
+| ----------------------- | ------------------------------------- | ---------------------------------------------------------------- |
+| Custody / signing       | Circle DCW + KMS                      | Circle DCW + KMS (same model)                                    |
+| Auth                    | SIWE + JWT                            | SIWS + JWT (ns/evm/sol claims, linked sessions)                  |
+| Universe primitive      | `Universe.sol`, `UniverseManager.sol` | `programs/universe` (PDA, hash-equivalent to EVM)                |
+| Episode mint            | `EpisodeNFT.sol`                      | `programs/episode` + Bubblegum cNFT                              |
+| Canon promotion         | `EpisodeCanonized` event              | `episode::canonize` → Metaplex Core asset                        |
+| Payment routing         | `PaymentRouter.sol`                   | `programs/payment` (pull accumulator, transfer_checked)          |
+| Multisig                | Safe                                  | Squads v4 (`lib/squads.ts`)                                      |
+| $LOAR token             | ERC20                                 | Token-2022 (mint locked on devnet, freeze nulled)                |
+| Indexer                 | Ponder                                | Helius webhook → Firestore + Anchor event decoder                |
+| Bridge                  | —                                     | Custodial v1 (prototype), Wormhole NTT path (code, not deployed) |
+| Mobile wallets          | RainbowKit / WalletConnect            | Mobile Wallet Adapter (Android), universal links (iOS)           |
+| MCP exposure            | —                                     | 6 tools (mint, canonize, pay, activity, attestation)             |
+| CI coverage             | Forge                                 | `anchor test` workflow                                           |
+| Cross-chain attestation | —                                     | Ed25519 over `{schema, mintedAt, solana, evm, lineage}`          |
 
 ### Real gaps — monetization + rights layer
 
@@ -139,7 +144,7 @@ Mapping each EVM contract → Solana approach. **Strategy** column:
 
 ### W2. Mainnet-beta deploy
 
-- Currently devnet. Follow [solana-mainnet-runbook.md](solana-mainnet-runbook.md).
+- Prototype reached devnet only. Follow [solana-mainnet-runbook.md](solana-mainnet-runbook.md) once Solana is restored.
 - Cost: program deploys ~$30-80, Bubblegum tree depth=14 ~$200, $LOAR mint creation ~$5, Squads vaults ~$10.
 - Sequencing: must follow W1 pass 1.
 

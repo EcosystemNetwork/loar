@@ -155,7 +155,7 @@ The marketplace has 10 tabs for revenue streams. Here's the honest status:
 
 ### What Works Today
 
-- Buy credits with ETH or $LOAR on-chain (Sepolia + Base Sepolia)
+- Buy credits with ETH or $LOAR on-chain (Ethereum Sepolia)
 - CreditStore UI with package selection and dual-margin pricing
 - Credit balance tracking and generation cost deduction
 - Platform stats (universes, views, mints, revenue)
@@ -250,6 +250,6 @@ NOT YET WORKING:
 
 1. **You own your universe.** The smart contract is deployed from your wallet. You are the admin.
 2. **Content is decentralized.** Your videos/images are stored across Pinata (IPFS), Lighthouse (Filecoin), and Firebase — not just one server.
-3. **This is testnet.** Everything runs on Sepolia + Base Sepolia. No real money is at stake. When we launch on Base mainnet, you'll need to redeploy.
+3. **This is testnet.** Everything runs on Ethereum Sepolia. No real money is at stake. When we launch on Ethereum Mainnet, you'll need to redeploy.
 4. **IP matters.** If you want to monetize, your content must be original. Fan works are welcome in the "Fan" category but can't generate revenue.
 5. **Credits are tracked.** AI generation costs are deducted from your credit balance. Purchase credits with ETH or $LOAR on-chain.

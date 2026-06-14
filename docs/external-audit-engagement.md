@@ -4,7 +4,7 @@
 **Owner:** Founder / BD lead. This doc is the handoff package an audit firm needs to quote and schedule.
 **Reference:** [docs/launch-readiness.md](./launch-readiness.md) items X5 / X6 / X7.
 
-External audit is the longest single pole on the mainnet critical path (8–12 weeks for Pass 1 + 4–6 weeks for Pass 2 + 3–6 weeks for the Solana track). Everything else cascades behind it. This doc exists so that step can start tomorrow.
+External audit is the longest single pole on the mainnet critical path (8–12 weeks for Pass 1 + 4–6 weeks for Pass 2). Everything else cascades behind it. This doc exists so that step can start tomorrow. (The Solana track below — 3–6 weeks — applies to a **planned future chain**, not the current Ethereum Mainnet launch.)
 
 ---
 
@@ -18,7 +18,7 @@ External audit is the longest single pole on the mainnet critical path (8–12 w
 | Total LOC       | ~12,750                                                                                                                     |
 | Compiler        | `solc 0.8.30` (pinned, CI-enforced)                                                                                         |
 | Framework       | Foundry; OpenZeppelin Upgradeable v5; UUPS proxies + Beacons                                                                |
-| Networks        | Already on Sepolia + Base Sepolia. Target mainnet: Base L2 (chain 8453)                                                     |
+| Networks        | Already on Ethereum Sepolia (chain 11155111). Target mainnet: Ethereum Mainnet (chain 1)                                    |
 | Internal review | 8 passes, 130 / 157 findings fixed across [docs/audit-fix-tracker.md](./audit-fix-tracker.md). P0 14/15, P1 27/31, P2 24/25 |
 | Code snapshot   | Commit `0d2b16a9` on `main` (suggest tagging `v0.1.0-pre-audit` before handoff)                                             |
 
@@ -32,7 +32,9 @@ External audit is the longest single pole on the mainnet critical path (8–12 w
 - `RightsRegistry` + `ContentLicensing` + `Escrow` + `StoryBounties` + `CollabManager` + `AdPlacement` — content/rights
 - `GovernorFactory` + `GovernanceTokenFactory` + `TimelockFactory` — per-universe governance (TimelockFactory is the newest addition, TIMELOCK-01 through TIMELOCK-04)
 
-### Solana track — `apps/programs/`
+### Solana track — `apps/programs/` (planned future chain)
+
+> Solana is a **planned future chain**, not part of the current Ethereum Mainnet launch. It was prototyped on devnet and archived in branch `archive/solana-base-support` (tag `solana-base-snapshot`). This track applies only when the Solana restore is scheduled.
 
 | Stat             | Value                                                                                                                                                        |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -127,7 +129,7 @@ Subject: External audit engagement — LOAR (UUPS + Uniswap v4 + governance, ~12
 
 Hi [team],
 
-We're LOAR, a creator-economy protocol launching on Base L2. We're looking
+We're LOAR, a creator-economy protocol launching on Ethereum Mainnet. We're looking
 to engage an audit firm for a Pass 1 (and likely Pass 2) on our EVM
 contracts before mainnet deployment.
 
@@ -136,7 +138,7 @@ Scope at a glance:
   • Foundry, solc 0.8.30 pinned, OpenZeppelin Upgradeable v5
   • UUPS proxies + Beacons; Uniswap v4 hooks for LP fees
   • Per-universe Governor + TimelockController (factory-deployed)
-  • Currently live on Sepolia + Base Sepolia testnet
+  • Currently live on Ethereum Sepolia testnet
   • Internal review complete: 8 passes, 130/157 findings closed
     (P0 14/15, P1 27/31, P2 24/25)
 
@@ -200,8 +202,8 @@ LOAR — https://loar.fun
 - **"Is there a fuzzing / invariant suite?"** Yes — `apps/contracts/test/invariant/BondingCurveInvariant.t.sol` and `PaymentRouterInvariant.t.sol`. Run `forge test --match-path test/invariant`.
 - **"Storage layout for UUPS upgrades?"** Verified in CI; `.github/workflows/security.yml` rejects missing `__gap`. Baseline JSON artifacts not yet committed (UPGRADE-01 follow-on — C2 in scorecard).
 - **"Coverage %?"** Refresh with `forge coverage --report summary` before sending. The 3.65% number in legacy audit reports is stale and reflects a much earlier codebase.
-- **"What's the mainnet deploy script?"** `apps/contracts/script/DeployAll.s.sol` (full system) or `DeployBase.s.sol` (Base L2 wrapper). Multisig handoff: `script/TransferToMultisig.s.sol` (supports `DRY_RUN`).
-- **"What's the deployer EOA today?"** Sepolia + Base Sepolia + Solana devnet are all on the deployer key. GOV-01 / O2 in the scorecard tracks the multisig handoff.
+- **"What's the mainnet deploy script?"** `apps/contracts/script/DeployAll.s.sol` (full system). Multisig handoff: `script/TransferToMultisig.s.sol` (supports `DRY_RUN`).
+- **"What's the deployer EOA today?"** Ethereum Sepolia is on the deployer key. GOV-01 / O2 in the scorecard tracks the multisig handoff. (The archived Solana devnet prototype used the same key.)
 - **"Bug bounty live?"** Not yet. Plan: stand up Immunefi or Code4rena bounty _after_ Pass 1 lands. Pool sized to one of: 10% of TVL, or $50K minimum, whichever is higher.
 
 ---

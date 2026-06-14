@@ -1,9 +1,11 @@
 # Solana Mainnet Runbook
 
-Migration path from devnet (where everything is live today) to `mainnet-beta`.
-Devnet program IDs + addresses are committed in
-[packages/abis/src/solana-addresses.ts](../packages/abis/src/solana-addresses.ts);
-mainnet entries are currently empty and get filled in by following this doc.
+> **⚠️ STATUS: PLANNED / FUTURE CHAIN — NOT YET ACTIVE.** Solana is not part of the current LOAR build. LOAR runs on **Ethereum only** today (Sepolia testnet — contracts live; Mainnet wired). The Solana stack described here was prototyped on **devnet** and has been **removed from the active codebase and archived for a future restore** (branch `archive/solana-base-support`, tag `solana-base-snapshot`). This runbook is the design spec for taking Solana from devnet prototype to `mainnet-beta` once the integration is brought back online — it does not describe a live deployment. Script paths and `solana-addresses.ts` references below point at the archived prototype.
+
+Migration path from the archived devnet prototype to `mainnet-beta`.
+Devnet program IDs + addresses were committed in
+[packages/abis/src/solana-addresses.ts](../packages/abis/src/solana-addresses.ts)
+(now archived); mainnet entries were never populated and would be filled in by following this doc once Solana is restored.
 
 ## Pre-mainnet blockers
 

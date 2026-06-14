@@ -25,8 +25,8 @@ graph TD
     end
 
     subgraph Blockchain
-        SEPOLIA[Sepolia Testnet<br/>Smart Contracts]
-        BASE[Base L2<br/>Target Mainnet]
+        SEPOLIA[Ethereum Sepolia Testnet<br/>Smart Contracts]
+        MAINNET[Ethereum Mainnet<br/>Target Mainnet]
     end
 
     WEB -->|tRPC over HTTP| SERVER

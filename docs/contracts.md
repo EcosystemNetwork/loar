@@ -2,7 +2,7 @@
 
 ## Overview
 
-All contracts are in `apps/contracts/src/`, built with [Foundry](https://book.getfoundry.sh/) (Solidity ^0.8.30), and deployed to **Sepolia testnet** (chain 11155111) with multi-chain support for **Base Sepolia** (84532) and **Base Mainnet** (8453).
+All contracts are in `apps/contracts/src/`, built with [Foundry](https://book.getfoundry.sh/) (Solidity ^0.8.30), and deployed to **Ethereum Sepolia testnet** (chain 11155111 — the only live network). **Ethereum Mainnet** (chain 1) is wired for swaps/auth but has no LOAR contracts deployed yet. The deployment tooling is multi-chain capable so that **Base** and **Solana** can be added as planned future chains (see the multi-chain roadmap).
 
 Revenue contracts use an **upgradeable proxy architecture**:
 
@@ -95,7 +95,7 @@ All upgradeable contracts use OpenZeppelin Upgradeable v5.0.2.
 
 - **Purpose:** Enhanced governance with TimelockController for safer execution
 - **Timelock:** 24-hour delay on proposal execution
-- **Parameters:** Voting delay 7200 blocks (~1 day on Base L2), voting period 50400 blocks (~7 days), proposal threshold 1M tokens
+- **Parameters:** Voting delay 7200 blocks (~1 day on Ethereum), voting period 50400 blocks (~7 days), proposal threshold 1M tokens
 
 ### Revenue Contracts (UUPS Pattern)
 

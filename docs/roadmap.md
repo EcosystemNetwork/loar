@@ -4,7 +4,7 @@
 
 ## Current State (April 2026)
 
-The platform has strong infrastructure — 69 smart contracts deployed (Sepolia + Base Sepolia), 44+ tRPC routers (400+ procedures), 65 web routes, 65 AI models (44 video + 21 image), audio/3D generation, LP yield management, TimelockController governance, Identity NFTs, multi-chain support, on-chain credit purchases, social features (follows, comments, activity feed, notifications), AI agent system with MCP server, worldbuilding studio, scene controls (camera/style/VFX/cast/motion brush), and interactive narrative player.
+The platform has strong infrastructure — 69 smart contracts deployed + verified on Ethereum Sepolia (Ethereum Mainnet wired for swaps/auth), 44+ tRPC routers (400+ procedures), 65 web routes, 65 AI models (44 video + 21 image), audio/3D generation, LP yield management, TimelockController governance, Identity NFTs, multi-chain support, on-chain credit purchases, social features (follows, comments, activity feed, notifications), AI agent system with MCP server, worldbuilding studio, scene controls (camera/style/VFX/cast/motion brush), and interactive narrative player.
 
 The critical gap is **closing the remaining monetization UI loops** (NFT minting, subscriptions, collabs) and **proving the product works for one external creator**.
 
@@ -19,7 +19,7 @@ The critical gap is **closing the remaining monetization UI loops** (NFT minting
 ### Deliverables
 
 - [x] **Fix Dashboard** — Real universe data via `universes.getByCreator()`, LP yield panel, quests, daily check-in, monetization overview
-- [x] **Wire Credit Purchases** — On-chain ETH/$LOAR payment verification live (Sepolia + Base Sepolia)
+- [x] **Wire Credit Purchases** — On-chain ETH/$LOAR payment verification live (Ethereum Sepolia)
 - [x] **Basic Governance** — TimelockController governance with configurable voting parameters, Ponder indexing proposals/votes
 - [x] **Token Deployment** — Standalone `/universe/$id/deploy-token` route with chain selection, custom symbols, allocation splits
 - [x] **LP Yield Management** — Fee collection, multi-recipient distribution, claim UI in dashboard
@@ -74,7 +74,8 @@ A non-team wallet can: create a universe, generate AI content, list an episode N
 - [x] ~~**Content Moderation**~~ — Review queue, flagging, DMCA takedown process (implemented: `/admin/moderation`, `/dmca`, content status gates)
 - [ ] **KYC/AML** — For high-value transactions (licensing, large NFT sales)
 - [x] ~~**Social Layer**~~ — Follows, comments, activity feed, notifications (fully implemented)
-- [ ] **Mainnet Deployment** — Base L2 (decided, multi-chain support already implemented)
+- [ ] **Mainnet Deployment** — Ethereum Mainnet (chain 1; wired for swaps/auth, contracts pending audit)
+- [ ] **Future chains: Solana & Base** — both prototyped (Solana devnet programs, Base Sepolia deploys) and archived for restore (branch `archive/solana-base-support`). Planned as additional chains post-Ethereum-mainnet via the existing multi-chain address registry + chain-selector UI
 - [ ] **Multi-Sig Governance Migration** — Transfer contract ownership from single EOA to Gnosis Safe + timelock
 - [ ] **Pausable Guards** — Add Pausable to 14 revenue-handling contracts (currently missing)
 - [ ] **Creator SDK / API** — Third-party apps can read universe data, embed episodes
