@@ -1491,13 +1491,29 @@ export const sceneAudioRouter = router({
       })
     )
     .query(async ({ input }) => {
-      let query = soundNodesCol().where('universeId', '==', input.universeId);
-      if (input.kind) {
-        query = query.where('kind', '==', input.kind);
-      }
+      // Firestore index ceiling: no soundNodes composite exists. Bound on the
+      // single universeId equality (no orderBy → no composite needed), then filter
+      // the optional kind and sort by createdAt asc in memory (no limit on this
+      // endpoint, so no slice — the full timeline is returned).
+      const snap = await soundNodesCol().where('universeId', '==', input.universeId).get();
 
-      const snap = await query.orderBy('createdAt', 'asc').get();
-      return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const ts = (v: unknown): number => {
+        const d = v as { toMillis?: () => number } | number | undefined;
+        if (d && typeof (d as { toMillis?: () => number }).toMillis === 'function') {
+          return (d as { toMillis: () => number }).toMillis();
+        }
+        return typeof d === 'number' ? d : 0;
+      };
+
+      const docs = snap.docs
+        .filter((d) => !input.kind || (d.data() as Record<string, unknown>).kind === input.kind)
+        .sort(
+          (a, b) =>
+            ts((a.data() as Record<string, unknown>).createdAt) -
+            ts((b.data() as Record<string, unknown>).createdAt)
+        );
+
+      return docs.map((d) => ({ id: d.id, ...d.data() }));
     }),
 
   /**

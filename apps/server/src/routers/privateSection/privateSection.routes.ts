@@ -243,26 +243,17 @@ export const privateSectionRouter = router({
       return { items: [], accessLevel };
     }
 
-    let query = itemsCol()
-      .where('universeId', '==', id)
-      .orderBy('createdAt', 'desc')
-      .limit(input.limit);
+    // No composite index on privateItems — bound by universeId only, then
+    // filter section/status, sort createdAt desc, and paginate in memory.
+    const snapshot = await itemsCol().where('universeId', '==', id).get();
+    let items = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[];
 
     if (input.section) {
-      query = query.where('section', '==', input.section);
+      items = items.filter((item: any) => item.section === input.section);
     }
     if (input.status) {
-      query = query.where('status', '==', input.status);
+      items = items.filter((item: any) => item.status === input.status);
     }
-    if (input.cursor) {
-      const cursorDoc = await itemsCol().doc(input.cursor).get();
-      if (cursorDoc.exists) {
-        query = query.startAfter(cursorDoc);
-      }
-    }
-
-    const snapshot = await query.get();
-    let items = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
     // Filter by access tier
     if (accessLevel === 'holders') {
@@ -271,6 +262,20 @@ export const privateSectionRouter = router({
       items = items.filter((item: any) => item.accessTier !== 'admin');
     }
     // admin sees everything
+
+    // Sort createdAt desc in memory.
+    const ts = (v: any) => (v?.toDate?.() ? v.toDate().getTime() : new Date(v ?? 0).getTime());
+    items.sort((a: any, b: any) => ts(b.createdAt) - ts(a.createdAt));
+
+    // Honor cursor pagination: drop everything up to and including the cursor id.
+    if (input.cursor) {
+      const cursorIdx = items.findIndex((item: any) => item.id === input.cursor);
+      if (cursorIdx >= 0) {
+        items = items.slice(cursorIdx + 1);
+      }
+    }
+
+    items = items.slice(0, input.limit);
 
     return { items, accessLevel };
   }),

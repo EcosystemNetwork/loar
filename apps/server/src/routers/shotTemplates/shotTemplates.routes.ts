@@ -65,19 +65,33 @@ export const shotTemplatesRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      let query: FirebaseFirestore.Query = col();
+      // READ_CAP bounds the indexed over-fetch before in-memory episodeId filtering.
+      const READ_CAP = 500;
 
       if (input.universeId) {
-        query = query.where('universeId', '==', input.universeId.toLowerCase());
-      } else {
-        query = query.where('createdBy', '==', ctx.user.uid.toLowerCase());
-      }
-      if (input.episodeId) {
-        query = query.where('episodeId', '==', input.episodeId);
+        // universeId+createdAt index EXISTS — keep the indexed orderBy, over-fetch,
+        // then filter episodeId + slice in memory.
+        const snapshot = await col()
+          .where('universeId', '==', input.universeId.toLowerCase())
+          .orderBy('createdAt', 'desc')
+          .limit(READ_CAP)
+          .get();
+        let rows = snapshot.docs.map((doc) => serialize(doc.id, doc.data()));
+        if (input.episodeId) {
+          rows = rows.filter((r) => r.episodeId === input.episodeId);
+        }
+        return rows.slice(0, input.limit);
       }
 
-      const snapshot = await query.orderBy('createdAt', 'desc').limit(input.limit).get();
-      return snapshot.docs.map((doc) => serialize(doc.id, doc.data()));
+      // createdBy path — NO createdBy+createdAt index. Bound by createdBy only,
+      // sort createdAt desc + filter episodeId in memory, then slice.
+      const snapshot = await col().where('createdBy', '==', ctx.user.uid.toLowerCase()).get();
+      let rows = snapshot.docs.map((doc) => serialize(doc.id, doc.data()));
+      if (input.episodeId) {
+        rows = rows.filter((r) => r.episodeId === input.episodeId);
+      }
+      rows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      return rows.slice(0, input.limit);
     }),
 
   /**

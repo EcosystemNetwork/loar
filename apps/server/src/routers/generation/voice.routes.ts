@@ -93,6 +93,8 @@ const voiceGenerationsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('voiceGenerations');
 };
+// Bound reads + sort in Firestore via the userId+createdAt index; secondary filters applied in memory to avoid extra composite indexes.
+const HISTORY_READ_CAP = 500;
 
 // ── Storage upload helper ─────────────────────────────────────────────
 
@@ -1128,20 +1130,18 @@ export const voiceRouter = router({
       z.object({ limit: z.number().min(1).max(100).default(20), entityId: z.string().optional() })
     )
     .query(async ({ input, ctx }) => {
-      let query = voiceGenerationsCol()
+      const snapshot = await voiceGenerationsCol()
         .where('userId', '==', ctx.user.uid)
         .orderBy('createdAt', 'desc')
-        .limit(input.limit);
+        .limit(HISTORY_READ_CAP)
+        .get();
+
+      let rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Record<string, any>);
 
       if (input.entityId) {
-        query = voiceGenerationsCol()
-          .where('userId', '==', ctx.user.uid)
-          .where('entityId', '==', input.entityId)
-          .orderBy('createdAt', 'desc')
-          .limit(input.limit);
+        rows = rows.filter((d) => d.entityId === input.entityId);
       }
 
-      const snapshot = await query.get();
-      return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      return rows.slice(0, input.limit);
     }),
 });

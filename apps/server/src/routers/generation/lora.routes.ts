@@ -80,16 +80,22 @@ export const loraRouter = router({
         });
         if (reservation?.existing) {
           // Look up the model created by the original call.
+          // Firestore index ceiling: only the [creatorUid, createdAt] composite
+          // exists. Bound on creatorUid + indexed orderBy(createdAt), raise the
+          // read window, then match triggerWord in memory and take the newest.
+          const READ_CAP = 500;
           const existingSnap = await loraModelsCol()
             .where('creatorUid', '==', ctx.user.uid)
-            .where('triggerWord', '==', input.triggerWord)
             .orderBy('createdAt', 'desc')
-            .limit(1)
+            .limit(READ_CAP)
             .get();
-          if (!existingSnap.empty) {
-            const d = existingSnap.docs[0].data() as any;
+          const match = existingSnap.docs.find(
+            (doc) => (doc.data() as any).triggerWord === input.triggerWord
+          );
+          if (match) {
+            const d = match.data() as any;
             return {
-              modelId: existingSnap.docs[0].id,
+              modelId: match.id,
               status: (d.status ?? 'training') as string,
               idempotentReplay: true as const,
             };
@@ -426,14 +432,29 @@ export const loraRouter = router({
   listByCharacter: publicProcedure
     .input(z.object({ characterId: z.string() }))
     .query(async ({ input }) => {
-      const snapshot = await loraModelsCol()
-        .where('characterId', '==', input.characterId)
-        .where('status', '==', 'ready')
-        .orderBy('createdAt', 'desc')
-        .limit(5)
-        .get();
+      // Firestore index ceiling: no [characterId, ...] composite exists. Bound on
+      // the single characterId equality (no orderBy → no composite needed), then
+      // filter status === 'ready' and sort by createdAt desc in memory, slice to 5.
+      const snapshot = await loraModelsCol().where('characterId', '==', input.characterId).get();
 
-      return snapshot.docs.map((doc) => {
+      const ts = (v: unknown): number => {
+        const d = v as { toMillis?: () => number } | number | undefined;
+        if (d && typeof (d as { toMillis?: () => number }).toMillis === 'function') {
+          return (d as { toMillis: () => number }).toMillis();
+        }
+        return typeof d === 'number' ? d : 0;
+      };
+
+      const docs = snapshot.docs
+        .filter((doc) => (doc.data() as Record<string, unknown>).status === 'ready')
+        .sort(
+          (a, b) =>
+            ts((b.data() as Record<string, unknown>).createdAt) -
+            ts((a.data() as Record<string, unknown>).createdAt)
+        )
+        .slice(0, 5);
+
+      return docs.map((doc) => {
         const data = doc.data();
         return {
           id: doc.id,

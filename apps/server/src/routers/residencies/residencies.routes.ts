@@ -52,14 +52,16 @@ export interface ResidencyApplication {
 
 export const residenciesRouter = router({
   submit: protectedProcedure.input(applySchema).mutation(async ({ input, ctx }) => {
-    // One pending application per (user, cohort)
-    const existing = await residencyApplicationsCol()
+    // One pending application per (user, cohort).
+    // No composite index on residencyApplications — bound by applicantUid only
+    // (small per-user set), then filter cohort + status in memory.
+    const existingSnap = await residencyApplicationsCol()
       .where('applicantUid', '==', ctx.user.uid)
-      .where('cohort', '==', input.cohort)
-      .where('status', '==', 'pending')
-      .limit(1)
       .get();
-    if (!existing.empty) {
+    const hasPending = existingSnap.docs
+      .map((d) => d.data() as ResidencyApplication)
+      .some((a) => a.cohort === input.cohort && a.status === 'pending');
+    if (hasPending) {
       throw new TRPCError({
         code: 'CONFLICT',
         message: 'You already have a pending application for this cohort',
@@ -88,26 +90,29 @@ export const residenciesRouter = router({
   cohort: publicProcedure
     .input(z.object({ cohort: z.string().default('default') }))
     .query(async ({ input }) => {
-      const snap = await residencyApplicationsCol()
-        .where('cohort', '==', input.cohort)
-        .where('status', '==', 'accepted')
-        .orderBy('reviewedAt', 'desc')
-        .limit(100)
-        .get();
-      // Strip statement + reviewerNote from public payload — privacy.
-      return snap.docs
+      // No composite index — bound by cohort only, filter status + sort in memory.
+      const snap = await residencyApplicationsCol().where('cohort', '==', input.cohort).get();
+      const accepted = snap.docs
         .map((d) => d.data() as ResidencyApplication)
-        .map(({ statement, reviewerNote, reviewerUid, ...rest }) => rest);
+        .filter((a) => a.status === 'accepted')
+        .sort(
+          (a, b) => new Date(b.reviewedAt ?? 0).getTime() - new Date(a.reviewedAt ?? 0).getTime()
+        )
+        .slice(0, 100);
+      // Strip statement + reviewerNote from public payload — privacy.
+      return accepted.map(({ statement, reviewerNote, reviewerUid, ...rest }) => rest);
     }),
 
   /** Applicant view — see your own application(s). */
   mine: protectedProcedure.query(async ({ ctx }) => {
-    const snap = await residencyApplicationsCol()
-      .where('applicantUid', '==', ctx.user.uid)
-      .orderBy('submittedAt', 'desc')
-      .limit(50)
-      .get();
-    return snap.docs.map((d) => d.data() as ResidencyApplication);
+    // No composite index — bound by applicantUid only, sort submittedAt in memory.
+    const snap = await residencyApplicationsCol().where('applicantUid', '==', ctx.user.uid).get();
+    return snap.docs
+      .map((d) => d.data() as ResidencyApplication)
+      .sort(
+        (a, b) => new Date(b.submittedAt ?? 0).getTime() - new Date(a.submittedAt ?? 0).getTime()
+      )
+      .slice(0, 50);
   }),
 
   /** Admin — list applications (optionally filter by status / cohort). */
@@ -120,11 +125,21 @@ export const residenciesRouter = router({
       })
     )
     .query(async ({ input }) => {
+      // No composite index — keep ONE bounding equality filter in Firestore
+      // (prefer status, else cohort, else none), filter the rest + sort in memory.
       let query = residencyApplicationsCol() as FirebaseFirestore.Query;
       if (input.status) query = query.where('status', '==', input.status);
-      if (input.cohort) query = query.where('cohort', '==', input.cohort);
-      const snap = await query.orderBy('submittedAt', 'desc').limit(input.limit).get();
-      return snap.docs.map((d) => d.data() as ResidencyApplication);
+      else if (input.cohort) query = query.where('cohort', '==', input.cohort);
+      const snap = await query.get();
+      // cohort only needs in-memory filtering when status was the Firestore filter.
+      const filterCohortInMemory = Boolean(input.status && input.cohort);
+      return snap.docs
+        .map((d) => d.data() as ResidencyApplication)
+        .filter((a) => (filterCohortInMemory ? a.cohort === input.cohort : true))
+        .sort(
+          (a, b) => new Date(b.submittedAt ?? 0).getTime() - new Date(a.submittedAt ?? 0).getTime()
+        )
+        .slice(0, input.limit);
     }),
 
   /** Admin — accept or reject an application. */

@@ -296,17 +296,16 @@ export async function verifyApiKey(
 
   const keyHash = hashKey(apiKey);
 
-  // Look up by hash
-  const snapshot = await apiKeysCol()
-    .where('keyHash', '==', keyHash)
-    .where('status', '==', 'active')
-    .limit(1)
-    .get();
+  // Look up by hash (effectively unique). No composite index — bound by keyHash
+  // only, then check status === 'active' in memory.
+  const snapshot = await apiKeysCol().where('keyHash', '==', keyHash).limit(1).get();
 
   if (snapshot.empty) return null;
 
   const doc = snapshot.docs[0];
   const keyDoc = { id: doc.id, ...doc.data() } as ApiKeyDoc;
+
+  if (keyDoc.status !== 'active') return null;
 
   // Check expiration
   if (keyDoc.expiresAt && new Date() > new Date(keyDoc.expiresAt as any)) {
@@ -376,13 +375,15 @@ export async function getApiKeyUsage(
   keyId: string,
   limit: number = 100
 ): Promise<ApiKeyUsageDoc[]> {
-  const snapshot = await apiKeyUsageCol()
-    .where('apiKeyId', '==', keyId)
-    .orderBy('timestamp', 'desc')
-    .limit(limit)
-    .get();
+  // No apiKeyId+timestamp composite index — bound by apiKeyId only, then sort
+  // timestamp desc in memory and slice to the limit.
+  const snapshot = await apiKeyUsageCol().where('apiKeyId', '==', keyId).get();
 
-  return snapshot.docs.map((d) => ({ ...d.data() }) as ApiKeyUsageDoc);
+  const ts = (v: any) => (v?.toDate?.() ? v.toDate().getTime() : new Date(v ?? 0).getTime());
+  return snapshot.docs
+    .map((d) => ({ ...d.data() }) as ApiKeyUsageDoc)
+    .sort((a: any, b: any) => ts(b.timestamp) - ts(a.timestamp))
+    .slice(0, limit);
 }
 
 /**

@@ -87,6 +87,8 @@ const generationsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('videoGenerations');
 };
+// Bound reads + sort in Firestore via the userId+createdAt index; secondary filters applied in memory to avoid extra composite indexes.
+const HISTORY_READ_CAP = 500;
 const modelOverridesCol = () => {
   if (!db) throw new Error('Firebase is not configured');
   return db.collection('modelOverrides');
@@ -1903,27 +1905,21 @@ export const generationRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      let query = generationsCol()
+      const snapshot = await generationsCol()
         .where('userId', '==', ctx.user.uid)
         .orderBy('createdAt', 'desc')
-        .limit(input.limit);
+        .limit(HISTORY_READ_CAP)
+        .get();
+
+      let rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Record<string, any>);
 
       if (input.entityId) {
-        query = generationsCol()
-          .where('userId', '==', ctx.user.uid)
-          .where('entityId', '==', input.entityId)
-          .orderBy('createdAt', 'desc')
-          .limit(input.limit);
+        rows = rows.filter((d) => d.entityId === input.entityId);
       } else if (input.universeId) {
-        query = generationsCol()
-          .where('userId', '==', ctx.user.uid)
-          .where('universeId', '==', input.universeId)
-          .orderBy('createdAt', 'desc')
-          .limit(input.limit);
+        rows = rows.filter((d) => d.universeId === input.universeId);
       }
 
-      const snapshot = await query.get();
-      return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      return rows.slice(0, input.limit);
     }),
 
   /**

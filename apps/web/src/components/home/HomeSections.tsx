@@ -409,7 +409,10 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
               src={proxiedImage(u.imageURL || u.tokenData?.imageURL, 1600)}
               srcSet={proxiedSrcSet(u.imageURL || u.tokenData?.imageURL)}
               sizes="100vw"
-              fetchPriority={i === currentIndex ? 'high' : 'low'}
+              {...({ fetchpriority: i === currentIndex ? 'high' : 'low' } as Record<
+                string,
+                string
+              >)}
               alt=""
               className="w-full h-full object-cover scale-105"
               style={{

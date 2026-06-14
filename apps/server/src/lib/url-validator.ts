@@ -123,7 +123,6 @@ export async function safeFetch(
   return fetch(parsed.toString(), {
     ...init,
     redirect: init.redirect ?? 'error',
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     dispatcher,
-  } as any);
+  } as RequestInit);
 }

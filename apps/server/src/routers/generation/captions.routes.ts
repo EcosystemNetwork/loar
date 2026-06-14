@@ -445,10 +445,23 @@ export const captionsRouter = router({
     )
     .query(async ({ input, ctx }) => {
       const limit = input?.limit ?? 20;
-      let q = captionProjectsCol().where('userId', '==', ctx.user.uid);
-      if (input?.episodeId) q = q.where('episodeId', '==', input.episodeId);
-      const snap = await q.orderBy('updatedAt', 'desc').limit(limit).get();
-      return snap.docs.map((d) => {
+      // Firestore index ceiling: only the [userId, updatedAt] composite exists.
+      // Bound on userId + indexed orderBy(updatedAt), raise the read window, then
+      // filter the optional episodeId in memory and slice to the limit.
+      const READ_CAP = 500;
+      const snap = await captionProjectsCol()
+        .where('userId', '==', ctx.user.uid)
+        .orderBy('updatedAt', 'desc')
+        .limit(READ_CAP)
+        .get();
+      let docs = snap.docs;
+      if (input?.episodeId) {
+        docs = docs.filter(
+          (d) => (d.data() as Record<string, unknown>).episodeId === input.episodeId
+        );
+      }
+      docs = docs.slice(0, limit);
+      return docs.map((d) => {
         const data = d.data() as Record<string, unknown>;
         return {
           id: d.id,

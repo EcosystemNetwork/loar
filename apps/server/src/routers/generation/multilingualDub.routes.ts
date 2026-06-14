@@ -372,13 +372,24 @@ export const multilingualDubRouter = router({
     )
     .query(async ({ input, ctx }) => {
       const params = input ?? { limit: 50 };
-      let q = multilingualDubsCol().where('userId', '==', ctx.user.uid) as FirebaseFirestore.Query;
-      if (params.episodeId) q = q.where('episodeId', '==', params.episodeId);
-      const snap = await q
+      const limit = params.limit ?? 50;
+      // Firestore index ceiling: only the [userId, createdAt] composite exists.
+      // Bound on userId + indexed orderBy(createdAt), raise the read window, then
+      // filter the optional episodeId in memory and slice to the limit.
+      const READ_CAP = 500;
+      const snap = await multilingualDubsCol()
+        .where('userId', '==', ctx.user.uid)
         .orderBy('createdAt', 'desc')
-        .limit(params.limit ?? 50)
+        .limit(READ_CAP)
         .get();
-      return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      let docs = snap.docs;
+      if (params.episodeId) {
+        docs = docs.filter(
+          (d) => (d.data() as Record<string, unknown>).episodeId === params.episodeId
+        );
+      }
+      docs = docs.slice(0, limit);
+      return docs.map((d) => ({ id: d.id, ...d.data() }));
     }),
 
   /**

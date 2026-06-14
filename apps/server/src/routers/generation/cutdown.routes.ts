@@ -436,21 +436,25 @@ export const cutdownRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      let query = cutdownsCol()
+      // Firestore index ceiling: only the [userId, createdAt] composite exists.
+      // Bound on userId + indexed orderBy(createdAt), raise the read window, then
+      // filter the optional universeAddress in memory and slice to the limit.
+      const READ_CAP = 500;
+      const snap = await cutdownsCol()
         .where('userId', '==', ctx.user.uid)
         .orderBy('createdAt', 'desc')
-        .limit(input.limit);
+        .limit(READ_CAP)
+        .get();
 
+      let docs = snap.docs;
       if (input.universeAddress) {
-        query = cutdownsCol()
-          .where('userId', '==', ctx.user.uid)
-          .where('universeAddress', '==', input.universeAddress)
-          .orderBy('createdAt', 'desc')
-          .limit(input.limit);
+        docs = docs.filter(
+          (doc) => (doc.data() as Record<string, unknown>).universeAddress === input.universeAddress
+        );
       }
+      docs = docs.slice(0, input.limit);
 
-      const snap = await query.get();
-      return snap.docs.map((doc) => {
+      return docs.map((doc) => {
         const data = doc.data();
         return {
           cutdownId: data.cutdownId,
