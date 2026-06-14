@@ -48,13 +48,24 @@ export const bountiesRouter = router({
       const col = getBountiesCol();
       if (!col) return [];
 
-      let query = col.orderBy('createdAt', 'desc').limit(input.limit);
-      if (input.status) query = query.where('status', '==', input.status);
+      // Keep at most one indexed equality (universeId or status) + createdAt in
+      // Firestore; filter the remaining fields in memory over a capped window.
+      // contentType has no composite index, and stacking status+universeId+
+      // contentType would each need their own — avoid them (DB at index ceiling).
+      const BOUNTIES_READ_CAP = 500;
+      let query: FirebaseFirestore.Query = col;
       if (input.universeId) query = query.where('universeId', '==', input.universeId);
-      if (input.contentType) query = query.where('contentType', '==', input.contentType);
+      else if (input.status) query = query.where('status', '==', input.status);
+      query = query.orderBy('createdAt', 'desc').limit(BOUNTIES_READ_CAP);
 
       const snap = await query.get();
-      return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      let docs = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Record<string, unknown>[];
+
+      // Filters not used to drive the indexed query are applied in memory.
+      if (input.universeId && input.status) docs = docs.filter((d) => d.status === input.status);
+      if (input.contentType) docs = docs.filter((d) => d.contentType === input.contentType);
+
+      return docs.slice(0, input.limit);
     }),
 
   // ── Get single bounty ──────────────────────────────────────

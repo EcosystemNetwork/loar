@@ -110,7 +110,11 @@ export const galleryRouter = router({
       if (input.universeId) {
         query = query.where('universeId', '==', input.universeId);
       }
-      if (input.creatorUid) {
+      // When BOTH universeId and creatorUid are set we'd need a 4-field composite
+      // index (visibility+universeId+creatorUid+sort); instead keep universeId in
+      // the query (indexed) and filter creatorUid in memory below.
+      const filterCreatorInMemory = !!(input.universeId && input.creatorUid);
+      if (input.creatorUid && !filterCreatorInMemory) {
         query = query.where('creatorUid', '==', input.creatorUid);
       }
 
@@ -145,10 +149,10 @@ export const galleryRouter = router({
       if (finalTypes.length === 0) {
         return { items: [], nextCursor: null };
       }
-      // Only apply filter if not matching all types (avoids unnecessary in clause)
-      if (finalTypes.length < allTypes.length) {
-        query = query.where('mediaType', 'in', finalTypes);
-      }
+      // mediaType is filtered in memory (see below) rather than via a Firestore
+      // `in` clause — that clause combined with universeId/creatorUid/sort would
+      // require a composite index for every permutation. `finalTypes` is reused
+      // for the in-memory filter.
 
       // Sorting — always tiebreak on __name__ so cursor pagination is stable
       // even when two docs share a sort value (same createdAt or views).
@@ -171,17 +175,36 @@ export const galleryRouter = router({
         }
       }
 
-      const snapshot = await query.limit(input.limit).get();
+      // Over-fetch because mediaType (and the rare universeId+creatorUid combo)
+      // are filtered in memory below — this avoids a composite index for every
+      // filter permutation while keeping cursor pagination lossless.
+      const GALLERY_FETCH = Math.min(input.limit * 5, 500);
+      const snapshot = await query.limit(GALLERY_FETCH).get();
 
-      const items = snapshot.docs
-        .filter((d) => {
-          const data = d.data();
-          if (!isVisible(data.contentStatus)) return false;
-          const uniId = (data.universeId as string | undefined)?.toLowerCase();
-          if (uniId && excluded.has(uniId)) return false;
-          return true;
-        })
-        .map(serializeGalleryItem);
+      const applyMediaFilter = finalTypes.length < allTypes.length;
+      const matchedDocs = snapshot.docs.filter((d) => {
+        const data = d.data();
+        if (!isVisible(data.contentStatus)) return false;
+        const uniId = (data.universeId as string | undefined)?.toLowerCase();
+        if (uniId && excluded.has(uniId)) return false;
+        if (applyMediaFilter && !finalTypes.includes(data.mediaType as string)) return false;
+        if (filterCreatorInMemory && data.creatorUid !== input.creatorUid) return false;
+        return true;
+      });
+
+      const pageDocs = matchedDocs.slice(0, input.limit);
+      const items = pageDocs.map(serializeGalleryItem);
+
+      // More pages remain if this page filled from a partial scan of the batch,
+      // or the raw batch came back full (more docs beyond it). Point the cursor at
+      // the last RETURNED doc so the next page resumes with no skipped items.
+      const rawFull = snapshot.docs.length === GALLERY_FETCH;
+      let nextCursor: string | null = null;
+      if (pageDocs.length === input.limit && (matchedDocs.length > input.limit || rawFull)) {
+        nextCursor = pageDocs[pageDocs.length - 1].id;
+      } else if (pageDocs.length < input.limit && rawFull) {
+        nextCursor = snapshot.docs[snapshot.docs.length - 1].id;
+      }
 
       // Enrich with licensing data if available
       const contentHashes = items.map((i: any) => i.contentHash).filter(Boolean);
@@ -215,8 +238,7 @@ export const galleryRouter = router({
           ...item,
           licensing: licensingMap[item.contentHash] || null,
         })),
-        nextCursor:
-          snapshot.docs.length === input.limit ? snapshot.docs[snapshot.docs.length - 1].id : null,
+        nextCursor,
       };
     }),
 

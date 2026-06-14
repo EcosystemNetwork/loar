@@ -59,23 +59,20 @@ export const listingsRouter = router({
     .query(async ({ input }) => {
       if (!db) return { listings: [], nextCursor: null };
 
+      // Keep only an indexed equality+sort in Firestore (status[+universeId]+
+      // createdAt). productType/rightsLane/search and the price/popular sorts are
+      // applied in memory over a capped window — this avoids a composite index for
+      // every filter/sort permutation (the DB is at its 200-index ceiling).
+      const LISTINGS_READ_CAP = 500;
       let q: FirebaseFirestore.Query = listingsCol().where('status', '==', 'ACTIVE');
-
       if (input.universeId) q = q.where('universeId', '==', input.universeId);
-      if (input.productType) q = q.where('productType', '==', input.productType);
-      if (input.rightsLane) q = q.where('rightsLane', '==', input.rightsLane);
-
-      if (input.sortBy === 'price_asc') q = q.orderBy('priceNum', 'asc');
-      else if (input.sortBy === 'price_desc') q = q.orderBy('priceNum', 'desc');
-      else if (input.sortBy === 'popular') q = q.orderBy('sold', 'desc');
-      else q = q.orderBy('createdAt', 'desc');
-
-      if (input.cursor) q = q.startAfter(input.cursor);
-      q = q.limit(input.limit + 1);
+      q = q.orderBy('createdAt', 'desc').limit(LISTINGS_READ_CAP);
 
       const snap = await q.get();
       let docs = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Record<string, unknown>[];
 
+      if (input.productType) docs = docs.filter((d) => d.productType === input.productType);
+      if (input.rightsLane) docs = docs.filter((d) => d.rightsLane === input.rightsLane);
       if (input.search) {
         const s = input.search.toLowerCase();
         docs = docs.filter(
@@ -89,9 +86,20 @@ export const listingsRouter = router({
         );
       }
 
-      const hasMore = docs.length > input.limit;
-      const results = docs.slice(0, input.limit);
-      const nextCursor = hasMore ? String(snap.docs[input.limit - 1].id) : null;
+      // Sort in memory — price/popular have no composite index; newest already
+      // arrives in createdAt-desc order from Firestore.
+      const num = (v: unknown) => (typeof v === 'number' ? v : Number(v ?? 0));
+      if (input.sortBy === 'price_asc') docs.sort((a, b) => num(a.priceNum) - num(b.priceNum));
+      else if (input.sortBy === 'price_desc')
+        docs.sort((a, b) => num(b.priceNum) - num(a.priceNum));
+      else if (input.sortBy === 'popular') docs.sort((a, b) => num(b.sold) - num(a.sold));
+
+      // Offset cursor over the in-memory result window (cursor is a numeric offset
+      // string; transparent to callers that just echo nextCursor back).
+      const offset = input.cursor ? Math.max(0, parseInt(input.cursor, 10) || 0) : 0;
+      const results = docs.slice(offset, offset + input.limit);
+      const nextOffset = offset + input.limit;
+      const nextCursor = nextOffset < docs.length ? String(nextOffset) : null;
 
       return { listings: results, nextCursor };
     }),
