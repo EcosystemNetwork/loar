@@ -59,6 +59,14 @@ import {
   SearchOverlay,
   ContinueWatchingRow,
   ForYouRow,
+  Top10Strip,
+  TokenPoweredRow,
+  NewArrivalsRow,
+  MostEpisodesRow,
+  AllUniversesRow,
+  RecentEpisodes,
+  CommunityCreations,
+  CreateBanner,
 } from '../components/home/HomeSections';
 
 /* ──────────────────────────────────────────
@@ -222,7 +230,7 @@ function HomeComponent() {
   }, [firestoreUniverses, ponderUniverses, tokensData, swapsData, holdersData]);
 
   return (
-    <div className="h-[calc(100svh-3.5rem)] overflow-hidden flex flex-col bg-background">
+    <div className="min-h-[calc(100svh-3.5rem)] flex flex-col bg-background pb-bottom-nav md:pb-12">
       {/* Ken Burns animation */}
       <style>{`
         @keyframes kenburns {
@@ -276,25 +284,23 @@ function HomeComponent() {
       </div>
 
       {/*
-        Single-viewport content area — horizontal rows only, no vertical scroll.
-        We keep the 3 priority rails (Continue Watching, Trending, For You) and
-        compress section/header/card sizing via arbitrary variants so all three
-        fit the remaining height. `overflow-hidden` clips gracefully on short
-        viewports rather than introducing a scrollbar.
+        Content rows — full Netflix-style category set on a normally-scrolling
+        page. Each row self-hides when it has no items (see HomeSections), so the
+        layout stays gap-free for logged-out/empty states.
       */}
       {!universesLoading && (
-        <div
-          className="flex-1 min-h-0 overflow-hidden flex flex-col justify-evenly
-            pb-bottom-nav md:pb-0
-            [&_section]:py-0!
-            [&_section>div:first-child]:mb-1.5!
-            [&_section_h2]:text-base!
-            [&_section_p.font-light]:hidden!
-            [&_.group.flex-shrink-0]:w-[200px]! md:[&_.group.flex-shrink-0]:w-[230px]!"
-        >
+        <div className="flex flex-col">
           <ContinueWatchingRow />
           <TrendingRow universes={universes} />
+          <Top10Strip universes={universes} />
           <ForYouRow />
+          <NewArrivalsRow universes={universes} />
+          <TokenPoweredRow universes={universes} />
+          <MostEpisodesRow universes={universes} />
+          <RecentEpisodes />
+          <CommunityCreations />
+          <AllUniversesRow universes={universes} />
+          <CreateBanner />
         </div>
       )}
     </div>

@@ -317,7 +317,7 @@ export function IndexerBanner() {
  * ────────────────────────────────────────── */
 export function HeroSkeleton() {
   return (
-    <div className="relative h-[40vh] min-h-[240px] max-h-[420px] bg-gradient-to-b from-primary/5 via-background to-background flex items-end">
+    <div className="relative h-[40vh] min-h-[260px] max-h-[420px] bg-gradient-to-b from-primary/5 via-background to-background flex items-end">
       <div className="w-full px-4 md:px-12 pb-8 md:pb-10 max-w-3xl space-y-4 animate-pulse">
         <div className="h-4 w-24 rounded bg-white/10" />
         <div className="h-12 sm:h-14 w-3/4 max-w-80 rounded bg-white/10" />
@@ -396,7 +396,7 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
   if (!current) return null;
 
   return (
-    <div className="relative isolate h-[40vh] min-h-[240px] max-h-[420px] overflow-hidden">
+    <div className="relative isolate h-[40vh] min-h-[260px] max-h-[420px] overflow-hidden">
       {/* Background image with Ken Burns effect */}
       {featured.map((u, i) => (
         <div
@@ -432,9 +432,9 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
 
       {/* Content */}
       <div className="absolute inset-0 flex items-end">
-        <div className="w-full px-4 md:px-12 pb-8 md:pb-10 max-w-3xl">
+        <div className="w-full px-4 md:px-12 pb-6 md:pb-10 max-w-3xl">
           {/* Badges */}
-          <div className="flex items-center gap-2 mb-3 md:mb-4 flex-wrap">
+          <div className="flex items-center gap-2 mb-2 md:mb-3 flex-wrap">
             <Badge className="bg-primary text-white border-0 text-xs">
               <Sparkles className="h-3 w-3 mr-1" />
               Featured
@@ -453,12 +453,12 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
           </div>
 
           {/* Title */}
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-display italic text-white mb-3 md:mb-4 leading-[1.1]">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-display italic text-white mb-2 md:mb-3 leading-[1.1]">
             {current.name || current.tokenData?.name}
           </h1>
 
           {/* Description */}
-          <p className="text-sm sm:text-base md:text-lg text-white/50 mb-5 md:mb-6 max-w-xl line-clamp-2 sm:line-clamp-3 leading-relaxed font-light">
+          <p className="text-sm sm:text-base md:text-lg text-white/50 mb-4 md:mb-5 max-w-xl line-clamp-2 leading-relaxed font-light">
             {current.description || current.tokenData?.metadata}
           </p>
 

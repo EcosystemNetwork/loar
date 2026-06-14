@@ -109,9 +109,30 @@ export function ApiKeyManager({ aiAgentId }: Props) {
     }
   };
 
-  const copyKey = (key: string) => {
-    navigator.clipboard.writeText(key);
-    toast.success('Copied to clipboard');
+  const copyKey = async (key: string) => {
+    // navigator.clipboard is undefined outside a secure context (e.g. served
+    // over a LAN IP instead of localhost/https), so guard + fall back to the
+    // legacy execCommand path. Either way the key stays selectable in the
+    // read-only field below, so the user can always Ctrl+C manually.
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(key);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = key;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (!ok) throw new Error('copy command rejected');
+      }
+      toast.success('Copied to clipboard');
+    } catch {
+      toast.error('Copy failed — select the key and copy manually (Ctrl/Cmd+C)');
+    }
   };
 
   return (
@@ -134,11 +155,18 @@ export function ApiKeyManager({ aiAgentId }: Props) {
             Save this key now — it won't be shown again
           </p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 rounded bg-zinc-800 px-3 py-2 font-mono text-sm text-white break-all">
-              {newKey}
-            </code>
+            <input
+              type="text"
+              readOnly
+              value={newKey}
+              onFocusCapture={(e) => e.currentTarget.select()}
+              onClick={(e) => e.currentTarget.select()}
+              className="flex-1 rounded bg-zinc-800 px-3 py-2 font-mono text-sm text-white select-all outline-none ring-1 ring-amber-500/30 focus:ring-amber-500/60"
+              aria-label="Your new API key"
+            />
             <Button size="sm" variant="outline" onClick={() => copyKey(newKey)}>
-              <Copy className="h-4 w-4" />
+              <Copy className="mr-1 h-4 w-4" />
+              Copy
             </Button>
           </div>
           <div className="mt-4 border-t border-amber-500/20 pt-3">

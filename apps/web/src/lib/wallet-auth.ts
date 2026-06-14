@@ -70,6 +70,19 @@ export function getSiweToken(): string | null {
 }
 
 function setSession(address: string, expiresAt: number, email?: string, walletId?: string) {
+  // Security: if a *different* user is signing in over an existing session in
+  // the same tab (e.g. user B logs in via email/social without user A signing
+  // out first), wipe the React Query cache before storing the new identity.
+  // Otherwise B is instantly served A's cached, user-scoped payloads — API key
+  // lists, BYOK keys, persona owner-only fields — because the query keys are
+  // not namespaced by user and staleTime (30s) suppresses an immediate refetch.
+  // clearSiweSession() already does this on the logout path; the login path
+  // needs the same guard. Read the prior address BEFORE overwriting it.
+  const prevAddress = localStorage.getItem(ADDRESS_KEY);
+  if (prevAddress && prevAddress.toLowerCase() !== address.toLowerCase()) {
+    queryClient.clear();
+  }
+
   localStorage.setItem(ADDRESS_KEY, address);
   localStorage.setItem(EXPIRY_KEY, String(expiresAt));
   if (email) localStorage.setItem(EMAIL_KEY, email);
