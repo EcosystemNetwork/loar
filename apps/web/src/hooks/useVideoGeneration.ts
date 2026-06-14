@@ -162,7 +162,7 @@ export function useVideoGeneration({
           model: selectedVideoModel as any,
           duration: selectedVideoDuration,
           aspectRatio: videoRatio === '1:1' ? '16:9' : videoRatio,
-          generateAudio: true,
+          // Veo on the AI Studio API surface rejects generateAudio — leave it off.
           negativePrompt: negativePrompt || undefined,
           universeId,
         });

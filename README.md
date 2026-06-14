@@ -270,7 +270,7 @@ These features have working smart contracts, backend APIs, AND frontend UIs, but
 
 69 EVM contracts are deployed and verified on **Ethereum Sepolia testnet** (chain ID 11155111). **Ethereum Mainnet** (chain ID 1) is wired for swaps/auth; no LOAR contracts are deployed there yet. Revenue contracts use an upgradeable proxy pattern: **UUPS** for singletons and **Beacon Proxy** for per-universe NFTs.
 
-**Target chain:** Ethereum Mainnet (chain 1). Contracts are currently deployed on Ethereum Sepolia for testing. **Solana and Base are planned future chains** — see the [multi-chain roadmap](#-multi-chain-roadmap--solana--base-coming-soon).
+Contracts are **live on Ethereum Sepolia** (chain 11155111) today — the only network with LOAR contracts deployed. **Ethereum Mainnet** (chain 1) is the deployment target and is wired for swaps/auth, but no LOAR contracts are deployed there yet. **Solana and Base are planned future chains** — see the [multi-chain roadmap](#-multi-chain-roadmap--solana--base-coming-soon).
 
 ### Core Protocol
 

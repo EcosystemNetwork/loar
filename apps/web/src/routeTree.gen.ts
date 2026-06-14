@@ -47,6 +47,7 @@ import { Route as ComingSoonRouteImport } from './routes/coming-soon'
 import { Route as CinematicUniverseCreateRouteImport } from './routes/cinematicUniverseCreate'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as CanvasRouteImport } from './routes/canvas'
+import { Route as ArcRouteImport } from './routes/arc'
 import { Route as AdReferenceRouteImport } from './routes/ad-reference'
 import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as IndexRouteImport } from './routes/index'
@@ -326,6 +327,11 @@ const CheckoutRoute = CheckoutRouteImport.update({
 const CanvasRoute = CanvasRouteImport.update({
   id: '/canvas',
   path: '/canvas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArcRoute = ArcRouteImport.update({
+  id: '/arc',
+  path: '/arc',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdReferenceRoute = AdReferenceRouteImport.update({
@@ -786,6 +792,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
   '/ad-reference': typeof AdReferenceRoute
+  '/arc': typeof ArcRoute
   '/canvas': typeof CanvasRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
@@ -916,6 +923,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
   '/ad-reference': typeof AdReferenceRoute
+  '/arc': typeof ArcRoute
   '/canvas': typeof CanvasRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
@@ -1047,6 +1055,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
   '/ad-reference': typeof AdReferenceRoute
+  '/arc': typeof ArcRoute
   '/canvas': typeof CanvasRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
@@ -1179,6 +1188,7 @@ export interface FileRouteTypes {
     | '/'
     | '/activity'
     | '/ad-reference'
+    | '/arc'
     | '/canvas'
     | '/checkout'
     | '/cinematicUniverseCreate'
@@ -1309,6 +1319,7 @@ export interface FileRouteTypes {
     | '/'
     | '/activity'
     | '/ad-reference'
+    | '/arc'
     | '/canvas'
     | '/checkout'
     | '/cinematicUniverseCreate'
@@ -1439,6 +1450,7 @@ export interface FileRouteTypes {
     | '/'
     | '/activity'
     | '/ad-reference'
+    | '/arc'
     | '/canvas'
     | '/checkout'
     | '/cinematicUniverseCreate'
@@ -1570,6 +1582,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActivityRoute: typeof ActivityRoute
   AdReferenceRoute: typeof AdReferenceRoute
+  ArcRoute: typeof ArcRoute
   CanvasRoute: typeof CanvasRouteWithChildren
   CheckoutRoute: typeof CheckoutRoute
   CinematicUniverseCreateRoute: typeof CinematicUniverseCreateRoute
@@ -1947,6 +1960,13 @@ declare module '@tanstack/react-router' {
       path: '/canvas'
       fullPath: '/canvas'
       preLoaderRoute: typeof CanvasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/arc': {
+      id: '/arc'
+      path: '/arc'
+      fullPath: '/arc'
+      preLoaderRoute: typeof ArcRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ad-reference': {
@@ -2693,6 +2713,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivityRoute: ActivityRoute,
   AdReferenceRoute: AdReferenceRoute,
+  ArcRoute: ArcRoute,
   CanvasRoute: CanvasRouteWithChildren,
   CheckoutRoute: CheckoutRoute,
   CinematicUniverseCreateRoute: CinematicUniverseCreateRoute,
