@@ -929,6 +929,14 @@
       ]
     },
     {
+      "collectionGroup": "apiKeys",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ownerUid", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "costAggregates",
       "queryScope": "COLLECTION",
       "fields": [
