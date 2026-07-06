@@ -143,8 +143,18 @@ export async function getAllUniverses(options?: {
   viewerAddress?: string;
 }) {
   try {
-    const snapshot = await collection().orderBy('created_at').limit(500).get();
+    // No Firestore-level orderBy here: Firestore silently excludes documents
+    // missing the ordered field, which would drop any universe whose
+    // created_at is unset/malformed (e.g. legacy/imported docs) from the
+    // homepage feed with no error. Sort in-memory instead, same pattern as
+    // getUniversesByCreator below.
+    const snapshot = await collection().limit(500).get();
     let data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[];
+    data.sort((a, b) => {
+      const aTime = a.created_at?.toMillis?.() ?? a.created_at ?? 0;
+      const bTime = b.created_at?.toMillis?.() ?? b.created_at ?? 0;
+      return aTime - bTime;
+    });
 
     if (!options?.includeHidden) {
       data = data.filter((u) => !u.isHidden);
