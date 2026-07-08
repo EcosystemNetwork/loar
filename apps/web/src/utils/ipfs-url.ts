@@ -69,7 +69,11 @@ function rewriteBrokenDedicatedGatewayUrl(url: string): string {
 }
 
 export function resolveIpfsUrl(url?: string | null): string {
-  if (!url) return '';
+  // Callers sometimes pass through a Ponder EMPTY_RESULT proxy (returned when
+  // the indexer is disabled/offline) instead of a real string — it's truthy
+  // but has no real string methods, so guard the type explicitly rather than
+  // just falsiness.
+  if (!url || typeof url !== 'string') return '';
   if (url.startsWith('ipfs://')) {
     const path = url.slice('ipfs://'.length).replace(/^ipfs\//, '');
     return appendToken(`${ACTIVE_GATEWAY}/ipfs/${path}`);
@@ -105,7 +109,7 @@ const KNOWN_GATEWAY_HOSTS = new Set<string>([
 // Extract the "<cid>[/sub/path][?query]" portion of a known IPFS URL.
 // Returns null if the URL isn't an IPFS gateway URL we recognize.
 function extractIpfsPath(url: string): { cidPath: string } | null {
-  if (!url) return null;
+  if (!url || typeof url !== 'string') return null;
   if (url.startsWith('ipfs://')) {
     const cidPath = url.slice('ipfs://'.length).replace(/^ipfs\//, '');
     return cidPath ? { cidPath } : null;
@@ -253,7 +257,7 @@ const SERVER_URL = (import.meta.env.VITE_SERVER_URL || '').replace(/\/$/, '');
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 
 export async function resolveIpfsUrlAsync(url?: string | null): Promise<string> {
-  if (!url) return '';
+  if (!url || typeof url !== 'string') return '';
   const parts = extractIpfsPath(url);
   if (!parts) return resolveIpfsUrl(url);
 
