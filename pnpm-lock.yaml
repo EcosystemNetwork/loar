@@ -14,7 +14,7 @@ overrides:
   follow-redirects@<=1.15.11: '>=1.15.12'
   defu@<6.1.5: '>=6.1.5'
   drizzle-orm@<0.45.2: '>=0.45.2'
-  kysely@<0.28.17: '>=0.28.17'
+  kysely@<0.28.17: 0.28.17
   tar@<7.5.10: '>=7.5.10'
   vite@<6.4.2: ~6.4.2
   ponder>vite: 5.4.21
@@ -7026,7 +7026,7 @@ packages:
       expo-sqlite: '>=14.0.0'
       gel: '>=2'
       knex: '*'
-      kysely: '>=0.28.17'
+      kysely: 0.28.17
       mysql2: '>=2'
       pg: '>=8'
       postgres: '>=3'
@@ -8650,9 +8650,9 @@ packages:
     resolution: {integrity: sha512-eTIzlVOSUR+JxdDFepEYcBMtZ9Qqdef+rnzWdRZuMbOywu5tO2w2N7rqjoANZ5k9vywhL6Br1VRjUIgTQx4E8w==}
     engines: {node: '>=6'}
 
-  kysely@0.29.2:
-    resolution: {integrity: sha512-s6WVJyEZrbm6jhBpiKHsGHyePMrVQKJ85wZCFCr9W4QHv6WTjWIrdvTmO9hDEA3bNK0xkrE2DqrHsXMLWuZpQg==}
-    engines: {node: '>=22.0.0'}
+  kysely@0.28.17:
+    resolution: {integrity: sha512-nbD8lB9EB3wNdMhOCdx5Li8DxnLbvKByylRLcJ1h+4SkrowVeECAyZlyiKMThF7xFdRz0jSQ2MoJr+wXux2y0Q==}
+    engines: {node: '>=20.0.0'}
 
   leven@3.1.0:
     resolution: {integrity: sha512-qsda+H8jTaUaN/x5vzW2rzc+8Rw4TAQ/4KjB46IwK5VH+IlVeeeje/EoZRpiXvIqjFgK84QffqPztGI3VBLG1A==}
@@ -20638,12 +20638,12 @@ snapshots:
 
   dotenv@17.4.2: {}
 
-  drizzle-orm@0.45.2(@electric-sql/pglite@0.2.13)(@opentelemetry/api@1.9.1)(@types/pg@8.6.1)(kysely@0.29.2)(pg@8.21.0):
+  drizzle-orm@0.45.2(@electric-sql/pglite@0.2.13)(@opentelemetry/api@1.9.1)(@types/pg@8.6.1)(kysely@0.28.17)(pg@8.21.0):
     optionalDependencies:
       '@electric-sql/pglite': 0.2.13
       '@opentelemetry/api': 1.9.1
       '@types/pg': 8.6.1
-      kysely: 0.29.2
+      kysely: 0.28.17
       pg: 8.21.0
 
   dunder-proto@1.0.1:
@@ -22785,7 +22785,7 @@ snapshots:
 
   kleur@3.0.3: {}
 
-  kysely@0.29.2: {}
+  kysely@0.28.17: {}
 
   leven@3.1.0: {}
 
@@ -24104,13 +24104,13 @@ snapshots:
       dataloader: 2.2.3
       detect-package-manager: 3.0.2
       dotenv: 16.6.1
-      drizzle-orm: 0.45.2(@electric-sql/pglite@0.2.13)(@opentelemetry/api@1.9.1)(@types/pg@8.6.1)(kysely@0.29.2)(pg@8.21.0)
+      drizzle-orm: 0.45.2(@electric-sql/pglite@0.2.13)(@opentelemetry/api@1.9.1)(@types/pg@8.6.1)(kysely@0.28.17)(pg@8.21.0)
       glob: 10.5.0
       graphql: 16.8.2
       graphql-yoga: 5.17.1(graphql@16.8.2)
       hono: 4.12.23
       http-terminator: 3.2.0
-      kysely: 0.29.2
+      kysely: 0.28.17
       pg: 8.21.0
       pg-connection-string: 2.13.0
       pg-copy-streams: 6.0.6

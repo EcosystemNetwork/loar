@@ -21,23 +21,8 @@ COPY apps/contracts/package.json ./apps/contracts/
 COPY packages/abis/package.json ./packages/abis/
 COPY packages/shared/package.json ./packages/shared/
 
-# Remove vitest from indexer devDeps (conflicts with Ponder's vite-node) and skip husky.
-#
-# NOTE on --no-frozen-lockfile: the in-container `delete p.devDependencies.vitest`
-# above mutates apps/indexer/package.json at build time, so the lockfile is
-# intentionally out of sync with the on-disk manifest. `--frozen-lockfile`
-# would fail the install. Supply-chain risk is bounded because the monorepo
-# lockfile is still committed and is what ships for every OTHER workspace —
-# only the indexer's devDeps diverge, and `pnpm prune --prod` on line 46
-# drops all devDeps before the image is promoted. Do NOT flip this flag
-# without also finding a way to strip vitest from the lockfile pre-install.
 RUN npm pkg set scripts.prepare="echo skip"
-RUN node -e "\
-  const fs=require('fs'); \
-  const p=JSON.parse(fs.readFileSync('./apps/indexer/package.json')); \
-  if(p.devDependencies)delete p.devDependencies.vitest; \
-  fs.writeFileSync('./apps/indexer/package.json',JSON.stringify(p,null,2))"
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --frozen-lockfile --prod
 
 # Copy indexer source (selective — no vitest.config.ts, no __tests__)
 COPY apps/indexer/src/api ./apps/indexer/src/api
@@ -48,12 +33,6 @@ COPY apps/indexer/abis ./apps/indexer/abis
 COPY packages/abis/ ./packages/abis/
 COPY deployments/ ./deployments/
 
-# Prune dev dependencies. Keep optional deps — rolldown (and other build
-# tools) ship their platform-specific native bindings as optionalDependencies,
-# so --no-optional strips @rolldown/binding-linux-x64-musl and the indexer
-# crashes at startup with MODULE_NOT_FOUND.
-RUN pnpm prune --prod
-
 # ── Stage 2: Production ──────────────────────────────────────────────────
 FROM node:20-slim
 
@@ -62,7 +41,7 @@ ENV COREPACK_INTEGRITY_KEYS=""
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
-# Copy pruned node_modules and source from builder
+# Copy production node_modules and source from builder
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/pnpm-workspace.yaml ./
