@@ -188,5 +188,8 @@ export default defineConfig({
     hmr: {
       port: 3001,
     },
+    headers: {
+      'Permissions-Policy': 'local-network=(), loopback-network=()',
+    },
   },
 });
