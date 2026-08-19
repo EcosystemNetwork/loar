@@ -26,16 +26,9 @@ const PROD_SERVER_URL = 'https://api.loar.fun';
 const RAW_SERVER_URL = (import.meta.env.VITE_SERVER_URL ?? '').trim().replace(/\/$/, '');
 
 export const SERVER_URL = (() => {
-  if (import.meta.env.PROD) {
-    if (RAW_SERVER_URL && RAW_SERVER_URL !== PROD_SERVER_URL) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[trpc] VITE_SERVER_URL="${RAW_SERVER_URL}" ignored in production build; using ${PROD_SERVER_URL}`
-      );
-    }
-    return PROD_SERVER_URL;
-  }
-  return RAW_SERVER_URL || '';
+  if (RAW_SERVER_URL) return RAW_SERVER_URL;
+  if (import.meta.env.PROD) return PROD_SERVER_URL;
+  return '';
 })();
 
 /** Shared React Query client. Retries 5xx errors and shows toast on failure. */
