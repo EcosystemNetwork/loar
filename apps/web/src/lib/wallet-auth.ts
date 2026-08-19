@@ -11,7 +11,7 @@
  * The client only stores the wallet address and session expiry for UI purposes.
  */
 import { useState, useEffect, useCallback, useSyncExternalStore } from 'react';
-import { queryClient } from '../utils/query-client';
+import { queryClient, SERVER_URL as BASE_SERVER_URL } from '../utils/query-client';
 
 const ADDRESS_KEY = 'siwe-address';
 const EXPIRY_KEY = 'siwe-expiry';
@@ -19,7 +19,7 @@ const EMAIL_KEY = 'circle-email';
 const WALLET_ID_KEY = 'circle-wallet-id';
 const AUTH_PROVIDER_KEY = 'auth-provider'; // 'circle' | 'siwe'
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+const SERVER_URL = BASE_SERVER_URL || 'http://localhost:3000';
 
 // ── Auth state (reactive via useSyncExternalStore) ────────────
 
