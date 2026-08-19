@@ -44,7 +44,21 @@ const userFallbacks = (process.env.PONDER_RPC_FALLBACKS ?? '').split(',').filter
  * Override via PONDER_RPC_FALLBACKS CSV when better/private endpoints are available.
  */
 const DEFAULT_FALLBACKS: Record<(typeof VALID_CHAINS)[number], string[]> = {
-  sepolia: ['https://ethereum-sepolia-rpc.publicnode.com', 'https://rpc.sepolia.org'],
+  // Sepolia fallbacks must serve ARCHIVE eth_getLogs — the backfill starts at the
+  // deployment block, not chain head. The previous defaults were dead weight:
+  // publicnode 403s archive queries ("Archive requests require a personal token")
+  // and rpc.sepolia.org now 404s. Ponder load-balances across every entry with
+  // per-host RPS tracking, so more healthy hosts = proportionally faster backfill.
+  // Measured (500 sequential-wave archive eth_getLogs, 2026-07-30):
+  //   drpc          64 req/s, 10k-block ranges
+  //   ethpandaops   63 req/s, 10k-block ranges
+  //   tenderly      14 req/s, 100k-block ranges
+  //   tatum        221 req/s, but caps eth_getLogs at 100 blocks
+  sepolia: [
+    'https://rpc.sepolia.ethpandaops.io',
+    'https://sepolia.gateway.tenderly.co',
+    'https://ethereum-sepolia.gateway.tatum.io',
+  ],
   mainnet: ['https://ethereum-rpc.publicnode.com', 'https://eth.llamarpc.com'],
 };
 

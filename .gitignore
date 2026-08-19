@@ -39,3 +39,13 @@ repair-broken-urls-*.json
 # Redis dump files (accidental commits)
 *.rdb
 dump.rdb
+
+# Firebase emulator debug logs
+firestore-debug.log
+firebase-debug.log
+ui-debug.log
+database-debug.log
+pubsub-debug.log
+
+# Rescued ephemeral media awaiting rehost (see scripts/backfill-ephemeral-generations.ts)
+rescued-media/

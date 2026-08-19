@@ -15,8 +15,12 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
-// Import firebase after env is loaded
-const { db } = await import('../src/lib/firebase.js');
+// Import firebase after env is loaded. `db` is only assigned inside
+// initFirebase(), so it has to run before the binding is read — otherwise
+// every write below fails with "Cannot read properties of null".
+const firebase = await import('../src/lib/firebase.js');
+firebase.initFirebase();
+const { db } = firebase;
 
 const SAMPLE_CHARACTERS = [
   {
@@ -77,16 +81,26 @@ const SAMPLE_CHARACTERS = [
   },
 ];
 
+// Field names must match what createUniverse() writes (universes.handlers.ts):
+// getAllUniverses() orders by `created_at`, and Firestore drops documents that
+// are missing the ordered field — a camelCase `createdAt` here makes the seeded
+// universe invisible to every list query.
 const SAMPLE_UNIVERSE = {
   address: '0x0000000000000000000000000000000000000001',
   creator: '0x0000000000000000000000000000000000000000',
+  name: 'Sample Universe',
   tokenAddress: '0x0000000000000000000000000000000000000002',
   governanceAddress: '0x0000000000000000000000000000000000000003',
-  imageUrl: 'https://placehold.co/800x400/16213e/e94560?text=Sample+Universe',
+  image_url: 'https://placehold.co/800x400/16213e/e94560?text=Sample+Universe',
+  portrait_image_url: null,
   description:
     'A sample cinematic universe for development and testing. Features four characters across different genres exploring interconnected storylines.',
-  createdAt: new Date(),
-  updatedAt: new Date(),
+  accessModel: 'open',
+  universeType: 'fun',
+  isPrivate: false,
+  hasPrivateSection: true,
+  created_at: new Date(),
+  updated_at: new Date(),
 };
 
 async function seed() {

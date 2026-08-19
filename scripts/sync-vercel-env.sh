@@ -85,13 +85,30 @@ add_env "VITE_PONDER_URL"               "https://idx.loar.fun"
 # apps/web/src/configs/addresses.ts — only treasury remains env-driven.
 add_env "VITE_TREASURY_ADDRESS"         "0x116C28e6DCABCa363f83217C712d79DCE168d90e"
 
-# ── Firebase web client (public SDK credentials) ─────────────
-add_env "VITE_FIREBASE_PROJECT_ID"          "loar-db"
-add_env "VITE_FIREBASE_API_KEY"             "AIzaSyBw0t7WI6W9sHL5UQi2XG7CZ9jVosGNdRU"
-add_env "VITE_FIREBASE_AUTH_DOMAIN"         "loar-db.firebaseapp.com"
-add_env "VITE_FIREBASE_STORAGE_BUCKET"      "loar-db.firebasestorage.app"
-add_env "VITE_FIREBASE_MESSAGING_SENDER_ID" "969698925631"
-add_env "VITE_FIREBASE_APP_ID"              "1:969698925631:web:0689e201946506fb132c8a"
+# ── Firebase web client — INTENTIONALLY NOT SYNCED ───────────
+# apps/web has no `firebase` dependency and never calls getFirestore() or
+# getStorage(); the VITE_FIREBASE_* vars in apps/web/src/lib/env.ts are
+# vestigial and all optional. All Firestore/Storage access is server-side
+# via the Admin SDK.
+#
+# Publishing these to the web bundle handed anyone reading the JS the exact
+# bucket name (`loar-db.firebasestorage.app`) and project id — the only two
+# things needed to exercise Storage rules directly. That mattered: the
+# Storage ruleset was the console starter template (world read+write) from
+# 2026-04-19 until it expired 2026-05-18. See storage.rules.
+#
+# Don't re-add these unless the client SDK is genuinely adopted. If it ever
+# is, restrict the browser API key by HTTP referrer and turn on App Check
+# first — and note the key below is burned, having been committed here in
+# plaintext; generate a fresh one rather than reusing it.
+#   (was: VITE_FIREBASE_API_KEY = AIzaSyBw0t7WI6W9sHL5UQi2XG7CZ9jVosGNdRU)
+#
+# NOTE: this only stops FUTURE syncs. Vars already set on Vercel must be
+# removed explicitly:
+#   for v in PROJECT_ID API_KEY AUTH_DOMAIN STORAGE_BUCKET MESSAGING_SENDER_ID APP_ID; do
+#     vercel env rm "VITE_FIREBASE_$v" production -y
+#     vercel env rm "VITE_FIREBASE_$v" preview -y
+#   done
 
 echo ""
 echo "🎉 Done! Run 'vercel env ls' to verify."

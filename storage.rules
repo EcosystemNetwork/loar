@@ -1,0 +1,40 @@
+rules_version = '2';
+
+// LOAR Firebase Storage Security Rules
+//
+// Policy: DENY ALL direct client access.
+//
+// Nothing in this repo initializes the Firebase client SDK — not apps/web,
+// not apps/mobile. Every object in `loar-db.firebasestorage.app` is written
+// and read by the server via the Firebase Admin SDK, which bypasses these
+// rules entirely. Uploads reach users through signed URLs / server routes,
+// never through a direct-from-browser Storage call.
+//
+// So there is no legitimate client-side caller to allow, and any request
+// that these rules would evaluate is by definition not ours.
+//
+// HISTORY — why this file exists:
+// The project's Storage ruleset was never managed in git. It sat on the
+// Firebase console starter template, which grants world read+write until a
+// hardcoded expiry date:
+//
+//     allow read, write: if request.time < timestamp.date(2026, 5, 18);
+//
+// Between 2026-04-19 (bucket created) and 2026-05-18 (template expiry) the
+// bucket was fully readable AND writable by anyone who knew the bucket name.
+// The bucket name ships in any client build that references it, and is
+// guessable from the project id regardless. Treat every object written
+// before 2026-05-18 as having been publicly exposed.
+//
+// If a future feature genuinely needs direct browser uploads, do NOT relax
+// this to `if true` — LOAR has no Firebase Auth, so `request.auth` is always
+// null here and there is no way to express per-user authorization in this
+// file. Keep uploads on the server behind SIWE and hand out signed URLs.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -34,9 +34,11 @@ export function useBatchCreateEpisodeListings() {
 }
 
 export function useMyNFTs() {
+  const { isAuthenticated, sessionReady } = useWalletAuth();
   return useQuery({
     queryKey: ['my-nfts'],
     queryFn: () => trpcClient.nft.getMyNFTs.query(),
+    enabled: sessionReady && isAuthenticated,
   });
 }
 

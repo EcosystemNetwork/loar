@@ -22,7 +22,8 @@ COPY packages/abis/package.json ./packages/abis/
 COPY packages/shared/package.json ./packages/shared/
 
 RUN npm pkg set scripts.prepare="echo skip"
-RUN pnpm install --frozen-lockfile --prod
+RUN node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package.json','utf8')); p.pnpm.overrides['kysely@<0.28.17']='0.27.6'; fs.writeFileSync('package.json',JSON.stringify(p,null,2));"
+RUN pnpm install --no-frozen-lockfile --prod
 
 # Copy indexer source (selective — no vitest.config.ts, no __tests__)
 COPY apps/indexer/src/api ./apps/indexer/src/api

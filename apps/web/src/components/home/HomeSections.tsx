@@ -46,6 +46,7 @@ import {
   type TokenHolder,
 } from '@/utils/ponder-api';
 import { trpc, trpcClient } from '@/utils/trpc';
+import { useWalletAuth } from '@/lib/wallet-auth';
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -1331,10 +1332,12 @@ export function SearchOverlay({
  * Renders nothing for anon / new users (server returns []).
  * ────────────────────────────────────────── */
 export function ContinueWatchingRow() {
+  const { isAuthenticated, sessionReady } = useWalletAuth();
   const { data: episodes } = useQuery<FeedEpisode[]>({
     queryKey: ['recommendations', 'continueWatching'],
     queryFn: () =>
       trpcClient.recommendations.continueWatching.query({ limit: 12 }) as Promise<FeedEpisode[]>,
+    enabled: sessionReady && isAuthenticated,
     staleTime: 60_000,
     retry: false,
     meta: { silent: true },

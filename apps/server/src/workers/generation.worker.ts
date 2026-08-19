@@ -10,7 +10,7 @@
 import { Worker, type Job } from 'bullmq';
 import { QUEUE_NAMES, type GenerationJobData, type GenerationJobResult } from '../lib/queue';
 import { getCircuitBreaker, CircuitOpenError } from '../lib/circuit-breaker';
-import { recordAiGeneration } from '../lib/metrics';
+import { recordAiGeneration, recordStorageUpload } from '../lib/metrics';
 import { withCostScope } from '../services/cost-tracker/scope';
 import { recordProviderCost } from '../services/cost-tracker';
 
@@ -259,11 +259,26 @@ async function processGenerationBody(
       status: 'completed',
       videoUrl: finalMediaUrl,
       ephemeralVideoUrl: result.videoUrl, // kept for debugging / provenance audit
-      ...(permanentUrl ? { permanentVideoUrl: permanentUrl } : {}),
+      ...(permanentUrl
+        ? { permanentVideoUrl: permanentUrl }
+        : // The upload above failed, so videoUrl now holds the provider's signed
+          // URL — it will 403 within hours and the bytes are gone for good.
+          // Mark it explicitly: without this the doc looks identical to a
+          // healthy one, so nothing can find it to retry while the asset is
+          // still alive. `scripts/backfill-ephemeral-generations.ts` sweeps these.
+          { storagePersisted: false, needsRehost: true, rehostFailedAt: new Date() }),
       ...(storageContentHash ? { storageContentHash, storagePersisted: true } : {}),
       latencyMs,
       completedAt: new Date(),
     });
+
+    if (!permanentUrl) {
+      console.error(
+        `[worker] ${data.generationId} completed with an EPHEMERAL url — asset will expire. ` +
+          `Flagged needsRehost=true.`
+      );
+      recordStorageUpload('all', 'failure');
+    }
 
     // Fire background tasks (best-effort, non-blocking)
     // Auto-attach to entity

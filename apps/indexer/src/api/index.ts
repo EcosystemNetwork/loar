@@ -42,35 +42,90 @@ app.use(
 // CORS is not enough — server-to-server scrapers bypass origin checks.
 // Simple in-memory token bucket: 60 req/min per IP for REST endpoints,
 // 30 req/min for GraphQL (more expensive per call).
+//
+// NOTE: in-memory means per-replica. Scaling the indexer past one replica
+// multiplies the effective limit by the replica count.
 const rateLimitBuckets = new Map<string, { tokens: number; lastRefill: number }>();
 const RATE_LIMIT_WINDOW_MS = 60_000;
+// Hard cap so a spoofed-header flood can't grow this Map until the process OOMs.
+const MAX_BUCKETS = 50_000;
+
+/**
+ * Number of reverse proxies between the public internet and this process.
+ * nginx uses `$proxy_add_x_forwarded_for` and Railway's edge behaves the same:
+ * both APPEND the peer address to whatever the client already sent. So the
+ * LEFTMOST X-Forwarded-For entry is fully attacker-controlled and the only
+ * trustworthy entry is the one our own proxy appended — counted from the RIGHT.
+ *
+ * Reading `[0]` (as this did previously) let anyone bypass the limiter entirely
+ * by rotating the header, and allocate an unbounded number of buckets doing it.
+ */
+const TRUSTED_PROXY_HOPS = Math.max(1, parseInt(process.env.TRUSTED_PROXY_HOPS ?? '1', 10) || 1);
+
+/** Set only when actually behind Cloudflare — otherwise the header is spoofable. */
+const TRUST_CF_HEADER = process.env.TRUST_CF_CONNECTING_IP === 'true';
 
 function clientIp(c: any): string {
-  return (
-    c.req.header('cf-connecting-ip') ||
-    c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
-    'unknown'
-  );
+  if (TRUST_CF_HEADER) {
+    const cf = c.req.header('cf-connecting-ip')?.trim();
+    if (cf) return cf;
+  }
+  const xff = c.req.header('x-forwarded-for');
+  if (xff) {
+    const parts = xff
+      .split(',')
+      .map((s: string) => s.trim())
+      .filter(Boolean);
+    if (parts.length > 0) {
+      // parts[len - hops] is the address our outermost trusted proxy observed.
+      const idx = parts.length - TRUSTED_PROXY_HOPS;
+      return parts[idx >= 0 ? idx : 0]!;
+    }
+  }
+  return 'unknown';
 }
 
-function rateLimit(max: number) {
-  return async (c: any, next: any) => {
-    const ip = clientIp(c);
-    const key = `${c.req.path.startsWith('/graphql') || c.req.path === '/' ? 'gql' : 'rest'}:${ip}`;
-    const now = Date.now();
-    const bucket = rateLimitBuckets.get(key) ?? { tokens: max, lastRefill: now };
-    const elapsed = now - bucket.lastRefill;
-    bucket.tokens = Math.min(max, bucket.tokens + (elapsed / RATE_LIMIT_WINDOW_MS) * max);
-    bucket.lastRefill = now;
-    if (bucket.tokens < 1) {
-      rateLimitBuckets.set(key, bucket);
-      c.header('Retry-After', '60');
-      return c.json({ error: 'rate_limit_exceeded' }, 429);
-    }
-    bucket.tokens -= 1;
+/** GraphQL is mounted at both '/' and '/graphql'; both are the expensive class. */
+function isGraphQLPath(path: string): boolean {
+  return path === '/' || path === '/graphql' || path.startsWith('/graphql/');
+}
+
+/** Health/readiness probes must never be throttled — a 429 fails the deploy. */
+const UNTHROTTLED = new Set(['/health', '/ready', '/indexer-status']);
+
+function consumeToken(key: string, max: number): boolean {
+  const now = Date.now();
+  const bucket = rateLimitBuckets.get(key) ?? { tokens: max, lastRefill: now };
+  const elapsed = now - bucket.lastRefill;
+  bucket.tokens = Math.min(max, bucket.tokens + (elapsed / RATE_LIMIT_WINDOW_MS) * max);
+  bucket.lastRefill = now;
+  const allowed = bucket.tokens >= 1;
+  if (allowed) bucket.tokens -= 1;
+  if (rateLimitBuckets.size < MAX_BUCKETS || rateLimitBuckets.has(key)) {
     rateLimitBuckets.set(key, bucket);
-    await next();
-  };
+  }
+  return allowed;
+}
+
+/**
+ * Global limiter. Registered with `app.use('*', ...)` BEFORE any route.
+ *
+ * Hono composes handlers in registration order, and a route handler that
+ * returns without calling next() ends the chain. The previous version
+ * registered `app.use('/creator/*', rateLimit(60))` AFTER the matching
+ * `app.get('/creator/...')` handlers, so the limiter never ran on any REST
+ * endpoint — they were entirely unlimited against Postgres.
+ */
+async function rateLimitMiddleware(c: any, next: any) {
+  const path = c.req.path;
+  if (UNTHROTTLED.has(path)) return next();
+  const gql = isGraphQLPath(path);
+  const key = `${gql ? 'gql' : 'rest'}:${clientIp(c)}`;
+  if (!consumeToken(key, gql ? 30 : 60)) {
+    c.header('Retry-After', '60');
+    return c.json({ error: 'rate_limit_exceeded' }, 429);
+  }
+  await next();
 }
 
 setInterval(() => {
@@ -79,6 +134,54 @@ setInterval(() => {
     if (b.lastRefill < cutoff) rateLimitBuckets.delete(k);
   }
 }, 60_000).unref?.();
+
+// ── GraphQL structural guard ─────────────────────────────────────────
+// Cheap structural guard on incoming GraphQL queries: reject queries with
+// excessive nesting, aliases, or document length. Universe→nodes→universe
+// cycles otherwise let an attacker force thousands of joins per request.
+//
+// Applied to BOTH mount points. Previously it was registered only on
+// '/graphql' while `app.use('/', graphql(...))` served the same schema at the
+// root — so POSTing a deeply-nested query to '/' bypassed every check here.
+const MAX_GQL_DEPTH = 7;
+const MAX_GQL_ALIASES = 20;
+const MAX_GQL_LENGTH = 10_000;
+
+function estimateGraphQLDepth(query: string): number {
+  let depth = 0;
+  let max = 0;
+  for (const ch of query) {
+    if (ch === '{') max = Math.max(max, ++depth);
+    else if (ch === '}') depth = Math.max(0, depth - 1);
+  }
+  return max;
+}
+
+async function graphqlGuard(c: any, next: any) {
+  if (c.req.method !== 'POST') return next();
+  const raw = await c.req.text();
+  const body = raw.length <= MAX_GQL_LENGTH ? raw : null;
+  if (!body) return c.json({ error: 'query_too_long' }, 400);
+  try {
+    const json = JSON.parse(body) as { query?: string };
+    const query = json.query ?? '';
+    const depth = estimateGraphQLDepth(query);
+    if (depth > MAX_GQL_DEPTH) return c.json({ error: 'query_too_deep', depth }, 400);
+    const aliases = (query.match(/:\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\(/g) || []).length;
+    if (aliases > MAX_GQL_ALIASES) return c.json({ error: 'too_many_aliases' }, 400);
+  } catch {
+    // Non-JSON or malformed — let ponder's graphql middleware produce the real error.
+  }
+  c.req.raw = new Request(c.req.raw, { body, headers: c.req.raw.headers, method: 'POST' });
+  await next();
+}
+
+// ── Middleware registration ──────────────────────────────────────────
+// MUST come before every route below. See rateLimitMiddleware's note on
+// Hono's registration-order semantics.
+app.use('*', rateLimitMiddleware);
+app.use('/', graphqlGuard);
+app.use('/graphql', graphqlGuard);
 
 // ── Query limits to prevent DoS ──────────────────────────────────────
 const DEFAULT_LIMIT = 100;
@@ -216,47 +319,8 @@ app.get('/universe/:address/proposals', async (c) => {
   return c.json({ proposals });
 });
 
-// Enforce rate limits on the REST + GraphQL surface.
-app.use('/creator/*', rateLimit(60));
-app.use('/universe/*', rateLimit(60));
-app.use('/graphql/*', rateLimit(30));
-
-// Cheap structural guard on incoming GraphQL queries: reject queries with
-// excessive nesting, aliases, or document length. Universe→nodes→universe
-// cycles otherwise let an attacker force thousands of joins per request.
-const MAX_GQL_DEPTH = 7;
-const MAX_GQL_ALIASES = 20;
-const MAX_GQL_LENGTH = 10_000;
-app.use('/graphql', async (c, next) => {
-  if (c.req.method !== 'POST') return next();
-  const raw = await c.req.text();
-  const body = raw.length <= MAX_GQL_LENGTH ? raw : null;
-  if (!body) return c.json({ error: 'query_too_long' }, 400);
-  try {
-    const json = JSON.parse(body) as { query?: string };
-    const query = json.query ?? '';
-    const depth = estimateGraphQLDepth(query);
-    if (depth > MAX_GQL_DEPTH) return c.json({ error: 'query_too_deep', depth }, 400);
-    const aliases = (query.match(/:\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\(/g) || []).length;
-    if (aliases > MAX_GQL_ALIASES) return c.json({ error: 'too_many_aliases' }, 400);
-  } catch {
-    // Non-JSON or malformed — let ponder's graphql middleware produce the real error.
-  }
-  c.req.raw = new Request(c.req.raw, { body, headers: c.req.raw.headers, method: 'POST' });
-  await next();
-});
-
-function estimateGraphQLDepth(query: string): number {
-  let depth = 0;
-  let max = 0;
-  for (const ch of query) {
-    if (ch === '{') max = Math.max(max, ++depth);
-    else if (ch === '}') depth = Math.max(0, depth - 1);
-  }
-  return max;
-}
-
-app.use('/', rateLimit(30));
+// GraphQL handlers last. Rate limiting and the structural guard are already
+// registered above — registering them here would be too late to run.
 app.use('/', graphql({ db, schema }));
 app.use('/graphql', graphql({ db, schema }));
 

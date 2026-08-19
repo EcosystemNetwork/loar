@@ -769,10 +769,36 @@ async function persistVideoToStorage(opts: {
       }
 
       console.log(`[persist] ${filename} saved permanently: ${permanentUrl}`);
+    } else {
+      await markRehostNeeded(opts.generationId, 'upload returned no url');
     }
   } catch (err) {
-    // Non-fatal — the temporary URL still works for now
+    // Non-fatal for the request — but the asset is now on a countdown. The
+    // provider URL still works "for now"; once its signature lapses the bytes
+    // are unrecoverable, so this must leave a trace something can act on.
     console.error(`[persist] Failed to persist video ${opts.generationId}:`, err);
+    await markRehostNeeded(opts.generationId, err instanceof Error ? err.message : 'unknown');
+  }
+}
+
+/**
+ * Flag a generation whose permanent-storage upload failed, so the rehost
+ * sweeper (`scripts/backfill-ephemeral-generations.ts`) can retry it while the
+ * provider URL is still live. Silently swallowing the failure is what let 73
+ * videos expire unnoticed.
+ */
+async function markRehostNeeded(generationId: string, reason: string) {
+  try {
+    await generationsCol()
+      .doc(generationId)
+      .update({
+        storagePersisted: false,
+        needsRehost: true,
+        rehostFailedAt: new Date(),
+        rehostFailureReason: reason.slice(0, 500),
+      });
+  } catch (err) {
+    console.error(`[persist] could not flag ${generationId} for rehost:`, err);
   }
 }
 
