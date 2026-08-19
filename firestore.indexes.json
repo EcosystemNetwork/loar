@@ -2861,6 +2861,100 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "indexer_universes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "_event.chainId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "indexer_universes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "_event.chainId", "order": "ASCENDING" },
+        { "fieldPath": "creator", "order": "ASCENDING" },
+        { "fieldPath": "tokenAddress", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "indexer_tokens",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "_event.chainId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "indexer_nodes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "_event.chainId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "indexer_nodes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "_event.chainId", "order": "ASCENDING" },
+        { "fieldPath": "universeAddress", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "indexer_swaps",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "_event.chainId", "order": "ASCENDING" },
+        { "fieldPath": "blockNumber", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "indexer_swaps",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "_event.chainId", "order": "ASCENDING" },
+        { "fieldPath": "poolId", "order": "ASCENDING" },
+        { "fieldPath": "blockNumber", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "indexer_swaps",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "_event.chainId", "order": "ASCENDING" },
+        { "fieldPath": "sender", "order": "ASCENDING" },
+        { "fieldPath": "blockNumber", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "indexer_bondingCurveSnapshots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "_event.chainId", "order": "ASCENDING" },
+        { "fieldPath": "bondingCurve", "order": "ASCENDING" },
+        { "fieldPath": "blockNumber", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "indexer_eventReceipts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "_event.chainId", "order": "ASCENDING" },
+        { "fieldPath": "_event.blockNumber", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "indexer_aggregateEventClaims",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "_event.chainId", "order": "ASCENDING" },
+        { "fieldPath": "_event.blockNumber", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -49,7 +49,7 @@ else
 fi
 
 # 2. Server root must serve HTTP 200
-HTTP=$(curl -sf --max-time 10 -o /dev/null -w "%{http_code}" "$SERVER_URL/" 2>/dev/null) || HTTP="000"
+HTTP=$(curl -s --max-time 10 -o /dev/null -w "%{http_code}" "$SERVER_URL/" 2>/dev/null) || HTTP="000"
 if [ "$HTTP" = "200" ]; then
   pass "server / → 200 OK"
 else
@@ -88,7 +88,7 @@ else
 fi
 
 # 6. Protected endpoint must reject unauthenticated requests
-HTTP=$(curl -sf --max-time 10 -o /dev/null -w "%{http_code}" \
+HTTP=$(curl -s --max-time 10 -o /dev/null -w "%{http_code}" \
   "$SERVER_URL/trpc/credits.getBalance" 2>/dev/null) || HTTP="000"
 if [ "$HTTP" = "401" ]; then
   pass "tRPC credits.getBalance → 401 (auth enforced)"
@@ -99,7 +99,7 @@ else
 fi
 
 # 7. Admin-only grant endpoint must reject unauthenticated requests
-HTTP=$(curl -sf --max-time 10 -o /dev/null -w "%{http_code}" \
+HTTP=$(curl -s --max-time 10 -o /dev/null -w "%{http_code}" \
   -X POST -H "Content-Type: application/json" \
   -d '{"targetUid":"x","credits":1,"reason":"test"}' \
   "$SERVER_URL/trpc/credits.grant" 2>/dev/null) || HTTP="000"
@@ -169,7 +169,7 @@ else
 fi
 
 # 5. Indexer REST API must respond to a parameterised request
-HTTP=$(curl -sf --max-time 20 -o /dev/null -w "%{http_code}" \
+HTTP=$(curl -s --max-time 20 -o /dev/null -w "%{http_code}" \
   "$INDEXER_URL/creator/0x0000000000000000000000000000000000000000/summary" \
   2>/dev/null) || HTTP="000"
 if [ "$HTTP" = "200" ]; then

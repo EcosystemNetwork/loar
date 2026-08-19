@@ -25,6 +25,7 @@ const state = {
   ready: false,
   phase: 'booting' as 'booting' | 'backfilling' | 'live',
   lastBlockIndexed: 0,
+  lastIndexedAt: 0,
   startedAt: Date.now(),
 };
 
@@ -33,26 +34,29 @@ export function setPhase(phase: typeof state.phase) {
 }
 export function setLastBlock(block: number) {
   state.lastBlockIndexed = block;
+  state.lastIndexedAt = Date.now();
 }
 export function markReady() {
   state.ready = true;
 }
 
-app.get('/health', (c) =>
-  c.json({
-    status: state.ready ? 'ok' : 'starting',
-    phase: state.phase,
-    chain: env.LISTENER_CHAIN,
-    lastBlockIndexed: state.lastBlockIndexed,
-    uptimeMs: Date.now() - state.startedAt,
-  })
-);
+app.get('/health', (c) => {
+  const stale = state.phase === 'live' && Date.now() - state.lastIndexedAt > 120_000;
+  return c.json(
+    {
+      status: state.ready && !stale ? 'ok' : stale ? 'stale' : 'starting',
+      phase: state.phase,
+      chain: env.LISTENER_CHAIN,
+      lastBlockIndexed: state.lastBlockIndexed,
+      lastIndexedAt: state.lastIndexedAt || null,
+      uptimeMs: Date.now() - state.startedAt,
+    },
+    stale ? 503 : 200
+  );
+});
 
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   logger.info({ port: info.port }, 'health server listening');
-  // Respond healthy once the HTTP server is listening — Railway's deploy
-  // gate only cares that the endpoint answers, not that backfill is complete.
-  state.ready = true;
 });
 
 process.on('unhandledRejection', (err) => {
@@ -64,10 +68,12 @@ async function main(): Promise<void> {
   logger.info({ chain: env.LISTENER_CHAIN }, 'event-listener booting');
 
   setPhase('backfilling');
-  await runBackfill();
+  const lastBackfilled = await runBackfill();
+  setLastBlock(lastBackfilled);
   setPhase('live');
+  markReady();
   logger.info('backfill complete, entering live loop');
-  await runLiveLoop();
+  await runLiveLoop(setLastBlock);
 }
 
 main().catch((err) => {

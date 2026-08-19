@@ -4,7 +4,7 @@
  */
 import { parseAbiItem, getAddress } from 'viem';
 import { db } from '../firestore.js';
-import { COLLECTIONS, type Hex, type Pool, type Swap } from '../schema.js';
+import { COLLECTIONS, scopedId, type Hex, type Pool, type Swap } from '../schema.js';
 import type { Handler } from './types.js';
 
 const initializeEvent = parseAbiItem(
@@ -31,7 +31,10 @@ const initialize: Handler<typeof initializeEvent> = {
       creationBlock: ctx.block.number,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.pools).doc(ctx.args.id as string), doc);
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.pools).doc(scopedId(ctx.envelope.chainId, ctx.args.id as string)),
+      doc
+    );
   },
 };
 
@@ -53,7 +56,10 @@ const swap: Handler<typeof swapEvent> = {
       blockNumber: ctx.block.number,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.swaps).doc(ctx.eventId), doc);
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.swaps).doc(scopedId(ctx.envelope.chainId, ctx.eventId)),
+      doc
+    );
   },
 };
 

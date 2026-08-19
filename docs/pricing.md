@@ -135,6 +135,8 @@ Five layers, five failure modes: entry never tracked (boot), prices fluctuated a
 
 | Model ID | Provider | Quality | Tier | Provider $/gen | Fiat $/gen | LOAR $/gen | Credits/gen | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `comfy-wan-t2v` | comfyui | standard | low | **$0** | **$0** | **$0** | 0 | ✅ live |
+| `comfy-wan-i2v` | comfyui | standard | low | **$0** | **$0** | **$0** | 0 | ✅ live |
 | `seedance2-t2v` | bytedance | premium | low | **$0** ⚠️ | **$0** | **$0** | 0 | ✅ live |
 | `seedance2-i2v` | bytedance | premium | low | **$0** ⚠️ | **$0** | **$0** | 0 | ✅ live |
 | `seedance2-fast-t2v` | bytedance | standard | low | **$0** ⚠️ | **$0** | **$0** | 0 | ✅ live |
@@ -228,8 +230,10 @@ Five layers, five failure modes: entry never tracked (boot), prices fluctuated a
 | `distil-whisper-large-v3-en-groq` | groq | standard | low | $0.000333 | $0 | $0 | 0 | ✅ live |
 | `whisper-large-v3-turbo-groq` | groq | standard | low | $0.000667 | $0 | $0 | 0 | ✅ live |
 | `whisper-large-v3-groq` | groq | standard | low | $0.0011 | $0 | $0 | 0 | ✅ live |
+| `gemini-2-5-flash-lite-transcribe-google` | google | draft | low | $0.0012 | $0 | $0 | 0 | ✅ live |
 | `nano-assemblyai` | assemblyai | draft | low | $0.002 | $0 | $0 | 0 | ✅ live |
 | `glm-asr-2512-zai` | zai | premium | low | $0.002 | $0 | $0 | 0 | ✅ live |
+| `gemini-2-5-flash-transcribe-google` | google | standard | low | $0.0024 | $0 | $0 | 0 | ✅ live |
 | `gpt-4o-mini-transcribe-openai` | openai | standard | low | $0.003 | $0 | $0 | 0 | ✅ live |
 | `nova-3-deepgram` | deepgram | premium | low | $0.0043 | $0.01 | $0.01 | 1 | ✅ live |
 | `nova-2-deepgram` | deepgram | standard | low | $0.0043 | $0.01 | $0.01 | 1 | 🔒 hidden |
@@ -238,8 +242,10 @@ Five layers, five failure modes: entry never tracked (boot), prices fluctuated a
 | `gpt-4o-transcribe-openai` | openai | premium | medium | $0.006 | $0.01 | $0.01 | 1 | ✅ live |
 | `gpt-4o-transcribe-diarize-openai` | openai | premium | medium | $0.006 | $0.01 | $0.01 | 1 | ✅ live |
 | `whisper-1-openai` | openai | standard | medium | $0.006 | $0.01 | $0.01 | 1 | 🔒 hidden |
+| `gemini-2-5-pro-transcribe-google` | google | premium | medium | $0.006 | $0.01 | $0.01 | 1 | ✅ live |
 | `nova-3-medical-deepgram` | deepgram | premium | medium | $0.0077 | $0.01 | $0.01 | 1 | 🔒 hidden |
 | `nova-3-multilingual-deepgram` | deepgram | premium | medium | $0.0092 | $0.01 | $0.01 | 1 | ✅ live |
+| `gemini-3-1-pro-transcribe-google` | google | premium | medium | $0.0096 | $0.01 | $0.01 | 1 | ✅ live |
 | `whisper-fal` | fal | standard | low | $0.012 | $0.02 | $0.02 | 2 | ✅ live |
 | `universal-2-assemblyai` | assemblyai | premium | medium | $0.0145 | $0.02 | $0.02 | 2 | ✅ live |
 
@@ -340,12 +346,12 @@ Five layers, five failure modes: entry never tracked (boot), prices fluctuated a
 | --- | --- | --- |
 | LLM | 30 | 30 |
 | Image | 44 | 43 |
-| Video | 59 | 59 |
+| Video | 61 | 61 |
 | TTS | 17 | 17 |
-| Transcription | 17 | 17 |
+| Transcription | 21 | 21 |
 | 3D | 11 | 11 |
 | Audio | 20 | 20 |
 | Editing | 37 | 37 |
-| **TOTAL** | **235** | **234** |
+| **TOTAL** | **241** | **240** |
 
 _End of generated document._

@@ -125,7 +125,8 @@ jobs:
           for contract in PaymentRouter RightsRegistry CanonMarketplace CreditManager \
                           AdPlacement SubscriptionManager LicensingRegistry CollabManager \
                           AnalyticsRegistry LaunchpadStaking StoryBounties Escrow \
-                          PremiumActions RemixFees ContentLicensing; do
+                          PremiumActions RemixFees ContentLicensing \
+                          AdSeedEscrow TalentAgentRegistry; do
             forge inspect "$contract" storage-layout --json > "storage-layouts/$contract.json" 2>/dev/null \
               || echo "::warning::Could not inspect $contract"
           done

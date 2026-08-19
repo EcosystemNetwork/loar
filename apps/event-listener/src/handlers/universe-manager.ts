@@ -14,6 +14,7 @@ import { db } from '../firestore.js';
 import { logger } from '../logger.js';
 import {
   COLLECTIONS,
+  scopedId,
   type Hex,
   type Universe,
   type Token,
@@ -85,6 +86,8 @@ const universeCreated: Handler<typeof universeCreatedEvent> = {
       universeId: null,
       creator: getAddress(ctx.args.creator).toLowerCase() as Hex,
       createdAt: ctx.block.timestamp,
+      createdAtBlock: ctx.block.number,
+      createdAtLogIndex: ctx.logIndex,
       name: universeName,
       description: universeDescription,
       imageURL,
@@ -94,7 +97,10 @@ const universeCreated: Handler<typeof universeCreatedEvent> = {
       _event: ctx.envelope,
     };
 
-    ctx.batcher.set(db.collection(COLLECTIONS.universes).doc(universeAddress), doc);
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.universes).doc(scopedId(ctx.envelope.chainId, universeAddress)),
+      doc
+    );
 
     await recordFactoryChild(
       'universe',
@@ -157,18 +163,32 @@ const tokenCreated: Handler<typeof tokenCreatedEvent> = {
     }
 
     // Strategy 2: Firestore fallback — find a universe by deployer with no
-    // tokenAddress yet, most recent first.
+    // tokenAddress yet that was emitted before this TokenCreated log. We use the
+    // emission position (block number + log index) to avoid the race where a
+    // deployer creates multiple universes in the same block.
     if (resolvedUniverseAddress === '0x0000000000000000000000000000000000000000') {
       try {
         const snap = await db
           .collection(COLLECTIONS.universes)
+          .where('_event.chainId', '==', ctx.envelope.chainId)
           .where('creator', '==', deployer)
           .where('tokenAddress', '==', null)
           .orderBy('createdAt', 'desc')
-          .limit(1)
+          .limit(20)
           .get();
-        if (!snap.empty) {
-          resolvedUniverseAddress = snap.docs[0]!.id as Hex;
+        const candidates = snap.docs
+          .map((d) => d.data() as Universe)
+          .filter(
+            (u) =>
+              u.createdAtBlock < ctx.block.number ||
+              (u.createdAtBlock === ctx.block.number && u.createdAtLogIndex < ctx.logIndex)
+          )
+          .sort((a, b) => {
+            if (a.createdAtBlock !== b.createdAtBlock) return a.createdAtBlock - b.createdAtBlock;
+            return a.createdAtLogIndex - b.createdAtLogIndex;
+          });
+        if (candidates.length > 0) {
+          resolvedUniverseAddress = candidates[candidates.length - 1]!.id;
         }
       } catch (err) {
         logger.warn({ err: (err as Error).message }, 'Firestore universe fallback failed');
@@ -176,10 +196,15 @@ const tokenCreated: Handler<typeof tokenCreatedEvent> = {
     }
 
     if (resolvedUniverseAddress !== '0x0000000000000000000000000000000000000000') {
-      ctx.batcher.update(db.collection(COLLECTIONS.universes).doc(resolvedUniverseAddress), {
-        tokenAddress,
-        governorAddress,
-      });
+      ctx.batcher.update(
+        db
+          .collection(COLLECTIONS.universes)
+          .doc(scopedId(ctx.envelope.chainId, resolvedUniverseAddress)),
+        {
+          tokenAddress,
+          governorAddress,
+        }
+      );
     }
 
     const tokenDoc: Token = {
@@ -201,7 +226,10 @@ const tokenCreated: Handler<typeof tokenCreatedEvent> = {
       _event: ctx.envelope,
     };
 
-    ctx.batcher.set(db.collection(COLLECTIONS.tokens).doc(tokenAddress), tokenDoc);
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.tokens).doc(scopedId(ctx.envelope.chainId, tokenAddress)),
+      tokenDoc
+    );
 
     // Register the spawned governor + token so handlers for those contract
     // kinds pick up events on subsequent log-fetch rounds.
@@ -240,7 +268,10 @@ const setHook: Handler<typeof setHookEvent> = {
       enabled: ctx.args.enabled,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.hookEvents).doc(ctx.eventId), doc);
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.hookEvents).doc(scopedId(ctx.envelope.chainId, ctx.eventId)),
+      doc
+    );
   },
 };
 
@@ -270,7 +301,10 @@ const bondingCurveCreated: Handler<typeof bondingCurveCreatedEvent> = {
       _event: ctx.envelope,
     };
 
-    ctx.batcher.set(db.collection(COLLECTIONS.bondingCurves).doc(curveAddress), doc);
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.bondingCurves).doc(scopedId(ctx.envelope.chainId, curveAddress)),
+      doc
+    );
 
     await recordFactoryChild(
       'bondingCurve',
@@ -293,6 +327,7 @@ const tokenGraduated: Handler<typeof tokenGraduatedEvent> = {
     // because the batcher's buffered writes aren't visible to reads.
     const snap = await db
       .collection(COLLECTIONS.bondingCurves)
+      .where('_event.chainId', '==', ctx.envelope.chainId)
       .where('tokenAddress', '==', tokenAddress)
       .limit(1)
       .get();

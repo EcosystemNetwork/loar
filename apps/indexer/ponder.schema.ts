@@ -16,6 +16,8 @@ export const universe = onchainTable(
     universeId: t.integer(), // universe ID from UniverseManager (if trackable)
     creator: t.hex().notNull(),
     createdAt: t.integer().notNull(),
+    createdAtBlock: t.integer().notNull().default(0),
+    createdAtLogIndex: t.integer().notNull().default(0),
     name: t.text().notNull(), // universe name from contract
     description: t.text().notNull(), // universe description from contract
     imageURL: t.text().notNull(), // universe image URL from contract

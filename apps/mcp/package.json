@@ -20,6 +20,8 @@
     "build": "tsc -b",
     "start": "node dist/src/index.js",
     "check-types": "tsc -b",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
@@ -29,7 +31,8 @@
   "devDependencies": {
     "@types/node": "^20.19.37",
     "tsx": "^4.21.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.6"
   },
   "repository": {
     "type": "git",

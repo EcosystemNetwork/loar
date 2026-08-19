@@ -55,6 +55,9 @@ contract AdSeedEscrow is
     /// @notice seedId → Seed
     mapping(bytes32 => Seed) public seeds;
 
+    /// @notice Storage gap reserved for future upgrades.
+    uint256[50] private __gap;
+
     // ── Events ──────────────────────────────────────────────────────────
 
     event SeedFunded(

@@ -32,6 +32,7 @@ services:
     environment:
       - NODE_ENV=production
       - REDIS_URL=redis://redis:6379
+      - GENERATION_WORKER_DISABLED=true
     depends_on:
       redis:
         condition: service_healthy
@@ -51,6 +52,39 @@ services:
       test: ['CMD', 'curl', '-f', 'http://localhost:3000/health']
       interval: 30s
       timeout: 10s
+      start_period: 5s
+      retries: 3
+    networks:
+      - loar-network
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+      target: production
+    container_name: loar-worker
+    env_file:
+      - ./.env
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-5}
+    command: ['node', 'apps/server/dist/workers/generation.worker.js']
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ['CMD', 'node', 'apps/server/dist/scripts/worker-healthcheck.js']
+      interval: 30s
+      timeout: 5s
       start_period: 5s
       retries: 3
     networks:

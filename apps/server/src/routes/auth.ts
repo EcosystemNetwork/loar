@@ -93,10 +93,10 @@ authRoutes.post('/verify', async (c) => {
   const ALLOWED_ORIGINS = new Set(
     (process.env.CORS_ORIGIN || 'https://loar.fun').split(',').map((o) => o.trim())
   );
-  // Also allow localhost in dev
+  // Also allow localhost in dev (Vite default 5173 and LOAR web 3001)
   if (!IS_PRODUCTION) {
     ALLOWED_ORIGINS.add('http://localhost:5173');
-    ALLOWED_ORIGINS.add('http://localhost:3000');
+    ALLOWED_ORIGINS.add('http://localhost:3001');
   }
   const originUrl = origin.replace(/\/$/, '');
   // Structural origin check — never substring-match `.includes('localhost')`,

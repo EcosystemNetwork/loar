@@ -2,6 +2,7 @@
  * Firebase Cloud Storage service — singleton wrapper around Google Cloud Storage bucket.
  * Handles file upload, download, and public URL generation for media assets.
  */
+import { createHash, createHmac } from 'crypto';
 import { getStorage } from 'firebase-admin/storage';
 // @ts-expect-error firebase-admin/storage re-exports this type
 import type { Bucket } from '@google-cloud/storage';
@@ -47,15 +48,25 @@ class StorageService {
 
   async upload(buffer: Buffer, filename: string): Promise<string> {
     const safeFilename = sanitizeGcsFilename(filename);
-    const key = `videos/${safeFilename}`;
+    const contentHash = createHash('sha256').update(buffer).digest('hex');
+    const extension = safeFilename.includes('.') ? `.${safeFilename.split('.').pop()}` : '';
+    const key = `objects/${contentHash.slice(0, 2)}/${contentHash}${extension}`;
     const file = this.bucket.file(key);
 
-    await file.save(buffer, {
-      contentType: this.getContentType(safeFilename),
-      metadata: { cacheControl: 'public, max-age=31536000' },
-    });
-
-    await file.makePublic();
+    try {
+      await file.save(buffer, {
+        contentType: this.getContentType(safeFilename),
+        resumable: false,
+        preconditionOpts: { ifGenerationMatch: 0 },
+        metadata: {
+          cacheControl: 'private, max-age=0, no-store',
+          metadata: { firebaseStorageDownloadTokens: this.downloadToken(key) },
+        },
+      });
+    } catch (error) {
+      const code = (error as { code?: number }).code;
+      if (code !== 412) throw error;
+    }
 
     return key;
   }
@@ -107,7 +118,12 @@ class StorageService {
   }
 
   getPublicUrl(key: string): string {
-    return `https://storage.googleapis.com/${BUCKET_NAME}/${key}`;
+    const encodedKey = encodeURIComponent(key);
+    return `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/${encodedKey}?alt=media&token=${this.downloadToken(key)}`;
+  }
+
+  async delete(key: string): Promise<void> {
+    await this.bucket.file(key).delete({ ignoreNotFound: true });
   }
 
   async exists(key: string): Promise<boolean> {
@@ -117,6 +133,14 @@ class StorageService {
     } catch {
       return false;
     }
+  }
+
+  private downloadToken(key: string): string {
+    const secret = process.env.FIREBASE_STORAGE_TOKEN_SECRET || process.env.SIWE_JWT_SECRET;
+    if (!secret || secret.length < 32) {
+      throw new Error('FIREBASE_STORAGE_TOKEN_SECRET must contain at least 32 characters');
+    }
+    return createHmac('sha256', secret).update(`${BUCKET_NAME}:${key}`).digest('hex');
   }
 
   private getContentType(filename: string): string {

@@ -25,6 +25,7 @@ const envSchema = z.object({
   FIREBASE_SERVICE_ACCOUNT: z.string().optional(),
   FIREBASE_SERVICE_ACCOUNT_PATH: z.string().optional(),
   FIREBASE_STORAGE_BUCKET: z.string().optional(),
+  FIREBASE_STORAGE_TOKEN_SECRET: z.string().min(32).optional(),
 
   // ── Admin ─────────────────────────────────────────────────────────────────
   ADMIN_WALLET: z
@@ -42,6 +43,11 @@ const envSchema = z.object({
   // ── KMS signing (production — private key stays in HSM) ──────────────
   KMS_KEY_ID: z.string().optional(),
   KMS_REGION: z.string().default('us-east-1'),
+  PROVIDER_KEY_KMS_KEY_ID: z.string().optional(),
+  PROVIDER_KEY_MASTER_KEY: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/)
+    .optional(),
 
   // ── On-chain payment verification ─────────────────────────────────────────
   // Falls back to PONDER_RPC_URL_2 in credits.routes.ts if unset, but setting
@@ -260,6 +266,18 @@ export function validateEnv(): Env {
     if (!env.FIREBASE_SERVICE_ACCOUNT && !env.FIREBASE_SERVICE_ACCOUNT_PATH) {
       prodErrors.push(
         'Either FIREBASE_SERVICE_ACCOUNT (JSON string) or FIREBASE_SERVICE_ACCOUNT_PATH (file path) is required in production'
+      );
+    }
+
+    if (env.FIREBASE_STORAGE_BUCKET && !env.FIREBASE_STORAGE_TOKEN_SECRET) {
+      prodErrors.push(
+        'FIREBASE_STORAGE_TOKEN_SECRET must be set to at least 32 characters when Firebase Storage is enabled'
+      );
+    }
+
+    if (env.PROVIDER_KEY_MASTER_KEY && !env.PROVIDER_KEY_KMS_KEY_ID) {
+      prodErrors.push(
+        'PROVIDER_KEY_KMS_KEY_ID is required in production when BYOK provider-key storage is enabled'
       );
     }
 

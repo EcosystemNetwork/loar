@@ -59,6 +59,8 @@ export interface Universe {
   universeId: number | null;
   creator: Hex;
   createdAt: number;
+  createdAtBlock: number;
+  createdAtLogIndex: number;
   name: string;
   description: string;
   imageURL: string;
@@ -399,6 +401,12 @@ export const COLLECTIONS = {
   bounties: 'indexer_bounties',
   checkpoints: 'indexer_checkpoints',
   factoryChildren: 'indexer_factoryChildren',
+  eventReceipts: 'indexer_eventReceipts',
+  aggregateEventClaims: 'indexer_aggregateEventClaims',
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
+
+export function scopedId(chainId: number, id: string): string {
+  return `${chainId}:${id}`;
+}

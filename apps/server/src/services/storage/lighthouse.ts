@@ -80,6 +80,10 @@ export class LighthouseProvider implements StorageProvider {
     return this.upload(buffer, resolvedFilename, contentType);
   }
 
+  async delete(_cid: string): Promise<void> {
+    throw new Error('Lighthouse/Filecoin content is immutable and cannot be deleted');
+  }
+
   async download(cid: string): Promise<Uint8Array> {
     const response = await fetch(`${GATEWAY}/ipfs/${cid}`);
     if (!response.ok) {

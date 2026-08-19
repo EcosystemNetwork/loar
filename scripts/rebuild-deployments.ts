@@ -48,6 +48,7 @@ const CHAINS: Record<string, ChainCfg> = {
 const APPLY = process.argv.includes('--apply');
 const chainArg = process.argv.find((a) => a.startsWith('--chain='))?.split('=')[1];
 const CHAINS_TO_RUN = chainArg ? [chainArg] : ['sepolia'];
+const UNDEPLOYED_CONTRACTS = ['StoryBounties', 'LoarHookStaticFee'] as const;
 
 // UpgradeableBeacon entries are still skipped — the beacon address itself isn't
 // the user-facing contract. ERC1967Proxy entries are NO LONGER skipped: every
@@ -374,6 +375,14 @@ async function main() {
     ts += `} as const;\n\n`;
     ts += `export type ${name}ChainId = keyof typeof ${name};\n\n`;
   }
+  ts += `\n// Restored as empty maps — these contracts were Base-Sepolia-only and have no\n`;
+  ts += `// Ethereum (Sepolia/mainnet) deployment yet. Exported so consumers' imports\n`;
+  ts += `// resolve; callers guard on the missing address ("not deployed on chain").\n`;
+  for (const name of UNDEPLOYED_CONTRACTS) {
+    ts += `export const ${name}: Record<string, \`0x\${string}\`> = {};\n`;
+    ts += `export type ${name}ChainId = keyof typeof ${name};\n\n`;
+  }
+  ts = `${ts.trimEnd()}\n`;
   const addrPath = path.resolve(process.cwd(), 'packages/abis/src/addresses.ts');
   fs.writeFileSync(addrPath, ts);
   console.log(

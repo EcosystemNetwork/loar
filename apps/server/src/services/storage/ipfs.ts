@@ -93,8 +93,21 @@ export class PinataProvider implements StorageProvider {
     return this.upload(buffer, resolvedFilename, contentType);
   }
 
+  async delete(cid: string): Promise<void> {
+    const response = await fetch(
+      `https://api.pinata.cloud/pinning/unpin/${encodeURIComponent(cid)}`,
+      {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${this.jwt}` },
+      }
+    );
+    if (!response.ok && response.status !== 404) {
+      throw new Error(`Pinata unpin failed: HTTP ${response.status}`);
+    }
+  }
+
   async download(cid: string): Promise<Uint8Array> {
-    const response = await fetch(this.getPublicUrl(cid));
+    const response = await fetch(this.getDownloadUrl(cid));
 
     if (!response.ok) {
       throw new Error(`IPFS download failed: HTTP ${response.status}`);
@@ -105,14 +118,16 @@ export class PinataProvider implements StorageProvider {
 
   getPublicUrl(cid: string): string {
     // Dedicated Pinata gateways (*.mypinata.cloud) require a token or they 403.
-    // If the env points at a dedicated gateway without a token, fall back to
-    // the public gateway so we never persist a URL the browser can't load.
+    // Public URLs always use an untokenized gateway so manifests and API
+    // responses never persist or disclose the dedicated gateway credential.
     const configured = this.gatewayUrl;
     const isDedicated = /\.mypinata\.cloud$/i.test(new URL(configured).host);
-    const gateway = isDedicated && !this.gatewayToken ? DEFAULT_GATEWAY : configured;
-    const base = `${gateway}/ipfs/${cid}`;
-    return this.gatewayToken && gateway === configured
-      ? `${base}?pinataGatewayToken=${this.gatewayToken}`
-      : base;
+    const gateway = isDedicated ? DEFAULT_GATEWAY : configured;
+    return `${gateway}/ipfs/${cid}`;
+  }
+
+  private getDownloadUrl(cid: string): string {
+    const base = `${this.gatewayUrl}/ipfs/${cid}`;
+    return this.gatewayToken ? `${base}?pinataGatewayToken=${this.gatewayToken}` : base;
   }
 }

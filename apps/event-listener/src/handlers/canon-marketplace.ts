@@ -8,7 +8,14 @@
  */
 import { parseAbiItem, getAddress } from 'viem';
 import { db } from '../firestore.js';
-import { COLLECTIONS, type Hex, type CanonSubmission, type CanonVote } from '../schema.js';
+import { runClaimedAggregateMutation } from '../idempotency.js';
+import {
+  COLLECTIONS,
+  scopedId,
+  type Hex,
+  type CanonSubmission,
+  type CanonVote,
+} from '../schema.js';
 import type { Handler } from './types.js';
 
 const submissionCreatedEvent = parseAbiItem(
@@ -75,7 +82,10 @@ const submissionCreated: Handler<typeof submissionCreatedEvent> = {
       finalizedAt: null,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.canonSubmissions).doc(id), doc);
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.canonSubmissions).doc(scopedId(ctx.envelope.chainId, id)),
+      doc
+    );
   },
 };
 
@@ -96,24 +106,35 @@ const voteCast: Handler<typeof voteCastEvent> = {
       timestamp: ctx.block.timestamp,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.canonVotes).doc(vote.id), vote);
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.canonVotes).doc(scopedId(ctx.envelope.chainId, vote.id)),
+      vote
+    );
 
     // Tally update must transact — concurrent votes on the same submission.
-    const subRef = db.collection(COLLECTIONS.canonSubmissions).doc(submissionIdStr);
-    await db.runTransaction(async (tx) => {
-      const snap = await tx.get(subRef);
-      if (!snap.exists) return;
-      const existing = snap.data() as CanonSubmission;
-      if (ctx.args.support) {
-        tx.update(subRef, {
-          votesFor: (BigInt(existing.votesFor) + ctx.args.weight).toString(),
-        });
-      } else {
-        tx.update(subRef, {
-          votesAgainst: (BigInt(existing.votesAgainst) + ctx.args.weight).toString(),
-        });
+    const subRef = db
+      .collection(COLLECTIONS.canonSubmissions)
+      .doc(scopedId(ctx.envelope.chainId, submissionIdStr));
+    await runClaimedAggregateMutation(
+      db,
+      `canon-submission-votes:${submissionIdStr}`,
+      ctx.envelope,
+      async (tx) => {
+        const snap = await tx.get(subRef);
+        if (!snap.exists) return false;
+        const existing = snap.data() as CanonSubmission;
+        if (ctx.args.support) {
+          tx.update(subRef, {
+            votesFor: (BigInt(existing.votesFor) + ctx.args.weight).toString(),
+          });
+        } else {
+          tx.update(subRef, {
+            votesAgainst: (BigInt(existing.votesAgainst) + ctx.args.weight).toString(),
+          });
+        }
+        return true;
       }
-    });
+    );
   },
 };
 
@@ -123,7 +144,9 @@ const submissionAccepted: Handler<typeof submissionAcceptedEvent> = {
   abi: submissionAcceptedEvent,
   async run(ctx) {
     ctx.batcher.update(
-      db.collection(COLLECTIONS.canonSubmissions).doc(ctx.args.submissionId.toString()),
+      db
+        .collection(COLLECTIONS.canonSubmissions)
+        .doc(scopedId(ctx.envelope.chainId, ctx.args.submissionId.toString())),
       { status: 2, finalizedAt: ctx.block.timestamp }
     );
   },
@@ -135,7 +158,9 @@ const submissionRejected: Handler<typeof submissionRejectedEvent> = {
   abi: submissionRejectedEvent,
   async run(ctx) {
     ctx.batcher.update(
-      db.collection(COLLECTIONS.canonSubmissions).doc(ctx.args.submissionId.toString()),
+      db
+        .collection(COLLECTIONS.canonSubmissions)
+        .doc(scopedId(ctx.envelope.chainId, ctx.args.submissionId.toString())),
       { status: 3, finalizedAt: ctx.block.timestamp }
     );
   },

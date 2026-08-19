@@ -11,8 +11,10 @@
 import { parseAbiItem, getAddress } from 'viem';
 import { db } from '../firestore.js';
 import { logger } from '../logger.js';
+import { runClaimedAggregateMutation } from '../idempotency.js';
 import {
   COLLECTIONS,
+  scopedId,
   type Hex,
   type BondingCurve,
   type BondingCurveTrade,
@@ -57,44 +59,54 @@ async function applyTrade(args: {
   snapshotId: string;
   envelope: BondingCurve['_event'];
 }): Promise<void> {
-  const curveRef = db.collection(COLLECTIONS.bondingCurves).doc(args.curveAddr);
-  const snapRef = db.collection(COLLECTIONS.bondingCurveSnapshots).doc(args.snapshotId);
+  const curveRef = db
+    .collection(COLLECTIONS.bondingCurves)
+    .doc(scopedId(args.envelope.chainId, args.curveAddr));
+  const snapRef = db
+    .collection(COLLECTIONS.bondingCurveSnapshots)
+    .doc(scopedId(args.envelope.chainId, args.snapshotId));
 
-  await db.runTransaction(async (tx) => {
-    const snap = await tx.get(curveRef);
-    if (!snap.exists) {
-      logger.warn(
-        { curveAddr: args.curveAddr },
-        'trade for unknown curve — skipping aggregate update'
-      );
-      return;
+  await runClaimedAggregateMutation(
+    db,
+    `bonding-curve-trade:${args.curveAddr}`,
+    args.envelope,
+    async (tx) => {
+      const snap = await tx.get(curveRef);
+      if (!snap.exists) {
+        logger.warn(
+          { curveAddr: args.curveAddr },
+          'trade for unknown curve — skipping aggregate update'
+        );
+        return false;
+      }
+      const row = snap.data() as BondingCurve;
+      const nextTokensSold = BigInt(row.tokensSold) + args.deltaTokensSold;
+      const nextEthRaised = BigInt(row.ethRaised) + args.deltaEthRaised;
+      const clampedTokens = nextTokensSold < 0n ? 0n : nextTokensSold;
+      const clampedEth = nextEthRaised < 0n ? 0n : nextEthRaised;
+
+      tx.update(curveRef, {
+        tokensSold: clampedTokens.toString(),
+        ethRaised: clampedEth.toString(),
+        lastPrice: args.newPrice.toString(),
+        tradeCount: row.tradeCount + 1,
+      });
+
+      const snapshot: BondingCurveSnapshot = {
+        id: args.snapshotId,
+        bondingCurve: args.curveAddr,
+        blockNumber: args.blockNumber,
+        timestamp: args.timestamp,
+        tokensSold: clampedTokens.toString(),
+        ethRaised: clampedEth.toString(),
+        price: args.newPrice.toString(),
+        trigger: args.trigger,
+        _event: args.envelope,
+      };
+      tx.set(snapRef, snapshot);
+      return true;
     }
-    const row = snap.data() as BondingCurve;
-    const nextTokensSold = BigInt(row.tokensSold) + args.deltaTokensSold;
-    const nextEthRaised = BigInt(row.ethRaised) + args.deltaEthRaised;
-    const clampedTokens = nextTokensSold < 0n ? 0n : nextTokensSold;
-    const clampedEth = nextEthRaised < 0n ? 0n : nextEthRaised;
-
-    tx.update(curveRef, {
-      tokensSold: clampedTokens.toString(),
-      ethRaised: clampedEth.toString(),
-      lastPrice: args.newPrice.toString(),
-      tradeCount: row.tradeCount + 1,
-    });
-
-    const snapshot: BondingCurveSnapshot = {
-      id: args.snapshotId,
-      bondingCurve: args.curveAddr,
-      blockNumber: args.blockNumber,
-      timestamp: args.timestamp,
-      tokensSold: clampedTokens.toString(),
-      ethRaised: clampedEth.toString(),
-      price: args.newPrice.toString(),
-      trigger: args.trigger,
-      _event: args.envelope,
-    };
-    tx.set(snapRef, snapshot);
-  });
+  );
 }
 
 const tokensPurchased: Handler<typeof tokensPurchasedEvent> = {
@@ -114,7 +126,12 @@ const tokensPurchased: Handler<typeof tokensPurchasedEvent> = {
       timestamp: ctx.block.timestamp,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.bondingCurveTrades).doc(ctx.eventId), trade);
+    ctx.batcher.set(
+      db
+        .collection(COLLECTIONS.bondingCurveTrades)
+        .doc(scopedId(ctx.envelope.chainId, ctx.eventId)),
+      trade
+    );
 
     await applyTrade({
       curveAddr,
@@ -147,7 +164,12 @@ const tokensSold: Handler<typeof tokensSoldEvent> = {
       timestamp: ctx.block.timestamp,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.bondingCurveTrades).doc(ctx.eventId), trade);
+    ctx.batcher.set(
+      db
+        .collection(COLLECTIONS.bondingCurveTrades)
+        .doc(scopedId(ctx.envelope.chainId, ctx.eventId)),
+      trade
+    );
 
     await applyTrade({
       curveAddr,
@@ -172,19 +194,40 @@ const refundPending: Handler<typeof refundPendingEvent> = {
     const buyer = getAddress(ctx.args.buyer).toLowerCase() as Hex;
     const id = `${curveAddr}:${buyer}`;
 
-    const curveRef = db.collection(COLLECTIONS.bondingCurves).doc(curveAddr);
-    const refundRef = db.collection(COLLECTIONS.bondingCurveRefunds).doc(id);
+    const curveRef = db
+      .collection(COLLECTIONS.bondingCurves)
+      .doc(scopedId(ctx.envelope.chainId, curveAddr));
+    const refundRef = db
+      .collection(COLLECTIONS.bondingCurveRefunds)
+      .doc(scopedId(ctx.envelope.chainId, id));
 
-    await db.runTransaction(async (tx) => {
-      const [curveSnap, refundSnap] = await Promise.all([tx.get(curveRef), tx.get(refundRef)]);
+    await runClaimedAggregateMutation(
+      db,
+      `bonding-curve-refund:${id}`,
+      ctx.envelope,
+      async (tx) => {
+        const [curveSnap, refundSnap] = await Promise.all([tx.get(curveRef), tx.get(refundRef)]);
 
-      if (refundSnap.exists) {
-        const existing = refundSnap.data() as BondingCurveRefund;
-        if (existing.claimedAt === null) {
-          tx.update(refundRef, {
-            amount: (BigInt(existing.amount) + ctx.args.amount).toString(),
-            lastEventId: ctx.eventId,
-          });
+        if (refundSnap.exists) {
+          const existing = refundSnap.data() as BondingCurveRefund;
+          if (existing.claimedAt === null) {
+            tx.update(refundRef, {
+              amount: (BigInt(existing.amount) + ctx.args.amount).toString(),
+              lastEventId: ctx.eventId,
+            });
+          } else {
+            const doc: BondingCurveRefund = {
+              id,
+              bondingCurve: curveAddr,
+              buyer,
+              amount: ctx.args.amount.toString(),
+              pendingSince: ctx.block.timestamp,
+              claimedAt: null,
+              lastEventId: ctx.eventId,
+              _event: ctx.envelope,
+            };
+            tx.set(refundRef, doc);
+          }
         } else {
           const doc: BondingCurveRefund = {
             id,
@@ -198,27 +241,16 @@ const refundPending: Handler<typeof refundPendingEvent> = {
           };
           tx.set(refundRef, doc);
         }
-      } else {
-        const doc: BondingCurveRefund = {
-          id,
-          bondingCurve: curveAddr,
-          buyer,
-          amount: ctx.args.amount.toString(),
-          pendingSince: ctx.block.timestamp,
-          claimedAt: null,
-          lastEventId: ctx.eventId,
-          _event: ctx.envelope,
-        };
-        tx.set(refundRef, doc);
-      }
 
-      if (curveSnap.exists) {
-        const curve = curveSnap.data() as BondingCurve;
-        tx.update(curveRef, {
-          pendingRefundsTotal: (BigInt(curve.pendingRefundsTotal) + ctx.args.amount).toString(),
-        });
+        if (curveSnap.exists) {
+          const curve = curveSnap.data() as BondingCurve;
+          tx.update(curveRef, {
+            pendingRefundsTotal: (BigInt(curve.pendingRefundsTotal) + ctx.args.amount).toString(),
+          });
+        }
+        return true;
       }
-    });
+    );
   },
 };
 
@@ -231,25 +263,38 @@ const refundClaimed: Handler<typeof refundClaimedEvent> = {
     const buyer = getAddress(ctx.args.buyer).toLowerCase() as Hex;
     const id = `${curveAddr}:${buyer}`;
 
-    const curveRef = db.collection(COLLECTIONS.bondingCurves).doc(curveAddr);
-    const refundRef = db.collection(COLLECTIONS.bondingCurveRefunds).doc(id);
+    const curveRef = db
+      .collection(COLLECTIONS.bondingCurves)
+      .doc(scopedId(ctx.envelope.chainId, curveAddr));
+    const refundRef = db
+      .collection(COLLECTIONS.bondingCurveRefunds)
+      .doc(scopedId(ctx.envelope.chainId, id));
 
-    await db.runTransaction(async (tx) => {
-      const [curveSnap, refundSnap] = await Promise.all([tx.get(curveRef), tx.get(refundRef)]);
-      if (refundSnap.exists) {
-        tx.update(refundRef, {
-          amount: '0',
-          claimedAt: ctx.block.timestamp,
-          lastEventId: ctx.eventId,
-        });
+    await runClaimedAggregateMutation(
+      db,
+      `bonding-curve-refund:${id}`,
+      ctx.envelope,
+      async (tx) => {
+        const [curveSnap, refundSnap] = await Promise.all([tx.get(curveRef), tx.get(refundRef)]);
+        let mutated = false;
+        if (refundSnap.exists) {
+          tx.update(refundRef, {
+            amount: '0',
+            claimedAt: ctx.block.timestamp,
+            lastEventId: ctx.eventId,
+          });
+          mutated = true;
+        }
+        if (curveSnap.exists) {
+          const curve = curveSnap.data() as BondingCurve;
+          const prev = BigInt(curve.pendingRefundsTotal);
+          const next = prev > ctx.args.amount ? prev - ctx.args.amount : 0n;
+          tx.update(curveRef, { pendingRefundsTotal: next.toString() });
+          mutated = true;
+        }
+        return mutated;
       }
-      if (curveSnap.exists) {
-        const curve = curveSnap.data() as BondingCurve;
-        const prev = BigInt(curve.pendingRefundsTotal);
-        const next = prev > ctx.args.amount ? prev - ctx.args.amount : 0n;
-        tx.update(curveRef, { pendingRefundsTotal: next.toString() });
-      }
-    });
+    );
   },
 };
 
@@ -269,19 +314,32 @@ const tradingHaltedByManager: Handler<typeof tradingHaltedByManagerEvent> = {
       blockNumber: ctx.block.number,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.bondingCurveHaltEvents).doc(ctx.eventId), haltDoc);
+    ctx.batcher.set(
+      db
+        .collection(COLLECTIONS.bondingCurveHaltEvents)
+        .doc(scopedId(ctx.envelope.chainId, ctx.eventId)),
+      haltDoc
+    );
 
-    const curveRef = db.collection(COLLECTIONS.bondingCurves).doc(curveAddr);
-    await db.runTransaction(async (tx) => {
-      const snap = await tx.get(curveRef);
-      if (!snap.exists) return;
-      const curve = snap.data() as BondingCurve;
-      if (curve.tradingStatus === 'graduated') return;
-      tx.update(curveRef, {
-        tradingStatus: ctx.args.halted ? 'halted' : 'active',
-        tradingStatusUpdatedAt: ctx.block.timestamp,
-      });
-    });
+    const curveRef = db
+      .collection(COLLECTIONS.bondingCurves)
+      .doc(scopedId(ctx.envelope.chainId, curveAddr));
+    await runClaimedAggregateMutation(
+      db,
+      `bonding-curve-trading-status:${curveAddr}`,
+      ctx.envelope,
+      async (tx) => {
+        const snap = await tx.get(curveRef);
+        if (!snap.exists) return false;
+        const curve = snap.data() as BondingCurve;
+        if (curve.tradingStatus === 'graduated') return false;
+        tx.update(curveRef, {
+          tradingStatus: ctx.args.halted ? 'halted' : 'active',
+          tradingStatusUpdatedAt: ctx.block.timestamp,
+        });
+        return true;
+      }
+    );
   },
 };
 
@@ -291,12 +349,15 @@ const graduated: Handler<typeof graduatedEvent> = {
   abi: graduatedEvent,
   async run(ctx) {
     const curveAddr = ctx.address;
-    ctx.batcher.update(db.collection(COLLECTIONS.bondingCurves).doc(curveAddr), {
-      graduated: true,
-      graduatedAt: ctx.block.timestamp,
-      tradingStatus: 'graduated',
-      tradingStatusUpdatedAt: ctx.block.timestamp,
-    });
+    ctx.batcher.update(
+      db.collection(COLLECTIONS.bondingCurves).doc(scopedId(ctx.envelope.chainId, curveAddr)),
+      {
+        graduated: true,
+        graduatedAt: ctx.block.timestamp,
+        tradingStatus: 'graduated',
+        tradingStatusUpdatedAt: ctx.block.timestamp,
+      }
+    );
 
     const haltDoc: BondingCurveHaltEvent = {
       id: `${ctx.eventId}:grad`,
@@ -309,7 +370,9 @@ const graduated: Handler<typeof graduatedEvent> = {
       _event: ctx.envelope,
     };
     ctx.batcher.set(
-      db.collection(COLLECTIONS.bondingCurveHaltEvents).doc(`${ctx.eventId}:grad`),
+      db
+        .collection(COLLECTIONS.bondingCurveHaltEvents)
+        .doc(scopedId(ctx.envelope.chainId, `${ctx.eventId}:grad`)),
       haltDoc
     );
   },

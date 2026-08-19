@@ -18,6 +18,7 @@ const ROOT = path.resolve(__dirname, '..');
 
 const DEPLOYMENT_DIR = path.join(ROOT, 'deployments');
 const ADDRESSES_FILE = path.join(ROOT, 'packages/abis/src/addresses.ts');
+const UNDEPLOYED_CONTRACTS = ['StoryBounties', 'LoarHookStaticFee'] as const;
 
 // ── load all deployment manifests ────────────────────────────────────────────
 const manifests: Array<{ chainId: number; contracts: Record<string, string> }> = [];
@@ -58,6 +59,15 @@ for (const name of allContractNames) {
   expected += `} as const;\n\n`;
   expected += `export type ${name}ChainId = keyof typeof ${name};\n\n`;
 }
+
+expected += `\n// Restored as empty maps — these contracts were Base-Sepolia-only and have no\n`;
+expected += `// Ethereum (Sepolia/mainnet) deployment yet. Exported so consumers' imports\n`;
+expected += `// resolve; callers guard on the missing address ("not deployed on chain").\n`;
+for (const name of UNDEPLOYED_CONTRACTS) {
+  expected += `export const ${name}: Record<string, \`0x\${string}\`> = {};\n`;
+  expected += `export type ${name}ChainId = keyof typeof ${name};\n\n`;
+}
+expected = `${expected.trimEnd()}\n`;
 
 // ── compare to disk ───────────────────────────────────────────────────────────
 if (!fs.existsSync(ADDRESSES_FILE)) {

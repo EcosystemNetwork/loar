@@ -22,6 +22,21 @@ const VERIFY_TIMEOUT_MS = 8_000;
 const BG_MAX_RETRIES = 2;
 const BG_RETRY_DELAYS = [5_000, 15_000];
 
+function sanitizeManifest(manifest: StorageManifest): StorageManifest {
+  return {
+    ...manifest,
+    uploads: manifest.uploads.map((upload) => {
+      try {
+        const url = new URL(upload.url);
+        url.searchParams.delete('pinataGatewayToken');
+        return { ...upload, url: url.toString() };
+      } catch {
+        return upload;
+      }
+    }),
+  };
+}
+
 /** Default provider priority order. Can be overridden via STORAGE_PROVIDER_PRIORITY env. */
 function buildProviders(): StorageProvider[] {
   const all: StorageProvider[] = [
@@ -109,7 +124,11 @@ export class StorageManager {
 
     // Deduplication — check if already uploaded
     const existing = await this.findManifest(contentHash);
-    if (existing) {
+    if (existing && !existing.deletedAt) {
+      if (userId && !existing.ownerIds?.includes(userId)) {
+        existing.ownerIds = [...(existing.ownerIds ?? []), userId];
+        await this.saveManifest(existing);
+      }
       console.log(`[StorageManager] Dedup hit for ${contentHash.slice(0, 12)}…`);
       // Return with a lightweight trace indicating cache hit
       return {
@@ -222,15 +241,16 @@ export class StorageManager {
       mimeType: resolvedMime,
       size: buffer.length,
       createdAt: Date.now(),
+      ownerIds: userId ? [userId] : [],
       trace,
     };
 
     await this.saveManifest(manifest);
 
-    // Background: upload to remaining providers for redundancy
+    // Upload to remaining providers before returning so redundancy is durable
     const remaining = available.filter((p) => !results.some((r) => r.provider === p.name));
     if (remaining.length > 0) {
-      this.uploadToRemainingProviders(
+      await this.uploadToRemainingProviders(
         buffer,
         filename,
         resolvedMime,
@@ -267,7 +287,7 @@ export class StorageManager {
     const resolvedMime = mimeType || getMimeType(filename);
 
     const existing = await this.findManifest(contentHash);
-    if (existing) return existing;
+    if (existing && !existing.deletedAt) return existing;
 
     const firebase = this.providers.find((p) => p.name === 'firebase');
     if (!firebase?.isAvailable()) {
@@ -290,6 +310,7 @@ export class StorageManager {
       mimeType: resolvedMime,
       size: buffer.length,
       createdAt: Date.now(),
+      ownerIds: userId ? [userId] : [],
     };
 
     await this.saveManifest(manifest);
@@ -367,8 +388,34 @@ export class StorageManager {
   /** Resolve a contentHash to the best available URL. */
   async resolve(contentHash: string): Promise<string | null> {
     const manifest = await this.findManifest(contentHash);
-    if (!manifest || manifest.uploads.length === 0) return null;
+    if (!manifest || manifest.deletedAt || manifest.uploads.length === 0) return null;
     return manifest.uploads[0].url;
+  }
+
+  async remove(contentHash: string): Promise<StorageManifest> {
+    const manifest = await this.findManifest(contentHash);
+    if (!manifest) throw new Error(`No manifest found for contentHash: ${contentHash}`);
+    const deletionResults = await Promise.all(
+      manifest.uploads.map(async (upload) => {
+        const provider = this.providers.find((candidate) => candidate.name === upload.provider);
+        if (!provider) {
+          return { provider: upload.provider, deleted: false, error: 'Provider unavailable' };
+        }
+        try {
+          await provider.delete(upload.contentId);
+          return { provider: upload.provider, deleted: true };
+        } catch (error) {
+          return {
+            provider: upload.provider,
+            deleted: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      })
+    );
+    const tombstone = { ...manifest, deletedAt: Date.now(), deletionResults };
+    await this.saveManifest(tombstone);
+    return tombstone;
   }
 
   /** Download content by contentHash, trying each provider in the manifest. */
@@ -398,7 +445,12 @@ export class StorageManager {
     try {
       const doc = await db.collection(MANIFESTS_COLLECTION).doc(contentHash).get();
       if (!doc.exists) return null;
-      return doc.data() as StorageManifest;
+      const stored = doc.data() as StorageManifest;
+      const sanitized = sanitizeManifest(stored);
+      if (sanitized.uploads.some((upload, index) => upload.url !== stored.uploads[index]?.url)) {
+        await doc.ref.set({ uploads: sanitized.uploads }, { merge: true });
+      }
+      return sanitized;
     } catch {
       return null;
     }
@@ -409,33 +461,46 @@ export class StorageManager {
   }
 
   private async saveManifest(manifest: StorageManifest): Promise<void> {
-    try {
-      await db
-        .collection(MANIFESTS_COLLECTION)
-        .doc(manifest.contentHash)
-        .set(manifest, { merge: true });
-    } catch (err) {
-      console.error('[StorageManager] Failed to save manifest:', err);
-    }
+    const ref = db.collection(MANIFESTS_COLLECTION).doc(manifest.contentHash);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const existing = snap.exists ? (snap.data() as StorageManifest) : null;
+      const base = existing?.deletedAt && !manifest.deletedAt ? null : existing;
+      const uploads = [...(base?.uploads ?? []), ...manifest.uploads].filter(
+        (upload, index, all) =>
+          all.findIndex(
+            (candidate) =>
+              candidate.provider === upload.provider && candidate.contentId === upload.contentId
+          ) === index
+      );
+      const ownerIds = [...new Set([...(base?.ownerIds ?? []), ...(manifest.ownerIds ?? [])])];
+      tx.set(ref, { ...(base ?? {}), ...manifest, uploads, ownerIds });
+    });
   }
 
-  // ─── Background Redundancy ────────────────────────────────
+  // ─── Redundant Provider Uploads ───────────────────────────
 
-  private uploadToRemainingProviders(
+  private async uploadToRemainingProviders(
     buffer: Buffer,
     filename: string,
     mimeType: string,
     contentHash: string,
     remaining: StorageProvider[],
     userId?: string
-  ): void {
-    for (const provider of remaining) {
-      this.uploadWithRetry(provider, buffer, filename, mimeType, BG_MAX_RETRIES)
-        .then(async (result) => {
+  ): Promise<void> {
+    await Promise.all(
+      remaining.map(async (provider) => {
+        try {
+          const result = await this.uploadWithRetry(
+            provider,
+            buffer,
+            filename,
+            mimeType,
+            BG_MAX_RETRIES
+          );
           console.log(
             `[StorageManager] Background upload to ${provider.name} succeeded (contentId=${result.contentId})`
           );
-
           void getCostLedger().recordUpload({
             provider: provider.name,
             bytes: buffer.length,
@@ -443,25 +508,17 @@ export class StorageManager {
             userId,
             metadata: { background: true },
           });
-
-          try {
-            const manifest = await this.findManifest(contentHash);
-            if (manifest) {
-              manifest.uploads.push(result);
-              await this.saveManifest(manifest);
-            }
-          } catch {
-            // Non-critical — manifest update best-effort
-          }
-        })
-        .catch((err) => {
+          const manifest = await this.findManifest(contentHash);
+          if (manifest) await this.saveManifest({ ...manifest, uploads: [result] });
+        } catch (err) {
           console.error(
             `[StorageManager] Background upload to ${provider.name} permanently failed: ${
               err instanceof Error ? err.message : err
             }`
           );
-        });
-    }
+        }
+      })
+    );
   }
 
   /**

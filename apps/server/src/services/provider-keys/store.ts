@@ -75,7 +75,7 @@ export async function upsert(
   }
 
   const fp = fingerprint(plaintextKey);
-  const encryptedKey = seal(plaintextKey);
+  const encryptedKey = await seal(plaintextKey);
   const last4 = plaintextKey.slice(-4);
   const now = new Date();
   const ref = col().doc(docId(userId, provider));

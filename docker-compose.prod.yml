@@ -56,6 +56,8 @@ services:
     # and require a password ≥32 bytes. Intentionally no `ports:` mapping so
     # Redis is only reachable inside loar-network — exposing 6379 to the host
     # is never correct in prod.
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD must be set - generate with openssl rand -hex 32}
     command: >-
       redis-server
       --maxmemory 256mb
@@ -68,7 +70,7 @@ services:
     networks:
       - loar-network
     healthcheck:
-      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
+      test: ['CMD-SHELL', 'REDISCLI_AUTH="$${REDIS_PASSWORD}" redis-cli ping']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -87,7 +89,7 @@ services:
       - NODE_ENV=production
       - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD required}@redis:6379
       - TRUST_PROXY=true
-      - WORKER_CONCURRENCY=0
+      - GENERATION_WORKER_DISABLED=true
     expose:
       - '3000'
     restart: unless-stopped
@@ -152,6 +154,12 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    healthcheck:
+      test: ['CMD', 'node', 'apps/server/dist/scripts/worker-healthcheck.js']
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
     networks:
       - loar-network
     deploy:
@@ -193,6 +201,42 @@ services:
       interval: 30s
       timeout: 10s
       start_period: 30s
+      retries: 3
+    networks:
+      - loar-network
+
+  # ── Scheduled Firestore backup ─────────────────────────────────────
+  backup:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+      target: production
+    container_name: loar-backup
+    env_file:
+      - ./.env
+    environment:
+      - NODE_ENV=production
+      - BACKUP_INTERVAL_MS=${BACKUP_INTERVAL_MS:-86400000}
+    command: ['node', 'apps/server/dist/scripts/backup-cron.js']
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "const fs=require('fs');const t=Number(fs.readFileSync('/tmp/backup-last-success','utf8'));process.exit(Date.now()-t<Number(process.env.BACKUP_INTERVAL_MS||86400000)*2?0:1)",
+        ]
+      interval: 1h
+      timeout: 5s
+      start_period: 15m
       retries: 3
     networks:
       - loar-network

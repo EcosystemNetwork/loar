@@ -8,7 +8,12 @@
  */
 
 import { Worker, type Job } from 'bullmq';
-import { QUEUE_NAMES, type GenerationJobData, type GenerationJobResult } from '../lib/queue';
+import {
+  QUEUE_NAMES,
+  type GenerationJobData,
+  type GenerationJobResult,
+  type UploadJobData,
+} from '../lib/queue';
 import { getCircuitBreaker, CircuitOpenError } from '../lib/circuit-breaker';
 import { recordAiGeneration, recordStorageUpload } from '../lib/metrics';
 import { withCostScope } from '../services/cost-tracker/scope';
@@ -47,8 +52,7 @@ async function processGenerationBody(
   const { getStorageManager } = await import('../services/storage');
   const { signWithProvenance } = await import('../services/provenance');
   const { createAttachment } = await import('../routers/media/media.handlers');
-  const { FieldValue } = await import('firebase-admin/firestore');
-  const { logFailedRefund } = await import('../lib/refund-audit');
+  const { finalizeGenerationFailure, logFailedRefund } = await import('../lib/refund-audit');
   const { trackQuests, trackModelUsage } = await import('../services/quest-tracker');
   const { translateCameraPreset, applyStyleToPrompt } = await import('../services/scene-controls');
 
@@ -59,6 +63,36 @@ async function processGenerationBody(
 
   const generationsCol = db.collection('videoGenerations');
   const breaker = getCircuitBreaker(model.provider);
+  const finalizeFailure = async (failureReason: string, latencyMs: number) => {
+    try {
+      const outcome = await finalizeGenerationFailure(db, {
+        userId: data.userId,
+        generationId: data.generationId,
+        creditsCharged: data.creditsCharged,
+        failureReason,
+        latencyMs,
+      });
+      if (outcome === 'refunded') {
+        const { recordCreditsTx } = await import('../lib/metrics');
+        recordCreditsTx('refund', 'success');
+      }
+      return outcome;
+    } catch (refundErr) {
+      if (data.creditsCharged > 0) {
+        const { recordCreditsTx } = await import('../lib/metrics');
+        recordCreditsTx('refund', 'failure');
+        console.error(`CRITICAL: Credit refund failed for ${data.userId}:`, refundErr);
+        await logFailedRefund({
+          userId: data.userId,
+          credits: data.creditsCharged,
+          source: 'generation.worker',
+          generationId: data.generationId,
+          error: refundErr instanceof Error ? refundErr.message : 'Unknown',
+        });
+      }
+      throw refundErr;
+    }
+  };
 
   // Update status to running
   await job.updateProgress(10);
@@ -145,39 +179,7 @@ async function processGenerationBody(
     if (result.status === 'failed' || result.error || !result.videoUrl) {
       markProviderUnhealthy(model.provider);
 
-      // Refund credits
-      if (data.creditsCharged > 0) {
-        try {
-          await db
-            .collection('userCredits')
-            .doc(data.userId)
-            .update({
-              balance: FieldValue.increment(data.creditsCharged),
-              totalSpent: FieldValue.increment(-data.creditsCharged),
-              updatedAt: new Date(),
-            });
-          const { recordCreditsTx } = await import('../lib/metrics');
-          recordCreditsTx('refund', 'success');
-        } catch (refundErr) {
-          const { recordCreditsTx } = await import('../lib/metrics');
-          recordCreditsTx('refund', 'failure');
-          console.error(`CRITICAL: Credit refund failed for ${data.userId}:`, refundErr);
-          logFailedRefund({
-            userId: data.userId,
-            credits: data.creditsCharged,
-            source: 'generation.worker',
-            generationId: data.generationId,
-            error: refundErr instanceof Error ? refundErr.message : 'Unknown',
-          });
-        }
-      }
-
-      await generationsCol.doc(data.generationId).update({
-        status: 'failed',
-        failureReason: result.error || 'Generation failed',
-        latencyMs,
-        completedAt: new Date(),
-      });
+      await finalizeFailure(result.error || 'Generation failed', latencyMs);
 
       recordAiGeneration(model.provider, 'video', 'failure', latencyMs / 1000);
 
@@ -402,14 +404,18 @@ async function processGenerationBody(
           universeAddress: data.input.universeId ?? null,
           options: { model: 'gemini-2.5-flash' },
         };
-        await db.collection('vlmJobs').doc(jobId).set({
-          jobId,
-          kind: 'extract',
-          status: 'pending',
-          creatorUid: data.userId.toLowerCase(),
-          input: vlmInput,
-          createdAt: new Date(),
-        });
+        await db
+          .collection('vlmJobs')
+          .doc(jobId)
+          .set({
+            jobId,
+            kind: 'extract',
+            status: 'pending',
+            creatorUid: data.userId.toLowerCase(),
+            input: vlmInput,
+            createdAt: new Date(),
+            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          });
         await getVlmQueue().add(
           'extract',
           {
@@ -470,39 +476,7 @@ async function processGenerationBody(
       throw error; // BullMQ will retry after backoff
     }
 
-    // Refund credits on unexpected failure
-    if (data.creditsCharged > 0) {
-      try {
-        await db
-          .collection('userCredits')
-          .doc(data.userId)
-          .update({
-            balance: FieldValue.increment(data.creditsCharged),
-            totalSpent: FieldValue.increment(-data.creditsCharged),
-            updatedAt: new Date(),
-          });
-        const { recordCreditsTx } = await import('../lib/metrics');
-        recordCreditsTx('refund', 'success');
-      } catch (refundErr) {
-        const { recordCreditsTx } = await import('../lib/metrics');
-        recordCreditsTx('refund', 'failure');
-        console.error(`CRITICAL: Credit refund failed for ${data.userId}:`, refundErr);
-        logFailedRefund({
-          userId: data.userId,
-          credits: data.creditsCharged,
-          source: 'generation.worker',
-          generationId: data.generationId,
-          error: refundErr instanceof Error ? refundErr.message : 'Unknown',
-        });
-      }
-    }
-
-    await generationsCol.doc(data.generationId).update({
-      status: 'failed',
-      failureReason: error instanceof Error ? error.message : 'Unknown error',
-      latencyMs,
-      completedAt: new Date(),
-    });
+    await finalizeFailure(error instanceof Error ? error.message : 'Unknown error', latencyMs);
 
     recordAiGeneration(model.provider, 'video', 'failure', latencyMs / 1000);
 
@@ -532,6 +506,7 @@ async function processGenerationBody(
 // ── Worker Instance ────────────────────────────────────────────────────
 
 let worker: Worker<GenerationJobData, GenerationJobResult> | null = null;
+let uploadWorker: Worker<UploadJobData> | null = null;
 
 /**
  * Start the generation worker. Can be called from the main server process
@@ -586,10 +561,35 @@ export function startGenerationWorker(
   return worker;
 }
 
+export function startUploadWorker(concurrency = 2): Worker<UploadJobData> {
+  if (uploadWorker) return uploadWorker;
+  uploadWorker = new Worker<UploadJobData>(
+    QUEUE_NAMES.UPLOAD,
+    async (job) => {
+      await job.updateProgress(10);
+      const { getStorageManager } = await import('../services/storage');
+      const manifest = await getStorageManager().uploadFromUrl(
+        job.data.videoUrl,
+        job.data.filename,
+        job.data.userId
+      );
+      await job.updateProgress(100);
+      return { manifest };
+    },
+    { connection: getConnectionOpts(), concurrency }
+  );
+  uploadWorker.on('failed', (job, error) => {
+    console.error(`[worker] Upload job ${job?.id} failed:`, error.message);
+  });
+  return uploadWorker;
+}
+
 export async function stopGenerationWorker(): Promise<void> {
-  if (!worker) return;
-  await worker.close();
+  await Promise.allSettled(
+    [worker?.close(), uploadWorker?.close()].filter(Boolean) as Promise<void>[]
+  );
   worker = null;
+  uploadWorker = null;
   console.log('[worker] Generation worker stopped');
 }
 
@@ -610,7 +610,10 @@ if (
   initFirebase();
 
   const concurrency = parseInt(process.env.WORKER_CONCURRENCY || '5', 10);
-  startGenerationWorker(concurrency);
+  await Promise.all([
+    startGenerationWorker(concurrency).waitUntilReady(),
+    startUploadWorker(Math.max(1, Math.min(concurrency, 4))).waitUntilReady(),
+  ]);
 
   const shutdown = async () => {
     console.log('[worker] Shutting down...');

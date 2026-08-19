@@ -16,13 +16,14 @@
  */
 import { getAddress, type Log, type Hex as ViemHex } from 'viem';
 import { client } from './rpc.js';
+import { db } from './firestore.js';
 import { logger } from './logger.js';
 import { Batcher, buildEnvelope } from './batcher.js';
 import { chainConfig, kindForStaticAddress } from './chain-config.js';
 import { getChildren } from './factory.js';
 import { findHandler, allTopics } from './handlers/index.js';
 import { decodeEventLog } from 'viem';
-import type { Hex } from './schema.js';
+import { COLLECTIONS, type Hex } from './schema.js';
 import type { ContractKind } from './handlers/types.js';
 
 const TOPICS = allTopics() as ViemHex[];
@@ -129,6 +130,14 @@ async function fetchAndDispatch(
         envelope,
         batcher,
         client,
+      });
+      const receiptId = `${envelope.chainId}:${eventId}`;
+      batcher.set(db.collection(COLLECTIONS.eventReceipts).doc(receiptId), {
+        id: receiptId,
+        kind,
+        event: handler.event,
+        address: addr,
+        _event: envelope,
       });
       handled += 1;
     } catch (err) {

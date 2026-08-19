@@ -5,7 +5,7 @@
  */
 import { parseAbiItem, getAddress } from 'viem';
 import { db } from '../firestore.js';
-import { COLLECTIONS, type Hex, type Collab } from '../schema.js';
+import { COLLECTIONS, scopedId, type Hex, type Collab } from '../schema.js';
 import type { Handler } from './types.js';
 
 const collabProposedEvent = parseAbiItem(
@@ -66,7 +66,10 @@ const collabProposed: Handler<typeof collabProposedEvent> = {
       createdAt: ctx.block.timestamp,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.collabs).doc(id), doc);
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.collabs).doc(scopedId(ctx.envelope.chainId, id)),
+      doc
+    );
   },
 };
 
@@ -75,10 +78,15 @@ const collabAccepted: Handler<typeof collabAcceptedEvent> = {
   event: 'CollabAccepted',
   abi: collabAcceptedEvent,
   async run(ctx) {
-    ctx.batcher.update(db.collection(COLLECTIONS.collabs).doc(ctx.args.collabId.toString()), {
-      status: 1,
-      acceptor: getAddress(ctx.args.acceptor).toLowerCase() as Hex,
-    });
+    ctx.batcher.update(
+      db
+        .collection(COLLECTIONS.collabs)
+        .doc(scopedId(ctx.envelope.chainId, ctx.args.collabId.toString())),
+      {
+        status: 1,
+        acceptor: getAddress(ctx.args.acceptor).toLowerCase() as Hex,
+      }
+    );
   },
 };
 
@@ -87,11 +95,16 @@ const collabCompleted: Handler<typeof collabCompletedEvent> = {
   event: 'CollabCompleted',
   abi: collabCompletedEvent,
   async run(ctx) {
-    ctx.batcher.update(db.collection(COLLECTIONS.collabs).doc(ctx.args.collabId.toString()), {
-      status: 3,
-      totalRevenue: ctx.args.totalRevenue.toString(),
-      endTime: ctx.block.timestamp,
-    });
+    ctx.batcher.update(
+      db
+        .collection(COLLECTIONS.collabs)
+        .doc(scopedId(ctx.envelope.chainId, ctx.args.collabId.toString())),
+      {
+        status: 3,
+        totalRevenue: ctx.args.totalRevenue.toString(),
+        endTime: ctx.block.timestamp,
+      }
+    );
   },
 };
 
@@ -100,9 +113,14 @@ const collabCancelled: Handler<typeof collabCancelledEvent> = {
   event: 'CollabCancelled',
   abi: collabCancelledEvent,
   async run(ctx) {
-    ctx.batcher.update(db.collection(COLLECTIONS.collabs).doc(ctx.args.collabId.toString()), {
-      status: 4,
-    });
+    ctx.batcher.update(
+      db
+        .collection(COLLECTIONS.collabs)
+        .doc(scopedId(ctx.envelope.chainId, ctx.args.collabId.toString())),
+      {
+        status: 4,
+      }
+    );
   },
 };
 

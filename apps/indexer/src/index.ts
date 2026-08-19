@@ -82,6 +82,8 @@ ponder.on('UniverseManager:UniverseCreated', async ({ event, context }) => {
     universeId: null, // We don't have direct access to the ID in the event
     creator: getAddress(event.args.creator),
     createdAt: Number(event.block.timestamp),
+    createdAtBlock: Number(event.block.number),
+    createdAtLogIndex: Number(event.log.logIndex),
     name: universeName,
     description: universeDescription,
     imageURL: imageURL,
@@ -140,38 +142,26 @@ ponder.on('UniverseManager:TokenCreated', async ({ event, context }) => {
     console.error('On-chain universe resolution failed, trying SQL fallback:', err);
   }
 
-  // Fallback: SQL query by deployer.
+  // Fallback: SQL query by deployer, scoped to universes emitted before this
+  // TokenCreated log and ordered by exact on-chain position (block number +
+  // log index). This resolves the race when a deployer creates multiple
+  // universes in the same block: only a universe created before the token log
+  // can be the parent, and the most recent such universe wins.
   //
-  // The on-chain back-resolution above scans the most recent 10 universes,
-  // which races when two universes are created in the same block (or within
-  // 10 universes of each other). This SQL fallback also races when one
-  // creator deploys multiple universes in a single session.
-  //
-  // To minimize collisions:
-  //   - Restrict the candidate row to the same block height (a tx that
-  //     creates a universe and tx that deploys its token must be within the
-  //     same block in the v3 deployer flow), AND
-  //   - Require the candidate has no tokenAddress yet (still empty),
-  //   - Order by createdAt DESC and take a single row.
-  //
-  // This is still not perfectly safe across reorgs / concurrent creates, but
-  // tightens the window from "any prior universe by this creator" to "the
-  // most-recent universe created in the same block by this creator", which is
-  // accurate for the canonical single-tx flow. Long-term fix: emit `universeId`
-  // in TokenCreated and switch to a direct lookup (contract change).
+  // Long-term fix: emit `universeId` in TokenCreated and switch to a direct
+  // lookup (contract change).
   if (resolvedUniverseAddress === '0x0000000000000000000000000000000000000000') {
     try {
       const deployerLower = deployer.toLowerCase();
-      // 60-second window matches the canonical create-then-deploy single-tx
-      // flow. Universes created earlier than that by the same deployer are
-      // assumed to belong to a separate session and not picked up here.
-      const tsLowerBound = Number(event.block.timestamp) - 60;
+      const tokenBlock = Number(event.block.number);
+      const tokenLogIndex = Number(event.log.logIndex);
       const universes = await context.db.sql.execute(sql`
         SELECT id FROM universe
         WHERE LOWER(creator) = ${deployerLower}
           AND "tokenAddress" IS NULL
-          AND "createdAt" >= ${tsLowerBound}
-        ORDER BY "createdAt" DESC
+          AND ("createdAtBlock" < ${tokenBlock}
+            OR ("createdAtBlock" = ${tokenBlock} AND "createdAtLogIndex" < ${tokenLogIndex}))
+        ORDER BY "createdAtBlock" DESC, "createdAtLogIndex" DESC
         LIMIT 1
       `);
       if (universes.rows.length > 0) {

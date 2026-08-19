@@ -76,6 +76,9 @@ contract TalentAgentRegistry is
     /// @notice agreementId → terms.
     mapping(bytes32 => Agreement) public agreements;
 
+    /// @notice Storage gap reserved for future upgrades.
+    uint256[50] private __gap;
+
     // ── Events ──────────────────────────────────────────────────────────
 
     event AgreementRegistered(

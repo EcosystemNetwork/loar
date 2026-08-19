@@ -57,6 +57,8 @@ export interface UploadJobData {
   userId: string;
   modelId?: string;
   prompt?: string;
+  filename?: string;
+  mimeType?: string;
 }
 
 export interface BackgroundJobData {

@@ -68,7 +68,7 @@ app.use('/*', rateLimiter({ windowMs: 60_000, max: 100 }));
 app.use(logger());
 
 // Support comma-separated CORS origins (e.g. "https://loar.fun,https://staging.loar.fun")
-const allowedOrigins = (env.CORS_ORIGIN || 'http://localhost:5173')
+const allowedOrigins = (env.CORS_ORIGIN || 'http://localhost:3001')
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
@@ -1142,12 +1142,15 @@ app.get('/health', async (c) => {
 
 // ── Start generation worker (in-process, if Redis configured) ─────────
 if (process.env.REDIS_URL) {
-  import('./workers/generation.worker')
-    .then(({ startGenerationWorker }) => {
-      const concurrency = parseInt(process.env.WORKER_CONCURRENCY || '5', 10);
-      startGenerationWorker(concurrency);
-    })
-    .catch((err) => console.warn('[worker] Failed to start generation worker:', err));
+  if (process.env.GENERATION_WORKER_DISABLED !== 'true') {
+    import('./workers/generation.worker')
+      .then(({ startGenerationWorker, startUploadWorker }) => {
+        const concurrency = parseInt(process.env.WORKER_CONCURRENCY || '5', 10);
+        startGenerationWorker(concurrency);
+        startUploadWorker(Math.max(1, Math.min(concurrency, 4)));
+      })
+      .catch((err) => console.warn('[worker] Failed to start generation worker:', err));
+  }
 
   // VLM worker — only spins up when GOOGLE_API_KEY is present, since every
   // kind of VLM job requires Gemini access. Opt out via VLM_WORKER_DISABLED=true.
@@ -1268,7 +1271,7 @@ import('./jobs/cost-alerts')
 const port = env.PORT;
 
 console.log(`Starting server on port ${port}`);
-console.log(`CORS origin: ${env.CORS_ORIGIN || 'http://localhost:5173 (default)'}`);
+console.log(`CORS origin: ${env.CORS_ORIGIN || 'http://localhost:3001 (default)'}`);
 console.log(`Environment: ${env.NODE_ENV}`);
 
 // Pricing audit — surfaces $0-cost ByteDance entries on boot so silent

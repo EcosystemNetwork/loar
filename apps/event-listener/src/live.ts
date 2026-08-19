@@ -21,13 +21,36 @@ import { client, chainId } from './rpc.js';
 import { db } from './firestore.js';
 import { loadCheckpoint, writeCheckpoint } from './checkpoint.js';
 import { ingestRange } from './ingest.js';
+import { chainConfig } from './chain-config.js';
+import { clearFactoryCache } from './factory.js';
 import { COLLECTIONS } from './schema.js';
 
 const CHAIN = env.LISTENER_CHAIN;
 
-// All indexer collections that hold per-event documents (i.e. have
-// `_event.blockHash` set). Checkpoints + factoryChildren are excluded because
-// they're keyed on stable identifiers and survive re-orgs.
+export function planLiveRanges(
+  lastIndexed: number,
+  head: number,
+  startBlock: number,
+  finalityDepth: number
+) {
+  const finalityCut = Math.max(startBlock - 1, head - finalityDepth);
+  const windowStart = Math.max(startBlock, finalityCut);
+  return {
+    finalityCut,
+    windowStart,
+    confirmedCatchup:
+      lastIndexed + 1 < windowStart ? { from: lastIndexed + 1, to: windowStart - 1 } : null,
+    confirmedBoundary: windowStart <= finalityCut ? { from: windowStart, to: finalityCut } : null,
+    unconfirmed:
+      Math.max(startBlock, finalityCut + 1) <= head
+        ? { from: Math.max(startBlock, finalityCut + 1), to: head }
+        : null,
+  };
+}
+
+// All indexer collections that carry an event envelope. A detected re-org
+// clears the affected chain projection and rebuilds it from the deployment
+// start block so mutable aggregates cannot retain orphaned event effects.
 const PER_EVENT_COLLECTIONS = [
   COLLECTIONS.universes,
   COLLECTIONS.tokens,
@@ -39,6 +62,7 @@ const PER_EVENT_COLLECTIONS = [
   COLLECTIONS.hookEvents,
   COLLECTIONS.nodes,
   COLLECTIONS.nodeCanonizations,
+  COLLECTIONS.episodeCanonizations,
   COLLECTIONS.nodeContents,
   COLLECTIONS.tokenTransfers,
   COLLECTIONS.tokenHolders,
@@ -55,6 +79,8 @@ const PER_EVENT_COLLECTIONS = [
   COLLECTIONS.licenses,
   COLLECTIONS.collabs,
   COLLECTIONS.bounties,
+  COLLECTIONS.eventReceipts,
+  COLLECTIONS.aggregateEventClaims,
 ];
 
 async function detectReorg(windowStart: number): Promise<number | null> {
@@ -66,6 +92,8 @@ async function detectReorg(windowStart: number): Promise<number | null> {
   // or, worse, false-positive a reorg and purge valid same-block data from the
   // sibling chain.
   for (const coll of [
+    COLLECTIONS.eventReceipts,
+    COLLECTIONS.aggregateEventClaims,
     COLLECTIONS.swaps,
     COLLECTIONS.bondingCurveTrades,
     COLLECTIONS.tokenTransfers,
@@ -88,56 +116,57 @@ async function detectReorg(windowStart: number): Promise<number | null> {
   return null;
 }
 
-async function purgeFromBlock(blockNumber: number): Promise<number> {
+async function purgeChainState(): Promise<number> {
   let totalDeleted = 0;
   for (const coll of PER_EVENT_COLLECTIONS) {
-    let deletedInColl = 0;
-    // Firestore `in` is capped, but we page by ranges on blockNumber. Filter
-    // by chainId so we don't purge the sibling chain's records from the
-    // shared collections.
     while (true) {
       const snap = await db
         .collection(coll)
         .where('_event.chainId', '==', chainId)
-        .where('_event.blockNumber', '>=', blockNumber)
         .limit(500)
         .get();
       if (snap.empty) break;
       const batch = db.batch();
       snap.docs.forEach((d) => batch.delete(d.ref));
       await batch.commit();
-      deletedInColl += snap.size;
+      totalDeleted += snap.size;
       if (snap.size < 500) break;
     }
-    totalDeleted += deletedInColl;
   }
 
-  // Also purge factoryChildren for the reorged range. Originally these were
-  // kept for stability across reorgs, but a reorg that *un-creates* a Universe
-  // leaves orphaned spawned-contract addresses in the registry — subsequent
-  // getLogs against those dead addresses returns empty (silently), masking
-  // the missing data. Re-derive the factoryChildren from the re-ingest path.
-  let childDeleted = 0;
   while (true) {
     const snap = await db
       .collection(COLLECTIONS.factoryChildren)
       .where('chain', '==', CHAIN)
-      .where('createdAtBlock', '>=', blockNumber)
       .limit(500)
       .get();
     if (snap.empty) break;
     const batch = db.batch();
     snap.docs.forEach((d) => batch.delete(d.ref));
     await batch.commit();
-    childDeleted += snap.size;
+    totalDeleted += snap.size;
     if (snap.size < 500) break;
   }
-  totalDeleted += childDeleted;
 
+  while (true) {
+    const snap = await db
+      .collection('episodes')
+      .where('indexerChainId', '==', chainId)
+      .limit(500)
+      .get();
+    if (snap.empty) break;
+    const batch = db.batch();
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+    totalDeleted += snap.size;
+    if (snap.size < 500) break;
+  }
+
+  clearFactoryCache();
   return totalDeleted;
 }
 
-export async function runLiveLoop(): Promise<never> {
+export async function runLiveLoop(onIndexed?: (block: number) => void): Promise<never> {
   logger.info({ poll_ms: env.LISTENER_POLL_INTERVAL_MS }, 'entering live loop');
   // Track local last-processed so we don't churn Firestore on every poll.
   let lastIndexed = (await loadCheckpoint())?.lastBlockIndexed ?? 0;
@@ -145,50 +174,56 @@ export async function runLiveLoop(): Promise<never> {
   while (true) {
     try {
       const head = Number(await client.getBlockNumber());
-      const windowStart = Math.max(lastIndexed + 1, head - env.LISTENER_FINALITY_DEPTH);
+      const { finalityCut, windowStart, confirmedCatchup, confirmedBoundary, unconfirmed } =
+        planLiveRanges(lastIndexed, head, chainConfig.startBlock, env.LISTENER_FINALITY_DEPTH);
 
       // Re-org check on the bottom of the window.
       const reorgAt = await detectReorg(windowStart);
       if (reorgAt !== null) {
         logger.warn({ reorgAt, windowStart }, 're-org detected, purging and re-ingesting');
-        const deleted = await purgeFromBlock(reorgAt);
+        const deleted = await purgeChainState();
         logger.info({ reorgAt, deleted }, 're-org purge complete');
-        lastIndexed = reorgAt - 1;
+        lastIndexed = chainConfig.startBlock - 1;
       }
 
-      if (head > lastIndexed) {
-        const from = lastIndexed + 1;
-        const to = head;
-        const finalityCut = head - env.LISTENER_FINALITY_DEPTH;
+      const step = env.LISTENER_BLOCK_RANGE;
 
-        // If the service was offline and the gap exceeds one RPC chunk, we
-        // must iterate — a single eth_getLogs over N blocks fails when N > the
-        // provider's per-call cap. Free-tier Alchemy caps at 10; PAYG at 2000+.
-        // Chunk size matches the backfill knob so live & backfill behave
-        // identically on catch-up.
-        const step = env.LISTENER_BLOCK_RANGE;
-
-        // Process confirmed portion (if any) first — these won't need rewrite.
-        if (finalityCut >= from) {
-          for (let cur = from; cur <= finalityCut; cur += step) {
-            const end = Math.min(cur + step - 1, finalityCut);
-            const { eventCount } = await ingestRange(cur, end, { unconfirmed: false });
-            logger.debug({ from: cur, to: end, eventCount }, 'ingested confirmed chunk');
-          }
+      // If the service was offline and the gap exceeds one RPC chunk, we
+      // must iterate — a single eth_getLogs over N blocks fails when N > the
+      // provider's per-call cap. Free-tier Alchemy caps at 10; PAYG at 2000+.
+      // Chunk size matches the backfill knob so live & backfill behave
+      // identically on catch-up.
+      if (confirmedCatchup) {
+        for (let cur = confirmedCatchup.from; cur <= confirmedCatchup.to; cur += step) {
+          const end = Math.min(cur + step - 1, confirmedCatchup.to);
+          const { eventCount } = await ingestRange(cur, end, { unconfirmed: false });
+          logger.debug({ from: cur, to: end, eventCount }, 'ingested confirmed chunk');
         }
-        // Then the unconfirmed window up to head.
-        const unconfirmedFrom = Math.max(from, finalityCut + 1);
-        if (unconfirmedFrom <= to) {
-          for (let cur = unconfirmedFrom; cur <= to; cur += step) {
-            const end = Math.min(cur + step - 1, to);
-            const { eventCount } = await ingestRange(cur, end, { unconfirmed: true });
-            logger.debug({ from: cur, to: end, eventCount }, 'ingested unconfirmed chunk');
-          }
-        }
-
-        await writeCheckpoint(head, head);
-        lastIndexed = head;
       }
+
+      // Process confirmed portion (if any) first — these won't need rewrite.
+      if (confirmedBoundary) {
+        const { eventCount } = await ingestRange(confirmedBoundary.from, confirmedBoundary.to, {
+          unconfirmed: false,
+        });
+        logger.debug(
+          { from: confirmedBoundary.from, to: confirmedBoundary.to, eventCount },
+          'ingested finality boundary'
+        );
+      }
+
+      // Then the unconfirmed window up to head.
+      if (unconfirmed) {
+        for (let cur = unconfirmed.from; cur <= unconfirmed.to; cur += step) {
+          const end = Math.min(cur + step - 1, unconfirmed.to);
+          const { eventCount } = await ingestRange(cur, end, { unconfirmed: true });
+          logger.debug({ from: cur, to: end, eventCount }, 'ingested unconfirmed chunk');
+        }
+      }
+
+      await writeCheckpoint(head, head);
+      lastIndexed = head;
+      onIndexed?.(head);
     } catch (err) {
       logger.error({ err: (err as Error).message }, 'live loop iteration failed');
     }

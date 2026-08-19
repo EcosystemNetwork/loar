@@ -50,7 +50,7 @@ const PORT = Number(process.env.PORT || 3334);
 const HOST = process.env.HOST || '0.0.0.0';
 const ISSUER = process.env.OAUTH_ISSUER || `http://${HOST}:${PORT}`;
 const LOAR_SERVER_URL = process.env.LOAR_SERVER_URL || 'http://localhost:3000';
-const LOAR_WEB_URL = process.env.LOAR_WEB_URL || 'http://localhost:5173';
+const LOAR_WEB_URL = process.env.LOAR_WEB_URL || 'http://localhost:3001';
 const SERVICE_KEY = process.env.MCP_GATEWAY_SERVICE_KEY;
 
 if (!process.env.OAUTH_JWT_SECRET) {

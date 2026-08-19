@@ -10,6 +10,7 @@ import { parseAbiItem, getAddress } from 'viem';
 import { db } from '../firestore.js';
 import {
   COLLECTIONS,
+  scopedId,
   type Hex,
   type Proposal,
   type ProposalExecution,
@@ -50,7 +51,12 @@ const proposalCreated: Handler<typeof proposalCreatedEvent> = {
       cancelled: false,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.proposals).doc(proposalId), doc);
+    ctx.batcher.set(
+      db
+        .collection(COLLECTIONS.proposals)
+        .doc(scopedId(ctx.envelope.chainId, `${ctx.address}:${proposalId}`)),
+      doc
+    );
   },
 };
 
@@ -60,7 +66,12 @@ const proposalExecuted: Handler<typeof proposalExecutedEvent> = {
   abi: proposalExecutedEvent,
   async run(ctx) {
     const proposalId = ctx.args.proposalId.toString();
-    ctx.batcher.update(db.collection(COLLECTIONS.proposals).doc(proposalId), { executed: true });
+    ctx.batcher.update(
+      db
+        .collection(COLLECTIONS.proposals)
+        .doc(scopedId(ctx.envelope.chainId, `${ctx.address}:${proposalId}`)),
+      { executed: true }
+    );
     const doc: ProposalExecution = {
       id: ctx.eventId,
       proposalId,
@@ -68,7 +79,12 @@ const proposalExecuted: Handler<typeof proposalExecutedEvent> = {
       timestamp: ctx.block.timestamp,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.proposalExecutions).doc(ctx.eventId), doc);
+    ctx.batcher.set(
+      db
+        .collection(COLLECTIONS.proposalExecutions)
+        .doc(scopedId(ctx.envelope.chainId, ctx.eventId)),
+      doc
+    );
   },
 };
 
@@ -78,7 +94,12 @@ const proposalCanceled: Handler<typeof proposalCanceledEvent> = {
   abi: proposalCanceledEvent,
   async run(ctx) {
     const proposalId = ctx.args.proposalId.toString();
-    ctx.batcher.update(db.collection(COLLECTIONS.proposals).doc(proposalId), { cancelled: true });
+    ctx.batcher.update(
+      db
+        .collection(COLLECTIONS.proposals)
+        .doc(scopedId(ctx.envelope.chainId, `${ctx.address}:${proposalId}`)),
+      { cancelled: true }
+    );
     const doc: ProposalCancellation = {
       id: ctx.eventId,
       proposalId,
@@ -86,7 +107,12 @@ const proposalCanceled: Handler<typeof proposalCanceledEvent> = {
       timestamp: ctx.block.timestamp,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.proposalCancellations).doc(ctx.eventId), doc);
+    ctx.batcher.set(
+      db
+        .collection(COLLECTIONS.proposalCancellations)
+        .doc(scopedId(ctx.envelope.chainId, ctx.eventId)),
+      doc
+    );
   },
 };
 
@@ -109,7 +135,10 @@ const voteCast: Handler<typeof voteCastEvent> = {
       timestamp: ctx.block.timestamp,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.votes).doc(id), doc);
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.votes).doc(scopedId(ctx.envelope.chainId, `${ctx.address}:${id}`)),
+      doc
+    );
   },
 };
 

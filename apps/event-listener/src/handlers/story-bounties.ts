@@ -9,7 +9,7 @@
  */
 import { parseAbiItem, getAddress } from 'viem';
 import { db } from '../firestore.js';
-import { COLLECTIONS } from '../schema.js';
+import { COLLECTIONS, scopedId } from '../schema.js';
 import type { Handler } from './types.js';
 
 const bountyCreatedEvent = parseAbiItem(
@@ -29,7 +29,7 @@ const bountyCreated: Handler<typeof bountyCreatedEvent> = {
   abi: bountyCreatedEvent,
   async run(ctx) {
     const id = ctx.args.bountyId.toString();
-    ctx.batcher.set(db.collection(COLLECTIONS.bounties).doc(id), {
+    ctx.batcher.set(db.collection(COLLECTIONS.bounties).doc(scopedId(ctx.envelope.chainId, id)), {
       id,
       poster: getAddress(ctx.args.poster).toLowerCase(),
       universeId: Number(ctx.args.universeId),
@@ -48,14 +48,18 @@ const bountyClaimed: Handler<typeof bountyClaimedEvent> = {
   abi: bountyClaimedEvent,
   async run(ctx) {
     const id = ctx.args.bountyId.toString();
-    ctx.batcher.set(db.collection(COLLECTIONS.bounties).doc(id), {
-      status: 'CLAIMED',
-      winner: getAddress(ctx.args.winner).toLowerCase(),
-      rewardPaid: ctx.args.reward.toString(),
-      platformFee: ctx.args.platformFee.toString(),
-      claimedAt: ctx.block.timestamp,
-      _event: ctx.envelope,
-    });
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.bounties).doc(scopedId(ctx.envelope.chainId, id)),
+      {
+        status: 'CLAIMED',
+        winner: getAddress(ctx.args.winner).toLowerCase(),
+        rewardPaid: ctx.args.reward.toString(),
+        platformFee: ctx.args.platformFee.toString(),
+        claimedAt: ctx.block.timestamp,
+        _event: ctx.envelope,
+      },
+      true
+    );
   },
 };
 
@@ -65,13 +69,17 @@ const bountyCancelled: Handler<typeof bountyCancelledEvent> = {
   abi: bountyCancelledEvent,
   async run(ctx) {
     const id = ctx.args.bountyId.toString();
-    ctx.batcher.set(db.collection(COLLECTIONS.bounties).doc(id), {
-      status: 'CANCELLED',
-      refund: ctx.args.refund.toString(),
-      cancelFee: ctx.args.fee.toString(),
-      cancelledAt: ctx.block.timestamp,
-      _event: ctx.envelope,
-    });
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.bounties).doc(scopedId(ctx.envelope.chainId, id)),
+      {
+        status: 'CANCELLED',
+        refund: ctx.args.refund.toString(),
+        cancelFee: ctx.args.fee.toString(),
+        cancelledAt: ctx.block.timestamp,
+        _event: ctx.envelope,
+      },
+      true
+    );
   },
 };
 
@@ -81,11 +89,15 @@ const bountyExpired: Handler<typeof bountyExpiredEvent> = {
   abi: bountyExpiredEvent,
   async run(ctx) {
     const id = ctx.args.bountyId.toString();
-    ctx.batcher.set(db.collection(COLLECTIONS.bounties).doc(id), {
-      status: 'EXPIRED',
-      expiredAt: ctx.block.timestamp,
-      _event: ctx.envelope,
-    });
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.bounties).doc(scopedId(ctx.envelope.chainId, id)),
+      {
+        status: 'EXPIRED',
+        expiredAt: ctx.block.timestamp,
+        _event: ctx.envelope,
+      },
+      true
+    );
   },
 };
 

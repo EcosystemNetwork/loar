@@ -2,7 +2,7 @@
  * Firebase Storage Router — direct operations on Google Cloud Storage.
  * Extracted from the root appRouter inline definition.
  */
-import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
+import { protectedProcedure, router } from '../../lib/trpc';
 import { z } from 'zod';
 import { firebaseStorageService } from '../../services/firebase-storage';
 import { wrapError } from '../../lib/errors';
@@ -52,7 +52,7 @@ export const firebaseStorageRouter = router({
   }),
 
   /** Get the public URL for a Firebase Storage key. */
-  getPublicUrl: publicProcedure.input(z.object({ key: z.string() })).query(({ input }) => {
+  getPublicUrl: protectedProcedure.input(z.object({ key: z.string() })).query(({ input }) => {
     return { url: firebaseStorageService.getPublicUrl(input.key) };
   }),
 });

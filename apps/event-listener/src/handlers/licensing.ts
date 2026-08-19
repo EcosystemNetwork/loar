@@ -5,7 +5,7 @@
  */
 import { parseAbiItem, getAddress } from 'viem';
 import { db } from '../firestore.js';
-import { COLLECTIONS, type Hex, type License } from '../schema.js';
+import { COLLECTIONS, scopedId, type Hex, type License } from '../schema.js';
 import type { Handler } from './types.js';
 
 const licenseCreatedEvent = parseAbiItem(
@@ -61,7 +61,10 @@ const licenseCreated: Handler<typeof licenseCreatedEvent> = {
       createdAt: ctx.block.timestamp,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.licenses).doc(id), doc);
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.licenses).doc(scopedId(ctx.envelope.chainId, id)),
+      doc
+    );
   },
 };
 
@@ -70,10 +73,15 @@ const licenseActivated: Handler<typeof licenseActivatedEvent> = {
   event: 'LicenseActivated',
   abi: licenseActivatedEvent,
   async run(ctx) {
-    ctx.batcher.update(db.collection(COLLECTIONS.licenses).doc(ctx.args.licenseId.toString()), {
-      status: 1,
-      startTime: ctx.block.timestamp,
-    });
+    ctx.batcher.update(
+      db
+        .collection(COLLECTIONS.licenses)
+        .doc(scopedId(ctx.envelope.chainId, ctx.args.licenseId.toString())),
+      {
+        status: 1,
+        startTime: ctx.block.timestamp,
+      }
+    );
   },
 };
 
@@ -82,10 +90,15 @@ const licenseRevoked: Handler<typeof licenseRevokedEvent> = {
   event: 'LicenseRevoked',
   abi: licenseRevokedEvent,
   async run(ctx) {
-    ctx.batcher.update(db.collection(COLLECTIONS.licenses).doc(ctx.args.licenseId.toString()), {
-      status: 3,
-      endTime: ctx.block.timestamp,
-    });
+    ctx.batcher.update(
+      db
+        .collection(COLLECTIONS.licenses)
+        .doc(scopedId(ctx.envelope.chainId, ctx.args.licenseId.toString())),
+      {
+        status: 3,
+        endTime: ctx.block.timestamp,
+      }
+    );
   },
 };
 

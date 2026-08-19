@@ -36,7 +36,7 @@ const schema = z.object({
   /** Blocks-from-head treated as unconfirmed (re-org window). */
   LISTENER_FINALITY_DEPTH: z.coerce.number().int().nonnegative().default(15),
 
-  /** HTTP health port. Railway overrides via PORT. */
+  /** HTTP health port. Override with LISTENER_PORT; falls back to PORT (Railway default). */
   PORT: z.coerce.number().int().positive().default(3400),
 
   /** Either FIREBASE_SERVICE_ACCOUNT (JSON string) or PATH must be set. */
@@ -49,7 +49,10 @@ const schema = z.object({
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
 });
 
-const parsed = schema.safeParse(process.env);
+// Railway sets PORT; the optional LISTENER_PORT override keeps `pnpm dev`
+// from using the root .env PORT=3000 and colliding with the API server.
+const listenerPortRaw = process.env.LISTENER_PORT || process.env.PORT;
+const parsed = schema.safeParse({ ...process.env, PORT: listenerPortRaw });
 if (!parsed.success) {
   console.error('❌ Event-listener env validation failed:');
   for (const issue of parsed.error.issues) {

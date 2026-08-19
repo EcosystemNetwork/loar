@@ -8,7 +8,7 @@
  */
 import { parseAbiItem, getAddress } from 'viem';
 import { db } from '../firestore.js';
-import { COLLECTIONS, type Hex, type AdSlot, type Sponsorship } from '../schema.js';
+import { COLLECTIONS, scopedId, type Hex, type AdSlot, type Sponsorship } from '../schema.js';
 import type { Handler } from './types.js';
 
 const adSlotCreatedEvent = parseAbiItem(
@@ -55,7 +55,10 @@ const adSlotCreated: Handler<typeof adSlotCreatedEvent> = {
       createdAt: ctx.block.timestamp,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.adSlots).doc(id), doc);
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.adSlots).doc(scopedId(ctx.envelope.chainId, id)),
+      doc
+    );
   },
 };
 
@@ -82,7 +85,10 @@ const sponsorshipActivated: Handler<typeof sponsorshipActivatedEvent> = {
       startedAt: ctx.block.timestamp,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.sponsorships).doc(id), doc);
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.sponsorships).doc(scopedId(ctx.envelope.chainId, id)),
+      doc
+    );
   },
 };
 

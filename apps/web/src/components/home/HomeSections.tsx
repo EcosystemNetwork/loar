@@ -790,7 +790,7 @@ export function Top10Strip({ universes }: { universes: EnrichedUniverse[] }) {
   if (sorted.length === 0) return null;
 
   return (
-    <section className="pt-20 pb-6">
+    <section className="py-6">
       <SectionHeader icon={Flame} title="Top 10 Universes" subtitle="Most active this week" />
       <ScrollRow>
         {sorted.map((u) => (

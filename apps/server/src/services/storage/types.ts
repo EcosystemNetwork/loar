@@ -59,8 +59,11 @@ export interface StorageManifest {
   mimeType: string;
   size: number;
   createdAt: number;
+  ownerIds?: string[];
   /** Populated on fresh uploads; absent on dedup hits returned from cache. */
   trace?: UploadTrace;
+  deletedAt?: number;
+  deletionResults?: Array<{ provider: string; deleted: boolean; error?: string }>;
 }
 
 export interface ProviderStatus {
@@ -81,6 +84,7 @@ export interface StorageProvider {
   upload(buffer: Buffer, filename: string, mimeType?: string): Promise<UploadResult>;
   uploadFromUrl(url: string, filename?: string): Promise<UploadResult>;
   download(contentId: string): Promise<Uint8Array>;
+  delete(contentId: string): Promise<void>;
   getPublicUrl(contentId: string): string;
 }
 

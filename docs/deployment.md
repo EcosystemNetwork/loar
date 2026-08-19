@@ -15,10 +15,11 @@ The stack is split across two deployment targets by design:
 | Service   | Dockerfile                | Port  | Health Check  | Platform     |
 | --------- | ------------------------- | ----- | ------------- | ------------ |
 | `server`  | `apps/server/Dockerfile`  | 3000  | `GET /health` | Docker (VPS) |
+| `worker`  | `apps/server/Dockerfile`  | —     | Process state | Docker (VPS) |
 | `indexer` | `apps/indexer/Dockerfile` | 42069 | `GET /health` | Docker (VPS) |
 | `web`     | —                         | —     | —             | Vercel (CDN) |
 
-The server and indexer connect via the `loar-network` bridge network. Each Dockerfile includes a `HEALTHCHECK` directive — Docker will restart unhealthy containers automatically with `restart: unless-stopped`.
+The server, generation worker, and indexer connect via the `loar-network` bridge network. The API exposes Redis and queue status through `GET /health`; the standalone worker is supervised by its container process.
 
 ## Quick Start (Local Development)
 
@@ -47,7 +48,7 @@ Railway auto-deploys from GitHub and manages containers, networking, and HTTPS f
 
 1. Create a [Railway](https://railway.com) project and connect your GitHub repo
 2. Add a **Redis** database: "+ New" → "Database" → "Add Redis". Railway exposes it as reference variable `${{Redis.REDIS_URL}}`.
-3. Add two services from the same repo:
+3. Add three services from the same repo:
 
 **Service 1: loar-server**
 
@@ -55,20 +56,31 @@ Railway auto-deploys from GitHub and manages containers, networking, and HTTPS f
 - Railway reads `apps/server/railway.toml` automatically
 - Set env vars in the Railway dashboard:
 
-| Variable                   | Required | Notes                                                                                          |
-| -------------------------- | -------- | ---------------------------------------------------------------------------------------------- |
-| `PORT`                     | Yes      | `3000`                                                                                         |
-| `NODE_ENV`                 | Yes      | `production`                                                                                   |
-| `SIWE_JWT_SECRET`          | Yes      | `openssl rand -hex 32`                                                                         |
-| `CORS_ORIGIN`              | Yes      | `https://loar.fun`                                                                             |
-| `FIREBASE_SERVICE_ACCOUNT` | Yes      | JSON string of service account                                                                 |
-| `RPC_URL`                  | Yes      | Base / Sepolia RPC URL                                                                         |
-| `LOAR_TOKEN_ADDRESS`       | Yes      | Token contract address                                                                         |
-| `TREASURY_ADDRESS`         | Yes      | Treasury wallet address                                                                        |
-| `REDIS_URL`                | Yes      | Set to `${{Redis.REDIS_URL}}` (reference). Without it, generation jobs run inline and time out |
-| AI keys, storage keys      | Optional | Features degrade gracefully without these                                                      |
+| Variable                     | Required | Notes                                                                                          |
+| ---------------------------- | -------- | ---------------------------------------------------------------------------------------------- |
+| `PORT`                       | Yes      | `3000`                                                                                         |
+| `NODE_ENV`                   | Yes      | `production`                                                                                   |
+| `SIWE_JWT_SECRET`            | Yes      | `openssl rand -hex 32`                                                                         |
+| `CORS_ORIGIN`                | Yes      | `https://loar.fun`                                                                             |
+| `FIREBASE_SERVICE_ACCOUNT`   | Yes      | JSON string of service account                                                                 |
+| `RPC_URL`                    | Yes      | Base / Sepolia RPC URL                                                                         |
+| `LOAR_TOKEN_ADDRESS`         | Yes      | Token contract address                                                                         |
+| `TREASURY_ADDRESS`           | Yes      | Treasury wallet address                                                                        |
+| `REDIS_URL`                  | Yes      | Set to `${{Redis.REDIS_URL}}` (reference). Without it, generation jobs run inline and time out |
+| `GENERATION_WORKER_DISABLED` | Yes      | `true`; generation jobs are consumed by the dedicated worker service                           |
+| AI keys, storage keys        | Optional | Features degrade gracefully without these                                                      |
 
-**Service 2: loar-indexer**
+**Service 2: loar-generation-worker**
+
+- Root directory: `apps/server`
+- Config file: `apps/server/railway.worker.toml`
+  - Railway does **not** auto-discover non-default `.toml` files. In the service settings, under Build & Deploy, set **Config File** to `apps/server/railway.worker.toml`.
+- Do not expose a public domain or configure an HTTP health-check path
+- Copy the server's Firebase, AI provider, storage, and `REDIS_URL` variables into this service
+- Set `WORKER_CONCURRENCY` to the number of generation jobs this replica may process concurrently (default `5`)
+- Scale this service independently; total concurrency is replicas × `WORKER_CONCURRENCY`
+
+**Service 3: loar-indexer**
 
 - Root directory: `apps/indexer`
 - Railway reads `apps/indexer/railway.toml` automatically

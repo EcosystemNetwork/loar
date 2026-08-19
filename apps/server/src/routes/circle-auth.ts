@@ -115,7 +115,11 @@ async function recordIssuance(email: string): Promise<void> {
     await db
       .collection('authOTPIssuances')
       .doc(email)
-      .set({ timestamps: fresh, updatedAt: new Date() });
+      .set({
+        timestamps: fresh,
+        updatedAt: new Date(),
+        expiresAt: new Date(now + OTP_ISSUE_WINDOW_MS),
+      });
     return;
   }
   memIssueLog.set(email, fresh);

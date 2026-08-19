@@ -9,8 +9,10 @@
 import { parseAbiItem, getAddress } from 'viem';
 import { db } from '../firestore.js';
 import { logger } from '../logger.js';
+import { runClaimedAggregateMutation } from '../idempotency.js';
 import {
   COLLECTIONS,
+  scopedId,
   type Hex,
   type IndexerNode,
   type NodeCanonization,
@@ -54,7 +56,10 @@ const nodeCreated: Handler<typeof nodeCreatedEvent> = {
       plotHash: (ctx.args.plotHash as Hex) ?? null,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.nodes).doc(compositeId), nodeDoc);
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.nodes).doc(scopedId(ctx.envelope.chainId, compositeId)),
+      nodeDoc
+    );
 
     const contentDoc: NodeContent = {
       id: compositeId,
@@ -64,22 +69,34 @@ const nodeCreated: Handler<typeof nodeCreatedEvent> = {
       plot: ctx.args.plot,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.nodeContents).doc(compositeId), contentDoc);
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.nodeContents).doc(scopedId(ctx.envelope.chainId, compositeId)),
+      contentDoc
+    );
 
     // Increment universe.nodeCount. Must transact — read-modify-write.
-    const universeRef = db.collection(COLLECTIONS.universes).doc(universeAddress);
-    await db.runTransaction(async (tx) => {
-      const snap = await tx.get(universeRef);
-      if (!snap.exists) return;
-      const current = snap.data() as { nodeCount: number };
-      tx.update(universeRef, { nodeCount: current.nodeCount + 1 });
-    });
+    const universeRef = db
+      .collection(COLLECTIONS.universes)
+      .doc(scopedId(ctx.envelope.chainId, universeAddress));
+    await runClaimedAggregateMutation(
+      db,
+      `universe-node-count:${universeAddress}`,
+      ctx.envelope,
+      async (tx) => {
+        const snap = await tx.get(universeRef);
+        if (!snap.exists) return false;
+        const current = snap.data() as { nodeCount: number };
+        tx.update(universeRef, { nodeCount: current.nodeCount + 1 });
+        return true;
+      }
+    );
 
     // Fun universes auto-canon every node so it surfaces on the cross-universe
     // landing rail without requiring a manual admin "Sync" or `publishAsCanon`
     // gesture. Monetized universes still go through the explicit on-chain
     // `setCanonForEpisode` + server `publishAsCanon` flow — landing real
     // estate for those is intentional, not a firehose of mints.
+    if (ctx.envelope.unconfirmed) return;
     const cinematicSnap = await db.collection('cinematicUniverses').doc(universeAddress).get();
     if (!cinematicSnap.exists) return;
     const universeType = (cinematicSnap.data()?.universeType as string | undefined) ?? 'monetized';
@@ -96,7 +113,7 @@ const nodeCreated: Handler<typeof nodeCreatedEvent> = {
         .slice(0, 120) || '';
     const title = firstLine || `Episode ${nodeId}`;
     const createdAtIso = new Date(Number(ctx.block.timestamp) * 1000).toISOString();
-    const episodeId = `auto-${universeAddress}-${nodeId}`;
+    const episodeId = `auto-${ctx.envelope.chainId}-${universeAddress}-${nodeId}`;
 
     ctx.batcher.set(db.collection('episodes').doc(episodeId), {
       id: episodeId,
@@ -125,6 +142,7 @@ const nodeCreated: Handler<typeof nodeCreatedEvent> = {
       sourceNodeIds: [String(nodeId)],
       sourceCreator: creator,
       sourceCreatedAt: Number(ctx.block.timestamp),
+      indexerChainId: ctx.envelope.chainId,
       autoCanon: true,
     });
   },
@@ -146,7 +164,10 @@ const canonChanged: Handler<typeof canonChangedEvent> = {
       timestamp: ctx.block.timestamp,
       _event: ctx.envelope,
     };
-    ctx.batcher.set(db.collection(COLLECTIONS.nodeCanonizations).doc(id), doc);
+    ctx.batcher.set(
+      db.collection(COLLECTIONS.nodeCanonizations).doc(scopedId(ctx.envelope.chainId, id)),
+      doc
+    );
   },
 };
 
@@ -161,7 +182,9 @@ const episodeCanonized: Handler<typeof episodeCanonizedEvent> = {
     // Mirror onto the episodes collection (server uses the same hash) so the
     // off-chain mirror reflects on-chain canon authoritatively.
     ctx.batcher.set(
-      db.collection(COLLECTIONS.episodeCanonizations).doc(`${universeAddress}:${episodeHash}`),
+      db
+        .collection(COLLECTIONS.episodeCanonizations)
+        .doc(scopedId(ctx.envelope.chainId, `${universeAddress}:${episodeHash}`)),
       {
         id: `${universeAddress}:${episodeHash}`,
         universeAddress,
@@ -184,13 +207,19 @@ const mediaUpdated: Handler<typeof mediaUpdatedEvent> = {
     const nodeId = Number(ctx.args.nodeId);
     const compositeId = `${universeAddress}:${nodeId}`;
 
-    ctx.batcher.update(db.collection(COLLECTIONS.nodeContents).doc(compositeId), {
-      contentHash: ctx.args.contentHash,
-      videoLink: ctx.args.link,
-    });
-    ctx.batcher.update(db.collection(COLLECTIONS.nodes).doc(compositeId), {
-      contentHash: ctx.args.contentHash,
-    });
+    ctx.batcher.update(
+      db.collection(COLLECTIONS.nodeContents).doc(scopedId(ctx.envelope.chainId, compositeId)),
+      {
+        contentHash: ctx.args.contentHash,
+        videoLink: ctx.args.link,
+      }
+    );
+    ctx.batcher.update(
+      db.collection(COLLECTIONS.nodes).doc(scopedId(ctx.envelope.chainId, compositeId)),
+      {
+        contentHash: ctx.args.contentHash,
+      }
+    );
   },
 };
 
@@ -200,9 +229,12 @@ const tokenUpdated: Handler<typeof tokenUpdatedEvent> = {
   abi: tokenUpdatedEvent,
   async run(ctx) {
     const universeAddress = ctx.address;
-    ctx.batcher.update(db.collection(COLLECTIONS.universes).doc(universeAddress), {
-      tokenAddress: getAddress(ctx.args.token).toLowerCase() as Hex,
-    });
+    ctx.batcher.update(
+      db.collection(COLLECTIONS.universes).doc(scopedId(ctx.envelope.chainId, universeAddress)),
+      {
+        tokenAddress: getAddress(ctx.args.token).toLowerCase() as Hex,
+      }
+    );
   },
 };
 

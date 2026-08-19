@@ -40,6 +40,10 @@ export class FirebaseAdapter implements StorageProvider {
     return firebaseStorageService.download(key);
   }
 
+  async delete(key: string): Promise<void> {
+    await firebaseStorageService.delete(key);
+  }
+
   getPublicUrl(key: string): string {
     return firebaseStorageService.getPublicUrl(key);
   }

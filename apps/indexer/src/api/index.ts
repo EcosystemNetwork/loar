@@ -21,7 +21,7 @@ const app = new Hono();
 
 // CORS — mirror apps/server: comma-separated allowlist via CORS_ORIGIN.
 // Browser clients (loar.fun) need this to fetch /graphql and REST endpoints.
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3001')
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
@@ -192,7 +192,7 @@ function getLimit(c: any): number {
   return Math.min(Math.max(1, raw), MAX_LIMIT);
 }
 
-app.get('/indexer-status', async (c) => {
+const indexerHealth = async (c: any) => {
   let dbStatus = 'ok';
   try {
     await db.select().from(universe).limit(1);
@@ -209,7 +209,10 @@ app.get('/indexer-status', async (c) => {
     timestamp: new Date().toISOString(),
     checks,
   });
-});
+};
+
+app.get('/health', indexerHealth);
+app.get('/indexer-status', indexerHealth);
 
 // NOTE: Raw SQL endpoint removed — use GraphQL instead.
 // Previously: app.use('/sql/*', client({ db, schema }));

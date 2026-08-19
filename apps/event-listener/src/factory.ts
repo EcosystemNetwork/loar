@@ -71,6 +71,10 @@ export async function recordFactoryChild(
     .set({ ...doc, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
 }
 
+export function clearFactoryCache(): void {
+  for (const addresses of Object.values(children)) addresses.clear();
+}
+
 export function getChildren(kind: FactoryChild['kind']): Hex[] {
   return [...children[kind]];
 }

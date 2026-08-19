@@ -19,4 +19,10 @@ declare module '@aws-sdk/client-kms' {
   export class GetPublicKeyCommand {
     constructor(input: { KeyId: string });
   }
+  export class GenerateDataKeyCommand {
+    constructor(input: { KeyId: string; KeySpec: string });
+  }
+  export class DecryptCommand {
+    constructor(input: { CiphertextBlob: Uint8Array });
+  }
 }

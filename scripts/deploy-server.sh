@@ -49,11 +49,14 @@ printf 'PREV_SHA=%s\nCURRENT_SHA=%s\nDEPLOY_TIME=%s\n' \
 # ── 3. Build & start containers ──────────────────────────────────────
 SERVER_REPLICAS="${SERVER_REPLICAS:-4}"
 WORKER_REPLICAS="${WORKER_REPLICAS:-2}"
+[ "$WORKER_REPLICAS" -ge 1 ] 2>/dev/null || die "WORKER_REPLICAS must be a positive integer" 2
 docker compose -f docker-compose.prod.yml build
 docker compose -f docker-compose.prod.yml up -d \
   --scale server="$SERVER_REPLICAS" \
   --scale worker="$WORKER_REPLICAS"
 docker compose -f docker-compose.prod.yml ps
+RUNNING_WORKERS=$(docker compose -f docker-compose.prod.yml ps --status running -q worker | wc -l | tr -d ' ')
+[ "$RUNNING_WORKERS" -eq "$WORKER_REPLICAS" ] || die "expected $WORKER_REPLICAS running workers, found $RUNNING_WORKERS"
 
 # ── 4. Wait for health endpoints (max 90s) ───────────────────────────
 log ""
@@ -62,7 +65,7 @@ READY=0
 for i in $(seq 1 18); do
   SRV=$(curl -sf --max-time 5 http://localhost/health         >/dev/null 2>&1 && echo ok || echo no)
   IDX=$(curl -sf --max-time 5 http://localhost:42069/health   >/dev/null 2>&1 && echo ok || echo no)
-  RDS=$(docker compose -f docker-compose.prod.yml exec -T redis redis-cli ping 2>/dev/null | grep -q PONG && echo ok || echo no)
+  RDS=$(docker compose -f docker-compose.prod.yml exec -T redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping' 2>/dev/null | grep -q PONG && echo ok || echo no)
   if [ "$SRV" = "ok" ] && [ "$IDX" = "ok" ] && [ "$RDS" = "ok" ]; then
     READY=1
     log "  All services responding after $((i * 5))s"
