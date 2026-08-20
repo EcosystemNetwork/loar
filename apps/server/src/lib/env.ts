@@ -275,9 +275,25 @@ export function validateEnv(): Env {
       );
     }
 
+    // NOTE: PROVIDER_KEY_KMS_KEY_ID is deliberately NOT required here.
+    //
+    // services/provider-keys/crypto.ts is envelope-aware: seal() falls back to
+    // AES-256-GCM under PROVIDER_KEY_MASTER_KEY when no KMS key is configured,
+    // and unseal() only calls AWS for blobs carrying the `kms:v1:` prefix. So
+    // KMS is an optional hardening step, not a functional dependency.
+    //
+    // Requiring it made the server refuse to boot in production, which took the
+    // API down while no AWS account existed and `userProviderKeys` held zero
+    // documents — i.e. it blocked every deploy to protect a feature with no
+    // users and no stored data. Warn instead, so the security gap stays visible
+    // without being fatal.
+    //
+    // Revisit when BYOK has real users: an env-var master key is readable by
+    // anyone with Railway dashboard access, whereas a KMS key is not extractable.
     if (env.PROVIDER_KEY_MASTER_KEY && !env.PROVIDER_KEY_KMS_KEY_ID) {
-      prodErrors.push(
-        'PROVIDER_KEY_KMS_KEY_ID is required in production when BYOK provider-key storage is enabled'
+      console.warn(
+        '⚠️  BYOK provider keys are sealed with PROVIDER_KEY_MASTER_KEY (env var). ' +
+          'Set PROVIDER_KEY_KMS_KEY_ID for HSM-backed envelope encryption before BYOK carries real user keys.'
       );
     }
 
