@@ -211,7 +211,10 @@ const indexerHealth = async (c: any) => {
   });
 };
 
-app.get('/health', indexerHealth);
+// NOTE: ponder reserves '/health' for its own liveness endpoint and fails the
+// build with "API route \"/health\" is reserved for internal use" if we register
+// it here. Ponder's built-in /health already answers liveness probes; this
+// richer payload stays available at /indexer-status.
 app.get('/indexer-status', indexerHealth);
 
 // NOTE: Raw SQL endpoint removed — use GraphQL instead.
