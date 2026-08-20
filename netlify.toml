@@ -1,0 +1,50 @@
+# Netlify config for the LOAR web app (apps/web), which serves loar.fun.
+#
+# DELIBERATELY NO [build] BLOCK. netlify.toml overrides the dashboard's build
+# settings, and the dashboard config currently builds and deploys correctly —
+# codifying a second source of truth here risks breaking a working deploy for
+# no gain. Everything below is purely additive: it fixes things that are
+# missing today and cannot affect whether the build succeeds.
+#
+# If you later want the build in version control, confirm the dashboard's
+# command/publish/base first, then add them here to match exactly.
+
+# ── SPA fallback ─────────────────────────────────────────────────────
+# Without this every deep link 404s: /gallery, /create, /universe/:id all
+# return Netlify's 404 page on direct navigation, refresh, or a shared link,
+# because no file exists at those paths. Netlify matches real static files
+# before applying a 200 rewrite, so /assets needs no exclusion (unlike the
+# regex carve-out vercel.json required for the same effect).
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
+
+# ── Security headers ─────────────────────────────────────────────────
+# Live responses currently carry only Strict-Transport-Security. These mirror
+# nginx.conf so the Netlify-served frontend matches the rest of the stack.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
+    X-Frame-Options           = "DENY"
+    X-Content-Type-Options    = "nosniff"
+    Referrer-Policy           = "strict-origin-when-cross-origin"
+    # Mirrors the meta tag in apps/web/index.html. Sent as a real header here —
+    # a meta http-equiv Permissions-Policy is ignored by most engines.
+    Permissions-Policy        = "local-network=(), loopback-network=()"
+
+# ── Caching ──────────────────────────────────────────────────────────
+# Vite emits content-hashed filenames under /assets, so they are immutable.
+# They are currently served max-age=0, must-revalidate, which re-fetches the
+# whole ~12MB bundle set on every visit.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# index.html must never be cached or clients pin to a stale build forever.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

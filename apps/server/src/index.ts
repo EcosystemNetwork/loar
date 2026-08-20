@@ -1088,12 +1088,32 @@ app.get('/', (c) => {
   return c.text('OK');
 });
 
+/**
+ * Bound a health probe so a hung dependency cannot hang the whole endpoint.
+ *
+ * Every check below talks to Redis, and none of the underlying clients carry a
+ * timeout: ioredis queues commands while a connection is down (enableOfflineQueue
+ * defaults to true), so `ping()` on a silently-dropped socket never settles.
+ * With no deadline here, `/health` hung indefinitely — past Railway's 30s
+ * healthcheckTimeout — so the platform marked healthy deploys as failed and
+ * restart-looped them. A probe must always answer; "degraded" is an answer,
+ * hanging is not.
+ */
+const HEALTH_CHECK_TIMEOUT_MS = 3_000;
+
+function withHealthTimeout<T>(p: Promise<T>, fallback: T): Promise<T> {
+  return Promise.race([
+    p.catch(() => fallback),
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), HEALTH_CHECK_TIMEOUT_MS)),
+  ]);
+}
+
 app.get('/health', async (c) => {
   const { firebaseAvailable } = await import('./lib/firebase');
   const { getPricingStatus } = await import('./services/pricing/heartbeat');
   const { isRedisHealthy } = await import('./lib/redis');
 
-  const redisHealthy = await isRedisHealthy();
+  const redisHealthy = await withHealthTimeout(isRedisHealthy(), false);
 
   const checks: Record<string, string> = {
     firebase: firebaseAvailable ? 'ok' : 'degraded',
@@ -1106,15 +1126,15 @@ app.get('/health', async (c) => {
   if (process.env.REDIS_URL) {
     try {
       const { getQueueMetrics } = await import('./lib/queue');
-      queueMetrics = await getQueueMetrics();
-      checks.queue = queueMetrics.healthy ? 'ok' : 'degraded';
+      queueMetrics = await withHealthTimeout(getQueueMetrics(), null);
+      checks.queue = queueMetrics ? (queueMetrics.healthy ? 'ok' : 'degraded') : 'degraded';
     } catch {
       checks.queue = 'not_initialized';
     }
 
     try {
       const { getAllCircuitStates } = await import('./lib/circuit-breaker');
-      circuitBreakers = await getAllCircuitStates();
+      circuitBreakers = await withHealthTimeout(getAllCircuitStates(), null);
     } catch {
       // Not initialized yet
     }
