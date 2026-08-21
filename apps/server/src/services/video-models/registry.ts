@@ -1296,6 +1296,13 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
   },
   {
     id: 'veo-30-google',
+    // DISABLED 2026-08-20: `veo-3.0-generate-001` returns 404 from the Gemini API
+    // (generativelanguage.googleapis.com) — verified with a live
+    // predictLongRunning probe. The `-001` GA ids are Vertex AI model names and
+    // are not served on the AI-Studio key surface this integration uses; only the
+    // `veo-3.1-*-preview` ids resolve. Leaving these visible meant a user picking
+    // "GA" (which reads as more stable than "preview") got a hard 500.
+    // Re-enable only if this moves to a Vertex AI credential + endpoint.
     provider: 'google',
     displayName: 'Veo 3.0 (Google Direct, GA)',
     shortDescription: 'Veo 3.0 GA — 720p+1080p',
@@ -1316,14 +1323,21 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     providerCostUsd: 2.4,
     fiatPriceUsd: withFiatMargin(2.4),
     loarPriceUsd: withLoarMargin(2.4),
-    isEnabled: true,
-    isVisibleToUsers: true,
+    isEnabled: false,
+    isVisibleToUsers: false,
     allowedPlans: [],
     tags: ['premium', 'google', 'veo', '3.0', 'ga'],
     bestFor: 'Veo 3.0 GA premium',
   },
   {
     id: 'veo-30-fast-google',
+    // DISABLED 2026-08-20: `veo-3.0-fast-generate-001` returns 404 from the Gemini API
+    // (generativelanguage.googleapis.com) — verified with a live
+    // predictLongRunning probe. The `-001` GA ids are Vertex AI model names and
+    // are not served on the AI-Studio key surface this integration uses; only the
+    // `veo-3.1-*-preview` ids resolve. Leaving these visible meant a user picking
+    // "GA" (which reads as more stable than "preview") got a hard 500.
+    // Re-enable only if this moves to a Vertex AI credential + endpoint.
     provider: 'google',
     displayName: 'Veo 3.0 Fast (Google Direct, GA)',
     shortDescription: 'Veo 3.0 Fast GA',
@@ -1344,8 +1358,8 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     providerCostUsd: 1.2,
     fiatPriceUsd: withFiatMargin(1.2),
     loarPriceUsd: withLoarMargin(1.2),
-    isEnabled: true,
-    isVisibleToUsers: true,
+    isEnabled: false,
+    isVisibleToUsers: false,
     allowedPlans: [],
     tags: ['standard', 'google', 'veo', '3.0', 'fast', 'ga'],
     bestFor: 'Veo 3.0 Fast GA — best balance of cost and quality',

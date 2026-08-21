@@ -29,6 +29,7 @@ const { verifyAuth } = await import('./lib/auth');
 const { securityHeaders } = await import('./middleware/security-headers');
 const { rateLimiter, aiRateLimiter } = await import('./middleware/rate-limit');
 const { errorHandler } = await import('./middleware/error-handler');
+const { redactSecrets } = await import('./lib/redact-secrets');
 const { csrfProtection } = await import('./middleware/csrf');
 const { z } = await import('zod');
 
@@ -1080,6 +1081,30 @@ app.use(
     router: appRouter,
     createContext: (_opts, context) => {
       return createContext({ context });
+    },
+    /**
+     * tRPC catches procedure errors internally and serialises them to the
+     * client, so they never reach Hono's app.onError. Without this hook a 500
+     * left nothing in the logs but the access-log line — a real provider
+     * failure (e.g. Veo returning 404 for a model id) was undiagnosable from
+     * the server side and had to be reverse-engineered from the client.
+     *
+     * Only INTERNAL_SERVER_ERROR is logged: the 4xx-mapped codes (UNAUTHORIZED,
+     * BAD_REQUEST, ...) are expected control flow and would drown the signal.
+     * `error.cause` carries the underlying provider error; it is redacted
+     * because provider messages sometimes echo the request, including keys.
+     */
+    onError: ({ error, path, type }) => {
+      if (error.code !== 'INTERNAL_SERVER_ERROR') return;
+      const cause = error.cause instanceof Error ? error.cause : undefined;
+      console.error(
+        `[trpc] ${type} ${path ?? '<unknown>'} failed: ` +
+          redactSecrets(cause?.message ?? error.message)
+      );
+      if (cause?.stack) console.error(redactSecrets(cause.stack));
+      void import('./lib/sentry').then(({ captureException, sentryEnabled }) => {
+        if (sentryEnabled) captureException(cause ?? error, { extra: { path, type } });
+      });
     },
   })
 );
