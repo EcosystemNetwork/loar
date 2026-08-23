@@ -1,4 +1,12 @@
-import { createPublicClient, createWalletClient, http, parseAbi, formatEther, decodeEventLog, getAddress } from 'viem';
+import {
+  createPublicClient,
+  createWalletClient,
+  http,
+  parseAbi,
+  formatEther,
+  decodeEventLog,
+  getAddress,
+} from 'viem';
 import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { readFileSync } from 'fs';
@@ -33,11 +41,21 @@ console.log(`  owner  : ${OWNER}`);
 
 // 1) simulate — catches reverts before spending anything
 const { request, result } = await pub.simulateContract({
-  address: UM, abi, functionName: 'createUniverse', args, account, value: 0n,
+  address: UM,
+  abi,
+  functionName: 'createUniverse',
+  args,
+  account,
+  value: 0n,
 });
-console.log(`  SIMULATION OK -> returns ${JSON.stringify(result, (k, x) => typeof x === 'bigint' ? x.toString() : x)}`);
+console.log(
+  `  SIMULATION OK -> returns ${JSON.stringify(result, (k, x) => (typeof x === 'bigint' ? x.toString() : x))}`
+);
 
-if (!APPLY) { console.log('\n  dry run — re-run with --apply to send'); process.exit(0); }
+if (!APPLY) {
+  console.log('\n  dry run — re-run with --apply to send');
+  process.exit(0);
+}
 
 // 2) execute
 const hash = await wallet.writeContract(request);
@@ -46,12 +64,20 @@ const rcpt = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });
 console.log(`  status : ${rcpt.status}  block ${rcpt.blockNumber}  gasUsed ${rcpt.gasUsed}`);
 
 // 3) parse the new universe address from logs
-let newAddr = null, newId = null;
+let newAddr = null,
+  newId = null;
 for (const log of rcpt.logs) {
   try {
     const d = decodeEventLog({ abi, data: log.data, topics: log.topics });
-    if (d.eventName === 'UniverseCreated') { newAddr = d.args.universe; newId = d.args.id; break; }
+    if (d.eventName === 'UniverseCreated') {
+      newAddr = d.args.universe;
+      newId = d.args.id;
+      break;
+    }
   } catch {}
 }
 console.log(`  NEW UNIVERSE: ${newAddr}  (onChainId ${newId})`);
-if (newAddr) { const { writeFileSync } = await import('fs'); writeFileSync(SCR + '/new_universe.txt', newAddr); }
+if (newAddr) {
+  const { writeFileSync } = await import('fs');
+  writeFileSync(SCR + '/new_universe.txt', newAddr);
+}
