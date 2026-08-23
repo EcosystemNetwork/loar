@@ -198,8 +198,11 @@ describe('nft router', () => {
 // firebaseStorage (legacy minio → renamed)
 // ---------------------------------------------------------------------------
 describe('firebaseStorage router', () => {
-  it('getPublicUrl is public', async () => {
-    const caller = createPublicCaller();
+  it('getPublicUrl requires auth', async () => {
+    // Was publicProcedure; hardened to protectedProcedure in a6bebb72 and
+    // this test was never updated to match — masked until now because CI
+    // wasn't reaching Server Tests.
+    const caller = createAuthCaller();
     const result = await caller.firebaseStorage.getPublicUrl({ key: 'videos/test.mp4' });
     expect(result).toHaveProperty('url');
   });
