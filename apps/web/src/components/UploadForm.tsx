@@ -110,11 +110,18 @@ export function UploadForm({
   const [entityId, setEntityId] = useState(defaultEntityId ?? '');
   const [entityName, setEntityName] = useState('');
 
-  const { data: myUniverses = [] } = useQuery({
+  const { data: myUniversesResult } = useQuery({
     queryKey: ['universes-by-creator', address],
     queryFn: () => trpcClient.universes.getByCreator.query({ creator: address! }),
     enabled: !!address,
   });
+  // getByCreator resolves { success, data, total } — never a bare array. Unwrap it the
+  // same way header.tsx/series.tsx/studio.tsx do, so a stray shape never breaks .map().
+  const myUniverses = Array.isArray((myUniversesResult as any)?.data)
+    ? (myUniversesResult as any).data
+    : Array.isArray(myUniversesResult)
+      ? myUniversesResult
+      : [];
 
   const { data: entitiesResult } = useQuery({
     queryKey: ['entities-by-universe', universeId],

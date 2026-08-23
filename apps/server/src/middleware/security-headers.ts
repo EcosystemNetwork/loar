@@ -29,6 +29,10 @@ const TRUSTED_MEDIA = [
   "'self'",
   'blob:',
   'https://storage.googleapis.com',
+  // Google-direct Veo's ephemeral Files API URL — only reached when the
+  // mirror-to-permanent-storage step falls back (it requires an API key
+  // to actually load, so this is a safety net, not the primary path).
+  'https://generativelanguage.googleapis.com',
   'https://*.firebasestorage.app',
   'https://*.pinata.cloud',
   'https://gateway.pinata.cloud',

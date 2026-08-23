@@ -111,6 +111,7 @@ export interface TimelineNodeData {
   nodeType?: 'scene' | 'branch' | 'add';
   isCanon?: boolean; // Whether this node is canonical
   isInCanonChain?: boolean; // Whether this node is part of the canonical chain
+  isDraft?: boolean; // Generated but not yet saved on-chain — lives only in this browser
   segmentCount?: number; // Number of video segments composing this event
   childCount?: number; // Number of child/branching nodes
   onAddScene?: (position: 'after' | 'branch', sourceNodeId?: string) => void;
@@ -415,6 +416,15 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                       className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold text-xs px-2 py-1"
                     >
                       Canon
+                    </Badge>
+                  )}
+                  {data.isDraft && (
+                    <Badge
+                      variant="default"
+                      className="bg-purple-500 hover:bg-purple-600 text-white font-bold text-xs px-2 py-1"
+                      title="Generated but not saved on-chain yet — click Save to make it permanent"
+                    >
+                      Unsaved
                     </Badge>
                   )}
                   {/* Scene control indicators */}

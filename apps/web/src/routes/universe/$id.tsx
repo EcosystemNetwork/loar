@@ -435,6 +435,7 @@ function UniverseTimelineEditorInner() {
   // Ref to track latest nodes without causing callback identity changes
   const nodesRef = useRef(nodes);
   nodesRef.current = nodes;
+  const createNodeFromGeneratedVideoRef = useRef<(videoUrl: string) => void>(() => {});
 
   // Contract hooks - we'll use the write contract directly for universe-specific contracts
   const { writeContractAsync } = useWriteContract();
@@ -755,6 +756,14 @@ function UniverseTimelineEditorInner() {
     setStatusMessage,
   });
 
+  // Stable trampoline into the ref above — keeps identity across renders so
+  // it doesn't churn useVideoGeneration's memoized handleGenerateVideo (which
+  // lists onVideoGenerated as a dep) on every render.
+  const handleVideoGenerated = useCallback(
+    (videoUrl: string) => createNodeFromGeneratedVideoRef.current(videoUrl),
+    []
+  );
+
   // Video generation - using extracted hook
   const {
     isGeneratingVideo,
@@ -769,6 +778,7 @@ function UniverseTimelineEditorInner() {
     videoPrompt,
     setGeneratedVideoUrl,
     setStatusMessage,
+    onVideoGenerated: handleVideoGenerated,
     universeId: id,
   });
 
@@ -2205,273 +2215,289 @@ function UniverseTimelineEditorInner() {
   }, []);
 
   // Handle creating actual event after dialog submission - Keep universe branch logic
-  const handleCreateEvent = useCallback(() => {
-    if (!videoTitle.trim()) return;
+  const handleCreateEvent = useCallback(
+    (completedVideoUrl?: string) => {
+      const videoUrl = completedVideoUrl ?? generatedVideoUrl;
+      const eventTitle =
+        videoTitle.trim() ||
+        (completedVideoUrl ? videoDescription.trim().slice(0, 80) || 'Untitled scene' : '');
+      if (!eventTitle || !videoUrl) return;
 
-    // Find source node if specified
-    const sourceNode = sourceNodeId
-      ? nodes.find((n) => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
-      : null;
-    const lastEventNode = nodes.filter((n: any) => n.data.nodeType === 'scene').pop();
-    const referenceNode = sourceNode || lastEventNode;
+      // Find source node if specified
+      const sourceNode = sourceNodeId
+        ? nodes.find((n) => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
+        : null;
+      const lastEventNode = nodes.filter((n: any) => n.data.nodeType === 'scene').pop();
+      const referenceNode = sourceNode || lastEventNode;
 
-    // Generate appropriate event ID based on addition type - Keep universe branch logic
-    let newEventId: string;
-    let newAddId: string;
+      // Generate appropriate event ID based on addition type - Keep universe branch logic
+      let newEventId: string;
+      let newAddId: string;
 
-    if (additionType === 'branch' && sourceNodeId) {
-      // For branches, add a letter suffix to the source node ID
-      const sourceEventId = sourceNodeId;
+      if (additionType === 'branch' && sourceNodeId) {
+        // For branches, add a letter suffix to the source node ID
+        const sourceEventId = sourceNodeId;
 
-      // Find all existing branches from this source node
-      const existingBranches = nodes.filter((n: any) => {
-        const eventId = n.data.eventId?.toString();
-        return eventId && eventId.startsWith(sourceEventId) && /[a-z]/.test(eventId);
-      });
+        // Find all existing branches from this source node
+        const existingBranches = nodes.filter((n: any) => {
+          const eventId = n.data.eventId?.toString();
+          return eventId && eventId.startsWith(sourceEventId) && /[a-z]/.test(eventId);
+        });
 
-      // Determine the next branch letter
-      const branchLetter = String.fromCharCode(98 + existingBranches.length); // 'b', 'c', 'd', etc.
-      newEventId = `${sourceEventId}${branchLetter}`;
-      newAddId = `add-${newEventId}`;
-    } else {
-      // For linear continuation, determine if we're continuing a branch or main timeline
-      const sceneNodes = nodes.filter((n: any) => n.data.nodeType === 'scene');
-
-      if (sceneNodes.length === 0) {
-        // First event
-        newEventId = '1';
+        // Determine the next branch letter
+        const branchLetter = String.fromCharCode(98 + existingBranches.length); // 'b', 'c', 'd', etc.
+        newEventId = `${sourceEventId}${branchLetter}`;
+        newAddId = `add-${newEventId}`;
       } else {
-        // Find the rightmost (last added) event to continue from
-        const lastNode = sceneNodes.reduce((latest: any, node: any) => {
-          if (!latest) return node;
-          // Compare positions to find the rightmost node
-          return node.position.x > latest.position.x ? node : latest;
-        }, null);
+        // For linear continuation, determine if we're continuing a branch or main timeline
+        const sceneNodes = nodes.filter((n: any) => n.data.nodeType === 'scene');
 
-        const lastEventId = lastNode?.data.eventId?.toString();
-
-        if (lastEventId && /[a-z]/.test(lastEventId)) {
-          // We're continuing a branch (e.g., from "1b" to "1c")
-          const baseNumber = lastEventId.replace(/[a-z]/g, '');
-          const lastLetter = lastEventId.match(/[a-z]/)?.[0] || 'a';
-          const nextLetter = String.fromCharCode(lastLetter.charCodeAt(0) + 1);
-          newEventId = `${baseNumber}${nextLetter}`;
+        if (sceneNodes.length === 0) {
+          // First event
+          newEventId = '1';
         } else {
-          // We're continuing the main timeline (e.g., from "2" to "3")
-          const maxEventId = sceneNodes.reduce((max: number, node: any) => {
-            const eventId = node.data.eventId;
-            if (eventId) {
-              // Extract numeric part only (ignore branch suffixes like 'b', 'c')
-              const numericId = parseInt(eventId.toString().replace(/[a-z]/g, ''));
-              return !isNaN(numericId) ? Math.max(max, numericId) : max;
-            }
-            return max;
-          }, 0);
-          newEventId = String(maxEventId + 1);
+          // Find the rightmost (last added) event to continue from
+          const lastNode = sceneNodes.reduce((latest: any, node: any) => {
+            if (!latest) return node;
+            // Compare positions to find the rightmost node
+            return node.position.x > latest.position.x ? node : latest;
+          }, null);
+
+          const lastEventId = lastNode?.data.eventId?.toString();
+
+          if (lastEventId && /[a-z]/.test(lastEventId)) {
+            // We're continuing a branch (e.g., from "1b" to "1c")
+            const baseNumber = lastEventId.replace(/[a-z]/g, '');
+            const lastLetter = lastEventId.match(/[a-z]/)?.[0] || 'a';
+            const nextLetter = String.fromCharCode(lastLetter.charCodeAt(0) + 1);
+            newEventId = `${baseNumber}${nextLetter}`;
+          } else {
+            // We're continuing the main timeline (e.g., from "2" to "3")
+            const maxEventId = sceneNodes.reduce((max: number, node: any) => {
+              const eventId = node.data.eventId;
+              if (eventId) {
+                // Extract numeric part only (ignore branch suffixes like 'b', 'c')
+                const numericId = parseInt(eventId.toString().replace(/[a-z]/g, ''));
+                return !isNaN(numericId) ? Math.max(max, numericId) : max;
+              }
+              return max;
+            }, 0);
+            newEventId = String(maxEventId + 1);
+          }
+        }
+        newAddId = `add-${newEventId}`;
+      }
+
+      // Calculate position based on addition type and depth in tree
+      let newEventPosition;
+      let newAddPosition;
+
+      const horizontalSpacing = 420;
+      const verticalSpacing = 320; // Match blockchain node spacing
+
+      if (additionType === 'branch' && sourceNode) {
+        // Create branch: same X depth as if it were a linear continuation, but offset vertically
+        // Count how many children the source node already has to position this branch correctly
+        const sourceChildren = nodes.filter((n: any) => {
+          const parentMatch = edges.find((e) => e.source === sourceNode.id && e.target === n.id);
+          return parentMatch && n.data.nodeType === 'scene';
+        });
+
+        const branchIndex = sourceChildren.length; // 0-based index for this new branch
+        const branchY = sourceNode.position.y + branchIndex * verticalSpacing;
+
+        // Use same X as linear continuation would use
+        newEventPosition = { x: sourceNode.position.x + horizontalSpacing, y: branchY };
+        newAddPosition = { x: sourceNode.position.x + horizontalSpacing * 2, y: branchY };
+      } else {
+        // Linear addition to the right of the reference node (or source node)
+        if (referenceNode) {
+          // Place after the specific reference/source node at same depth
+          newEventPosition = {
+            x: referenceNode.position.x + horizontalSpacing,
+            y: referenceNode.position.y,
+          };
+          newAddPosition = {
+            x: referenceNode.position.x + horizontalSpacing * 2,
+            y: referenceNode.position.y,
+          };
+        } else {
+          // No reference node, start fresh
+          newEventPosition = { x: 100, y: 100 };
+          newAddPosition = { x: 100 + horizontalSpacing, y: 100 };
         }
       }
-      newAddId = `add-${newEventId}`;
-    }
 
-    // Calculate position based on addition type and depth in tree
-    let newEventPosition;
-    let newAddPosition;
+      // Generate user-friendly display name - Keep it simple for universe branch
+      const displayName = newEventId;
 
-    const horizontalSpacing = 420;
-    const verticalSpacing = 320; // Match blockchain node spacing
-
-    if (additionType === 'branch' && sourceNode) {
-      // Create branch: same X depth as if it were a linear continuation, but offset vertically
-      // Count how many children the source node already has to position this branch correctly
-      const sourceChildren = nodes.filter((n: any) => {
-        const parentMatch = edges.find((e) => e.source === sourceNode.id && e.target === n.id);
-        return parentMatch && n.data.nodeType === 'scene';
-      });
-
-      const branchIndex = sourceChildren.length; // 0-based index for this new branch
-      const branchY = sourceNode.position.y + branchIndex * verticalSpacing;
-
-      // Use same X as linear continuation would use
-      newEventPosition = { x: sourceNode.position.x + horizontalSpacing, y: branchY };
-      newAddPosition = { x: sourceNode.position.x + horizontalSpacing * 2, y: branchY };
-    } else {
-      // Linear addition to the right of the reference node (or source node)
-      if (referenceNode) {
-        // Place after the specific reference/source node at same depth
-        newEventPosition = {
-          x: referenceNode.position.x + horizontalSpacing,
-          y: referenceNode.position.y,
-        };
-        newAddPosition = {
-          x: referenceNode.position.x + horizontalSpacing * 2,
-          y: referenceNode.position.y,
-        };
-      } else {
-        // No reference node, start fresh
-        newEventPosition = { x: 100, y: 100 };
-        newAddPosition = { x: 100 + horizontalSpacing, y: 100 };
-      }
-    }
-
-    // Generate user-friendly display name - Keep it simple for universe branch
-    const displayName = newEventId;
-
-    // Create new event node
-    const newEventNode: Node<TimelineNodeData> = {
-      id: newEventId,
-      type: 'timelineEvent',
-      position: newEventPosition,
-      data: {
-        label: videoTitle,
-        description: videoDescription,
-        videoUrl: generatedVideoUrl || undefined,
-        timelineColor: additionType === 'branch' ? '#f59e0b' : '#10b981',
-        nodeType: 'scene',
-        eventId: newEventId,
-        displayName: displayName, // User-friendly display name
-        timelineId: `timeline-${id}`,
-        universeId: id,
-        onAddScene: handleAddEvent,
-        onEditScene: handleEditScene,
-        onRegenerateScene: handleRegenerateScene,
-        onSwitchVersion: handleSwitchVersion,
-        onDeleteNode: handleDeleteNode,
-        isSelected: false,
-      },
-    };
-
-    // Create new add button node
-    const newAddNode: Node<TimelineNodeData> = {
-      id: newAddId,
-      type: 'timelineEvent',
-      position: newAddPosition,
-      data: {
-        label: '',
-        description: '',
-        nodeType: 'add',
-        onAddScene: handleAddEvent,
-      },
-    };
-
-    // Create edges
-    const newEdges: Edge[] = [];
-    const edgeColor = additionType === 'branch' ? '#f59e0b' : '#10b981';
-
-    if (referenceNode) {
-      newEdges.push({
-        id: `edge-${referenceNode.id}-${newEventId}`,
-        source: referenceNode.id,
-        target: newEventId,
-        animated: true,
-        style: { stroke: edgeColor, strokeWidth: 3 },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: edgeColor,
+      // Create new event node
+      const newEventNode: Node<TimelineNodeData> = {
+        id: newEventId,
+        type: 'timelineEvent',
+        position: newEventPosition,
+        data: {
+          label: eventTitle,
+          description: videoDescription,
+          videoUrl,
+          timelineColor: additionType === 'branch' ? '#f59e0b' : '#10b981',
+          nodeType: 'scene',
+          eventId: newEventId,
+          displayName: displayName, // User-friendly display name
+          timelineId: `timeline-${id}`,
+          universeId: id,
+          onAddScene: handleAddEvent,
+          onEditScene: handleEditScene,
+          onRegenerateScene: handleRegenerateScene,
+          onSwitchVersion: handleSwitchVersion,
+          onDeleteNode: handleDeleteNode,
+          isSelected: false,
         },
+      };
+
+      // Create new add button node
+      const newAddNode: Node<TimelineNodeData> = {
+        id: newAddId,
+        type: 'timelineEvent',
+        position: newAddPosition,
+        data: {
+          label: '',
+          description: '',
+          nodeType: 'add',
+          onAddScene: handleAddEvent,
+        },
+      };
+
+      // Create edges
+      const newEdges: Edge[] = [];
+      const edgeColor = additionType === 'branch' ? '#f59e0b' : '#10b981';
+
+      if (referenceNode) {
+        newEdges.push({
+          id: `edge-${referenceNode.id}-${newEventId}`,
+          source: referenceNode.id,
+          target: newEventId,
+          animated: true,
+          style: { stroke: edgeColor, strokeWidth: 3 },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: edgeColor,
+          },
+        });
+      }
+
+      newEdges.push({
+        id: `edge-${newEventId}-${newAddId}`,
+        source: newEventId,
+        target: newAddId,
+        animated: true,
+        style: { stroke: '#cbd5e1', strokeDasharray: '8,8' },
       });
-    }
 
-    newEdges.push({
-      id: `edge-${newEventId}-${newAddId}`,
-      source: newEventId,
-      target: newAddId,
-      animated: true,
-      style: { stroke: '#cbd5e1', strokeDasharray: '8,8' },
-    });
+      // For linear addition, remove old add nodes. For branches, keep everything
+      let filteredNodes = nodes;
+      let filteredEdges = edges;
 
-    // For linear addition, remove old add nodes. For branches, keep everything
-    let filteredNodes = nodes;
-    let filteredEdges = edges;
+      if (additionType === 'after') {
+        // Linear addition: remove all existing add nodes and their edges
+        filteredNodes = nodes.filter((n: any) => n.data.nodeType !== 'add');
+        filteredEdges = edges.filter(
+          (e: any) =>
+            !nodes.some(
+              (n: any) => n.data.nodeType === 'add' && (e.source === n.id || e.target === n.id)
+            )
+        );
+      }
+      // For branches: keep all existing nodes and just add the new ones
 
-    if (additionType === 'after') {
-      // Linear addition: remove all existing add nodes and their edges
-      filteredNodes = nodes.filter((n: any) => n.data.nodeType !== 'add');
-      filteredEdges = edges.filter(
-        (e: any) =>
-          !nodes.some(
-            (n: any) => n.data.nodeType === 'add' && (e.source === n.id || e.target === n.id)
-          )
-      );
-    }
-    // For branches: keep all existing nodes and just add the new ones
+      setNodes([...filteredNodes, newEventNode as any, newAddNode as any]);
+      setEdges([...filteredEdges, ...newEdges]);
+      setEventCounter((prev) => prev + 1);
 
-    setNodes([...filteredNodes, newEventNode as any, newAddNode as any]);
-    setEdges([...filteredEdges, ...newEdges]);
-    setEventCounter((prev) => prev + 1);
+      // Save event data to localStorage for ALL events (not just branched)
 
-    // Save event data to localStorage for ALL events (not just branched)
+      // Save ALL events to localStorage for now (easier debugging)
+      const eventData = {
+        eventId: newEventId,
+        title: eventTitle,
+        description: videoDescription,
+        videoUrl,
+        imageUrl: generatedImageUrl,
 
-    // Save ALL events to localStorage for now (easier debugging)
-    const eventData = {
-      eventId: newEventId,
-      title: videoTitle,
-      description: videoDescription,
-      videoUrl: generatedVideoUrl,
-      imageUrl: generatedImageUrl,
+        // Characters used in this event
+        characterIds: selectedCharacters, // Array of character IDs
+        characterNames:
+          selectedCharacters.length > 0 && charactersData?.characters
+            ? charactersData.characters
+                .filter((c: any) => selectedCharacters.includes(c.id))
+                .map((c: any) => c.character_name)
+            : [],
 
-      // Characters used in this event
-      characterIds: selectedCharacters, // Array of character IDs
-      characterNames:
-        selectedCharacters.length > 0 && charactersData?.characters
-          ? charactersData.characters
-              .filter((c: any) => selectedCharacters.includes(c.id))
-              .map((c: any) => c.character_name)
-          : [],
+        // Generation prompts and settings
+        imagePrompt: videoDescription, // The prompt used for image generation
+        videoPrompt: videoPrompt || videoDescription, // Video animation prompt
+        negativePrompt: negativePrompt || '', // Negative prompt for filtering unwanted content
 
-      // Generation prompts and settings
-      imagePrompt: videoDescription, // The prompt used for image generation
-      videoPrompt: videoPrompt || videoDescription, // Video animation prompt
-      negativePrompt: negativePrompt || '', // Negative prompt for filtering unwanted content
+        // Model and settings used
+        videoModel: selectedVideoModel, // Which AI model was used (veo3, kling, wan25, sora)
+        videoDuration: selectedVideoDuration, // Video duration in seconds
+        videoRatio: videoRatio, // Aspect ratio (16:9, 9:16, 1:1)
+        imageFormat: imageFormat, // Image format used
 
-      // Model and settings used
-      videoModel: selectedVideoModel, // Which AI model was used (veo3, kling, wan25, sora)
-      videoDuration: selectedVideoDuration, // Video duration in seconds
-      videoRatio: videoRatio, // Aspect ratio (16:9, 9:16, 1:1)
-      imageFormat: imageFormat, // Image format used
+        // Music/Soundtrack
+        soundtrackUrl: soundtrackUrl || '', // Music track URL
+        soundtrackName: soundtrackName || '', // Track name/title
 
-      // Music/Soundtrack
-      soundtrackUrl: soundtrackUrl || '', // Music track URL
-      soundtrackName: soundtrackName || '', // Track name/title
+        sourceNodeId: sourceNodeId,
+        additionType: additionType,
+        timestamp: Date.now(),
+        position: newEventPosition,
+      };
 
-      sourceNodeId: sourceNodeId,
-      additionType: additionType,
-      timestamp: Date.now(),
-      position: newEventPosition,
+      // Store in universe-specific localStorage
+      const storageKey = `universe_events_${id}`;
+      const existingEvents = localStorage.getItem(storageKey);
+      const eventsData = existingEvents ? JSON.parse(existingEvents) : {};
+
+      eventsData[newEventId] = eventData;
+      localStorage.setItem(storageKey, JSON.stringify(eventsData));
+
+      // Close dialog and reset
+      setShowVideoDialog(false);
+      setVideoTitle('');
+      setVideoDescription('');
+      setSourceNodeId(null);
+      setGeneratedImageUrl(null);
+      setGeneratedVideoUrl(null);
+      setShowVideoStep(false);
+    },
+    [
+      nodes,
+      edges,
+      eventCounter,
+      id,
+      videoTitle,
+      videoDescription,
+      additionType,
+      sourceNodeId,
+      handleAddEvent,
+      handleEditScene,
+      handleRegenerateScene,
+      handleSwitchVersion,
+      handleDeleteNode,
+      generatedVideoUrl,
+      generatedImageUrl,
+    ]
+  );
+
+  useEffect(() => {
+    createNodeFromGeneratedVideoRef.current = (videoUrl) => {
+      handleCreateEvent(videoUrl);
+      toast.success('Video generated and added to the timeline', {
+        description: 'Your new scene is ready in the editor.',
+      });
     };
-
-    // Store in universe-specific localStorage
-    const storageKey = `universe_events_${id}`;
-    const existingEvents = localStorage.getItem(storageKey);
-    const eventsData = existingEvents ? JSON.parse(existingEvents) : {};
-
-    eventsData[newEventId] = eventData;
-    localStorage.setItem(storageKey, JSON.stringify(eventsData));
-
-    // Close dialog and reset
-    setShowVideoDialog(false);
-    setVideoTitle('');
-    setVideoDescription('');
-    setSourceNodeId(null);
-    setGeneratedImageUrl(null);
-    setGeneratedVideoUrl(null);
-    setShowVideoStep(false);
-  }, [
-    nodes,
-    edges,
-    eventCounter,
-    id,
-    videoTitle,
-    videoDescription,
-    additionType,
-    sourceNodeId,
-    handleAddEvent,
-    handleEditScene,
-    handleRegenerateScene,
-    handleSwitchVersion,
-    handleDeleteNode,
-    generatedVideoUrl,
-    generatedImageUrl,
-  ]);
+  }, [handleCreateEvent]);
 
   // Convert blockchain data to timeline nodes
   useEffect(() => {
@@ -2650,6 +2676,79 @@ function UniverseTimelineEditorInner() {
           },
         });
       }
+    });
+
+    // ── Merge in unsaved local drafts ──────────────────────────────────────
+    // handleCreateEvent() fires automatically the moment a generation completes
+    // (see handleVideoGenerated below) so a freshly generated clip is placed on
+    // the canvas immediately rather than only living in transient dialog state.
+    // That node has no on-chain id yet, so without this step it would vanish
+    // the next time this effect reruns (e.g. graphData refetching on window
+    // refocus) — reproducing the exact "clip disappeared" bug this exists to
+    // fix. Re-inject any localEvents entry not yet backed by an on-chain node.
+    const onChainIds = new Set(
+      graphData.nodeIds.map((nodeIdStr) => normalizeNodeId(nodeIdStr).toString())
+    );
+    const draftEntries = Object.entries(localEvents)
+      .filter(([eventId, ev]: [string, any]) => !onChainIds.has(eventId) && ev?.videoUrl)
+      .sort((a: any, b: any) => (a[1].timestamp || 0) - (b[1].timestamp || 0));
+
+    let chainTailId: string | null =
+      blockchainNodes.length > 0 ? blockchainNodes[blockchainNodes.length - 1].id : null;
+    let chainTailPosition =
+      blockchainNodes.length > 0
+        ? blockchainNodes[blockchainNodes.length - 1].position
+        : { x: 100, y: 100 };
+
+    draftEntries.forEach(([eventId, ev]: [string, any]) => {
+      const position = ev.position || { x: chainTailPosition.x + 420, y: chainTailPosition.y };
+
+      blockchainNodes.push({
+        id: eventId,
+        type: 'timelineEvent',
+        position,
+        data: {
+          label: ev.title || 'Untitled scene',
+          description: ev.description || '',
+          videoUrl: ev.videoUrl,
+          timelineColor: '#a855f7',
+          nodeType: 'scene',
+          eventId,
+          displayName: eventId,
+          timelineId: `timeline-${id}`,
+          universeId: finalUniverse?.id || id,
+          isDraft: true,
+          onAddScene: handleAddEvent,
+          onEditScene: handleEditScene,
+          onRegenerateScene: handleRegenerateScene,
+          onSwitchVersion: handleSwitchVersion,
+          onDeleteNode: handleDeleteNode,
+          isSelected: false,
+        },
+      });
+
+      // An explicit branch source (on-chain or an earlier draft) if the user
+      // picked one when generating, otherwise chain off the current tail.
+      const explicitSourceId = ev.sourceNodeId
+        ? onChainIds.has(String(ev.sourceNodeId))
+          ? `blockchain-node-${normalizeNodeId(ev.sourceNodeId)}`
+          : String(ev.sourceNodeId)
+        : null;
+      const edgeSource = explicitSourceId || chainTailId;
+
+      if (edgeSource) {
+        blockchainEdges.push({
+          id: `edge-${edgeSource}-${eventId}`,
+          source: edgeSource,
+          target: eventId,
+          animated: true,
+          style: { stroke: '#a855f7', strokeWidth: 2, strokeDasharray: '4,4' },
+          markerEnd: { type: MarkerType.ArrowClosed, color: '#a855f7' },
+        });
+      }
+
+      chainTailId = eventId;
+      chainTailPosition = position;
     });
 
     // Add final + node to continue the timeline

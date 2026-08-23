@@ -255,7 +255,24 @@ async function processGenerationBody(
     try {
       const manager = getStorageManager();
       const filename = `generation-${data.generationId}.mp4`;
-      const response = await fetch(result.videoUrl!);
+      // Google's Gemini Files API (Google-direct Veo) scopes downloads to
+      // the API key that created them — an unauthenticated fetch 401s here.
+      const isGeminiFilesHost = (() => {
+        try {
+          return new URL(result.videoUrl!).hostname === 'generativelanguage.googleapis.com';
+        } catch {
+          return false;
+        }
+      })();
+      const response = await fetch(result.videoUrl!, {
+        headers:
+          isGeminiFilesHost && process.env.GOOGLE_API_KEY
+            ? { 'x-goog-api-key': process.env.GOOGLE_API_KEY }
+            : undefined,
+      });
+      if (!response.ok) {
+        throw new Error(`Source fetch failed: ${response.status} ${response.statusText}`);
+      }
       const arrayBuf = await response.arrayBuffer();
       const rawBuffer: Buffer = Buffer.from(new Uint8Array(arrayBuf));
 

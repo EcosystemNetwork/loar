@@ -52,6 +52,8 @@ export interface UseVideoGenerationProps {
   videoPrompt: string;
   setGeneratedVideoUrl: (url: string | null) => void;
   setStatusMessage: (message: StatusMessage | null) => void;
+  /** Lets an editor immediately place a completed video into its timeline. */
+  onVideoGenerated?: (url: string) => void;
   sceneControls?: SceneControlGenParams;
   universeId?: string;
 }
@@ -74,6 +76,7 @@ export function useVideoGeneration({
   videoPrompt,
   setGeneratedVideoUrl,
   setStatusMessage,
+  onVideoGenerated,
   sceneControls,
   universeId,
 }: UseVideoGenerationProps): UseVideoGenerationReturn {
@@ -175,6 +178,7 @@ export function useVideoGeneration({
       invalidateBalance(); // Refresh credit display after spend
       if (data.videoUrl) {
         setGeneratedVideoUrl(data.videoUrl);
+        onVideoGenerated?.(data.videoUrl);
 
         const modelNames: Record<string, string> = {
           'fal-veo3': 'Veo3',
@@ -369,6 +373,7 @@ ${videoRatio === '1:1' ? "[!] ISSUE: You selected 1:1 which Sora doesn't support
 
           if (result.videoUrl) {
             setGeneratedVideoUrl(result.videoUrl);
+            onVideoGenerated?.(result.videoUrl);
             setStatusMessage({
               type: 'success',
               title: 'Video Generated Successfully!',
@@ -410,6 +415,7 @@ ${videoRatio === '1:1' ? "[!] ISSUE: You selected 1:1 which Sora doesn't support
       videoPrompt,
       setGeneratedVideoUrl,
       setStatusMessage,
+      onVideoGenerated,
       checkCredits,
       invalidateBalance,
       sceneControls,

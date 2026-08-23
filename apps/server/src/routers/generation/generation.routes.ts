@@ -715,8 +715,26 @@ async function persistVideoToStorage(opts: {
     const filename = `generation-${opts.generationId}.mp4`;
     console.log(`[persist] Uploading ${filename} to permanent storage...`);
 
-    // Fetch the video, sign with C2PA provenance, then upload
-    const response = await fetch(opts.videoUrl);
+    // Fetch the video, sign with C2PA provenance, then upload. Google's
+    // Gemini Files API (Google-direct Veo) scopes downloads to the API key
+    // that created them — attach it or this 401s and the video is lost once
+    // Google's copy expires (see markRehostNeeded below).
+    const isGeminiFilesHost = (() => {
+      try {
+        return new URL(opts.videoUrl).hostname === 'generativelanguage.googleapis.com';
+      } catch {
+        return false;
+      }
+    })();
+    const response = await fetch(opts.videoUrl, {
+      headers:
+        isGeminiFilesHost && process.env.GOOGLE_API_KEY
+          ? { 'x-goog-api-key': process.env.GOOGLE_API_KEY }
+          : undefined,
+    });
+    if (!response.ok) {
+      throw new Error(`Source fetch failed: ${response.status} ${response.statusText}`);
+    }
     const arrayBuf = await response.arrayBuffer();
     let videoBuffer: Buffer = Buffer.from(new Uint8Array(arrayBuf));
 
@@ -2481,6 +2499,32 @@ export const generationRouter = router({
       if (result.status === 'failed' || result.error) {
         throw new Error(result.error || 'Video generation failed');
       }
+
+      // Google-direct Veo hands back a private, key-scoped Files API URL —
+      // a <video> tag can't attach the auth header it needs, so it renders
+      // blank, and it 404s within ~48h regardless. Mirror it to permanent
+      // storage now and swap the URL before it ever reaches the client —
+      // the same pattern the queue worker already uses for this provider.
+      if (isGoogle && result.videoUrl) {
+        try {
+          const manifest = await getStorageManager().uploadFromUrl(
+            result.videoUrl,
+            `legacy-video-${result.id || Date.now()}.mp4`,
+            ctx.user.uid
+          );
+          const permanentUrl = manifest.uploads[0]?.url;
+          if (!permanentUrl) throw new Error('Storage upload returned no URL');
+          result = { ...result, videoUrl: permanentUrl };
+        } catch (mirrorErr) {
+          await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);
+          const msg = mirrorErr instanceof Error ? mirrorErr.message : 'Storage mirror failed';
+          console.error(`[legacy video] Google mirror failed for ${result.id}:`, msg);
+          throw new Error(
+            `Video generated but could not be prepared for playback (${msg}). Credits refunded — please retry.`
+          );
+        }
+      }
+
       const legacyGenId = result.id || randomUUID();
       saveLegacyVideoRecord({
         id: legacyGenId,

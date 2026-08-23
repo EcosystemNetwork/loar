@@ -110,12 +110,28 @@ export async function fetchToBuffer(
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    // Google's Gemini Files API (used by Google-direct Veo video generation)
+    // scopes downloads to the API key that created them — an unauthenticated
+    // fetch gets a 401/403, silently failing the mirror-to-permanent-storage
+    // step. Attach the platform key when mirroring from that host. (Doesn't
+    // cover BYOK-generated files created with a different key.)
+    const isGeminiFilesHost = (() => {
+      try {
+        return new URL(url).hostname === 'generativelanguage.googleapis.com';
+      } catch {
+        return false;
+      }
+    })();
+
     // safeFetch validates + pins the resolved IP, so DNS rebinding between
     // the check and the connection cannot redirect us to link-local / cloud
     // metadata endpoints.
     const response = await safeFetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; LOARStorage/1.0)',
+        ...(isGeminiFilesHost && process.env.GOOGLE_API_KEY
+          ? { 'x-goog-api-key': process.env.GOOGLE_API_KEY }
+          : {}),
       },
       redirect: 'error',
       signal: controller.signal,
