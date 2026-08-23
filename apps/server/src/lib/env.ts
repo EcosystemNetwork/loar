@@ -75,8 +75,8 @@ const envSchema = z.object({
   TRUST_PROXY: z.enum(['true', 'false']).optional(),
 
   // ── Scaling ─────────────────────────────────────────────────────────────
-  MAX_CONCURRENT_GENERATIONS: z.string().default('50'),
-  MAX_QUEUED_GENERATIONS: z.string().default('200'),
+  MAX_CONCURRENT_GENERATIONS: z.string().default('100'),
+  MAX_QUEUED_GENERATIONS: z.string().default('400'),
   WORKER_CONCURRENCY: z.string().default('5'),
 
   // ── Stripe (optional — enables card payments) ────────────────────────────

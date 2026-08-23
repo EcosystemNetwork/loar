@@ -137,7 +137,7 @@ Gemini-backed media-understanding pipeline (moderation, canon checks, multimodal
 | `VLM_AUTO_EXTRACT`              | server | Auto-enqueue extract after every generation. Default `true`.                               |
 | `VLM_AUTO_HIDE_HIGH_RISK`       | server | Auto-hide content when risk=high (requires admin review to un-hide). Default `false`.      |
 | `VLM_EMBEDDINGS`                | server | Store `text-embedding-004` vectors on `sceneIndex` for similarity search. Default `false`. |
-| `VLM_EXTRACT_PER_USER_PER_HOUR` | server | Per-user rate limit for `vlm.extract.start`. Default `10`.                                 |
+| `VLM_EXTRACT_PER_USER_PER_HOUR` | server | Per-user rate limit for `vlm.extract.start`. Default `20`.                                 |
 | `VLM_USER_MONTHLY_USD`          | server | Per-user monthly VLM spend cap, USD. Default `5`.                                          |
 | `VLM_CROSS_MODEL`               | server | Ensemble Gemini + OpenAI for high-stakes checks. Default `false`.                          |
 | `VLM_MODERATION_ON_GENERATION`  | server | Run VLM moderation on every finished generation. Default `false`.                          |

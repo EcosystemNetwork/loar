@@ -349,7 +349,7 @@ export async function buildPackagesFromConfig(): Promise<CreditPackage[]> {
 
 // ── Generation Costs (credits per action) ─────────────────────────────
 
-const GENERATION_COSTS: Record<string, number> = {
+export const GENERATION_COSTS: Record<string, number> = {
   image: 3,
   video_draft: 5,
   video_standard: 13,
@@ -703,6 +703,13 @@ export const creditsRouter = router({
     .input(
       z.object({
         generationType: z.string().max(50),
+        // SEC-2: no longer trusted as the authoritative cost — see below.
+        // Kept accepted-but-ignored so existing callers don't break; the
+        // actual amount debited is always looked up server-side from
+        // GENERATION_COSTS so a caller can't self-declare an inflated cost
+        // (this endpoint has no reservation tying it to real generation work,
+        // so trusting a client-supplied amount let any active universe team
+        // member drain the shared pool).
         creditOverride: z.number().min(1).max(10_000).optional(),
         universeId: z.string().max(200).optional(),
         generationId: z.string().max(200).optional(),
@@ -728,7 +735,9 @@ export const creditsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const cost = input.creditOverride || GENERATION_COSTS[input.generationType] || 1;
+      // SEC-2: cost is always looked up server-side — `creditOverride` is
+      // intentionally ignored (see input schema comment above).
+      const cost = GENERATION_COSTS[input.generationType] ?? 1;
 
       // ── Universe pool path ────────────────────────────────────────
       if (input.useUniversePool && input.universeId) {

@@ -118,7 +118,14 @@ export async function verifyStripePayment(
     );
   }
 
-  const intent = await stripeClient.paymentIntents.retrieve(paymentIntentId);
+  // Expand `latest_charge` so we can verify the charge wasn't refunded or
+  // disputed after the PI moved to `succeeded`. Without this, an attacker
+  // could pay → refund/chargeback → still pass the `status === 'succeeded'`
+  // check and keep the credits (see entitlements.routes.ts unlockWithStripe
+  // for the sibling check this mirrors).
+  const intent = await stripeClient.paymentIntents.retrieve(paymentIntentId, {
+    expand: ['latest_charge'],
+  });
 
   if (intent.status !== 'succeeded') {
     throw new Error(
@@ -143,5 +150,18 @@ export async function verifyStripePayment(
     throw new Error(
       'Payment was not created by your account. You can only claim credits for your own payments.'
     );
+  }
+
+  // Refund / dispute defense — a succeeded PI whose underlying charge has
+  // since been refunded (full or partial) or disputed must not grant credits.
+  const latestCharge =
+    intent.latest_charge && typeof intent.latest_charge === 'object' ? intent.latest_charge : null;
+  if (latestCharge) {
+    if (latestCharge.refunded || (latestCharge.amount_refunded ?? 0) > 0) {
+      throw new Error('This payment has been refunded and can no longer be redeemed for credits.');
+    }
+    if (latestCharge.disputed) {
+      throw new Error('This payment has an open dispute and cannot be redeemed for credits.');
+    }
   }
 }

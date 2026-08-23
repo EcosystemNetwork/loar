@@ -252,7 +252,7 @@ docker compose -f docker-compose.prod.yml ps --format table
 ### Expected behaviour under overload
 
 - Rate limit (`rateLimiter` middleware) returns 429 **before** any of the above ceilings trip. User sees "too many requests".
-- Generation queue backs up — new jobs wait in BullMQ. The BullMQ admission gate (`MAX_QUEUED_GENERATIONS=200` in `.env.example`) rejects new jobs with a user-visible "platform is busy" error rather than letting the queue grow unbounded.
+- Generation queue backs up — new jobs wait in BullMQ. The BullMQ admission gate (`MAX_QUEUED_GENERATIONS=400` in `.env.example`) rejects new jobs with a user-visible "platform is busy" error rather than letting the queue grow unbounded.
 - Worker failures → circuit breakers open → client sees "provider unavailable", StorageManager falls over, job ends up in failed state and refund is issued.
 
 All three of these are already coded. The scaling knobs above only matter until you hit the first of those ceilings; after that, scaling workers further makes no difference until the ceiling is raised.

@@ -49,3 +49,6 @@ pubsub-debug.log
 
 # Rescued ephemeral media awaiting rehost (see scripts/backfill-ephemeral-generations.ts)
 rescued-media/
+
+# Local Netlify folder
+.netlify

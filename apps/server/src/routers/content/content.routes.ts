@@ -285,6 +285,44 @@ export const contentRouter = router({
     };
   }),
 
+  /**
+   * Get a content item for the versioned edit canvas.
+   *
+   * This deliberately remains separate from `get`: the public endpoint must
+   * not disclose private or unlisted assets, while an owner still needs their
+   * full asset record to open it in the editor.
+   */
+  getForEdit: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const doc = await contentCol().doc(input.id).get();
+      if (!doc.exists) return null;
+
+      const data = doc.data()!;
+      if (data.creatorUid !== ctx.user.uid) return null;
+
+      const status = data.contentStatus || 'active';
+      if (status !== 'active' && status !== 'reinstated') return null;
+
+      return {
+        id: doc.id,
+        title: data.title,
+        description: data.description,
+        mediaUrl: data.mediaUrl,
+        thumbnailUrl: data.thumbnailUrl || null,
+        mediaType: data.mediaType,
+        classification: data.classification,
+        tags: data.tags || [],
+        ipDeclaration: data.ipDeclaration,
+        creatorUid: data.creatorUid,
+        universeId: data.universeId || null,
+        visibility: data.visibility,
+        views: data.views || 0,
+        likes: data.likes || 0,
+        createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null,
+      };
+    }),
+
   /** Get content by creator UID (respects visibility) */
   getByCreator: publicProcedure
     .input(

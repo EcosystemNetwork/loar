@@ -110,10 +110,16 @@ export async function getRedisClientAsync(): Promise<any | null> {
  * Health check — returns true if Redis is connected and responding to PING.
  */
 export async function isRedisHealthy(): Promise<boolean> {
-  if (!redisClient || !redisReady) return false;
+  // Initialize the lazy singleton first. Without this, a health check that runs
+  // before any request has touched Redis reports "degraded" on a perfectly
+  // healthy instance — and keeps reporting it until something else happens to
+  // call getRedisClient(), which is exactly backwards for a readiness probe on
+  // a freshly started process.
+  const client = await getRedisClientAsync();
+  if (!client || !redisReady) return false;
 
   try {
-    const result = await redisClient.ping();
+    const result = await client.ping();
     return result === 'PONG';
   } catch {
     return false;

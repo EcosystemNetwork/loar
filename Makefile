@@ -27,6 +27,12 @@ install: ## Install all dependencies
 dev: ## Start all services (web + server + indexer)
 	pnpm dev
 
+dev-local: ## Start full local stack (redis + persistent Firestore emulator + apps)
+	@bash scripts/dev-local.sh
+
+dev-local-seed: ## Same as dev-local, but re-seed sample data first
+	@bash scripts/dev-local.sh --seed
+
 dev-web: ## Start web app only (port 3001)
 	pnpm dev:web
 

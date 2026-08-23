@@ -7,7 +7,7 @@ import { PlayerControls } from './PlayerControls';
 import { BranchStats } from './BranchStats';
 import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
-import { getIpfsUrlCandidates, resolveIpfsUrl } from '@/utils/ipfs-url';
+import { getIpfsUrlCandidatesPreferred, raceIpfsGateways, resolveIpfsUrl } from '@/utils/ipfs-url';
 import { useHlsVideo, isHlsUrl } from '@/hooks/useHlsVideo';
 
 interface NodeData {
@@ -140,8 +140,14 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
     return hlsUrl || currentNode?.mediaUrl || '';
   }, [currentNode?.contentHash, currentNode?.mediaUrl, hlsLookup]);
 
-  const srcCandidates = useMemo(() => getIpfsUrlCandidates(sourceUrl), [sourceUrl]);
-  const activeSrc = srcCandidates[srcIndex] || resolveIpfsUrl(sourceUrl);
+  const srcCandidates = useMemo(() => getIpfsUrlCandidatesPreferred(sourceUrl), [sourceUrl]);
+  // Ordered fallback chain, re-headed to whichever gateway raceIpfsGateways
+  // finds live/fastest — see the racing effect below.
+  const [orderedSrcCandidates, setOrderedSrcCandidates] = useState<string[]>(srcCandidates);
+  // True while we're probing gateways before committing a src. Skipped when
+  // there's nothing to race (single candidate, e.g. a non-IPFS HLS URL).
+  const [resolvingSrc, setResolvingSrc] = useState(srcCandidates.length > 1);
+  const activeSrc = resolvingSrc ? '' : orderedSrcCandidates[srcIndex] || resolveIpfsUrl(sourceUrl);
   const playingHls = isHlsUrl(activeSrc);
 
   // hls.js attaches itself to the <video> element when src is .m3u8. For
@@ -149,22 +155,56 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
   useHlsVideo(videoRef, playingHls ? activeSrc : null);
 
   // Reset src/error state whenever the source URL changes (branch switch
-  // OR HLS just became available for the current node).
+  // OR HLS just became available for the current node), and race the
+  // candidate gateways so we commit `src` to whichever is verified live and
+  // fastest instead of starting on the primary and waiting for a native
+  // `onerror` — which never fires on a hang, only a hard failure, and a
+  // stalled public gateway can hang for 20s+ before that happens.
   useEffect(() => {
     setSrcIndex(0);
     setHasError(false);
-    setIsBuffering(false);
+    setOrderedSrcCandidates(srcCandidates);
+
+    if (srcCandidates.length <= 1) {
+      setResolvingSrc(false);
+      setIsBuffering(false);
+      return;
+    }
+
+    setResolvingSrc(true);
+    setIsBuffering(true);
+    let cancelled = false;
+    const controller = new AbortController();
+    raceIpfsGateways(sourceUrl, { signal: controller.signal, timeoutMs: 2500 })
+      .then((best) => {
+        if (cancelled || !best) return;
+        setOrderedSrcCandidates((prev) => [best, ...prev.filter((c) => c !== best)]);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setResolvingSrc(false);
+          setIsBuffering(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+    // `srcCandidates` is a derived memo keyed on `sourceUrl`; keying this
+    // effect on `sourceUrl` avoids re-racing on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceUrl]);
 
   const handleVideoError = useCallback(() => {
-    if (srcIndex + 1 < srcCandidates.length) {
+    if (srcIndex + 1 < orderedSrcCandidates.length) {
       setSrcIndex(srcIndex + 1);
       setIsBuffering(true);
     } else {
       setIsBuffering(false);
       setHasError(true);
     }
-  }, [srcIndex, srcCandidates.length]);
+  }, [srcIndex, orderedSrcCandidates.length]);
 
   const retryPlayback = useCallback(() => {
     setHasError(false);

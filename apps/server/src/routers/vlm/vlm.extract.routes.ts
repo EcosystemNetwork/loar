@@ -16,7 +16,7 @@ import { getCostScope } from '../../services/cost-tracker';
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const RATE_LIMIT_COUNT = Math.max(
   1,
-  parseInt(process.env.VLM_EXTRACT_PER_USER_PER_HOUR || '10', 10)
+  parseInt(process.env.VLM_EXTRACT_PER_USER_PER_HOUR || '20', 10)
 );
 
 async function enforceRateLimit(uid: string) {

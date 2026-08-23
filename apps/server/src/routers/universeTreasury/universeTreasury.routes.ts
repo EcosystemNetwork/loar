@@ -20,7 +20,11 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { createPublicClient, http, parseUnits, type Hash } from 'viem';
 import { mainnet, sepolia } from 'viem/chains';
-import { DEFAULT_PACKAGES, buildPackagesFromConfig } from '../credits/credits.routes';
+import {
+  DEFAULT_PACKAGES,
+  buildPackagesFromConfig,
+  GENERATION_COSTS,
+} from '../credits/credits.routes';
 import { verifyStripePayment } from '../credits/stripe.routes';
 import { claimTxHash } from '../../services/tx-verify';
 import { getMembership } from '../universeTeam/universeTeam.routes';
@@ -451,6 +455,11 @@ export const universeTreasuryRouter = router({
       z.object({
         universeId: z.string().max(200),
         generationType: z.string().max(50),
+        // SEC-2: no longer trusted as the authoritative cost — accepted for
+        // backward compatibility but ignored. The amount actually debited is
+        // always looked up server-side from GENERATION_COSTS, since this
+        // endpoint has no reservation tying it to real generation work and a
+        // trusted client value let any active team member drain the pool.
         cost: z.number().min(1).max(100_000),
         generationId: z.string().max(200).optional(),
         modelId: z.string().max(100).optional(),
@@ -470,6 +479,9 @@ export const universeTreasuryRouter = router({
     .mutation(async ({ input, ctx }) => {
       const universeId = input.universeId.toLowerCase();
       const callerUid = ctx.user.uid.toLowerCase();
+      // SEC-2: cost is always looked up server-side — `cost` is
+      // intentionally ignored (see input schema comment above).
+      const cost = GENERATION_COSTS[input.generationType] ?? 1;
 
       // Verify membership
       const membership = (await getMembership(universeId, callerUid)) as any;
@@ -488,10 +500,10 @@ export const universeTreasuryRouter = router({
         const poolBalance = (poolDoc.data()?.balance as number) || 0;
         const poolSpent = (poolDoc.data()?.totalSpent as number) || 0;
 
-        if (poolBalance < input.cost) {
+        if (poolBalance < cost) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: `Universe credit pool is too low. Need ${input.cost}, available ${poolBalance}. Ask the universe admin to top up the pool.`,
+            message: `Universe credit pool is too low. Need ${cost}, available ${poolBalance}. Ask the universe admin to top up the pool.`,
           });
         }
 
@@ -512,17 +524,17 @@ export const universeTreasuryRouter = router({
           // Enforce cap only when a non-zero allowance is set (0 = unlimited)
           if (
             memberData.monthlyAllowance > 0 &&
-            usedThisMonth + input.cost > memberData.monthlyAllowance
+            usedThisMonth + cost > memberData.monthlyAllowance
           ) {
             throw new TRPCError({
               code: 'BAD_REQUEST',
-              message: `Monthly credit allowance exceeded. Allowance: ${memberData.monthlyAllowance}, used: ${usedThisMonth}, requested: ${input.cost}`,
+              message: `Monthly credit allowance exceeded. Allowance: ${memberData.monthlyAllowance}, used: ${usedThisMonth}, requested: ${cost}`,
             });
           }
 
           // Always update spend tracking for audit trail
           tx.update(memberRef, {
-            creditsUsedThisMonth: usedThisMonth + input.cost,
+            creditsUsedThisMonth: usedThisMonth + cost,
             allowancePeriodStart: sameMonth ? memberData.allowancePeriodStart : now,
             updatedAt: now,
           });
@@ -531,8 +543,8 @@ export const universeTreasuryRouter = router({
         tx.set(
           poolRef,
           {
-            balance: poolBalance - input.cost,
-            totalSpent: poolSpent + input.cost,
+            balance: poolBalance - cost,
+            totalSpent: poolSpent + cost,
             updatedAt: new Date(),
           },
           { merge: true }
@@ -545,19 +557,19 @@ export const universeTreasuryRouter = router({
           type: 'spend',
           spentByUid: callerUid,
           generationType: input.generationType,
-          credits: -input.cost,
+          credits: -cost,
           generationId: input.generationId ?? null,
           modelId: input.modelId ?? null,
           metadata: input.metadata ?? null,
           createdAt: new Date(),
         });
 
-        return poolBalance - input.cost;
+        return poolBalance - cost;
       });
 
       return {
         ok: true,
-        creditsSpent: input.cost,
+        creditsSpent: cost,
         remainingPoolBalance,
       };
     }),

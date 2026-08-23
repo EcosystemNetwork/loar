@@ -108,6 +108,22 @@ export async function reorderAttachments(
   creator: string,
   items: { id: string; sortOrder: number }[]
 ): Promise<void> {
+  if (items.length === 0) return;
+
+  // SEC-6: `creator` was previously accepted but never checked — any
+  // authenticated caller could reorder attachments belonging to someone
+  // else by ID (IDs are exposed via the public listByTarget/listByCreator
+  // endpoints, so they're discoverable, not secret). Verify ownership of
+  // every item up front, same as updateAttachment/deleteAttachment, before
+  // committing any writes.
+  const creatorLower = creator.toLowerCase();
+  const refs = items.map((item) => col().doc(item.id));
+  const snaps = await db.getAll(...refs);
+  for (const snap of snaps) {
+    if (!snap.exists) throw new Error(`Attachment not found: ${snap.id}`);
+    if (snap.data()!.creator !== creatorLower) throw new Error('Not authorized');
+  }
+
   const batch = db.batch();
   for (const item of items) {
     const ref = col().doc(item.id);

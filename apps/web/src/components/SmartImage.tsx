@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { decode as decodeBlurhash } from 'blurhash';
 import { cn } from '@/lib/utils';
-import { getIpfsUrlCandidates } from '@/utils/ipfs-url';
+import { getIpfsUrlCandidatesPreferred, raceIpfsGateways } from '@/utils/ipfs-url';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export interface SmartImageProps extends Omit<
@@ -71,21 +71,60 @@ export function SmartImage({
   onError,
   ...rest
 }: SmartImageProps) {
-  const candidates = useMemo(() => getIpfsUrlCandidates(src || ''), [src]);
+  const candidates = useMemo(() => getIpfsUrlCandidatesPreferred(src || ''), [src]);
+  // Ordered fallback chain, re-headed to whichever gateway raceIpfsGateways
+  // finds live/fastest — see the racing effect below. Starts as `candidates`
+  // and gets reordered once the race settles.
+  const [orderedCandidates, setOrderedCandidates] = useState<string[]>(candidates);
   const [candidateIdx, setCandidateIdx] = useState(0);
+  // True while we're probing gateways in parallel before committing a src.
+  // Skipped entirely when there's nothing to race (single candidate, e.g. a
+  // plain non-IPFS URL) so non-IPFS images never pay the probe round trip.
+  const [racing, setRacing] = useState(candidates.length > 1);
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
 
-  const activeSrc = candidates[candidateIdx] || '';
+  const activeSrc = racing ? '' : orderedCandidates[candidateIdx] || '';
 
   useEffect(() => {
+    setOrderedCandidates(candidates);
     setCandidateIdx(0);
     setLoaded(false);
     setErrored(false);
+
+    if (candidates.length <= 1) {
+      setRacing(false);
+      return;
+    }
+
+    // Race the candidate gateways (HEAD, in parallel) so we commit `src` to
+    // whichever one is verified live and fastest, instead of starting on the
+    // primary and waiting for a native `onerror` — which never fires on a
+    // hang, only a hard failure, and a stalled public gateway can hang for
+    // 20s+ before that happens.
+    setRacing(true);
+    let cancelled = false;
+    const controller = new AbortController();
+    raceIpfsGateways(src, { signal: controller.signal, timeoutMs: 2500 })
+      .then((best) => {
+        if (cancelled || !best) return;
+        setOrderedCandidates((prev) => [best, ...prev.filter((c) => c !== best)]);
+      })
+      .finally(() => {
+        if (!cancelled) setRacing(false);
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+    // `candidates` is a derived memo keyed on `src`; keying this effect on
+    // `src` avoids re-racing on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src]);
 
   const handleError: React.ReactEventHandler<HTMLImageElement> = (e) => {
-    if (candidateIdx + 1 < candidates.length) {
+    if (candidateIdx + 1 < orderedCandidates.length) {
       setCandidateIdx(candidateIdx + 1);
     } else {
       setErrored(true);
@@ -124,22 +163,24 @@ export function SmartImage({
         ) : (
           <Skeleton className="absolute inset-0 rounded-none" />
         ))}
-      <img
-        {...rest}
-        src={activeSrc}
-        srcSet={srcSet}
-        sizes={sizes}
-        alt={alt}
-        loading={priority ? 'eager' : 'lazy'}
-        decoding="async"
-        fetchPriority={priority ? 'high' : 'auto'}
-        onLoad={handleLoad}
-        onError={handleError}
-        className={cn(
-          'absolute inset-0 w-full h-full object-cover transition-opacity duration-300',
-          loaded ? 'opacity-100' : 'opacity-0'
-        )}
-      />
+      {activeSrc && (
+        <img
+          {...rest}
+          src={activeSrc}
+          srcSet={srcSet}
+          sizes={sizes}
+          alt={alt}
+          loading={priority ? 'eager' : 'lazy'}
+          decoding="async"
+          fetchPriority={priority ? 'high' : 'auto'}
+          onLoad={handleLoad}
+          onError={handleError}
+          className={cn(
+            'absolute inset-0 w-full h-full object-cover transition-opacity duration-300',
+            loaded ? 'opacity-100' : 'opacity-0'
+          )}
+        />
+      )}
     </div>
   );
 }

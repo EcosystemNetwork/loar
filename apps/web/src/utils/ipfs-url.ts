@@ -165,7 +165,7 @@ export function getIpfsUrlCandidates(url?: string | null): string[] {
 // or null if the chain is exhausted.
 export function getNextIpfsFallback(currentUrl?: string | null): string | null {
   if (!currentUrl) return null;
-  const candidates = getIpfsUrlCandidates(currentUrl);
+  const candidates = getIpfsUrlCandidatesPreferred(currentUrl);
   if (candidates.length <= 1) return null;
 
   const idx = candidates.findIndex((c) => c === currentUrl);
@@ -204,6 +204,12 @@ export async function raceIpfsGateways(
 
   return new Promise((resolve) => {
     let settled = false;
+    // Populated if/when our own dedicated gateway resolves (see below). Preferred
+    // over the public-gateway primary as the last-resort fallback, since it's the
+    // one we've actually measured as fast/reliable — the public primary is
+    // whatever public gateway happens to be first (ipfs.io), which is exactly the
+    // one known to occasionally hang for 20s+ before failing.
+    let dedicatedUrl: string | null = null;
     const controllers: AbortController[] = [];
 
     const finish = (result: string) => {
@@ -220,7 +226,9 @@ export async function raceIpfsGateways(
     };
 
     if (opts.signal) {
-      opts.signal.addEventListener('abort', () => finish(candidates[0]), { once: true });
+      opts.signal.addEventListener('abort', () => finish(dedicatedUrl || candidates[0]), {
+        once: true,
+      });
     }
 
     let pending = candidates.length;
@@ -230,14 +238,29 @@ export async function raceIpfsGateways(
       fetch(candidate, { method: 'HEAD', signal: controller.signal, mode: 'cors' })
         .then((res) => {
           if (res.ok) finish(candidate);
-          else if (--pending === 0) finish(candidates[0]);
+          else if (--pending === 0) finish(dedicatedUrl || candidates[0]);
         })
         .catch(() => {
-          if (--pending === 0) finish(candidates[0]);
+          if (--pending === 0) finish(dedicatedUrl || candidates[0]);
         });
     }
 
-    setTimeout(() => finish(candidates[0]), timeoutMs);
+    // Race our own dedicated gateway (server-signed, WEB-1) alongside the public
+    // gateways above. The server already serves this gateway live, so it needs no
+    // separate HEAD probe — first live result of either kind wins. Falls through
+    // to a no-op (resolves to the public primary) when VITE_SERVER_URL isn't
+    // configured, so dev without a server behaves exactly as before.
+    resolveIpfsUrlAsync(url)
+      .then((resolved) => {
+        if (!resolved || resolved === candidates[0]) return;
+        dedicatedUrl = resolved;
+        finish(resolved);
+      })
+      .catch(() => {
+        /* lookup failed — public gateway race still runs unaffected */
+      });
+
+    setTimeout(() => finish(dedicatedUrl || candidates[0]), timeoutMs);
   });
 }
 
@@ -278,4 +301,33 @@ export async function resolveIpfsUrlAsync(url?: string | null): Promise<string> 
   } catch {
     return resolveIpfsUrl(url);
   }
+}
+
+// Sync candidate chain, preferring our own dedicated gateway when it's already
+// warm in signedUrlCache (e.g. resolved earlier for this CID by this call
+// itself, by raceIpfsGateways, or by another element on the page). Used by
+// every *synchronous* fallback consumer — SmartImage, BranchingPlayer, and the
+// global onerror rotator in install-ipfs-fallback.ts — none of which can await
+// a network round trip mid-render or mid-event-handler.
+//
+// Cold cache (nothing resolved yet): behaves exactly like getIpfsUrlCandidates
+// and kicks off a background resolve so the *next* call — the next onerror hop
+// for this element, or any other element sharing the CID — has a shot at the
+// warm cache instead of falling through to whichever public gateway is
+// currently degraded.
+export function getIpfsUrlCandidatesPreferred(url?: string | null): string[] {
+  const candidates = getIpfsUrlCandidates(url);
+  if (candidates.length === 0) return candidates;
+
+  const parts = extractIpfsPath(url || candidates[0]);
+  const cacheKey = parts?.cidPath.split('?')[0];
+  const cached = cacheKey ? signedUrlCache.get(cacheKey) : undefined;
+  const dedicated = cached && cached.expiresAt > Date.now() ? cached.url : null;
+
+  // Fire-and-forget — resolveIpfsUrlAsync no-ops against its own cache when a
+  // fresh entry already exists, so this is cheap on repeated calls.
+  void resolveIpfsUrlAsync(url);
+
+  if (!dedicated || dedicated === candidates[0]) return candidates;
+  return [dedicated, ...candidates.filter((c) => c !== dedicated)];
 }

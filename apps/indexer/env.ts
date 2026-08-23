@@ -49,11 +49,13 @@ const DEFAULT_FALLBACKS: Record<(typeof VALID_CHAINS)[number], string[]> = {
   // publicnode 403s archive queries ("Archive requests require a personal token")
   // and rpc.sepolia.org now 404s. Ponder load-balances across every entry with
   // per-host RPS tracking, so more healthy hosts = proportionally faster backfill.
-  // Measured (500 sequential-wave archive eth_getLogs, 2026-07-30):
-  //   drpc          64 req/s, 10k-block ranges
+  // Measured (500 sequential-wave archive eth_getLogs):
   //   ethpandaops   63 req/s, 10k-block ranges
   //   tenderly      14 req/s, 100k-block ranges
   //   tatum        221 req/s, but caps eth_getLogs at 100 blocks
+  // Do NOT add drpc back: as of 2026-08-20 its free plan refuses Sepolia
+  // outright ("chain is not available on free plan"), and because ponder keeps
+  // a dead primary in rotation the whole backfill stalls at "Waiting to start".
   sepolia: [
     'https://rpc.sepolia.ethpandaops.io',
     'https://sepolia.gateway.tenderly.co',

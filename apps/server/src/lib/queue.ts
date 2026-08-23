@@ -255,8 +255,8 @@ export function getWebhookQueue(): Queue<WebhookJobData, WebhookJobResult> {
 
 // ── Admission Control ──────────────────────────────────────────────────
 
-const MAX_CONCURRENT_GENERATIONS = parseInt(process.env.MAX_CONCURRENT_GENERATIONS || '50', 10);
-const MAX_QUEUED_GENERATIONS = parseInt(process.env.MAX_QUEUED_GENERATIONS || '200', 10);
+const MAX_CONCURRENT_GENERATIONS = parseInt(process.env.MAX_CONCURRENT_GENERATIONS || '100', 10);
+const MAX_QUEUED_GENERATIONS = parseInt(process.env.MAX_QUEUED_GENERATIONS || '400', 10);
 
 // ── Degraded-mode (Redis-down) inline admission bound ───────────────────
 // When Redis is unavailable BullMQ can't track active/waiting jobs, so
@@ -267,7 +267,7 @@ const MAX_QUEUED_GENERATIONS = parseInt(process.env.MAX_QUEUED_GENERATIONS || '2
 // (no hard 503), but only up to a small concurrency ceiling, after which
 // callers get a "try again" signal. The counter is per-process and lost on
 // restart, which is fine — it only guards the transient Redis-outage window.
-const INLINE_DEGRADED_MAX = parseInt(process.env.MAX_INLINE_GENERATIONS_DEGRADED || '5', 10);
+const INLINE_DEGRADED_MAX = parseInt(process.env.MAX_INLINE_GENERATIONS_DEGRADED || '10', 10);
 let inlineDegradedActive = 0;
 
 /**

@@ -46,8 +46,8 @@ export function EditCanvasShell({ assetId }: { assetId: string }) {
   const [isKeeping, setIsKeeping] = useState(false);
 
   const contentQuery = useQuery({
-    queryKey: ['content', 'get', assetId],
-    queryFn: () => trpcClient.content.get.query({ id: assetId }),
+    queryKey: ['content', 'getForEdit', assetId],
+    queryFn: () => trpcClient.content.getForEdit.query({ id: assetId }),
     staleTime: 30_000,
   });
 
@@ -70,7 +70,7 @@ export function EditCanvasShell({ assetId }: { assetId: string }) {
       setPreview(null);
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['editJobs', 'listVersions', assetId] }),
-        qc.invalidateQueries({ queryKey: ['content', 'get', assetId] }),
+        qc.invalidateQueries({ queryKey: ['content', 'getForEdit', assetId] }),
       ]);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to save version');

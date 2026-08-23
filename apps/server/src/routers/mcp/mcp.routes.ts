@@ -10,9 +10,11 @@
  * See docs/prd-mcp-integration.md §5.
  *
  * Access: requires an authenticated caller. When the caller is an API-key
- * session with the `mcp_server` scope, `ownerAddress` is used to scope the
- * listing to the end-user's wallet (passed through from the MCP session).
- * For JWT/cookie sessions, defaults to `ctx.user.address`.
+ * session with the `mcp_server` scope, the listing is scoped to
+ * `ctx.user.endUserAddress` — the end-user's wallet, passed through from the
+ * MCP session's `X-Loar-End-User-Address` header and validated by auth.ts
+ * against the key's allowlist. For JWT/cookie sessions, defaults to
+ * `ctx.user.address`. Never trust a client-supplied address for scoping.
  */
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
@@ -20,8 +22,6 @@ import { protectedProcedure, router } from '../../lib/trpc';
 import { getUniverse, getUniversesByCreator } from '../universes/universes.handlers';
 import { getEntity, getEntitiesByCreator } from '../entities/entities.handlers';
 import { db, firebaseAvailable } from '../../lib/firebase';
-
-const ETH_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
 // ── URI helpers ────────────────────────────────────────────────────────
 
@@ -67,12 +67,19 @@ export const mcpRouter = router({
       z.object({
         cursor: z.string().optional(),
         types: z.array(z.enum(SUPPORTED_URI_TYPES)).optional(),
-        ownerAddress: z.string().regex(ETH_ADDRESS_RE, 'Invalid Ethereum address').optional(),
         limit: z.number().min(1).max(200).default(50),
       })
     )
     .query(async ({ input, ctx }) => {
-      const effectiveAddress = (input.ownerAddress ?? ctx.user.address ?? '').toLowerCase();
+      // SEC-5: previously accepted a client-supplied `ownerAddress` and used
+      // it directly, bypassing the validated MCP-session passthrough — any
+      // authenticated caller could list another wallet's universes/entities
+      // by simply naming it in the request body. The only place a caller may
+      // legitimately act as a different address is `ctx.user.endUserAddress`,
+      // which auth.ts has already checked against the API key's allowlist
+      // (isEndUserAddressAllowed); everything else falls back to the caller's
+      // own address.
+      const effectiveAddress = (ctx.user.endUserAddress ?? ctx.user.address ?? '').toLowerCase();
 
       const requestedTypes = input.types ?? [...SUPPORTED_URI_TYPES];
       const want = (t: UriType) => requestedTypes.includes(t);
@@ -190,6 +197,16 @@ export const mcpRouter = router({
         case 'universe': {
           const u = await getUniverse(parsed.id);
           if (!u) throw new TRPCError({ code: 'NOT_FOUND', message: 'Universe not found' });
+          // SEC-5: getUniverse() itself applies no visibility filtering —
+          // mirror universes.get's owner-or-not-hidden/private check here,
+          // otherwise any authenticated caller who knows a universe's
+          // address could read a private/hidden universe's full data.
+          const uData = (u as any)?.data ?? {};
+          const uCreator = (uData.creator as string | undefined)?.toLowerCase();
+          const isUniverseOwner = !!callerAddress && !!uCreator && callerAddress === uCreator;
+          if (!isUniverseOwner && (uData.isHidden || uData.isPrivate)) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Universe not found' });
+          }
           payload = u;
           break;
         }
@@ -230,7 +247,22 @@ export const mcpRouter = router({
           if (!doc.exists) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Profile not found' });
           }
-          payload = { id: doc.id, ...doc.data() };
+          const pData = doc.data() as any;
+          const isProfileOwner = !!callerAddress && callerAddress === addr;
+          // SEC-5: mirror profiles.getByUid's redaction — without this, a
+          // private profile's bio/socialLinks/layout leaked to any
+          // authenticated caller via the MCP resource read.
+          if (pData?.visibility === 'private' && !isProfileOwner) {
+            payload = {
+              id: doc.id,
+              displayName: pData.displayName,
+              username: pData.username,
+              avatarUrl: pData.avatarUrl || null,
+              visibility: 'private' as const,
+            };
+          } else {
+            payload = { id: doc.id, ...pData };
+          }
           break;
         }
         case 'credits': {

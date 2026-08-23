@@ -39,6 +39,7 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { safeFetch } from '../lib/url-validator';
 
 // The server runs as ESM, where `__dirname` is undefined — derive it from the
 // module URL (same approach as lib/firebase.ts) so the bundled workflow
@@ -127,7 +128,12 @@ function injectPlaceholders(template: string, values: Record<string, string | nu
 
 /** Upload a reference image to ComfyUI's input folder; returns the filename. */
 async function uploadImage(imageUrl: string): Promise<string> {
-  const res = await fetch(imageUrl);
+  // SEC-3: imageUrl is client-supplied (generation.routes.ts `imageUrl` input)
+  // — fetch it through the SSRF-safe helper (private-IP/loopback/metadata
+  // block + DNS-rebinding pin), same as every other server-side fetch of a
+  // user-supplied URL in this codebase. A raw `fetch()` here let an attacker
+  // point the server at internal/cloud-metadata hosts.
+  const res = await safeFetch(imageUrl);
   if (!res.ok) throw new Error(`Failed to fetch reference image (${res.status})`);
   const buf = Buffer.from(new Uint8Array(await res.arrayBuffer()));
 

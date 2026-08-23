@@ -121,8 +121,8 @@ export function isEndUserAddressAllowed(keyDoc: ApiKeyDoc, address: string): boo
 }
 
 /** Default rate limits per-key-per-minute for mcp_server vs direct keys. */
-export const MCP_SERVER_RATE_LIMIT = 300;
-export const DIRECT_KEY_RATE_LIMIT = 60;
+export const MCP_SERVER_RATE_LIMIT = 600;
+export const DIRECT_KEY_RATE_LIMIT = 120;
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -190,8 +190,8 @@ const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
 // counter is decremented by `releaseKeyConcurrencySlot` when the caller
 // finishes its work (typically in a `finally`).
 const concurrencyMap = new Map<string, number>();
-const MAX_CONCURRENT_PER_KEY_DEFAULT = 8;
-const MAX_CONCURRENT_PER_MCP_KEY_DEFAULT = 32;
+const MAX_CONCURRENT_PER_KEY_DEFAULT = 16;
+const MAX_CONCURRENT_PER_MCP_KEY_DEFAULT = 64;
 
 export function acquireKeyConcurrencySlot(keyId: string, isMcp: boolean): boolean {
   const cap = isMcp ? MAX_CONCURRENT_PER_MCP_KEY_DEFAULT : MAX_CONCURRENT_PER_KEY_DEFAULT;
