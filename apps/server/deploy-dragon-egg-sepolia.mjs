@@ -74,7 +74,9 @@ for (const log of rcpt.logs) {
       newId = d.args.id;
       break;
     }
-  } catch {}
+  } catch {
+    // Not a matching log — keep scanning.
+  }
 }
 console.log(`  NEW UNIVERSE: ${newAddr}  (onChainId ${newId})`);
 if (newAddr) {

@@ -26,7 +26,9 @@ export default tseslint.config(
     },
   },
   {
-    files: ['scripts/**/*.{js,mjs}', '**/*.config.{js,mjs}'],
+    // scripts/** covers the scripts dir; *.{js,mjs} (no dir prefix) covers
+    // one-off root-level CLI scripts like deploy-dragon-egg-sepolia.mjs.
+    files: ['scripts/**/*.{js,mjs}', '*.{js,mjs}', '**/*.config.{js,mjs}'],
     languageOptions: {
       globals: nodeGlobals,
     },
