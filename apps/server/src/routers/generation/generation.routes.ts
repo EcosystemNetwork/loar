@@ -2392,9 +2392,11 @@ export const generationRouter = router({
       }
 
       let result;
+      // Dispatch: Google-direct Veo → Google API; Seedance → ByteDance; everything else → FAL.
+      // Declared outside the try block — the post-generation storage mirror
+      // below needs to know isGoogle too.
+      const isGoogle = input.model?.endsWith('-google');
       try {
-        // Dispatch: Google-direct Veo → Google API; Seedance → ByteDance; everything else → FAL.
-        const isGoogle = input.model?.endsWith('-google');
         const isByteDance = input.model?.startsWith('bytedance/');
 
         // Scene Controls: Camera preset translation
