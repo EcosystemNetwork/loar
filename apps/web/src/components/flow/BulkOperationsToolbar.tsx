@@ -5,7 +5,7 @@
  * play, duplicate, assign to arc, toggle canon, audio tools, delete.
  */
 
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -61,7 +61,7 @@ interface BulkOperationsToolbarProps {
   onScriptToEpisode: () => void;
 }
 
-export function BulkOperationsToolbar({
+function BulkOperationsToolbarImpl({
   selectedNodeIds,
   nodes,
   arcs,
@@ -351,3 +351,5 @@ export function BulkOperationsToolbar({
     </div>
   );
 }
+
+export const BulkOperationsToolbar = memo(BulkOperationsToolbarImpl);

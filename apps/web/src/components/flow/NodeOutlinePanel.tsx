@@ -5,7 +5,7 @@
  * Supports search, click-to-navigate, arc badges, and drag reorder.
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, memo } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -174,7 +174,7 @@ function TreeNode({
   );
 }
 
-export function NodeOutlinePanel({
+function NodeOutlinePanelImpl({
   open,
   onOpenChange,
   nodes,
@@ -252,3 +252,5 @@ export function NodeOutlinePanel({
     </Sheet>
   );
 }
+
+export const NodeOutlinePanel = memo(NodeOutlinePanelImpl);

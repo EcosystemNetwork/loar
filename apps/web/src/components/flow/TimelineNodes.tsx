@@ -29,7 +29,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { LoarIcon } from '@/components/loar-icons';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
 import type { StylePresetId } from '../style-presets';
 
@@ -161,7 +161,7 @@ function getStyleColor(styleId: string | null | undefined): string {
   return STYLE_COLORS[styleId] || '#666';
 }
 
-export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
+function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
   const [displayVideoUrl, setDisplayVideoUrl] = useState<string | null>(data.videoUrl || null);
   const [isLoadingStorage, setIsLoadingStorage] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -605,3 +605,5 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
     </>
   );
 }
+
+export const TimelineEventNode = memo(TimelineEventNodeImpl);

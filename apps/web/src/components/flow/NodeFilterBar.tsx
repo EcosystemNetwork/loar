@@ -5,7 +5,7 @@
  * Provides free-text search, canon status filter, arc filter, and video filter.
  */
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, memo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Search, X, Filter, Sparkles, Film, Tag } from 'lucide-react';
@@ -34,7 +34,7 @@ interface NodeFilterBarProps {
   onClose: () => void;
 }
 
-export function NodeFilterBar({
+function NodeFilterBarImpl({
   filter,
   isActive,
   arcs,
@@ -190,3 +190,5 @@ export function NodeFilterBar({
     </div>
   );
 }
+
+export const NodeFilterBar = memo(NodeFilterBarImpl);

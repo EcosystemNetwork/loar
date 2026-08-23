@@ -6,7 +6,7 @@
  * pre-fill the creation dialog and save as a timeline event.
  */
 
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
@@ -47,7 +47,7 @@ interface GenerationsPanelProps {
   }) => void;
 }
 
-export function GenerationsPanel({
+function GenerationsPanelImpl({
   universeId,
   isOpen,
   onClose,
@@ -377,3 +377,5 @@ export function GenerationsPanel({
     </div>
   );
 }
+
+export const GenerationsPanel = memo(GenerationsPanelImpl);

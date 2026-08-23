@@ -40,6 +40,8 @@ export interface ImageModelConfig {
   loarPriceUsd: number; // user price at 25% margin (LOAR payments)
   isEnabled: boolean;
   isVisibleToUsers: boolean;
+  /** True when the model is cataloged but not runnable yet (no provider credit). Shown in the UI as "Coming Soon" and excluded from dispatch. */
+  comingSoon?: boolean;
   allowedPlans: string[]; // empty = all plans
   tags: string[];
   bestFor: string;

@@ -138,6 +138,8 @@ import { ScriptToEpisode } from '@/components/episodes/ScriptToEpisode';
 import { useIsMobile } from '@/hooks/useBreakpoint';
 import { useNodeArcs } from '@/hooks/useNodeArcs';
 import { useGraphLayout } from '@/hooks/useGraphLayout';
+import { useUniverseEvents } from '@/hooks/useUniverseEvents';
+import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { useNodeFilter } from '@/hooks/useNodeFilter';
 import type { ContextMenuState } from '@/components/flow/types';
 import { getSceneNodes } from '@/components/flow/types';
@@ -381,7 +383,14 @@ function UniverseTimelineEditorInner() {
 
   // Multi-select state
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // Generic confirm dialog — replaces window.confirm() so destructive actions
+  // (bulk delete, delete-from-dialog) get a themed, non-blocking prompt.
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    description: string;
+    confirmLabel?: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   // Node-swap state — bulk toolbar uses selection, context menu uses a marker
   const [swapMarkNodeId, setSwapMarkNodeId] = useState<string | null>(null);
@@ -431,11 +440,6 @@ function UniverseTimelineEditorInner() {
   const [miniMapShowLegend, setMiniMapShowLegend] = useState(true);
   const [miniMapShowEdges, setMiniMapShowEdges] = useState(true);
   const [isMiniMapHovered, setIsMiniMapHovered] = useState(false);
-
-  // Undo/redo state
-  const undoStack = useRef<{ nodes: Node<TimelineNodeData>[]; edges: Edge[] }[]>([]);
-  const redoStack = useRef<{ nodes: Node<TimelineNodeData>[]; edges: Edge[] }[]>([]);
-  const isUndoRedoAction = useRef(false);
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -663,7 +667,7 @@ function UniverseTimelineEditorInner() {
         setShowMotionBrush(false);
       } catch (err) {
         console.error('Failed to upload motion mask:', err);
-        alert('Failed to save motion mask. Please try again.');
+        toast.error('Failed to save motion mask. Please try again.');
       }
     },
     [selectedNode]
@@ -709,7 +713,7 @@ function UniverseTimelineEditorInner() {
       });
     },
     onError: (error) => {
-      alert('Failed to generate character. Please try again.');
+      toast.error('Failed to generate character. Please try again.');
       setIsGeneratingCharacter(false);
     },
   });
@@ -743,7 +747,7 @@ function UniverseTimelineEditorInner() {
       await refetchCharacters();
     },
     onError: (error) => {
-      alert('Failed to save character to database. Please try again.');
+      toast.error('Failed to save character to database. Please try again.');
     },
   });
 
@@ -872,7 +876,7 @@ function UniverseTimelineEditorInner() {
         throw new Error('No URL returned from storage');
       }
     } catch (error) {
-      alert('Failed to upload image. Please try again.');
+      toast.error('Failed to upload image. Please try again.');
     } finally {
       setIsUploading(false);
     }
@@ -943,6 +947,10 @@ function UniverseTimelineEditorInner() {
     [id]
   );
 
+  // Locally-cached event data (titles, descriptions, resolved media URLs,
+  // generation context) — see useUniverseEvents for the storage contract.
+  const { getStoredEvents, setStoredEvents } = useUniverseEvents(id);
+
   // Delete a single node
   const handleDeleteNode = useCallback(
     (eventId: string) => {
@@ -965,13 +973,9 @@ function UniverseTimelineEditorInner() {
       }
 
       // Remove from localStorage events
-      const storageKey = `universe_events_${id}`;
-      const storedEvents = localStorage.getItem(storageKey);
-      if (storedEvents) {
-        const eventsData = JSON.parse(storedEvents);
-        delete eventsData[eventId];
-        localStorage.setItem(storageKey, JSON.stringify(eventsData));
-      }
+      const eventsData = getStoredEvents();
+      delete eventsData[eventId];
+      setStoredEvents(eventsData);
 
       // Remove node and its connected edges from the flow
       setNodes((nds: any) => nds.filter((n: any) => n.id !== nodeFlowId));
@@ -987,7 +991,15 @@ function UniverseTimelineEditorInner() {
         return next;
       });
     },
-    [id, getArchivedNodeIds, saveArchivedNodeIds, setNodes, setEdges]
+    [
+      id,
+      getArchivedNodeIds,
+      saveArchivedNodeIds,
+      getStoredEvents,
+      setStoredEvents,
+      setNodes,
+      setEdges,
+    ]
   );
 
   // Delete all selected nodes
@@ -995,9 +1007,7 @@ function UniverseTimelineEditorInner() {
     if (selectedNodeIds.size === 0) return;
 
     const archived = getArchivedNodeIds();
-    const storageKey = `universe_events_${id}`;
-    const storedEvents = localStorage.getItem(storageKey);
-    const eventsData = storedEvents ? JSON.parse(storedEvents) : {};
+    const eventsData = getStoredEvents();
 
     // Process each selected node
     for (const nodeFlowId of selectedNodeIds) {
@@ -1016,7 +1026,7 @@ function UniverseTimelineEditorInner() {
     }
 
     saveArchivedNodeIds(archived);
-    localStorage.setItem(storageKey, JSON.stringify(eventsData));
+    setStoredEvents(eventsData);
 
     // Remove all selected nodes and their edges from the flow
     setNodes((nds: any) => nds.filter((n: any) => !selectedNodeIds.has(n.id)));
@@ -1026,8 +1036,15 @@ function UniverseTimelineEditorInner() {
 
     setSelectedNode(null);
     setSelectedNodeIds(new Set());
-    setShowDeleteConfirm(false);
-  }, [selectedNodeIds, id, getArchivedNodeIds, saveArchivedNodeIds, setNodes, setEdges]);
+  }, [
+    selectedNodeIds,
+    getArchivedNodeIds,
+    saveArchivedNodeIds,
+    getStoredEvents,
+    setStoredEvents,
+    setNodes,
+    setEdges,
+  ]);
 
   // Swap the on-chain content of two ReactFlow nodes. The DAG (parents/positions)
   // stays put; contentHash + plotHash are exchanged on-chain, and we mirror the
@@ -1209,44 +1226,8 @@ function UniverseTimelineEditorInner() {
   }, [selectedNodeIds, nodes]);
 
   // ── Undo / Redo ────────────────────────────────────────────────────
-  const pushUndoState = useCallback(() => {
-    undoStack.current.push({
-      nodes: JSON.parse(JSON.stringify(nodesRef.current)),
-      edges: JSON.parse(JSON.stringify(edges)),
-    });
-    if (undoStack.current.length > 50) undoStack.current.shift();
-    redoStack.current = [];
-  }, [edges]);
-
-  const handleUndo = useCallback(() => {
-    const prev = undoStack.current.pop();
-    if (!prev) return;
-    isUndoRedoAction.current = true;
-    redoStack.current.push({
-      nodes: JSON.parse(JSON.stringify(nodesRef.current)),
-      edges: JSON.parse(JSON.stringify(edges)),
-    });
-    setNodes(prev.nodes as any);
-    setEdges(prev.edges);
-    requestAnimationFrame(() => {
-      isUndoRedoAction.current = false;
-    });
-  }, [edges, setNodes, setEdges]);
-
-  const handleRedo = useCallback(() => {
-    const next = redoStack.current.pop();
-    if (!next) return;
-    isUndoRedoAction.current = true;
-    undoStack.current.push({
-      nodes: JSON.parse(JSON.stringify(nodesRef.current)),
-      edges: JSON.parse(JSON.stringify(edges)),
-    });
-    setNodes(next.nodes as any);
-    setEdges(next.edges);
-    requestAnimationFrame(() => {
-      isUndoRedoAction.current = false;
-    });
-  }, [edges, setNodes, setEdges]);
+  const { pushUndoState, handleUndo, handleRedo, canUndo, canRedo, isUndoRedoAction } =
+    useUndoRedo<TimelineNodeData>(nodes, edges, setNodes as any, setEdges, 50);
 
   // ── Node Search ───────────────────────────────────────────────────
   const searchResults = useMemo(() => {
@@ -1383,9 +1364,7 @@ function UniverseTimelineEditorInner() {
       if (!eventId) return;
 
       // Load current video URL from localStorage or from the node
-      const storageKey = `universe_events_${id}`;
-      const storedEvents = localStorage.getItem(storageKey);
-      const eventsData = storedEvents ? JSON.parse(storedEvents) : {};
+      const eventsData = getStoredEvents();
       const eventData = eventsData[eventId];
 
       // Also check the current node in the flow for its videoUrl
@@ -1400,7 +1379,7 @@ function UniverseTimelineEditorInner() {
       setEditVideoPreview(currentUrl || null);
       setEditVideoDialogOpen(true);
     },
-    [id]
+    [getStoredEvents]
   );
 
   // Regenerate a scene's video using the same generation context
@@ -1409,19 +1388,19 @@ function UniverseTimelineEditorInner() {
       if (!eventId || regeneratingEventId) return;
 
       // Load the event's generation context from localStorage
-      const storageKey = `universe_events_${id}`;
-      const storedEvents = localStorage.getItem(storageKey);
-      const eventsData = storedEvents ? JSON.parse(storedEvents) : {};
+      const eventsData = getStoredEvents();
       const eventData = eventsData[eventId];
 
       if (!eventData) {
-        alert('No generation context found for this event. Use Edit to change the video instead.');
+        toast.error(
+          'No generation context found for this event. Use Edit to change the video instead.'
+        );
         return;
       }
 
       const currentVideoUrl = eventData.videoUrl;
       if (!currentVideoUrl) {
-        alert('No existing video to regenerate. Use Edit to add a video first.');
+        toast.error('No existing video to regenerate. Use Edit to add a video first.');
         return;
       }
 
@@ -1434,7 +1413,7 @@ function UniverseTimelineEditorInner() {
       const imageUrl = eventData.imageUrl || null;
 
       if (!prompt) {
-        alert('No prompt found for this event. Use Edit to change the video instead.');
+        toast.error('No prompt found for this event. Use Edit to change the video instead.');
         return;
       }
 
@@ -1511,7 +1490,7 @@ function UniverseTimelineEditorInner() {
             currentVersionIndex: -1, // -1 = latest
             timestamp: Date.now(),
           };
-          localStorage.setItem(storageKey, JSON.stringify(eventsData));
+          setStoredEvents(eventsData);
 
           // Update the node in the flow
           setNodes((nds: any) =>
@@ -1541,7 +1520,9 @@ function UniverseTimelineEditorInner() {
           );
         }
       } catch (error) {
-        alert('Regeneration failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+        toast.error('Regeneration failed', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        });
         // Clear regenerating state
         setNodes((nds: any) =>
           nds.map((node: any) => {
@@ -1558,7 +1539,7 @@ function UniverseTimelineEditorInner() {
         setRegeneratingEventId(null);
       }
     },
-    [id, setNodes, regeneratingEventId]
+    [getStoredEvents, setStoredEvents, setNodes, regeneratingEventId]
   );
 
   // Switch to a different version of a video on a node
@@ -1566,9 +1547,7 @@ function UniverseTimelineEditorInner() {
     (eventId: string, versionIndex: number) => {
       if (!eventId) return;
 
-      const storageKey = `universe_events_${id}`;
-      const storedEvents = localStorage.getItem(storageKey);
-      const eventsData = storedEvents ? JSON.parse(storedEvents) : {};
+      const eventsData = getStoredEvents();
       const eventData = eventsData[eventId];
 
       if (!eventData || !eventData.videoVersions) return;
@@ -1597,7 +1576,7 @@ function UniverseTimelineEditorInner() {
       // Update the display video URL and current index
       eventsData[eventId].videoUrl = newVideoUrl;
       eventsData[eventId].currentVersionIndex = versionIndex;
-      localStorage.setItem(storageKey, JSON.stringify(eventsData));
+      setStoredEvents(eventsData);
 
       // Update the node
       setNodes((nds: any) =>
@@ -1616,16 +1595,14 @@ function UniverseTimelineEditorInner() {
         })
       );
     },
-    [id, setNodes]
+    [getStoredEvents, setStoredEvents, setNodes]
   );
 
   // Duplicate selected nodes
   const handleDuplicateSelected = useCallback(() => {
     if (selectedNodeIds.size === 0) return;
 
-    const storageKey = `universe_events_${id}`;
-    const storedEvents = localStorage.getItem(storageKey);
-    const eventsData = storedEvents ? JSON.parse(storedEvents) : {};
+    const eventsData = getStoredEvents();
 
     const newNodes: Node<TimelineNodeData>[] = [];
     const newEdges: Edge[] = [];
@@ -1702,7 +1679,7 @@ function UniverseTimelineEditorInner() {
     }
 
     // Save updated localStorage
-    localStorage.setItem(storageKey, JSON.stringify(eventsData));
+    setStoredEvents(eventsData);
 
     // Add new nodes and edges to the flow
     setNodes((nds: any) => [...nds, ...newNodes]);
@@ -1712,8 +1689,9 @@ function UniverseTimelineEditorInner() {
     setSelectedNodeIds(new Set());
   }, [
     selectedNodeIds,
-    id,
     edges,
+    getStoredEvents,
+    setStoredEvents,
     handleAddEvent,
     handleEditScene,
     handleRegenerateScene,
@@ -1950,7 +1928,12 @@ function UniverseTimelineEditorInner() {
       // Delete / Backspace — delete selected nodes
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNodeIds.size > 0) {
         e.preventDefault();
-        setShowDeleteConfirm(true);
+        setConfirmDialog({
+          title: 'Delete selected events?',
+          description: `Delete ${selectedNodeIds.size} selected event${selectedNodeIds.size > 1 ? 's' : ''} from the universe? This cannot be undone.`,
+          confirmLabel: 'Delete',
+          onConfirm: handleDeleteSelected,
+        });
         return;
       }
 
@@ -2010,6 +1993,7 @@ function UniverseTimelineEditorInner() {
     handleDuplicateSelected,
     handleToggleCanon,
     handleEditScene,
+    handleDeleteSelected,
     selectedNodeIds,
     showSearch,
     contextMenu.visible,
@@ -2022,11 +2006,11 @@ function UniverseTimelineEditorInner() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('video/')) {
-      alert('Please select a video file');
+      toast.error('Please select a video file');
       return;
     }
     if (file.size > 200 * 1024 * 1024) {
-      alert('File too large (max 200MB)');
+      toast.error('File too large (max 200MB)');
       return;
     }
     setEditVideoFile(file);
@@ -2049,7 +2033,7 @@ function UniverseTimelineEditorInner() {
         // Verify session
         const meRes = await fetch(`${serverUrl}/auth/me`, { credentials: 'include' });
         if (!meRes.ok || !(await meRes.json()).authenticated) {
-          alert('Session expired. Please sign in again.');
+          toast.error('Session expired. Please sign in again.');
           setIsUploadingEditVideo(false);
           return;
         }
@@ -2070,9 +2054,9 @@ function UniverseTimelineEditorInner() {
         if (!url) throw new Error('No URL returned from upload');
         finalUrl = url;
       } catch (error) {
-        alert(
-          'Failed to upload video: ' + (error instanceof Error ? error.message : 'Unknown error')
-        );
+        toast.error('Failed to upload video', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        });
         setIsUploadingEditVideo(false);
         return;
       }
@@ -2080,14 +2064,12 @@ function UniverseTimelineEditorInner() {
     }
 
     if (!finalUrl) {
-      alert('Please provide a video URL or upload a file');
+      toast.error('Please provide a video URL or upload a file');
       return;
     }
 
     // Update localStorage — save old video as a version if it exists
-    const storageKey = `universe_events_${id}`;
-    const storedEvents = localStorage.getItem(storageKey);
-    const eventsData = storedEvents ? JSON.parse(storedEvents) : {};
+    const eventsData = getStoredEvents();
     const existingEvent = eventsData[editingEventId];
 
     if (existingEvent) {
@@ -2121,7 +2103,7 @@ function UniverseTimelineEditorInner() {
         timestamp: Date.now(),
       };
     }
-    localStorage.setItem(storageKey, JSON.stringify(eventsData));
+    setStoredEvents(eventsData);
 
     // Build version data for the node
     const versions = eventsData[editingEventId]?.videoVersions || [];
@@ -2158,21 +2140,17 @@ function UniverseTimelineEditorInner() {
     setEditVideoUrl('');
     setEditVideoFile(null);
     setEditVideoPreview(null);
-  }, [editingEventId, editVideoUrl, editVideoFile, id, setNodes]);
+  }, [editingEventId, editVideoUrl, editVideoFile, getStoredEvents, setStoredEvents, setNodes]);
 
   // Remove video from a node without deleting the node itself
   const handleRemoveVideo = useCallback(() => {
     if (!editingEventId) return;
 
     // Clear from localStorage
-    const storageKey = `universe_events_${id}`;
-    const storedEvents = localStorage.getItem(storageKey);
-    if (storedEvents) {
-      const eventsData = JSON.parse(storedEvents);
-      if (eventsData[editingEventId]) {
-        delete eventsData[editingEventId].videoUrl;
-        localStorage.setItem(storageKey, JSON.stringify(eventsData));
-      }
+    const eventsData = getStoredEvents();
+    if (eventsData[editingEventId]) {
+      delete eventsData[editingEventId].videoUrl;
+      setStoredEvents(eventsData);
     }
 
     // Clear videoUrl from the node
@@ -2199,21 +2177,28 @@ function UniverseTimelineEditorInner() {
     setEditVideoUrl('');
     setEditVideoFile(null);
     setEditVideoPreview(null);
-  }, [editingEventId, id, setNodes]);
+  }, [editingEventId, getStoredEvents, setStoredEvents, setNodes]);
 
   // Delete the entire event node from the dialog
   const handleDeleteFromDialog = useCallback(() => {
     if (!editingEventId) return;
-    if (!confirm('Delete this event from the universe? This cannot be undone.')) return;
+    const eventIdToDelete = editingEventId;
 
-    handleDeleteNode(editingEventId);
+    setConfirmDialog({
+      title: 'Delete event?',
+      description: 'Delete this event from the universe? This cannot be undone.',
+      confirmLabel: 'Delete',
+      onConfirm: () => {
+        handleDeleteNode(eventIdToDelete);
 
-    // Close dialog
-    setEditVideoDialogOpen(false);
-    setEditingEventId(null);
-    setEditVideoUrl('');
-    setEditVideoFile(null);
-    setEditVideoPreview(null);
+        // Close dialog
+        setEditVideoDialogOpen(false);
+        setEditingEventId(null);
+        setEditVideoUrl('');
+        setEditVideoFile(null);
+        setEditVideoPreview(null);
+      },
+    });
   }, [editingEventId, handleDeleteNode]);
 
   // Handle selecting a generation from the panel — pre-fills dialog with video ready to save
@@ -2510,12 +2495,10 @@ function UniverseTimelineEditorInner() {
       };
 
       // Store in universe-specific localStorage
-      const storageKey = `universe_events_${id}`;
-      const existingEvents = localStorage.getItem(storageKey);
-      const eventsData = existingEvents ? JSON.parse(existingEvents) : {};
+      const eventsData = getStoredEvents();
 
       eventsData[newEventId] = eventData;
-      localStorage.setItem(storageKey, JSON.stringify(eventsData));
+      setStoredEvents(eventsData);
 
       // Close dialog and reset
       setShowVideoDialog(false);
@@ -2542,6 +2525,8 @@ function UniverseTimelineEditorInner() {
       handleDeleteNode,
       generatedVideoUrl,
       generatedImageUrl,
+      getStoredEvents,
+      setStoredEvents,
     ]
   );
 
@@ -2576,9 +2561,7 @@ function UniverseTimelineEditorInner() {
     });
 
     // Load locally-saved event data (has resolved URLs and descriptions)
-    const localStorageKey = `universe_events_${id}`;
-    const storedEvents = localStorage.getItem(localStorageKey);
-    const localEvents: Record<string, any> = storedEvents ? JSON.parse(storedEvents) : {};
+    const localEvents: Record<string, any> = getStoredEvents();
 
     // Helper: detect bytes32 hashes (0x + 64 hex chars) which aren't useful for display
     const isHash = (val: string) => /^0x[0-9a-fA-F]{64}$/.test(val);
@@ -2859,6 +2842,7 @@ function UniverseTimelineEditorInner() {
     handleSwitchVersion,
     handleDeleteNode,
     getArchivedNodeIds,
+    getStoredEvents,
     fitView,
     applySavedPositions,
   ]);
@@ -3495,7 +3479,7 @@ function UniverseTimelineEditorInner() {
                       onClick={handleUndo}
                       className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white disabled:opacity-30"
                       title="Undo (Ctrl+Z)"
-                      disabled={undoStack.current.length === 0}
+                      disabled={!canUndo}
                     >
                       <Undo2 className="h-4 w-4" />
                     </button>
@@ -3503,7 +3487,7 @@ function UniverseTimelineEditorInner() {
                       onClick={handleRedo}
                       className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white disabled:opacity-30"
                       title="Redo (Ctrl+Shift+Z)"
-                      disabled={redoStack.current.length === 0}
+                      disabled={!canRedo}
                     >
                       <Redo2 className="h-4 w-4" />
                     </button>
@@ -3996,9 +3980,7 @@ function UniverseTimelineEditorInner() {
             {/* Regenerate with same context */}
             {editingEventId &&
               (() => {
-                const storageKey = `universe_events_${id}`;
-                const storedEvents = localStorage.getItem(storageKey);
-                const eventsData = storedEvents ? JSON.parse(storedEvents) : {};
+                const eventsData = getStoredEvents();
                 const eventData = eventsData[editingEventId];
                 const hasContext =
                   eventData?.videoPrompt || eventData?.imagePrompt || eventData?.description;
@@ -4233,6 +4215,35 @@ function UniverseTimelineEditorInner() {
                 )}
               </Button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Generic confirm dialog — bulk delete, delete-from-edit-dialog, etc. */}
+      <Dialog
+        open={!!confirmDialog}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDialog(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{confirmDialog?.title}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{confirmDialog?.description}</p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmDialog(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                confirmDialog?.onConfirm();
+                setConfirmDialog(null);
+              }}
+            >
+              {confirmDialog?.confirmLabel || 'Confirm'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

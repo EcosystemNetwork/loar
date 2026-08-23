@@ -7,7 +7,7 @@
  * Feature 4 of the Node Editor Expansion PRD.
  */
 
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Paintbrush, Eraser, RotateCcw, Check, X } from 'lucide-react';
@@ -23,7 +23,7 @@ interface MotionBrushProps {
 
 type Tool = 'paint' | 'erase';
 
-export function MotionBrush({
+function MotionBrushImpl({
   imageUrl,
   initialMaskUrl,
   onSave,
@@ -277,3 +277,5 @@ export function MotionBrush({
     </div>
   );
 }
+
+export const MotionBrush = memo(MotionBrushImpl);

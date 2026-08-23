@@ -8,7 +8,7 @@
  * Feature 3 of the Node Editor Expansion PRD.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,7 +24,7 @@ interface CastManagerProps {
   onClose: () => void;
 }
 
-export function CastManager({ universeId, isOpen, onClose }: CastManagerProps) {
+function CastManagerImpl({ universeId, isOpen, onClose }: CastManagerProps) {
   const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
   const [newName, setNewName] = useState('');
@@ -262,3 +262,5 @@ export function CastManager({ universeId, isOpen, onClose }: CastManagerProps) {
     </div>
   );
 }
+
+export const CastManager = memo(CastManagerImpl);

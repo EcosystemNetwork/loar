@@ -8,7 +8,7 @@
  * Data is persisted via the sceneControls.saveNodeControls tRPC endpoint.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, memo } from 'react';
 // Card wrapper removed — panel is already inside a bordered container in universe/$id.tsx
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -93,7 +93,7 @@ interface SceneControlsPanelProps {
 
 type Tab = 'camera' | 'cast' | 'motion' | 'keyframe' | 'vfx' | 'style';
 
-export function SceneControlsPanel({
+function SceneControlsPanelImpl({
   nodeId,
   universeId,
   controls,
@@ -539,3 +539,5 @@ export function SceneControlsPanel({
     </div>
   );
 }
+
+export const SceneControlsPanel = memo(SceneControlsPanelImpl);

@@ -5,6 +5,7 @@
  * Rendered as a ReactFlow Panel overlay.
  */
 
+import { memo } from 'react';
 import { X, Keyboard } from 'lucide-react';
 
 interface ShortcutsHelpDialogProps {
@@ -38,7 +39,7 @@ const SHORTCUTS = [
   ['Ctrl+Shift+Z', 'Redo'],
 ] as const;
 
-export function ShortcutsHelpDialog({ onClose }: ShortcutsHelpDialogProps) {
+function ShortcutsHelpDialogImpl({ onClose }: ShortcutsHelpDialogProps) {
   return (
     <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-xl shadow-2xl p-4 animate-in fade-in duration-150 max-w-md">
       <div className="flex items-center justify-between mb-3">
@@ -62,3 +63,5 @@ export function ShortcutsHelpDialog({ onClose }: ShortcutsHelpDialogProps) {
     </div>
   );
 }
+
+export const ShortcutsHelpDialog = memo(ShortcutsHelpDialogImpl);

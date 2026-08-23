@@ -168,8 +168,12 @@ export default function Header() {
       <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between px-4 lg:px-6">
         {/* ── Left: Logo + Nav ── */}
         <div className="flex items-center gap-4 min-w-0">
-          <Link to="/" className="flex-shrink-0">
-            <img src="/loarIconTextLogo.png" alt="LOAR" className="h-7 w-auto object-contain" />
+          <Link to="/" className="shrink min-w-0">
+            <img
+              src="/loarIconTextLogo.png"
+              alt="LOAR"
+              className="h-7 w-auto max-w-full object-contain"
+            />
           </Link>
 
           <nav className="hidden lg:flex items-center">

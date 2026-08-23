@@ -6,7 +6,7 @@
  * arc assignment, delete, view on-chain, copy hash.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, memo } from 'react';
 import {
   Pencil,
   Copy,
@@ -87,7 +87,7 @@ function MenuItem({
   );
 }
 
-export function NodeContextMenu({
+function NodeContextMenuImpl({
   state,
   node,
   arcs,
@@ -321,3 +321,5 @@ export function NodeContextMenu({
     </div>
   );
 }
+
+export const NodeContextMenu = memo(NodeContextMenuImpl);

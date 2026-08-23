@@ -60,6 +60,8 @@ export interface LlmModelConfig {
   // ── Gating ─────────────────────────────────────────────────────────
   isEnabled: boolean;
   isVisibleToUsers: boolean;
+  /** True when the model is cataloged but not runnable yet (no provider credit). Shown in the UI as "Coming Soon" and excluded from dispatch. */
+  comingSoon?: boolean;
   allowedPlans: string[];
   serverPoolAvailable: boolean;
 

@@ -30,6 +30,8 @@ export interface EditingModelConfig {
   loarPriceUsd: number;
   creditCost: number;
   isEnabled: boolean;
+  /** True when the model is cataloged but not runnable yet (no provider credit). Shown in the UI as "Coming Soon" and excluded from dispatch. */
+  comingSoon?: boolean;
   /** Max input resolution supported */
   maxInputResolution?: string;
   /** Output resolution (for upscale) */

@@ -6,7 +6,7 @@
  * the ReactFlow viewport using useReactFlow's viewport transform.
  */
 
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import { useReactFlow } from 'reactflow';
 import type { Node } from 'reactflow';
 import type { TimelineNodeData } from './TimelineNodes';
@@ -29,7 +29,7 @@ const NODE_WIDTH = 320; // w-80 = 320px
 const NODE_HEIGHT = 288; // h-72 = 288px
 const PADDING = 24;
 
-export function NodeArcOverlay({ nodes, arcs }: NodeArcOverlayProps) {
+function NodeArcOverlayImpl({ nodes, arcs }: NodeArcOverlayProps) {
   const { getViewport } = useReactFlow();
   const viewport = getViewport();
 
@@ -113,3 +113,5 @@ export function NodeArcOverlay({ nodes, arcs }: NodeArcOverlayProps) {
     </svg>
   );
 }
+
+export const NodeArcOverlay = memo(NodeArcOverlayImpl);
