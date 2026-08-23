@@ -182,14 +182,14 @@ Five layers, five failure modes: entry never tracked (boot), prices fluctuated a
 | `veo-31-fast-preview-google` | google | premium | medium | $0.9000 | $1.2200 | $1.1300 | 122 | ✅ live |
 | `seedance-2-0-fal-t2v` | fal | premium | medium | $1.0500 | $1.4200 | $1.3100 | 142 | 🔒 hidden |
 | `seedance-2-0-fal-i2v` | fal | premium | medium | $1.0500 | $1.4200 | $1.3100 | 142 | 🔒 hidden |
-| `veo-30-fast-google` | google | standard | medium | $1.2000 | $1.6200 | $1.5000 | 162 | ✅ live |
+| `veo-30-fast-google` | google | standard | medium | $1.2000 | $1.6200 | $1.5000 | 162 | 🚫 disabled |
 | `kling-v3-pro-t2v` | fal | premium | high | $1.6000 | $2.1600 | $2.0000 | 216 | ✅ live |
 | `kling-v3-pro-i2v` | fal | premium | high | $1.6000 | $2.1600 | $2.0000 | 216 | ✅ live |
 | `veo-20-google` | google | standard | medium | $2.1000 | $2.8400 | $2.6300 | 284 | 🔒 hidden |
 | `sora2-pro-t2v` | fal | premium | high | $2.4000 | $3.2400 | $3.0000 | 324 | ✅ live |
 | `sora2-pro-i2v` | fal | premium | high | $2.4000 | $3.2400 | $3.0000 | 324 | ✅ live |
 | `veo-31-preview-google` | google | premium | high | $2.4000 | $3.2400 | $3.0000 | 324 | ✅ live |
-| `veo-30-google` | google | premium | high | $2.4000 | $3.2400 | $3.0000 | 324 | ✅ live |
+| `veo-30-google` | google | premium | high | $2.4000 | $3.2400 | $3.0000 | 324 | 🚫 disabled |
 | `veo-31-fal` | fal | premium | high | $2.4000 | $3.2400 | $3.0000 | 324 | 🔒 hidden |
 | `kling-v3-4k-t2v` | fal | premium | high | $3.0000 | $4.0500 | $3.7500 | 405 | ✅ live |
 | `kling-v3-4k-i2v` | fal | premium | high | $3.0000 | $4.0500 | $3.7500 | 405 | ✅ live |
@@ -346,12 +346,12 @@ Five layers, five failure modes: entry never tracked (boot), prices fluctuated a
 | --- | --- | --- |
 | LLM | 30 | 30 |
 | Image | 44 | 43 |
-| Video | 61 | 61 |
+| Video | 61 | 59 |
 | TTS | 17 | 17 |
 | Transcription | 21 | 21 |
 | 3D | 11 | 11 |
 | Audio | 20 | 20 |
 | Editing | 37 | 37 |
-| **TOTAL** | **241** | **240** |
+| **TOTAL** | **241** | **238** |
 
 _End of generated document._
