@@ -61,18 +61,9 @@ export type ApiKeyScope = keyof typeof API_KEY_SCOPES;
  * Validate that all permissions in an array are known scopes.
  * Rejects unknown strings to prevent scope creep.
  */
-export function validatePermissions(permissions: string[]): permissions is ApiKeyScope[] {
+function validatePermissions(permissions: string[]): permissions is ApiKeyScope[] {
   const validScopes = new Set(Object.keys(API_KEY_SCOPES));
   return permissions.every((p) => validScopes.has(p));
-}
-
-/**
- * Check if a key has a specific permission scope.
- * Supports wildcard 'admin.all' which grants everything.
- * `mcp_server` inherits every non-admin scope.
- */
-export function hasPermission(keyDoc: ApiKeyDoc, scope: ApiKeyScope): boolean {
-  return hasScope(keyDoc.permissions, scope);
 }
 
 /**
@@ -121,8 +112,8 @@ export function isEndUserAddressAllowed(keyDoc: ApiKeyDoc, address: string): boo
 }
 
 /** Default rate limits per-key-per-minute for mcp_server vs direct keys. */
-export const MCP_SERVER_RATE_LIMIT = 600;
-export const DIRECT_KEY_RATE_LIMIT = 120;
+const MCP_SERVER_RATE_LIMIT = 600;
+const DIRECT_KEY_RATE_LIMIT = 120;
 
 // ── Types ──────────────────────────────────────────────────────────────
 

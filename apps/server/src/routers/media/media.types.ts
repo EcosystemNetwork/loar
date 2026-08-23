@@ -15,23 +15,8 @@ export const MEDIA_CATEGORIES = [
 
 export type MediaCategory = (typeof MEDIA_CATEGORIES)[number];
 
-export const MEDIA_CATEGORY_LABELS: Record<MediaCategory, string> = {
-  image: 'Image / Artwork',
-  video: 'Video / Animation',
-  music: 'Music / Score',
-  sound: 'Sound Effect',
-  environment: 'Environment / Ambiance',
-  '3d': '3D Model / Scene',
-  texture: 'Texture Map',
-  animation: 'Animation',
-  rig: 'Rig / Skeleton',
-  document: 'Document / Script',
-  design: 'Design File',
-  other: 'Other',
-};
-
 /** Sub-categories for finer-grained asset classification. */
-export const TEXTURE_SUB_CATEGORIES = [
+const TEXTURE_SUB_CATEGORIES = [
   'diffuse',
   'normal',
   'roughness',
@@ -44,7 +29,7 @@ export const TEXTURE_SUB_CATEGORIES = [
 ] as const;
 export type TextureSubCategory = (typeof TEXTURE_SUB_CATEGORIES)[number];
 
-export const ANIMATION_SUB_CATEGORIES = [
+const ANIMATION_SUB_CATEGORIES = [
   'idle',
   'walk',
   'run',
@@ -56,7 +41,7 @@ export const ANIMATION_SUB_CATEGORIES = [
 ] as const;
 export type AnimationSubCategory = (typeof ANIMATION_SUB_CATEGORIES)[number];
 
-export const IMAGE_SUB_CATEGORIES = [
+const IMAGE_SUB_CATEGORIES = [
   'portrait',
   'full_body',
   'concept_art',
@@ -66,7 +51,7 @@ export const IMAGE_SUB_CATEGORIES = [
 ] as const;
 export type ImageSubCategory = (typeof IMAGE_SUB_CATEGORIES)[number];
 
-export const THREE_D_SUB_CATEGORIES = [
+const THREE_D_SUB_CATEGORIES = [
   'high_poly',
   'low_poly',
   'game_ready',

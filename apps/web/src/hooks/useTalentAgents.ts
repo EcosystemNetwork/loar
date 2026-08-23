@@ -44,17 +44,6 @@ export function useRegisterAgent() {
   });
 }
 
-export function useUpdateAgentProfile() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: Parameters<typeof trpcClient.talentAgents.updateProfile.mutate>[0]) =>
-      trpcClient.talentAgents.updateProfile.mutate(input),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['talentAgents'] });
-    },
-  });
-}
-
 // ── Contracts ──────────────────────────────────────────────────────────
 
 export function useMyContracts(status: string = 'ALL') {
@@ -71,14 +60,6 @@ export function useAgentClients() {
   });
 }
 
-export function useAgentContract(contractId: string | undefined) {
-  return useQuery({
-    queryKey: ['talentAgents', 'contract', contractId],
-    queryFn: () => trpcClient.talentAgents.getContract.query({ contractId: contractId! }),
-    enabled: !!contractId,
-  });
-}
-
 export function useProposeContract() {
   const qc = useQueryClient();
   return useMutation({
@@ -87,37 +68,6 @@ export function useProposeContract() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['talentAgents'] });
     },
-  });
-}
-
-export function useAcceptContract() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { contractId: string }) =>
-      trpcClient.talentAgents.acceptContract.mutate(input),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['talentAgents'] });
-    },
-  });
-}
-
-export function useTerminateContract() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { contractId: string; reason?: string }) =>
-      trpcClient.talentAgents.terminateContract.mutate(input),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['talentAgents'] });
-    },
-  });
-}
-
-// ── Commissions ────────────────────────────────────────────────────────
-
-export function useAgentCommissions(limit: number = 50) {
-  return useQuery({
-    queryKey: ['talentAgents', 'commissions', limit],
-    queryFn: () => trpcClient.talentAgents.getCommissions.query({ limit }),
   });
 }
 

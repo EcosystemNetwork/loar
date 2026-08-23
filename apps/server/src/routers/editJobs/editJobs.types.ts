@@ -61,7 +61,7 @@ export const editOpSchema = z.discriminatedUnion('kind', [
 
 export type EditOp = z.infer<typeof editOpSchema>;
 
-export const boundingBoxSchema = z.object({
+const boundingBoxSchema = z.object({
   x: z.number(),
   y: z.number(),
   width: z.number().positive(),

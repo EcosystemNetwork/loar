@@ -43,7 +43,7 @@ export interface ViralPreset {
   promptHint?: string;
 }
 
-export const VIRAL_PRESETS: ViralPreset[] = [
+const VIRAL_PRESETS: ViralPreset[] = [
   {
     id: 'neon_pulse',
     label: 'Neon Pulse',

@@ -4,12 +4,12 @@
  */
 import { z } from 'zod';
 
-export const loreRuleSchema = z.object({
+const loreRuleSchema = z.object({
   rule: z.string().min(1).max(500),
   type: z.enum(['DO', 'DONT']),
 });
 
-export const accessTypeEnum = z.enum(['PUBLIC', 'HOLDERS', 'WHITELISTED']);
+const accessTypeEnum = z.enum(['PUBLIC', 'HOLDERS', 'WHITELISTED']);
 
 export const universeGenConfigSchema = z.object({
   universeAddress: z.string(),

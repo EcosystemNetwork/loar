@@ -76,17 +76,3 @@ export function useClearReferenceBundle(entityId: string | undefined) {
     },
   });
 }
-
-/** Count how many reference images are attached across all slots. */
-export function countBundleRefs(bundle: ResolvedReferenceBundle | null | undefined): number {
-  if (!bundle) return 0;
-  let total = 0;
-  for (const slot of REFERENCE_SLOTS) total += bundle.slots?.[slot]?.length ?? 0;
-  return total;
-}
-
-/** Count active locks. */
-export function countActiveLocks(bundle: ResolvedReferenceBundle | null | undefined): number {
-  if (!bundle) return 0;
-  return IDENTITY_LOCKS.filter((k) => bundle.locks?.[k] === true).length;
-}

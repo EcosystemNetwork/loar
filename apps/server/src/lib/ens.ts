@@ -48,17 +48,6 @@ function mainnetClient() {
   return getChainClient(MAINNET);
 }
 
-/** ENSIP-26 / common agent text-record keys read for an agent card. */
-export const AGENT_TEXT_KEYS = [
-  'agent-endpoint[mcp]',
-  'agent-endpoint[a2a]',
-  'url',
-  'description',
-  'avatar',
-  'com.twitter',
-  'com.github',
-] as const;
-
 /**
  * Reverse-resolve an address → primary ENS name, forward-verified.
  * Returns null when there's no name or the reverse record doesn't round-trip.
@@ -124,7 +113,7 @@ export async function resolveName(name: string): Promise<string | null> {
 }
 
 /** Read a single ENS text record. */
-export async function getText(name: string, recordKey: string): Promise<string | null> {
+async function getText(name: string, recordKey: string): Promise<string | null> {
   const key = `txt:${name.toLowerCase()}:${recordKey}`;
   const hit = cached<string | null>(key);
   if (hit !== undefined) return hit;

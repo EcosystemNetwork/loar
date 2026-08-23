@@ -44,17 +44,3 @@ export function AddressDisplay({
     </span>
   );
 }
-
-/**
- * Inline address with avatar — same resolution as {@link AddressDisplay} but
- * always reserves space for the avatar (ENS/UD).
- */
-export function AddressWithAvatar({
-  address,
-  className = '',
-}: {
-  address: string;
-  className?: string;
-}) {
-  return <AddressDisplay address={address} className={className} showAvatar />;
-}

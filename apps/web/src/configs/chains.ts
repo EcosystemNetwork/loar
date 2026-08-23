@@ -18,7 +18,7 @@ export const SUPPORTED_EVM_CHAIN_IDS = [sepolia.id, mainnet.id] as const;
 
 export type SupportedEvmChainId = (typeof SUPPORTED_EVM_CHAIN_IDS)[number];
 
-export function isSupportedEvmChain(chainId: number): chainId is SupportedEvmChainId {
+function isSupportedEvmChain(chainId: number): chainId is SupportedEvmChainId {
   return (SUPPORTED_EVM_CHAIN_IDS as readonly number[]).includes(chainId);
 }
 
@@ -36,7 +36,7 @@ export const isSupportedChain = isSupportedEvmChain;
 // the form silently dead-ends (mintFee read returns undefined forever).
 // ---------------------------------------------------------------------------
 
-export const DEPLOYABLE_CHAIN_IDS = SUPPORTED_EVM_CHAIN_IDS.filter(
+const DEPLOYABLE_CHAIN_IDS = SUPPORTED_EVM_CHAIN_IDS.filter(
   (id) => UniverseManager[String(id) as keyof typeof UniverseManager] !== undefined
 ) as SupportedEvmChainId[];
 
@@ -55,7 +55,7 @@ export const DEFAULT_DEPLOYABLE_CHAIN_ID: SupportedEvmChainId =
 // these below would TDZ in production minified bundles.)
 // ---------------------------------------------------------------------------
 
-export const BLOCK_EXPLORER_URLS: Record<number, string> = {
+const BLOCK_EXPLORER_URLS: Record<number, string> = {
   [sepolia.id]: 'https://sepolia.etherscan.io',
   [mainnet.id]: 'https://etherscan.io',
 };
@@ -65,7 +65,7 @@ export const CHAIN_NAMES: Record<number, string> = {
   [mainnet.id]: 'Ethereum',
 };
 
-export const EXPLORER_NAMES: Record<number, string> = {
+const EXPLORER_NAMES: Record<number, string> = {
   [sepolia.id]: 'Etherscan',
   [mainnet.id]: 'Etherscan',
 };

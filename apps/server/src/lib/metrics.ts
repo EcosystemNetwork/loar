@@ -15,13 +15,13 @@ collectDefaultMetrics({ prefix: 'loar_' });
 
 // ── HTTP ───────────────────────────────────────────────────────────────
 
-export const httpRequestsTotal = new Counter({
+const httpRequestsTotal = new Counter({
   name: 'loar_http_requests_total',
   help: 'Total HTTP requests by method, route, and status class.',
   labelNames: ['method', 'route', 'status'] as const,
 });
 
-export const httpRequestDurationSeconds = new Histogram({
+const httpRequestDurationSeconds = new Histogram({
   name: 'loar_http_request_duration_seconds',
   help: 'HTTP request duration in seconds by route.',
   labelNames: ['method', 'route'] as const,
@@ -30,32 +30,32 @@ export const httpRequestDurationSeconds = new Histogram({
 
 // ── Domain counters ────────────────────────────────────────────────────
 
-export const aiGenerationTotal = new Counter({
+const aiGenerationTotal = new Counter({
   name: 'loar_ai_generation_total',
   help: 'AI generation jobs by provider, kind, and outcome.',
   labelNames: ['provider', 'kind', 'status'] as const,
 });
 
-export const aiGenerationDurationSeconds = new Histogram({
+const aiGenerationDurationSeconds = new Histogram({
   name: 'loar_ai_generation_duration_seconds',
   help: 'AI generation wall-clock duration in seconds.',
   labelNames: ['provider', 'kind'] as const,
   buckets: [1, 5, 15, 30, 60, 120, 240, 480, 900],
 });
 
-export const storageUploadTotal = new Counter({
+const storageUploadTotal = new Counter({
   name: 'loar_storage_upload_total',
   help: 'Storage uploads by provider and outcome.',
   labelNames: ['provider', 'status'] as const,
 });
 
-export const creditsTxTotal = new Counter({
+const creditsTxTotal = new Counter({
   name: 'loar_credits_transactions_total',
   help: 'Credit transactions by kind (grant, spend, refund, purchase).',
   labelNames: ['kind', 'status'] as const,
 });
 
-export const authEventsTotal = new Counter({
+const authEventsTotal = new Counter({
   name: 'loar_auth_events_total',
   help: 'Auth events by kind (nonce, verify, refresh) and outcome.',
   labelNames: ['kind', 'status'] as const,

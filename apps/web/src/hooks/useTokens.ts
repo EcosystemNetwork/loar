@@ -24,7 +24,7 @@ export interface TokenWithUniverse extends Token {
   latestPrice?: string;
 }
 
-export function useAllTokens() {
+function useAllTokens() {
   return useQuery({
     queryKey: ['all-tokens'],
     queryFn: async () => {
@@ -178,34 +178,6 @@ export function useMySwapHistory(address: string | undefined, limit = 50) {
   });
 }
 
-// ─── Token holders ─────────────────────────────────────────────────────
-
-export function useTokenHolders(tokenAddress: string | undefined) {
-  return useQuery({
-    queryKey: ['token-holders', tokenAddress],
-    queryFn: async () => {
-      const data = await ponderGql<{
-        tokenHolders: { items: TokenHolder[] };
-      }>(
-        `query ($tokenAddress: String!) {
-          tokenHolders(where: { tokenAddress: $tokenAddress }, orderBy: "balance", orderDirection: "desc", limit: 100) {
-            items {
-              id
-              tokenAddress
-              holderAddress
-              balance
-            }
-          }
-        }`,
-        { tokenAddress: tokenAddress!.toLowerCase() }
-      );
-      return data.tokenHolders.items;
-    },
-    enabled: !!tokenAddress,
-    ...ponderQueryDefaults,
-  });
-}
-
 // ─── Pool data ─────────────────────────────────────────────────────────
 
 export interface PoolData {
@@ -295,7 +267,7 @@ export function useBondingCurveForToken(tokenAddress: string | undefined) {
 
 export type TokenStage = 'bonding' | 'graduating' | 'graduated' | 'halted';
 
-export function stageFromBondingCurve(curve: BondingCurveData | null | undefined): TokenStage {
+function stageFromBondingCurve(curve: BondingCurveData | null | undefined): TokenStage {
   if (!curve) return 'graduated'; // pools without bonding curve are post-graduation
   if (curve.tradingStatus === 'halted') return 'halted';
   if (curve.graduated || curve.tradingStatus === 'graduated') return 'graduated';
@@ -339,7 +311,7 @@ export interface UserBondingTrade {
  * resolve each curve → tokenAddress. Returns [] if the indexer doesn't expose
  * bondingCurves (older schema on some chains).
  */
-export function useUserBondingCurveTrades(userAddress: string | undefined) {
+function useUserBondingCurveTrades(userAddress: string | undefined) {
   return useQuery({
     queryKey: ['user-bonding-curve-trades', userAddress?.toLowerCase()],
     queryFn: async (): Promise<UserBondingTrade[]> => {
@@ -402,7 +374,7 @@ export interface UserHolding {
   balance: string;
 }
 
-export function useUserTokenHoldings(userAddress: string | undefined) {
+function useUserTokenHoldings(userAddress: string | undefined) {
   return useQuery({
     queryKey: ['user-token-holdings', userAddress?.toLowerCase()],
     queryFn: async (): Promise<UserHolding[]> => {
@@ -696,7 +668,7 @@ export function useUniverseForToken(universeAddress: string | undefined) {
  * small/large prices (e.g. fresh post-graduation tokens). Stay in bigint
  * until the final ratio.
  */
-export function priceFromSqrtX96(sqrtPriceX96: string): number {
+function priceFromSqrtX96(sqrtPriceX96: string): number {
   const sqrtP = BigInt(sqrtPriceX96);
   // price = sqrtP² / 2^192. Multiply by 1e18 first so we keep enough
   // precision for the final Number() cast.
@@ -811,7 +783,7 @@ export function computeAmountOut({
  * Calculate price from tick
  * price = 1.0001^tick
  */
-export function priceFromTick(tick: number): number {
+function priceFromTick(tick: number): number {
   return Math.pow(1.0001, tick);
 }
 

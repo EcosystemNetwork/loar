@@ -410,7 +410,7 @@ export async function verifySessionToken(token: string): Promise<SiweSessionPayl
  *  that mint a new token from an old one (refreshSessionToken) use this to
  *  refuse extending sessions that only verified against the previous secret,
  *  so a leaked pre-rotation token does not become durable post-rotation. */
-export async function verifySessionTokenDetailed(
+async function verifySessionTokenDetailed(
   token: string
 ): Promise<{ payload: SiweSessionPayload; secret: 'current' | 'previous' } | null> {
   const verifyOpts = { issuer: JWT_ISSUER, audience: JWT_AUDIENCE };

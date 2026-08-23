@@ -951,7 +951,7 @@ export interface VeoTask {
   model: string;
 }
 
-export async function veoCreate(opts: VeoGenerateOptions): Promise<VeoTask> {
+async function veoCreate(opts: VeoGenerateOptions): Promise<VeoTask> {
   const apiKey = resolveGeminiKey(opts.apiKey);
   const instance: Record<string, unknown> = { prompt: opts.prompt };
   // Veo on the Gemini API surface (generativelanguage.googleapis.com) only
@@ -1013,7 +1013,7 @@ export async function veoCreate(opts: VeoGenerateOptions): Promise<VeoTask> {
   };
 }
 
-export async function veoPoll(
+async function veoPoll(
   operationName: string,
   apiKey?: string,
   signal?: AbortSignal

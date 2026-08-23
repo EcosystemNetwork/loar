@@ -163,14 +163,3 @@ export function allocateShares(
 
   return shares;
 }
-
-/**
- * Sanity-check that a derived split adds to exactly TOTAL_BPS.
- * Used in tests + as a guardrail on persisted policies.
- */
-export function assertTotalsToHundredPercent(shares: number[]): void {
-  const sum = shares.reduce((a, b) => a + b, 0);
-  if (sum !== TOTAL_BPS) {
-    throw new Error(`Royalty shares sum to ${sum}, expected ${TOTAL_BPS}`);
-  }
-}

@@ -39,7 +39,7 @@ const agentContractsCol = () => {
  * that includes the required scope. Returns the contract if valid.
  * Throws FORBIDDEN if not authorized.
  */
-export async function validateAgentAuthorization(
+async function validateAgentAuthorization(
   agentUid: string,
   creatorUid: string,
   requiredScope: string

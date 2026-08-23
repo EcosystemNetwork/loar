@@ -192,7 +192,7 @@ let exclusionCacheInflight: Promise<{ facts: ExcludedUniverseFact[]; byId: strin
   null;
 
 /** Invalidate the exclusion cache (called by visibility write paths). */
-export function invalidateExcludedUniverseCache(): void {
+function invalidateExcludedUniverseCache(): void {
   exclusionCache = null;
 }
 

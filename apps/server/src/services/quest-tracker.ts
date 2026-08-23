@@ -14,7 +14,7 @@ const questProgressCol = () => {
 /**
  * Increment quest progress for a user. Fire-and-forget.
  */
-export function trackQuest(userId: string, questId: string, increment = 1): void {
+function trackQuest(userId: string, questId: string, increment = 1): void {
   const docId = `${userId}_${questId}`;
   const ref = questProgressCol().doc(docId);
 

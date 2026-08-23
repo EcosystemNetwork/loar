@@ -239,15 +239,6 @@ export function migrateLegacyEvent(legacyEvent: LegacyEvent): MultiSegmentEvent 
 }
 
 /**
- * Helper function to check if event has multiple segments
- */
-export function isMultiSegmentEvent(
-  event: MultiSegmentEvent | LegacyEvent
-): event is MultiSegmentEvent {
-  return 'segments' in event && Array.isArray(event.segments);
-}
-
-/**
  * Get the effective duration of a single segment, accounting for trims.
  * Returns duration in seconds.
  */
@@ -256,13 +247,6 @@ export function getEffectiveDuration(segment: VideoSegment): number {
   const start = segment.startTrim ?? 0;
   const end = segment.endTrim ?? fullMs;
   return (end - start) / 1000;
-}
-
-/**
- * Helper function to get total duration of all segments (accounting for trims)
- */
-export function getTotalDuration(event: MultiSegmentEvent): number {
-  return event.segments.reduce((total, segment) => total + getEffectiveDuration(segment), 0);
 }
 
 /**

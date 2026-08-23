@@ -72,7 +72,7 @@ export interface SubscriptionTier {
   featureList: string[]; // UI display bullets
 }
 
-export const PLATFORM_TIERS: SubscriptionTier[] = [
+const PLATFORM_TIERS: SubscriptionTier[] = [
   {
     id: 'starter',
     name: 'Starter',
@@ -200,7 +200,7 @@ function getStripePriceId(tierId: string, billing: 'monthly' | 'annual'): string
 
 const subscriptionsCol = () => db.collection('platformSubscriptions');
 
-export async function getUserSubscription(uid: string) {
+async function getUserSubscription(uid: string) {
   const doc = await subscriptionsCol().doc(uid.toLowerCase()).get();
   if (!doc.exists) return null;
   return doc.data() as {
@@ -516,118 +516,6 @@ function getSubscriptionPeriod(sub: any): { start?: number; end?: number } {
     start: item?.current_period_start ?? sub?.current_period_start ?? undefined,
     end: item?.current_period_end ?? sub?.current_period_end ?? undefined,
   };
-}
-
-/**
- * Handle a successful subscription checkout — create the subscription record
- * and issue the first month's credits.
- */
-export async function handleCheckoutCompleted(session: any) {
-  const userId = session.metadata?.userId;
-  const tierId = session.metadata?.tierId;
-  if (!userId || !tierId) return;
-
-  const tier = PLATFORM_TIERS.find((t) => t.id === tierId);
-  if (!tier) return;
-
-  const subscription = await getStripe()?.subscriptions.retrieve(session.subscription);
-  if (!subscription) return;
-
-  const period = getSubscriptionPeriod(subscription);
-  const now = new Date();
-  await subscriptionsCol()
-    .doc(userId.toLowerCase())
-    .set({
-      uid: userId.toLowerCase(),
-      tierId,
-      stripeSubscriptionId: subscription.id,
-      stripeCustomerId: subscription.customer,
-      status: subscription.status,
-      currentPeriodStart: period.start ? new Date(period.start * 1000) : now,
-      currentPeriodEnd: period.end ? new Date(period.end * 1000) : now,
-      cancelAtPeriodEnd: subscription.cancel_at_period_end,
-      creditsRefreshedAt: now,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-  // Issue first month's credits
-  await issueSubscriptionCredits(userId, tier, `checkout-${session.id}`);
-}
-
-/**
- * Handle a recurring invoice payment — refresh monthly credits.
- */
-export async function handleInvoicePaid(invoice: any) {
-  const subscriptionId = invoice.subscription;
-  if (!subscriptionId) return;
-
-  // Find the user by subscription ID
-  const snap = await subscriptionsCol()
-    .where('stripeSubscriptionId', '==', subscriptionId)
-    .limit(1)
-    .get();
-  if (snap.empty) return;
-
-  const subDoc = snap.docs[0];
-  const subData = subDoc.data();
-  const tier = PLATFORM_TIERS.find((t) => t.id === subData.tierId);
-  if (!tier) return;
-
-  // Dedup: don't double-credit for the same invoice
-  const dedupKey = `sub-refresh-${invoice.id}`;
-  const existingTx = await db.collection('creditTransactions').doc(dedupKey).get();
-  if (existingTx.exists) return;
-
-  await issueSubscriptionCredits(subData.uid, tier, dedupKey);
-
-  // Update subscription period
-  const subscription = await getStripe()?.subscriptions.retrieve(subscriptionId);
-  if (subscription) {
-    const period = getSubscriptionPeriod(subscription);
-    const now = new Date();
-    await subDoc.ref.update({
-      status: subscription.status,
-      currentPeriodStart: period.start ? new Date(period.start * 1000) : now,
-      currentPeriodEnd: period.end ? new Date(period.end * 1000) : now,
-      cancelAtPeriodEnd: subscription.cancel_at_period_end,
-      creditsRefreshedAt: now,
-      updatedAt: now,
-    });
-  }
-}
-
-/**
- * Handle subscription updates (tier changes, cancellations).
- */
-export async function handleSubscriptionUpdated(subscription: any) {
-  const userId = subscription.metadata?.userId;
-  if (!userId) return;
-
-  const tierId = subscription.metadata?.tierId;
-  await subscriptionsCol()
-    .doc(userId.toLowerCase())
-    .update({
-      status: subscription.status,
-      tierId: tierId || undefined,
-      cancelAtPeriodEnd: subscription.cancel_at_period_end,
-      currentPeriodStart: new Date(subscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-      updatedAt: new Date(),
-    });
-}
-
-/**
- * Handle subscription deletion (expired/fully canceled).
- */
-export async function handleSubscriptionDeleted(subscription: any) {
-  const userId = subscription.metadata?.userId;
-  if (!userId) return;
-
-  await subscriptionsCol().doc(userId.toLowerCase()).update({
-    status: 'canceled',
-    updatedAt: new Date(),
-  });
 }
 
 // ── Internal: issue credits ──────────────────────────────────────────

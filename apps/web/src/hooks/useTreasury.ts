@@ -38,20 +38,6 @@ export function useFundPool() {
   });
 }
 
-// ---- Spend From Pool (team members) ----
-
-export function useSpendFromPool() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: Parameters<typeof trpcClient.universeTreasury.spendFromPool.mutate>[0]) =>
-      trpcClient.universeTreasury.spendFromPool.mutate(input),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['treasury-pool'] });
-      qc.invalidateQueries({ queryKey: ['treasury-history'] });
-    },
-  });
-}
-
 // ---- Allocate Credits to Member (admin) ----
 
 export function useAllocateToMember() {

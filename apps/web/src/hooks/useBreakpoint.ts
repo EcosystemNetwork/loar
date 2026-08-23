@@ -30,13 +30,3 @@ export function useBreakpoint(bp: Breakpoint): boolean {
 export function useIsMobile(): boolean {
   return !useBreakpoint('md');
 }
-
-export function useIsTablet(): boolean {
-  const md = useBreakpoint('md');
-  const lg = useBreakpoint('lg');
-  return md && !lg;
-}
-
-export function useIsDesktop(): boolean {
-  return useBreakpoint('lg');
-}

@@ -32,7 +32,7 @@ const dailySpendCache = new Map<string, SpendCacheEntry>();
  * Cached per-uid for 30s — safe because the cap only matters at the boundary,
  * and small overshoot is acceptable.
  */
-export async function getMonthlySpend(uid: string): Promise<number> {
+async function getMonthlySpend(uid: string): Promise<number> {
   const now = Date.now();
   const cached = spendCache.get(uid);
   if (cached && now - cached.computedAt < CACHE_TTL_MS) {
@@ -80,7 +80,7 @@ export async function getMonthlySpend(uid: string): Promise<number> {
 
 /** Rolling 24h spend, cached 30s. Mirrors the 30d helper; separate cache so the
  *  two windows don't fight over the same key. */
-export async function getDailySpend(uid: string): Promise<number> {
+async function getDailySpend(uid: string): Promise<number> {
   const now = Date.now();
   const cached = dailySpendCache.get(uid);
   if (cached && now - cached.computedAt < CACHE_TTL_MS) return cached.totalCredits;

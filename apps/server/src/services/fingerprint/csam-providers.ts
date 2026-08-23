@@ -122,7 +122,7 @@ class HiveCsamProvider implements CsamProvider {
  *   2. Hive (classifier — catches novel CSAM but less precise)
  *   3. disabled
  */
-export function getCsamProvider(): CsamProvider | null {
+function getCsamProvider(): CsamProvider | null {
   const photodnaEndpoint = process.env.PHOTODNA_ENDPOINT;
   const photodnaKey = process.env.PHOTODNA_SUBSCRIPTION_KEY;
   if (photodnaEndpoint && photodnaKey) {

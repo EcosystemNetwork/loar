@@ -120,7 +120,7 @@ export async function claimTxHash(params: {
  * the shared default for verifyAndClaimTx (nft / listings / splits). The bespoke
  * credits/treasury flows use a higher MIN_CONFIRMATIONS = 6 in their own files.
  */
-export const VERIFY_TX_MIN_CONFIRMATIONS = 3;
+const VERIFY_TX_MIN_CONFIRMATIONS = 3;
 
 export interface VerifyTxBinding {
   /** Require `tx.from` to equal this address (lowercase-compared). */
@@ -259,34 +259,4 @@ export async function verifyAndClaimTx(
   await claimTxHash({ txHash, purpose, callerUid, chainId });
 
   return { receipt, tx };
-}
-
-/**
- * Lightweight verification — checks tx exists and succeeded but does NOT
- * claim it for dedup. Use for optional/informational txHash fields.
- */
-export async function verifyTxReceipt(txHash: string, chainId?: number): Promise<{ receipt: any }> {
-  if (!txHash || !txHash.startsWith('0x') || txHash.length !== 66) {
-    throw new Error('Invalid transaction hash format');
-  }
-
-  const client = getChainClient(chainId);
-  const chainName = chainId === 1 ? 'Ethereum' : 'Sepolia';
-
-  let receipt: any;
-  try {
-    receipt = await getCachedOrFetch(`receipt-${txHash.toLowerCase()}`, () =>
-      client.getTransactionReceipt({ hash: txHash.toLowerCase() as Hash })
-    );
-  } catch {
-    throw new Error(
-      `Transaction not found on ${chainName}. Confirm it has been broadcast and included in a block.`
-    );
-  }
-
-  if (receipt.status !== 'success') {
-    throw new Error('Transaction was reverted on-chain.');
-  }
-
-  return { receipt };
 }

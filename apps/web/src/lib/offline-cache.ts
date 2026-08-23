@@ -156,8 +156,3 @@ export async function isSaved(episodeId: string): Promise<boolean> {
   );
   return !!entry;
 }
-
-export async function listSavedEpisodes(): Promise<SavedEpisode[]> {
-  if (!offlineSupported()) return [];
-  return tx<SavedEpisode[]>('readonly', (store) => store.getAll() as IDBRequest<SavedEpisode[]>);
-}

@@ -20,8 +20,8 @@ import { confirmTx } from '@/components/tx-confirm';
  * block. 5% covers normal mempool churn without exposing the user to a
  * sandwich-sized loss; callers can override on a per-tx basis.
  */
-export const DEFAULT_BONDING_CURVE_SLIPPAGE_BPS = 500;
-export const MAX_BONDING_CURVE_SLIPPAGE_BPS = 5000; // 50% hard cap
+const DEFAULT_BONDING_CURVE_SLIPPAGE_BPS = 500;
+const MAX_BONDING_CURVE_SLIPPAGE_BPS = 5000; // 50% hard cap
 
 function applySlippage(expected: bigint, slippageBps: number): bigint {
   const bps = BigInt(
@@ -191,31 +191,6 @@ export function usePreviewBuy(bondingCurveAddress: Address | undefined, ethAmoun
   });
 
   return { tokensOut: data ?? 0n, isLoading };
-}
-
-export function usePreviewSell(bondingCurveAddress: Address | undefined, tokenAmount: bigint) {
-  const { data, isLoading } = useReadContract({
-    address: bondingCurveAddress,
-    abi: BONDING_CURVE_ABI,
-    functionName: 'getEthForTokens',
-    args: [tokenAmount],
-    query: {
-      enabled: !!bondingCurveAddress && tokenAmount > 0n,
-    },
-  });
-
-  return { ethOut: data ?? 0n, isLoading };
-}
-
-export function useMaxBuyAmount(bondingCurveAddress: Address | undefined) {
-  const { data } = useReadContract({
-    address: bondingCurveAddress,
-    abi: BONDING_CURVE_ABI,
-    functionName: 'MAX_BUY_AMOUNT',
-    query: { enabled: !!bondingCurveAddress },
-  });
-
-  return data ?? 0n;
 }
 
 // ── Write hooks ──────────────────────────────────────────────────────

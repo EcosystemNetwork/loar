@@ -249,12 +249,8 @@ export const ALL_RELIGHT_PRESETS: RelightPreset[] = [
   ...MOOD_PRESETS,
 ];
 
-export function getPresetById(id: string): RelightPreset | undefined {
+function getPresetById(id: string): RelightPreset | undefined {
   return ALL_RELIGHT_PRESETS.find((p) => p.id === id);
-}
-
-export function getPresetsByKind(kind: RelightPresetKind): RelightPreset[] {
-  return ALL_RELIGHT_PRESETS.filter((p) => p.kind === kind);
 }
 
 /** Stored shape of a per-universe house-look preset. */

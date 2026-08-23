@@ -46,7 +46,7 @@ export interface QuestDefinition {
   repeatCooldownHours?: number;
 }
 
-export const QUESTS: QuestDefinition[] = [
+const QUESTS: QuestDefinition[] = [
   // ── Onboarding ──────────────────────────────────────────────────
   {
     id: 'first_connect',

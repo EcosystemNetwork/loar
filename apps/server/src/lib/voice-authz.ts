@@ -44,7 +44,7 @@ async function loadAllowedVoiceIds(): Promise<Set<string>> {
   }
 }
 
-export async function isVoiceIdAllowed(voiceId: string): Promise<boolean> {
+async function isVoiceIdAllowed(voiceId: string): Promise<boolean> {
   if (!voiceId) return false;
   // ElevenLabs ids are hex; reject garbage before we hit the network.
   if (!/^[A-Za-z0-9_-]{10,64}$/.test(voiceId)) return false;

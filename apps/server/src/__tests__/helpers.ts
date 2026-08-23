@@ -6,7 +6,7 @@ import { appRouter } from '../routers/index';
 type AuthUser = { uid: string; address: string; email?: string };
 
 /** The wallet address used by createAdminCaller — set ADMIN_ADDRESSES to match */
-export const ADMIN_TEST_ADDRESS = '0xad0000000000000000000000000000000000dead';
+const ADMIN_TEST_ADDRESS = '0xad0000000000000000000000000000000000dead';
 
 const TEST_CLIENT_IP = '127.0.0.1';
 

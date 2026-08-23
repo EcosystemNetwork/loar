@@ -97,21 +97,6 @@ function useUniverseFullGraph(contractAddress?: string) {
   });
 }
 
-/**
- * Paginated graph fetch — use when getFullGraph exceeds gas limits.
- */
-export function useUniverseGraphPage(contractAddress?: string, startId = 1, count = 500) {
-  return useReadContract({
-    abi: universeAbi,
-    address: (contractAddress || '0x') as Address,
-    functionName: 'getGraphPage',
-    args: [BigInt(startId), BigInt(count)],
-    query: {
-      enabled: !!contractAddress,
-    },
-  });
-}
-
 function useUniverseCanonChain(contractAddress?: string) {
   // Read currentCanonId first — only fetch the chain when a canon is set.
   // This avoids the CanonNotSet() revert entirely instead of catching it.

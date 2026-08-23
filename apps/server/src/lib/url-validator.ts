@@ -51,7 +51,7 @@ export async function validateUploadUrl(url: string): Promise<URL> {
  *   3. unpinned `fetch(url)` re-resolves and hits IP_B.
  * By reusing `pinnedIp` from step 1, the connection cannot be redirected.
  */
-export async function validateAndPinUrl(url: string): Promise<ValidatedUrl> {
+async function validateAndPinUrl(url: string): Promise<ValidatedUrl> {
   const parsed = new URL(url);
 
   if (!['https:', 'http:'].includes(parsed.protocol)) {

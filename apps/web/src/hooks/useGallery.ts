@@ -46,18 +46,6 @@ export function useGalleryFeatured(universeId: string | undefined) {
   });
 }
 
-/** Set featured content (universe admin) */
-export function useSetFeatured() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { universeId: string; contentIds: string[]; expiresAt?: Date }) =>
-      trpcClient.gallery.setFeatured.mutate(input),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['gallery', 'featured', variables.universeId] });
-    },
-  });
-}
-
 /**
  * Lineage neighborhood — parent (derived-from) and derivatives for a content
  * doc. Scoped to a single id so we fetch on-demand when the lightbox opens.
@@ -74,16 +62,6 @@ export function useGalleryLineage(contentId: string | undefined, derivativeLimit
   });
 }
 
-/** Get a creator's portfolio */
-export function useCreatorPortfolio(creatorUid: string | undefined, limit?: number) {
-  return useQuery({
-    queryKey: ['gallery', 'portfolio', creatorUid, limit],
-    queryFn: () =>
-      creatorUid ? trpcClient.gallery.creatorPortfolio.query({ creatorUid, limit }) : null,
-    enabled: !!creatorUid,
-  });
-}
-
 /** Send a commission request */
 export function useRequestCommission() {
   const queryClient = useQueryClient();
@@ -95,26 +73,6 @@ export function useRequestCommission() {
       budget?: string;
       universeId?: string;
     }) => trpcClient.gallery.requestCommission.mutate(input),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['gallery', 'commissions'] });
-    },
-  });
-}
-
-/** Get my commission requests */
-export function useMyCommissions(direction: 'received' | 'sent' = 'received', limit?: number) {
-  return useQuery({
-    queryKey: ['gallery', 'commissions', direction, limit],
-    queryFn: () => trpcClient.gallery.myCommissions.query({ direction, limit }),
-  });
-}
-
-/** Respond to a commission request */
-export function useRespondToCommission() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { commissionId: string; accept: boolean; responseMessage?: string }) =>
-      trpcClient.gallery.respondToCommission.mutate(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gallery', 'commissions'] });
     },

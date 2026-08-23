@@ -67,8 +67,3 @@ export interface Handler<TEvent extends AbiEvent = AbiEvent> {
 // cast-through-any keeps viem happy without losing the decoded arg types at
 // the call site (handlers see `ctx.args.<field>` typed correctly).
 type DecodedArgs<E extends AbiEvent> = DecodeEventLogReturnType<[E], any>['args'];
-
-/** Convenience key combining kind + event, matching Ponder's `'<Kind>:<Event>'` style. */
-export function handlerKey(kind: ContractKind, event: string): string {
-  return `${kind}:${event}`;
-}

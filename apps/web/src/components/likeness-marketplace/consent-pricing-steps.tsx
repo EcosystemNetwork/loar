@@ -331,7 +331,7 @@ export function emptyPricingState(opts?: { title?: string; description?: string 
 }
 
 /** Sum of split percent fields; -1 if any entry is non-numeric. */
-export function splitsTotalPercent(splits: SplitRecipient[]): number {
+function splitsTotalPercent(splits: SplitRecipient[]): number {
   let sum = 0;
   for (const s of splits) {
     const n = Number(s.percent);

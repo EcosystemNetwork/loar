@@ -32,14 +32,6 @@ export function useRevokeApiKey() {
   });
 }
 
-export function useApiKeyUsage(keyId: string | undefined) {
-  return useQuery({
-    queryKey: ['apiKeys', 'usage', keyId],
-    queryFn: () => trpcClient.apiKeys.getUsage.query({ keyId: keyId! }),
-    enabled: !!keyId,
-  });
-}
-
 export function useAvailablePermissions() {
   return useQuery({
     queryKey: ['apiKeys', 'permissions'],

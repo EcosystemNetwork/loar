@@ -45,23 +45,3 @@ export function useUpsertGenConfig() {
     },
   });
 }
-
-/** Check if current user has access to generate in a universe */
-export function useCheckGenAccess(universeId: string | undefined) {
-  return useQuery({
-    queryKey: ['universeGenConfig', 'checkAccess', universeId],
-    queryFn: () =>
-      universeId ? trpcClient.universeGenConfig.checkAccess.query({ universeId }) : null,
-    enabled: !!universeId,
-  });
-}
-
-/** Get approved models for a universe */
-export function useApprovedModels(universeId: string | undefined) {
-  return useQuery({
-    queryKey: ['universeGenConfig', 'approvedModels', universeId],
-    queryFn: () =>
-      universeId ? trpcClient.universeGenConfig.getApprovedModels.query({ universeId }) : null,
-    enabled: !!universeId,
-  });
-}

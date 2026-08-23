@@ -83,7 +83,7 @@ interface SlotForm {
   episodes: string;
 }
 
-export function CreateAdSlotPage() {
+function CreateAdSlotPage() {
   const navigate = useNavigate();
   const { isConnected, isAuthenticated, isAuthenticating } = useWalletAuth();
   const createSlot = useCreateAdSlot();

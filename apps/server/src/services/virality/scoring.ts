@@ -51,7 +51,7 @@ export interface ViralityScore {
 }
 
 /** Sums to 1.0 — adjust if a signal proves unreliable in the wild. */
-export const VIRALITY_WEIGHTS = {
+const VIRALITY_WEIGHTS = {
   hook: 0.3,
   hold: 0.3,
   completion: 0.2,

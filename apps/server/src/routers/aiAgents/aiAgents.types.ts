@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 // ── Agent types and permissions ────────────────────────────────────────
 
-export const AI_AGENT_TYPES = [
+const AI_AGENT_TYPES = [
   'content_creator',
   'universe_manager',
   'moderator',
@@ -13,7 +13,7 @@ export const AI_AGENT_TYPES = [
 ] as const;
 export type AIAgentType = (typeof AI_AGENT_TYPES)[number];
 
-export const AI_AGENT_PERMISSIONS = [
+const AI_AGENT_PERMISSIONS = [
   'create_entities',
   'generate_assets',
   'submit_canon',
@@ -91,7 +91,7 @@ export interface AIAgentDoc {
 
 // ── Pipeline types ─────────────────────────────────────────────────────
 
-export const pipelineStepSchema = z.object({
+const pipelineStepSchema = z.object({
   stepId: z.string().min(1),
   action: z.string().min(1), // e.g. "entities.create", "studio.createEntityPack"
   inputMapping: z.record(z.string(), z.string()).default({}), // maps outputs from previous steps

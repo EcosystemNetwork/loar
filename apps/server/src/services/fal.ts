@@ -155,7 +155,7 @@ export interface FalVideoGenerationResult {
   error?: string;
 }
 
-export class FalService {
+class FalService {
   constructor() {
     // Defer config — credentials are set per-call via configureCall() so BYOK
     // users can run on their own quota.

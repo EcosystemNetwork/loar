@@ -46,35 +46,11 @@ export function useCreateListing() {
   });
 }
 
-export function useUpdateListing() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: Parameters<typeof trpcClient.listings.update.mutate>[0]) =>
-      trpcClient.listings.update.mutate(input),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['my-listings'] });
-      qc.invalidateQueries({ queryKey: ['listing'] });
-    },
-  });
-}
-
 export function useDelistListing() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (listingId: string) => trpcClient.listings.delist.mutate({ listingId }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['my-listings'] }),
-  });
-}
-
-export function usePurchaseListing() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: Parameters<typeof trpcClient.listings.purchase.mutate>[0]) =>
-      trpcClient.listings.purchase.mutate(input),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['listings-browse'] });
-      qc.invalidateQueries({ queryKey: ['listing'] });
-    },
   });
 }
 

@@ -79,22 +79,3 @@ export interface NsfwProvider {
   readonly name: string;
   scan(media: MediaRef): Promise<NsfwOutcome>;
 }
-
-/**
- * Hamming distance between two equal-length hex strings. Lower = more similar.
- * Returns null when the strings are different lengths (can't compare).
- */
-export function hammingDistance(a: string, b: string): number | null {
-  if (a.length !== b.length) return null;
-  let d = 0;
-  for (let i = 0; i < a.length; i += 2) {
-    const byteA = parseInt(a.slice(i, i + 2), 16);
-    const byteB = parseInt(b.slice(i, i + 2), 16);
-    let xor = byteA ^ byteB;
-    while (xor) {
-      d += xor & 1;
-      xor >>= 1;
-    }
-  }
-  return d;
-}

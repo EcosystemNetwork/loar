@@ -39,15 +39,6 @@ function docIdFor(ownerUid: string, clientToken: string): string {
   return `${ownerUid}:${clientToken}`;
 }
 
-export function isValidClientToken(token: unknown): token is string {
-  return (
-    typeof token === 'string' &&
-    token.length >= CLIENT_TOKEN_MIN &&
-    token.length <= CLIENT_TOKEN_MAX &&
-    CLIENT_TOKEN_RE.test(token)
-  );
-}
-
 /**
  * Reserve the idempotency slot. If a non-expired record already exists,
  * return it (caller should short-circuit and return the existing jobId).

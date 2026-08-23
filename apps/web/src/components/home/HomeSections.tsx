@@ -53,7 +53,7 @@ import { createPortal } from 'react-dom';
 /* ──────────────────────────────────────────
  * Utility: horizontal scroll row with arrows
  * ────────────────────────────────────────── */
-export function ScrollRow({
+function ScrollRow({
   children,
   className = '',
 }: {
@@ -243,7 +243,7 @@ export function UniverseCard({ universe }: { universe: EnrichedUniverse }) {
 /* ──────────────────────────────────────────
  * Wide landscape card for featured row
  * ────────────────────────────────────────── */
-export function WideCard({ universe }: { universe: EnrichedUniverse }) {
+function WideCard({ universe }: { universe: EnrichedUniverse }) {
   const navigate = useNavigate();
 
   return (
@@ -295,20 +295,6 @@ export function WideCard({ universe }: { universe: EnrichedUniverse }) {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-/* ──────────────────────────────────────────
- * Indexer offline / stale banner
- * ────────────────────────────────────────── */
-export function IndexerBanner() {
-  return (
-    <div className="bg-amber-950/40 border-b border-amber-800/40 px-4 md:px-12 py-2 flex items-center gap-2.5 text-sm">
-      <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
-      <span className="text-amber-200/80">
-        Blockchain indexer is offline — on-chain universe data is unavailable
-      </span>
     </div>
   );
 }

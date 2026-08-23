@@ -117,7 +117,7 @@ interface BqParam {
 }
 
 /** Run a parameterized standard-SQL query and return rows as plain objects. */
-export async function runQuery<T = Record<string, string>>(
+async function runQuery<T = Record<string, string>>(
   sql: string,
   params: BqParam[] = []
 ): Promise<T[]> {

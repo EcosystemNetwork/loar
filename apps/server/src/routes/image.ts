@@ -24,17 +24,6 @@ setInterval(
   60 * 60 * 1000
 );
 
-// Store a base64 image and return an ID
-export function storeImage(base64Data: string, mimeType: string = 'image/png'): string {
-  const id = randomBytes(12).toString('hex');
-  imageStore.set(id, {
-    data: base64Data,
-    mimeType,
-    timestamp: Date.now(),
-  });
-  return id;
-}
-
 // Serve stored images
 imageRouter.get('/temp/:id', (c) => {
   const id = c.req.param('id');

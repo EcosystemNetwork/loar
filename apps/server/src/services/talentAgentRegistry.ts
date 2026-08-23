@@ -96,7 +96,7 @@ const REGISTRY_ABI = [
 /** Deterministic agreementId mirror of the off-chain `${agentUid}-${creatorUid}`
  *  Firestore doc id. Hashing the colon-separated tuple keeps it
  *  collision-free even when uids contain dashes. */
-export function agreementIdFor(agentUid: string, creatorUid: string): Hex {
+function agreementIdFor(agentUid: string, creatorUid: string): Hex {
   return keccak256(toBytes(`${agentUid.toLowerCase()}:${creatorUid.toLowerCase()}`));
 }
 

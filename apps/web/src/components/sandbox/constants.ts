@@ -156,16 +156,6 @@ export const T2V_CAPABLE_MODELS = new Set<VideoModel>([
   'veo-30-fast-google',
 ]);
 
-// Google-direct models use a single dual-mode registry id (t2v === i2v); the server's
-// google branch picks the mode from imageUrl presence.
-export const GOOGLE_VIDEO_MODELS = new Set<VideoModel>([
-  'veo-31-preview-google',
-  'veo-31-fast-preview-google',
-  'veo-31-lite-preview-google',
-  'veo-30-google',
-  'veo-30-fast-google',
-]);
-
 export const IMAGE_SIZES = [
   { value: 'landscape_16_9', label: '16:9 Landscape' },
   { value: 'portrait_16_9', label: '9:16 Portrait' },

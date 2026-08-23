@@ -48,41 +48,6 @@ export function useMediaAttachments(targetType: AttachmentTargetType, targetId: 
   });
 }
 
-export function useMediaVariants(attachmentId: string | null) {
-  return useQuery({
-    queryKey: ['mediaVariants', attachmentId],
-    queryFn: () => trpcClient.media.variants.query({ attachmentId: attachmentId! }),
-    enabled: !!attachmentId,
-  });
-}
-
-export function useAttachMedia() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: {
-      contentHash: string;
-      originalFilename: string;
-      mimeType: string;
-      size: number;
-      url: string;
-      targetType: AttachmentTargetType;
-      targetId: string;
-      targetName: string;
-      category: MediaCategory;
-      label: string;
-      subCategory?: string | null;
-      version?: number;
-      variantOf?: string | null;
-      variantLabel?: string | null;
-      sortOrder?: number;
-      generationId?: string | null;
-    }) => trpcClient.media.attach.mutate(input),
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ['mediaAttachments', vars.targetType, vars.targetId] });
-    },
-  });
-}
-
 export function useDetachMedia() {
   const qc = useQueryClient();
   return useMutation({
@@ -90,39 +55,6 @@ export function useDetachMedia() {
       trpcClient.media.detach.mutate({ id: vars.id }),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ['mediaAttachments', vars.targetType, vars.targetId] });
-    },
-  });
-}
-
-export function useUpdateMediaAttachment() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: {
-      id: string;
-      category?: MediaCategory;
-      label?: string;
-      subCategory?: string | null;
-      version?: number;
-      variantOf?: string | null;
-      variantLabel?: string | null;
-      sortOrder?: number;
-      targetType?: AttachmentTargetType;
-      targetId?: string;
-      targetName?: string;
-    }) => trpcClient.media.update.mutate(input),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['mediaAttachments'] });
-    },
-  });
-}
-
-export function useReorderMedia() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { items: { id: string; sortOrder: number }[] }) =>
-      trpcClient.media.reorder.mutate(input),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['mediaAttachments'] });
     },
   });
 }

@@ -133,7 +133,7 @@ async function createCircleWalletRaw(chainId: number): Promise<CircleWallet> {
  * Create a new Circle wallet for a user and persist it under doc(userId)
  * (the default-chain mapping). Creates an EOA on the configured blockchain.
  */
-export async function createUserWallet(userId: string, chainId = 11155111): Promise<CircleWallet> {
+async function createUserWallet(userId: string, chainId = 11155111): Promise<CircleWallet> {
   const circleWallet = await createCircleWalletRaw(chainId);
 
   // Persist the mapping
@@ -149,46 +149,6 @@ export async function createUserWallet(userId: string, chainId = 11155111): Prom
   }
 
   return circleWallet;
-}
-
-/**
- * Resolve a Circle wallet by its on-chain address (not the userId doc key).
- *
- * Circle wallet docs are keyed by an opaque userId (e.g. `email:foo@bar.com`),
- * so address-keyed callers — the tx proxy, the Uniswap swap orchestrator —
- * can't `getUserWallet(uid)`. Look up the wallet via the two collections that
- * record the address: `userAccounts.walletAddress` and `circleWallets.address`.
- * Case-insensitive on the address.
- */
-export async function resolveWalletByAddress(address: string): Promise<CircleWallet | null> {
-  if (!address) return null;
-  if (firebaseAvailable) {
-    const accountSnap = await db
-      .collection('userAccounts')
-      .where('walletAddress', '==', address)
-      .limit(1)
-      .get();
-    if (!accountSnap.empty) {
-      const data = accountSnap.docs[0].data();
-      if (data.walletId) {
-        return { walletId: data.walletId, address: data.walletAddress, blockchain: '' };
-      }
-    }
-    const walletSnap = await db
-      .collection('circleWallets')
-      .where('address', '==', address)
-      .limit(1)
-      .get();
-    if (!walletSnap.empty) {
-      return walletSnap.docs[0].data() as CircleWallet;
-    }
-    return null;
-  }
-  // Dev fallback — scan the in-memory map by address.
-  for (const w of memWallets.values()) {
-    if (w.address.toLowerCase() === address.toLowerCase()) return w;
-  }
-  return null;
 }
 
 /**
@@ -411,15 +371,6 @@ export async function getTransactionStatus(txId: string): Promise<TxResult> {
     state: tx.state ?? 'UNKNOWN',
     txHash: tx.txHash ?? undefined,
   };
-}
-
-/**
- * Get token balances for a Circle wallet.
- */
-export async function getWalletBalances(walletId: string) {
-  const client = getClient();
-  const resp = await client.getWalletTokenBalance({ id: walletId });
-  return resp.data?.tokenBalances ?? [];
 }
 
 /**

@@ -138,23 +138,6 @@ export async function ponderGql<T = any>(
   return EMPTY_RESULT as T;
 }
 
-/** Exposed for `/status` and health checks. Primary URL and any fallbacks with state. */
-export function getIndexerHealth(): Array<{
-  url: string;
-  healthy: boolean;
-  cooldownMsRemaining: number;
-}> {
-  const now = Date.now();
-  return candidateUrls().map((url) => {
-    const cooldown = _offlineUntil.get(url) ?? 0;
-    return {
-      url,
-      healthy: now >= cooldown,
-      cooldownMsRemaining: Math.max(0, cooldown - now),
-    };
-  });
-}
-
 // ──────────────────────────────────────────────────────────────────────
 // tRPC indexer fallback (feature-flagged via VITE_USE_TRPC_INDEXER)
 //

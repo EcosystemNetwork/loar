@@ -179,16 +179,3 @@ vi.mock('../services/platformConfig', () => ({
     ethPriceUsd: 3000,
   }),
 }));
-
-// Stub storage upload queue
-const mockUploadQueue = {
-  enqueue: vi.fn().mockReturnValue('job-123'),
-  getStatus: vi.fn().mockReturnValue({ jobId: 'job-123', status: 'pending' }),
-  getActiveJobs: vi.fn().mockReturnValue([]),
-  getRecentJobs: vi.fn().mockReturnValue([]),
-  retry: vi.fn().mockReturnValue(true),
-};
-vi.mock('../services/storage/upload-queue', () => ({
-  uploadQueue: mockUploadQueue,
-  getUploadQueue: vi.fn().mockReturnValue(mockUploadQueue),
-}));

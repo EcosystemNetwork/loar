@@ -297,21 +297,3 @@ export function useUniverseGovernor(governorAddress: `0x${string}` | undefined) 
     error,
   };
 }
-
-/**
- * Helper function to create a proposal for canonizing a node
- * This encodes a call to Universe.setCanon(nodeId)
- */
-export function encodeCanonizeNodeProposal(universeAddress: `0x${string}`, nodeId: bigint) {
-  const calldata = encodeAbiParameters(
-    universeAbiForEncoding.find((f: any) => f.name === 'setCanon')?.inputs || [],
-    [nodeId]
-  );
-
-  return {
-    targets: [universeAddress],
-    values: [0n],
-    calldatas: [calldata],
-    description: `Canonize Node #${nodeId}`,
-  };
-}

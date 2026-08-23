@@ -82,7 +82,7 @@ const arcsCol = () => {
  * Generate the per-episode prompt with continuity scaffolding.
  * Episode 1 introduces the premise. Episodes 2..N reference the prior beat.
  */
-export function buildEpisodePrompt(
+function buildEpisodePrompt(
   premise: string,
   episodeNumber: number,
   totalEpisodes: number,

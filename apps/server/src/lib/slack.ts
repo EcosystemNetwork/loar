@@ -14,8 +14,6 @@ import { captureException } from './sentry';
 const WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL;
 const ENV = process.env.NODE_ENV ?? 'development';
 
-export const slackEnabled = Boolean(WEBHOOK_URL);
-
 export interface SlackAlert {
   /** Short headline — appears in the mobile notification. */
   title: string;

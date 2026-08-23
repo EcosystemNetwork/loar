@@ -53,7 +53,7 @@ function stripFences(text: string): string {
   return t;
 }
 
-export async function downloadToBuffer(url: string): Promise<Buffer> {
+async function downloadToBuffer(url: string): Promise<Buffer> {
   await validateUploadUrl(url);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
@@ -77,7 +77,7 @@ export interface GeminiFilePart {
   };
 }
 
-export async function uploadFileAndWait(
+async function uploadFileAndWait(
   buffer: Buffer,
   mimeType: string,
   displayName: string

@@ -28,9 +28,9 @@ export const PRODUCT_TYPES = [
   'IP_LICENSE',
 ] as const;
 
-export const CURRENCIES = ['ETH', 'LOAR', 'CREDITS', 'USD'] as const;
-export const RIGHTS_LANES = ['fan', 'original', 'licensed'] as const;
-export const LISTING_STATUSES = ['DRAFT', 'ACTIVE', 'SOLD_OUT', 'DELISTED'] as const;
+const CURRENCIES = ['ETH', 'LOAR', 'CREDITS', 'USD'] as const;
+const RIGHTS_LANES = ['fan', 'original', 'licensed'] as const;
+const LISTING_STATUSES = ['DRAFT', 'ACTIVE', 'SOLD_OUT', 'DELISTED'] as const;
 
 const listingsCol = () => {
   if (!db) throw new Error('Firebase is not configured');

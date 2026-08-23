@@ -69,9 +69,3 @@ export function vocab(key: VocabKey, web3Mode: boolean): string {
   const entry = VOCAB_MAP[key];
   return web3Mode ? entry.web3 : entry.web2;
 }
-
-/**
- * React hook version — pulls web3Mode from context automatically.
- * Import and call: const v = useVocab(); v('mint')
- */
-export { VOCAB_MAP };

@@ -217,14 +217,3 @@ export async function withProviderRateLimit<T>(provider: string, fn: () => Promi
     releaseLocal(g);
   }
 }
-
-/** Test-only: in-process gate snapshot. */
-export function _rateLimitSnapshot(provider: string): {
-  active: number;
-  cap: number;
-  queued: number;
-} {
-  const g = localGates.get(provider);
-  if (!g) return { active: 0, cap: limitFor(provider), queued: 0 };
-  return { active: g.active, cap: g.cap, queued: g.queue.length };
-}

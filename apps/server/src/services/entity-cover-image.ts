@@ -221,7 +221,7 @@ const STRUCTURAL_PROMPT: PromptConfig = {
   personGeneration: 'DONT_ALLOW',
 };
 
-export function getEntityPromptConfig(kind: string): PromptConfig {
+function getEntityPromptConfig(kind: string): PromptConfig {
   return PROMPT_CONFIGS[kind] || STRUCTURAL_PROMPT;
 }
 
@@ -261,7 +261,7 @@ export interface EntityForCover {
  * Generate a cover image for an entity and update its imageUrl in Firestore.
  * Returns the IPFS URL on success. Throws on failure.
  */
-export async function generateEntityCoverImage(entity: EntityForCover): Promise<string> {
+async function generateEntityCoverImage(entity: EntityForCover): Promise<string> {
   const config = getEntityPromptConfig(entity.kind);
   const prompt = config.buildPrompt(entity.name, entity.description || '', entity.metadata || {});
 

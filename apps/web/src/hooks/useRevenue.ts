@@ -5,30 +5,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { useWalletAuth } from '@/lib/wallet-auth';
 
-// ---- Episode NFTs ----
-
-export function useEpisodeNFTs(universeId: string) {
-  return useQuery({
-    queryKey: ['episode-nfts', universeId],
-    queryFn: () => trpcClient.nft.getEpisodesByUniverse.query({ universeId }),
-    enabled: !!universeId,
-  });
-}
-
 export function useCreateEpisodeListing() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: Parameters<typeof trpcClient.nft.createEpisodeListing.mutate>[0]) =>
       trpcClient.nft.createEpisodeListing.mutate(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['episode-nfts'] }),
-  });
-}
-
-export function useBatchCreateEpisodeListings() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: Parameters<typeof trpcClient.nft.batchCreateEpisodeListing.mutate>[0]) =>
-      trpcClient.nft.batchCreateEpisodeListing.mutate(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['episode-nfts'] }),
   });
 }
@@ -47,15 +28,6 @@ export function useCharacterNFTs(universeId: string) {
     queryKey: ['character-nfts', universeId],
     queryFn: () => trpcClient.nft.getCharactersByUniverse.query({ universeId }),
     enabled: !!universeId,
-  });
-}
-
-export function useCreateCharacterNFT() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: Parameters<typeof trpcClient.nft.createCharacterNFT.mutate>[0]) =>
-      trpcClient.nft.createCharacterNFT.mutate(input),
-    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['character-nfts', vars.universeId] }),
   });
 }
 
@@ -154,31 +126,6 @@ export function useCreditBalance() {
   });
 }
 
-export function useCreditTiers() {
-  return useQuery({
-    queryKey: ['credit-tiers'],
-    queryFn: () => trpcClient.credits.getPackages.query(),
-  });
-}
-
-export function usePurchaseCredits() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: Parameters<typeof trpcClient.credits.purchaseWithFiat.mutate>[0]) =>
-      trpcClient.credits.purchaseWithFiat.mutate(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['credit-balance'] }),
-  });
-}
-
-export function useSpendCredits() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: Parameters<typeof trpcClient.credits.spend.mutate>[0]) =>
-      trpcClient.credits.spend.mutate(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['credit-balance'] }),
-  });
-}
-
 export function useCreditHistory(limit = 20) {
   return useQuery({
     queryKey: ['credit-history', limit],
@@ -196,27 +143,10 @@ export function useSubscriptionTiers(universeId: string) {
   });
 }
 
-export function useSubscribe() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: Parameters<typeof trpcClient.subscriptions.subscribe.mutate>[0]) =>
-      trpcClient.subscriptions.subscribe.mutate(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['my-subs'] }),
-  });
-}
-
 export function useMySubscriptions() {
   return useQuery({
     queryKey: ['my-subs'],
     queryFn: () => trpcClient.subscriptions.mySubscriptions.query(),
-  });
-}
-
-export function useUniverseSubStats(universeId: string) {
-  return useQuery({
-    queryKey: ['sub-stats', universeId],
-    queryFn: () => trpcClient.subscriptions.getUniverseStats.query({ universeId }),
-    enabled: !!universeId,
   });
 }
 
@@ -243,14 +173,6 @@ export function useAdBids(slotId: string) {
     queryKey: ['ad-bids', slotId],
     queryFn: () => trpcClient.ads.getBids.query({ slotId }),
     enabled: !!slotId,
-  });
-}
-
-export function useUniverseSponsorships(universeId: string) {
-  return useQuery({
-    queryKey: ['universe-sponsorships', universeId],
-    queryFn: () => trpcClient.ads.getSponsorships.query({ universeId }),
-    enabled: !!universeId,
   });
 }
 
@@ -401,16 +323,6 @@ export function useRejectAdSeedPlacement() {
   });
 }
 
-// ---- Analytics ----
-
-export function useUniverseMetrics(universeId: string) {
-  return useQuery({
-    queryKey: ['universe-metrics', universeId],
-    queryFn: () => trpcClient.analytics.getUniverseMetrics.query({ universeId }),
-    enabled: !!universeId,
-  });
-}
-
 export function useUniversesMetricsBatch(universeIds: string[]) {
   const ids = [...universeIds].sort();
   return useQuery({
@@ -418,13 +330,6 @@ export function useUniversesMetricsBatch(universeIds: string[]) {
     queryFn: () => trpcClient.analytics.getUniversesMetricsBatch.query({ universeIds: ids }),
     enabled: ids.length > 0,
     staleTime: 60_000,
-  });
-}
-
-export function useRecordView() {
-  return useMutation({
-    mutationFn: (input: Parameters<typeof trpcClient.analytics.recordView.mutate>[0]) =>
-      trpcClient.analytics.recordView.mutate(input),
   });
 }
 

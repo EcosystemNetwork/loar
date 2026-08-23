@@ -78,7 +78,7 @@ function formatEntity(entity: Entity): string {
  * Returns a structured text block suitable for prepending to generation prompts,
  * or null if the universe has no entities.
  */
-export async function buildUniverseContext(universeAddress: string): Promise<string | null> {
+async function buildUniverseContext(universeAddress: string): Promise<string | null> {
   if (!db) return null;
 
   const snapshot = await db
@@ -133,7 +133,7 @@ export async function buildUniverseContext(universeAddress: string): Promise<str
  *
  * Returns a focused context block, or null if entity not found.
  */
-export async function buildEntityContext(entityId: string): Promise<string | null> {
+async function buildEntityContext(entityId: string): Promise<string | null> {
   if (!db) return null;
 
   const entityDoc = await db.collection('entities').doc(entityId).get();

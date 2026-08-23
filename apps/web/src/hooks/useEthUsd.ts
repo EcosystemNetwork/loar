@@ -27,21 +27,6 @@ export function useEthUsd() {
   return { rate: data ?? null, isLoading, isError };
 }
 
-export function ethToUsd(eth: number, rate: number | null): number | null {
-  if (rate == null) return null;
-  return eth * rate;
-}
-
-export function weiToUsd(wei: bigint | string, rate: number | null): number | null {
-  if (rate == null) return null;
-  try {
-    const bi = typeof wei === 'string' ? BigInt(wei) : wei;
-    return Number(formatEther(bi)) * rate;
-  } catch {
-    return null;
-  }
-}
-
 export function formatUsd(amount: number, opts?: { compact?: boolean }): string {
   if (opts?.compact) {
     if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(2)}M`;

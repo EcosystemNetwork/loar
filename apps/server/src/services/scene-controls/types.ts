@@ -929,21 +929,6 @@ export interface SceneControlFields {
   shotPreset: ShotPresetId | null;
 }
 
-/** Default values for all scene control fields */
-export const DEFAULT_SCENE_CONTROLS: SceneControlFields = {
-  cameraPreset: null,
-  cameraIntensity: 'standard',
-  castMemberIds: [],
-  motionMaskHash: null,
-  useSourceMask: false,
-  startFrameFrom: null,
-  endFrameTarget: null,
-  vfxPresets: [],
-  stylePreset: null,
-  styleInherits: true,
-  shotPreset: null,
-};
-
 // ── Provider capability flags ────────────────────────────────────────
 
 export interface ProviderCapabilities {

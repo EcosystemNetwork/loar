@@ -39,7 +39,7 @@ function arcRpcUrl(): string {
   return process.env.ARC_RPC_URL || 'https://rpc.testnet.arc.network';
 }
 
-export const arcTestnet = defineChain({
+const arcTestnet = defineChain({
   id: ARC_TESTNET_ID,
   name: 'Arc Testnet',
   nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: USDC_DECIMALS },

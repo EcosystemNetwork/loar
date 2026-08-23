@@ -44,7 +44,7 @@ function anyEnvSet(...names: string[]): BlockerStatus {
   return names.every((n) => envSet(n) === 'ready') ? 'ready' : 'blocked';
 }
 
-export const BLOCKERS: Blocker[] = [
+const BLOCKERS: Blocker[] = [
   // ── Operational — EVM cross-cutting ─────────────────────────────────
   {
     id: 'GOV-01',

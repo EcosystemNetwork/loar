@@ -155,36 +155,6 @@ Output JSON with this exact shape:
 Output JSON only.`;
 }
 
-export function buildSceneIndexPrompt(): string {
-  return `You are building a searchable index over a video by scene.
-For each scene you detect, output compact tags, objects, and a caption.
-
-RULES:
-- tags must be lowercase, single or two-word tokens ("red sigil", "desert", "sunset", "betrayal", "void engine")
-- objects are concrete visible nouns ("sword", "spaceship hull", "crown")
-- faces are proper names if you can identify them, else empty
-- mood is a single descriptor ("tense", "melancholy", "triumphant")
-- captions are 1 sentence max
-
-Output JSON with this exact shape:
-{
-  "scenes": [
-    {
-      "sceneIndex": 0,
-      "caption": "...",
-      "tags": ["..."],
-      "objects": ["..."],
-      "faces": ["..."],
-      "mood": "...",
-      "startSec": 0.0,
-      "endSec": 0.0
-    }
-  ]
-}
-
-Output JSON only.`;
-}
-
 export function buildRecapPrompt(input: { targetDurationSec?: number; audience?: string }): string {
   const audience = input.audience ? `\nTARGET AUDIENCE: ${input.audience}` : '';
   const duration = input.targetDurationSec

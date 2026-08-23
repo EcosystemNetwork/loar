@@ -7,15 +7,32 @@
  */
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Film, GripVertical, Play, Clock, Sparkles, Loader2 } from 'lucide-react';
+import {
+  X,
+  Film,
+  GripVertical,
+  Play,
+  Clock,
+  Sparkles,
+  Loader2,
+  XCircle,
+  ListChecks,
+} from 'lucide-react';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
 
 /** How many generations to load per page */
 const PAGE_SIZE = 20;
+
+/** Statuses that mean "still working" — everything else is terminal. */
+const IN_PROGRESS_STATUSES = new Set(['queued', 'running', 'pending', 'processing']);
+
+/** Poll cadence for the review queue while the panel is open. */
+const QUEUE_POLL_MS = 4000;
 
 interface GenerationsPanelProps {
   universeId: string;
@@ -38,8 +55,11 @@ export function GenerationsPanel({
 }: GenerationsPanelProps) {
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const queryClient = useQueryClient();
 
-  // Fetch all generations for this universe
+  // Fetch all generations for this universe. Polls while open so the review
+  // queue (in-progress jobs) below reflects status changes without a manual
+  // refresh — see IN_PROGRESS_STATUSES / QUEUE_POLL_MS.
   const { data: generations, isLoading } = useQuery({
     queryKey: ['universe-generations', universeId],
     queryFn: () =>
@@ -48,6 +68,16 @@ export function GenerationsPanel({
         limit: 50,
       }),
     enabled: isOpen && !!universeId,
+    refetchInterval: isOpen ? QUEUE_POLL_MS : false,
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (jobId: string) => trpcClient.generation.cancel.mutate({ jobId }),
+    onSuccess: () => {
+      toast.success('Generation cancelled');
+      queryClient.invalidateQueries({ queryKey: ['universe-generations', universeId] });
+    },
+    onError: (err: any) => toast.error(err.message || 'Failed to cancel generation'),
   });
 
   // Also fetch media attachments for this universe
@@ -65,6 +95,12 @@ export function GenerationsPanel({
 
   const videoGenerations = (generations || []).filter(
     (g: any) => g.status === 'completed' && (g.videoUrl || g.permanentVideoUrl)
+  );
+
+  // Review queue — tasks currently in motion, so the owner can see what's
+  // running and cancel it without leaving the canvas.
+  const inProgressItems = (generations || []).filter((g: any) =>
+    IN_PROGRESS_STATUSES.has(g.status)
   );
 
   const videoMedia = (mediaAttachments || []).filter((m: any) => m.category === 'video' && m.url);
@@ -126,6 +162,17 @@ export function GenerationsPanel({
 
   const isGeneration = (item: any) => 'prompt' in item;
 
+  const formatElapsed = (date: any) => {
+    if (!date) return '';
+    const started = date._seconds ? date._seconds * 1000 : new Date(date).getTime();
+    if (Number.isNaN(started)) return '';
+    const secs = Math.max(0, Math.floor((Date.now() - started) / 1000));
+    if (secs < 60) return `${secs}s`;
+    const mins = Math.floor(secs / 60);
+    if (mins < 60) return `${mins}m ${secs % 60}s`;
+    return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+  };
+
   return (
     <div className="fixed right-0 top-0 h-full w-80 bg-background border-l border-border shadow-xl z-[55] flex flex-col animate-in slide-in-from-right duration-200">
       {/* Header */}
@@ -136,6 +183,12 @@ export function GenerationsPanel({
           {allItems.length > 0 && (
             <Badge variant="secondary" className="text-xs">
               {allItems.length}
+            </Badge>
+          )}
+          {inProgressItems.length > 0 && (
+            <Badge className="text-xs bg-amber-500/90 hover:bg-amber-600 text-white border-0 flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {inProgressItems.length} running
             </Badge>
           )}
         </div>
@@ -159,6 +212,53 @@ export function GenerationsPanel({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        {/* Review queue — tasks in motion */}
+        {inProgressItems.length > 0 && (
+          <div className="mb-3 pb-3 border-b border-border space-y-2">
+            <div className="flex items-center gap-1.5 px-0.5">
+              <ListChecks className="h-3.5 w-3.5 text-amber-500" />
+              <h3 className="text-xs font-medium text-foreground">In progress</h3>
+            </div>
+            {inProgressItems.map((item: any) => (
+              <div
+                key={item.id}
+                className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 space-y-1.5"
+              >
+                <div className="flex items-start gap-2">
+                  <Loader2 className="h-3.5 w-3.5 text-amber-500 animate-spin mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-foreground line-clamp-2 flex-1">
+                    {(item.prompt || item.label || 'Generating…').slice(0, 100)}
+                  </p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 capitalize">
+                      {item.status}
+                    </Badge>
+                    <span className="flex items-center gap-0.5">
+                      <Clock className="h-2.5 w-2.5" />
+                      {formatElapsed(item.createdAt)}
+                    </span>
+                    {modelDisplayNames[item.finalModelId] && (
+                      <span>{modelDisplayNames[item.finalModelId]}</span>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-[10px] text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                    disabled={cancelMutation.isPending}
+                    onClick={() => cancelMutation.mutate(item.id)}
+                  >
+                    <XCircle className="h-3 w-3 mr-1" />
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {isLoading && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

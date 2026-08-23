@@ -482,17 +482,3 @@ export function LoarIcon({ name, size = '1em', className, ...rest }: LoarIconPro
 
   return <IconFn width={size} height={size} className={className} aria-hidden="true" {...rest} />;
 }
-
-/**
- * Shorthand for inline icon usage in text contexts.
- * Returns a small inline icon matching the surrounding text size.
- */
-export function loarIcon(name: LoarIconName, className?: string) {
-  return (
-    <LoarIcon
-      name={name}
-      size="1em"
-      className={`inline-block align-[-0.125em] ${className ?? ''}`}
-    />
-  );
-}

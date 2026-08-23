@@ -73,7 +73,7 @@ const WORD_GROUPING = {
 
 // ── Service ──────────────────────────────────────────────────────────
 
-export class TranscriptionService {
+class TranscriptionService {
   private configured = false;
 
   private ensureConfigured(): void {

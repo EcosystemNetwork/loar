@@ -9,7 +9,7 @@ import { ENTITY_KINDS, ENTITY_RELATION_TYPES } from '../../routers/entities/enti
 const entityKindEnum = z.enum(ENTITY_KINDS as unknown as [string, ...string[]]);
 const relationTypeEnum = z.enum(ENTITY_RELATION_TYPES as unknown as [string, ...string[]]);
 
-export const riskKindEnum = z.enum([
+const riskKindEnum = z.enum([
   'nsfw',
   'violence',
   'copyright_logo',
@@ -19,7 +19,7 @@ export const riskKindEnum = z.enum([
   'franchise_lookalike',
 ]);
 
-export const extractedSceneSchema = z.object({
+const extractedSceneSchema = z.object({
   index: z.number().int().nonnegative(),
   startSec: z.number().nonnegative(),
   endSec: z.number().nonnegative(),
@@ -31,7 +31,7 @@ export const extractedSceneSchema = z.object({
   actions: z.array(z.string().max(400)).max(20).default([]),
 });
 
-export const extractedEntitySchema = z.object({
+const extractedEntitySchema = z.object({
   kind: entityKindEnum,
   name: z.string().min(1).max(200),
   description: z.string().max(3000).default(''),
@@ -40,7 +40,7 @@ export const extractedEntitySchema = z.object({
   metadata: z.record(z.string(), z.string()).optional(),
 });
 
-export const extractedRelationshipSchema = z.object({
+const extractedRelationshipSchema = z.object({
   sourceName: z.string().min(1).max(200),
   targetName: z.string().min(1).max(200),
   type: relationTypeEnum,
@@ -48,20 +48,20 @@ export const extractedRelationshipSchema = z.object({
   description: z.string().max(1000).optional(),
 });
 
-export const extractedTimelineEventSchema = z.object({
+const extractedTimelineEventSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(1500).default(''),
   atSec: z.number().nonnegative(),
   confidence: z.number().min(0).max(1),
 });
 
-export const extractedChapterSchema = z.object({
+const extractedChapterSchema = z.object({
   title: z.string().min(1).max(200),
   startSec: z.number().nonnegative(),
   summary: z.string().max(1000).default(''),
 });
 
-export const extractedRiskSchema = z.object({
+const extractedRiskSchema = z.object({
   kind: riskKindEnum,
   score: z.number().min(0).max(1),
   evidence: z.string().max(1000),
@@ -81,7 +81,7 @@ export const extractionOutputSchema = z.object({
 
 export type ExtractionOutput = z.infer<typeof extractionOutputSchema>;
 
-export const canonConflictSchema = z.object({
+const canonConflictSchema = z.object({
   severity: z.enum(['info', 'warn', 'block']),
   rule: z.enum([
     'costume_drift',
@@ -104,7 +104,7 @@ export const canonCheckOutputSchema = z.object({
 
 export type CanonCheckOutput = z.infer<typeof canonCheckOutputSchema>;
 
-export const sceneIndexOutputSchema = z.object({
+const sceneIndexOutputSchema = z.object({
   scenes: z
     .array(
       z.object({

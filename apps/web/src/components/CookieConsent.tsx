@@ -13,10 +13,10 @@
 import { useEffect, useState } from 'react';
 import { QA_EVENTS } from '@/lib/qa-events';
 
-export const CONSENT_KEY = 'loar_consent_v1';
+const CONSENT_KEY = 'loar_consent_v1';
 export type ConsentLevel = 'all' | 'essential';
 
-export function readConsent(): ConsentLevel | null {
+function readConsent(): ConsentLevel | null {
   if (typeof window === 'undefined') return null;
   const raw = window.localStorage.getItem(CONSENT_KEY);
   return raw === 'all' || raw === 'essential' ? raw : null;

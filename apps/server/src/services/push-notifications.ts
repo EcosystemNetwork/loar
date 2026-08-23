@@ -31,7 +31,7 @@ const fcmTokensCol = () => {
  * Send a push notification to a list of FCM tokens.
  * Returns counts of successes, failures, and any invalid tokens that should be removed.
  */
-export async function sendPushNotification(
+async function sendPushNotification(
   fcmTokens: string[],
   payload: PushPayload
 ): Promise<SendResult> {

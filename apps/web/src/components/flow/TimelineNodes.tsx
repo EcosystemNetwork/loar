@@ -112,6 +112,8 @@ export interface TimelineNodeData {
   isCanon?: boolean; // Whether this node is canonical
   isInCanonChain?: boolean; // Whether this node is part of the canonical chain
   isDraft?: boolean; // Generated but not yet saved on-chain — lives only in this browser
+  isPending?: boolean; // Placeholder node for a generation that's still in flight — no media yet
+  pendingPrompt?: string; // Prompt shown on a pending node while its generation runs
   segmentCount?: number; // Number of video segments composing this event
   childCount?: number; // Number of child/branching nodes
   onAddScene?: (position: 'after' | 'branch', sourceNodeId?: string) => void;
@@ -205,7 +207,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
   }, [isHovered, videoElement]);
 
   const handleClick = () => {
-    if (!data.universeId) return;
+    if (!data.universeId || data.isPending) return;
 
     // Use blockchainNodeId if available (the actual blockchain node ID)
     // Otherwise fall back to parsing eventId
@@ -480,6 +482,16 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                   />
                 )}
               </>
+            ) : data.isPending ? (
+              <div className="w-full h-full bg-gradient-to-br from-purple-950 to-slate-900 flex flex-col items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400 mb-3" />
+                <div className="text-white text-sm font-medium">Generating…</div>
+                {data.pendingPrompt && (
+                  <div className="text-white/50 text-xs mt-1 px-4 text-center line-clamp-2">
+                    {data.pendingPrompt}
+                  </div>
+                )}
+              </div>
             ) : (
               <div
                 className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex flex-col items-center justify-center cursor-pointer hover:from-gray-500 hover:to-gray-700 transition-all duration-200"
@@ -519,53 +531,57 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                   {data.childCount} branches
                 </Badge>
               )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  data.onEditScene?.(data.eventId || '');
-                }}
-                className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Change video"
-              >
-                <Film className="h-4 w-4" />
-              </Button>
+              {!data.isPending && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    data.onEditScene?.(data.eventId || '');
+                  }}
+                  className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Change video"
+                >
+                  <Film className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Bottom action buttons - appear on hover */}
-        <div className="absolute -bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
-          {/* Delete button */}
-          {data.onDeleteNode && (
+        {/* Bottom action buttons - appear on hover (hidden while a generation is still pending) */}
+        {!data.isPending && (
+          <div className="absolute -bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+            {/* Delete button */}
+            {data.onDeleteNode && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-8 h-8 p-0 border-2 border-red-500/60 hover:border-red-500 hover:bg-red-500/20 rounded-full bg-card"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onDeleteNode?.(data.eventId || '');
+                }}
+                title="Delete node"
+              >
+                <Trash2 className="h-4 w-4 text-red-500" />
+              </Button>
+            )}
+            {/* Branch button */}
             <Button
               variant="outline"
               size="sm"
-              className="w-8 h-8 p-0 border-2 border-red-500/60 hover:border-red-500 hover:bg-red-500/20 rounded-full bg-card"
+              className="w-8 h-8 p-0 border-2 border-dashed border-primary/60 hover:border-primary hover:bg-primary/10 rounded-full bg-card"
               onClick={(e) => {
                 e.stopPropagation();
-                data.onDeleteNode?.(data.eventId || '');
+                data.onAddScene?.('branch', data.eventId);
               }}
-              title="Delete node"
+              title="Create branch event"
             >
-              <Trash2 className="h-4 w-4 text-red-500" />
+              <Plus className="h-4 w-4 text-primary" />
             </Button>
-          )}
-          {/* Branch button */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-8 h-8 p-0 border-2 border-dashed border-primary/60 hover:border-primary hover:bg-primary/10 rounded-full bg-card"
-            onClick={(e) => {
-              e.stopPropagation();
-              data.onAddScene?.('branch', data.eventId);
-            }}
-            title="Create branch event"
-          >
-            <Plus className="h-4 w-4 text-primary" />
-          </Button>
-        </div>
+          </div>
+        )}
 
         {/* Selection checkbox — top-left, appears on hover or when selected */}
         {data.isSelected !== undefined && (
@@ -586,21 +602,6 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
       </div>
 
       <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
-    </>
-  );
-}
-
-export function TimelineBranchNode({ data }: { data: { label: string; color: string } }) {
-  return (
-    <>
-      <Handle type="target" position={Position.Top} />
-      <div
-        className="px-3 py-1 rounded-full text-xs font-medium text-white"
-        style={{ backgroundColor: data.color }}
-      >
-        {data.label}
-      </div>
-      <Handle type="source" position={Position.Bottom} />
     </>
   );
 }

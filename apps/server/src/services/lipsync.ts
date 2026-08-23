@@ -34,7 +34,7 @@ const HEALTH_RECOVERY_MS = 5 * 60 * 1000; // 5 minutes
 
 // ── Service ──────────────────────────────────────────────────────────
 
-export class LipSyncService {
+class LipSyncService {
   private configured = false;
   private providerHealth: Record<string, ProviderHealth> = {};
 

@@ -628,7 +628,3 @@ export const VOICE_LIBRARY_SEED: VoiceLibrarySeedEntry[] = [
     tags: ['specialty', 'noir', 'detective', 'monologue'],
   },
 ];
-
-export const VOICE_LIBRARY_SEED_BY_SLUG: Record<string, VoiceLibrarySeedEntry> = Object.fromEntries(
-  VOICE_LIBRARY_SEED.map((e) => [e.slug, e])
-);

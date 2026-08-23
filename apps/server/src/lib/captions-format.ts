@@ -49,7 +49,7 @@ const DEFAULTS: Required<CaptionStyleOptions> = {
 
 // ── Time formatters ──────────────────────────────────────────────────
 
-export function formatTimeSRT(seconds: number): string {
+function formatTimeSRT(seconds: number): string {
   const safe = Math.max(0, seconds);
   const h = Math.floor(safe / 3600);
   const m = Math.floor((safe % 3600) / 60);
@@ -58,7 +58,7 @@ export function formatTimeSRT(seconds: number): string {
   return `${pad2(h)}:${pad2(m)}:${pad2(s)},${pad3(ms)}`;
 }
 
-export function formatTimeVTT(seconds: number): string {
+function formatTimeVTT(seconds: number): string {
   const safe = Math.max(0, seconds);
   const h = Math.floor(safe / 3600);
   const m = Math.floor((safe % 3600) / 60);
@@ -78,7 +78,7 @@ function pad3(n: number): string {
 // ── Text shaping ─────────────────────────────────────────────────────
 
 /** Greedy word-wrap to a max line width. Never splits a word. */
-export function wrapLine(text: string, maxChars: number): string[] {
+function wrapLine(text: string, maxChars: number): string[] {
   const words = text.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return [];
   const lines: string[] = [];

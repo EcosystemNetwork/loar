@@ -89,35 +89,3 @@ export function QueryState({
 
   return <>{children}</>;
 }
-
-/** Centered spinner for inline loading (e.g., inside a card or sidebar) */
-export function InlineLoader({ className = '' }: { className?: string }) {
-  return (
-    <div className={`flex items-center justify-center py-12 ${className}`}>
-      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-    </div>
-  );
-}
-
-/**
- * AuthRequired — Shown when a page needs authentication but user isn't signed in.
- * Replaces blank/empty states on pages that silently require auth.
- */
-export function AuthRequired({
-  message = 'Sign in to access this page.',
-  action,
-}: {
-  message?: string;
-  action?: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="p-4 rounded-full bg-muted mb-4">
-        <AlertCircle className="h-8 w-8 text-muted-foreground" />
-      </div>
-      <h3 className="text-lg font-semibold mb-2">Sign in required</h3>
-      <p className="text-muted-foreground text-sm max-w-md mb-4">{message}</p>
-      {action}
-    </div>
-  );
-}

@@ -21,22 +21,12 @@ export const CONTROL_TYPES = [
 
 export type ControlType = (typeof CONTROL_TYPES)[number];
 
-export const CONTROL_TYPE_LABELS: Record<ControlType, string> = {
-  subject: 'Subject / Character',
-  style: 'Style Reference',
-  scribble: 'Sketch / Scribble',
-  pose: 'Pose Guide',
-  depth: 'Depth Layout',
-  canny: 'Edge / Line Art',
-  shot_reference: 'Previous Shot',
-};
-
 // ── Shot angle presets (still-image camera angles) ──────────────────
 // Kept separate from scene-controls CAMERA_PRESETS (which are motion
 // presets for video). These are composition-only descriptors suitable
 // for still image generation.
 
-export const SHOT_ANGLE_PRESETS = {
+const SHOT_ANGLE_PRESETS = {
   low_angle: {
     label: 'Low Angle',
     promptPrefix: 'Shot from a low angle looking up at the subject',
@@ -90,7 +80,7 @@ export type ShotAnglePresetId = keyof typeof SHOT_ANGLE_PRESETS;
 // convert the 0–1 slider to a verbal modifier that the model actually
 // responds to.
 
-export function strengthToPhrase(strength: number): string {
+function strengthToPhrase(strength: number): string {
   if (strength < 0.2) return 'loosely inspired by';
   if (strength < 0.45) return 'taking general cues from';
   if (strength < 0.65) return 'following closely';

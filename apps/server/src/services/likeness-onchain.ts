@@ -54,16 +54,6 @@ export const RightsType = {
 } as const;
 export type RightsTypeValue = (typeof RightsType)[keyof typeof RightsType];
 
-/**
- * ContentLicensing DealType enum mirror — index order MUST match
- * `apps/contracts/src/revenue/ContentLicensing.sol::DealType`.
- */
-export const ContractDealType = {
-  BUY: 0,
-  RENT: 1,
-  LICENSE: 2,
-} as const;
-
 const SUPPORTED_CHAIN_IDS = new Set<number>([sepolia.id, mainnet.id]);
 
 interface OnChainEnv {
@@ -427,38 +417,6 @@ export async function readContentRegistration(
   };
   if (row.creator === '0x0000000000000000000000000000000000000000') return null;
   return { creator: row.creator, active: row.active, buyPrice: row.buyPrice };
-}
-
-/**
- * Encode the calldata for `ContentLicensing.registerContent`. Useful when
- * forwarding the call through Circle DCW (server signs as the seller).
- */
-export function encodeRegisterContentCall(opts: {
-  contentHash: Hex;
-  universeId: bigint;
-  splitEntityHash: Hex;
-  buyPriceWei: bigint;
-  rentPricePerDayWei: bigint;
-  licenseFeeWei: bigint;
-  licenseRoyaltyBps: number;
-}): {
-  abi: typeof contentLicensingAbi;
-  functionName: 'registerContent';
-  args: readonly [Hex, bigint, Hex, bigint, bigint, bigint, number];
-} {
-  return {
-    abi: contentLicensingAbi,
-    functionName: 'registerContent',
-    args: [
-      opts.contentHash,
-      opts.universeId,
-      opts.splitEntityHash,
-      opts.buyPriceWei,
-      opts.rentPricePerDayWei,
-      opts.licenseFeeWei,
-      opts.licenseRoyaltyBps,
-    ] as const,
-  };
 }
 
 // ── ContentLicensing: read deal state ────────────────────────────────────

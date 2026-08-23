@@ -49,15 +49,3 @@ export async function assertGenerationAllowed(uid: string, credits: number): Pro
     throw err;
   }
 }
-
-/** Generic variant for non-generation features (mint, purchase, registration). */
-export async function assertFeatureAllowed(feature: FeatureKey): Promise<void> {
-  try {
-    await assertFeatureEnabled(feature);
-  } catch (err) {
-    if (err instanceof FeatureDisabledError) {
-      throw new TRPCError({ code: 'FORBIDDEN', message: err.message });
-    }
-    throw err;
-  }
-}

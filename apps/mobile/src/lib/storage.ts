@@ -27,10 +27,6 @@ export async function getToken(): Promise<string | null> {
   return SecureStore.getItemAsync(TOKEN_KEY, SECURE_OPTS);
 }
 
-export async function getStoredAddress(): Promise<string | null> {
-  return SecureStore.getItemAsync(ADDRESS_KEY, SECURE_OPTS);
-}
-
 export async function getStoredSession(): Promise<StoredSession | null> {
   const [token, address, email, expiryRaw] = await Promise.all([
     SecureStore.getItemAsync(TOKEN_KEY, SECURE_OPTS),

@@ -119,7 +119,7 @@ interface SeedForm {
   deadlineDays: string;
 }
 
-export function CreateAdSeedPage() {
+function CreateAdSeedPage() {
   const navigate = useNavigate();
   const { isConnected, isAuthenticated, isAuthenticating } = useWalletAuth();
   const createSeed = useCreateAdSeed();

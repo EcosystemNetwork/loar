@@ -188,22 +188,6 @@ export function getUploadQueue(): Queue<UploadJobData> {
   return uploadQueue;
 }
 
-export function getBackgroundQueue(): Queue<BackgroundJobData> {
-  if (!backgroundQueue) {
-    const connection = getConnectionOpts();
-    backgroundQueue = new Queue(QUEUE_NAMES.BACKGROUND, {
-      connection,
-      defaultJobOptions: {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-        removeOnComplete: { age: 1800 },
-        removeOnFail: { age: 43200 },
-      },
-    });
-  }
-  return backgroundQueue;
-}
-
 export function getGenerationEvents(): QueueEvents {
   if (!generationEvents) {
     const connection = getConnectionOpts();
@@ -226,14 +210,6 @@ export function getVlmQueue(): Queue<VlmJobData, VlmJobResult> {
     });
   }
   return vlmQueue;
-}
-
-export function getVlmEvents(): QueueEvents {
-  if (!vlmEvents) {
-    const connection = getConnectionOpts();
-    vlmEvents = new QueueEvents(QUEUE_NAMES.VLM, { connection });
-  }
-  return vlmEvents;
 }
 
 export function getWebhookQueue(): Queue<WebhookJobData, WebhookJobResult> {

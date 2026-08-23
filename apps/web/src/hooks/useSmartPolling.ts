@@ -49,21 +49,6 @@ export function jitteredInterval(baseMs: number): number {
 }
 
 /**
- * Hook version of visibility check for conditional refetching.
- */
-export function useIsTabVisible(): boolean {
-  const [visible, setVisible] = useState(!document.hidden);
-
-  useEffect(() => {
-    const handler = () => setVisible(!document.hidden);
-    document.addEventListener('visibilitychange', handler);
-    return () => document.removeEventListener('visibilitychange', handler);
-  }, []);
-
-  return visible;
-}
-
-/**
  * Recommended polling intervals by data criticality.
  * Use these instead of hardcoded numbers across the app.
  */

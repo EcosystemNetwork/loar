@@ -23,7 +23,7 @@ import { collabHandlers } from './collab.js';
 import { storyBountiesHandlers } from './story-bounties.js';
 import type { Handler, ContractKind } from './types.js';
 
-export const allHandlers: Handler[] = [
+const allHandlers: Handler[] = [
   ...universeManagerHandlers,
   ...bondingCurveHandlers,
   ...universeHandlers,
@@ -68,10 +68,6 @@ for (const h of allHandlers) {
 
 export function findHandler(kind: ContractKind, topic0: string): Handler | undefined {
   return byKindAndTopic.get(`${kind}:${topic0.toLowerCase()}`);
-}
-
-export function topicsForKind(kind: ContractKind): string[] {
-  return topicsByKind[kind];
 }
 
 export function allTopics(): string[] {

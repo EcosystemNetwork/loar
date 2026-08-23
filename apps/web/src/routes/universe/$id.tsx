@@ -258,6 +258,15 @@ function UniverseTimelineEditorInner() {
   const [nodes, setNodes, onNodesChangeBase] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
+  // The transient "Generating…" placeholder node currently on the canvas, if
+  // any. A node is required to represent every in-flight video generation —
+  // see the isGeneratingVideo effect below, which plants it the moment
+  // generation starts and clears it once the job settles. Kept as a ref (not
+  // just its id) so the graph-rebuild effect further down can re-inject it —
+  // that effect replaces `nodes` wholesale from graphData/localStorage and
+  // would otherwise wipe the placeholder mid-generation.
+  const pendingVideoNodeRef = useRef<Node<TimelineNodeData> | null>(null);
+
   // The graph is rebuilt from blockchain data + a tree-layout algorithm on
   // every load, which would otherwise discard any manual rearrangement.
   const { applySavedPositions, savePosition } = useGraphLayout(id, 'universe');
@@ -782,10 +791,56 @@ function UniverseTimelineEditorInner() {
     universeId: id,
   });
 
-  // Wrapper to call the hook's handler with the correct parameters
+  // Wrapper to call the hook's handler with the correct parameters. Plants a
+  // "Generating…" placeholder node on the canvas first — every generation
+  // must be represented by a node while it's in flight, floating and
+  // unconnected, so it's visible on the canvas rather than only living in
+  // this dialog's transient state. The effect below clears it once the job
+  // settles (success replaces it with the real draft node; failure just
+  // removes it — the error is already surfaced via statusMessage).
   const handleGenerateVideo = useCallback(async () => {
+    const lastNode = nodes[nodes.length - 1];
+    const position = lastNode
+      ? { x: lastNode.position.x + 420, y: lastNode.position.y }
+      : { x: 100, y: 100 };
+    const pendingId = `pending-video-${Date.now()}`;
+    const pendingNode: Node<TimelineNodeData> = {
+      id: pendingId,
+      type: 'timelineEvent',
+      position,
+      data: {
+        label: 'Generating…',
+        description: '',
+        nodeType: 'scene',
+        isPending: true,
+        pendingPrompt: videoDescription || videoPrompt || undefined,
+        timelineColor: '#a855f7',
+        displayName: 'Generating…',
+      },
+    };
+    pendingVideoNodeRef.current = pendingNode;
+    setNodes((nds: any) => [...nds, pendingNode]);
+
     await handleGenerateVideoFromHook(generatedImageUrl, uploadedUrl);
-  }, [handleGenerateVideoFromHook, generatedImageUrl, uploadedUrl]);
+  }, [
+    handleGenerateVideoFromHook,
+    generatedImageUrl,
+    uploadedUrl,
+    nodes,
+    setNodes,
+    videoDescription,
+    videoPrompt,
+  ]);
+
+  // Clear the pending placeholder once the job leaves the "generating" state,
+  // whichever way it resolves.
+  useEffect(() => {
+    if (isGeneratingVideo) return;
+    const pending = pendingVideoNodeRef.current;
+    if (!pending) return;
+    pendingVideoNodeRef.current = null;
+    setNodes((nds: any) => nds.filter((n: any) => n.id !== pending.id));
+  }, [isGeneratingVideo, setNodes]);
 
   // Upload generated image to decentralized storage
   const uploadToStorage = useCallback(async () => {
@@ -2777,7 +2832,16 @@ function UniverseTimelineEditorInner() {
       });
     }
 
-    setNodes(applySavedPositions(blockchainNodes) as any);
+    // Re-inject the in-flight "Generating…" placeholder, if any — this effect
+    // rebuilds `nodes` wholesale from graphData/localStorage and would
+    // otherwise drop it (e.g. on a graphData refetch mid-generation).
+    const nextNodes = applySavedPositions(blockchainNodes) as Node<TimelineNodeData>[];
+    const pending = pendingVideoNodeRef.current;
+    setNodes(
+      (pending && !nextNodes.some((n) => n.id === pending.id)
+        ? [...nextNodes, pending]
+        : nextNodes) as any
+    );
     setEdges(blockchainEdges);
     setEventCounter(graphData.nodeIds.length + 1);
 

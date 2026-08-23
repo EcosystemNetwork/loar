@@ -41,7 +41,7 @@ const LANGUAGE_LABELS: Record<string, string> = {
   sv: 'Swedish',
 };
 
-export function languageLabel(code: string): string {
+function languageLabel(code: string): string {
   return LANGUAGE_LABELS[code] ?? code;
 }
 

@@ -65,7 +65,7 @@ function safeBigInt(value: string | undefined | null): bigint {
   }
 }
 
-export function SlotDetailPage() {
+function SlotDetailPage() {
   const { slotId } = Route.useParams();
   const navigate = useNavigate();
   const { address, isConnected } = useWalletAuth();

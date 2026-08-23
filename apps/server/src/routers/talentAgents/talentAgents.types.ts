@@ -3,25 +3,6 @@
  */
 import { z } from 'zod';
 
-// ── Agent profile ──────────────────────────────────────────────────────
-
-export const AGENT_SPECIALTIES = [
-  'animation',
-  'character-design',
-  'world-building',
-  'licensing',
-  'voice-acting',
-  'music',
-  'writing',
-  'directing',
-  '3d-modeling',
-  'vfx',
-  'marketing',
-  'brand-deals',
-  'merch',
-  'legal',
-] as const;
-
 export const talentAgentProfileSchema = z.object({
   agencyName: z.string().min(1).max(100),
   displayName: z.string().min(1).max(50),
@@ -67,7 +48,7 @@ export const CONTRACT_SCOPES = [
 ] as const;
 export type ContractScope = (typeof CONTRACT_SCOPES)[number];
 
-export const contractStatusEnum = z.enum(['PROPOSED', 'ACTIVE', 'EXPIRED', 'TERMINATED']);
+const contractStatusEnum = z.enum(['PROPOSED', 'ACTIVE', 'EXPIRED', 'TERMINATED']);
 export type ContractStatus = z.infer<typeof contractStatusEnum>;
 
 export const proposeContractSchema = z.object({

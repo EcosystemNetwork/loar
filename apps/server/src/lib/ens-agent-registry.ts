@@ -90,7 +90,7 @@ export async function registerAgentSubname(input: {
   return record;
 }
 
-export async function getAgentSubname(label: string): Promise<AgentSubname | null> {
+async function getAgentSubname(label: string): Promise<AgentSubname | null> {
   const l = normalizeLabel(label);
   const c = col();
   if (c) {

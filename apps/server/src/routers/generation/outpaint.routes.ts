@@ -45,7 +45,7 @@ function maskProviderName(raw: string): string {
 
 // ── Schemas ────────────────────────────────────────────────────────────
 
-export const TARGET_ASPECTS = ['1:1', '4:5', '16:9', '9:16', '21:9'] as const;
+const TARGET_ASPECTS = ['1:1', '4:5', '16:9', '9:16', '21:9'] as const;
 export type OutpaintAspect = (typeof TARGET_ASPECTS)[number];
 
 const expandSchema = z.object({
