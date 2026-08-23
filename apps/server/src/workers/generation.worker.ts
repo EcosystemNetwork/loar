@@ -125,6 +125,44 @@ async function processGenerationBody(
       await job.updateProgress(30);
 
       // Dispatch to provider
+      if (model.provider === 'google') {
+        // Veo 2 / 3 / 3.1 direct — was previously unhandled here (this
+        // branch is new), which meant a Google-Direct Veo job silently fell
+        // through to falService.generateVideo() with no falModelId and
+        // failed. dispatchGoogleVeo also auto-retries on a same-provider
+        // fallback tier when Google returns a 429/RESOURCE_EXHAUSTED quota
+        // error, mirroring the inline dispatch path.
+        const { resolveProviderKey: resolveGoogle } = await import('../lib/byok');
+        const { dispatchGoogleVeo } = await import('../services/video-models/google-veo-dispatch');
+        const googleApiKey = await resolveGoogle(data.userId, 'google');
+        if (!googleApiKey) {
+          return {
+            status: 'failed',
+            error: 'GOOGLE_API_KEY is not configured — set one in /settings/api-keys',
+            videoUrl: undefined,
+          };
+        }
+        const googleResult = await dispatchGoogleVeo(
+          model,
+          {
+            prompt: input.prompt,
+            imageUrl: input.imageUrl ?? data.resolvedCastUrls?.[0],
+            durationSec: input.durationSec,
+            resolution: input.resolution,
+            aspectRatio: input.aspectRatio === '9:16' ? '9:16' : '16:9',
+            audio: input.audio,
+            mode: input.mode === 'image_to_video' ? 'image_to_video' : 'text_to_video',
+          },
+          googleApiKey
+        );
+        if (googleResult.wasFallback) {
+          console.warn(
+            `[worker] ${model.id} was quota-exhausted — completed on Google fallback tier ${googleResult.modelUsed} instead`
+          );
+        }
+        return googleResult;
+      }
+
       if (model.provider === 'bytedance') {
         const { resolveProviderKey: resolveBd } = await import('../lib/byok');
         const bdApiKey = await resolveBd(data.userId, 'bytedance');

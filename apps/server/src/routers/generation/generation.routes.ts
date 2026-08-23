@@ -422,9 +422,12 @@ async function dispatchGenerationInner(
   }
 
   if (model.provider === 'google') {
-    // Veo 2 / 3 / 3.1 — async predict-long-running with polling.
+    // Veo 2 / 3 / 3.1 — async predict-long-running with polling. On a 429
+    // quota error, dispatchGoogleVeo automatically walks down to the next
+    // enabled Google-Direct Veo tier before giving up (stays within the
+    // `google` provider — see google-veo-dispatch.ts).
     const { resolveProviderKey } = await import('../../lib/byok');
-    const { veoGenerate } = await import('../../services/gemini');
+    const { dispatchGoogleVeo } = await import('../../services/video-models/google-veo-dispatch');
     const userKey = callerUid ? await resolveProviderKey(callerUid, 'google') : undefined;
     if (!userKey) {
       return {
@@ -434,34 +437,37 @@ async function dispatchGenerationInner(
       };
     }
     try {
-      const reso: '720p' | '1080p' | '4k' =
-        input.resolution === '4k' ? '4k' : input.resolution === '1080p' ? '1080p' : '720p';
-      const veoDuration = snapToSupportedDuration(input.durationSec, model.supportedDurations);
-      const result = await veoGenerate({
-        apiKey: userKey,
-        model: model.googleModelId || 'veo-3.0-generate-001',
-        prompt: input.prompt,
-        imageUrl: input.imageUrl ?? (resolvedCastUrls && resolvedCastUrls[0]) ?? undefined,
-        durationSec: veoDuration,
-        resolution: reso,
-        // Veo only supports 16:9 / 9:16 — coerce other aspect ratios.
-        aspectRatio: input.aspectRatio === '9:16' ? '9:16' : '16:9',
-        withAudio: model.supportsAudio && input.audio,
-        signal: callerSignal,
-      });
+      const result = await dispatchGoogleVeo(
+        model,
+        {
+          prompt: input.prompt,
+          imageUrl: input.imageUrl ?? (resolvedCastUrls && resolvedCastUrls[0]) ?? undefined,
+          durationSec: input.durationSec,
+          resolution: input.resolution as '720p' | '1080p' | '4k' | undefined,
+          aspectRatio: input.aspectRatio === '9:16' ? '9:16' : '16:9',
+          audio: input.audio,
+          mode: input.mode as 'text_to_video' | 'image_to_video',
+          signal: callerSignal,
+        },
+        userKey
+      );
       if (result.status === 'completed') {
         const { recordProviderCost } = await import('../../services/cost-tracker');
         recordProviderCost({
           provider: 'gemini',
-          model: model.id,
+          model: result.modelUsed,
           kind: 'video_gen',
           costUsd: model.providerCostUsd,
           extra: {
-            durationSec: veoDuration,
-            resolution: reso,
             taskName: result.name ?? null,
+            wasFallback: result.wasFallback,
           },
         }).catch((err) => console.warn('[veo] recordProviderCost failed:', (err as Error).message));
+      }
+      if (result.wasFallback) {
+        console.warn(
+          `[veo] ${model.id} was quota-exhausted — completed on Google fallback tier ${result.modelUsed} instead`
+        );
       }
       return {
         id: result.name ?? '',
