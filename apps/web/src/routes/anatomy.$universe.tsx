@@ -6,25 +6,31 @@
  * built: who belongs where, who opposes whom, what hangs off what.
  *
  * This route renders all entities in a universe as nodes and all declared
- * relationships as edges, grouped by kind column. Read-only for now — the
- * edit path is still through /wiki/entity/$id.
+ * relationships as edges, grouped by kind column. Content is read-only —
+ * the edit path is still through /wiki/entity/$id — but the layout itself
+ * can be dragged into shape; collaborators' rearrangements persist via
+ * useGraphLayout so the skeleton doesn't reset to the default grid on
+ * every reload.
  */
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import ReactFlow, {
   Background,
   Controls,
   MiniMap,
   Position,
+  useNodesState,
   type Edge,
   type Node,
+  type NodeChange,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { trpcClient } from '@/utils/trpc';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Loader2, Network } from 'lucide-react';
+import { useGraphLayout } from '@/hooks/useGraphLayout';
 
 const KIND_COLUMNS: string[] = [
   'person',
@@ -79,8 +85,18 @@ const RELATION_COLORS: Record<string, string> = {
 const COLUMN_WIDTH = 260;
 const ROW_HEIGHT = 100;
 
-function AnatomyGraph({ entities, relations }: { entities: any[]; relations: any[] }) {
-  const { nodes, edges } = useMemo(() => {
+function AnatomyGraph({
+  universeId,
+  entities,
+  relations,
+}: {
+  universeId: string;
+  entities: any[];
+  relations: any[];
+}) {
+  const { applySavedPositions, savePosition } = useGraphLayout(universeId, 'anatomy');
+
+  const { nodes: computedNodes, edges } = useMemo(() => {
     // Bucket entities by kind
     const buckets = new Map<string, any[]>();
     for (const e of entities) {
@@ -150,7 +166,27 @@ function AnatomyGraph({ entities, relations }: { entities: any[]; relations: any
     return { nodes: rfNodes, edges: rfEdges };
   }, [entities, relations]);
 
-  if (nodes.length === 0) {
+  const [nodes, setNodes, onNodesChangeBase] = useNodesState(computedNodes);
+
+  // Re-derive from source data whenever it changes, overlaying any
+  // previously-saved manual positions on top of the freshly computed layout.
+  useEffect(() => {
+    setNodes(applySavedPositions(computedNodes));
+  }, [computedNodes, applySavedPositions, setNodes]);
+
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      onNodesChangeBase(changes);
+      for (const change of changes) {
+        if (change.type === 'position' && change.position && !change.dragging) {
+          savePosition(change.id, change.position);
+        }
+      }
+    },
+    [onNodesChangeBase, savePosition]
+  );
+
+  if (computedNodes.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-muted-foreground/30 py-16 text-center">
         <Network className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
@@ -164,7 +200,15 @@ function AnatomyGraph({ entities, relations }: { entities: any[]; relations: any
 
   return (
     <div style={{ width: '100%', height: 720 }} className="rounded-lg border bg-card">
-      <ReactFlow nodes={nodes} edges={edges} nodesDraggable fitView minZoom={0.2} maxZoom={1.5}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        nodesDraggable
+        fitView
+        minZoom={0.2}
+        maxZoom={1.5}
+      >
         <Background color="#1e293b" gap={24} />
         <Controls />
         <MiniMap zoomable pannable nodeColor={(n: any) => '#334155'} />
@@ -249,7 +293,7 @@ function AnatomyPage() {
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <AnatomyGraph entities={entities} relations={relations} />
+        <AnatomyGraph universeId={universe} entities={entities} relations={relations} />
       )}
     </div>
   );

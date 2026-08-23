@@ -33,6 +33,7 @@ import {
   NotebookPen,
   Wand2,
   Sparkles,
+  Fingerprint,
 } from 'lucide-react';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
 import { RandomUniverseBuilder } from '@/components/RandomUniverseBuilder';
@@ -165,6 +166,14 @@ const ENTITY_TYPES: EntityTypeCard[] = [
       'Upload reference photos + optional video / 3D, generate stylized renders, and license your likeness under your own terms.',
     icon: Crown,
     color: 'from-emerald-500/30 to-cyan-500/30 border-emerald-500/40',
+  },
+  {
+    kind: 'persona',
+    label: 'Persona Package',
+    description:
+      'Bundle your voice, likeness, and personality into one sellable identity — list it for sale, lease, or license.',
+    icon: Fingerprint,
+    color: 'from-emerald-500/30 to-violet-500/30 border-emerald-500/40',
   },
   // Visual-language kinds — PRD 5 (Retexture, Moodboards, House Style Packs)
   {

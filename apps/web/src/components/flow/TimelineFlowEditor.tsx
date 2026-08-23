@@ -17,7 +17,7 @@ import ReactFlow, {
   MarkerType,
   addEdge,
 } from 'reactflow';
-import type { Node, Edge, Connection } from 'reactflow';
+import type { Node, Edge, Connection, NodeChange } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { TimelineEventNode } from './TimelineNodes';
 import type { TimelineNodeData } from './TimelineNodes';
@@ -27,6 +27,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Film, Plus, Settings, Clock, ArrowLeftRight } from 'lucide-react';
 import { useSwapNodes } from '@/hooks/useTimeline';
+import { useGraphLayout } from '@/hooks/useGraphLayout';
 
 // Register custom node types
 const nodeTypes = {
@@ -51,8 +52,27 @@ export function TimelineFlowEditor({
   initialEdges = [],
   readOnly = false,
 }: TimelineFlowEditorProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [nodes, setNodes, onNodesChangeBase] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Node positions here are recomputed from blockchain data on every load
+  // (a fixed grid), which would otherwise discard any manual rearrangement.
+  const { applySavedPositions, savePosition } = useGraphLayout(
+    universeId,
+    `timeline:${timelineId}`
+  );
+
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      onNodesChangeBase(changes);
+      for (const change of changes) {
+        if (change.type === 'position' && change.position && !change.dragging) {
+          savePosition(change.id, change.position);
+        }
+      }
+    },
+    [onNodesChangeBase, savePosition]
+  );
   const [selectedNode, setSelectedNode] = useState<Node<TimelineNodeData> | null>(null);
   const [eventCounter, setEventCounter] = useState(1);
 
@@ -70,12 +90,13 @@ export function TimelineFlowEditor({
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
-  // Update nodes and edges when initialNodes/initialEdges change
+  // Update nodes and edges when initialNodes/initialEdges change, overlaying
+  // any previously-saved manual positions on top of the recomputed grid.
   useEffect(() => {
     if (initialNodes && initialNodes.length > 0) {
-      setNodes(initialNodes);
+      setNodes(applySavedPositions(initialNodes));
     }
-  }, [initialNodes, setNodes]);
+  }, [initialNodes, applySavedPositions, setNodes]);
 
   useEffect(() => {
     if (initialEdges && initialEdges.length > 0) {

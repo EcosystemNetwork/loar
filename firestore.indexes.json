@@ -2955,6 +2955,14 @@
         { "fieldPath": "_event.chainId", "order": "ASCENDING" },
         { "fieldPath": "_event.blockNumber", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "clipAssets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "universeId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

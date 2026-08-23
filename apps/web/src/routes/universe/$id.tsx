@@ -137,6 +137,7 @@ import { EpisodeList } from '@/components/episodes/EpisodeList';
 import { ScriptToEpisode } from '@/components/episodes/ScriptToEpisode';
 import { useIsMobile } from '@/hooks/useBreakpoint';
 import { useNodeArcs } from '@/hooks/useNodeArcs';
+import { useGraphLayout } from '@/hooks/useGraphLayout';
 import { useNodeFilter } from '@/hooks/useNodeFilter';
 import type { ContextMenuState } from '@/components/flow/types';
 import { getSceneNodes } from '@/components/flow/types';
@@ -254,8 +255,12 @@ function UniverseTimelineEditorInner() {
   const chainId = useChainId();
 
   // Timeline flow state
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [nodes, setNodes, onNodesChangeBase] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
+  // The graph is rebuilt from blockchain data + a tree-layout algorithm on
+  // every load, which would otherwise discard any manual rearrangement.
+  const { applySavedPositions, savePosition } = useGraphLayout(id, 'universe');
   const [selectedNode, setSelectedNode] = useState<Node<TimelineNodeData> | null>(null);
   const [eventCounter, setEventCounter] = useState(1);
 
@@ -1232,7 +1237,9 @@ function UniverseTimelineEditorInner() {
       startY: 100,
     });
 
-    // Apply positions
+    // Apply positions, saving each one so the reset sticks — otherwise the
+    // next load would re-overlay whatever manual positions were saved before
+    // this auto-layout and undo it.
     setNodes((nds: any) =>
       nds.map((n: any) => {
         if (n.data.nodeType !== 'scene') {
@@ -1245,7 +1252,9 @@ function UniverseTimelineEditorInner() {
                 sourceNode.data.blockchainNodeId || parseInt(sourceNode.data.eventId) || 0
               );
               if (sourcePos) {
-                return { ...n, position: { x: sourcePos.x + 420, y: sourcePos.y } };
+                const pos = { x: sourcePos.x + 420, y: sourcePos.y };
+                savePosition(n.id, pos);
+                return { ...n, position: pos };
               }
             }
           }
@@ -1253,6 +1262,7 @@ function UniverseTimelineEditorInner() {
         }
         const eid = n.data.blockchainNodeId || parseInt(n.data.eventId) || 0;
         const pos = layout.nodePositions.get(eid);
+        if (pos) savePosition(n.id, pos);
         return pos ? { ...n, position: pos } : n;
       })
     );
@@ -1260,7 +1270,7 @@ function UniverseTimelineEditorInner() {
     requestAnimationFrame(() => {
       fitView({ padding: 0.15, duration: 500 });
     });
-  }, [nodes, edges, setNodes, fitView, pushUndoState]);
+  }, [nodes, edges, setNodes, fitView, pushUndoState, savePosition]);
 
   // Focus search input when opened
   useEffect(() => {
@@ -2668,7 +2678,7 @@ function UniverseTimelineEditorInner() {
       });
     }
 
-    setNodes(blockchainNodes as any);
+    setNodes(applySavedPositions(blockchainNodes) as any);
     setEdges(blockchainEdges);
     setEventCounter(graphData.nodeIds.length + 1);
 
@@ -2687,6 +2697,7 @@ function UniverseTimelineEditorInner() {
     handleDeleteNode,
     getArchivedNodeIds,
     fitView,
+    applySavedPositions,
   ]);
 
   // Handle connections between nodes
@@ -2853,7 +2864,12 @@ function UniverseTimelineEditorInner() {
                   );
                   if (hasDrag) pushUndoState();
                 }
-                onNodesChange(changes);
+                for (const change of changes) {
+                  if (change.type === 'position' && change.position && !change.dragging) {
+                    savePosition(change.id, change.position);
+                  }
+                }
+                onNodesChangeBase(changes);
               }}
               onEdgesChange={onEdgesChange}
               onConnect={(connection) => {

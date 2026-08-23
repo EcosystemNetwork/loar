@@ -44,6 +44,7 @@ import { analyticsRouter } from './analytics/analytics.routes';
 import { adsRouter } from './ads/ads.routes';
 import { adSeedsRouter } from './ads/adSeeds.routes';
 import { editorDraftsRouter } from './editorDrafts/editorDrafts.routes';
+import { graphLayoutsRouter } from './graphLayouts/graphLayouts.routes';
 import { storageRouter } from './storage/storage.routes';
 import { firebaseStorageRouter } from './storage/firebase.routes';
 import { synapseRouter } from './storage/synapse.routes';
@@ -117,6 +118,7 @@ import { universeStyleRouter } from './universeStyle/universeStyle.routes';
 import { universeTonePacksRouter } from './universeStyle/tonePacks.routes';
 import { revenueDashboardRouter } from './revenueDashboard/revenueDashboard.routes';
 import { episodesRouter } from './episodes/episodes.routes';
+import { clipLibraryRouter } from './clipLibrary/clipLibrary.routes';
 import { shotTemplatesRouter } from './shotTemplates/shotTemplates.routes';
 import { lineageRouter } from './lineage/lineage.routes';
 import { mcpRouter } from './mcp/mcp.routes';
@@ -279,6 +281,7 @@ export const appRouter = router({
   ads: adsRouter,
   adSeeds: adSeedsRouter,
   editorDrafts: editorDraftsRouter,
+  graphLayouts: graphLayoutsRouter,
 
   // ── Analytics ───────────────────────────────────────────────────────
   analytics: analyticsRouter,
@@ -384,6 +387,9 @@ export const appRouter = router({
 
   // ── Episodes (clip arrangement + export) ──────────────────────────
   episodes: episodesRouter,
+
+  // ── Clip Library (trim/merge/import standalone reusable clips) ────
+  clipLibrary: clipLibraryRouter,
 
   // ── Shot Templates (PRD 7: pose/composition/angle control) ────────
   shotTemplates: shotTemplatesRouter,

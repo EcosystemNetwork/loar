@@ -522,6 +522,62 @@ app.post('/api/upload', async (c) => {
   }
 });
 
+// ── Clip / episode download proxy ──────────────────────────────────
+// Fixes what the old ad-hoc `<a download>` links couldn't guarantee: a real
+// `Content-Disposition: attachment` response header so the browser actually
+// saves a file instead of navigating to it (remote hosts don't reliably set
+// this themselves, and the `download` attribute is ignored cross-origin).
+// Works for any clip URL — generated, merged, or imported — and for an
+// episode's final `exportUrl`. SSRF-validated like every other server-side
+// fetch of a user-supplied URL in this codebase (see url-validator.ts).
+app.use('/api/clips/download', rateLimiter({ windowMs: 60_000, max: 30 }));
+app.get('/api/clips/download', async (c) => {
+  const url = c.req.query('url');
+  const filenameParam = c.req.query('filename');
+  if (!url) {
+    return c.json({ code: 'BAD_REQUEST', message: 'Missing url' }, 400);
+  }
+
+  try {
+    const { validateUploadUrl } = await import('./lib/url-validator');
+    const validated = await validateUploadUrl(url);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30_000);
+    let upstream: Response;
+    try {
+      upstream = await fetch(url, { signal: controller.signal, redirect: 'error' });
+    } finally {
+      clearTimeout(timeout);
+    }
+    if (!upstream.ok || !upstream.body) {
+      return c.json(
+        { code: 'BAD_GATEWAY', message: `Upstream fetch failed: HTTP ${upstream.status}` },
+        502
+      );
+    }
+
+    const rawName = filenameParam || validated.pathname.split('/').pop() || 'clip.mp4';
+    const safeName = sanitizeUploadFilename(rawName);
+    const contentLength = upstream.headers.get('content-length');
+
+    c.header('Content-Type', upstream.headers.get('content-type') || 'video/mp4');
+    c.header('Content-Disposition', `attachment; filename="${safeName}"`);
+    if (contentLength) c.header('Content-Length', contentLength);
+
+    return c.body(upstream.body);
+  } catch (error) {
+    console.error('Clip download proxy error:', error);
+    return c.json(
+      {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: `Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      },
+      500
+    );
+  }
+});
+
 // ── Public DMCA takedown REST endpoint ─────────────────────────────
 // External reporters can't use tRPC, so this mirrors moderation.submitTakedown as REST.
 // Strict rate limit: 3 requests per minute per IP to prevent mass-flagging abuse

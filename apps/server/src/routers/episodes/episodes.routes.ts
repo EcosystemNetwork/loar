@@ -187,118 +187,23 @@ async function runExport(jobId: string, clips: EpisodeClip[], episodeId: string,
   const jobRef = exportJobsCol().doc(jobId);
 
   try {
-    const { execFile } = await import('child_process');
-    const { promisify } = await import('util');
     const { tmpdir } = await import('os');
     const { join } = await import('path');
-    const { writeFile, readFile, unlink, mkdir } = await import('fs/promises');
-    const execFileAsync = promisify(execFile);
+    const { readFile, unlink, mkdir } = await import('fs/promises');
+    const { downloadAndNormalizeClip, concatNormalizedClips } =
+      await import('../../services/ffmpeg/clip-pipeline');
 
     const workDir = join(tmpdir(), `episode-${jobId}`);
     await mkdir(workDir, { recursive: true });
 
     await jobRef.update({ status: 'downloading', progress: 10 });
 
-    // 1. Download all clips
+    // 1. Download + trim + normalize each clip so they can be concatenated
+    // with a fast stream-copy below.
     const localPaths: string[] = [];
     for (let i = 0; i < clips.length; i++) {
-      const clip = clips[i];
-      const ext = clip.videoUrl.includes('.webm') ? 'webm' : 'mp4';
-      const clipPath = join(workDir, `clip-${String(i).padStart(3, '0')}.${ext}`);
-
-      const { validateUploadUrl } = await import('../../lib/url-validator');
-      await validateUploadUrl(clip.videoUrl);
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 60_000);
-      const res = await fetch(clip.videoUrl, {
-        signal: controller.signal,
-        redirect: 'error',
-      });
-      clearTimeout(timeout);
-
-      if (!res.ok) throw new Error(`Failed to download clip ${i}: HTTP ${res.status}`);
-      const buf = Buffer.from(await res.arrayBuffer());
-      await writeFile(clipPath, buf);
-
-      // If clip needs trimming or has audio overlay, re-encode
-      if (clip.trimStart > 0 || clip.trimEnd > 0 || clip.audioUrl) {
-        const processedPath = join(workDir, `proc-${String(i).padStart(3, '0')}.mp4`);
-        const args = ['-y'];
-
-        // Input video
-        args.push('-i', clipPath);
-
-        // Optional audio overlay
-        if (clip.audioUrl) {
-          // Download audio
-          await validateUploadUrl(clip.audioUrl);
-          const audioPath = join(workDir, `audio-${String(i).padStart(3, '0')}.mp3`);
-          const audioRes = await fetch(clip.audioUrl, { redirect: 'error' });
-          if (audioRes.ok) {
-            await writeFile(audioPath, Buffer.from(await audioRes.arrayBuffer()));
-            args.push('-i', audioPath);
-          }
-        }
-
-        // Trim
-        if (clip.trimStart > 0) args.push('-ss', String(clip.trimStart));
-        if (clip.trimEnd > 0) args.push('-to', String(clip.trimEnd));
-
-        // Re-encode to consistent format for concat
-        args.push(
-          '-vf',
-          'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2',
-          '-c:v',
-          'libx264',
-          '-preset',
-          'fast',
-          '-crf',
-          '23',
-          '-c:a',
-          'aac',
-          '-b:a',
-          '192k',
-          '-ar',
-          '44100',
-          '-ac',
-          '2',
-          '-shortest',
-          processedPath
-        );
-
-        await execFileAsync('ffmpeg', args, { timeout: 120_000 });
-        localPaths.push(processedPath);
-      } else {
-        // Re-encode for consistent concat (resolution, codec)
-        const processedPath = join(workDir, `proc-${String(i).padStart(3, '0')}.mp4`);
-        await execFileAsync(
-          'ffmpeg',
-          [
-            '-y',
-            '-i',
-            clipPath,
-            '-vf',
-            'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2',
-            '-c:v',
-            'libx264',
-            '-preset',
-            'fast',
-            '-crf',
-            '23',
-            '-c:a',
-            'aac',
-            '-b:a',
-            '192k',
-            '-ar',
-            '44100',
-            '-ac',
-            '2',
-            processedPath,
-          ],
-          { timeout: 120_000 }
-        );
-        localPaths.push(processedPath);
-      }
+      const processedPath = await downloadAndNormalizeClip(clips[i], workDir, i);
+      localPaths.push(processedPath);
 
       const pct = Math.round(10 + (i / clips.length) * 60);
       await jobRef.update({ progress: pct });
@@ -306,22 +211,13 @@ async function runExport(jobId: string, clips: EpisodeClip[], episodeId: string,
 
     await jobRef.update({ status: 'concatenating', progress: 75 });
 
-    // 2. Build concat list
-    const listPath = join(workDir, 'concat.txt');
-    const listContent = localPaths.map((p) => `file '${p}'`).join('\n');
-    await writeFile(listPath, listContent);
-
-    // 3. Concat
+    // 2. Concat
     const outputPath = join(workDir, `episode-${jobId}.mp4`);
-    await execFileAsync(
-      'ffmpeg',
-      ['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', outputPath],
-      { timeout: 300_000 }
-    );
+    await concatNormalizedClips(localPaths, outputPath);
 
     await jobRef.update({ status: 'uploading', progress: 90 });
 
-    // 4. Upload to Firebase Storage
+    // 3. Upload to Firebase Storage
     const outputBuffer = await readFile(outputPath);
     const storageKey = await firebaseStorageService.upload(
       outputBuffer,
@@ -329,15 +225,12 @@ async function runExport(jobId: string, clips: EpisodeClip[], episodeId: string,
     );
     const publicUrl = firebaseStorageService.getPublicUrl(storageKey);
 
-    // 5. Update episode doc with export URL
-    await episodesCol()
-      .doc(episodeId)
-      .update({
-        exportUrl: publicUrl,
-        exportStorageKey: storageKey,
-        exportedAt: new Date().toISOString(),
-        exportDurationMs: Date.now() - Date.now(), // approximate
-      });
+    // 4. Update episode doc with export URL
+    await episodesCol().doc(episodeId).update({
+      exportUrl: publicUrl,
+      exportStorageKey: storageKey,
+      exportedAt: new Date().toISOString(),
+    });
 
     await jobRef.update({
       status: 'completed',
@@ -349,7 +242,6 @@ async function runExport(jobId: string, clips: EpisodeClip[], episodeId: string,
 
     // Cleanup temp files
     for (const p of localPaths) unlink(p).catch(() => {});
-    unlink(listPath).catch(() => {});
     unlink(outputPath).catch(() => {});
   } catch (err: any) {
     console.error(`[episode-export] Job ${jobId} failed:`, err);

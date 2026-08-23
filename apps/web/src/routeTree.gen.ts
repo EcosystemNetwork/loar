@@ -138,6 +138,7 @@ import { Route as AdplacementsSeedsNewRouteImport } from './routes/adplacements/
 import { Route as AdplacementsSeedsSeedIdRouteImport } from './routes/adplacements/seeds/$seedId'
 import { Route as LabZaiVideoJobIdRouteImport } from './routes/lab.zai.video.$jobId'
 import { Route as DashboardPersonasPersonaIdEditRouteImport } from './routes/dashboard.personas.$personaId.edit'
+import { Route as UniverseIdEpisodeEpisodeIdStudioRouteImport } from './routes/universe/$id/episode.$episodeId.studio'
 
 const ViralityRoute = ViralityRouteImport.update({
   id: '/virality',
@@ -787,6 +788,12 @@ const DashboardPersonasPersonaIdEditRoute =
     path: '/$personaId/edit',
     getParentRoute: () => DashboardPersonasRoute,
   } as any)
+const UniverseIdEpisodeEpisodeIdStudioRoute =
+  UniverseIdEpisodeEpisodeIdStudioRouteImport.update({
+    id: '/episode/$episodeId/studio',
+    path: '/episode/$episodeId/studio',
+    getParentRoute: () => UniverseIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -918,6 +925,7 @@ export interface FileRoutesByFullPath {
   '/adplacements/seeds/': typeof AdplacementsSeedsIndexRoute
   '/dashboard/personas/$personaId/edit': typeof DashboardPersonasPersonaIdEditRoute
   '/lab/zai/video/$jobId': typeof LabZaiVideoJobIdRoute
+  '/universe/$id/episode/$episodeId/studio': typeof UniverseIdEpisodeEpisodeIdStudioRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -1049,6 +1057,7 @@ export interface FileRoutesByTo {
   '/adplacements/seeds': typeof AdplacementsSeedsIndexRoute
   '/dashboard/personas/$personaId/edit': typeof DashboardPersonasPersonaIdEditRoute
   '/lab/zai/video/$jobId': typeof LabZaiVideoJobIdRoute
+  '/universe/$id/episode/$episodeId/studio': typeof UniverseIdEpisodeEpisodeIdStudioRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1181,6 +1190,7 @@ export interface FileRoutesById {
   '/adplacements/seeds/': typeof AdplacementsSeedsIndexRoute
   '/dashboard/personas/$personaId/edit': typeof DashboardPersonasPersonaIdEditRoute
   '/lab/zai/video/$jobId': typeof LabZaiVideoJobIdRoute
+  '/universe/$id/episode/$episodeId/studio': typeof UniverseIdEpisodeEpisodeIdStudioRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1314,6 +1324,7 @@ export interface FileRouteTypes {
     | '/adplacements/seeds/'
     | '/dashboard/personas/$personaId/edit'
     | '/lab/zai/video/$jobId'
+    | '/universe/$id/episode/$episodeId/studio'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1445,6 +1456,7 @@ export interface FileRouteTypes {
     | '/adplacements/seeds'
     | '/dashboard/personas/$personaId/edit'
     | '/lab/zai/video/$jobId'
+    | '/universe/$id/episode/$episodeId/studio'
   id:
     | '__root__'
     | '/'
@@ -1576,6 +1588,7 @@ export interface FileRouteTypes {
     | '/adplacements/seeds/'
     | '/dashboard/personas/$personaId/edit'
     | '/lab/zai/video/$jobId'
+    | '/universe/$id/episode/$episodeId/studio'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -2599,6 +2612,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardPersonasPersonaIdEditRouteImport
       parentRoute: typeof DashboardPersonasRoute
     }
+    '/universe/$id/episode/$episodeId/studio': {
+      id: '/universe/$id/episode/$episodeId/studio'
+      path: '/episode/$episodeId/studio'
+      fullPath: '/universe/$id/episode/$episodeId/studio'
+      preLoaderRoute: typeof UniverseIdEpisodeEpisodeIdStudioRouteImport
+      parentRoute: typeof UniverseIdRoute
+    }
   }
 }
 
@@ -2693,6 +2713,7 @@ interface UniverseIdRouteChildren {
   UniverseIdProfileRoute: typeof UniverseIdProfileRoute
   UniverseIdStyleRoute: typeof UniverseIdStyleRoute
   UniverseIdWatchRoute: typeof UniverseIdWatchRoute
+  UniverseIdEpisodeEpisodeIdStudioRoute: typeof UniverseIdEpisodeEpisodeIdStudioRoute
 }
 
 const UniverseIdRouteChildren: UniverseIdRouteChildren = {
@@ -2703,6 +2724,7 @@ const UniverseIdRouteChildren: UniverseIdRouteChildren = {
   UniverseIdProfileRoute: UniverseIdProfileRoute,
   UniverseIdStyleRoute: UniverseIdStyleRoute,
   UniverseIdWatchRoute: UniverseIdWatchRoute,
+  UniverseIdEpisodeEpisodeIdStudioRoute: UniverseIdEpisodeEpisodeIdStudioRoute,
 }
 
 const UniverseIdRouteWithChildren = UniverseIdRoute._addFileChildren(

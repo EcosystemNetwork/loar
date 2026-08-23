@@ -8,9 +8,10 @@
  */
 
 import { useState, useMemo } from 'react';
+import { Link } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Film, Play, Download, Loader2, AlertCircle, Check } from 'lucide-react';
+import { X, Film, Play, Download, Loader2, AlertCircle, Check, Scissors } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { SelectionPlayer } from '@/components/player/SelectionPlayer';
@@ -178,6 +179,15 @@ export function EpisodeList({ universeId, onClose }: EpisodeListProps) {
                       disabled={!ep.clips?.length}
                     >
                       <Play className="w-3.5 h-3.5 mr-1" /> Play
+                    </Button>
+
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link
+                        to="/universe/$id/episode/$episodeId/studio"
+                        params={{ id: universeId, episodeId: ep.id }}
+                      >
+                        <Scissors className="w-3.5 h-3.5 mr-1" /> Studio
+                      </Link>
                     </Button>
 
                     {isExported && downloadUrl ? (

@@ -82,6 +82,16 @@ function EpisodePlayer() {
   const [activeIndex, setActiveIndex] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // When a merged export exists, that's the "cohesive episode" viewers
+  // should see by default — a single continuous file instead of N separate
+  // <video> elements auto-advancing into each other. Viewers can still jump
+  // into per-part playback from the Parts list.
+  const hasExport = !!episode?.exportUrl;
+  const [viewMode, setViewMode] = useState<'merged' | 'clips'>('clips');
+  useEffect(() => {
+    setViewMode(episode?.exportUrl ? 'merged' : 'clips');
+  }, [episode?.id, episode?.exportUrl]);
+
   // Silent watch-session collector — accumulates data for Continue Watching
   // and For You rows. No UI surfaces here.
   useWatchSession({
@@ -99,13 +109,14 @@ function EpisodePlayer() {
   // autoplay on a fresh <video> in some configurations, so we explicitly call
   // play() and swallow the rejection (e.g. iOS without user gesture).
   useEffect(() => {
+    if (viewMode !== 'clips') return;
     const v = videoRef.current;
     if (!v) return;
     v.load();
     v.play().catch(() => {
       /* autoplay blocked — user can press play */
     });
-  }, [activeIndex]);
+  }, [activeIndex, viewMode]);
 
   // Reset to the first clip whenever the episode itself changes.
   useEffect(() => {
@@ -212,14 +223,24 @@ function EpisodePlayer() {
           {/* Player + metadata */}
           <div>
             <div className="relative aspect-video rounded-2xl overflow-hidden bg-black ring-1 ring-white/10">
-              <video
-                ref={videoRef}
-                src={resolveIpfsUrl(activeClip.videoUrl!)}
-                className="w-full h-full"
-                controls
-                playsInline
-                onEnded={handleClipEnded}
-              />
+              {viewMode === 'merged' && episode.exportUrl ? (
+                <video
+                  ref={videoRef}
+                  src={resolveIpfsUrl(episode.exportUrl)}
+                  className="w-full h-full"
+                  controls
+                  playsInline
+                />
+              ) : (
+                <video
+                  ref={videoRef}
+                  src={resolveIpfsUrl(activeClip.videoUrl!)}
+                  className="w-full h-full"
+                  controls
+                  playsInline
+                  onEnded={handleClipEnded}
+                />
+              )}
             </div>
 
             <div className="mt-4 flex items-start gap-3">
@@ -251,7 +272,17 @@ function EpisodePlayer() {
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground">{universeName}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">{universeName}</p>
+                  {hasExport && clips.length > 1 && (
+                    <button
+                      onClick={() => setViewMode((m) => (m === 'merged' ? 'clips' : 'merged'))}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      {viewMode === 'merged' ? 'Watch by parts' : 'Watch full episode'}
+                    </button>
+                  )}
+                </div>
               </div>
               {canOffline && (
                 <Button
@@ -316,11 +347,14 @@ function EpisodePlayer() {
             </div>
             <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
               {clips.map((c, i) => {
-                const isActive = i === activeIndex;
+                const isActive = viewMode === 'clips' && i === activeIndex;
                 return (
                   <button
                     key={c.nodeId ?? `clip-${i}`}
-                    onClick={() => setActiveIndex(i)}
+                    onClick={() => {
+                      setViewMode('clips');
+                      setActiveIndex(i);
+                    }}
                     className={`w-full text-left flex gap-3 p-2 rounded-lg border transition-all ${
                       isActive
                         ? 'border-primary/50 bg-primary/10'
