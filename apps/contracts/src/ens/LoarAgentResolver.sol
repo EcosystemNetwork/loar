@@ -18,11 +18,7 @@ pragma solidity =0.8.30;
 contract LoarAgentResolver {
     /// EIP-3668 CCIP-Read.
     error OffchainLookup(
-        address sender,
-        string[] urls,
-        bytes callData,
-        bytes4 callbackFunction,
-        bytes extraData
+        address sender, string[] urls, bytes callData, bytes4 callbackFunction, bytes extraData
     );
 
     string[] public gatewayUrls;
@@ -73,11 +69,7 @@ contract LoarAgentResolver {
     {
         bytes memory callData = abi.encodeWithSelector(this.resolve.selector, name, data);
         revert OffchainLookup(
-            address(this),
-            gatewayUrls,
-            callData,
-            this.resolveWithProof.selector,
-            callData
+            address(this), gatewayUrls, callData, this.resolveWithProof.selector, callData
         );
     }
 
@@ -97,11 +89,7 @@ contract LoarAgentResolver {
 
         bytes32 digest = keccak256(
             abi.encodePacked(
-                hex"1900",
-                address(this),
-                expires,
-                keccak256(extraData),
-                keccak256(result)
+                hex"1900", address(this), expires, keccak256(extraData), keccak256(result)
             )
         );
         address signer = _recover(digest, sig);
@@ -111,9 +99,8 @@ contract LoarAgentResolver {
 
     /// ENSIP-10 interface id + ERC-165.
     function supportsInterface(bytes4 interfaceID) external pure returns (bool) {
-        return
-            interfaceID == 0x9061b923 || // IExtendedResolver.resolve
-            interfaceID == 0x01ffc9a7; // ERC-165
+        return interfaceID == 0x9061b923 // IExtendedResolver.resolve
+            || interfaceID == 0x01ffc9a7; // ERC-165
     }
 
     function _recover(bytes32 hash, bytes memory sig) internal pure returns (address) {
