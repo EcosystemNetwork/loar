@@ -9,6 +9,8 @@ import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { useVisibilityAwareInterval, POLL_INTERVALS } from './useSmartPolling';
 
+// Mirrors serializeUploadJob's return shape on the server
+// (apps/server/src/routers/storage/storage.routes.ts) — keep in sync.
 export interface UploadJobStatus {
   id: string;
   userId: string;
@@ -16,15 +18,16 @@ export interface UploadJobStatus {
   progress: number;
   filename: string;
   mimeType: string;
+  sourceUrl?: string;
   manifest?: {
     contentHash: string;
     uploads: { provider: string; url: string; contentId: string }[];
     size: number;
   };
   error?: string;
-  providers: { name: string; status: string; url?: string }[];
   createdAt: number;
   updatedAt: number;
+  retryCount: number;
 }
 
 /**
@@ -49,8 +52,12 @@ export function useUploadQueue() {
       url,
       filename,
     });
-    setActiveJobIds((prev) => [...prev, result.jobId]);
-    return result.jobId;
+    const jobId = result.jobId;
+    if (!jobId) {
+      throw new Error('Upload queue did not return a job ID');
+    }
+    setActiveJobIds((prev) => [...prev, jobId]);
+    return jobId;
   }, []);
 
   /**
