@@ -1,32 +1,54 @@
 /**
- * Z.AI service — full-stack adapter for the Zhipu AI / Z.AI devpack.
+ * Google-backed adapter for LOAR's "Model Lab" (formerly the Z.AI devpack
+ * integration — Z.AI credits ran out 2026-08-23). This service now speaks
+ * to Google's Gemini / Imagen / Veo APIs directly instead of api.z.ai, but
+ * keeps the exact method names, option shapes, and result shapes the
+ * caller side already depends on:
+ *   - routers/zai/zai.routes.ts (the /lab/zai tRPC surface)
+ *   - components/zai/script-compare.tsx (shared between /lab/zai and /create)
+ * Neither needed structural changes for this swap — only the model-id
+ * enums they pass in changed from GLM ids to Gemini/Imagen/Veo ids.
  *
- * Powers Track 1 (AI-Native New Species) + Track 4 (Crypto & Agents) workflows
- * in LOAR: GLM-5.1 reasoning + tool use, GLM-5V vision, GLM-Image / CogView-4
- * for stills, CogVideoX-3 / Vidu Q1 for motion, GLM-ASR for speech-to-text,
- * plus the Web Search / Web Reader / Translation / Slide-Poster agent APIs.
+ * Why this duplicates rather than reuses `services/gemini.ts`: this swap
+ * needed a `thinkingConfig` addition (for the Lab's chain-of-thought demo)
+ * that `geminiChat()` doesn't have, and a GitNexus impact() check on that
+ * function came back CRITICAL — 700+ upstream symbols across wiki
+ * generation, character analysis, TTS/3D dispatch, captions, etc. Talking
+ * to the Gemini REST API directly here instead keeps the blast radius
+ * contained to this file + its router, which a prior impact() run
+ * confirmed is isolated (~6 upstream callers per method, all inside the
+ * zai router). Some duplication of gemini.ts's REST plumbing is the
+ * deliberate trade-off for that isolation.
  *
- * Every method takes an optional `apiKey` so the BYOK flow can pass a
- * user-supplied key from the encrypted userSecrets store without ever
- * touching the platform-level env key. Behaviour mirrors `bytedance.ts`
- * exactly so the UI / router patterns line up.
+ * BYOK: every method takes an optional `apiKey`, resolved by the router via
+ * `resolveProviderKey(uid, 'google')` (see lib/byok.ts), falling back to
+ * the platform `GOOGLE_API_KEY`. No plaintext key ever leaves server memory.
  *
- * Docs: https://docs.z.ai/llms.txt
- * Base URL: https://api.z.ai/api/paas/v4
+ * SSRF hardening: every fetch of a *caller-supplied* URL (reference images,
+ * audio, the web reader target) goes through `safeFetch` from
+ * lib/url-validator.ts — private/loopback/link-local/cloud-metadata targets
+ * are rejected before a DNS-pinned connection is made, and redirects are
+ * refused rather than followed. This closes the SSRF findings from the Lab
+ * feature audit (2026-08-23): unrestricted fetch of `seedFromUrl`'s target
+ * and `transcribe`'s audio URL.
  */
+
+import { getStorageManager } from './storage';
+import { safeFetch } from '../lib/url-validator';
+import { redactSecrets } from '../lib/redact-secrets';
 
 // ── Common ───────────────────────────────────────────────────────────────
 
 export interface ZaiCallOptions {
-  /** If set, this single API key is used (no env rotation). */
+  /** If set, this single API key is used instead of the platform env key. */
   apiKey?: string;
 }
 
-const BASE_URL = 'https://api.z.ai/api/paas/v4';
+const GEMINI_REST = 'https://generativelanguage.googleapis.com/v1beta';
 const POLL_INTERVAL_MS = 4000;
 const MAX_POLL_ATTEMPTS = 90; // 6 minutes — video gen can be slow
 
-// ── Chat (GLM-5.1 / 5-Turbo / 4.6 / 4.5-Air) ────────────────────────────
+// ── Chat (Gemini 2.5 / 3.1) ─────────────────────────────────────────────
 
 export interface ZaiChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -37,6 +59,8 @@ export interface ZaiChatMessage {
   name?: string;
 }
 
+/** Kept for interface parity with the pre-swap type — no caller currently
+ *  passes `tools`/`toolChoice`, and Gemini function-calling isn't wired up. */
 export interface ZaiChatTool {
   type: 'function' | 'web_search' | 'retrieval';
   function?: {
@@ -48,19 +72,19 @@ export interface ZaiChatTool {
 }
 
 export interface ZaiChatOptions extends ZaiCallOptions {
-  /** Model id — defaults to 'glm-4.7' (devpack-tier coverage + latest GLM). */
+  /** Short model id — see CHAT_MODEL_MAP below. Defaults to 'gemini-2-5-flash'. */
   model?: string;
   messages: ZaiChatMessage[];
   temperature?: number;
   topP?: number;
   maxTokens?: number;
-  /** When true, returns JSON-only output (handy for entity extractors). */
+  /** When true, returns JSON-only output. */
   jsonMode?: boolean;
-  /** Optional structured-output schema enforcement. */
+  /** Optional structured-output schema enforcement (Gemini-flavoured JSON Schema). */
   responseSchema?: Record<string, unknown>;
   tools?: ZaiChatTool[];
   toolChoice?: 'auto' | 'none' | { type: 'function'; function: { name: string } };
-  /** Enable Z.AI's deep-thinking / reasoning mode (GLM-5.x). */
+  /** Surfaces Gemini's chain-of-thought (2.5+ `thinkingConfig.includeThoughts`). */
   thinking?: boolean;
 }
 
@@ -72,33 +96,30 @@ export interface ZaiChatToolCall {
 
 export interface ZaiChatResult {
   content: string;
-  /** Chain-of-thought from GLM reasoning models (4.7, 5.1). Empty on non-reasoning models. */
+  /** Chain-of-thought, present only when `thinking: true` and the model surfaced any. */
   reasoningContent?: string;
   toolCalls?: ZaiChatToolCall[];
   finishReason?: string;
   usage?: {
     promptTokens?: number;
     completionTokens?: number;
-    /** Subset of promptTokens that hit Z.AI's prompt cache (~10× cheaper). */
     cachedInputTokens?: number;
     totalTokens?: number;
   };
   raw?: unknown;
 }
 
-// ── Image (GLM-Image / CogView-4) ────────────────────────────────────────
+// ── Image (Imagen 4 / Gemini image) ──────────────────────────────────────
 
 export interface ZaiImageOptions extends ZaiCallOptions {
   prompt: string;
-  /** Defaults to 'glm-image' — confirmed working against api.z.ai 2026-04-26.
-   *  Z.AI does not currently expose `cogview-*` ids on the paas/v4 surface;
-   *  attempting them returns code 1211 "Unknown Model". */
+  /** Short model id — see IMAGE_MODEL_MAP below. Defaults to 'nano-banana'. */
   model?: string;
-  /** e.g. '1024x1024', '1280x720', '720x1280'. */
+  /** e.g. '1024x1024', '1280x720', '720x1280' — mapped to the nearest Imagen aspect ratio. */
   size?: string;
-  /** Batch size; not all models support >1. */
+  /** Batch size (predict endpoint only; the Gemini image endpoint always returns 1). */
   n?: number;
-  /** Optional reference image URL (for image-conditioned models). */
+  /** Optional reference image URL (image-to-image on the Gemini endpoint). */
   imageUrl?: string;
   userId?: string;
 }
@@ -110,25 +131,25 @@ export interface ZaiImageResult {
   error?: string;
 }
 
-// ── Video (CogVideoX-3 / Vidu Q1) ────────────────────────────────────────
+// ── Video (Veo 3.1, Google-Direct) ───────────────────────────────────────
 
 export interface ZaiVideoOptions extends ZaiCallOptions {
   prompt: string;
-  /** Defaults pick automatically: `viduq1-image` when `imageUrl` is set,
-   *  else `viduq1-text`. These are the only video model ids exposed on
-   *  api.z.ai paas/v4 as of 2026-04-26 — `cogvideox-*` returns code 1211. */
+  /** Short model id — see VIDEO_MODEL_MAP below. Defaults to 'veo-31-fast-preview-google'. */
   model?: string;
   /** Reference image for image-to-video. */
   imageUrl?: string;
-  /** Optional ending frame for first-and-last-frame generation. */
+  /** Accepted for UI/schema parity with the old Vidu flow — Veo's Google-Direct
+   *  surface has no first-and-last-frame parameter, so this has no effect. */
   endImageUrl?: string;
-  /** 5 / 10 seconds typical, model-dependent. */
+  /** Snapped to Veo's supported durations: 4 / 6 / 8 seconds. */
   duration?: number;
-  /** '720p' | '1080p' typical. */
+  /** '720p' | '1080p'. 4K is available on some tiers but not exposed here. */
   quality?: string;
-  /** Aspect ratio hint, e.g. '16:9', '9:16'. */
+  /** Only '16:9' and '9:16' are supported; anything else falls back to '16:9'. */
   aspectRatio?: string;
-  /** Generate audio track inline (CogVideoX-3 supports it). */
+  /** Accepted for parity — every Google-Direct Veo tier currently rejects
+   *  `generateAudio`, so this is never sent regardless of value. */
   withAudio?: boolean;
   style?: string;
   userId?: string;
@@ -143,7 +164,7 @@ export interface ZaiVideoResult {
   raw?: unknown;
 }
 
-// ── ASR (GLM-ASR-2512) ───────────────────────────────────────────────────
+// ── ASR (Gemini multimodal transcription) ────────────────────────────────
 
 export interface ZaiTranscribeOptions extends ZaiCallOptions {
   /** Either url OR base64+mimeType is required. */
@@ -165,7 +186,6 @@ export interface ZaiTranscribeResult {
 
 export interface ZaiWebSearchOptions extends ZaiCallOptions {
   query: string;
-  /** 'search_std' | 'search_pro' | 'search_pro_sogou' etc. */
   searchEngine?: string;
   count?: number;
 }
@@ -192,137 +212,266 @@ export interface ZaiWebReaderResult {
   raw?: unknown;
 }
 
+// ── Model maps ───────────────────────────────────────────────────────────
+// Short ids match the conventions used by services/llm-models/registry.ts,
+// services/image-models/registry.ts and services/video-models/registry.ts
+// elsewhere in the app, mapped here to the real provider model id. Kept as
+// small local tables (rather than importing those registries) to avoid
+// coupling this self-contained adapter to files outside the Lab surface.
+
+const CHAT_MODEL_MAP: Record<string, string> = {
+  'gemini-3-1-pro': 'gemini-3.1-pro-preview',
+  'gemini-2-5-pro': 'gemini-2.5-pro',
+  'gemini-2-5-flash': 'gemini-2.5-flash',
+  'gemini-2-5-flash-lite': 'gemini-2.5-flash-lite',
+  'gemini-3-1-flash-lite': 'gemini-3.1-flash-lite',
+};
+const DEFAULT_CHAT_MODEL = 'gemini-2-5-flash';
+
+const IMAGE_MODEL_MAP: Record<string, string> = {
+  'nano-banana': 'gemini-2.5-flash-image',
+  'imagen-4': 'imagen-4.0-generate-001',
+  'imagen-4-fast': 'imagen-4.0-fast-generate-001',
+};
+const DEFAULT_IMAGE_MODEL = 'nano-banana';
+const PREDICT_IMAGE_MODELS = new Set([
+  'imagen-4.0-generate-001',
+  'imagen-4.0-fast-generate-001',
+  'imagen-4.0-ultra-generate-001',
+]);
+
+const VIDEO_MODEL_MAP: Record<string, string> = {
+  'veo-31-fast-preview-google': 'veo-3.1-fast-generate-preview',
+  'veo-31-preview-google': 'veo-3.1-generate-preview',
+  'veo-31-lite-preview-google': 'veo-3.1-lite-generate-preview',
+};
+const DEFAULT_VIDEO_MODEL = 'veo-31-fast-preview-google';
+const VIDEO_SUPPORTED_DURATIONS = [4, 6, 8];
+
+const TRANSCRIBE_MODEL_MAP: Record<string, string> = {
+  'gemini-2-5-flash-transcribe': 'gemini-2.5-flash',
+  'gemini-2-5-pro-transcribe': 'gemini-2.5-pro',
+};
+const DEFAULT_TRANSCRIBE_MODEL = 'gemini-2-5-flash-transcribe';
+
+// ── Key resolution ───────────────────────────────────────────────────────
+
+function resolveKey(apiKey?: string): string {
+  const key = apiKey?.trim() || process.env.GOOGLE_API_KEY?.trim();
+  if (!key) {
+    throw new Error(
+      'GOOGLE_API_KEY is not configured. Set it in the root .env, or have the user paste a Google AI key in /settings/api-keys (BYOK).'
+    );
+  }
+  return key;
+}
+
+// ── Shared fetch helpers ─────────────────────────────────────────────────
+
+/** SSRF-guarded fetch of a caller-supplied URL, returned as base64 + mime. */
+async function fetchAsBase64(
+  url: string,
+  timeoutMs: number
+): Promise<{ mimeType: string; base64: string; sizeBytes: number }> {
+  const res = await safeFetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+  if (!res.ok) throw new Error(`Failed to fetch ${url.slice(0, 80)}: HTTP ${res.status}`);
+  const mimeType =
+    res.headers.get('content-type')?.split(';')[0]?.trim() || 'application/octet-stream';
+  const buf = Buffer.from(await res.arrayBuffer());
+  return { mimeType, base64: buf.toString('base64'), sizeBytes: buf.byteLength };
+}
+
+function snapDuration(want: number | undefined): number {
+  const target = want ?? VIDEO_SUPPORTED_DURATIONS[VIDEO_SUPPORTED_DURATIONS.length - 1];
+  return VIDEO_SUPPORTED_DURATIONS.reduce(
+    (best, d) => (Math.abs(d - target) < Math.abs(best - target) ? d : best),
+    VIDEO_SUPPORTED_DURATIONS[0]
+  );
+}
+
+function sizeToAspectRatio(size?: string): string {
+  const table: Array<[string, number]> = [
+    ['1:1', 1],
+    ['16:9', 16 / 9],
+    ['9:16', 9 / 16],
+    ['4:3', 4 / 3],
+    ['3:4', 3 / 4],
+  ];
+  const match = size?.match(/^(\d+)x(\d+)$/);
+  if (!match) return '1:1';
+  const ratio = Number(match[1]) / Number(match[2]);
+  let best = table[0];
+  let bestDiff = Infinity;
+  for (const t of table) {
+    const diff = Math.abs(t[1] - ratio);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = t;
+    }
+  }
+  return best[0];
+}
+
+function geminiAudioMime(contentType: string): string {
+  const ct = contentType.split(';')[0].trim().toLowerCase();
+  if (ct === 'audio/mpeg') return 'audio/mp3';
+  if (ct.startsWith('audio/') || ct.startsWith('video/')) return ct;
+  return 'audio/mp3';
+}
+
+interface RawTranscriptSegment {
+  start?: number;
+  end?: number;
+  text?: string;
+}
+
+function parseTranscriptSegments(
+  rawText: string
+): Array<{ start: number; end: number; text: string }> {
+  let body = rawText.trim();
+  if (body.startsWith('```')) {
+    body = body
+      .replace(/^```(?:json)?/i, '')
+      .replace(/```$/, '')
+      .trim();
+  }
+  const first = body.indexOf('[');
+  const last = body.lastIndexOf(']');
+  if (first !== -1 && last !== -1 && last > first) body = body.slice(first, last + 1);
+  let parsed: RawTranscriptSegment[] = [];
+  try {
+    const json = JSON.parse(body);
+    parsed = Array.isArray(json) ? json : [];
+  } catch {
+    return [];
+  }
+  return parsed
+    .filter((s) => typeof s.text === 'string' && s.text.trim().length > 0)
+    .map((s) => {
+      const start = Number.isFinite(s.start) ? Math.max(0, s.start as number) : 0;
+      const end = Number.isFinite(s.end) ? Math.max(start, s.end as number) : start;
+      return { start, end, text: (s.text as string).trim() };
+    });
+}
+
 // ── Service ──────────────────────────────────────────────────────────────
 
 class ZaiServiceImpl {
-  private apiKeys: string[] | null = null;
-  private activeKeyIdx = 0;
-
-  /** Resolve env-configured keys (comma-separated). */
-  private ensureConfigured(): string[] {
-    if (!this.apiKeys) {
-      const raw = (process.env.ZAI_API_KEY || process.env.Z_AI_API_KEY || '').trim();
-      this.apiKeys = raw
-        .split(',')
-        .map((k) => k.trim())
-        .filter(Boolean);
-    }
-    if (this.apiKeys.length === 0) {
-      throw new Error(
-        'ZAI_API_KEY is not configured. Set it in the root .env, or have the user paste a key in /settings/api-keys (BYOK).'
-      );
-    }
-    return this.apiKeys;
-  }
-
-  /** Returns true if at least one key (env or BYOK) is plausible. */
+  /** Returns true if a plausible key is available (BYOK or platform env). */
   isConfigured(byok?: string): boolean {
     if (byok && byok.trim().length >= 8) return true;
-    try {
-      this.ensureConfigured();
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  private async request<T>(path: string, init: RequestInit = {}, overrideKey?: string): Promise<T> {
-    const url = `${BASE_URL}${path}`;
-    const key = overrideKey?.trim() || this.ensureConfigured()[this.activeKeyIdx];
-    const response = await fetch(url, {
-      ...init,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}`,
-        ...(init.headers ?? {}),
-      },
-    });
-
-    if (response.ok) {
-      const ct = response.headers.get('content-type') ?? '';
-      if (ct.includes('application/json')) return response.json() as Promise<T>;
-      return (await response.text()) as unknown as T;
-    }
-
-    const body = await response.text().catch(() => '');
-    let detail = '';
-    try {
-      const parsed = JSON.parse(body);
-      detail = parsed?.error?.message || parsed?.message || parsed?.detail || parsed?.code || body;
-    } catch {
-      detail = body;
-    }
-
-    // Rotate key on 401/403/429 if running on env keys
-    if (
-      !overrideKey &&
-      (response.status === 401 || response.status === 403 || response.status === 429) &&
-      this.apiKeys &&
-      this.apiKeys.length > 1
-    ) {
-      this.activeKeyIdx = (this.activeKeyIdx + 1) % this.apiKeys.length;
-    }
-
-    const tag = overrideKey ? ' (BYOK)' : '';
-    throw new Error(`Z.AI API error ${response.status}${tag}: ${detail}`.slice(0, 500));
+    return !!process.env.GOOGLE_API_KEY?.trim();
   }
 
   // ── Chat ────────────────────────────────────────────────────────────
 
   async chat(opts: ZaiChatOptions): Promise<ZaiChatResult> {
-    const body: Record<string, unknown> = {
-      model: opts.model ?? 'glm-4.7',
-      messages: opts.messages,
-      temperature: opts.temperature ?? 0.7,
-      ...(opts.topP !== undefined ? { top_p: opts.topP } : {}),
-      ...(opts.maxTokens !== undefined ? { max_tokens: opts.maxTokens } : {}),
-      ...(opts.tools ? { tools: opts.tools } : {}),
-      ...(opts.toolChoice ? { tool_choice: opts.toolChoice } : {}),
-    };
+    const apiKey = resolveKey(opts.apiKey);
+    const shortId = opts.model && CHAT_MODEL_MAP[opts.model] ? opts.model : DEFAULT_CHAT_MODEL;
+    const modelId = CHAT_MODEL_MAP[shortId];
 
-    if (opts.jsonMode || opts.responseSchema) {
-      body.response_format = opts.responseSchema
-        ? { type: 'json_schema', json_schema: opts.responseSchema }
-        : { type: 'json_object' };
-    }
-    if (opts.thinking) {
-      body.thinking = { type: 'enabled' };
-    }
+    type Part = { text?: string; inline_data?: { mime_type: string; data: string } };
+    type Content = { role: 'user' | 'model'; parts: Part[] };
 
-    const raw = await this.request<{
-      choices?: Array<{
-        message?: {
-          content?: string;
-          reasoning_content?: string;
-          tool_calls?: ZaiChatToolCall[];
-        };
-        finish_reason?: string;
-      }>;
-      usage?: {
-        prompt_tokens?: number;
-        completion_tokens?: number;
-        total_tokens?: number;
-        // OpenAI-compat cached-prompt accounting — GLM-4.6 charges
-        // ~$0.11/M for cached vs $1.10/M for fresh prompt tokens (10×
-        // discount). Capturing this is required for accurate billing
-        // attribution on long system prompts + retrieval contexts.
-        prompt_tokens_details?: { cached_tokens?: number };
+    const systemTexts: string[] = [];
+    const contents: Content[] = [];
+    for (const m of opts.messages) {
+      const flatten = async (): Promise<Part[]> => {
+        if (typeof m.content === 'string') return [{ text: m.content }];
+        const parts: Part[] = [];
+        for (const p of m.content) {
+          if (p.type === 'text') parts.push({ text: p.text });
+          if (p.type === 'image_url') {
+            const { mimeType, base64 } = await fetchAsBase64(p.image_url.url, 20_000);
+            parts.push({ inline_data: { mime_type: mimeType, data: base64 } });
+          }
+        }
+        return parts;
       };
-    }>('/chat/completions', { method: 'POST', body: JSON.stringify(body) }, opts.apiKey);
 
-    const choice = raw.choices?.[0];
+      if (m.role === 'system') {
+        const parts = await flatten();
+        const text = parts.map((p) => p.text ?? '').join('\n\n');
+        if (text) systemTexts.push(text);
+        continue;
+      }
+      // 'tool' role has no current caller — fold into 'user' rather than drop it.
+      const role: Content['role'] = m.role === 'assistant' ? 'model' : 'user';
+      const parts = await flatten();
+      if (parts.length > 0) contents.push({ role, parts });
+    }
+
+    const body: Record<string, unknown> = { contents };
+    if (systemTexts.length > 0) {
+      body.system_instruction = { parts: [{ text: systemTexts.join('\n\n') }] };
+    }
+    const generationConfig: Record<string, unknown> = {};
+    if (opts.temperature != null) generationConfig.temperature = opts.temperature;
+    if (opts.topP != null) generationConfig.topP = opts.topP;
+    if (opts.maxTokens != null) generationConfig.maxOutputTokens = opts.maxTokens;
+    if (opts.jsonMode || opts.responseSchema) {
+      generationConfig.responseMimeType = 'application/json';
+      if (opts.responseSchema) generationConfig.responseSchema = opts.responseSchema;
+    }
+    if (opts.thinking) generationConfig.thinkingConfig = { includeThoughts: true };
+    if (Object.keys(generationConfig).length > 0) body.generationConfig = generationConfig;
+
+    const res = await fetch(
+      `${GEMINI_REST}/models/${encodeURIComponent(modelId)}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(120_000),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.text().catch(() => '');
+      throw new Error(`Gemini chat ${res.status}: ${redactSecrets(err).slice(0, 500)}`);
+    }
+
+    interface GeminiResp {
+      candidates?: Array<{
+        content?: { parts?: Array<{ text?: string; thought?: boolean }> };
+        finishReason?: string;
+      }>;
+      promptFeedback?: { blockReason?: string };
+      usageMetadata?: {
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+        totalTokenCount?: number;
+      };
+    }
+    const data = (await res.json()) as GeminiResp;
+    if (data.promptFeedback?.blockReason) {
+      throw new Error(`Gemini blocked the prompt: ${data.promptFeedback.blockReason}`);
+    }
+    const candidate = data.candidates?.[0];
+    const finishReason = candidate?.finishReason;
+    if (finishReason && !['STOP', 'MAX_TOKENS', 'FINISH_REASON_STOP'].includes(finishReason)) {
+      throw new Error(
+        `Gemini returned no usable text (finishReason=${finishReason}) — safety, recitation, or another non-completion stop.`
+      );
+    }
+    const allParts = candidate?.content?.parts ?? [];
+    const content = allParts
+      .filter((p) => !p.thought && p.text)
+      .map((p) => p.text ?? '')
+      .join('');
+    const reasoningParts = allParts.filter((p) => p.thought === true && p.text);
+    const reasoningContent =
+      reasoningParts.length > 0 ? reasoningParts.map((p) => p.text ?? '').join('\n\n') : undefined;
+
     return {
-      content: choice?.message?.content ?? '',
-      reasoningContent: choice?.message?.reasoning_content,
-      toolCalls: choice?.message?.tool_calls,
-      finishReason: choice?.finish_reason,
+      content,
+      reasoningContent,
+      finishReason,
       usage: {
-        promptTokens: raw.usage?.prompt_tokens,
-        completionTokens: raw.usage?.completion_tokens,
-        cachedInputTokens: raw.usage?.prompt_tokens_details?.cached_tokens,
-        totalTokens: raw.usage?.total_tokens,
+        promptTokens: data.usageMetadata?.promptTokenCount,
+        completionTokens: data.usageMetadata?.candidatesTokenCount,
+        totalTokens: data.usageMetadata?.totalTokenCount,
       },
-      raw,
+      raw: data,
     };
   }
 
@@ -336,14 +485,12 @@ class ZaiServiceImpl {
       responseSchema: opts.schema,
     });
 
-    // Some GLM tiers stream the JSON into reasoning_content when thinking is on,
-    // or leave content empty when finish_reason==="length". Try both fields.
     const candidates = [result.content, result.reasoningContent].filter(
       (s): s is string => typeof s === 'string' && s.trim().length > 0
     );
     if (candidates.length === 0) {
       throw new Error(
-        `Z.AI returned empty content (finish_reason=${result.finishReason ?? 'unknown'}). The model may have hit max_tokens before producing JSON.`
+        `Gemini returned empty content (finishReason=${result.finishReason ?? 'unknown'}). The model may have hit max tokens before producing JSON.`
       );
     }
 
@@ -355,7 +502,6 @@ class ZaiServiceImpl {
       try {
         return JSON.parse(stripped) as T;
       } catch {
-        // Last-resort: extract the first {...} or [...] block from mixed prose.
         const match = stripped.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
         if (!match) return null;
         try {
@@ -375,11 +521,11 @@ class ZaiServiceImpl {
 
     const sample = (candidates[0] ?? '').slice(0, 200);
     throw new Error(
-      `Z.AI did not return valid JSON (finish_reason=${result.finishReason ?? 'unknown'}). Sample: ${sample}`
+      `Gemini did not return valid JSON (finishReason=${result.finishReason ?? 'unknown'}). Sample: ${sample}`
     );
   }
 
-  // ── Vision (GLM-5V / 4.6V) ──────────────────────────────────────────
+  // ── Vision ────────────────────────────────────────────────────────────
 
   async vision(opts: {
     apiKey?: string;
@@ -390,7 +536,7 @@ class ZaiServiceImpl {
   }): Promise<ZaiChatResult> {
     return this.chat({
       apiKey: opts.apiKey,
-      model: opts.model ?? 'glm-4.5v',
+      model: opts.model ?? 'gemini-2-5-flash',
       maxTokens: opts.maxTokens,
       messages: [
         {
@@ -410,39 +556,131 @@ class ZaiServiceImpl {
   // ── Image generation ────────────────────────────────────────────────
 
   async generateImage(opts: ZaiImageOptions): Promise<ZaiImageResult> {
-    const body: Record<string, unknown> = {
-      model: opts.model ?? 'glm-image',
-      prompt: opts.prompt,
-      ...(opts.size ? { size: opts.size } : {}),
-      ...(opts.n ? { n: opts.n } : {}),
-      ...(opts.imageUrl ? { image_url: opts.imageUrl } : {}),
-      ...(opts.userId ? { user_id: opts.userId } : {}),
-    };
-
     try {
-      const raw = await this.request<{
-        data?: Array<{ url?: string; b64_json?: string }>;
-        created?: number;
-      }>('/images/generations', { method: 'POST', body: JSON.stringify(body) }, opts.apiKey);
+      const apiKey = resolveKey(opts.apiKey);
+      const shortId = opts.model && IMAGE_MODEL_MAP[opts.model] ? opts.model : DEFAULT_IMAGE_MODEL;
+      const modelId = IMAGE_MODEL_MAP[shortId];
 
-      const images = (raw.data ?? [])
-        .map((d) => ({ url: d.url ?? '', b64: d.b64_json }))
-        .filter((d) => d.url || d.b64);
+      const images = PREDICT_IMAGE_MODELS.has(modelId)
+        ? await this.predictImage(modelId, opts, apiKey)
+        : await this.geminiImageGenerate(modelId, opts, apiKey);
 
       if (images.length === 0) {
-        return { status: 'failed', images: [], raw, error: 'No image data returned' };
+        return { status: 'failed', images: [], error: 'No image data returned' };
       }
-      return { status: 'completed', images, raw };
+
+      // Google returns base64 only (no hosted URL) — upload to LOAR storage
+      // so the caller gets a real, permanent url the same way Z.AI's
+      // response used to provide one.
+      const uploaded = await Promise.all(
+        images.map(async (img, idx) => {
+          try {
+            const buf = Buffer.from(img.base64, 'base64');
+            const filename = `zai-img-${Date.now()}-${idx}.png`;
+            const manifest = await getStorageManager().upload(
+              buf,
+              filename,
+              img.mimeType,
+              opts.userId
+            );
+            const url = manifest.uploads[0]?.url;
+            return { url: url ?? '', b64: img.base64 };
+          } catch (err) {
+            console.warn(
+              '[zai.generateImage] storage upload failed, returning inline data only',
+              err
+            );
+            return { url: '', b64: img.base64 };
+          }
+        })
+      );
+      return { status: 'completed', images: uploaded };
     } catch (err) {
       return {
         status: 'failed',
         images: [],
-        error: err instanceof Error ? err.message : String(err),
+        error: err instanceof Error ? redactSecrets(err.message) : String(err),
       };
     }
   }
 
-  // ── Video generation (async + poll) ────────────────────────────────
+  private async geminiImageGenerate(
+    modelId: string,
+    opts: ZaiImageOptions,
+    apiKey: string
+  ): Promise<Array<{ base64: string; mimeType: string }>> {
+    const parts: Array<{ text: string } | { inline_data: { mime_type: string; data: string } }> =
+      [];
+    if (opts.imageUrl) {
+      const { mimeType, base64 } = await fetchAsBase64(opts.imageUrl, 20_000);
+      parts.push({ inline_data: { mime_type: mimeType, data: base64 } });
+    }
+    parts.push({ text: opts.prompt });
+
+    const res = await fetch(
+      `${GEMINI_REST}/models/${encodeURIComponent(modelId)}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+        }),
+        signal: AbortSignal.timeout(60_000),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.text().catch(() => '');
+      throw new Error(`Gemini image ${res.status}: ${redactSecrets(err).slice(0, 500)}`);
+    }
+    const data = (await res.json()) as {
+      candidates?: Array<{
+        content?: { parts?: Array<{ inlineData?: { mimeType: string; data: string } }> };
+      }>;
+    };
+    const out: Array<{ base64: string; mimeType: string }> = [];
+    for (const c of data.candidates ?? []) {
+      for (const p of c.content?.parts ?? []) {
+        if (p.inlineData)
+          out.push({ base64: p.inlineData.data, mimeType: p.inlineData.mimeType || 'image/png' });
+      }
+    }
+    return out;
+  }
+
+  private async predictImage(
+    modelId: string,
+    opts: ZaiImageOptions,
+    apiKey: string
+  ): Promise<Array<{ base64: string; mimeType: string }>> {
+    const res = await fetch(`${GEMINI_REST}/models/${encodeURIComponent(modelId)}:predict`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        instances: [{ prompt: opts.prompt }],
+        parameters: {
+          sampleCount: Math.min(Math.max(opts.n ?? 1, 1), 4),
+          aspectRatio: sizeToAspectRatio(opts.size),
+          safetyFilterLevel: 'BLOCK_ONLY_HIGH',
+          personGeneration: 'ALLOW_ADULT',
+        },
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!res.ok) {
+      const err = await res.text().catch(() => '');
+      throw new Error(`Imagen ${res.status}: ${redactSecrets(err).slice(0, 500)}`);
+    }
+    const data = (await res.json()) as {
+      predictions?: Array<{ bytesBase64Encoded: string; mimeType?: string }>;
+    };
+    return (data.predictions ?? []).map((p) => ({
+      base64: p.bytesBase64Encoded,
+      mimeType: p.mimeType || 'image/png',
+    }));
+  }
+
+  // ── Video generation (Veo async LRO: submit + poll) ─────────────────
 
   async generateVideo(opts: ZaiVideoOptions): Promise<ZaiVideoResult> {
     const submitted = await this.submitVideo(opts);
@@ -450,199 +688,245 @@ class ZaiServiceImpl {
     return this.pollVideo(submitted.id, opts.apiKey);
   }
 
-  /** Fire-and-forget submission — returns the Z.AI task id without polling. */
+  /** Fire-and-forget submission — returns the Veo operation id without polling. */
   async submitVideo(opts: ZaiVideoOptions): Promise<ZaiVideoResult> {
-    // Smart model default: viduq1-image when an input frame is supplied
-    // (image-to-video), otherwise viduq1-text. The API rejects `cogvideox-*`
-    // and bare `viduq1` — only the typed variants are accepted.
-    const defaultModel = opts.imageUrl ? 'viduq1-image' : 'viduq1-text';
-    const body: Record<string, unknown> = {
-      model: opts.model ?? defaultModel,
-      prompt: opts.prompt,
-      ...(opts.imageUrl ? { image_url: opts.imageUrl } : {}),
-      ...(opts.endImageUrl ? { end_image_url: opts.endImageUrl } : {}),
-      ...(opts.duration ? { duration: opts.duration } : {}),
-      ...(opts.quality ? { quality: opts.quality } : {}),
-      ...(opts.aspectRatio ? { size: aspectRatioToSize(opts.aspectRatio) } : {}),
-      ...(opts.withAudio !== undefined ? { with_audio: opts.withAudio } : {}),
-      ...(opts.style ? { style: opts.style } : {}),
-      ...(opts.userId ? { user_id: opts.userId } : {}),
-    };
-
     try {
-      const submitted = await this.request<{
-        id?: string;
-        request_id?: string;
-        task_id?: string;
-      }>('/videos/generations', { method: 'POST', body: JSON.stringify(body) }, opts.apiKey);
-      const id = submitted.id ?? submitted.request_id ?? submitted.task_id;
-      if (!id) return { id: '', status: 'failed', error: 'No task id returned by Z.AI' };
-      return { id, status: 'pending' };
-    } catch (err) {
-      return {
-        id: '',
-        status: 'failed',
-        error: err instanceof Error ? err.message : String(err),
+      const apiKey = resolveKey(opts.apiKey);
+      const shortId = opts.model && VIDEO_MODEL_MAP[opts.model] ? opts.model : DEFAULT_VIDEO_MODEL;
+      const modelId = VIDEO_MODEL_MAP[shortId];
+
+      const instance: Record<string, unknown> = { prompt: opts.prompt };
+      if (opts.imageUrl) {
+        const { mimeType, base64 } = await fetchAsBase64(opts.imageUrl, 30_000);
+        instance.image = { bytesBase64Encoded: base64, mimeType };
+      }
+      // endImageUrl: no equivalent parameter on the Google-Direct Veo surface —
+      // intentionally not forwarded (see ZaiVideoOptions.endImageUrl doc).
+
+      const parameters: Record<string, unknown> = {
+        durationSeconds: snapDuration(opts.duration),
+        aspectRatio: opts.aspectRatio === '9:16' ? '9:16' : '16:9',
+        resolution: opts.quality === '1080p' ? '1080p' : '720p',
       };
+      // generateAudio intentionally omitted — every Google-Direct Veo tier
+      // currently rejects it, even `false` (see video-models/registry.ts).
+
+      const res = await fetch(
+        `${GEMINI_REST}/models/${encodeURIComponent(modelId)}:predictLongRunning`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+          body: JSON.stringify({ instances: [instance], parameters }),
+          signal: AbortSignal.timeout(60_000),
+        }
+      );
+      if (!res.ok) {
+        const err = await res.text().catch(() => '');
+        return {
+          id: '',
+          status: 'failed',
+          error: `Veo create ${res.status}: ${redactSecrets(err).slice(0, 400)}`,
+        };
+      }
+      const data = (await res.json()) as {
+        name?: string;
+        done?: boolean;
+        error?: { message?: string };
+      };
+      if (!data.name) {
+        return {
+          id: '',
+          status: 'failed',
+          error: data.error?.message ?? 'No operation id returned by Veo',
+        };
+      }
+      // Strip the "operations/" prefix so the id is slash-free: it becomes
+      // both a Firestore doc id (which cannot contain "/") and a
+      // /lab/zai/video/$jobId URL param upstream. Reconstructed in
+      // getVideoStatus() below.
+      const id = data.name.replace(/^operations\//, '');
+      return { id, status: data.done ? 'completed' : 'pending' };
+    } catch (err) {
+      return { id: '', status: 'failed', error: err instanceof Error ? err.message : String(err) };
     }
   }
 
   async pollVideo(taskId: string, apiKey?: string): Promise<ZaiVideoResult> {
     for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
       const status = await this.getVideoStatus(taskId, apiKey);
-      if (status.status === 'completed' || status.status === 'failed') {
-        return status;
-      }
+      if (status.status === 'completed' || status.status === 'failed') return status;
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     }
-    return { id: taskId, status: 'failed', error: 'Z.AI video polling timed out' };
+    return { id: taskId, status: 'failed', error: 'Veo video polling timed out' };
   }
 
   async getVideoStatus(taskId: string, apiKey?: string): Promise<ZaiVideoResult> {
-    const raw = await this.request<{
-      id?: string;
-      task_status?: string;
-      video_result?: Array<{ url?: string; cover_image_url?: string }>;
-      error?: { message?: string };
-    }>(`/async-result/${encodeURIComponent(taskId)}`, { method: 'GET' }, apiKey);
-
-    const status = mapVideoStatus(raw.task_status);
-    const first = raw.video_result?.[0];
-    return {
-      id: raw.id ?? taskId,
-      status,
-      videoUrl: first?.url,
-      coverUrl: first?.cover_image_url,
-      error: raw.error?.message,
-      raw,
-    };
+    try {
+      const key = resolveKey(apiKey);
+      const operationName = taskId.startsWith('operations/') ? taskId : `operations/${taskId}`;
+      const res = await fetch(`${GEMINI_REST}/${operationName}`, {
+        method: 'GET',
+        headers: { 'x-goog-api-key': key },
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!res.ok) {
+        const err = await res.text().catch(() => '');
+        return {
+          id: taskId,
+          status: 'failed',
+          error: `Veo poll ${res.status}: ${redactSecrets(err).slice(0, 400)}`,
+        };
+      }
+      const data = (await res.json()) as {
+        done?: boolean;
+        error?: { message?: string };
+        response?: {
+          generateVideoResponse?: { generatedSamples?: Array<{ video?: { uri?: string } }> };
+        };
+      };
+      if (data.error) return { id: taskId, status: 'failed', error: data.error.message };
+      if (!data.done) return { id: taskId, status: 'in_progress' };
+      const videoUrl = data.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri;
+      if (!videoUrl)
+        return {
+          id: taskId,
+          status: 'failed',
+          error: 'Veo finished with no video in the response',
+        };
+      return { id: taskId, status: 'completed', videoUrl };
+    } catch (err) {
+      return {
+        id: taskId,
+        status: 'failed',
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
   }
 
-  // ── ASR (GLM-ASR-2512) ─────────────────────────────────────────────
-  // The transcriptions endpoint is multipart/form-data only. Mono audio
-  // is required — stereo input returns code 1214 "supports mono only".
+  // ── ASR (Gemini multimodal transcription) ────────────────────────────
 
   async transcribe(opts: ZaiTranscribeOptions): Promise<ZaiTranscribeResult> {
     if (!opts.url && !opts.base64) {
       throw new Error('zai.transcribe requires either url or base64 input');
     }
+    const apiKey = resolveKey(opts.apiKey);
+    const shortId =
+      opts.model && TRANSCRIBE_MODEL_MAP[opts.model] ? opts.model : DEFAULT_TRANSCRIBE_MODEL;
+    const modelId = TRANSCRIBE_MODEL_MAP[shortId];
 
-    // Resolve to a Buffer regardless of input form — multipart needs bytes.
     let audioBytes: Buffer;
-    let contentType = opts.mimeType ?? 'audio/wav';
+    let contentType = opts.mimeType ?? 'audio/mp3';
     if (opts.base64) {
       audioBytes = Buffer.from(opts.base64, 'base64');
     } else {
-      const fetched = await fetch(opts.url!);
-      if (!fetched.ok) throw new Error(`Failed to fetch audio: HTTP ${fetched.status}`);
-      audioBytes = Buffer.from(await fetched.arrayBuffer());
-      contentType = fetched.headers.get('content-type') ?? contentType;
+      // SSRF-guarded: safeFetch validates + DNS-pins before connecting and
+      // refuses redirects outright (closes the redirect-based bypass a plain
+      // fetch(url, {redirect:'follow'}) would allow — Lab audit finding #2).
+      const res = await safeFetch(opts.url!, { signal: AbortSignal.timeout(120_000) });
+      if (!res.ok) throw new Error(`Failed to fetch audio: HTTP ${res.status}`);
+      audioBytes = Buffer.from(await res.arrayBuffer());
+      contentType = geminiAudioMime(res.headers.get('content-type') ?? contentType);
     }
 
-    const ext = contentType.includes('mp3')
-      ? 'mp3'
-      : contentType.includes('webm')
-        ? 'webm'
-        : contentType.includes('ogg')
-          ? 'ogg'
-          : 'wav';
+    const GEMINI_MAX_INLINE_BYTES = 18 * 1024 * 1024; // Gemini's ~20MB request cap, with margin
+    if (audioBytes.byteLength > GEMINI_MAX_INLINE_BYTES) {
+      throw new Error(
+        `Audio too large for Gemini inline transcription (${(audioBytes.byteLength / 1024 / 1024).toFixed(1)} MB > 18 MB).`
+      );
+    }
 
-    const form = new FormData();
-    // Live-confirmed against api.z.ai paas/v4 on 2026-04-26: the documented
-    // `glm-asr` alias is rejected; the date-versioned id `glm-asr-2512` is
-    // the only one accepted. Returns { text, created, id, request_id, usage }.
-    form.append('model', opts.model ?? 'glm-asr-2512');
-    if (opts.language) form.append('language', opts.language);
-    form.append(
-      'file',
-      new Blob([new Uint8Array(audioBytes)], { type: contentType }),
-      `audio.${ext}`
-    );
+    const langHint = opts.language
+      ? ` The spoken language is "${opts.language}"; transcribe in that language.`
+      : '';
+    const prompt =
+      'Transcribe the attached audio verbatim into time-aligned segments.' +
+      langHint +
+      ' Break at natural sentence boundaries. For each segment give "start" and "end" as SECOND' +
+      ' offsets from the start of the audio, and "text" as the spoken words. Return only the' +
+      ' structured segments, no commentary.';
 
-    const apiKey = opts.apiKey?.trim() || this.ensureConfigured()[this.activeKeyIdx];
-    const response = await fetch(`${BASE_URL}/audio/transcriptions`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: form,
-    });
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      let detail = body;
-      try {
-        detail = JSON.parse(body)?.error?.message ?? body;
-      } catch {
-        // body is not JSON — keep raw
+    const res = await fetch(
+      `${GEMINI_REST}/models/${encodeURIComponent(modelId)}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { inline_data: { mime_type: contentType, data: audioBytes.toString('base64') } },
+                { text: prompt },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0,
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: 'ARRAY',
+              items: {
+                type: 'OBJECT',
+                properties: {
+                  start: { type: 'NUMBER' },
+                  end: { type: 'NUMBER' },
+                  text: { type: 'STRING' },
+                },
+                required: ['start', 'end', 'text'],
+              },
+            },
+          },
+        }),
+        signal: AbortSignal.timeout(300_000),
       }
-      throw new Error(`Z.AI ASR error ${response.status}: ${detail}`.slice(0, 500));
+    );
+    if (!res.ok) {
+      const err = await res.text().catch(() => '');
+      throw new Error(`Gemini ASR ${res.status}: ${redactSecrets(err).slice(0, 500)}`);
     }
-
-    const raw = (await response.json()) as {
-      text?: string;
-      language?: string;
-      segments?: Array<{ start: number; end: number; text: string }>;
+    const data = (await res.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      promptFeedback?: { blockReason?: string };
     };
-
+    if (data.promptFeedback?.blockReason) {
+      throw new Error(`Gemini blocked the audio: ${data.promptFeedback.blockReason}`);
+    }
+    const rawText = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
+    const segments = parseTranscriptSegments(rawText);
     return {
-      text: raw.text ?? '',
-      language: raw.language,
-      segments: raw.segments,
-      raw,
+      text: segments.map((s) => s.text).join(' '),
+      language: opts.language,
+      segments,
+      raw: data,
     };
   }
 
-  // ── Web Search ──────────────────────────────────────────────────────
+  // ── Web Search — disabled ─────────────────────────────────────────────
+  // Z.AI's Web Search tool has no direct Google equivalent key; Gemini's
+  // "grounding with Google Search" returns results embedded in a model
+  // response rather than a raw results list, and isn't wired up yet.
+  // Left as a clear, typed failure rather than silently returning an
+  // empty list — see the /lab/zai Search tab, which is disabled to match.
 
-  async webSearch(opts: ZaiWebSearchOptions): Promise<ZaiWebSearchResult> {
-    const body = {
-      search_query: opts.query,
-      search_engine: opts.searchEngine ?? 'search_std',
-      count: opts.count ?? 10,
-    };
-    // Live API returns each result as { title, link, content, publish_date,
-    // refer, icon, media }. There is no separate `snippet` field — `content`
-    // serves both the preview and full-snippet roles.
-    const raw = await this.request<{
-      search_result?: Array<{
-        title?: string;
-        link?: string;
-        content?: string;
-        publish_date?: string;
-        refer?: string;
-        icon?: string;
-        media?: string;
-      }>;
-    }>('/web_search', { method: 'POST', body: JSON.stringify(body) }, opts.apiKey);
-
-    return {
-      results: (raw.search_result ?? []).map((r) => ({
-        title: r.title ?? '',
-        link: r.link ?? '',
-        snippet: r.content,
-        content: r.content,
-        publishDate: r.publish_date,
-      })),
-      raw,
-    };
+  async webSearch(_opts: ZaiWebSearchOptions): Promise<ZaiWebSearchResult> {
+    throw new Error(
+      "Web search is temporarily unavailable — the Lab no longer uses Z.AI, and Google Search grounding isn't wired up yet."
+    );
   }
 
-  // ── Web Reader (local fallback) ────────────────────────────────────
-  // Z.AI's paas/v4 surface does NOT expose a standalone web reader endpoint
-  // — `/tools/web_reader`, `/web_reader`, and `/tools/web-reader` all 404.
-  // We do the readable-text extraction ourselves: fetch the page, strip
-  // <script> / <style>, collapse whitespace, return the first ~10KB. Honest
-  // about the limitation; preserves the API shape the router was built
-  // against so seedFromUrl keeps working.
+  // ── Web Reader (local extraction, SSRF-hardened) ─────────────────────
 
   async webReader(opts: ZaiWebReaderOptions): Promise<ZaiWebReaderResult> {
-    const response = await fetch(opts.url, {
+    // SSRF-guarded: rejects private/loopback/link-local/cloud-metadata
+    // targets and refuses to follow redirects (closes the redirect-based
+    // bypass a plain fetch(url, {redirect:'follow'}) would allow — this was
+    // the critical finding in the Lab feature audit, 2026-08-23).
+    const response = await safeFetch(opts.url, {
       headers: {
-        // Some sites refuse default fetch UA. Spoof a common one so we get
-        // the public page rather than a 403 / robot interstitial.
         'User-Agent': 'Mozilla/5.0 (compatible; LOAR-WebReader/1.0; +https://loar.fun)',
         Accept: 'text/html,application/xhtml+xml',
       },
-      redirect: 'follow',
+      signal: AbortSignal.timeout(15_000),
     });
     if (!response.ok) {
       throw new Error(`Web reader fetch failed: HTTP ${response.status}`);
@@ -673,39 +957,6 @@ class ZaiServiceImpl {
     const content = cleaned.slice(0, 12000);
 
     return { title, content, url: opts.url, raw: { html: html.length } };
-  }
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-function aspectRatioToSize(aspect: string): string {
-  const presets: Record<string, string> = {
-    '1:1': '1024x1024',
-    '16:9': '1280x720',
-    '9:16': '720x1280',
-    '4:3': '1024x768',
-    '3:4': '768x1024',
-    '21:9': '1280x540',
-  };
-  return presets[aspect] ?? aspect;
-}
-
-function mapVideoStatus(s: string | undefined): ZaiVideoResult['status'] {
-  switch ((s ?? '').toUpperCase()) {
-    case 'SUCCESS':
-    case 'COMPLETED':
-      return 'completed';
-    case 'FAIL':
-    case 'FAILED':
-    case 'CANCELLED':
-      return 'failed';
-    case 'PROCESSING':
-    case 'RUNNING':
-      return 'in_progress';
-    case 'PENDING':
-    case 'WAITING':
-    default:
-      return 'pending';
   }
 }
 

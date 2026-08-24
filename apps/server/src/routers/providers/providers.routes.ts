@@ -24,6 +24,8 @@ import {
   setEnabled,
   remove,
   serverPoolAvailable,
+  getByokProviderSet,
+  computeModelUsability,
 } from '../../services/provider-keys';
 import { TRANSCRIPTION_MODELS, getVisibleModels } from '../../services/transcription-models';
 import { db } from '../../lib/firebase';
@@ -102,12 +104,9 @@ export const providersRouter = router({
   // ── Transcription model catalog (capability-aware) ────────────────
 
   listModels: protectedProcedure.query(async ({ ctx }) => {
-    // Which providers does this user have a (enabled) key for?
-    const userKeys = await listForUser(ctx.user.uid);
-    const byokProviders = new Set(userKeys.filter((k) => k.enabled).map((k) => k.provider));
+    const byokProviders = await getByokProviderSet(ctx.user.uid);
     return getVisibleModels().map((m) => {
-      const hasByok = byokProviders.has(m.provider as any);
-      const hasServer = m.serverPoolAvailable && serverPoolAvailable(m.provider as any);
+      const usability = computeModelUsability(m.provider, byokProviders, m.serverPoolAvailable);
       return {
         id: m.id,
         provider: m.provider,
@@ -125,14 +124,7 @@ export const providersRouter = router({
         maxAudioMinutes: m.maxAudioMinutes,
         tags: m.tags,
         bestFor: m.bestFor,
-        /** True when the user can dispatch to this model right now. */
-        usableByMe: hasByok || hasServer,
-        /** Why it's unusable — surface to the UI for the disabled tooltip. */
-        unusableReason:
-          hasByok || hasServer
-            ? null
-            : `Add a ${PROVIDER_REGISTRY[m.provider as keyof typeof PROVIDER_REGISTRY]?.displayName ?? m.provider} API key in Settings to enable this model.`,
-        sourceOnDispatch: hasByok ? ('byok' as const) : hasServer ? ('server' as const) : null,
+        ...usability,
       };
     });
   }),

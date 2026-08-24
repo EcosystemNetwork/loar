@@ -62,6 +62,7 @@ import { reserveClientToken } from '../../lib/jobIdempotency';
 import { enqueueWebhook, validateWebhookUrl } from '../../lib/webhooks';
 import { withProviderRateLimit } from '../../lib/rate-limit';
 import type { CostProvider } from '../../services/cost-tracker';
+import { getByokProviderSet, computeModelUsability } from '../../services/provider-keys';
 
 /** VideoModelConfig.provider → CostProvider for the rate-limit gate. */
 function videoCostProviderFor(p: string): CostProvider {
@@ -964,7 +965,7 @@ export const generationRouter = router({
         })
         .optional()
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       // Check for admin overrides in Firestore
       const overrides = new Map<string, { isEnabled: boolean; isVisibleToUsers: boolean }>();
       try {
@@ -998,6 +999,8 @@ export const generationRouter = router({
         models = models.filter((m) => m.mode.includes(input.mode!));
       }
 
+      const byokProviders = await getByokProviderSet(ctx.user?.uid);
+
       return models.map((m) => ({
         id: m.id,
         provider: m.provider,
@@ -1017,6 +1020,7 @@ export const generationRouter = router({
         loarPriceUsd: m.loarPriceUsd,
         tags: m.tags,
         bestFor: m.bestFor,
+        ...computeModelUsability(m.provider, byokProviders),
       }));
     }),
 

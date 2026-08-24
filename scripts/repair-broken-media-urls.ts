@@ -34,6 +34,15 @@ const EPHEMERAL_PATTERNS = [
   'replicate.delivery',
   'oaidalleapiprodscus.blob.core.windows.net',
   'ark-acg',
+  // Dedicated Pinata gateways require a server-side token the client never
+  // has, and gateway-restriction settings can 401 even the platform's own
+  // requests — treat as ephemeral so genuinely-dead pins get hidden rather
+  // than left as permanent 401s. HEAD-check below still spares live ones.
+  'mypinata.cloud',
+  // Google's Gemini Files API (Google-direct Veo) scopes downloads to the
+  // creating API key and the file itself expires — same "never mirrored"
+  // failure mode as the other ephemeral hosts.
+  'generativelanguage.googleapis.com',
 ];
 const MEDIA_URL_FIELDS = ['mediaUrl', 'videoUrl', 'audioUrl', 'imageUrl', 'thumbnailUrl'];
 
@@ -56,11 +65,31 @@ function isEphemeralUrl(url: string): boolean {
   }
 }
 
+// Dedicated `.mypinata.cloud` gateways 401 unauthenticated requests outright
+// — including our own liveness probe — regardless of whether the CID is
+// still actually retrievable on the public network. Probe the public gateway
+// instead so a live pin isn't misclassified as dead just because the private
+// gateway needs a token we don't have here.
+function toLivenessCheckUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    if (!u.host.toLowerCase().endsWith('.mypinata.cloud')) return url;
+    const m = u.pathname.match(/^\/ipfs\/(.+)$/);
+    return m ? `https://ipfs.io/ipfs/${m[1]}` : url;
+  } catch {
+    return url;
+  }
+}
+
 async function headOk(url: string, timeoutMs = 5000): Promise<boolean> {
   try {
     const c = new AbortController();
     const t = setTimeout(() => c.abort(), timeoutMs);
-    const r = await fetch(url, { method: 'HEAD', signal: c.signal, redirect: 'manual' });
+    const r = await fetch(toLivenessCheckUrl(url), {
+      method: 'HEAD',
+      signal: c.signal,
+      redirect: 'follow',
+    });
     clearTimeout(t);
     return r.status >= 200 && r.status < 400;
   } catch {

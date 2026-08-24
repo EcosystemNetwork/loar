@@ -30,6 +30,10 @@ export interface ModelOption {
   priceTier: string;
   fiatPriceUsd: number;
   bestFor: string;
+  /** True when the current user can dispatch to this model right now (server credit or their own BYOK key). */
+  usableByMe?: boolean;
+  /** Why it's unusable — shown as a "Coming Soon" tooltip. */
+  unusableReason?: string | null;
 }
 
 interface ModelSelectorProps {
@@ -106,21 +110,35 @@ export function ModelSelector({
               </span>
             </SelectItem>
           )}
-          {(models ?? []).map((m: ModelOption) => (
-            <SelectItem key={m.id} value={m.id}>
-              <span className="flex items-center gap-1.5">
-                {m.displayName}
-                <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${TIER_COLORS[m.qualityTier] ?? TIER_COLORS.standard}`}
-                >
-                  {m.qualityTier}
+          {(models ?? []).map((m: ModelOption) => {
+            const comingSoon = m.usableByMe === false;
+            return (
+              <SelectItem
+                key={m.id}
+                value={m.id}
+                disabled={comingSoon}
+                title={comingSoon ? (m.unusableReason ?? 'Coming soon') : undefined}
+              >
+                <span className={`flex items-center gap-1.5 ${comingSoon ? 'opacity-50' : ''}`}>
+                  {m.displayName}
+                  {comingSoon ? (
+                    <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full font-medium">
+                      Coming Soon
+                    </span>
+                  ) : (
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${TIER_COLORS[m.qualityTier] ?? TIER_COLORS.standard}`}
+                    >
+                      {m.qualityTier}
+                    </span>
+                  )}
+                  <span className="text-[10px] text-muted-foreground">
+                    {PRICE_LABELS[m.priceTier] ?? ''}
+                  </span>
                 </span>
-                <span className="text-[10px] text-muted-foreground">
-                  {PRICE_LABELS[m.priceTier] ?? ''}
-                </span>
-              </span>
-            </SelectItem>
-          ))}
+              </SelectItem>
+            );
+          })}
         </SelectContent>
       </Select>
     </div>

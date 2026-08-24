@@ -304,7 +304,7 @@ function WideCard({ universe }: { universe: EnrichedUniverse }) {
  * ────────────────────────────────────────── */
 export function HeroSkeleton() {
   return (
-    <div className="relative h-[40vh] min-h-[260px] max-h-[420px] bg-gradient-to-b from-primary/5 via-background to-background flex items-end">
+    <div className="relative h-[46vh] min-h-[320px] max-h-[460px] md:max-h-[520px] lg:max-h-[600px] bg-gradient-to-b from-primary/5 via-background to-background flex items-end">
       <div className="w-full px-4 md:px-12 pb-8 md:pb-10 max-w-3xl space-y-4 animate-pulse">
         <div className="h-4 w-24 rounded bg-white/10" />
         <div className="h-12 sm:h-14 w-3/4 max-w-80 rounded bg-white/10" />
@@ -383,7 +383,7 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
   if (!current) return null;
 
   return (
-    <div className="relative isolate h-[40vh] min-h-[260px] max-h-[420px] overflow-hidden">
+    <div className="relative isolate h-[46vh] min-h-[320px] max-h-[460px] md:max-h-[520px] lg:max-h-[600px] overflow-hidden">
       {/* Background image with Ken Burns effect */}
       {featured.map((u, i) => (
         <div

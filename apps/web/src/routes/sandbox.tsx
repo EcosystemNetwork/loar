@@ -1686,13 +1686,16 @@ function SandboxPage() {
                       </div>
                       <div className="flex flex-col gap-1">
                         <label className="text-[11px] text-muted-foreground">Camera motion</label>
-                        <Select value={cameraPreset} onValueChange={setCameraPreset}>
+                        <Select
+                          value={cameraPreset || 'none'}
+                          onValueChange={(v) => setCameraPreset(v === 'none' ? '' : v)}
+                        >
                           <SelectTrigger className="h-8 text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             {CAMERA_PRESET_OPTIONS.map((p) => (
-                              <SelectItem key={p.id || 'none'} value={p.id}>
+                              <SelectItem key={p.id || 'none'} value={p.id || 'none'}>
                                 {p.label}
                               </SelectItem>
                             ))}

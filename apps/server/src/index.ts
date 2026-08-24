@@ -980,6 +980,13 @@ app.use('/trpc/sceneAudio.*', aiRateLimiter({ windowMs: 60_000, max: 10 })); // 
 app.use('/trpc/audio.*', aiRateLimiter({ windowMs: 60_000, max: 20 })); // music gen ~15s
 app.use('/trpc/voice.*', aiRateLimiter({ windowMs: 60_000, max: 30 })); // TTS, short + cheap
 app.use('/trpc/image.*', aiRateLimiter({ windowMs: 60_000, max: 30 })); // image gen ~$0.04, fast
+// Was UNLIMITED beyond the global 100/min IP cap until the Lab feature audit
+// (2026-08-23) flagged it — the zai.* router carries 8 expensiveProcedure
+// mutations including Veo video generation, with none of the per-route/
+// per-wallet/daily budgets every sibling AI router gets. Tiered like
+// generation.* since startVideo/generateVideo/talkingScene are full video
+// generations; chat/image/transcribe calls are cheaper but share the bucket.
+app.use('/trpc/zai.*', aiRateLimiter({ windowMs: 60_000, max: 5 }));
 
 // ── Job status SSE (real-time generation progress) ───────────────────
 const { jobStatusRouter } = await import('./routes/job-status');

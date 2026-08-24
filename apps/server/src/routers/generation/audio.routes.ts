@@ -43,6 +43,7 @@ import {
 import type { AudioGenerationMode, RoutingMode } from '../../services/audio-models';
 import { getPlatformConfig } from '../../services/platformConfig';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
+import { getByokProviderSet, computeModelUsability } from '../../services/provider-keys';
 
 // ── Pricing helpers ──────────────────────────────────────────────────
 
@@ -133,9 +134,11 @@ const routingModeSchema = z.enum(['auto', 'manual']);
 
 export const audioRouter = router({
   // ── List models ────────────────────────────────────────────────────
-  listModels: publicProcedure.query(() => {
+  listModels: publicProcedure.query(async ({ ctx }) => {
+    const byokProviders = await getByokProviderSet(ctx.user?.uid);
     return getVisibleModels().map((m) => ({
       id: m.id,
+      provider: m.provider,
       displayName: m.displayName,
       shortDescription: m.shortDescription,
       mode: m.mode,
@@ -147,6 +150,7 @@ export const audioRouter = router({
       creditCost: m.creditCost,
       tags: m.tags,
       bestFor: m.bestFor,
+      ...computeModelUsability(m.provider, byokProviders),
     }));
   }),
 

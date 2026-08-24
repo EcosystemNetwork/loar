@@ -1061,7 +1061,8 @@ function EntityCreateForm() {
       } catch {
         models = [];
       }
-      const rolledModel = models.length > 0 ? pickRandom(models) : null;
+      const usableModels = models.filter((m) => m.usableByMe !== false);
+      const rolledModel = usableModels.length > 0 ? pickRandom(usableModels) : null;
       const rolledModelId = rolledModel?.id ?? '';
       setLastRoll({
         style: preset.label,

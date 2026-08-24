@@ -45,6 +45,7 @@ import { adsRouter } from './ads/ads.routes';
 import { adSeedsRouter } from './ads/adSeeds.routes';
 import { editorDraftsRouter } from './editorDrafts/editorDrafts.routes';
 import { graphLayoutsRouter } from './graphLayouts/graphLayouts.routes';
+import { universeEventsRouter } from './universeEvents/universeEvents.routes';
 import { storageRouter } from './storage/storage.routes';
 import { firebaseStorageRouter } from './storage/firebase.routes';
 import { synapseRouter } from './storage/synapse.routes';
@@ -282,6 +283,7 @@ export const appRouter = router({
   adSeeds: adSeedsRouter,
   editorDrafts: editorDraftsRouter,
   graphLayouts: graphLayoutsRouter,
+  universeEvents: universeEventsRouter,
 
   // ── Analytics ───────────────────────────────────────────────────────
   analytics: analyticsRouter,

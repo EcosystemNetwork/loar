@@ -1,5 +1,5 @@
 /**
- * /lab/zai/video/$jobId — async Vidu Q1 job poller.
+ * /lab/zai/video/$jobId — async Veo 3.1 job poller.
  *
  * Polls `zai.videoJob` every 4s until status flips to completed or failed.
  * The server caches the job row in Firestore (zaiVideoJobs/{taskId}), so
@@ -36,7 +36,7 @@ function VideoJobPage() {
   if (!address) {
     return (
       <div className="container mx-auto max-w-2xl px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold">Z.AI video job</h1>
+        <h1 className="text-2xl font-bold">Video job</h1>
         <p className="text-muted-foreground mt-2">Connect a wallet to view your jobs.</p>
       </div>
     );
@@ -80,7 +80,7 @@ function VideoJobPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clapperboard className="h-5 w-5 text-violet-400" />
-            Vidu Q1 Job
+            Veo 3.1 Job
             <Badge
               className={
                 status === 'completed'
@@ -135,7 +135,7 @@ function VideoJobPage() {
           {!isTerminal && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground bg-zinc-900/40 border border-white/10 rounded-lg p-3">
               <Loader2 className="h-4 w-4 animate-spin text-violet-400" />
-              Rendering — Vidu Q1-3 typically takes 1–3 minutes. Polling every 4s.
+              Rendering — Veo 3.1 typically takes 1–3 minutes. Polling every 4s.
             </div>
           )}
 

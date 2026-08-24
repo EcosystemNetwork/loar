@@ -301,7 +301,7 @@ function UniverseTimelineEditorInner() {
     | 'veo-31-lite-preview-google'
     | 'veo-30-google'
     | 'veo-30-fast-google'
-  >('seedance');
+  >('veo-31-fast-preview-google'); // default to a model with server credit — see FlowCreationPanel's comingSoonVideoModels
   const [selectedVideoDuration, setSelectedVideoDuration] = useState<number>(8);
   const [negativePrompt, setNegativePrompt] = useState('');
   const [videoPrompt, setVideoPrompt] = useState('');

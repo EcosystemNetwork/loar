@@ -1,5 +1,6 @@
 /**
- * Z.AI script + compare cards — shared between /lab/zai and /create.
+ * Model Lab script + compare cards — shared between /lab/zai and /create.
+ * Switched from GLM (Z.AI) to Gemini model ids 2026-08-23.
  *
  * Pulled out of lab.zai.tsx so the same A/B demo can be embedded inside
  * the Create hub without duplicating logic. Keep this file dependency-free
@@ -22,28 +23,21 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-// All chat model ids confirmed live against api.z.ai paas/v4 on 2026-04-26.
+// Short ids match services/zai.ts's CHAT_MODEL_MAP.
 export const CHAT_MODELS = [
-  { id: 'glm-4.5-air', label: 'GLM-4.5 Air — fastest / cheapest' },
-  { id: 'glm-4.5', label: 'GLM-4.5' },
-  { id: 'glm-4.5v', label: 'GLM-4.5V — vision' },
-  { id: 'glm-4.6', label: 'GLM-4.6 — balanced' },
-  { id: 'glm-4.6v', label: 'GLM-4.6V — vision' },
-  { id: 'glm-4.7', label: 'GLM-4.7 — reasoning (default)' },
-  { id: 'glm-4-plus', label: 'GLM-4 Plus' },
-  { id: 'glm-zero-preview', label: 'GLM-Zero Preview' },
-  { id: 'glm-5', label: 'GLM-5 — flagship' },
-  { id: 'glm-5-turbo', label: 'GLM-5 Turbo — fast flagship' },
-  { id: 'glm-5.1', label: 'GLM-5.1 — newest reasoning' },
-  { id: 'glm-5v-turbo', label: 'GLM-5V Turbo — flagship vision' },
+  { id: 'gemini-3-1-flash-lite', label: 'Gemini 3.1 Flash-Lite — fastest / cheapest (preview)' },
+  { id: 'gemini-2-5-flash-lite', label: 'Gemini 2.5 Flash-Lite — budget' },
+  { id: 'gemini-2-5-flash', label: 'Gemini 2.5 Flash — balanced (default)' },
+  { id: 'gemini-2-5-pro', label: 'Gemini 2.5 Pro — reasoning + vision' },
+  { id: 'gemini-3-1-pro', label: 'Gemini 3.1 Pro — flagship reasoning (preview)' },
 ] as const;
 export type ChatModelId = (typeof CHAT_MODELS)[number]['id'];
 
 // ── Compare ──────────────────────────────────────────────────────────
 // A/B two chat models side-by-side on the same worldbuild prompt. Useful
-// for picking the right model for a given universe (GLM-5.1's reasoning
-// vs GLM-4.6's tighter prose vs GLM-5-Turbo's speed). Both calls fire in
-// parallel and persist=false so the wiki isn't double-populated.
+// for picking the right model for a given universe (Gemini 2.5 Pro's
+// reasoning vs Gemini 2.5 Flash's speed). Both calls fire in parallel and
+// persist=false so the wiki isn't double-populated.
 
 interface CompareSlotResult {
   model: ChatModelId;
@@ -55,8 +49,8 @@ export function CompareCard() {
   const [prompt, setPrompt] = useState(
     'A neon-noir city built on the back of a sleeping leviathan, where rain is currency.'
   );
-  const [modelA, setModelA] = useState<ChatModelId>('glm-4.6');
-  const [modelB, setModelB] = useState<ChatModelId>('glm-5.1');
+  const [modelA, setModelA] = useState<ChatModelId>('gemini-2-5-flash');
+  const [modelB, setModelB] = useState<ChatModelId>('gemini-2-5-pro');
   const [running, setRunning] = useState(false);
   const [resultA, setResultA] = useState<CompareSlotResult | null>(null);
   const [resultB, setResultB] = useState<CompareSlotResult | null>(null);
@@ -96,8 +90,8 @@ export function CompareCard() {
           A/B compare chat models
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Same prompt, two GLM models, side-by-side. Both calls fire in parallel and stay in memory
-          only — nothing persists to the wiki.
+          Same prompt, two Gemini models, side-by-side. Both calls fire in parallel and stay in
+          memory only — nothing persists to the wiki.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -215,7 +209,7 @@ function CompareSlot({
 // Two models, same logline, two full screenplays. Differs from the generic
 // Compare card in that it returns a richer structured-script shape (scenes
 // with sluglines + dialogue blocks + parentheticals) and renders in proper
-// screenplay format. The strongest "GLM model spread matters" demo.
+// screenplay format. The strongest "model spread matters" demo.
 
 type ScriptResult = Awaited<ReturnType<typeof trpcClient.zai.writeScript.mutate>>;
 
@@ -226,8 +220,8 @@ export function ScriptCard() {
   const [tone, setTone] = useState('cosmic horror, Tarkovsky-paced');
   const [characters, setCharacters] = useState('');
   const [sceneCount, setSceneCount] = useState(5);
-  const [modelA, setModelA] = useState<ChatModelId>('glm-4.7');
-  const [modelB, setModelB] = useState<ChatModelId>('glm-5.1');
+  const [modelA, setModelA] = useState<ChatModelId>('gemini-2-5-flash');
+  const [modelB, setModelB] = useState<ChatModelId>('gemini-2-5-pro');
   const [running, setRunning] = useState(false);
   const [resultA, setResultA] = useState<ScriptResult | null>(null);
   const [resultB, setResultB] = useState<ScriptResult | null>(null);
@@ -266,7 +260,7 @@ export function ScriptCard() {
           Script writer — A/B compare
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Same logline, two GLM models, two full screenplays in screenplay format. Output is
+          Same logline, two Gemini models, two full screenplays in screenplay format. Output is
           ephemeral — promote a winner to a Notebook draft if you want to keep it.
         </p>
       </CardHeader>

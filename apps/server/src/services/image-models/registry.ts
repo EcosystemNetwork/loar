@@ -1175,6 +1175,9 @@ export const IMAGE_MODELS: ImageModelConfig[] = [
   // ── Z.AI / Zhipu image additions ─────────────────────────────────────
   {
     id: 'cogview-4',
+    // DISABLED 2026-08-23: Z.AI (Zhipu) platform credits exhausted — the
+    // Lab feature audit + Z.AI -> Google swap left this model unreachable.
+    // Re-enable once ZAI_API_KEY has credits again; see services/zai.ts.
     provider: 'zai',
     displayName: 'CogView-4 (Z.AI)',
     shortDescription: 'CogView 4 — strong Chinese-text rendering, prompt-faithful',
@@ -1198,7 +1201,7 @@ export const IMAGE_MODELS: ImageModelConfig[] = [
     providerCostUsd: 0.02,
     fiatPriceUsd: withFiatMargin(0.02),
     loarPriceUsd: withLoarMargin(0.02),
-    isEnabled: true,
+    isEnabled: false,
     isVisibleToUsers: true,
     allowedPlans: [],
     tags: ['standard', 'zai', 'cogview', 'chinese-text', 'cinematic'],
@@ -1402,6 +1405,9 @@ export const IMAGE_MODELS: ImageModelConfig[] = [
   // ── Original glm-image kept below ────────────────────────────────────
   {
     id: 'glm-image',
+    // DISABLED 2026-08-23: Z.AI (Zhipu) platform credits exhausted — the
+    // Lab feature audit + Z.AI -> Google swap left this model unreachable.
+    // Re-enable once ZAI_API_KEY has credits again; see services/zai.ts.
     provider: 'zai',
     displayName: 'GLM-Image (Z.AI)',
     shortDescription: 'Z.AI flagship image model — strong prompt adherence, broad subject coverage',
@@ -1425,7 +1431,7 @@ export const IMAGE_MODELS: ImageModelConfig[] = [
     providerCostUsd: 0.015,
     fiatPriceUsd: withFiatMargin(0.015),
     loarPriceUsd: withLoarMargin(0.015),
-    isEnabled: true,
+    isEnabled: false,
     isVisibleToUsers: true,
     allowedPlans: [],
     tags: ['standard', 'zai', 'glm', 'cinematic'],

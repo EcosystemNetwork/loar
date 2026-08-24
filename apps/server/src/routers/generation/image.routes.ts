@@ -56,6 +56,7 @@ import { buildGenerationContext } from '../../services/wiki-context';
 import { recordProviderCost, type CostProvider } from '../../services/cost-tracker';
 import { withProviderRateLimit } from '../../lib/rate-limit';
 import { publishToGallery } from '../../lib/gallery-publish';
+import { getByokProviderSet, computeModelUsability } from '../../services/provider-keys';
 
 /** ImageModelConfig.provider → CostProvider for the rate-limit + ledger. */
 function imageCostProviderFor(p: ImageModelConfig['provider']): CostProvider {
@@ -1642,7 +1643,7 @@ export const imageRouter = router({
         })
         .optional()
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       // Check admin overrides
       const overrides = new Map<string, { isEnabled: boolean; isVisibleToUsers: boolean }>();
       try {
@@ -1663,6 +1664,8 @@ export const imageRouter = router({
         models = models.filter((m) => m.tasks.includes(input.task!));
       }
 
+      const byokProviders = await getByokProviderSet(ctx.user?.uid);
+
       return models.map((m) => ({
         id: m.id,
         provider: m.provider,
@@ -1680,6 +1683,7 @@ export const imageRouter = router({
         loarPriceUsd: m.loarPriceUsd,
         tags: m.tags,
         bestFor: m.bestFor,
+        ...computeModelUsability(m.provider, byokProviders),
       }));
     }),
 

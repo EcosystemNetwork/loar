@@ -323,6 +323,9 @@ export const LLM_MODELS: LlmModelConfig[] = [
   // ── Z.AI / Zhipu GLM ─────────────────────────────────────────────────
   {
     id: 'glm-5-1',
+    // DISABLED 2026-08-23: Z.AI (Zhipu) platform credits exhausted — the
+    // Lab feature audit + Z.AI -> Google swap left this model unreachable.
+    // Re-enable once ZAI_API_KEY has credits again; see services/zai.ts.
     provider: 'zai',
     displayName: 'GLM-5.1 (Z.AI)',
     shortDescription: 'Z.AI flagship — 754B, 200K context',
@@ -335,7 +338,7 @@ export const LLM_MODELS: LlmModelConfig[] = [
     priceTier: 'medium',
     ...pricing({ inputUsd: 1.4, cachedInputUsd: 0.35, outputUsd: 4.4 }),
     lastVerified: '2026-05-17',
-    isEnabled: true,
+    isEnabled: false,
     isVisibleToUsers: true,
     allowedPlans: [],
     serverPoolAvailable: true,
@@ -344,6 +347,9 @@ export const LLM_MODELS: LlmModelConfig[] = [
   },
   {
     id: 'glm-5',
+    // DISABLED 2026-08-23: Z.AI (Zhipu) platform credits exhausted — the
+    // Lab feature audit + Z.AI -> Google swap left this model unreachable.
+    // Re-enable once ZAI_API_KEY has credits again; see services/zai.ts.
     provider: 'zai',
     displayName: 'GLM-5 (Z.AI)',
     shortDescription: 'GLM-5 — 200K MoE flagship',
@@ -356,7 +362,7 @@ export const LLM_MODELS: LlmModelConfig[] = [
     priceTier: 'medium',
     ...pricing({ inputUsd: 1.0, cachedInputUsd: 0.25, outputUsd: 3.2 }),
     lastVerified: '2026-05-17',
-    isEnabled: true,
+    isEnabled: false,
     isVisibleToUsers: true,
     allowedPlans: [],
     serverPoolAvailable: true,
@@ -365,6 +371,9 @@ export const LLM_MODELS: LlmModelConfig[] = [
   },
   {
     id: 'glm-4-7',
+    // DISABLED 2026-08-23: Z.AI (Zhipu) platform credits exhausted — the
+    // Lab feature audit + Z.AI -> Google swap left this model unreachable.
+    // Re-enable once ZAI_API_KEY has credits again; see services/zai.ts.
     provider: 'zai',
     displayName: 'GLM-4.7 (Z.AI)',
     shortDescription: 'GLM-4.7 — reasoning + 200K context',
@@ -377,7 +386,7 @@ export const LLM_MODELS: LlmModelConfig[] = [
     priceTier: 'low',
     ...pricing({ inputUsd: 0.4, cachedInputUsd: 0.1, outputUsd: 1.75 }),
     lastVerified: '2026-05-17',
-    isEnabled: true,
+    isEnabled: false,
     isVisibleToUsers: true,
     allowedPlans: [],
     serverPoolAvailable: true,
@@ -386,6 +395,9 @@ export const LLM_MODELS: LlmModelConfig[] = [
   },
   {
     id: 'glm-4-7-flash',
+    // DISABLED 2026-08-23: Z.AI (Zhipu) platform credits exhausted — the
+    // Lab feature audit + Z.AI -> Google swap left this model unreachable.
+    // Re-enable once ZAI_API_KEY has credits again; see services/zai.ts.
     provider: 'zai',
     displayName: 'GLM-4.7 Flash (Z.AI)',
     shortDescription: 'Cheapest fast Z.AI tier',
@@ -398,7 +410,7 @@ export const LLM_MODELS: LlmModelConfig[] = [
     priceTier: 'low',
     ...pricing({ inputUsd: 0.06, cachedInputUsd: 0.015, outputUsd: 0.4 }),
     lastVerified: '2026-05-17',
-    isEnabled: true,
+    isEnabled: false,
     isVisibleToUsers: true,
     allowedPlans: [],
     serverPoolAvailable: true,
@@ -407,6 +419,9 @@ export const LLM_MODELS: LlmModelConfig[] = [
   },
   {
     id: 'glm-4-5-flash',
+    // DISABLED 2026-08-23: Z.AI (Zhipu) platform credits exhausted — the
+    // Lab feature audit + Z.AI -> Google swap left this model unreachable.
+    // Re-enable once ZAI_API_KEY has credits again; see services/zai.ts.
     provider: 'zai',
     displayName: 'GLM-4.5 Flash (Z.AI)',
     shortDescription: 'Free tier — basic completions',
@@ -419,7 +434,7 @@ export const LLM_MODELS: LlmModelConfig[] = [
     priceTier: 'low',
     ...pricing({ inputUsd: 0, cachedInputUsd: 0, outputUsd: 0 }),
     lastVerified: '2026-05-17',
-    isEnabled: true,
+    isEnabled: false,
     isVisibleToUsers: true,
     allowedPlans: [],
     serverPoolAvailable: true,
@@ -428,6 +443,9 @@ export const LLM_MODELS: LlmModelConfig[] = [
   },
   {
     id: 'glm-4-5-air',
+    // DISABLED 2026-08-23: Z.AI (Zhipu) platform credits exhausted — the
+    // Lab feature audit + Z.AI -> Google swap left this model unreachable.
+    // Re-enable once ZAI_API_KEY has credits again; see services/zai.ts.
     provider: 'zai',
     displayName: 'GLM-4.5 Air (Z.AI)',
     shortDescription: 'GLM-4.5 Air — 131K context, lightweight',
@@ -440,7 +458,7 @@ export const LLM_MODELS: LlmModelConfig[] = [
     priceTier: 'low',
     ...pricing({ inputUsd: 0.13, cachedInputUsd: 0.03, outputUsd: 0.85 }),
     lastVerified: '2026-05-17',
-    isEnabled: true,
+    isEnabled: false,
     isVisibleToUsers: true,
     allowedPlans: [],
     serverPoolAvailable: true,
@@ -451,6 +469,9 @@ export const LLM_MODELS: LlmModelConfig[] = [
   // ── Z.AI Vision ──────────────────────────────────────────────────────
   {
     id: 'glm-4-6v',
+    // DISABLED 2026-08-23: Z.AI (Zhipu) platform credits exhausted — the
+    // Lab feature audit + Z.AI -> Google swap left this model unreachable.
+    // Re-enable once ZAI_API_KEY has credits again; see services/zai.ts.
     provider: 'zai',
     displayName: 'GLM-4.6V (Z.AI Vision)',
     shortDescription: 'Z.AI flagship VLM — 128K, function calling',
@@ -463,7 +484,7 @@ export const LLM_MODELS: LlmModelConfig[] = [
     priceTier: 'low',
     ...pricing({ inputUsd: 0.6, cachedInputUsd: 0.15, outputUsd: 0.9 }),
     lastVerified: '2026-05-17',
-    isEnabled: true,
+    isEnabled: false,
     isVisibleToUsers: true,
     allowedPlans: [],
     serverPoolAvailable: true,
@@ -472,6 +493,9 @@ export const LLM_MODELS: LlmModelConfig[] = [
   },
   {
     id: 'glm-4-6v-flash',
+    // DISABLED 2026-08-23: Z.AI (Zhipu) platform credits exhausted — the
+    // Lab feature audit + Z.AI -> Google swap left this model unreachable.
+    // Re-enable once ZAI_API_KEY has credits again; see services/zai.ts.
     provider: 'zai',
     displayName: 'GLM-4.6V Flash (Z.AI)',
     shortDescription: 'Free-tier vision — 9B, 128K context',
@@ -484,7 +508,7 @@ export const LLM_MODELS: LlmModelConfig[] = [
     priceTier: 'low',
     ...pricing({ inputUsd: 0, cachedInputUsd: 0, outputUsd: 0 }),
     lastVerified: '2026-05-17',
-    isEnabled: true,
+    isEnabled: false,
     isVisibleToUsers: true,
     allowedPlans: [],
     serverPoolAvailable: true,

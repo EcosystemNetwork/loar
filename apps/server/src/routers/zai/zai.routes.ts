@@ -1,22 +1,26 @@
 /**
- * Z.AI router — hackathon-grade integration of the Z.AI devpack into LOAR.
+ * Model Lab router — was a Z.AI devpack integration; switched to Google
+ * (Gemini / Imagen / Veo) 2026-08-23 when Z.AI credits ran out. The tRPC
+ * namespace stays `zai.*` and every method signature is unchanged so
+ * `/create` (via components/zai/script-compare.tsx) and the `/lab/zai`
+ * pages didn't need to change — see services/zai.ts for the swap itself.
  *
  * Surfaces:
- *   - chat               — direct GLM passthrough (with deep-thinking flag)
+ *   - chat               — direct Gemini passthrough (with thinking/reasoning flag)
  *   - worldbuild         — prompt → JSON entity bundle, auto-persisted
- *   - seedFromUrl        — Web Reader → entity bundle (lore from real sources)
- *   - webSearch          — Z.AI Web Search tool, surfaced for canon-research UI
- *   - generateImage      — CogView-4 / GLM-Image, rehosted via StorageManager
- *   - generateVideo      — CogVideoX-3, rehosted via StorageManager
- *   - talkingScene       — image + script → CogVideoX video (provider-alt to OmniHuman)
+ *   - seedFromUrl        — local Web Reader → entity bundle (lore from real sources)
+ *   - webSearch          — disabled (no Z.AI-equivalent Google Search grounding yet)
+ *   - generateImage      — Gemini image / Imagen 4, rehosted via StorageManager
+ *   - generateVideo      — Veo 3.1 (Google-Direct), rehosted via StorageManager
+ *   - talkingScene       — image + script → Veo video (provider-alt to OmniHuman)
  *   - canonCheck         — vision + reasoning consistency score before publish
  *   - governanceAgent    — summarize on-chain proposal + recommend vote rationale
- *   - transcribe         — GLM-ASR for voice memos
+ *   - transcribe         — Gemini multimodal transcription for voice memos
  *   - episodeFromVoice   — voice → transcript → structured episode draft
  *
- * Every mutation auto-prefers the user's BYOK Z.AI key (via userSecrets) and
- * falls back to the platform ZAI_API_KEY env. No plaintext key ever leaves
- * server memory.
+ * Every mutation auto-prefers the user's BYOK Google key (via userSecrets)
+ * and falls back to the platform GOOGLE_API_KEY env. No plaintext key ever
+ * leaves server memory.
  */
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
@@ -38,7 +42,7 @@ import { db, firebaseAvailable } from '../../lib/firebase';
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 async function resolveKey(uid: string): Promise<string | undefined> {
-  return resolveProviderKey(uid, 'zai').catch(() => undefined);
+  return resolveProviderKey(uid, 'google').catch(() => undefined);
 }
 
 async function rehostUrl(
@@ -48,7 +52,22 @@ async function rehostUrl(
   userId?: string
 ): Promise<string> {
   try {
-    const res = await fetch(fileUrl);
+    // Google's Gemini Files API (Google-Direct Veo's video.uri) scopes
+    // downloads to the API key that created them — an unauthenticated fetch
+    // 401s here. Mirrors the same check already used in generation.worker.ts.
+    let isGeminiFilesHost = false;
+    try {
+      isGeminiFilesHost = new URL(fileUrl).hostname === 'generativelanguage.googleapis.com';
+    } catch {
+      // malformed URL — let the fetch below surface the real error
+    }
+    const res = await fetch(fileUrl, {
+      headers:
+        isGeminiFilesHost && process.env.GOOGLE_API_KEY
+          ? { 'x-goog-api-key': process.env.GOOGLE_API_KEY }
+          : undefined,
+      signal: AbortSignal.timeout(60_000),
+    });
     if (!res.ok) return fileUrl;
     const buf = Buffer.from(await res.arrayBuffer());
     const manifest = await getStorageManager().upload(buf, filename, mimeType, userId);
@@ -61,31 +80,23 @@ async function rehostUrl(
 
 // ── Schemas ───────────────────────────────────────────────────────────────
 
-// Live-confirmed against api.z.ai paas/v4 on 2026-04-26. The full menu of
-// chat models the keys can hit:
-//   glm-4.5-air, glm-4.5, glm-4.5v       — GLM-4.5 family + vision variant
-//   glm-4.6, glm-4.6v                     — GLM-4.6 + vision variant
-//   glm-4.7                               — GLM-4.7 (current devpack-tier flagship)
-//   glm-4-plus                            — GLM-4 Plus
-//   glm-zero-preview                      — early preview tier
-//   glm-5, glm-5-turbo, glm-5.1           — GLM-5 family (flagship reasoning)
-//   glm-5v-turbo                          — GLM-5 vision turbo
+// Switched from GLM ids to Gemini ids 2026-08-23 (Z.AI → Google swap). Short
+// ids match services/zai.ts's CHAT_MODEL_MAP, which resolves each to the
+// real Gemini API model string:
+//   gemini-3-1-flash-lite   — fastest / cheapest (preview)
+//   gemini-2-5-flash-lite   — budget, GA
+//   gemini-2-5-flash        — balanced (default)
+//   gemini-2-5-pro          — reasoning + vision, GA
+//   gemini-3-1-pro          — flagship reasoning (preview)
 const chatModelSchema = z
   .enum([
-    'glm-4.5-air',
-    'glm-4.5',
-    'glm-4.5v',
-    'glm-4.6',
-    'glm-4.6v',
-    'glm-4.7',
-    'glm-4-plus',
-    'glm-zero-preview',
-    'glm-5',
-    'glm-5-turbo',
-    'glm-5.1',
-    'glm-5v-turbo',
+    'gemini-3-1-flash-lite',
+    'gemini-2-5-flash-lite',
+    'gemini-2-5-flash',
+    'gemini-2-5-pro',
+    'gemini-3-1-pro',
   ])
-  .default('glm-4.7');
+  .default('gemini-2-5-flash');
 
 const messageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant']),
@@ -125,193 +136,198 @@ Rules:
 // ── Router ────────────────────────────────────────────────────────────────
 
 export const zaiRouter = router({
-  // Public health probe — does the platform have any Z.AI key configured?
+  // Public health probe — does the platform have any Google key configured?
   status: publicProcedure.query(() => ({
     platformKey: zaiService.isConfigured(),
   })),
 
   /**
-   * 0. Diagnostic — pings every Z.AI surface with a minimal payload and
-   *    captures pass/fail + a truncated raw sample so you can spot when
-   *    the live response shape differs from what we parse. No retries,
-   *    no caching — runs end-to-end on every invocation.
+   * 0. Diagnostic — pings every Google surface the Lab depends on with a
+   *    minimal payload and captures pass/fail + a truncated raw sample so
+   *    you can spot when the live response shape differs from what we
+   *    parse. No retries, no caching — runs end-to-end on every invocation.
+   *
+   *    Gated like the other mutations (was a bare protectedProcedure before
+   *    the Lab audit, 2026-08-23) — it fires 5 real paid calls per run,
+   *    including an image generation and a video submission, so it needs
+   *    the same permission + AI rate-limit tier as everything else here.
    *
    *    Notes on parallelism:
-   *    Each step is awaited sequentially so a 401 on the first call doesn't
-   *    rate-limit a fan-out across 6 endpoints simultaneously. Total budget
-   *    is ~8s (chat ~1s, image ~5s, video submit ~1s, search/reader ~1s each).
+   *    Each step is awaited sequentially so a failure on the first call
+   *    doesn't fan out across every endpoint simultaneously.
    */
-  diagnostic: protectedProcedure.mutation(async ({ ctx }) => {
-    const apiKey = await resolveKey(ctx.user.uid);
-    const platformConfigured = zaiService.isConfigured(apiKey);
-    const usingByok = !!apiKey;
+  diagnostic: expensiveProcedure
+    .use(requirePermission('generation.create'))
+    .mutation(async ({ ctx }) => {
+      const apiKey = await resolveKey(ctx.user.uid);
+      const platformConfigured = zaiService.isConfigured(apiKey);
+      const usingByok = !!apiKey;
 
-    type Step = {
-      name: string;
-      status: 'pass' | 'fail' | 'skip';
-      latencyMs: number;
-      detail?: string;
-      sample?: unknown;
-    };
-    const steps: Step[] = [];
-
-    async function run<T>(name: string, fn: () => Promise<T>, sampler?: (r: T) => unknown) {
-      const t0 = Date.now();
-      try {
-        const result = await fn();
-        steps.push({
-          name,
-          status: 'pass',
-          latencyMs: Date.now() - t0,
-          sample: sampler ? sampler(result) : truncateForLog(result),
-        });
-        return result;
-      } catch (err) {
-        steps.push({
-          name,
-          status: 'fail',
-          latencyMs: Date.now() - t0,
-          detail: err instanceof Error ? err.message : String(err),
-        });
-        return null;
-      }
-    }
-
-    if (!platformConfigured) {
-      return {
-        ok: false,
-        platformConfigured,
-        usingByok,
-        steps: [
-          {
-            name: 'config',
-            status: 'fail' as const,
-            latencyMs: 0,
-            detail:
-              'No Z.AI API key. Set ZAI_API_KEY in root .env or paste a key in /settings/api-keys.',
-          },
-        ],
+      type Step = {
+        name: string;
+        status: 'pass' | 'fail' | 'skip';
+        latencyMs: number;
+        detail?: string;
+        sample?: unknown;
       };
-    }
+      const steps: Step[] = [];
 
-    // 1. Chat — cheapest sanity check (GLM-4.5-Air, 4 tokens).
-    await run('chat (glm-4.5-air)', () =>
-      zaiService.chat({
-        apiKey,
-        model: 'glm-4.5-air',
-        messages: [{ role: 'user', content: 'ping' }],
-        maxTokens: 4,
-      })
-    );
+      async function run<T>(name: string, fn: () => Promise<T>, sampler?: (r: T) => unknown) {
+        const t0 = Date.now();
+        try {
+          const result = await fn();
+          steps.push({
+            name,
+            status: 'pass',
+            latencyMs: Date.now() - t0,
+            sample: sampler ? sampler(result) : truncateForLog(result),
+          });
+          return result;
+        } catch (err) {
+          steps.push({
+            name,
+            status: 'fail',
+            latencyMs: Date.now() - t0,
+            detail: err instanceof Error ? err.message : String(err),
+          });
+          return null;
+        }
+      }
 
-    // 2. Chat with structured JSON output — the worldbuilder's contract.
-    await run('chat json mode (glm-4.7)', () =>
-      zaiService.chatJson<{ ok: boolean }>({
-        apiKey,
-        model: 'glm-4.7',
-        maxTokens: 500,
-        messages: [
-          {
-            role: 'system',
-            content: 'Reply with strict JSON: {"ok": true}. JSON only.',
-          },
-          { role: 'user', content: 'go' },
-        ],
-      })
-    );
+      if (!platformConfigured) {
+        return {
+          ok: false,
+          platformConfigured,
+          usingByok,
+          steps: [
+            {
+              name: 'config',
+              status: 'fail' as const,
+              latencyMs: 0,
+              detail:
+                'No Google API key. Set GOOGLE_API_KEY in root .env or paste a key in /settings/api-keys.',
+            },
+          ],
+        };
+      }
 
-    // 3. Vision — uses a tiny public placeholder so failure means the
-    //    parameter contract changed, not that the image is bad.
-    await run('vision (glm-4.5v)', () =>
-      zaiService.vision({
-        apiKey,
-        model: 'glm-4.5v',
-        maxTokens: 80,
-        prompt: 'In one short sentence, describe what you see.',
-        imageUrls: ['https://placehold.co/256x256/png'],
-      })
-    );
-
-    // 4. Image generation — `glm-image` is the only id Z.AI's paas/v4
-    //    surface accepts; `cogview-*` returns code 1211. Smallest size.
-    await run(
-      'image (glm-image)',
-      () =>
-        zaiService.generateImage({
+      // 1. Chat — cheapest sanity check.
+      await run('chat (gemini-2.5-flash-lite)', () =>
+        zaiService.chat({
           apiKey,
-          prompt: 'a single red square on white background',
-          model: 'glm-image',
-          size: '1024x1024',
-        }),
-      (r) => ({
-        status: r.status,
-        imageCount: r.images.length,
-        firstUrl: r.images[0]?.url ? truncateString(r.images[0].url, 80) : null,
-        error: r.error ?? null,
-      })
-    );
+          model: 'gemini-2-5-flash-lite',
+          messages: [{ role: 'user', content: 'ping' }],
+          maxTokens: 4,
+        })
+      );
 
-    // 5. Video submit — fire-and-forget, returns task id only. Uses
-    //    `viduq1-text` (the only T2V model id Z.AI exposes; `cogvideox-*`
-    //    is rejected). 5s is the minimum supported duration.
-    await run(
-      'video submit (viduq1-text)',
-      () =>
-        zaiService.submitVideo({
+      // 2. Chat with structured JSON output — the worldbuilder's contract.
+      await run('chat json mode (gemini-2.5-flash)', () =>
+        zaiService.chatJson<{ ok: boolean }>({
           apiKey,
-          prompt: 'a single dot pulsing on a black background',
-          model: 'viduq1-text',
-          duration: 5,
-          aspectRatio: '1:1',
-        }),
-      (r) => ({ status: r.status, taskId: r.id, error: r.error ?? null })
-    );
+          model: 'gemini-2-5-flash',
+          maxTokens: 500,
+          messages: [
+            {
+              role: 'system',
+              content: 'Reply with strict JSON: {"ok": true}. JSON only.',
+            },
+            { role: 'user', content: 'go' },
+          ],
+        })
+      );
 
-    // 6. Web search.
-    await run(
-      'web search',
-      () => zaiService.webSearch({ apiKey, query: 'ping', count: 1 }),
-      (r) => ({
-        resultCount: r.results.length,
-        first: r.results[0]?.title?.slice(0, 80),
-      })
-    );
+      // 3. Vision — uses a tiny public placeholder so failure means the
+      //    parameter contract changed, not that the image is bad.
+      await run('vision (gemini-2.5-flash)', () =>
+        zaiService.vision({
+          apiKey,
+          model: 'gemini-2-5-flash',
+          maxTokens: 80,
+          prompt: 'In one short sentence, describe what you see.',
+          imageUrls: ['https://placehold.co/256x256/png'],
+        })
+      );
 
-    // 7. Web reader (uses example.com — known-stable target).
-    await run(
-      'web reader',
-      () => zaiService.webReader({ apiKey, url: 'https://example.com' }),
-      (r) => ({ contentLength: r.content.length, title: r.title })
-    );
+      // 4. Image generation — smallest size, default (Gemini image) model.
+      await run(
+        'image (nano-banana)',
+        () =>
+          zaiService.generateImage({
+            apiKey,
+            prompt: 'a single red square on white background',
+            model: 'nano-banana',
+            size: '1024x1024',
+          }),
+        (r) => ({
+          status: r.status,
+          imageCount: r.images.length,
+          firstUrl: r.images[0]?.url ? truncateString(r.images[0].url, 80) : null,
+          error: r.error ?? null,
+        })
+      );
 
-    // 8. ASR — requires an actual audio source so we mark it skipped
-    //    rather than fail when no public clip is configured. Set the env
-    //    var ZAI_DIAG_AUDIO_URL to a public mp3/wav to enable.
-    const diagAudioUrl = process.env.ZAI_DIAG_AUDIO_URL?.trim() || '';
-    if (diagAudioUrl) {
-      await run('asr (glm-asr)', () => zaiService.transcribe({ apiKey, url: diagAudioUrl }));
-    } else {
+      // 5. Video submit — fire-and-forget, returns the Veo operation id only.
+      //    4s is the shortest duration Veo 3.1 supports.
+      await run(
+        'video submit (veo-3.1-fast)',
+        () =>
+          zaiService.submitVideo({
+            apiKey,
+            prompt: 'a single dot pulsing on a black background',
+            model: 'veo-31-fast-preview-google',
+            duration: 4,
+            aspectRatio: '16:9',
+          }),
+        (r) => ({ status: r.status, taskId: r.id, error: r.error ?? null })
+      );
+
+      // 6. Web search — disabled since the Z.AI → Google swap (no Google
+      //    Search grounding wired up yet). Skip rather than fail.
       steps.push({
-        name: 'asr (glm-asr)',
+        name: 'web search',
         status: 'skip',
         latencyMs: 0,
-        detail: 'Set ZAI_DIAG_AUDIO_URL to a public mp3/wav URL to test transcription.',
+        detail: 'Web search is disabled — Google Search grounding is not wired up yet.',
       });
-    }
 
-    const passes = steps.filter((s) => s.status === 'pass').length;
-    const fails = steps.filter((s) => s.status === 'fail').length;
-    return {
-      ok: fails === 0,
-      platformConfigured,
-      usingByok,
-      summary: { total: steps.length, passes, fails },
-      steps,
-    };
-  }),
+      // 7. Web reader (uses example.com — known-stable target).
+      await run(
+        'web reader',
+        () => zaiService.webReader({ apiKey, url: 'https://example.com' }),
+        (r) => ({ contentLength: r.content.length, title: r.title })
+      );
+
+      // 8. ASR — requires an actual audio source so we mark it skipped
+      //    rather than fail when no public clip is configured. Set the env
+      //    var ZAI_DIAG_AUDIO_URL to a public mp3/wav to enable.
+      const diagAudioUrl = process.env.ZAI_DIAG_AUDIO_URL?.trim() || '';
+      if (diagAudioUrl) {
+        await run('asr (gemini-2.5-flash)', () =>
+          zaiService.transcribe({ apiKey, url: diagAudioUrl })
+        );
+      } else {
+        steps.push({
+          name: 'asr (gemini-2.5-flash)',
+          status: 'skip',
+          latencyMs: 0,
+          detail: 'Set ZAI_DIAG_AUDIO_URL to a public mp3/wav URL to test transcription.',
+        });
+      }
+
+      const passes = steps.filter((s) => s.status === 'pass').length;
+      const fails = steps.filter((s) => s.status === 'fail').length;
+      return {
+        ok: fails === 0,
+        platformConfigured,
+        usingByok,
+        summary: { total: steps.length, passes, fails },
+        steps,
+      };
+    }),
 
   /**
-   * 1. Generic chat — full GLM-5.x access. Powers the lab page and any
+   * 1. Generic chat — full Gemini access. Powers the lab page and any
    *    downstream agent surface that wants raw model access.
    */
   chat: protectedProcedure
@@ -361,7 +377,7 @@ export const zaiRouter = router({
 
       const { data, reasoningContent } = await zaiService.chatJson<WorldbuildBundle>({
         apiKey,
-        model: input.model ?? 'glm-4.7',
+        model: input.model ?? 'gemini-2-5-flash',
         temperature: 0.85,
         maxTokens: 4000,
         messages: [
@@ -375,7 +391,7 @@ export const zaiRouter = router({
       if (filtered.length === 0) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: 'Z.AI returned an empty or invalid worldbuild bundle',
+          message: 'Gemini returned an empty or invalid worldbuild bundle',
         });
       }
 
@@ -416,8 +432,8 @@ export const zaiRouter = router({
     }),
 
   /**
-   * 3. Seed-from-URL — Web Reader fetches a page, GLM-4.6 turns it into an
-   *    entity bundle. "Wikipedia article → playable Universe in one click."
+   * 3. Seed-from-URL — the local Web Reader fetches a page, Gemini turns it
+   *    into an entity bundle. "Wikipedia article → playable Universe in one click."
    */
   seedFromUrl: expensiveProcedure
     .use(requirePermission('entities.create'))
@@ -435,13 +451,13 @@ export const zaiRouter = router({
       if (!reader.content) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: `Z.AI Web Reader could not extract content from ${input.url}`,
+          message: `Web Reader could not extract content from ${input.url}`,
         });
       }
 
       const { data } = await zaiService.chatJson<WorldbuildBundle>({
         apiKey,
-        model: input.model ?? 'glm-4.7',
+        model: input.model ?? 'gemini-2-5-flash',
         temperature: 0.7,
         maxTokens: 4000,
         messages: [
@@ -513,15 +529,15 @@ export const zaiRouter = router({
     }),
 
   /**
-   * 5. Generate image (CogView-4 / GLM-Image), rehosted on the LOAR
-   *    storage stack so judges see canonical loar.fun URLs in the gallery.
+   * 5. Generate image (Gemini image / Imagen 4), rehosted on the LOAR
+   *    storage stack so it gets a canonical loar.fun URL in the gallery.
    */
   generateImage: expensiveProcedure
     .use(requirePermission('generation.create'))
     .input(
       z.object({
         prompt: z.string().min(2).max(2000),
-        model: z.enum(['glm-image']).default('glm-image'),
+        model: z.enum(['nano-banana', 'imagen-4', 'imagen-4-fast']).default('nano-banana'),
         size: z.string().optional(),
         n: z.number().int().min(1).max(4).optional(),
         imageUrl: z.string().url().optional(),
@@ -543,7 +559,7 @@ export const zaiRouter = router({
       if (result.status !== 'completed' || result.images.length === 0) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: result.error ?? 'Z.AI image generation failed',
+          message: result.error ?? 'Image generation failed',
         });
       }
 
@@ -566,16 +582,22 @@ export const zaiRouter = router({
     }),
 
   /**
-   * 6. Generate video (CogVideoX-3 / Vidu Q1). Long-running — polled inside
-   *    the service. Output is rehosted via StorageManager so it lives on
-   *    Pinata/Lighthouse alongside every other generation.
+   * 6. Generate video (Veo 3.1, Google-Direct). Long-running — polled
+   *    inside the service. Output is rehosted via StorageManager so it
+   *    lives on Pinata/Lighthouse alongside every other generation.
    */
   generateVideo: expensiveProcedure
     .use(requirePermission('generation.create'))
     .input(
       z.object({
         prompt: z.string().min(2).max(2000),
-        model: z.enum(['viduq1-text', 'viduq1-image', 'cogvideox-3']).default('viduq1-text'),
+        model: z
+          .enum([
+            'veo-31-fast-preview-google',
+            'veo-31-preview-google',
+            'veo-31-lite-preview-google',
+          ])
+          .default('veo-31-fast-preview-google'),
         imageUrl: z.string().url().optional(),
         endImageUrl: z.string().url().optional(),
         duration: z.number().int().min(2).max(15).optional(),
@@ -605,7 +627,7 @@ export const zaiRouter = router({
       if (result.status !== 'completed' || !result.videoUrl) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: result.error ?? 'Z.AI video generation failed',
+          message: result.error ?? 'Video generation failed',
         });
       }
 
@@ -637,7 +659,13 @@ export const zaiRouter = router({
     .input(
       z.object({
         prompt: z.string().min(2).max(2000),
-        model: z.enum(['viduq1-text', 'viduq1-image', 'cogvideox-3']).default('viduq1-text'),
+        model: z
+          .enum([
+            'veo-31-fast-preview-google',
+            'veo-31-preview-google',
+            'veo-31-lite-preview-google',
+          ])
+          .default('veo-31-fast-preview-google'),
         imageUrl: z.string().url().optional(),
         endImageUrl: z.string().url().optional(),
         duration: z.number().int().min(2).max(15).optional(),
@@ -657,7 +685,7 @@ export const zaiRouter = router({
       if (submitted.status === 'failed' || !submitted.id) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: submitted.error ?? 'Z.AI did not return a task id',
+          message: submitted.error ?? 'Veo did not return a task id',
         });
       }
       if (firebaseAvailable) {
@@ -686,9 +714,9 @@ export const zaiRouter = router({
     }),
 
   /**
-   * 6c. Job poller. Live-checks Z.AI when the cached row is still pending,
-   *     rehosts the resulting video on LOAR storage on first completion, and
-   *     caches everything in Firestore so refreshes are free.
+   * 6c. Job poller. Live-checks the Veo operation when the cached row is
+   *     still pending, rehosts the resulting video on LOAR storage on first
+   *     completion, and caches everything in Firestore so refreshes are free.
    */
   videoJob: protectedProcedure
     .input(z.object({ taskId: z.string().min(4) }))
@@ -701,7 +729,7 @@ export const zaiRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your job' });
       }
 
-      // Terminal cached states short-circuit — no Z.AI roundtrip.
+      // Terminal cached states short-circuit — no Veo roundtrip.
       if (cached && (cached.status === 'completed' || cached.status === 'failed')) {
         return cached as Record<string, unknown>;
       }
@@ -746,7 +774,7 @@ export const zaiRouter = router({
     }),
 
   /**
-   * 6d. List the caller's recent Z.AI video jobs (most recent first).
+   * 6d. List the caller's recent video jobs (most recent first).
    */
   listVideoJobs: protectedProcedure
     .input(z.object({ limit: z.number().int().min(1).max(50).default(20) }))
@@ -762,7 +790,7 @@ export const zaiRouter = router({
     }),
 
   /**
-   * 7. Talking scene via CogVideoX — alternative to ByteDance OmniHuman.
+   * 7. Talking scene via Veo — alternative to ByteDance OmniHuman.
    *    Pass an actor portrait + line of dialogue, get a talking video back.
    *    The motion-prompt phrasing is curated for lip-sync-friendly output.
    */
@@ -787,10 +815,10 @@ export const zaiRouter = router({
       const result = await zaiService.generateVideo({
         apiKey,
         prompt: motionPrompt,
-        // viduq1-image is image-conditioned (we always pass actorImageUrl).
-        // viduq1 doesn't currently expose inline audio — talkingScene voice
-        // can be layered post-hoc via the existing lipsync/elevenlabs flow.
-        model: 'viduq1-image',
+        // Veo doesn't expose inline audio on the Google-Direct surface —
+        // talkingScene voice can be layered post-hoc via the existing
+        // lipsync/elevenlabs flow, same as before the Z.AI → Google swap.
+        model: 'veo-31-fast-preview-google',
         imageUrl: input.actorImageUrl,
         duration: input.duration,
         aspectRatio: input.aspectRatio,
@@ -800,7 +828,7 @@ export const zaiRouter = router({
       if (result.status !== 'completed' || !result.videoUrl) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: result.error ?? 'Z.AI talking-scene generation failed',
+          message: result.error ?? 'Talking-scene generation failed',
         });
       }
 
@@ -836,7 +864,7 @@ export const zaiRouter = router({
       const apiKey = await resolveKey(ctx.user.uid);
       const result = await zaiService.vision({
         apiKey,
-        model: 'glm-4.5v',
+        model: 'gemini-2-5-pro',
         maxTokens: 1200,
         prompt: `You are LOAR's canon consistency reviewer for the universe "${input.universeName}".
 
@@ -894,7 +922,7 @@ Output JSON only.`,
         return {
           skipped: true as const,
           reason:
-            'Canon check skipped — Z.AI not configured, no playable first clip, or thumbnail extraction failed.',
+            'Canon check skipped — Google API key not configured, no playable first clip, or thumbnail extraction failed.',
         };
       }
       return { skipped: false as const, ...result };
@@ -926,7 +954,7 @@ Output JSON only.`,
         charterAlignment: string;
       }>({
         apiKey,
-        model: 'glm-4.7',
+        model: 'gemini-2-5-pro',
         temperature: 0.4,
         maxTokens: 1200,
         thinking: true,
@@ -946,7 +974,8 @@ Output JSON only.`,
     }),
 
   /**
-   * 10. Transcribe — GLM-ASR for voice memos and uploaded clips.
+   * 10. Transcribe — Gemini multimodal transcription for voice memos and
+   *     uploaded clips.
    */
   transcribe: protectedProcedure
     .input(
@@ -973,10 +1002,10 @@ Output JSON only.`,
     }),
 
   /**
-   * 11. Episode-from-voice — voice memo → ASR → GLM-4.6 → structured
-   *     episode draft (title, logline, scene list, dialogue). Mobile-first
-   *     creator flow: tap-and-hold to record an idea, ship a fully formed
-   *     episode skeleton.
+   * 11. Episode-from-voice — voice memo → ASR → Gemini → structured episode
+   *     draft (title, logline, scene list, dialogue). Mobile-first creator
+   *     flow: tap-and-hold to record an idea, ship a fully formed episode
+   *     skeleton.
    */
   episodeFromVoice: expensiveProcedure
     .use(requirePermission('generation.create'))
@@ -1007,7 +1036,7 @@ Output JSON only.`,
       if (!transcript.text) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: 'Empty transcript from Z.AI ASR',
+          message: 'Empty transcript from Gemini ASR',
         });
       }
 
@@ -1018,7 +1047,7 @@ Output JSON only.`,
         scenes: Array<{ heading: string; action: string; dialogue?: string }>;
       }>({
         apiKey,
-        model: 'glm-4.7',
+        model: 'gemini-2-5-flash',
         temperature: 0.7,
         maxTokens: 2000,
         messages: [
@@ -1110,7 +1139,7 @@ Rules:
       }`;
 
       const t0 = Date.now();
-      const model = input.model ?? 'glm-4.7';
+      const model = input.model ?? 'gemini-2-5-flash';
       let data: {
         title: string;
         logline: string;

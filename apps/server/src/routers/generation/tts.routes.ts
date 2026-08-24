@@ -16,6 +16,7 @@ import { dispatchTts, getVisibleTtsModels, getTtsModelById } from '../../service
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { withReservation } from '../../services/credits';
 import { TRPCError } from '@trpc/server';
+import { getByokProviderSet, computeModelUsability } from '../../services/provider-keys';
 
 export interface TtsSynthesizeOutput {
   modelId: string;
@@ -49,7 +50,8 @@ const synthesizeSchema = z.object({
 
 export const ttsRouter = router({
   // ── Discoverable model list (public — no key required to browse) ────
-  listModels: publicProcedure.query(() => {
+  listModels: publicProcedure.query(async ({ ctx }) => {
+    const byokProviders = await getByokProviderSet(ctx.user?.uid);
     return getVisibleTtsModels().map((m) => ({
       id: m.id,
       provider: m.provider,
@@ -71,6 +73,7 @@ export const ttsRouter = router({
       creditCostPer1kChars: m.creditCostPer1kChars,
       tags: m.tags,
       bestFor: m.bestFor,
+      ...computeModelUsability(m.provider, byokProviders, m.serverPoolAvailable),
     }));
   }),
 

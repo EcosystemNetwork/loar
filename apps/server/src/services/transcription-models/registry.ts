@@ -461,6 +461,9 @@ export const TRANSCRIPTION_MODELS: TranscriptionModelConfig[] = [
   // ── Z.AI ──────────────────────────────────────────────────────────────
   {
     id: 'glm-asr-2512-zai',
+    // DISABLED 2026-08-23: Z.AI (Zhipu) platform credits exhausted — the
+    // Lab feature audit + Z.AI -> Google swap left this model unreachable.
+    // Re-enable once ZAI_API_KEY has credits again; see services/zai.ts.
     provider: 'zai',
     displayName: 'GLM-ASR 2512 (Z.AI)',
     shortDescription:
@@ -479,7 +482,7 @@ export const TRANSCRIPTION_MODELS: TranscriptionModelConfig[] = [
     loarPriceUsdPerMinute: withLoarMargin(0.002),
     creditCostPerMinute: usdToCredits(withFiatMargin(0.002)),
     lastVerified: '2026-05-17',
-    isEnabled: true,
+    isEnabled: false,
     isVisibleToUsers: true,
     allowedPlans: [],
     serverPoolAvailable: true,

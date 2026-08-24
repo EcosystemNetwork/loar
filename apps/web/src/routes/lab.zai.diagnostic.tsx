@@ -1,9 +1,9 @@
 /**
- * /lab/zai/diagnostic — Z.AI endpoint smoke harness.
+ * /lab/zai/diagnostic — Google model endpoint smoke harness.
  *
- * Pings every Z.AI surface with a tiny payload and reports pass/fail +
- * truncated raw response sample so you can spot when the live response
- * shape differs from what the adapter parses.
+ * Pings every Google surface the Lab depends on with a tiny payload and
+ * reports pass/fail + truncated raw response sample so you can spot when
+ * the live response shape differs from what the adapter parses.
  */
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useMutation } from '@tanstack/react-query';
@@ -43,7 +43,7 @@ function ZaiDiagnosticPage() {
   if (!address) {
     return (
       <div className="container mx-auto max-w-2xl px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold">Z.AI Diagnostic</h1>
+        <h1 className="text-2xl font-bold">Model Lab Diagnostic</h1>
         <p className="text-muted-foreground mt-2">Connect a wallet to run the smoke harness.</p>
       </div>
     );
@@ -80,9 +80,9 @@ function ZaiDiagnosticPage() {
             )}
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Pings every Z.AI surface with a minimal payload. Failures surface the live error message
-            and a truncated response sample — match that against the parser in{' '}
-            <code className="text-xs">services/zai.ts</code> if anything's red.
+            Pings every Google surface the Lab depends on with a minimal payload. Failures surface
+            the live error message and a truncated response sample — match that against the parser
+            in <code className="text-xs">services/zai.ts</code> if anything's red.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">

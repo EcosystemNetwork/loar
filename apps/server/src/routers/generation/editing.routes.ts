@@ -34,6 +34,7 @@ import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/
 import { assertEditSourceAuthorized } from '../../lib/edit-source-authz';
 import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 import { withReservation } from '../../services/credits';
+import { getByokProviderSet, computeModelUsability } from '../../services/provider-keys';
 
 // Prompt length caps. Kept tight (≤500) because these strings are forwarded to
 // Flux/FAL/Google where unbounded input drives GPU memory and provider cost.
@@ -206,10 +207,12 @@ export const editingRouter = router({
   /** List available editing models, optionally filtered by operation */
   listModels: protectedProcedure
     .input(z.object({ operation: operationSchema.optional() }).optional())
-    .query(({ input }) => {
+    .query(async ({ input, ctx }) => {
+      const byokProviders = await getByokProviderSet(ctx.user.uid);
       if (input?.operation) {
         return getEditingModelsForOperation(input.operation).map((m) => ({
           id: m.id,
+          provider: m.provider,
           operation: m.operation,
           displayName: m.displayName,
           shortDescription: m.shortDescription,
@@ -221,10 +224,12 @@ export const editingRouter = router({
           supportsImage: m.supportsImage,
           tags: m.tags,
           bestFor: m.bestFor,
+          ...computeModelUsability(m.provider, byokProviders),
         }));
       }
       return getEnabledEditingModels().map((m) => ({
         id: m.id,
+        provider: m.provider,
         operation: m.operation,
         displayName: m.displayName,
         shortDescription: m.shortDescription,
@@ -236,6 +241,7 @@ export const editingRouter = router({
         supportsImage: m.supportsImage,
         tags: m.tags,
         bestFor: m.bestFor,
+        ...computeModelUsability(m.provider, byokProviders),
       }));
     }),
 

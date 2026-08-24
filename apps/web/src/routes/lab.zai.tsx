@@ -1,16 +1,18 @@
 /**
- * /lab/zai — Z.AI integration playground.
+ * /lab/zai — Google model playground (was a Z.AI devpack integration until
+ * Z.AI credits ran out, 2026-08-23 — the tRPC namespace stayed `zai.*` so
+ * nothing outside this file and its router needed to change).
  *
- * Single-page demo of every Z.AI surface wired into LOAR:
- *   • Worldbuild from prompt        (GLM-4.6 + structured output)
- *   • Worldbuild from URL            (Web Reader → entities)
- *   • Web Search                     (research panel)
- *   • CogView-4 image generation
- *   • Vidu Q1 video generation
+ * Single-page demo of every Google surface wired into LOAR:
+ *   • Worldbuild from prompt        (Gemini + structured output)
+ *   • Worldbuild from URL            (local Web Reader → entities)
+ *   • Web Search                     (disabled — no Google Search grounding yet)
+ *   • Gemini / Imagen 4 image generation
+ *   • Veo 3.1 video generation
  *   • Talking-scene (image + line)
  *   • Canon consistency vision check
  *   • Governance agent
- *   • Voice → episode draft (ASR)
+ *   • Voice → episode draft (Gemini transcription)
  */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
@@ -56,9 +58,9 @@ import {
 } from '@/components/zai/script-compare';
 
 const VIDEO_MODELS = [
-  { id: 'viduq1-text', label: 'Vidu Q1 — text→video (fast)' },
-  { id: 'viduq1-image', label: 'Vidu Q1 — image→video' },
-  { id: 'cogvideox-3', label: 'CogVideoX-3 — premium (audio + 1080p)' },
+  { id: 'veo-31-fast-preview-google', label: 'Veo 3.1 Fast — cheaper preview tier' },
+  { id: 'veo-31-preview-google', label: 'Veo 3.1 — premium (up to 4K)' },
+  { id: 'veo-31-lite-preview-google', label: 'Veo 3.1 Lite — cheapest tier' },
 ] as const;
 type VideoModelId = (typeof VIDEO_MODELS)[number]['id'];
 
@@ -93,9 +95,8 @@ function ZaiLabPage() {
             Model Lab
           </h1>
           <p className="text-muted-foreground text-sm mt-2 max-w-2xl">
-            The full Z.AI devpack wired into LOAR — GLM-4.7 reasoning (with live chain-of-thought),
-            GLM-5V vision, GLM-Image stills, Vidu Q1 motion, GLM-ASR speech, and Web Search / Web
-            Reader. BYOK from{' '}
+            Google's model stack wired into LOAR — Gemini reasoning (with live chain-of-thought),
+            Gemini vision, Gemini / Imagen 4 stills, Veo 3.1 motion, Gemini transcription. BYOK from{' '}
             <a className="underline" href="/settings/api-keys">
               /settings/api-keys
             </a>
@@ -117,7 +118,7 @@ function ZaiLabPage() {
             Diagnostic →
           </a>
           <a
-            href="https://docs.z.ai/llms.txt"
+            href="https://ai.google.dev/gemini-api/docs"
             target="_blank"
             rel="noopener noreferrer"
             className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
@@ -145,7 +146,7 @@ function ZaiLabPage() {
             <Globe className="h-3.5 w-3.5 mr-1" />
             From URL
           </TabsTrigger>
-          <TabsTrigger value="search">
+          <TabsTrigger value="search" disabled className="opacity-50 cursor-not-allowed">
             <Search className="h-3.5 w-3.5 mr-1" />
             Search
           </TabsTrigger>
@@ -207,9 +208,9 @@ function ZaiLabPage() {
 }
 
 // ── Reasoning stream ──────────────────────────────────────────────────
-// Reveals GLM's chain-of-thought as a typewriter so judges can watch the
-// model think. Z.AI is one of the few providers that exposes
-// `reasoning_content` — most LLM APIs hide it. This is the demo centerpiece.
+// Reveals Gemini's chain-of-thought as a typewriter so judges can watch the
+// model think, via `thinkingConfig.includeThoughts` — most LLM APIs hide
+// this. This is the demo centerpiece.
 
 function ReasoningStream({ text, model }: { text: string; model: string }) {
   const [shown, setShown] = useState(0);
@@ -253,7 +254,7 @@ function WorldbuildCard() {
     'A neon-noir city built on the back of a sleeping leviathan, where rain is currency.'
   );
   const [persist, setPersist] = useState(true);
-  const [model, setModel] = useState<ChatModelId>('glm-4.7');
+  const [model, setModel] = useState<ChatModelId>('gemini-2-5-pro');
 
   const mut = useMutation({
     mutationFn: () => trpcClient.zai.worldbuild.mutate({ prompt, persist, model }),
@@ -266,7 +267,7 @@ function WorldbuildCard() {
       <CardHeader>
         <CardTitle>Worldbuild from prompt</CardTitle>
         <p className="text-sm text-muted-foreground">
-          GLM-4.7 streams its reasoning live, then returns a typed JSON bundle (universe + 6–12
+          Gemini streams its reasoning live, then returns a typed JSON bundle (universe + 6–12
           entities) that auto-populates the worldbuilding wiki. Switch models to compare reasoning
           depth vs latency.
         </p>
@@ -310,8 +311,8 @@ function WorldbuildCard() {
               <ReasoningStream text={mut.data.reasoning} model={model} />
             ) : (
               <div className="rounded border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-amber-200">
-                {model} did not surface chain-of-thought. Try GLM-4.7 or GLM-5.1 to see live model
-                reasoning.
+                {model} did not surface chain-of-thought. Try Gemini 2.5 Pro or Gemini 3.1 Pro to
+                see live model reasoning.
               </div>
             )}
             <div>
@@ -365,7 +366,7 @@ function SeedFromUrlCard() {
       <CardHeader>
         <CardTitle>Seed from URL</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Z.AI Web Reader fetches the page, GLM-4.6 turns it into a worldbuild bundle.
+          The built-in Web Reader fetches the page, Gemini turns it into a worldbuild bundle.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -394,17 +395,17 @@ function SearchCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Web Search</CardTitle>
+        <CardTitle>Web Search — unavailable</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Z.AI's purpose-built search engine for LLMs. Surface real-world facts inside a creator's
-          worldbuilding flow.
+          Z.AI's search tool went away with the Google swap, and Gemini's Google Search grounding
+          isn't wired up here yet. Coming back once it is.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex gap-2">
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} />
-          <Button onClick={() => mut.mutate()} disabled={mut.isPending}>
-            {mut.isPending ? 'Searching…' : 'Search'}
+          <Input value={query} onChange={(e) => setQuery(e.target.value)} disabled />
+          <Button onClick={() => mut.mutate()} disabled>
+            Search
           </Button>
         </div>
         <div className="space-y-2">
@@ -427,7 +428,7 @@ function SearchCard() {
   );
 }
 
-// ── Image (CogView-4) ─────────────────────────────────────────────────
+// ── Image (Gemini / Imagen 4) ───────────────────────────────────────────
 
 function ImageCard() {
   const [prompt, setPrompt] = useState(
@@ -437,7 +438,7 @@ function ImageCard() {
     mutationFn: () =>
       trpcClient.zai.generateImage.mutate({
         prompt,
-        model: 'glm-image',
+        model: 'nano-banana',
         size: '1024x1024',
         rehost: true,
       }),
@@ -446,7 +447,7 @@ function ImageCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Image (GLM-Image)</CardTitle>
+        <CardTitle>Image (Gemini / Nano Banana)</CardTitle>
         <p className="text-sm text-muted-foreground">
           Generates and rehosts on the LOAR storage stack (Pinata / Lighthouse) for canonical URLs.
         </p>
@@ -468,7 +469,7 @@ function ImageCard() {
   );
 }
 
-// ── Video (Vidu Q1) ───────────────────────────────────────────────
+// ── Video (Veo 3.1) ────────────────────────────────────────────────
 
 function VideoCard() {
   const navigate = useNavigate();
@@ -476,12 +477,12 @@ function VideoCard() {
     'Aerial shot of a city of glass towers parting like water as a leviathan rises beneath'
   );
   const [imageUrl, setImageUrl] = useState('');
-  // Default: smart-pick based on whether an image is supplied. User can
-  // override to force CogVideoX-3 (premium tier with audio).
+  // Veo's fast preview tier handles both text→video and image→video with the
+  // same model id, so "auto" just means "fast tier" — user can still
+  // override to the premium (4K) or lite (cheapest) tier below.
   const [model, setModel] = useState<VideoModelId | 'auto'>('auto');
 
-  const resolvedModel: VideoModelId =
-    model === 'auto' ? (imageUrl ? 'viduq1-image' : 'viduq1-text') : model;
+  const resolvedModel: VideoModelId = model === 'auto' ? 'veo-31-fast-preview-google' : model;
 
   const start = useMutation({
     mutationFn: () =>
@@ -490,7 +491,7 @@ function VideoCard() {
         model: resolvedModel,
         imageUrl: imageUrl || undefined,
         aspectRatio: '16:9',
-        duration: 5,
+        duration: 6,
       }),
     onSuccess: (res) => {
       toast.success('Job submitted — watching for completion');
@@ -508,7 +509,7 @@ function VideoCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Video (Vidu Q1)</CardTitle>
+        <CardTitle>Video (Veo 3.1)</CardTitle>
         <p className="text-sm text-muted-foreground">
           Long-running async render. Submit kicks off the job and routes to a poller page that
           survives refreshes — Firestore caches every state transition.
@@ -528,9 +529,7 @@ function VideoCard() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="auto">
-                Auto — picks Vidu Q1 (text or image based on input)
-              </SelectItem>
+              <SelectItem value="auto">Auto — Veo 3.1 Fast</SelectItem>
               {VIDEO_MODELS.map((m) => (
                 <SelectItem key={m.id} value={m.id}>
                   {m.label}
@@ -609,7 +608,7 @@ function CanonCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Canon consistency check (GLM-5V)</CardTitle>
+        <CardTitle>Canon consistency check (Gemini 2.5 Pro)</CardTitle>
         <p className="text-sm text-muted-foreground">
           Vision model scores frames against a universe's lore. Wire into the publish-to-canon
           gesture as a soft gate.
@@ -684,7 +683,7 @@ function GovernanceCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>DAO Governance Agent (GLM-4.6 + thinking)</CardTitle>
+        <CardTitle>DAO Governance Agent (Gemini 2.5 Pro + thinking)</CardTitle>
         <p className="text-sm text-muted-foreground">
           Track 4 demo: agent reads a proposal + universe charter, returns a recommended vote with
           rationale and risks.
@@ -753,7 +752,7 @@ function VoiceCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Voice → episode draft (GLM-ASR + GLM-4.6)</CardTitle>
+        <CardTitle>Voice → episode draft (Gemini transcription + Gemini 2.5)</CardTitle>
         <p className="text-sm text-muted-foreground">
           Drop a voice memo URL — the server transcribes it and turns it into a structured episode
           draft (title, logline, scene list).

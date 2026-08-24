@@ -7,3 +7,4 @@ export {
   NoKeyAvailableError,
   type ResolvedKey,
 } from './dispatcher';
+export { getByokProviderSet, computeModelUsability, type ModelUsability } from './usability';

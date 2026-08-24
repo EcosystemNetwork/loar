@@ -453,6 +453,18 @@ export function FlowCreationPanel({
     'image-to-video': 'Image to Video',
   };
 
+  // Platform only has server credit for Google-based models right now.
+  // Non-Google models still work if the user brings their own provider key
+  // (see Settings → API Keys) — this just flags the default/no-BYOK state.
+  const comingSoonVideoModels = new Set([
+    'seedance',
+    'seedance-fast',
+    'fal-veo3',
+    'fal-kling',
+    'fal-wan25',
+    'fal-sora',
+  ]);
+
   return (
     <>
       {/* Quick Character Creation Dialog */}
@@ -698,19 +710,35 @@ export function FlowCreationPanel({
                     'fal-wan25',
                     'fal-sora',
                   ] as const
-                ).map((model) => (
-                  <button
-                    key={model}
-                    onClick={() => setSelectedVideoModel(model)}
-                    className={`px-3 py-2 text-sm rounded-md border transition-colors text-left ${
-                      selectedVideoModel === model
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-input bg-background hover:bg-muted'
-                    }`}
-                  >
-                    {modelNames[model]}
-                  </button>
-                ))}
+                ).map((model) => {
+                  const comingSoon = comingSoonVideoModels.has(model);
+                  return (
+                    <button
+                      key={model}
+                      onClick={() => !comingSoon && setSelectedVideoModel(model)}
+                      disabled={comingSoon}
+                      title={
+                        comingSoon
+                          ? 'Coming soon — add your own provider API key in Settings to use this model now'
+                          : undefined
+                      }
+                      className={`px-3 py-2 text-sm rounded-md border transition-colors text-left flex items-center justify-between gap-2 ${
+                        comingSoon
+                          ? 'border-input bg-background opacity-50 cursor-not-allowed'
+                          : selectedVideoModel === model
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-input bg-background hover:bg-muted'
+                      }`}
+                    >
+                      <span>{modelNames[model]}</span>
+                      {comingSoon && (
+                        <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full font-medium">
+                          Soon
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

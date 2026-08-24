@@ -925,6 +925,9 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
   // rejected (1211 / 1214).
   {
     id: 'viduq1-t2v',
+    // DISABLED 2026-08-23: Z.AI (Zhipu) platform credits exhausted — the
+    // Lab feature audit + Z.AI -> Google swap left this model unreachable.
+    // Re-enable once ZAI_API_KEY has credits again; see services/zai.ts.
     provider: 'zai',
     displayName: 'Vidu Q1 (Z.AI)',
     shortDescription: 'Z.AI text-to-video — Vidu Q1 standard quality',
@@ -945,7 +948,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     providerCostUsd: 0.16,
     fiatPriceUsd: withFiatMargin(0.16),
     loarPriceUsd: withLoarMargin(0.16),
-    isEnabled: true,
+    isEnabled: false,
     isVisibleToUsers: true,
     allowedPlans: [],
     tags: ['standard', 'zai', 'vidu'],
@@ -953,6 +956,9 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
   },
   {
     id: 'viduq1-i2v',
+    // DISABLED 2026-08-23: Z.AI (Zhipu) platform credits exhausted — the
+    // Lab feature audit + Z.AI -> Google swap left this model unreachable.
+    // Re-enable once ZAI_API_KEY has credits again; see services/zai.ts.
     provider: 'zai',
     displayName: 'Vidu Q1 (image-to-video, Z.AI)',
     shortDescription: 'Z.AI image-conditioned video — preserves the source frame',
@@ -973,7 +979,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     providerCostUsd: 0.18,
     fiatPriceUsd: withFiatMargin(0.18),
     loarPriceUsd: withLoarMargin(0.18),
-    isEnabled: true,
+    isEnabled: false,
     isVisibleToUsers: true,
     allowedPlans: [],
     tags: ['standard', 'zai', 'vidu', 'image-animation'],
@@ -981,6 +987,9 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
   },
   {
     id: 'cogvideox-3',
+    // DISABLED 2026-08-23: Z.AI (Zhipu) platform credits exhausted — the
+    // Lab feature audit + Z.AI -> Google swap left this model unreachable.
+    // Re-enable once ZAI_API_KEY has credits again; see services/zai.ts.
     provider: 'zai',
     displayName: 'CogVideoX-3 (Z.AI)',
     shortDescription: 'Z.AI premium video — cinematic motion + inline audio support',
@@ -1001,7 +1010,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     providerCostUsd: 0.22,
     fiatPriceUsd: withFiatMargin(0.22),
     loarPriceUsd: withLoarMargin(0.22),
-    isEnabled: true,
+    isEnabled: false,
     isVisibleToUsers: true,
     allowedPlans: [],
     tags: ['premium', 'zai', 'cogvideox', 'audio', '4k'],
@@ -1009,6 +1018,9 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
   },
   {
     id: 'cogvideox-flash',
+    // DISABLED 2026-08-23: Z.AI (Zhipu) platform credits exhausted — the
+    // Lab feature audit + Z.AI -> Google swap left this model unreachable.
+    // Re-enable once ZAI_API_KEY has credits again; see services/zai.ts.
     provider: 'zai',
     displayName: 'CogVideoX Flash (Z.AI)',
     shortDescription: 'Free tier — fast previews via Z.AI',
@@ -1029,7 +1041,7 @@ export const VIDEO_MODELS: VideoModelConfig[] = [
     providerCostUsd: 0,
     fiatPriceUsd: 0,
     loarPriceUsd: 0,
-    isEnabled: true,
+    isEnabled: false,
     isVisibleToUsers: true,
     allowedPlans: [],
     tags: ['draft', 'zai', 'cogvideox', 'flash', 'free'],

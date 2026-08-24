@@ -169,7 +169,10 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
       era: (form as any).eraSetting || (form as any).era,
       stylePrompt: form.stylePrompt,
       negativePrompt: form.negativePrompt,
-      referenceImages: form.referenceImages,
+      // "Add Reference Image" inserts an empty slot for the user to fill in;
+      // the server requires every entry to be a valid URL, so an unfilled
+      // slot would reject the whole save. Only send the ones actually set.
+      referenceImages: form.referenceImages.filter((url) => url.trim().length > 0),
       aspectRatio: (form as any).defaultAspectRatio || (form as any).aspectRatio,
       locked: form.locked,
     });

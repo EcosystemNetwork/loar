@@ -97,7 +97,7 @@ async function main() {
 
   const work: Array<{
     contentDoc: FirebaseFirestore.QueryDocumentSnapshot;
-    vgDoc: FirebaseFirestore.QueryDocumentSnapshot;
+    sourceUrl: string;
   }> = [];
 
   for (const uni of targets) {
@@ -112,17 +112,37 @@ async function main() {
       const genId = String(c.generationId || '').split(':')[0];
       if (!genId) continue;
 
+      // Google-direct Veo stores the raw Gemini long-running-operation name
+      // here (e.g. "models/veo-3.1-generate-preview/operations/xyz"), not a
+      // flat videoGenerations doc id — `.doc()` rejects it (even segment
+      // count) since it isn't a Firestore path at all. The mirror-to-storage
+      // step already fell through for these, so mediaUrl itself is the raw
+      // ephemeral provider URL — use it directly instead of looking up a
+      // videoGenerations record that was never keyed by this id.
+      if (genId.includes('/')) {
+        if (c.mediaUrl) work.push({ contentDoc: cDoc, sourceUrl: c.mediaUrl });
+        else counts.noGenRecord++;
+        continue;
+      }
+
       // Lookup videoGenerations by document id
       const vg = await db.collection('videoGenerations').doc(genId).get();
       if (!vg.exists) {
         counts.noGenRecord++;
         continue;
       }
-      work.push({ contentDoc: cDoc, vgDoc: vg });
+      // Prefer permanentVideoUrl, else videoUrl
+      const g = vg.data() as any;
+      const sourceUrl: string | undefined = g.permanentVideoUrl || g.videoUrl;
+      if (!sourceUrl) {
+        counts.providerUrlDead++;
+        continue;
+      }
+      work.push({ contentDoc: cDoc, sourceUrl });
     }
   }
 
-  console.log(`\n${work.length} content docs matched a videoGenerations record`);
+  console.log(`\n${work.length} content docs matched a recoverable source URL`);
 
   const queue = [...work];
 
@@ -132,14 +152,7 @@ async function main() {
       if (!item) break;
       counts.checked++;
       const c = item.contentDoc.data() as any;
-      const g = item.vgDoc.data() as any;
-
-      // Prefer permanentVideoUrl, else videoUrl
-      const sourceUrl: string | undefined = g.permanentVideoUrl || g.videoUrl;
-      if (!sourceUrl) {
-        counts.providerUrlDead++;
-        continue;
-      }
+      const sourceUrl = item.sourceUrl;
 
       const live = await headOk(sourceUrl);
       if (!live) {
