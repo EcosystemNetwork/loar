@@ -31,9 +31,16 @@ import { z } from 'zod';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 
+// #audit finding 5: both fields optional here (rather than required, as they
+// were) — the gateway is the only caller expected to hit this URL with
+// params attached, but a stale bookmark, a truncated share link, or a typo'd
+// direct visit hits it without them. `.parse()` throwing on a missing field
+// escaped the route entirely and hit the root error boundary as a generic,
+// unhelpful crash; validation now always succeeds and the component renders
+// its own specific "invalid link" state below instead.
 const searchSchema = z.object({
-  authz: z.string().min(1),
-  return_to: z.string().url(),
+  authz: z.string().min(1).optional(),
+  return_to: z.string().optional(),
 });
 
 export const Route = createFileRoute('/oauth/siwe')({
@@ -52,6 +59,7 @@ function OAuthSiwePage() {
 
   // Parse the gateway origin out of return_to so we can display it prominently.
   const gatewayOrigin = useMemo(() => {
+    if (!return_to) return null;
     try {
       return new URL(return_to).origin;
     } catch {
@@ -69,6 +77,25 @@ function OAuthSiwePage() {
     return new Set(prod);
   }, []);
   const returnAllowed = gatewayOrigin ? ALLOWED_RETURN_HOSTS.has(gatewayOrigin) : false;
+
+  if (!authz || !return_to) {
+    return (
+      <CenteredCard>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg text-destructive">
+            <AlertCircle className="h-5 w-5" />
+            Invalid authorization link
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p>This link is missing required parameters and can't authorize an agent session.</p>
+          <p className="text-muted-foreground">
+            Start the authorization flow again from the agent client that sent you here.
+          </p>
+        </CardContent>
+      </CenteredCard>
+    );
+  }
 
   const authorize = async () => {
     if (!address) return;

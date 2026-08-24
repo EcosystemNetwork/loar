@@ -231,11 +231,9 @@ function CheckoutPage() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
-        <button onClick={() => history.back()}>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-        </button>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => history.back()}>
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
         <h1 className="font-bold">Checkout</h1>
       </div>
 

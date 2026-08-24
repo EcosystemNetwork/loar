@@ -304,7 +304,7 @@ function WideCard({ universe }: { universe: EnrichedUniverse }) {
  * ────────────────────────────────────────── */
 export function HeroSkeleton() {
   return (
-    <div className="relative h-[46vh] min-h-[320px] max-h-[460px] md:max-h-[520px] lg:max-h-[600px] bg-gradient-to-b from-primary/5 via-background to-background flex items-end">
+    <div className="relative h-[46vh] min-h-[400px] max-h-[460px] md:max-h-[520px] lg:max-h-[600px] bg-gradient-to-b from-primary/5 via-background to-background flex items-end">
       <div className="w-full px-4 md:px-12 pb-8 md:pb-10 max-w-3xl space-y-4 animate-pulse">
         <div className="h-4 w-24 rounded bg-white/10" />
         <div className="h-12 sm:h-14 w-3/4 max-w-80 rounded bg-white/10" />
@@ -383,7 +383,16 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
   if (!current) return null;
 
   return (
-    <div className="relative isolate h-[46vh] min-h-[320px] max-h-[460px] md:max-h-[520px] lg:max-h-[600px] overflow-hidden">
+    <div
+      // min-h is a hard floor, not just a small-screen fallback: on any
+      // viewport short enough that 46vh undercuts it (common once browser
+      // chrome eats into window height — e.g. a 1366x768 laptop), this is
+      // what keeps the bottom-anchored badge/title block from crowding the
+      // ActivityTicker sitting directly above (items-end docks content to
+      // this container's true bottom, so the only way to guarantee
+      // clearance from the top is to keep the container itself tall enough).
+      className="relative isolate h-[46vh] min-h-[400px] max-h-[460px] md:max-h-[520px] lg:max-h-[600px] overflow-hidden"
+    >
       {/* Background image with Ken Burns effect */}
       {featured.map((u, i) => (
         <div

@@ -40,7 +40,7 @@ export function useUniverseEvents(universeId: string) {
   }, [storageKey]);
 
   const upsertMutation = useMutation({
-    mutationFn: (patch: Record<string, unknown>) =>
+    mutationFn: (patch: Record<string, Record<string, any> | null>) =>
       trpcClient.universeEvents.upsert.mutate({ universeId, events: patch }),
   });
 
@@ -50,7 +50,7 @@ export function useUniverseEvents(universeId: string) {
   // patch. `pendingPatchRef` accumulates that patch across a debounce
   // window so a burst of edits sends one request instead of one per call.
   const lastSyncedRef = useRef<Record<string, any>>({});
-  const pendingPatchRef = useRef<Record<string, unknown>>({});
+  const pendingPatchRef = useRef<Record<string, Record<string, any> | null>>({});
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const flush = useCallback(() => {

@@ -19,6 +19,17 @@ import { listForUser } from './store';
 import { serverPoolAvailable } from './dispatcher';
 import { PROVIDER_REGISTRY } from './registry';
 
+/**
+ * Providers that dispatch to a self-hosted/free backend with no API-key
+ * concept at all — they're deliberately absent from the BYOK
+ * `PROVIDER_REGISTRY` (there's nothing to bring your own key *for*), so
+ * `isKnownProvider` correctly says false. Without this, every model on such
+ * a provider (e.g. ComfyUI, self-hosted/local) got mislabeled "Unknown
+ * provider" / disabled by the generic closed-registry check below instead
+ * of the always-available free option it actually is (#audit finding 3).
+ */
+const NO_KEY_REQUIRED_PROVIDERS = new Set(['comfyui']);
+
 export interface ModelUsability {
   /** True when the current caller can dispatch to this model right now. */
   usableByMe: boolean;
@@ -43,6 +54,9 @@ export function computeModelUsability(
   byokProviders: Set<string>,
   modelServerPoolAvailable = true
 ): ModelUsability {
+  if (NO_KEY_REQUIRED_PROVIDERS.has(provider)) {
+    return { usableByMe: true, unusableReason: null, sourceOnDispatch: 'server' };
+  }
   if (!isKnownProvider(provider)) {
     return { usableByMe: false, unusableReason: 'Unknown provider', sourceOnDispatch: null };
   }

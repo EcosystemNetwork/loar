@@ -41,6 +41,39 @@ app.onError(errorHandler);
 // Security headers on all responses
 app.use('/*', securityHeaders);
 
+// Support comma-separated CORS origins (e.g. "https://loar.fun,https://staging.loar.fun")
+const allowedOrigins = (env.CORS_ORIGIN || 'http://localhost:3001')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+// CORS — registered BEFORE metrics/rate-limiting/everything else so it wraps
+// the whole chain. #audit finding 2: hono/cors sets Access-Control-Allow-*
+// headers on `c.res` before calling `next()`, so it only wins the race if it
+// runs *first* — a middleware later in the chain that short-circuits (e.g.
+// the rate limiter returning 429 without calling `next()`) never reaches a
+// CORS middleware registered after it, so that response goes out with no
+// CORS headers at all. Browsers can't read a response without them, so a
+// rate-limited request surfaced as an opaque "blocked by CORS policy"
+// network error instead of a readable 429 — hiding the real cause for every
+// endpoint site-wide once a client crossed the limit.
+app.use(
+  '/*',
+  cors({
+    origin: (origin) => {
+      // No Origin header = non-browser request (curl, server-to-server).
+      // Return null to omit CORS headers entirely — auth middleware
+      // enforces access control independently of CORS.
+      if (!origin) return null;
+      // Reject unknown origins instead of falling back to a default
+      return allowedOrigins.includes(origin) ? origin : null;
+    },
+    allowMethods: ['GET', 'POST', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+    credentials: true,
+  })
+);
+
 // ── Prometheus /metrics — registered BEFORE rate limiting and auth so a
 // scraper hitting it every 15s doesn't get throttled. Protected by bearer
 // token when METRICS_AUTH_TOKEN is set; otherwise open (deploy on a private
@@ -67,29 +100,6 @@ app.use('/*', metricsMiddleware());
 app.use('/*', rateLimiter({ windowMs: 60_000, max: 100 }));
 
 app.use(logger());
-
-// Support comma-separated CORS origins (e.g. "https://loar.fun,https://staging.loar.fun")
-const allowedOrigins = (env.CORS_ORIGIN || 'http://localhost:3001')
-  .split(',')
-  .map((o) => o.trim())
-  .filter(Boolean);
-
-app.use(
-  '/*',
-  cors({
-    origin: (origin) => {
-      // No Origin header = non-browser request (curl, server-to-server).
-      // Return null to omit CORS headers entirely — auth middleware
-      // enforces access control independently of CORS.
-      if (!origin) return null;
-      // Reject unknown origins instead of falling back to a default
-      return allowedOrigins.includes(origin) ? origin : null;
-    },
-    allowMethods: ['GET', 'POST', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
-    credentials: true,
-  })
-);
 
 // CSRF protection — validate Origin header on mutating requests.
 // Must be AFTER CORS (which sets response headers) but BEFORE route handlers.
