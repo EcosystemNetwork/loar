@@ -19,12 +19,23 @@ const chains = SUPPORTED_EVM_CHAIN_IDS.map((id) => allChains[id]);
 /** Default chain used for contract interactions and wallet prompts. */
 export const defaultChain = chains[0];
 
-// Per-chain RPC URL from VITE_RPC_<chainId>. Public viem defaults cap
-// eth_getLogs ranges and throttle large eth_call responses, which breaks
-// governance proposal loads and getFullGraph on universes with many nodes.
-// Point this at Alchemy/Infura in .env to fix both.
+// Per-chain RPC URL from VITE_RPC_<chainId>. Point this at Alchemy/Infura in
+// .env for higher eth_getLogs ranges and eth_call limits (needed for
+// governance proposal loads and getFullGraph on universes with many nodes).
+//
+// FALLBACK_RPC covers builds where that build-time env var wasn't set (e.g.
+// a deploy pipeline missing VITE_RPC_<chainId>): without it, viem falls back
+// to the chain's baked-in default RPC — for sepolia that's thirdweb's public
+// endpoint, which has been unreliable ("Failed to fetch" on the admin
+// dashboard's balance reads). These are all on *.publicnode.com, already
+// allowed by the CSP connect-src in index.html.
+const FALLBACK_RPC: Record<number, string> = {
+  [sepolia.id]: 'https://ethereum-sepolia-rpc.publicnode.com',
+  [mainnet.id]: 'https://ethereum-rpc.publicnode.com',
+};
+
 const rpcFor = (chainId: number): string | undefined =>
-  (import.meta.env[`VITE_RPC_${chainId}`] as string | undefined) || undefined;
+  (import.meta.env[`VITE_RPC_${chainId}`] as string | undefined) || FALLBACK_RPC[chainId];
 
 const transports = Object.fromEntries(chains.map((c) => [c.id, http(rpcFor(c.id))])) as Record<
   (typeof chains)[number]['id'],

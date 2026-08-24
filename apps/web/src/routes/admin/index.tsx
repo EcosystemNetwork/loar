@@ -29,6 +29,7 @@ import {
   KeyRound,
   Activity,
   ArrowRight,
+  Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -131,6 +132,18 @@ function OpsBadge({ enabled }: { enabled: boolean }) {
   );
 }
 
+function UsersBadge({ enabled }: { enabled: boolean }) {
+  const { data } = useQuery({
+    queryKey: ['admin-hub', 'analytics-overview'],
+    queryFn: () => trpcClient.admin.analytics.overview.query(),
+    enabled,
+    staleTime: 30_000,
+  });
+  const total = (data as any)?.totalUsers;
+  if (total == null) return null;
+  return <Badge variant="outline">{total} users</Badge>;
+}
+
 function MainnetBadge({ enabled }: { enabled: boolean }) {
   const { data } = useQuery({
     queryKey: ['admin-hub', 'mainnet'],
@@ -148,6 +161,13 @@ function AdminHub() {
   const gated = isAuthenticated && isAdmin;
 
   const links: AdminLink[] = [
+    {
+      to: '/admin/dashboard',
+      title: 'Site Analytics',
+      description: 'Total users, signups over time, active wallets, universes/episodes.',
+      icon: Users,
+      badge: () => <UsersBadge enabled={gated} />,
+    },
     {
       to: '/admin/ops',
       title: 'Ops',

@@ -34,6 +34,9 @@ docs/qa/visual-*/
 *-output/
 ingest-log.json
 repair-broken-urls-*.json
+dead-gcs-urls-report-*.json
+rescue-gcs-hero-clips-*.json
+credit-loss-scan-*.json
 
 # Redis dump files (accidental commits)
 *.rdb

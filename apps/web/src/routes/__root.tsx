@@ -52,12 +52,11 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
         content: 'Decentralized Narrative Control Suite',
       },
     ],
-    links: [
-      {
-        rel: 'icon',
-        href: '/favicon.ico',
-      },
-    ],
+    // No favicon `links` entry here on purpose: index.html already declares
+    // <link rel="icon" href="loarButton_Logo.png"> statically, so it's live
+    // at first paint. A second rel="icon" injected here by HeadContent after
+    // hydration raced it and caused the tab icon to flip/disappear depending
+    // on browser favicon-cache behavior.
   }),
 });
 

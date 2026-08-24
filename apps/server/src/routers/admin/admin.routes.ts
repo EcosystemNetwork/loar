@@ -19,6 +19,7 @@ import {
 import { sendSlackAlert } from '../../lib/slack';
 import { adminCostRouter } from './cost.routes';
 import { adminMcpUsageRouter } from './mcpUsage.routes';
+import { adminAnalyticsRouter } from './analytics.routes';
 
 // Kill-switch fields that warrant a Slack alert when flipped.
 const ALERT_FIELDS = [
@@ -80,6 +81,9 @@ export const adminRouter = router({
   // ── MCP agent integration observability ──────────────────────────
   // See docs/prd-mcp-integration.md §3
   mcpUsage: adminMcpUsageRouter,
+
+  // ── Site-wide analytics (users, signups, engagement) ──────────────
+  analytics: adminAnalyticsRouter,
 
   // ── Read current config ───────────────────────────────────────────
 

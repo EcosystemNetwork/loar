@@ -99,6 +99,11 @@ const SAMPLE_UNIVERSE = {
   universeType: 'fun',
   isPrivate: false,
   hasPrivateSection: true,
+  // Explicit off-chain marker: this universe was never minted via
+  // UniverseManager, so it must stay in Firestore-only "fun mode"
+  // (apps/web/src/routes/universe/$id.tsx reads this to decide whether to
+  // read on-chain graph data or Firestore-only nodes).
+  onChainUniverseId: null,
   created_at: new Date(),
   updated_at: new Date(),
 };
@@ -115,10 +120,15 @@ async function seed() {
   }
   console.log(`  Characters: ${SAMPLE_CHARACTERS.length} entries`);
 
-  // Seed cinematic universe
-  const universeRef = db.collection('cinematicUniverses').doc('sample-universe');
+  // Seed cinematic universe. Doc id must be the lowercased contract address
+  // (matching createUniverse() in universes.handlers.ts, and every real
+  // universe in the system) — a human-readable slug here made this universe
+  // permanently unopenable in the real editor at /universe/$id, which only
+  // ever attempts a Firestore/indexer lookup when the id starts with "0x".
+  const universeId = SAMPLE_UNIVERSE.address.toLowerCase();
+  const universeRef = db.collection('cinematicUniverses').doc(universeId);
   batch.set(universeRef, SAMPLE_UNIVERSE, { merge: true });
-  console.log('  Cinematic Universes: 1 entry');
+  console.log(`  Cinematic Universes: 1 entry (${universeId})`);
 
   await batch.commit();
 

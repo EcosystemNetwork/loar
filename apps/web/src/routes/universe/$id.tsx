@@ -492,6 +492,13 @@ function UniverseTimelineEditorInner() {
               governanceAddress: d.governanceAddress,
               isDefault: false,
               universeType: (d.universeType as 'fun' | 'monetized') ?? 'monetized',
+              // Dropped here previously — `isOnChain` (below) reads this field off
+              // the mapped object, not the raw Firestore doc. Without it, every
+              // on-chain universe silently fell back to strict off-chain mode
+              // (0 events/leaves) even though its own getFullGraph/getLeaves
+              // reads had already succeeded, because the fallback flag flips
+              // isOnChain to `false` (not `undefined`) once this doc loads.
+              onChainUniverseId: d.onChainUniverseId,
             };
           }
         } catch {

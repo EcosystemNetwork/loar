@@ -115,6 +115,7 @@ import { Route as AdminOpsRouteImport } from './routes/admin/ops'
 import { Route as AdminModerationRouteImport } from './routes/admin/moderation'
 import { Route as AdminMcpUsageRouteImport } from './routes/admin/mcp-usage'
 import { Route as AdminMainnetRouteImport } from './routes/admin/mainnet'
+import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
 import { Route as AdminCostRouteImport } from './routes/admin/cost'
 import { Route as AdminByokCodesRouteImport } from './routes/admin/byok-codes'
 import { Route as AdplacementsSeedsIndexRouteImport } from './routes/adplacements/seeds/index'
@@ -671,6 +672,11 @@ const AdminMainnetRoute = AdminMainnetRouteImport.update({
   path: '/admin/mainnet',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminDashboardRoute = AdminDashboardRouteImport.update({
+  id: '/admin/dashboard',
+  path: '/admin/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminCostRoute = AdminCostRouteImport.update({
   id: '/admin/cost',
   path: '/admin/cost',
@@ -846,6 +852,7 @@ export interface FileRoutesByFullPath {
   '/virality': typeof ViralityRoute
   '/admin/byok-codes': typeof AdminByokCodesRoute
   '/admin/cost': typeof AdminCostRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/mainnet': typeof AdminMainnetRoute
   '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
@@ -979,6 +986,7 @@ export interface FileRoutesByTo {
   '/virality': typeof ViralityRoute
   '/admin/byok-codes': typeof AdminByokCodesRoute
   '/admin/cost': typeof AdminCostRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/mainnet': typeof AdminMainnetRoute
   '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
@@ -1113,6 +1121,7 @@ export interface FileRoutesById {
   '/virality': typeof ViralityRoute
   '/admin/byok-codes': typeof AdminByokCodesRoute
   '/admin/cost': typeof AdminCostRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/mainnet': typeof AdminMainnetRoute
   '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
@@ -1248,6 +1257,7 @@ export interface FileRouteTypes {
     | '/virality'
     | '/admin/byok-codes'
     | '/admin/cost'
+    | '/admin/dashboard'
     | '/admin/mainnet'
     | '/admin/mcp-usage'
     | '/admin/moderation'
@@ -1381,6 +1391,7 @@ export interface FileRouteTypes {
     | '/virality'
     | '/admin/byok-codes'
     | '/admin/cost'
+    | '/admin/dashboard'
     | '/admin/mainnet'
     | '/admin/mcp-usage'
     | '/admin/moderation'
@@ -1514,6 +1525,7 @@ export interface FileRouteTypes {
     | '/virality'
     | '/admin/byok-codes'
     | '/admin/cost'
+    | '/admin/dashboard'
     | '/admin/mainnet'
     | '/admin/mcp-usage'
     | '/admin/moderation'
@@ -1648,6 +1660,7 @@ export interface RootRouteChildren {
   ViralityRoute: typeof ViralityRoute
   AdminByokCodesRoute: typeof AdminByokCodesRoute
   AdminCostRoute: typeof AdminCostRoute
+  AdminDashboardRoute: typeof AdminDashboardRoute
   AdminMainnetRoute: typeof AdminMainnetRoute
   AdminMcpUsageRoute: typeof AdminMcpUsageRoute
   AdminModerationRoute: typeof AdminModerationRoute
@@ -2464,6 +2477,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminMainnetRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/dashboard': {
+      id: '/admin/dashboard'
+      path: '/admin/dashboard'
+      fullPath: '/admin/dashboard'
+      preLoaderRoute: typeof AdminDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/cost': {
       id: '/admin/cost'
       path: '/admin/cost'
@@ -2796,6 +2816,7 @@ const rootRouteChildren: RootRouteChildren = {
   ViralityRoute: ViralityRoute,
   AdminByokCodesRoute: AdminByokCodesRoute,
   AdminCostRoute: AdminCostRoute,
+  AdminDashboardRoute: AdminDashboardRoute,
   AdminMainnetRoute: AdminMainnetRoute,
   AdminMcpUsageRoute: AdminMcpUsageRoute,
   AdminModerationRoute: AdminModerationRoute,
