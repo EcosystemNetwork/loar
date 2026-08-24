@@ -8,6 +8,7 @@
 import { db } from '../../lib/firebase';
 import { randomUUID } from 'crypto';
 import { getSafeInfo } from '../../lib/safe-admin';
+import { TRPCError } from '@trpc/server';
 
 // ── Mint fee credit conversion (~$10 worth of generation credits) ─────────
 const UNIVERSE_MINT_CREDITS = parseInt(process.env.UNIVERSE_MINT_CREDITS ?? '333', 10);
@@ -118,7 +119,7 @@ export async function getUniverse(id: string) {
     const doc = await collection().doc(id.toLowerCase()).get();
 
     if (!doc.exists) {
-      throw new Error('Universe not found');
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Universe not found' });
     }
 
     return {
@@ -126,6 +127,7 @@ export async function getUniverse(id: string) {
       data: { id: doc.id, ...doc.data() },
     };
   } catch (error) {
+    if (error instanceof TRPCError) throw error;
     if (error instanceof Error && !error.message.startsWith('Failed to')) throw error;
     console.error('Error fetching universe:', error);
     throw new Error('Failed to fetch universe', { cause: error });
@@ -275,7 +277,7 @@ export async function setUniverseHidden(
 ) {
   const id = universeId.toLowerCase();
   const doc = await collection().doc(id).get();
-  if (!doc.exists) throw new Error('Universe not found');
+  if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Universe not found' });
 
   const previousHidden = Boolean(doc.data()?.isHidden);
   const now = new Date();
@@ -313,7 +315,7 @@ export async function setUniversePrivate(
 ) {
   const id = universeId.toLowerCase();
   const doc = await collection().doc(id).get();
-  if (!doc.exists) throw new Error('Universe not found');
+  if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Universe not found' });
 
   const previousPrivate = Boolean(doc.data()?.isPrivate);
   const now = new Date();
@@ -352,7 +354,7 @@ export async function deleteUniverse(
   const id = universeId.toLowerCase();
   const ref = collection().doc(id);
   const doc = await ref.get();
-  if (!doc.exists) throw new Error('Universe not found');
+  if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Universe not found' });
 
   const snapshot = doc.data() ?? {};
   const now = new Date();

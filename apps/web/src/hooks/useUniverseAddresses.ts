@@ -9,6 +9,7 @@ import { useReadContract, useChainId } from 'wagmi';
 import { ponderGql, ponderQueryDefaults } from '@/utils/ponder-api';
 import { universeManagerAbi } from '@loar/abis/generated';
 import { UniverseManager } from '@loar/abis/addresses';
+import { trpcClient } from '@/utils/trpc';
 
 interface UniverseAddresses {
   universeAddress: `0x${string}` | undefined;
@@ -20,9 +21,12 @@ interface UniverseAddresses {
 }
 
 /**
- * Resolve universe contract addresses from Ponder indexer or on-chain.
+ * Resolve universe contract addresses from Ponder indexer, on-chain, or the
+ * universe's own Firestore doc.
  *
- * @param universeId - Either a contract address (0x...) or numeric universe ID
+ * @param universeId - A contract address (0x...), a numeric universe ID, or
+ *   a human-readable slug (most universes are addressed this way — resolved
+ *   via `universes.get`, same as `/universe/$id`).
  */
 export function useUniverseAddresses(
   universeId: string | undefined
@@ -61,8 +65,13 @@ export function useUniverseAddresses(
     ...ponderQueryDefaults,
   });
 
-  // Fallback: direct on-chain read when universeId is numeric
-  const numericId = !isAddress && universeId ? BigInt(universeId) : undefined;
+  // Fallback: direct on-chain read when universeId is a plain base-10 numeric
+  // string. Guard this explicitly — most universes are actually addressed by
+  // a human-readable Firestore slug (e.g. "sample-universe"), which is
+  // neither a `0x…` address nor numeric; passing one to BigInt() throws an
+  // uncaught SyntaxError straight out of this hook (#audit finding 1).
+  const isNumeric = !isAddress && !!universeId && /^\d+$/.test(universeId);
+  const numericId = isNumeric ? BigInt(universeId as string) : undefined;
   const onChain = useReadContract({
     address: contractAddress,
     abi: universeManagerAbi,
@@ -74,7 +83,19 @@ export function useUniverseAddresses(
     chainId,
   });
 
-  // Merge results: Ponder data first, then on-chain fallback
+  // Fallback: resolve a slug id (neither address nor numeric) via the
+  // universe's own Firestore doc, which already stores its on-chain
+  // addresses — the same fields `/universe/$id` reads directly.
+  const bySlug = useQuery({
+    queryKey: ['universe-addresses-slug', universeId],
+    queryFn: async () => {
+      const res = await trpcClient.universes.get.query({ id: universeId as string });
+      return (res as { data?: Record<string, unknown> } | null)?.data ?? null;
+    },
+    enabled: !!universeId && !isAddress && !isNumeric,
+  });
+
+  // Merge results: Ponder data first, then on-chain fallback, then slug lookup
   if (ponder.data) {
     return {
       universeAddress: ponder.data.id as `0x${string}`,
@@ -108,6 +129,23 @@ export function useUniverseAddresses(
     };
   }
 
+  if (bySlug.data) {
+    const d = bySlug.data as {
+      address?: string;
+      tokenAddress?: string;
+      governanceAddress?: string;
+    };
+    return {
+      universeAddress: (d.address as `0x${string}`) || undefined,
+      tokenAddress: (d.tokenAddress as `0x${string}`) || undefined,
+      governorAddress: (d.governanceAddress as `0x${string}`) || undefined,
+      hookAddress: undefined,
+      lockerAddress: undefined,
+      bondingCurveAddress: undefined,
+      isLoading: false,
+    };
+  }
+
   return {
     universeAddress: isAddress ? (universeId as `0x${string}`) : undefined,
     tokenAddress: undefined,
@@ -115,6 +153,6 @@ export function useUniverseAddresses(
     hookAddress: undefined,
     lockerAddress: undefined,
     bondingCurveAddress: undefined,
-    isLoading: ponder.isLoading || onChain.isLoading,
+    isLoading: ponder.isLoading || onChain.isLoading || bySlug.isLoading,
   };
 }

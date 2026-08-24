@@ -58,6 +58,7 @@ import { Route as CreateIndexRouteImport } from './routes/create/index'
 import { Route as BountiesIndexRouteImport } from './routes/bounties/index'
 import { Route as AgentsIndexRouteImport } from './routes/agents/index'
 import { Route as AdplacementsIndexRouteImport } from './routes/adplacements/index'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as WikiKindRouteImport } from './routes/wiki/$kind'
 import { Route as UniverseIdRouteImport } from './routes/universe/$id'
 import { Route as TreasuryUniverseIdRouteImport } from './routes/treasury/$universeId'
@@ -383,6 +384,11 @@ const AgentsIndexRoute = AgentsIndexRouteImport.update({
 const AdplacementsIndexRoute = AdplacementsIndexRouteImport.update({
   id: '/adplacements/',
   path: '/adplacements/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WikiKindRoute = WikiKindRouteImport.update({
@@ -896,6 +902,7 @@ export interface FileRoutesByFullPath {
   '/treasury/$universeId': typeof TreasuryUniverseIdRoute
   '/universe/$id': typeof UniverseIdRouteWithChildren
   '/wiki/$kind': typeof WikiKindRoute
+  '/admin/': typeof AdminIndexRoute
   '/adplacements/': typeof AdplacementsIndexRoute
   '/agents/': typeof AgentsIndexRoute
   '/bounties/': typeof BountiesIndexRoute
@@ -1028,6 +1035,7 @@ export interface FileRoutesByTo {
   '/treasury/$universeId': typeof TreasuryUniverseIdRoute
   '/universe/$id': typeof UniverseIdRouteWithChildren
   '/wiki/$kind': typeof WikiKindRoute
+  '/admin': typeof AdminIndexRoute
   '/adplacements': typeof AdplacementsIndexRoute
   '/agents': typeof AgentsIndexRoute
   '/bounties': typeof BountiesIndexRoute
@@ -1161,6 +1169,7 @@ export interface FileRoutesById {
   '/treasury/$universeId': typeof TreasuryUniverseIdRoute
   '/universe/$id': typeof UniverseIdRouteWithChildren
   '/wiki/$kind': typeof WikiKindRoute
+  '/admin/': typeof AdminIndexRoute
   '/adplacements/': typeof AdplacementsIndexRoute
   '/agents/': typeof AgentsIndexRoute
   '/bounties/': typeof BountiesIndexRoute
@@ -1295,6 +1304,7 @@ export interface FileRouteTypes {
     | '/treasury/$universeId'
     | '/universe/$id'
     | '/wiki/$kind'
+    | '/admin/'
     | '/adplacements/'
     | '/agents/'
     | '/bounties/'
@@ -1427,6 +1437,7 @@ export interface FileRouteTypes {
     | '/treasury/$universeId'
     | '/universe/$id'
     | '/wiki/$kind'
+    | '/admin'
     | '/adplacements'
     | '/agents'
     | '/bounties'
@@ -1559,6 +1570,7 @@ export interface FileRouteTypes {
     | '/treasury/$universeId'
     | '/universe/$id'
     | '/wiki/$kind'
+    | '/admin/'
     | '/adplacements/'
     | '/agents/'
     | '/bounties/'
@@ -1688,6 +1700,7 @@ export interface RootRouteChildren {
   TreasuryUniverseIdRoute: typeof TreasuryUniverseIdRoute
   UniverseIdRoute: typeof UniverseIdRouteWithChildren
   WikiKindRoute: typeof WikiKindRoute
+  AdminIndexRoute: typeof AdminIndexRoute
   AdplacementsIndexRoute: typeof AdplacementsIndexRoute
   AgentsIndexRoute: typeof AgentsIndexRoute
   BountiesIndexRoute: typeof BountiesIndexRoute
@@ -2050,6 +2063,13 @@ declare module '@tanstack/react-router' {
       path: '/adplacements'
       fullPath: '/adplacements/'
       preLoaderRoute: typeof AdplacementsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/wiki/$kind': {
@@ -2828,6 +2848,7 @@ const rootRouteChildren: RootRouteChildren = {
   TreasuryUniverseIdRoute: TreasuryUniverseIdRoute,
   UniverseIdRoute: UniverseIdRouteWithChildren,
   WikiKindRoute: WikiKindRoute,
+  AdminIndexRoute: AdminIndexRoute,
   AdplacementsIndexRoute: AdplacementsIndexRoute,
   AgentsIndexRoute: AgentsIndexRoute,
   BountiesIndexRoute: BountiesIndexRoute,

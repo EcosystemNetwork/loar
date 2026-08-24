@@ -5,6 +5,7 @@
  * Renamed from cinematicUniverses to align with domain naming conventions.
  */
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { publicProcedure, protectedProcedure, adminProcedure, router } from '../../lib/trpc';
 import {
   createUniverse,
@@ -126,7 +127,7 @@ export const universesRouter = router({
     const creator = (data.creator as string | undefined)?.toLowerCase();
     const isOwner = !!viewer && !!creator && viewer === creator;
     if (!isOwner && (data.isHidden || data.isPrivate)) {
-      throw new Error('Universe not found');
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Universe not found' });
     }
     return result;
   }),
