@@ -47,33 +47,33 @@ Five layers, five failure modes: entry never tracked (boot), prices fluctuated a
 
 | Model ID | Provider | Quality | Tier | Provider $/Mtok in | Cached $/Mtok | Provider $/Mtok out | Fiat $/Mtok in | Fiat $/Mtok out | Credits/1k in | Credits/1k out | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `glm-4-5-flash` | zai | draft | low | **$0** | **$0** | **$0** | **$0** | **$0** | 1 | 1 | ✅ live |
-| `glm-4-6v-flash` | zai | standard | low | **$0** | **$0** | **$0** | **$0** | **$0** | 1 | 1 | ✅ live |
+| `glm-4-5-flash` | zai | draft | low | **$0** | **$0** | **$0** | **$0** | **$0** | 1 | 1 | 🚫 disabled |
+| `glm-4-6v-flash` | zai | standard | low | **$0** | **$0** | **$0** | **$0** | **$0** | 1 | 1 | 🚫 disabled |
 | `gpt-5-nano` | openai | standard | low | $0.0500 | $0.0050 | $0.4000 | $0.0700 | $0.5400 | 1 | 1 | ✅ live |
 | `llama-3-1-8b-instant-groq` | groq | standard | low | $0.0500 | $0.0250 | $0.0800 | $0.0700 | $0.1100 | 1 | 1 | ✅ live |
-| `glm-4-7-flash` | zai | standard | low | $0.0600 | $0.0150 | $0.4000 | $0.0800 | $0.5400 | 1 | 1 | ✅ live |
+| `glm-4-7-flash` | zai | standard | low | $0.0600 | $0.0150 | $0.4000 | $0.0800 | $0.5400 | 1 | 1 | 🚫 disabled |
 | `gpt-oss-20b-groq` | groq | standard | low | $0.0750 | $0.0375 | $0.3000 | $0.1000 | $0.4100 | 1 | 1 | ✅ live |
 | `gpt-4-1-nano` | openai | standard | low | $0.1000 | $0.0250 | $0.4000 | $0.1400 | $0.5400 | 1 | 1 | ✅ live |
 | `gemini-2-5-flash-lite` | google | standard | low | $0.1000 | $0.0100 | $0.4000 | $0.1400 | $0.5400 | 1 | 1 | ✅ live |
 | `doubao-seed-2-0-lite` | bytedance | standard | low | $0.1000 | $0.0200 | $0.3000 | $0.1400 | $0.4100 | 1 | 1 | ✅ live |
-| `glm-4-5-air` | zai | standard | low | $0.1300 | $0.0300 | $0.8500 | $0.1800 | $1.15 | 1 | 1 | ✅ live |
+| `glm-4-5-air` | zai | standard | low | $0.1300 | $0.0300 | $0.8500 | $0.1800 | $1.15 | 1 | 1 | 🚫 disabled |
 | `gpt-oss-120b-groq` | groq | premium | low | $0.1500 | $0.0750 | $0.6000 | $0.2000 | $0.8100 | 1 | 1 | ✅ live |
 | `gpt-5-mini` | openai | premium | medium | $0.2500 | $0.0250 | $2 | $0.3400 | $2.7 | 1 | 1 | ✅ live |
 | `gemini-3-1-flash-lite` | google | standard | low | $0.2500 | $0.0250 | $1.5 | $0.3400 | $2.03 | 1 | 1 | ✅ live |
 | `qwen-3-32b-groq` | groq | standard | low | $0.2900 | $0.1450 | $0.5900 | $0.3900 | $0.8000 | 1 | 1 | ✅ live |
 | `gemini-2-5-flash` | google | standard | low | $0.3000 | $0.0300 | $2.5 | $0.4100 | $3.38 | 1 | 1 | ✅ live |
 | `gpt-4-1-mini` | openai | standard | low | $0.4000 | $0.1000 | $1.6 | $0.5400 | $2.16 | 1 | 1 | ✅ live |
-| `glm-4-7` | zai | standard | low | $0.4000 | $0.1000 | $1.75 | $0.5400 | $2.36 | 1 | 1 | ✅ live |
+| `glm-4-7` | zai | standard | low | $0.4000 | $0.1000 | $1.75 | $0.5400 | $2.36 | 1 | 1 | 🚫 disabled |
 | `doubao-seed-1-6-vision` | bytedance | premium | low | $0.4000 | $0.1000 | $1.2 | $0.5400 | $1.62 | 1 | 1 | ✅ live |
 | `doubao-seed-2-0-pro` | bytedance | premium | low | $0.5000 | $0.1000 | $1.5 | $0.6800 | $2.03 | 1 | 1 | ✅ live |
 | `llama-3-3-70b-versatile-groq` | groq | standard | low | $0.5900 | $0.3000 | $0.7900 | $0.8000 | $1.07 | 1 | 1 | ✅ live |
-| `glm-4-6v` | zai | premium | low | $0.6000 | $0.1500 | $0.9000 | $0.8100 | $1.22 | 1 | 1 | ✅ live |
+| `glm-4-6v` | zai | premium | low | $0.6000 | $0.1500 | $0.9000 | $0.8100 | $1.22 | 1 | 1 | 🚫 disabled |
 | `kimi-k2-instruct-groq` | groq | premium | medium | $0.6000 | $0.3000 | $2.5 | $0.8100 | $3.38 | 1 | 1 | ✅ live |
-| `glm-5` | zai | premium | medium | $1 | $0.2500 | $3.2 | $1.35 | $4.32 | 1 | 1 | ✅ live |
+| `glm-5` | zai | premium | medium | $1 | $0.2500 | $3.2 | $1.35 | $4.32 | 1 | 1 | 🚫 disabled |
 | `o4-mini` | openai | standard | low | $1.1 | $0.2750 | $4.4 | $1.49 | $5.94 | 1 | 1 | ✅ live |
 | `gpt-5` | openai | premium | high | $1.25 | $0.1250 | $10 | $1.69 | $13.5 | 1 | 1 | ✅ live |
 | `gemini-2-5-pro` | google | premium | medium | $1.25 | $0.1250 | $10 | $1.69 | $13.5 | 1 | 1 | ✅ live |
-| `glm-5-1` | zai | premium | medium | $1.4 | $0.3500 | $4.4 | $1.89 | $5.94 | 1 | 1 | ✅ live |
+| `glm-5-1` | zai | premium | medium | $1.4 | $0.3500 | $4.4 | $1.89 | $5.94 | 1 | 1 | 🚫 disabled |
 | `o3` | openai | premium | medium | $2 | $0.5000 | $8 | $2.7 | $10.8 | 1 | 1 | ✅ live |
 | `gpt-4-1` | openai | premium | medium | $2 | $0.5000 | $8 | $2.7 | $10.8 | 1 | 1 | ✅ live |
 | `gemini-3-1-pro` | google | premium | medium | $2 | $0.2000 | $12 | $2.7 | $16.2 | 1 | 2 | ✅ live |
@@ -93,10 +93,10 @@ Five layers, five failure modes: entry never tracked (boot), prices fluctuated a
 | `wan27` | fal | standard | low | $0.0100 | $0.0100 | $0.0100 | 1 | ✅ live |
 | `gpt-image-1-mini` | openai | standard | low | $0.0120 | $0.0200 | $0.0200 | 2 | ✅ live |
 | `flux-2-klein` | fal | standard | low | $0.0150 | $0.0200 | $0.0200 | 2 | ✅ live |
-| `glm-image` | zai | standard | low | $0.0150 | $0.0200 | $0.0200 | 2 | ✅ live |
+| `glm-image` | zai | standard | low | $0.0150 | $0.0200 | $0.0200 | 2 | 🚫 disabled |
 | `qwen-image` | fal | standard | low | $0.0200 | $0.0300 | $0.0300 | 3 | ✅ live |
 | `imagen-4-fast` | google | standard | low | $0.0200 | $0.0300 | $0.0300 | 3 | ✅ live |
-| `cogview-4` | zai | standard | low | $0.0200 | $0.0300 | $0.0300 | 3 | ✅ live |
+| `cogview-4` | zai | standard | low | $0.0200 | $0.0300 | $0.0300 | 3 | 🚫 disabled |
 | `flux-dev` | fal | standard | medium | $0.0250 | $0.0300 | $0.0300 | 3 | ✅ live |
 | `flux-2-pro` | fal | premium | medium | $0.0300 | $0.0400 | $0.0400 | 4 | ✅ live |
 | `seedream-v5` | fal | standard | low | $0.0300 | $0.0400 | $0.0400 | 4 | 🚫 disabled |
@@ -143,7 +143,7 @@ Five layers, five failure modes: entry never tracked (boot), prices fluctuated a
 | `seedance2-fast-i2v` | bytedance | standard | low | **$0** ⚠️ | **$0** | **$0** | 0 | ✅ live |
 | `seedance2-ref` | bytedance | premium | low | **$0** ⚠️ | **$0** | **$0** | 0 | ✅ live |
 | `seedance2-fast-ref` | bytedance | standard | low | **$0** ⚠️ | **$0** | **$0** | 0 | ✅ live |
-| `cogvideox-flash` | zai | draft | low | **$0** | **$0** | **$0** | 0 | ✅ live |
+| `cogvideox-flash` | zai | draft | low | **$0** | **$0** | **$0** | 0 | 🚫 disabled |
 | `ltx-video` | fal | draft | low | $0.0200 | $0.0300 | $0.0300 | 3 | ✅ live |
 | `hunyuan` | fal | draft | low | $0.0400 | $0.0500 | $0.0500 | 5 | ✅ live |
 | `cogvideox` | fal | standard | low | $0.0500 | $0.0700 | $0.0600 | 8 | ✅ live |
@@ -156,9 +156,9 @@ Five layers, five failure modes: entry never tracked (boot), prices fluctuated a
 | `kling-i2v` | fal | standard | medium | $0.1000 | $0.1400 | $0.1300 | 15 | ✅ live |
 | `ltx-2-19b` | fal | standard | low | $0.1200 | $0.1600 | $0.1500 | 16 | ✅ live |
 | `kling3-i2v` | fal | premium | high | $0.1500 | $0.2000 | $0.1900 | 20 | ✅ live |
-| `viduq1-t2v` | zai | standard | medium | $0.1600 | $0.2200 | $0.2000 | 22 | ✅ live |
-| `viduq1-i2v` | zai | standard | medium | $0.1800 | $0.2400 | $0.2200 | 24 | ✅ live |
-| `cogvideox-3` | zai | premium | medium | $0.2200 | $0.3000 | $0.2800 | 30 | ✅ live |
+| `viduq1-t2v` | zai | standard | medium | $0.1600 | $0.2200 | $0.2000 | 22 | 🚫 disabled |
+| `viduq1-i2v` | zai | standard | medium | $0.1800 | $0.2400 | $0.2200 | 24 | 🚫 disabled |
+| `cogvideox-3` | zai | premium | medium | $0.2200 | $0.3000 | $0.2800 | 30 | 🚫 disabled |
 | `veo31-t2v` | fal | premium | high | $0.2500 | $0.3400 | $0.3100 | 34 | ✅ live |
 | `veo31-i2v` | fal | premium | high | $0.2500 | $0.3400 | $0.3100 | 34 | ✅ live |
 | `runway-gen3` | fal | premium | high | $0.2500 | $0.3400 | $0.3100 | 34 | ✅ live |
@@ -232,7 +232,7 @@ Five layers, five failure modes: entry never tracked (boot), prices fluctuated a
 | `whisper-large-v3-groq` | groq | standard | low | $0.0011 | $0 | $0 | 0 | ✅ live |
 | `gemini-2-5-flash-lite-transcribe-google` | google | draft | low | $0.0012 | $0 | $0 | 0 | ✅ live |
 | `nano-assemblyai` | assemblyai | draft | low | $0.002 | $0 | $0 | 0 | ✅ live |
-| `glm-asr-2512-zai` | zai | premium | low | $0.002 | $0 | $0 | 0 | ✅ live |
+| `glm-asr-2512-zai` | zai | premium | low | $0.002 | $0 | $0 | 0 | 🚫 disabled |
 | `gemini-2-5-flash-transcribe-google` | google | standard | low | $0.0024 | $0 | $0 | 0 | ✅ live |
 | `gpt-4o-mini-transcribe-openai` | openai | standard | low | $0.003 | $0 | $0 | 0 | ✅ live |
 | `nova-3-deepgram` | deepgram | premium | low | $0.0043 | $0.01 | $0.01 | 1 | ✅ live |
@@ -344,14 +344,14 @@ Five layers, five failure modes: entry never tracked (boot), prices fluctuated a
 
 | Registry | Total models | Enabled |
 | --- | --- | --- |
-| LLM | 30 | 30 |
-| Image | 44 | 43 |
-| Video | 61 | 59 |
+| LLM | 30 | 22 |
+| Image | 44 | 41 |
+| Video | 61 | 55 |
 | TTS | 17 | 17 |
-| Transcription | 21 | 21 |
+| Transcription | 21 | 20 |
 | 3D | 11 | 11 |
 | Audio | 20 | 20 |
 | Editing | 37 | 37 |
-| **TOTAL** | **241** | **238** |
+| **TOTAL** | **241** | **223** |
 
 _End of generated document._
