@@ -33,7 +33,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ModelSelector } from '@/components/ModelSelector';
 import { toast } from 'sonner';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrl, resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import {
   Select,
   SelectContent,
@@ -154,7 +154,7 @@ export function GenerationCard({
             {gen.videoUrl ? (
               // Turntable preview if Meshy returned one
               <video
-                src={resolveIpfsUrl(gen.videoUrl)}
+                src={resolveIpfsUrlPreferred(gen.videoUrl)}
                 className="w-full h-full object-cover"
                 autoPlay
                 muted
@@ -180,7 +180,7 @@ export function GenerationCard({
           gen.kind !== '3d-model' &&
           gen.videoUrl && (
             <video
-              src={resolveIpfsUrl(gen.videoUrl)}
+              src={resolveIpfsUrlPreferred(gen.videoUrl)}
               className="w-full h-full object-cover"
               controls
               muted

@@ -88,6 +88,7 @@ export function resolveIpfsUrl(url?: string | null): string {
 const PUBLIC_FALLBACK_GATEWAYS = [
   'https://ipfs.io',
   PINATA_PUBLIC_GATEWAY,
+  'https://cloudflare-ipfs.com',
   'https://dweb.link',
   'https://w3s.link',
 ];
@@ -330,4 +331,21 @@ export function getIpfsUrlCandidatesPreferred(url?: string | null): string[] {
 
   if (!dedicated || dedicated === candidates[0]) return candidates;
   return [dedicated, ...candidates.filter((c) => c !== dedicated)];
+}
+
+// Drop-in, cache-aware replacement for `resolveIpfsUrl()` for call sites that
+// render a single <video>/<audio>/<img> src synchronously (no local retry
+// state of their own) and just want "the best URL we currently know about".
+// Returns our dedicated (authenticated) gateway when it's already warm in
+// signedUrlCache — e.g. another element on the page resolved this CID first,
+// or a prior render of this same element did — and the public primary
+// otherwise, while kicking off a background resolve so a *later* render or
+// the global onerror rotator (install-ipfs-fallback.ts) can pick up the
+// dedicated URL once it lands. Public gateways (ipfs.io, gateway.pinata.cloud
+// unauthenticated) are rate-limited/degraded far more often than our own
+// signed gateway, so preferring the warm cache measurably cuts 429/504s for
+// callers that don't run their own race/fallback chain.
+export function resolveIpfsUrlPreferred(url?: string | null): string {
+  const candidates = getIpfsUrlCandidatesPreferred(url);
+  return candidates[0] || resolveIpfsUrl(url);
 }

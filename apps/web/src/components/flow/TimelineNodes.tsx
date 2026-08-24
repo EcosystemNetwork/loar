@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { LoarIcon } from '@/components/loar-icons';
 import { useState, useEffect, memo } from 'react';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import type { StylePresetId } from '../style-presets';
 
 // ── Scene Control Types (mirrors server scene-controls/types.ts) ──────
@@ -323,8 +323,8 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
                   }}
                   onError={() => setVideoError(true)}
                 >
-                  <source src={resolveIpfsUrl(displayVideoUrl)} type="video/mp4" />
-                  <source src={resolveIpfsUrl(displayVideoUrl)} />
+                  <source src={resolveIpfsUrlPreferred(displayVideoUrl)} type="video/mp4" />
+                  <source src={resolveIpfsUrlPreferred(displayVideoUrl)} />
                 </video>
 
                 {/* Hover overlay — edit + regenerate actions */}

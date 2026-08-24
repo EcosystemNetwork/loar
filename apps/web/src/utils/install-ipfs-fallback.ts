@@ -1,7 +1,9 @@
 import { getNextIpfsFallback, isIpfsGatewayUrl } from './ipfs-url';
 
-// Max hops per element — we have 3 public fallbacks after the primary.
-const MAX_HOPS = 4;
+// Max hops per element — up to 4 public fallbacks after the primary, plus
+// one extra hop of headroom for the dedicated gateway landing mid-chain once
+// its async resolve completes (see getIpfsUrlCandidatesPreferred).
+const MAX_HOPS = 6;
 const HOP_ATTR = 'data-ipfs-hops';
 
 function advance(el: HTMLImageElement | HTMLVideoElement | HTMLSourceElement): boolean {

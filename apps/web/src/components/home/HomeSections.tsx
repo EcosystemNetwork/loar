@@ -11,7 +11,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import { proxiedImage, proxiedSrcSet } from '@/utils/img-proxy';
 
 import {
@@ -697,7 +697,7 @@ export function RecentEpisodes() {
                 {ep.videoUrl ? (
                   <>
                     <video
-                      src={`${resolveIpfsUrl(ep.videoUrl)}#t=0.1`}
+                      src={`${resolveIpfsUrlPreferred(ep.videoUrl)}#t=0.1`}
                       poster={proxiedImage(ep.thumbnailUrl) || undefined}
                       className="w-full h-full object-cover"
                       muted
@@ -1016,7 +1016,7 @@ export function ContentCard({ item }: { item: any }) {
         {item.thumbnailUrl || item.mediaUrl ? (
           isVideo && item.mediaUrl ? (
             <video
-              src={`${resolveIpfsUrl(item.mediaUrl)}#t=0.1`}
+              src={`${resolveIpfsUrlPreferred(item.mediaUrl)}#t=0.1`}
               poster={proxiedImage(item.thumbnailUrl) || undefined}
               className="w-full h-full object-cover"
               muted
@@ -1360,7 +1360,7 @@ export function ContinueWatchingRow() {
               <div className="relative aspect-video rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all">
                 {ep.videoUrl ? (
                   <video
-                    src={`${resolveIpfsUrl(ep.videoUrl)}#t=${Math.max(0, resume - 1)}`}
+                    src={`${resolveIpfsUrlPreferred(ep.videoUrl)}#t=${Math.max(0, resume - 1)}`}
                     poster={proxiedImage(ep.thumbnailUrl) || undefined}
                     className="w-full h-full object-cover"
                     muted
@@ -1440,7 +1440,7 @@ export function ForYouRow() {
             <div className="relative aspect-video rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all">
               {ep.videoUrl ? (
                 <video
-                  src={`${resolveIpfsUrl(ep.videoUrl)}#t=0.1`}
+                  src={`${resolveIpfsUrlPreferred(ep.videoUrl)}#t=0.1`}
                   poster={proxiedImage(ep.thumbnailUrl) || undefined}
                   className="w-full h-full object-cover"
                   muted

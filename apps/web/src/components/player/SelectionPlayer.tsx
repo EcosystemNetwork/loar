@@ -20,7 +20,7 @@ import {
   Minimize,
   Loader2,
 } from 'lucide-react';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 
 export interface SelectionVideo {
   nodeId: string;
@@ -207,7 +207,7 @@ export function SelectionPlayer({ videos, onClose }: SelectionPlayerProps) {
       <div className="flex-1 flex items-center justify-center relative">
         <video
           ref={videoRef}
-          src={resolveIpfsUrl(current.videoUrl)}
+          src={resolveIpfsUrlPreferred(current.videoUrl)}
           onEnded={handleEnded}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleTimeUpdate}

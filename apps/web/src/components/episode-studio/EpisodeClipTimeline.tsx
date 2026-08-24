@@ -16,7 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { GripVertical, Trash2, Scissors, Download, Music } from 'lucide-react';
 import { VideoTrimmer } from '@/components/segments/VideoTrimmer';
 import type { VideoSegment } from '@/types/segments';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import { cn } from '@/lib/utils';
 
 export interface EpisodeClip {
@@ -127,7 +127,7 @@ export function EpisodeClipTimeline({
               />
               <div className="relative aspect-video w-20 flex-shrink-0 overflow-hidden rounded bg-muted">
                 <video
-                  src={resolveIpfsUrl(clip.videoUrl)}
+                  src={resolveIpfsUrlPreferred(clip.videoUrl)}
                   muted
                   preload="metadata"
                   className="h-full w-full object-cover"

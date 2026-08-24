@@ -41,7 +41,7 @@ import {
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { toast } from 'sonner';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrl, resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import type { DraftData, GenKind } from '@/types/sandbox.types';
 
 // ── Draft Card ─────────────────────────────────────────────────
@@ -138,7 +138,7 @@ export function DraftCard({ draft, onDelete, onReuse }: DraftCardProps) {
           )
         ) : draft.videoUrl ? (
           <video
-            src={resolveIpfsUrl(draft.videoUrl)}
+            src={resolveIpfsUrlPreferred(draft.videoUrl)}
             className="w-full h-full object-cover"
             muted
             playsInline

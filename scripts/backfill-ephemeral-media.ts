@@ -19,7 +19,7 @@
  */
 import dotenv from 'dotenv';
 import path from 'path';
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { initializeApp, cert, applicationDefault, getApps } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { readFileSync } from 'fs';
 
@@ -87,17 +87,61 @@ async function headOk(url: string): Promise<boolean> {
 }
 
 // ── Firebase init ────────────────────────────────────────────────────
+/**
+ * The repo `.env` sets FIRESTORE_EMULATOR_HOST for local dev. dotenv.config()
+ * above loads it, and firebase-admin silently honours it — so without this
+ * guard a "rescue" run would read an empty emulator, report zero work, and
+ * look like a success while production kept rotting. Require an explicit
+ * --emulator to target the emulator; otherwise strip the var. Kept in sync
+ * with scripts/backfill-ephemeral-generations.ts.
+ */
+function resolveTarget() {
+  const wantEmulator = process.argv.includes('--emulator');
+  const emuHost = process.env.FIRESTORE_EMULATOR_HOST;
+  if (wantEmulator) {
+    if (!emuHost) throw new Error('--emulator passed but FIRESTORE_EMULATOR_HOST is not set');
+    console.log(`target: EMULATOR ${emuHost}`);
+    return;
+  }
+  if (emuHost) {
+    console.log(`(ignoring FIRESTORE_EMULATOR_HOST=${emuHost}; pass --emulator to use it)`);
+    delete process.env.FIRESTORE_EMULATOR_HOST;
+  }
+  console.log('target: PRODUCTION loar-db');
+}
+
 function initDb(): Firestore {
   const existing = getApps()[0];
   if (existing) return getFirestore(existing);
+  resolveTarget();
+
+  // Prefer an explicit service account; fall back to Application Default
+  // Credentials (gcloud auth application-default login) when the configured
+  // key has no production access — the checked-in `local-emulator` key does not.
   const saPath = path.resolve(
     process.cwd(),
     process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? 'firebase-sa-key-20260416.json'
   );
-  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
-    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-    : JSON.parse(readFileSync(saPath, 'utf-8'));
-  const app = initializeApp({ credential: cert(serviceAccount) });
+  let credential;
+  try {
+    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
+      ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+      : JSON.parse(readFileSync(saPath, 'utf-8'));
+    if (
+      /local-emulator/.test(String(serviceAccount.client_email)) &&
+      !process.env.FIRESTORE_EMULATOR_HOST
+    ) {
+      console.log('(configured key is the local-emulator SA — using ADC instead)');
+      credential = applicationDefault();
+    } else {
+      credential = cert(serviceAccount);
+    }
+  } catch {
+    console.log('(no usable service account file — using ADC)');
+    credential = applicationDefault();
+  }
+
+  const app = initializeApp({ credential, projectId: 'loar-db' });
   const db = getFirestore(app);
   db.settings({ preferRest: true });
   return db;
