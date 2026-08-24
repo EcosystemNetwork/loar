@@ -36,6 +36,7 @@ const EPHEMERAL_HOSTS = [
   'pbxt.replicate.delivery',
   'oaidalleapiprodscus.blob.core.windows.net',
   'ark-acg',
+  'generativelanguage.googleapis.com', // Google-direct Veo/Gemini Files API — key-scoped, expires
 ];
 
 function isEphemeralUrl(url: string | null | undefined): boolean {
@@ -46,6 +47,20 @@ function isEphemeralUrl(url: string | null | undefined): boolean {
   } catch {
     return false;
   }
+}
+
+// Google's Gemini Files API (Google-direct Veo) scopes downloads to the API
+// key that created them — an unauthenticated fetch 403s even on a still-live
+// file. Keep in sync with fetchToBuffer's isGeminiFilesHost check
+// (apps/server/src/services/storage/types.ts), which the production rehost
+// path already goes through.
+function geminiAuthHeaders(url: string): Record<string, string> | undefined {
+  try {
+    if (new URL(url).hostname !== 'generativelanguage.googleapis.com') return undefined;
+  } catch {
+    return undefined;
+  }
+  return process.env.GOOGLE_API_KEY ? { 'x-goog-api-key': process.env.GOOGLE_API_KEY } : undefined;
 }
 
 function isPermanentUrl(url: string | null | undefined): boolean {
@@ -60,7 +75,11 @@ function isPermanentUrl(url: string | null | undefined): boolean {
 
 async function headOk(url: string): Promise<boolean> {
   try {
-    const res = await fetch(url, { method: 'HEAD', redirect: 'follow' });
+    const res = await fetch(url, {
+      method: 'HEAD',
+      redirect: 'follow',
+      headers: geminiAuthHeaders(url),
+    });
     return res.ok;
   } catch {
     return false;
@@ -93,7 +112,7 @@ async function pinFromUrl(url: string, filename: string): Promise<string | null>
   }
 
   try {
-    const res = await fetch(url, { redirect: 'follow' });
+    const res = await fetch(url, { redirect: 'follow', headers: geminiAuthHeaders(url) });
     if (!res.ok) return null;
     const buf = Buffer.from(await res.arrayBuffer());
     const contentType = res.headers.get('content-type') || 'application/octet-stream';

@@ -2,12 +2,12 @@
  * Media Lightbox — Full-screen modal for viewing gallery videos and images.
  * Click a gallery card to pop it out into this immersive viewer.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { X, Download, Heart, Eye, GitBranch, ArrowUpRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useGalleryLineage } from '@/hooks/useGallery';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { getIpfsUrlCandidatesPreferred, raceIpfsGateways, resolveIpfsUrl } from '@/utils/ipfs-url';
 import { ModelViewer } from '@/components/ModelViewer';
 
 interface MediaLightboxProps {
@@ -37,12 +37,73 @@ export function MediaLightbox({ content, onClose, onNavigate }: MediaLightboxPro
   const isVideo = content?.mediaType === 'video' || content?.mediaType === 'ai-video';
   const isAudio = content?.mediaType === 'audio';
   const is3D = content?.mediaType === '3d' || content?.mediaType === 'ai-3d';
+  const rawMediaUrl = content?.mediaUrl;
+
+  // Video/audio need the same gateway fallback chain every other player in
+  // the app uses (BranchingPlayer, useVideoLoad) — the public Pinata gateway
+  // is rate-limited unauthenticated, so handing the raw mediaUrl straight to
+  // the element leaves it stuck on a 429ing gateway with no way to reach the
+  // server-signed dedicated gateway or a verified-live public mirror.
+  const srcCandidates = useMemo(() => getIpfsUrlCandidatesPreferred(rawMediaUrl), [rawMediaUrl]);
+  const [orderedSrcCandidates, setOrderedSrcCandidates] = useState<string[]>(srcCandidates);
+  const [mediaSrcIndex, setMediaSrcIndex] = useState(0);
+
+  useEffect(() => {
+    setMediaSrcIndex(0);
+    setOrderedSrcCandidates(srcCandidates);
+    if (srcCandidates.length <= 1) return;
+
+    let cancelled = false;
+    const controller = new AbortController();
+    raceIpfsGateways(rawMediaUrl, { signal: controller.signal, timeoutMs: 2500 })
+      .then((best) => {
+        if (cancelled || !best) return;
+        setOrderedSrcCandidates((prev) => [best, ...prev.filter((c) => c !== best)]);
+      })
+      .catch(() => {
+        /* race failed — orderedSrcCandidates still has the sync fallback chain */
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+    // `srcCandidates` is a derived memo keyed on `rawMediaUrl`; keying this
+    // effect on `rawMediaUrl` avoids re-racing on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawMediaUrl]);
+
+  const handleMediaError = useCallback(() => {
+    setMediaSrcIndex((i) => (i + 1 < orderedSrcCandidates.length ? i + 1 : i));
+  }, [orderedSrcCandidates.length]);
+
+  // `onError` alone isn't reliable for a stuck gateway: browsers often retry
+  // failing byte-range requests (e.g. a 429) against the *same* URL for a
+  // long time — or indefinitely — before ever surfacing a MediaError, so a
+  // rate-limited gateway can hang the player forever with no fallback. Race
+  // a stall timer against real playback: if this candidate hasn't produced
+  // a frame within STALL_MS, treat it as failed and advance, same as
+  // `onError` would. `handleMediaError` itself is a no-op once we're on the
+  // last candidate, so this can't skip past a working final fallback.
+  const STALL_MS = 8000;
+  const stallTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    if (!(isVideo || isAudio)) return;
+    stallTimerRef.current = setTimeout(handleMediaError, STALL_MS);
+    return () => clearTimeout(stallTimerRef.current);
+    // Re-arm whenever the candidate we're actually trying changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVideo, isAudio, mediaSrcIndex, orderedSrcCandidates]);
+  const handleMediaProgress = useCallback(() => {
+    clearTimeout(stallTimerRef.current);
+  }, []);
+
   // Prefer the full-quality source; fall back to thumbnail so images always display
-  const videoSrc = content?.mediaUrl;
-  const audioSrc = content?.mediaUrl;
-  const modelSrc = content?.mediaUrl
-    ? resolveIpfsUrl(content.mediaUrl) || content.mediaUrl
-    : undefined;
+  const resolvedMediaUrl =
+    orderedSrcCandidates[mediaSrcIndex] || resolveIpfsUrl(rawMediaUrl) || rawMediaUrl;
+  const videoSrc = resolvedMediaUrl;
+  const audioSrc = resolvedMediaUrl;
+  const modelSrc = rawMediaUrl ? resolveIpfsUrl(rawMediaUrl) || rawMediaUrl : undefined;
   const imageSrc = content?.mediaUrl || content?.imageUrl || content?.thumbnailUrl;
   const mediaSrc = isVideo ? videoSrc : isAudio ? audioSrc : is3D ? modelSrc : imageSrc;
 
@@ -110,6 +171,8 @@ export function MediaLightbox({ content, onClose, onNavigate }: MediaLightboxPro
               loop
               playsInline
               preload="auto"
+              onError={handleMediaError}
+              onLoadedData={handleMediaProgress}
             />
           ) : is3D && modelSrc ? (
             <ModelViewer
@@ -122,7 +185,15 @@ export function MediaLightbox({ content, onClose, onNavigate }: MediaLightboxPro
             />
           ) : isAudio ? (
             <div className="flex items-center justify-center w-[60vw] max-w-[85vw] min-h-[40vh] p-8 bg-gradient-to-br from-emerald-500/20 to-cyan-500/20">
-              <audio key={mediaSrc} src={mediaSrc} controls autoPlay className="w-full" />
+              <audio
+                key={mediaSrc}
+                src={mediaSrc}
+                controls
+                autoPlay
+                className="w-full"
+                onError={handleMediaError}
+                onLoadedData={handleMediaProgress}
+              />
             </div>
           ) : (
             <>

@@ -12,6 +12,7 @@ const EPHEMERAL_HOSTS = [
   'pbxt.replicate.delivery',
   'oaidalleapiprodscus.blob.core.windows.net', // OpenAI DALL-E
   'ark-acg', // ByteDance TOS prefix
+  'generativelanguage.googleapis.com', // Google-direct Veo/Gemini Files API — key-scoped, expires
 ];
 
 export function isEphemeralUrl(url: string | null | undefined): boolean {

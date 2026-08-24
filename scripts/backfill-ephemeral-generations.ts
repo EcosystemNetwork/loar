@@ -52,6 +52,7 @@ const EPHEMERAL_HOSTS = [
   'replicate.delivery',
   'pbxt.replicate.delivery',
   'oaidalleapiprodscus.blob.core.windows.net',
+  'generativelanguage.googleapis.com', // Google-direct Veo/Gemini Files API — key-scoped, expires
 ];
 
 function isEphemeralUrl(url: unknown): url is string {
@@ -62,6 +63,20 @@ function isEphemeralUrl(url: unknown): url is string {
   } catch {
     return false;
   }
+}
+
+// Google's Gemini Files API (Google-direct Veo) scopes downloads to the API
+// key that created them — an unauthenticated fetch 403s even on a still-live
+// file. Keep in sync with fetchToBuffer's isGeminiFilesHost check
+// (apps/server/src/services/storage/types.ts), which the production rehost
+// path already goes through.
+function geminiAuthHeaders(url: string): Record<string, string> | undefined {
+  try {
+    if (new URL(url).hostname !== 'generativelanguage.googleapis.com') return undefined;
+  } catch {
+    return undefined;
+  }
+  return process.env.GOOGLE_API_KEY ? { 'x-goog-api-key': process.env.GOOGLE_API_KEY } : undefined;
 }
 
 function extFor(contentType: string): string {
@@ -146,7 +161,10 @@ async function pinFromUrl(url: string, basename: string): Promise<string | null>
   if (!APPLY) {
     let alive = false;
     try {
-      const res = await fetch(url, { redirect: 'follow', headers: { Range: 'bytes=0-2047' } });
+      const res = await fetch(url, {
+        redirect: 'follow',
+        headers: { Range: 'bytes=0-2047', ...geminiAuthHeaders(url) },
+      });
       alive = res.ok;
       if (!alive) console.log(`      source dead (${res.status})`);
     } catch (err) {
@@ -166,7 +184,7 @@ async function pinFromUrl(url: string, basename: string): Promise<string | null>
 
   let result: string | null = null;
   try {
-    const res = await fetch(url, { redirect: 'follow' });
+    const res = await fetch(url, { redirect: 'follow', headers: geminiAuthHeaders(url) });
     if (!res.ok) {
       // 403/404 => signature already expired. Nothing to recover.
       console.log(`      source dead (${res.status})`);
