@@ -68,7 +68,7 @@ const envSchema = z.object({
   REDIS_URL: z.string().url('REDIS_URL must be a valid URL (redis://...)').optional(),
 
   // ── Reverse proxy ───────────────────────────────────────────────────────
-  // Set to 'true' when behind a trusted reverse proxy (Railway, Fly, Vercel,
+  // Set to 'true' when behind a trusted reverse proxy (Railway, Fly,
   // nginx). Without this, the rate limiter keys on the socket remote address
   // — which on hosted platforms is the load balancer's IP, collapsing every
   // client into one bucket.
@@ -369,7 +369,7 @@ export function validateEnv(): Env {
 
     if (env.TRUST_PROXY !== 'true') {
       prodErrors.push(
-        'TRUST_PROXY=true is required in production. Hosted platforms (Railway/Fly/Vercel/nginx) ' +
+        'TRUST_PROXY=true is required in production. Hosted platforms (Railway/Fly/nginx) ' +
           'terminate TLS at a load balancer; without this flag the rate limiter keys on the LB IP ' +
           'and collapses every client into a single bucket. Verify your reverse proxy strips ' +
           'client-supplied x-forwarded-for / x-real-ip headers before enabling.'

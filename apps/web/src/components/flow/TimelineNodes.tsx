@@ -27,6 +27,7 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  Scissors,
 } from 'lucide-react';
 import { LoarIcon } from '@/components/loar-icons';
 import { useState, useEffect, memo } from 'react';
@@ -132,6 +133,12 @@ export interface TimelineNodeData {
   currentVersionIndex?: number; // -1 or undefined = latest (current), 0+ = historical version
   wiki?: { title?: string; summary?: string; plot?: string };
 
+  // ── Trim (in/out points) ────────────────────────────────────────
+  /** Start trim in milliseconds (default: 0) */
+  trimStart?: number;
+  /** End trim in milliseconds (default: full clip duration) */
+  trimEnd?: number;
+
   // ── Scene Controls (Node Editor Expansion v1) ──────────────────
   sceneControls?: SceneControls;
 
@@ -183,6 +190,8 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
     let playPromise: Promise<void> | undefined;
 
     if (isHovered) {
+      // Start the hover preview from the trim in-point, if one is set.
+      videoElement.currentTime = (data.trimStart ?? 0) / 1000;
       playPromise = videoElement.play();
       if (playPromise !== undefined) {
         playPromise.catch(() => {
@@ -204,7 +213,23 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
         videoElement.currentTime = 0;
       }
     }
-  }, [isHovered, videoElement]);
+  }, [isHovered, videoElement, data.trimStart]);
+
+  // Loop the hover preview back to the trim in-point at the trim out-point
+  // instead of the native `loop` attribute's restart-at-0 — otherwise a
+  // trimmed clip would keep playing past its out-point during preview.
+  useEffect(() => {
+    if (!videoElement || data.trimEnd == null) return;
+    const trimStartSec = (data.trimStart ?? 0) / 1000;
+    const trimEndSec = data.trimEnd / 1000;
+    const onTimeUpdate = () => {
+      if (videoElement.currentTime >= trimEndSec) {
+        videoElement.currentTime = trimStartSec;
+      }
+    };
+    videoElement.addEventListener('timeupdate', onTimeUpdate);
+    return () => videoElement.removeEventListener('timeupdate', onTimeUpdate);
+  }, [videoElement, data.trimStart, data.trimEnd]);
 
   const handleClick = () => {
     if (!data.universeId || data.isPending) return;
@@ -427,6 +452,15 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
                       title="Generated but not saved on-chain yet — click Save to make it permanent"
                     >
                       Unsaved
+                    </Badge>
+                  )}
+                  {((data.trimStart ?? 0) > 0 || data.trimEnd != null) && (
+                    <Badge
+                      variant="secondary"
+                      className="bg-zinc-700/90 text-white text-xs px-1 py-0.5"
+                      title="Clip is trimmed"
+                    >
+                      <Scissors className="h-3 w-3" />
                     </Badge>
                   )}
                   {/* Scene control indicators */}

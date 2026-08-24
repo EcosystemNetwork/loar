@@ -71,7 +71,7 @@ lint: ## Run linting
 check-types: ## Run TypeScript type checking across all apps
 	pnpm check-types
 
-# ---- Docker (server + indexer only; web deploys via Vercel) ----
+# ---- Docker (server + indexer only; web deploys via Netlify) ----
 
 docker-build: ## Build server + indexer containers
 	docker compose build

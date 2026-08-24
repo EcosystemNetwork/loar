@@ -99,7 +99,7 @@ const BLOCKERS: Blocker[] = [
     owner: 'ops',
     effort: 'hours',
     check: () => envSet('DMCA_PUTBACK_ENABLED'),
-    nextStep: 'Set DMCA_PUTBACK_ENABLED=true on Railway / Vercel for the prod replica.',
+    nextStep: 'Set DMCA_PUTBACK_ENABLED=true on Railway for the prod replica.',
     docAnchor: 'O1',
   },
 

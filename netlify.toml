@@ -13,8 +13,8 @@
 # Without this every deep link 404s: /gallery, /create, /universe/:id all
 # return Netlify's 404 page on direct navigation, refresh, or a shared link,
 # because no file exists at those paths. Netlify matches real static files
-# before applying a 200 rewrite, so /assets needs no exclusion (unlike the
-# regex carve-out vercel.json required for the same effect).
+# before applying a 200 rewrite, so /assets needs no exclusion (the old
+# vercel.json config needed a regex carve-out for the same effect).
 [[redirects]]
   from   = "/*"
   to     = "/index.html"

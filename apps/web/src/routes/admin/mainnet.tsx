@@ -2,7 +2,7 @@
  * /admin/mainnet — Mainnet Readiness Scorecard.
  *
  * Live status of every blocker tracked in docs/launch-readiness.md.
- * Env-var-driven checks update as ops sets values on Railway / Vercel.
+ * Env-var-driven checks update as ops sets values on Railway / Netlify.
  * External/legal items are surfaced as a checklist with concrete next steps.
  */
 

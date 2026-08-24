@@ -413,7 +413,7 @@ pnpm -F indexer dev    # indexer only (port 42069)
 
 ```
                     ┌─────────────────┐
-                    │   Vercel (CDN)   │  ← apps/web (static SPA)
+                    │  Netlify (CDN)   │  ← apps/web (static SPA)
                     │    loar.fun      │
                     └────────┬────────┘
                              │ HTTPS
@@ -428,17 +428,17 @@ pnpm -F indexer dev    # indexer only (port 42069)
   Storage providers   Ethereum RPC
 ```
 
-| Service              | Deployed To             | Trigger                                 |
-| -------------------- | ----------------------- | --------------------------------------- |
-| **Web**              | Vercel                  | Push to `main` (Vercel Git integration) |
-| **Server + Indexer** | Railway or VPS (Docker) | Push to `main`                          |
-| **Mobile**           | Expo (iOS + Android)    | `eas build` / `eas submit`              |
+| Service              | Deployed To             | Trigger                                  |
+| -------------------- | ----------------------- | ---------------------------------------- |
+| **Web**              | Netlify                 | Push to `main` (Netlify Git integration) |
+| **Server + Indexer** | Railway or VPS (Docker) | Push to `main`                           |
+| **Mobile**           | Expo (iOS + Android)    | `eas build` / `eas submit`               |
 
-### Web → Vercel
+### Web → Netlify
 
-1. Connect the repo to Vercel
-2. Set env vars in Vercel dashboard: `VITE_SERVER_URL`, `VITE_PONDER_URL`
-3. Build config is in `vercel.json` — SPA rewrites included
+1. Connect the repo to Netlify
+2. Set env vars in the Netlify site dashboard: `VITE_SERVER_URL`, `VITE_PONDER_URL`
+3. Build command/publish directory are set in the Netlify dashboard; `netlify.toml` at the repo root adds SPA rewrites, security headers, and asset caching on top
 
 ### Server + Indexer → Railway (recommended)
 
@@ -448,14 +448,14 @@ pnpm -F indexer dev    # indexer only (port 42069)
    - **loar-indexer** — root directory: `apps/indexer` (picks up `railway.toml`)
 3. Set env vars in each service's Railway dashboard (see [deployment docs](docs/deployment.md))
 4. Add custom domains: `api.loar.fun` → server, `idx.loar.fun` → indexer
-5. Update Vercel env vars: `VITE_SERVER_URL` and `VITE_PONDER_URL` to your Railway URLs
+5. Update Netlify env vars: `VITE_SERVER_URL` and `VITE_PONDER_URL` to your Railway URLs
 
 ### Server + Indexer → VPS (Docker, alternative)
 
 ```bash
 # On the VPS:
 git clone <repo-url> && cd loar
-cp .env.example .env   # fill in production values (CORS_ORIGIN = your Vercel URL)
+cp .env.example .env   # fill in production values (CORS_ORIGIN = your Netlify URL)
 docker compose build
 docker compose up -d
 ```

@@ -138,6 +138,14 @@ export interface LegacyEvent {
   additionType?: 'after' | 'branch';
   timestamp: number;
   position?: { x: number; y: number };
+
+  // Trimming — in/out points set from the Universe Editor's node trim
+  // control. Non-destructive: playback surfaces (SegmentPlayer, VideoTimeline)
+  // clip to this range instead of re-encoding the source video.
+  /** Start trim in milliseconds (default: 0) */
+  trimStart?: number;
+  /** End trim in milliseconds (default: videoDuration * 1000) */
+  trimEnd?: number;
 }
 
 /**
@@ -222,6 +230,8 @@ export function migrateLegacyEvent(legacyEvent: LegacyEvent): MultiSegmentEvent 
     characterIds: legacyEvent.characterIds,
     characterNames: legacyEvent.characterNames,
     negativePrompt: legacyEvent.negativePrompt,
+    startTrim: legacyEvent.trimStart,
+    endTrim: legacyEvent.trimEnd,
   };
 
   return {

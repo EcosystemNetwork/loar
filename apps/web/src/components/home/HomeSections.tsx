@@ -508,8 +508,9 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
         </div>
       )}
 
-      {/* Bottom fade into content */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
+      {/* Bottom fade into content — purely decorative, must not eat clicks on
+          the Explore/Details buttons it overlaps at the bottom of the hero */}
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
     </div>
   );
 }

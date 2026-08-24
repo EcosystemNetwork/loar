@@ -50,6 +50,7 @@ import {
   Hand,
   MousePointer2,
   Film,
+  Scissors,
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
@@ -143,6 +144,8 @@ import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { useNodeFilter } from '@/hooks/useNodeFilter';
 import type { ContextMenuState } from '@/components/flow/types';
 import { getSceneNodes } from '@/components/flow/types';
+import { VideoTrimmer } from '@/components/segments/VideoTrimmer';
+import type { VideoSegment } from '@/types/segments';
 
 // Custom MiniMap node — shape varies by node type
 function MiniMapNode({
@@ -358,6 +361,7 @@ function UniverseTimelineEditorInner() {
   const [editVideoPreview, setEditVideoPreview] = useState<string | null>(null);
   const [isUploadingEditVideo, setIsUploadingEditVideo] = useState(false);
   const editFileInputRef = useRef<HTMLInputElement>(null);
+  const [showTrimPanel, setShowTrimPanel] = useState(false);
 
   // Regeneration state
   const [regeneratingEventId, setRegeneratingEventId] = useState<string | null>(null);
@@ -1377,9 +1381,41 @@ function UniverseTimelineEditorInner() {
       setEditVideoUrl(currentUrl);
       setEditVideoFile(null);
       setEditVideoPreview(currentUrl || null);
+      setShowTrimPanel(false);
       setEditVideoDialogOpen(true);
     },
     [getStoredEvents]
+  );
+
+  // Persist trim in/out points for the video currently attached to an
+  // event — instant and non-destructive, same convention as the per-scene
+  // segment editor's VideoTrimmer (see event.$universe.$event.tsx).
+  const handleTrimChange = useCallback(
+    (eventId: string, startTrimMs: number, endTrimMs: number) => {
+      const eventsData = getStoredEvents();
+      const existingEvent = eventsData[eventId] || { eventId, timestamp: Date.now() };
+      existingEvent.trimStart = startTrimMs;
+      existingEvent.trimEnd = endTrimMs;
+      eventsData[eventId] = existingEvent;
+      setStoredEvents(eventsData);
+
+      setNodes((nds: any) =>
+        nds.map((node: any) => {
+          const nodeEventId = node.data.eventId;
+          const nodeBlockchainId = node.data.blockchainNodeId?.toString();
+          if (nodeEventId === eventId || nodeBlockchainId === eventId) {
+            return {
+              ...node,
+              data: { ...node.data, trimStart: startTrimMs, trimEnd: endTrimMs },
+            };
+          }
+          return node;
+        })
+      );
+
+      toast.success('Trim saved');
+    },
+    [getStoredEvents, setStoredEvents, setNodes]
   );
 
   // Regenerate a scene's video using the same generation context
@@ -2672,6 +2708,8 @@ function UniverseTimelineEditorInner() {
           isSelected: false,
           videoVersions,
           currentVersionIndex,
+          trimStart: localEvent?.trimStart,
+          trimEnd: localEvent?.trimEnd,
         },
       });
     });
@@ -3965,10 +4003,22 @@ function UniverseTimelineEditorInner() {
                   }}
                 />
                 <button
+                  onClick={() => setShowTrimPanel((v) => !v)}
+                  title="Trim clip"
+                  className={`absolute top-2 right-10 rounded-full p-1 transition-colors ${
+                    showTrimPanel
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-black/70 hover:bg-black/90 text-white'
+                  }`}
+                >
+                  <Scissors className="h-4 w-4" />
+                </button>
+                <button
                   onClick={() => {
                     setEditVideoPreview(null);
                     setEditVideoFile(null);
                     setEditVideoUrl('');
+                    setShowTrimPanel(false);
                   }}
                   className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full p-1 transition-colors"
                 >
@@ -3976,6 +4026,37 @@ function UniverseTimelineEditorInner() {
                 </button>
               </div>
             )}
+
+            {/* Trim in/out points — instant, non-destructive (respected by the
+                published watch/event/episode players via the shared segment
+                trim convention). */}
+            {showTrimPanel &&
+              editingEventId &&
+              editVideoPreview &&
+              (() => {
+                const eventData = getStoredEvents()[editingEventId];
+                const trimSegment: VideoSegment = {
+                  id: editingEventId,
+                  videoUrl: editVideoPreview,
+                  description: '',
+                  prompt: '',
+                  duration: eventData?.videoDuration || 8,
+                  order: 0,
+                  startTrim: eventData?.trimStart,
+                  endTrim: eventData?.trimEnd,
+                  model: 'fal-veo3',
+                  generatedAt: Date.now(),
+                  aspectRatio: '16:9',
+                  generationMode: 'text-to-video',
+                };
+                return (
+                  <VideoTrimmer
+                    segment={trimSegment}
+                    onTrimChange={handleTrimChange}
+                    onClose={() => setShowTrimPanel(false)}
+                  />
+                );
+              })()}
 
             {/* Regenerate with same context */}
             {editingEventId &&

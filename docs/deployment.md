@@ -6,18 +6,18 @@ The stack is split across two deployment targets by design:
 
 | Layer                | Platform                          | Why                                                                                                |
 | -------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **Web frontend**     | **Vercel**                        | Static SPA — global CDN, automatic HTTPS, git-push deploys, `VITE_*` env vars managed in dashboard |
+| **Web frontend**     | **Netlify**                       | Static SPA — global CDN, automatic HTTPS, git-push deploys, `VITE_*` env vars managed in dashboard |
 | **Server + Indexer** | **Railway** or **Docker Compose** | Stateful persistent processes — need direct chain access, Firebase Admin, restart policies         |
 | **Mobile**           | **Expo (EAS)**                    | iOS + Android builds via `eas build` / `eas submit`                                                |
 
 ## Architecture
 
-| Service   | Dockerfile                | Port  | Health Check  | Platform     |
-| --------- | ------------------------- | ----- | ------------- | ------------ |
-| `server`  | `apps/server/Dockerfile`  | 3000  | `GET /health` | Docker (VPS) |
-| `worker`  | `apps/server/Dockerfile`  | —     | Process state | Docker (VPS) |
-| `indexer` | `apps/indexer/Dockerfile` | 42069 | `GET /health` | Docker (VPS) |
-| `web`     | —                         | —     | —             | Vercel (CDN) |
+| Service   | Dockerfile                | Port  | Health Check  | Platform      |
+| --------- | ------------------------- | ----- | ------------- | ------------- |
+| `server`  | `apps/server/Dockerfile`  | 3000  | `GET /health` | Docker (VPS)  |
+| `worker`  | `apps/server/Dockerfile`  | —     | Process state | Docker (VPS)  |
+| `indexer` | `apps/indexer/Dockerfile` | 42069 | `GET /health` | Docker (VPS)  |
+| `web`     | —                         | —     | —             | Netlify (CDN) |
 
 The server, generation worker, and indexer connect via the `loar-network` bridge network. The API exposes Redis and queue status through `GET /health`; the standalone worker is supervised by its container process.
 
@@ -98,7 +98,7 @@ In Railway, add custom domains to each service:
 - `api.loar.fun` → server service
 - `idx.loar.fun` → indexer service
 
-Then update Vercel env vars:
+Then update Netlify env vars:
 
 - `VITE_SERVER_URL` = `https://api.loar.fun`
 - `VITE_PONDER_URL` = `https://idx.loar.fun`
@@ -143,7 +143,7 @@ make rollback         # roll back to previous SHA (reads .loar-deploy)
 ### Environment Variables in Docker
 
 - **Server & Indexer**: `.env` is injected at runtime via `env_file` in `docker-compose.yml`
-- **Web**: `VITE_*` variables are baked at build time by Vite. On Vercel, set them in the project dashboard — Vercel rebuilds on every push automatically.
+- **Web**: `VITE_*` variables are baked at build time by Vite. On Netlify, set them in the site dashboard — Netlify rebuilds on every push automatically.
 
 ### Health Checks
 
@@ -153,7 +153,7 @@ All services expose health endpoints. Docker checks them every 30s and restarts 
 # Manual verification
 curl http://localhost:3000/health   # Server — returns JSON with status, uptime, env
 curl http://localhost:42069/health  # Indexer — returns JSON with status
-# Web health is monitored by Vercel (dashboard → Deployments)
+# Web health is monitored by Netlify (dashboard → Deploys)
 ```
 
 ### Build Details
@@ -164,7 +164,7 @@ curl http://localhost:42069/health  # Indexer — returns JSON with status
 - Bundles to single ESM file, excludes `better-sqlite3` (native module)
 - Production image: `node:20-alpine` + `curl` (for healthcheck)
 
-**Web**: deployed via Vercel (see [Vercel section](#vercel-web-frontend-only) below — no Dockerfile needed).
+**Web**: deployed via Netlify (see [Netlify section](#netlify-web-frontend-only) below — no Dockerfile needed).
 
 **Indexer** (`apps/indexer/Dockerfile`):
 
@@ -220,23 +220,17 @@ Runs on every push/PR to `main`:
 2. **Build**: full Turbo build
 3. **Contracts**: Foundry fmt → build → test
 
-## Vercel (Web Frontend Only)
+## Netlify (Web Frontend Only)
 
-`vercel.json` at the repo root deploys **only the web app** as a static site:
+`netlify.toml` at the repo root deploys **only the web app** as a static site. It deliberately has no `[build]` block — the build command, publish directory, and base are set in the Netlify site dashboard, which is the source of truth for the build; `netlify.toml` only adds things a dashboard-only setup can't express:
 
-```json
-{
-  "buildCommand": "cd apps/web && pnpm run build",
-  "outputDirectory": "apps/web/dist",
-  "installCommand": "npm i -g pnpm@9.15.0 && pnpm install --frozen-lockfile",
-  "framework": null,
-  "rewrites": [{ "source": "/((?!assets/).*)", "destination": "/index.html" }]
-}
-```
+- SPA fallback (`/* → /index.html`, 200) so deep links like `/gallery` and `/universe/:id` don't 404 on refresh
+- Security headers (HSTS, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`)
+- Immutable caching for content-hashed files under `/assets`, and no-cache for `/index.html`
 
-Vercel handles the web frontend. The server and indexer must be deployed separately (Docker on a VPS, Railway, Fly.io, etc.).
+Netlify handles the web frontend. The server and indexer must be deployed separately (Docker on a VPS, Railway, Fly.io, etc.).
 
-Set `VITE_SERVER_URL` and `VITE_PONDER_URL` in Vercel's environment variables to point at your deployed server and indexer.
+Set `VITE_SERVER_URL` and `VITE_PONDER_URL` in Netlify's environment variables to point at your deployed server and indexer.
 
 ## Manual Deployment (Without Docker)
 
@@ -328,9 +322,9 @@ See [contracts.md](./contracts.md) for the full address table and architecture d
 
 Each service receives only the secrets it needs. The tables below list the exact vars to configure per platform.
 
-### Vercel (web only)
+### Netlify (web only)
 
-Set these in **Vercel → Settings → Environment Variables**. All are `VITE_` prefixed and safe to expose publicly — they are baked into the JS bundle.
+Set these in **Netlify → Site configuration → Environment variables**. All are `VITE_` prefixed and safe to expose publicly — they are baked into the JS bundle.
 
 | Variable                | Required    | Notes                               |
 | ----------------------- | ----------- | ----------------------------------- |
@@ -340,7 +334,7 @@ Set these in **Vercel → Settings → Environment Variables**. All are `VITE_` 
 | `VITE_FIREBASE_*`       | optional    | Firebase web client config (6 vars) |
 | `VITE_ADMIN_ADDRESSES`  | optional    | Comma-separated admin wallets       |
 
-> ⚠ Never add `FIREBASE_SERVICE_ACCOUNT` or any server secret to Vercel — those belong on the server only.
+> ⚠ Never add `FIREBASE_SERVICE_ACCOUNT` or any server secret to Netlify — those belong on the server only.
 
 ### Docker / VPS (server)
 
@@ -379,7 +373,7 @@ Rotating one secret does **not** require rebuilding unrelated services:
 | `FIREBASE_SERVICE_ACCOUNT` | server  | Restart server                                                       |
 | AI keys (`FAL_KEY`, etc.)  | server  | Restart server                                                       |
 | `PONDER_RPC_URL_2`         | indexer | Restart indexer only                                                 |
-| Any `VITE_*` var           | web     | Update Vercel dashboard → redeploy web                               |
+| Any `VITE_*` var           | web     | Update Netlify dashboard → redeploy web                              |
 | `PRIVATE_KEY`              | server  | Restart server; update on-chain authorized address if wallet changed |
 
 ## Environment Matrix
@@ -410,11 +404,11 @@ Rotating one secret does **not** require rebuilding unrelated services:
 - [ ] `PONDER_RPC_URL_2` uses a production-grade RPC endpoint (paid tier)
 - [ ] Indexer starts cleanly — no `❌ Indexer environment validation failed` in logs
 
-**Web (Vercel)**
+**Web (Netlify)**
 
 - [ ] `VITE_SERVER_URL` and `VITE_PONDER_URL` point at production endpoints
-- [ ] No server secrets set in Vercel env vars
-- [ ] Vercel deployment is live
+- [ ] No server secrets set in Netlify env vars
+- [ ] Netlify deployment is live
 
 **Infrastructure**
 

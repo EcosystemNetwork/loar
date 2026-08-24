@@ -20,7 +20,6 @@ firebase-service-account.json
 firebase-sa-key-*.json
 build.log
 .gitnexus
-.vercel
 .firebase
 apps/contracts/broadcast/
 
