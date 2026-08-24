@@ -26,6 +26,9 @@ interface UseCollaborativeEntityProps {
   entityId: string;
   enabled?: boolean;
   displayName?: string;
+  /** Seeds live state so fields are editable immediately, before the first
+   *  `entity_update` SSE event round-trips (join → SSE connect → snapshot). */
+  initialEntity?: Entity | null;
 }
 
 interface UseCollaborativeEntityReturn {
@@ -51,8 +54,12 @@ export function useCollaborativeEntity({
   entityId,
   enabled = true,
   displayName,
+  initialEntity,
 }: UseCollaborativeEntityProps): UseCollaborativeEntityReturn {
-  const [entity, setEntity] = useState<Entity | null>(null);
+  // Seed from initialEntity (not null) so optimistic updates in updateField
+  // have something to merge into before the first live snapshot arrives —
+  // otherwise early keystrokes are dropped by the controlled-input revert.
+  const [entity, setEntity] = useState<Entity | null>(initialEntity ?? null);
   const [editors, setEditors] = useState<ActiveEditor[]>([]);
   const [lockedFields, setLockedFields] = useState<Record<string, LockedField>>({});
   const [isConnected, setIsConnected] = useState(false);
@@ -63,6 +70,9 @@ export function useCollaborativeEntity({
   const eventSourceRef = useRef<EventSource | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const debounceTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  // Latest not-yet-sent value per field, kept in step with debounceTimers so
+  // an unmount/entityId-change can flush instead of silently dropping it.
+  const pendingUpdates = useRef<Map<string, string | number | boolean | null>>(new Map());
   const queryClient = useQueryClient();
 
   // Join session on mount
@@ -160,6 +170,26 @@ export function useCollaborativeEntity({
     return () => {
       cancelled = true;
 
+      // Flush any debounced edits that hadn't fired yet — otherwise closing
+      // the editor or switching entities within the 300ms debounce window
+      // silently drops the last keystroke(s): never sent to the server,
+      // never in the audit trail.
+      if (sessionIdRef.current) {
+        const flushSessionId = sessionIdRef.current;
+        debounceTimers.current.forEach((timer, fieldPath) => {
+          clearTimeout(timer);
+          const value = pendingUpdates.current.get(fieldPath);
+          if (value === undefined) return;
+          trpcClient.collaboration.updateField
+            .mutate({ entityId, sessionId: flushSessionId, fieldPath, value })
+            .catch((err) => console.error('Failed to flush pending edit on close:', err));
+        });
+      } else {
+        debounceTimers.current.forEach((timer) => clearTimeout(timer));
+      }
+      debounceTimers.current.clear();
+      pendingUpdates.current.clear();
+
       // Leave session
       if (sessionIdRef.current) {
         trpcClient.collaboration.leaveSession
@@ -179,10 +209,6 @@ export function useCollaborativeEntity({
         heartbeatRef.current = null;
       }
 
-      // Clear debounce timers
-      debounceTimers.current.forEach((timer) => clearTimeout(timer));
-      debounceTimers.current.clear();
-
       setIsConnected(false);
       setSessionId(null);
       sessionIdRef.current = null;
@@ -195,6 +221,8 @@ export function useCollaborativeEntity({
       // Clear existing debounce for this field
       const existing = debounceTimers.current.get(fieldPath);
       if (existing) clearTimeout(existing);
+
+      pendingUpdates.current.set(fieldPath, value);
 
       // Optimistic local update
       setEntity((prev) => {
@@ -211,6 +239,8 @@ export function useCollaborativeEntity({
 
       // Debounce the server call (300ms)
       const timer = setTimeout(async () => {
+        debounceTimers.current.delete(fieldPath);
+        pendingUpdates.current.delete(fieldPath);
         if (!sessionIdRef.current) return;
         try {
           await trpcClient.collaboration.updateField.mutate({
@@ -241,6 +271,13 @@ export function useCollaborativeEntity({
           sessionId: sessionIdRef.current,
           fieldPath,
         });
+        if (result.ok) {
+          // Surface which field this session is on so other editors' presence
+          // badges can show "editing X" instead of just a bare name.
+          trpcClient.collaboration.heartbeat
+            .mutate({ sessionId: sessionIdRef.current, activeField: fieldPath })
+            .catch(() => {});
+        }
         return result.ok;
       } catch {
         return false;
@@ -259,6 +296,12 @@ export function useCollaborativeEntity({
         });
       } catch {
         // Unlock failed — lock will expire via TTL
+      } finally {
+        if (sessionIdRef.current) {
+          trpcClient.collaboration.heartbeat
+            .mutate({ sessionId: sessionIdRef.current, activeField: null })
+            .catch(() => {});
+        }
       }
     },
     [entityId]

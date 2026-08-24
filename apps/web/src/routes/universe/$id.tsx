@@ -272,6 +272,17 @@ function UniverseTimelineEditorInner() {
   // would otherwise wipe the placeholder mid-generation.
   const pendingVideoNodeRef = useRef<Node<TimelineNodeData> | null>(null);
 
+  // Fingerprint of the last node set the graph-rebuild effect below fit the
+  // view for. `graphData` (and `applySavedPositions`, whose identity flips
+  // on every layout-cache update) recompute — and thus re-run that effect —
+  // far more often than the actual set of nodes changes: a media-override
+  // refetch, a position autosave, a background contract refetch after any
+  // save. Without this guard every one of those replays the 300ms animated
+  // fitView, which reads as the whole graph "spawning in" repeatedly even
+  // though nothing visible changed. Only re-fit when nodes were genuinely
+  // added/removed (or on the first successful load).
+  const lastFitSignatureRef = useRef<string | null>(null);
+
   // The graph is rebuilt from blockchain data + a tree-layout algorithm on
   // every load, which would otherwise discard any manual rearrangement.
   const { applySavedPositions, savePosition } = useGraphLayout(id, 'universe');
@@ -2858,18 +2869,26 @@ function UniverseTimelineEditorInner() {
     // otherwise drop it (e.g. on a graphData refetch mid-generation).
     const nextNodes = applySavedPositions(blockchainNodes) as Node<TimelineNodeData>[];
     const pending = pendingVideoNodeRef.current;
-    setNodes(
-      (pending && !nextNodes.some((n) => n.id === pending.id)
-        ? [...nextNodes, pending]
-        : nextNodes) as any
-    );
+    const finalNodes =
+      pending && !nextNodes.some((n) => n.id === pending.id) ? [...nextNodes, pending] : nextNodes;
+    setNodes(finalNodes as any);
     setEdges(blockchainEdges);
     setEventCounter(graphData.nodeIds.length + 1);
 
-    // Re-fit the viewport after nodes are rendered so outlier nodes are reachable
-    requestAnimationFrame(() => {
-      fitView({ padding: 0.15, duration: 300 });
-    });
+    // Re-fit the viewport only when the node set actually changed (added,
+    // removed, or first load) — not on every rebuild of this effect, which
+    // fires far more often than the visible graph actually changes (see
+    // lastFitSignatureRef above).
+    const fitSignature = finalNodes
+      .map((n) => n.id)
+      .sort()
+      .join(',');
+    if (lastFitSignatureRef.current !== fitSignature) {
+      lastFitSignatureRef.current = fitSignature;
+      requestAnimationFrame(() => {
+        fitView({ padding: 0.15, duration: 300 });
+      });
+    }
   }, [
     graphData,
     finalUniverse?.id,

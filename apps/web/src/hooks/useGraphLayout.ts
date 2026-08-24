@@ -12,19 +12,22 @@
  * `timeline:${timelineId}`, 'anatomy'.
  */
 import { useCallback, useEffect, useRef } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Node } from 'reactflow';
 import { trpcClient } from '@/utils/trpc';
 
 type Position = { x: number; y: number };
+type LayoutQueryData = { positions: Record<string, Position>; updatedAt: string | null } | null;
 
 const SAVE_DEBOUNCE_MS = 600;
 
 export function useGraphLayout(universeId: string | undefined, graphKey: string) {
   const enabled = !!universeId;
+  const queryClient = useQueryClient();
+  const queryKey = ['graphLayout', universeId, graphKey] as const;
 
   const layoutQuery = useQuery({
-    queryKey: ['graphLayout', universeId, graphKey],
+    queryKey,
     queryFn: () => trpcClient.graphLayouts.get.query({ universeId: universeId!, graphKey }),
     enabled,
     staleTime: 60_000,
@@ -33,6 +36,18 @@ export function useGraphLayout(universeId: string | undefined, graphKey: string)
   const saveMutation = useMutation({
     mutationFn: (positions: Record<string, Position>) =>
       trpcClient.graphLayouts.save.mutate({ universeId: universeId!, graphKey, positions }),
+    // Merge the just-saved positions into the cached layout immediately.
+    // Without this, `applySavedPositions` keeps serving pre-drag coordinates
+    // (the query's 60s staleTime, or the server's own eventual consistency)
+    // until the next natural refetch — so any graphData-triggered rebuild in
+    // between (adding a node, refreshing the timeline, a post-save refetch)
+    // silently reverts the drag the user just made.
+    onSuccess: (_result, positions) => {
+      queryClient.setQueryData(queryKey, (old: LayoutQueryData) => ({
+        positions: { ...(old?.positions ?? {}), ...positions },
+        updatedAt: new Date().toISOString(),
+      }));
+    },
   });
 
   // Batch rapid drag-stop events into one save call instead of one per node.

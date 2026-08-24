@@ -160,6 +160,7 @@ export function useContractSave({
       // Step 1: Upload to decentralized storage via unified StorageManager
       let storageUrl: string | null = null;
       let contentHashHex: string | null = null;
+      let storagePersisted = false;
 
       try {
         const uuid = crypto.randomUUID();
@@ -170,13 +171,26 @@ export function useContractSave({
 
         contentHashHex = manifest.contentHash;
         storageUrl = manifest.uploads[0]?.url || generatedVideoUrl;
+        storagePersisted = true;
         setStorageKey(manifest.contentHash);
         setStorageSaved(true);
 
         setGeneratedVideoUrl(storageUrl);
       } catch (storageError) {
-        // Storage failed — fall back to original URL
+        // Storage failed — fall back to the original (often ephemeral,
+        // provider-hosted) URL. This is about to be written on-chain
+        // *permanently*, so don't swallow it quietly: warn loudly rather
+        // than let the user believe decentralized storage happened.
+        console.error(
+          '[useContractSave] Decentralized storage upload failed, falling back to source URL:',
+          storageError
+        );
         storageUrl = generatedVideoUrl;
+        toast.warning('Decentralized storage upload failed', {
+          description:
+            'Continuing with the original video URL. It may expire — the on-chain record will still point at it.',
+          duration: 8000,
+        });
       }
 
       setIsSavingToStorage(false);
@@ -271,10 +285,15 @@ export function useContractSave({
 
       setContractSaved(true);
 
-      toast.success('Event Saved to Blockchain & Decentralized Storage!', {
-        description: `Node #${newNodeId} stored on-chain.\nTransaction: ${txHash.substring(0, 10)}...${txHash.substring(txHash.length - 8)}`,
-        duration: 8000,
-      });
+      toast.success(
+        storagePersisted
+          ? 'Event Saved to Blockchain & Decentralized Storage!'
+          : 'Event Saved to Blockchain (storage upload failed — using original URL)',
+        {
+          description: `Node #${newNodeId} stored on-chain.\nTransaction: ${txHash.substring(0, 10)}...${txHash.substring(txHash.length - 8)}`,
+          duration: 8000,
+        }
+      );
 
       // Step 6: Generate wiki entry in background (non-blocking)
       // Build previousEvents from local description store + graphData fallback

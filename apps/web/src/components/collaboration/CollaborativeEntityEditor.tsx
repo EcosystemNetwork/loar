@@ -149,6 +149,7 @@ export function CollaborativeEntityEditor({
     entityId,
     enabled: true,
     displayName: currentAddress?.slice(0, 10) || 'Anonymous',
+    initialEntity,
   });
 
   // Use live entity if available, fallback to initial

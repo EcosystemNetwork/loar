@@ -108,12 +108,26 @@ export function UniverseProfileEditor({ open, onOpenChange, universe }: Props) {
         metadataUpdates.imageUrl !== undefined ||
         metadataUpdates.portraitImageUrl !== undefined;
 
+      let metadataSaved = false;
       if (hasMetadataChange) {
         await trpcClient.universes.updateMetadata.mutate(metadataUpdates);
+        metadataSaved = true;
       }
 
       if (!isMonetized && isPrivate !== Boolean(universe.isPrivate)) {
-        await trpcClient.universes.setPrivate.mutate({ universeId, isPrivate });
+        try {
+          await trpcClient.universes.setPrivate.mutate({ universeId, isPrivate });
+        } catch (err) {
+          // Metadata may have already saved above — don't report a blanket
+          // "failed to save" when part of the change actually went through.
+          throw new Error(
+            metadataSaved
+              ? `Profile details saved, but visibility change failed: ${err instanceof Error ? err.message : 'unknown error'}`
+              : err instanceof Error
+                ? err.message
+                : 'Failed to save profile'
+          );
+        }
       }
     },
     onSuccess: () => {
@@ -125,6 +139,11 @@ export function UniverseProfileEditor({ open, onOpenChange, universe }: Props) {
       onOpenChange(false);
     },
     onError: (err) => {
+      // Refresh regardless — a partial failure may still have persisted the
+      // metadata half of the change, and stale cached data shouldn't linger.
+      queryClient.invalidateQueries({ queryKey: ['universe'] });
+      queryClient.invalidateQueries({ queryKey: ['universes'] });
+      queryClient.invalidateQueries({ queryKey: ['universe-metadata', universeId] });
       toast.error(err instanceof Error ? err.message : 'Failed to save profile');
     },
   });

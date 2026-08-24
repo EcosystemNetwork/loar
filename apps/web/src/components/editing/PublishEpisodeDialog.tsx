@@ -15,7 +15,7 @@
  * available on the agent owner's wallet (G1's `onchain.nft.mintEpisode`
  * action covers the pipeline path; this dialog is the manual path).
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -53,6 +53,15 @@ export function PublishEpisodeDialog({ open, onOpenChange, videoUrl }: PublishEp
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [publishAsCanon, setPublishAsCanon] = useState(false);
+  // Episode created by a prior attempt in this same dialog session — reused
+  // on retry so a canon-publish failure after a successful create doesn't
+  // spawn a duplicate episode.
+  const createdEpisodeIdRef = useRef<string | null>(null);
+
+  // Fresh open = fresh attempt; don't carry a stale episode id across opens.
+  useEffect(() => {
+    if (open) createdEpisodeIdRef.current = null;
+  }, [open]);
 
   const universesQuery = useQuery({
     queryKey: ['universes', 'byCreator', address],
@@ -70,20 +79,28 @@ export function PublishEpisodeDialog({ open, onOpenChange, videoUrl }: PublishEp
       if (!title.trim()) throw new Error('Title required');
 
       // 1. Create the episode (single clip wrapping the editor's current video)
-      const episode = (await trpcClient.episodes.create.mutate({
-        universeId,
-        title: title.trim(),
-        description: description.trim(),
-        clips: [
-          {
-            nodeId: `editor-${Date.now()}`,
-            label: title.trim(),
-            videoUrl,
-            trimStart: 0,
-            trimEnd: 0,
-          },
-        ],
-      })) as { id: string };
+      //    — reuse the episode from a prior failed attempt in this session
+      //    instead of creating a duplicate.
+      let episode: { id: string };
+      if (createdEpisodeIdRef.current) {
+        episode = { id: createdEpisodeIdRef.current };
+      } else {
+        episode = (await trpcClient.episodes.create.mutate({
+          universeId,
+          title: title.trim(),
+          description: description.trim(),
+          clips: [
+            {
+              nodeId: `editor-${Date.now()}`,
+              label: title.trim(),
+              videoUrl,
+              trimStart: 0,
+              trimEnd: 0,
+            },
+          ],
+        })) as { id: string };
+        createdEpisodeIdRef.current = episode.id;
+      }
 
       // 2. Optionally publish as canon (off-chain "fun" path for v1)
       if (publishAsCanon) {
@@ -101,6 +118,7 @@ export function PublishEpisodeDialog({ open, onOpenChange, videoUrl }: PublishEp
       queryClient.invalidateQueries({ queryKey: ['episodes'] });
       onOpenChange(false);
       // Reset
+      createdEpisodeIdRef.current = null;
       setTitle('');
       setDescription('');
       setPublishAsCanon(false);
