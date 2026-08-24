@@ -259,57 +259,88 @@ async function processGenerationBody(
     // Rehost to permanent storage (IPFS/Filecoin) BEFORE writing the content
     // doc, so the gallery never points to an ephemeral provider URL that will
     // 403 when the short-lived signed URL expires.
+    //
+    // A single attempt used to fall straight through to the ephemeral URL on
+    // any hiccup (a transient network blip, a slow upstream) with nothing but
+    // a console.error to show for it — no retry, no record that the doc was
+    // now a ticking clock. That's how ~150 docs across the platform (mostly
+    // one universe's video library) silently rotted once their providers'
+    // presigned URLs expired, with no signal until users started seeing
+    // broken players. Retry a few times before giving up, and if it still
+    // fails, mark the doc so it's queryable/repairable before it goes dead
+    // instead of only after.
     let permanentUrl: string | null = null;
     let storageContentHash: string | null = null;
-    try {
-      const manager = getStorageManager();
-      const filename = `generation-${data.generationId}.mp4`;
-      // Google's Gemini Files API (Google-direct Veo) scopes downloads to
-      // the API key that created them — an unauthenticated fetch, or one
-      // authenticated with a *different* key (e.g. the platform pool key
-      // when this file was generated with a user's BYOK key), 403s here.
-      // Reuse the exact key the dispatch used; only fall back to the pool
-      // env var if that key somehow never got captured.
-      const isGeminiFilesHost = (() => {
-        try {
-          return new URL(result.videoUrl!).hostname === 'generativelanguage.googleapis.com';
-        } catch {
-          return false;
+    let mirrorAttempts = 0;
+    let lastMirrorError: unknown;
+    const MAX_MIRROR_ATTEMPTS = 3;
+    while (mirrorAttempts < MAX_MIRROR_ATTEMPTS && permanentUrl === null) {
+      mirrorAttempts++;
+      try {
+        const manager = getStorageManager();
+        const filename = `generation-${data.generationId}.mp4`;
+        // Google's Gemini Files API (Google-direct Veo) scopes downloads to
+        // the API key that created them — an unauthenticated fetch, or one
+        // authenticated with a *different* key (e.g. the platform pool key
+        // when this file was generated with a user's BYOK key), 403s here.
+        // Reuse the exact key the dispatch used; only fall back to the pool
+        // env var if that key somehow never got captured.
+        const isGeminiFilesHost = (() => {
+          try {
+            return new URL(result.videoUrl!).hostname === 'generativelanguage.googleapis.com';
+          } catch {
+            return false;
+          }
+        })();
+        const geminiRehostKey = googleApiKeyForRehost || process.env.GOOGLE_API_KEY;
+        if (isGeminiFilesHost && !geminiRehostKey) {
+          // No key available to re-fetch this file at all — persisting the raw
+          // ephemeral URL below is guaranteed to 403 in every viewer's browser
+          // (Google requires the creating key on every download). Surface this
+          // loudly instead of silently falling through.
+          console.error(
+            `[worker] no Google API key available to rehost ${data.generationId} — ` +
+              `gallery/content doc will fall back to an ephemeral Gemini Files URL that will 403 for viewers`
+          );
         }
-      })();
-      const geminiRehostKey = googleApiKeyForRehost || process.env.GOOGLE_API_KEY;
-      if (isGeminiFilesHost && !geminiRehostKey) {
-        // No key available to re-fetch this file at all — persisting the raw
-        // ephemeral URL below is guaranteed to 403 in every viewer's browser
-        // (Google requires the creating key on every download). Surface this
-        // loudly instead of silently falling through.
-        console.error(
-          `[worker] no Google API key available to rehost ${data.generationId} — ` +
-            `gallery/content doc will fall back to an ephemeral Gemini Files URL that will 403 for viewers`
-        );
-      }
-      const response = await fetch(result.videoUrl!, {
-        headers:
-          isGeminiFilesHost && geminiRehostKey ? { 'x-goog-api-key': geminiRehostKey } : undefined,
-      });
-      if (!response.ok) {
-        throw new Error(`Source fetch failed: ${response.status} ${response.statusText}`);
-      }
-      const arrayBuf = await response.arrayBuffer();
-      const rawBuffer: Buffer = Buffer.from(new Uint8Array(arrayBuf));
+        const response = await fetch(result.videoUrl!, {
+          headers:
+            isGeminiFilesHost && geminiRehostKey
+              ? { 'x-goog-api-key': geminiRehostKey }
+              : undefined,
+        });
+        if (!response.ok) {
+          throw new Error(`Source fetch failed: ${response.status} ${response.statusText}`);
+        }
+        const arrayBuf = await response.arrayBuffer();
+        const rawBuffer: Buffer = Buffer.from(new Uint8Array(arrayBuf));
 
-      const videoBuffer = await signWithProvenance(rawBuffer, filename, {
-        model: data.finalModelId,
-        prompt: data.originalPrompt,
-        generatedAt: new Date().toISOString(),
-        mimeType: 'video/mp4',
-      });
+        const videoBuffer = await signWithProvenance(rawBuffer, filename, {
+          model: data.finalModelId,
+          prompt: data.originalPrompt,
+          generatedAt: new Date().toISOString(),
+          mimeType: 'video/mp4',
+        });
 
-      const manifest = await manager.upload(videoBuffer, filename, 'video/mp4', data.userId);
-      permanentUrl = manifest.uploads[0]?.url ?? null;
-      storageContentHash = manifest.contentHash;
-    } catch (err) {
-      console.error(`[worker] storage persist failed for ${data.generationId}:`, err);
+        const manifest = await manager.upload(videoBuffer, filename, 'video/mp4', data.userId);
+        permanentUrl = manifest.uploads[0]?.url ?? null;
+        storageContentHash = manifest.contentHash;
+      } catch (err) {
+        lastMirrorError = err;
+        if (mirrorAttempts < MAX_MIRROR_ATTEMPTS) {
+          console.warn(
+            `[worker] storage persist attempt ${mirrorAttempts}/${MAX_MIRROR_ATTEMPTS} failed for ${data.generationId}, retrying:`,
+            err
+          );
+          await new Promise((r) => setTimeout(r, 1000 * mirrorAttempts));
+        }
+      }
+    }
+    if (permanentUrl === null) {
+      console.error(
+        `[worker] storage persist failed for ${data.generationId} after ${mirrorAttempts} attempts:`,
+        lastMirrorError
+      );
       // Fall through — content doc will use the ephemeral URL rather than fail the job.
     }
 

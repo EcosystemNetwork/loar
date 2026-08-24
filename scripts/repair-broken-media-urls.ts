@@ -67,31 +67,54 @@ function isEphemeralUrl(url: string): boolean {
 
 // Dedicated `.mypinata.cloud` gateways 401 unauthenticated requests outright
 // — including our own liveness probe — regardless of whether the CID is
-// still actually retrievable on the public network. Probe the public gateway
-// instead so a live pin isn't misclassified as dead just because the private
-// gateway needs a token we don't have here.
-function toLivenessCheckUrl(url: string): string {
+// still actually retrievable on the public network. A single public gateway
+// isn't trustworthy either: racing one gateway (ipfs.io) with a 5s timeout
+// produced wildly different broken/live splits across consecutive runs on
+// the exact same candidate set (2123 vs 1677 broken out of 2381; a follow-up
+// consensus check found 98% of what that flagged as "dead" was actually
+// alive). Race several public gateways with a generous per-gateway timeout
+// instead — alive if ANY responds 2xx.
+const PUBLIC_IPFS_GATEWAYS = [
+  'https://ipfs.io/ipfs/',
+  'https://dweb.link/ipfs/',
+  'https://gateway.pinata.cloud/ipfs/',
+  'https://w3s.link/ipfs/',
+];
+
+function extractIpfsCid(url: string): string | null {
   try {
     const u = new URL(url);
-    if (!u.host.toLowerCase().endsWith('.mypinata.cloud')) return url;
+    if (!u.host.toLowerCase().endsWith('.mypinata.cloud')) return null;
     const m = u.pathname.match(/^\/ipfs\/(.+)$/);
-    return m ? `https://ipfs.io/ipfs/${m[1]}` : url;
+    return m ? m[1] : null;
   } catch {
-    return url;
+    return null;
   }
 }
 
-async function headOk(url: string, timeoutMs = 5000): Promise<boolean> {
+async function headOkOne(url: string, timeoutMs: number): Promise<boolean> {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), timeoutMs);
   try {
-    const c = new AbortController();
-    const t = setTimeout(() => c.abort(), timeoutMs);
-    const r = await fetch(toLivenessCheckUrl(url), {
-      method: 'HEAD',
-      signal: c.signal,
-      redirect: 'follow',
-    });
-    clearTimeout(t);
+    const r = await fetch(url, { method: 'HEAD', signal: c.signal, redirect: 'follow' });
     return r.status >= 200 && r.status < 400;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function headOk(url: string, timeoutMs = 12000): Promise<boolean> {
+  try {
+    const cid = extractIpfsCid(url);
+    if (cid) {
+      const results = await Promise.all(
+        PUBLIC_IPFS_GATEWAYS.map((gw) => headOkOne(`${gw}${cid}`, timeoutMs))
+      );
+      return results.some(Boolean);
+    }
+    return await headOkOne(url, timeoutMs);
   } catch {
     return false;
   }
