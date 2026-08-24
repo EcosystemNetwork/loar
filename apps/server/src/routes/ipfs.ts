@@ -36,12 +36,13 @@ function gatewayToken(): string {
   return (process.env.PINATA_GATEWAY_TOKEN || '').trim();
 }
 
+// cloudflare-ipfs.com removed 2026-08-24 — Cloudflare shut down its public
+// IPFS gateway (NXDOMAIN now); see apps/web/src/utils/ipfs-url.ts.
 const KNOWN_GATEWAY_HOSTS = new Set<string>([
   'gateway.pinata.cloud',
   'w3s.link',
   'ipfs.io',
   'dweb.link',
-  'cloudflare-ipfs.com',
   '4everland.io',
   'nftstorage.link',
 ]);

@@ -85,10 +85,12 @@ export function resolveIpfsUrl(url?: string | null): string {
 // they stall on CIDv0. raceIpfsGateways() probes these in parallel anyway, so
 // a degraded leader can't block — but the order sets the sync-default and the
 // onError fallback sequence.
+// cloudflare-ipfs.com was removed 2026-08-24: Cloudflare shut down its public
+// IPFS gateway (NXDOMAIN now), so every hop through it was a guaranteed dead
+// end that burned part of the MAX_HOPS budget before reaching a live gateway.
 const PUBLIC_FALLBACK_GATEWAYS = [
   'https://ipfs.io',
   PINATA_PUBLIC_GATEWAY,
-  'https://cloudflare-ipfs.com',
   'https://dweb.link',
   'https://w3s.link',
 ];
@@ -98,7 +100,6 @@ const KNOWN_GATEWAY_HOSTS = new Set<string>([
   'w3s.link',
   'ipfs.io',
   'dweb.link',
-  'cloudflare-ipfs.com',
   '4everland.io',
   'nftstorage.link',
 ]);
