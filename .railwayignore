@@ -81,6 +81,13 @@ apps/indexer/generated/
 **/__tests__/
 
 # Documentation + scripts (one-off migration scripts aren't deploy surface)
-docs/
-scripts/
-skills/
+# Anchored to repo root: unanchored "scripts/" also glob-matched
+# apps/server/src/scripts/ (backup-cron.ts, firestore-backup.ts,
+# worker-healthcheck.ts - real runtime code, not one-off scripts), which
+# silently dropped it from `railway up` CLI uploads and broke the esbuild
+# bundle step with a confusing "entry point cannot be marked as external"
+# error. GitHub-triggered Railway builds were unaffected (this file only
+# governs the CLI upload path), so this never surfaced there.
+/docs/
+/scripts/
+/skills/
