@@ -247,7 +247,21 @@ export function FlowCreationPanel({
         setGeneratedImageUrl(frameUrl);
       }
     } catch (error) {
-      // Error handled by UI state
+      // Surface the failure instead of swallowing it — a tainted-canvas
+      // SecurityError (CORS on the video host) is the most likely cause
+      // here, so call that out specifically when it happens.
+      if (setStatusMessage) {
+        const isCorsError = error instanceof DOMException && error.name === 'SecurityError';
+        setStatusMessage({
+          type: 'error',
+          title: 'Frame Extraction Failed',
+          description: isCorsError
+            ? 'Could not read the previous video frame (blocked by CORS). Please try again or pick a different frame.'
+            : error instanceof Error
+              ? error.message
+              : 'Failed to extract the last frame. Please try again.',
+        });
+      }
     } finally {
       setIsExtractingFrame(false);
     }
@@ -299,7 +313,19 @@ export function FlowCreationPanel({
         setVideoDescription(improvedPrompt);
       }
     } catch (error) {
-      // Error handled by UI state
+      // Surface the failure — previously this was swallowed silently, so
+      // the button just spun and reverted with no indication anything
+      // went wrong (#improve-with-ai-silent-failure).
+      if (setStatusMessage) {
+        setStatusMessage({
+          type: 'error',
+          title: 'Improve with AI Failed',
+          description:
+            error instanceof Error
+              ? error.message
+              : 'Failed to improve the prompt. Please try again.',
+        });
+      }
     } finally {
       setIsImprovingPrompt(false);
     }
