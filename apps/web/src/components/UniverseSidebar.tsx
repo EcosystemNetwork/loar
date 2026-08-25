@@ -73,7 +73,7 @@ import { trpcClient } from '@/utils/trpc';
 import { toast } from 'sonner';
 import type { UniverseData } from '@/types/universe';
 import { isBlockchainUniverse as checkBlockchain } from '@/types/universe';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 
 interface UniverseSidebarProps {
   finalUniverse: UniverseData | null;
@@ -902,11 +902,10 @@ function WikiEntitiesSection({ universeAddress }: { universeAddress?: string }) 
                             className="flex items-center gap-2 px-3 pl-8 py-1 hover:bg-muted/40 transition-colors group"
                           >
                             {entity.imageUrl ? (
-                              <img
-                                src={resolveIpfsUrl(entity.imageUrl)}
+                              <SmartImage
+                                src={entity.imageUrl}
                                 alt={entity.name}
                                 className="h-6 w-6 rounded object-cover flex-shrink-0 border border-border"
-                                loading="lazy"
                               />
                             ) : (
                               <div className="h-6 w-6 rounded bg-muted flex items-center justify-center flex-shrink-0 border border-border">

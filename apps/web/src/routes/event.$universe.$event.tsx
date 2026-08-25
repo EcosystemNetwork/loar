@@ -49,7 +49,7 @@ import {
 } from '@/components/segments/AddSegmentDialog';
 import type { VideoSegment, MultiSegmentEvent } from '@/types/segments';
 import { migrateLegacyEvent, generateSegmentId, sortSegments } from '@/types/segments';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 
 function VideoThumb({ src, iconClassName = 'h-8 w-8' }: { src?: string; iconClassName?: string }) {
   const [failed, setFailed] = useState(false);
@@ -62,7 +62,7 @@ function VideoThumb({ src, iconClassName = 'h-8 w-8' }: { src?: string; iconClas
   }
   return (
     <video
-      src={resolveIpfsUrl(src)}
+      src={resolveIpfsUrlPreferred(src)}
       className="w-full h-full object-cover"
       muted
       onError={() => setFailed(true)}
@@ -72,7 +72,7 @@ function VideoThumb({ src, iconClassName = 'h-8 w-8' }: { src?: string; iconClas
 
 function CharacterThumb({ src, name }: { src?: string | null; name?: string }) {
   const [failed, setFailed] = useState(false);
-  const resolved = src ? resolveIpfsUrl(src) : '';
+  const resolved = src ? resolveIpfsUrlPreferred(src) : '';
   if (!resolved || failed) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/15 to-primary/5 text-primary">

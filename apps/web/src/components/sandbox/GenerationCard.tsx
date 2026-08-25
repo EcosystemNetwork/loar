@@ -33,7 +33,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ModelSelector } from '@/components/ModelSelector';
 import { toast } from 'sonner';
-import { resolveIpfsUrl, resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import {
   Select,
   SelectContent,
@@ -162,11 +163,7 @@ export function GenerationCard({
                 playsInline
               />
             ) : gen.thumbnailUrl ? (
-              <img
-                src={resolveIpfsUrl(gen.thumbnailUrl)}
-                alt=""
-                className="w-full h-full object-cover"
-              />
+              <SmartImage src={gen.thumbnailUrl} alt="" className="w-full h-full object-cover" />
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
                 <Frame className="h-8 w-8 text-muted-foreground" />
@@ -193,10 +190,9 @@ export function GenerationCard({
           gen.kind !== '3d-model' &&
           !gen.videoUrl &&
           gen.imageUrl && (
-            <img
-              src={resolveIpfsUrl(gen.imageUrl)}
+            <SmartImage
+              src={gen.imageUrl}
               alt=""
-              loading="lazy"
               decoding="async"
               className="w-full h-full object-cover"
             />

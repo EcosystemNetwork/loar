@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { useState } from 'react';
 import { Briefcase, Star, Shield, Globe, ArrowLeft, Handshake, ExternalLink } from 'lucide-react';
 import { AgentContractModal } from '@/components/agents/AgentContractModal';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 
 export const Route = createFileRoute('/agents/$uid')({
   component: AgentProfilePage,
@@ -59,8 +59,8 @@ function AgentProfilePage() {
         {/* Profile Header */}
         <div className="flex items-start gap-6">
           {(agent as any).avatarUrl ? (
-            <img
-              src={resolveIpfsUrl((agent as any).avatarUrl)}
+            <SmartImage
+              src={(agent as any).avatarUrl}
               alt={(agent as any).displayName}
               className="h-20 w-20 rounded-full object-cover"
             />

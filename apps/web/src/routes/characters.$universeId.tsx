@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import { UserText } from '@/components/user-text';
 import { Price } from '@/components/Price';
 
@@ -177,11 +177,10 @@ function CharacterCard({ character }: { character: any }) {
       <Card className="overflow-hidden group cursor-pointer hover:shadow-lg transition-all duration-300">
         <div className="aspect-[3/4] bg-muted relative">
           {character.imageUrl ? (
-            <img
-              src={resolveIpfsUrl(character.imageUrl)}
+            <SmartImage
+              src={character.imageUrl}
               alt={character.name}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              loading="lazy"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">

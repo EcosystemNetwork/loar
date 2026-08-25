@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useOrder } from '@/hooks/useListings';
 import { toast } from 'sonner';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 
 export const Route = createFileRoute('/order/$id')({
   component: OrderConfirmationPage,
@@ -53,8 +53,8 @@ function OrderConfirmationPage() {
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center shrink-0 overflow-hidden">
                   {o.thumbnailUrl ? (
-                    <img
-                      src={resolveIpfsUrl(o.thumbnailUrl)}
+                    <SmartImage
+                      src={o.thumbnailUrl}
                       alt={o.title}
                       className="w-full h-full object-cover"
                     />

@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Film, Play, Plus } from 'lucide-react';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 
 interface EpisodesTabProps {
   universeAddress?: string;
@@ -152,15 +152,11 @@ export function EpisodesTab({ universeAddress }: EpisodesTabProps) {
                 <Film className="h-8 w-8 text-muted-foreground/30" />
               </div>
               {ep.thumbnailUrl && (
-                <img
-                  src={resolveIpfsUrl(ep.thumbnailUrl)}
+                <SmartImage
+                  src={ep.thumbnailUrl}
                   alt={ep.title || ep.id}
-                  loading="lazy"
                   decoding="async"
                   className="absolute inset-0 w-full h-full object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
                 />
               )}
               {ep.exportUrl && (

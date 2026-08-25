@@ -30,7 +30,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { DirectUpload } from '@/components/DirectUpload';
 import { trpcClient } from '@/utils/trpc';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 
 interface UniverseSnapshot {
   id: string;
@@ -163,8 +163,8 @@ export function UniverseProfileEditor({ open, onOpenChange, universe }: Props) {
             </Label>
             {imageUrl && (
               <div className="relative aspect-[16/9] w-full overflow-hidden rounded-md border border-white/10 bg-muted">
-                <img
-                  src={resolveIpfsUrl(imageUrl)}
+                <SmartImage
+                  src={imageUrl}
                   alt="Cover preview"
                   className="h-full w-full object-cover"
                 />
@@ -189,8 +189,8 @@ export function UniverseProfileEditor({ open, onOpenChange, universe }: Props) {
             <div className="flex items-center gap-4">
               <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-full border border-white/10 bg-muted">
                 {portraitImageUrl ? (
-                  <img
-                    src={resolveIpfsUrl(portraitImageUrl)}
+                  <SmartImage
+                    src={portraitImageUrl}
                     alt="Portrait preview"
                     className="h-full w-full object-cover"
                   />

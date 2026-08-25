@@ -702,7 +702,28 @@ async function autoPublishVideoToGallery(opts: {
   });
 }
 
-// ── Persist video to permanent storage (fire-and-forget) ────────────
+// Google's Gemini Files API (Google-direct Veo) scopes downloads to the API
+// key that created them — a bare browser request (no way to attach a custom
+// header from a <video src>) always 403s. Any code path that might hand a
+// videoUrl to the client must mirror it to permanent storage first when this
+// is true. Duplicated as a tiny inline check in a couple of other services
+// (gemini-client.ts, worker, storage/types.ts) — kept local here rather than
+// shared since it's a one-line hostname test.
+function isGeminiFilesUrl(url: string): boolean {
+  try {
+    return new URL(url).hostname === 'generativelanguage.googleapis.com';
+  } catch {
+    return false;
+  }
+}
+
+// ── Persist video to permanent storage ───────────────────────────────
+//
+// Returns the permanent URL on success, or undefined on failure (in which
+// case the generation is flagged via markRehostNeeded for the rehost
+// sweeper). Callers with a non-auth-gated provider URL can fire this and
+// forget it; callers holding a Gemini Files URL must await it — see
+// isGeminiFilesUrl above — since the raw URL 403s for the client.
 
 async function persistVideoToStorage(opts: {
   generationId: string;
@@ -710,23 +731,16 @@ async function persistVideoToStorage(opts: {
   userId: string;
   modelId?: string;
   prompt?: string;
-}) {
+}): Promise<string | undefined> {
   try {
     const manager = getStorageManager();
     const filename = `generation-${opts.generationId}.mp4`;
     console.log(`[persist] Uploading ${filename} to permanent storage...`);
 
-    // Fetch the video, sign with C2PA provenance, then upload. Google's
-    // Gemini Files API (Google-direct Veo) scopes downloads to the API key
-    // that created them — attach it or this 401s and the video is lost once
+    // Fetch the video, sign with C2PA provenance, then upload. Attach the
+    // Gemini Files auth header or this 401s and the video is lost once
     // Google's copy expires (see markRehostNeeded below).
-    const isGeminiFilesHost = (() => {
-      try {
-        return new URL(opts.videoUrl).hostname === 'generativelanguage.googleapis.com';
-      } catch {
-        return false;
-      }
-    })();
+    const isGeminiFilesHost = isGeminiFilesUrl(opts.videoUrl);
     const response = await fetch(opts.videoUrl, {
       headers:
         isGeminiFilesHost && process.env.GOOGLE_API_KEY
@@ -794,16 +808,42 @@ async function persistVideoToStorage(opts: {
       }
 
       console.log(`[persist] ${filename} saved permanently: ${permanentUrl}`);
-    } else {
-      await markRehostNeeded(opts.generationId, 'upload returned no url');
+      return permanentUrl;
     }
+    await markRehostNeeded(opts.generationId, 'upload returned no url');
+    return undefined;
   } catch (err) {
     // Non-fatal for the request — but the asset is now on a countdown. The
     // provider URL still works "for now"; once its signature lapses the bytes
     // are unrecoverable, so this must leave a trace something can act on.
     console.error(`[persist] Failed to persist video ${opts.generationId}:`, err);
     await markRehostNeeded(opts.generationId, err instanceof Error ? err.message : 'unknown');
+    return undefined;
   }
+}
+
+/**
+ * Resolves the URL that's safe to hand to the client. Gemini Files URLs
+ * (Google-direct Veo) are key-scoped and 403 for a bare browser request, so
+ * those are mirrored to permanent storage synchronously — the caller awaits
+ * this before writing videoUrl anywhere the client can see it. Every other
+ * provider URL is directly playable, so persistVideoToStorage still runs for
+ * them (so the gallery/attachments eventually get the permanent URL) but
+ * fire-and-forget, same as before — no need to hold up the response.
+ */
+async function resolveClientVideoUrl(opts: {
+  generationId: string;
+  videoUrl: string;
+  userId: string;
+  modelId?: string;
+  prompt?: string;
+}): Promise<string> {
+  if (!isGeminiFilesUrl(opts.videoUrl)) {
+    persistVideoToStorage(opts).catch(() => {});
+    return opts.videoUrl;
+  }
+  const permanentUrl = await persistVideoToStorage(opts);
+  return permanentUrl ?? opts.videoUrl;
 }
 
 /**
@@ -1597,12 +1637,24 @@ export const generationRouter = router({
               ctx.user.uid
             );
             if (fallbackResult) {
+              // Gemini Files URLs (Google-direct Veo fallback tier) 403 for a
+              // bare browser request — mirror to permanent storage before this
+              // reaches Firestore/the response. No-op latency for every other
+              // provider (resolves synchronously, persist still fires async).
+              const fallbackVideoUrl = await resolveClientVideoUrl({
+                generationId,
+                videoUrl: fallbackResult.videoUrl,
+                userId: ctx.user.uid,
+                modelId: fallbackResult.fallbackModelId,
+                prompt: originalPrompt,
+              });
+
               await generationsCol()
                 .doc(generationId)
                 .update({
                   status: 'completed',
                   fallbackModelId: fallbackResult.fallbackModelId,
-                  videoUrl: fallbackResult.videoUrl,
+                  videoUrl: fallbackVideoUrl,
                   latencyMs: Date.now() - startTime,
                   completedAt: new Date(),
                 });
@@ -1611,21 +1663,13 @@ export const generationRouter = router({
                 creator: ctx.user.uid,
                 entityId: input.entityId,
                 generationId,
-                videoUrl: fallbackResult.videoUrl,
+                videoUrl: fallbackVideoUrl,
                 prompt: originalPrompt,
               });
 
-              persistVideoToStorage({
-                generationId,
-                videoUrl: fallbackResult.videoUrl,
-                userId: ctx.user.uid,
-                modelId: fallbackResult.fallbackModelId,
-                prompt: originalPrompt,
-              }).catch(() => {});
-
               autoPublishVideoToGallery({
                 creatorUid: ctx.user.uid,
-                videoUrl: fallbackResult.videoUrl,
+                videoUrl: fallbackVideoUrl,
                 prompt: originalPrompt,
                 model: fallbackResult.fallbackModelId,
                 universeId: input.universeId,
@@ -1646,7 +1690,7 @@ export const generationRouter = router({
                     jobId: generationId,
                     kind: 'video' as const,
                     status: 'completed',
-                    resultUrl: fallbackResult.videoUrl,
+                    resultUrl: fallbackVideoUrl,
                     modelUsed: fallbackResult.fallbackModelId,
                     wasFallback: true,
                     creditsCharged,
@@ -1657,7 +1701,7 @@ export const generationRouter = router({
               return {
                 generationId,
                 status: 'completed' as const,
-                videoUrl: fallbackResult.videoUrl,
+                videoUrl: fallbackVideoUrl,
                 modelUsed: fallbackResult.fallbackModelId,
                 modelDisplayName:
                   getModelById(fallbackResult.fallbackModelId)?.displayName ||
@@ -1694,9 +1738,20 @@ export const generationRouter = router({
         ]);
         trackModelUsage(ctx.user.uid, finalModelId);
 
+        // Gemini Files URLs (Google-direct Veo) 403 for a bare browser
+        // request — mirror to permanent storage before this reaches
+        // Firestore/the response. No-op latency for every other provider.
+        const finalVideoUrl = await resolveClientVideoUrl({
+          generationId,
+          videoUrl: result.videoUrl!,
+          userId: ctx.user.uid,
+          modelId: finalModelId,
+          prompt: originalPrompt,
+        });
+
         await generationsCol().doc(generationId).update({
           status: 'completed',
-          videoUrl: result.videoUrl,
+          videoUrl: finalVideoUrl,
           latencyMs,
           completedAt: new Date(),
         });
@@ -1705,21 +1760,13 @@ export const generationRouter = router({
           creator: ctx.user.uid,
           entityId: input.entityId,
           generationId,
-          videoUrl: result.videoUrl!,
+          videoUrl: finalVideoUrl,
           prompt: originalPrompt,
         });
 
-        persistVideoToStorage({
-          generationId,
-          videoUrl: result.videoUrl!,
-          userId: ctx.user.uid,
-          modelId: finalModelId,
-          prompt: originalPrompt,
-        }).catch(() => {});
-
         autoPublishVideoToGallery({
           creatorUid: ctx.user.uid,
-          videoUrl: result.videoUrl!,
+          videoUrl: finalVideoUrl,
           prompt: originalPrompt,
           model: finalModelId,
           universeId: input.universeId,
@@ -1746,7 +1793,7 @@ export const generationRouter = router({
           creatorUid: ctx.user.uid,
           creatorAddress: ctx.user.address ?? null,
           universeId: input.universeId ?? null,
-          outputUrl: result.videoUrl!,
+          outputUrl: finalVideoUrl,
           outputKind: 'video',
           status: 'completed',
         });
@@ -1761,7 +1808,7 @@ export const generationRouter = router({
               jobId: generationId,
               kind: 'video' as const,
               status: 'completed',
-              resultUrl: result.videoUrl,
+              resultUrl: finalVideoUrl,
               modelUsed: finalModelId,
               wasFallback: false,
               creditsCharged,
@@ -1772,7 +1819,7 @@ export const generationRouter = router({
         return {
           generationId,
           status: 'completed' as const,
-          videoUrl: result.videoUrl,
+          videoUrl: finalVideoUrl,
           modelUsed: finalModelId,
           modelDisplayName: model.displayName,
           routingMode: input.routingMode,

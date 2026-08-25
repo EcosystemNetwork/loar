@@ -10,7 +10,8 @@ import { createFileRoute, Link, useParams } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { trpcClient } from '@/utils/trpc';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import { Button } from '@/components/ui/button';
 import {
   Loader2,
@@ -139,7 +140,7 @@ function EpisodePlayer() {
         toast.success('Removed from offline');
       } else {
         const urls = clips
-          .map((c) => (c.videoUrl ? resolveIpfsUrl(c.videoUrl) : null))
+          .map((c) => (c.videoUrl ? resolveIpfsUrlPreferred(c.videoUrl) : null))
           .filter((u): u is string => !!u);
         const res = await saveEpisode({
           episodeId: episode.id,
@@ -226,7 +227,7 @@ function EpisodePlayer() {
               {viewMode === 'merged' && episode.exportUrl ? (
                 <video
                   ref={videoRef}
-                  src={resolveIpfsUrl(episode.exportUrl)}
+                  src={resolveIpfsUrlPreferred(episode.exportUrl)}
                   className="w-full h-full"
                   controls
                   playsInline
@@ -234,7 +235,7 @@ function EpisodePlayer() {
               ) : (
                 <video
                   ref={videoRef}
-                  src={resolveIpfsUrl(activeClip.videoUrl!)}
+                  src={resolveIpfsUrlPreferred(activeClip.videoUrl!)}
                   className="w-full h-full"
                   controls
                   playsInline
@@ -245,10 +246,9 @@ function EpisodePlayer() {
 
             <div className="mt-4 flex items-start gap-3">
               {universeImage ? (
-                <img
-                  src={resolveIpfsUrl(universeImage)}
+                <SmartImage
+                  src={universeImage}
                   alt=""
-                  loading="lazy"
                   className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
                 />
               ) : (
@@ -364,7 +364,7 @@ function EpisodePlayer() {
                     <div className="relative aspect-video w-24 flex-shrink-0 rounded-md overflow-hidden bg-muted">
                       {c.videoUrl ? (
                         <video
-                          src={resolveIpfsUrl(c.videoUrl)}
+                          src={resolveIpfsUrlPreferred(c.videoUrl)}
                           muted
                           preload="metadata"
                           className="w-full h-full object-cover"

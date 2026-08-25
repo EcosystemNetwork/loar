@@ -71,7 +71,9 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { ModelViewer } from '@/components/ModelViewer';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrl, resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
+import { useResolvedIpfsUrl } from '@/hooks/useResolvedIpfsUrl';
 
 // New wiki components
 import { EntityCard } from '@/components/wiki/EntityCard';
@@ -316,19 +318,20 @@ function TrendingTile({ item }: { item: any }) {
       : item.thumbnailUrl || item.imageUrl || item.mediaUrl || '/placeholder.jpg';
   const { videoRef, ready, onLoaded } = useVideoLoad(isVideo ? item.mediaUrl : undefined);
   const [loaded, setLoaded] = useState(false);
+  const posterUrl = useResolvedIpfsUrl(item.thumbnailUrl || item.imageUrl);
   return (
     <div className="relative aspect-video rounded-lg overflow-hidden group cursor-pointer bg-gradient-to-br from-zinc-900 via-zinc-900/95 to-zinc-800">
       {isVideo && item.mediaUrl ? (
         <>
           <video
             ref={videoRef}
-            src={ready ? `${resolveIpfsUrl(item.mediaUrl)}#t=0.5` : undefined}
+            src={ready ? `${resolveIpfsUrlPreferred(item.mediaUrl)}#t=0.5` : undefined}
             className={`w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
             muted
             loop
             playsInline
             preload="metadata"
-            poster={resolveIpfsUrl(item.thumbnailUrl || item.imageUrl) || undefined}
+            poster={posterUrl}
             onLoadedData={() => {
               setLoaded(true);
               onLoaded();
@@ -348,15 +351,11 @@ function TrendingTile({ item }: { item: any }) {
           )}
         </>
       ) : visualThumbnail ? (
-        <img
-          src={resolveIpfsUrl(visualThumbnail) || visualThumbnail}
+        <SmartImage
+          src={visualThumbnail}
           alt={item.title || 'Trending'}
-          loading="lazy"
           decoding="async"
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).src = '/placeholder.jpg';
-          }}
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center">
@@ -526,15 +525,11 @@ function CollectionTab() {
                   <Users className="h-10 w-10 text-muted-foreground/30" />
                 </div>
                 {char.image_url && (
-                  <img
-                    src={resolveIpfsUrl(char.image_url)}
+                  <SmartImage
+                    src={char.image_url}
                     alt={char.character_name}
-                    loading="lazy"
                     decoding="async"
                     className="absolute inset-0 w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
                   />
                 )}
               </div>
@@ -675,15 +670,11 @@ function CharacterProfilesTab({ universeAddress }: { universeAddress?: string })
                     <UserCircle className="h-10 w-10 text-muted-foreground/30" />
                   </div>
                   {entity.imageUrl && (
-                    <img
-                      src={resolveIpfsUrl(entity.imageUrl)}
+                    <SmartImage
+                      src={entity.imageUrl}
                       alt={entity.name}
-                      loading="lazy"
                       decoding="async"
                       className="absolute inset-0 w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
                     />
                   )}
                 </div>
@@ -827,15 +818,11 @@ function ThreeDModelsTab({ universeAddress }: { universeAddress?: string }) {
                   <Rotate3d className="h-6 w-6 text-muted-foreground/30" />
                 </div>
                 {(item.thumbnailUrl || item.mediaUrl) && (
-                  <img
-                    src={resolveIpfsUrl(item.thumbnailUrl || item.mediaUrl)}
+                  <SmartImage
+                    src={item.thumbnailUrl || item.mediaUrl}
                     alt={item.title}
-                    loading="lazy"
                     decoding="async"
                     className="absolute inset-0 w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
                   />
                 )}
                 <Badge className="absolute top-2 left-2 bg-black/60 text-white border-0 text-[10px]">
@@ -1060,6 +1047,8 @@ function Model3DTestbenchDialog({
   });
 
   const activeUrl = viewerUrl ?? (item?.mediaUrl ? resolveIpfsUrl(item.mediaUrl) : null);
+  const itemPosterUrl = useResolvedIpfsUrl(item?.thumbnailUrl);
+  const turntablePosterUrl = useResolvedIpfsUrl(turntable?.thumbnailUrl);
 
   return (
     <Dialog open={!!item} onOpenChange={onOpenChange}>
@@ -1074,7 +1063,7 @@ function Model3DTestbenchDialog({
               <div className="h-[60vh] w-full">
                 <ModelViewer
                   src={activeUrl}
-                  poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
+                  poster={itemPosterUrl}
                   alt={item.title || '3D Model'}
                   className="h-full"
                   testbench
@@ -1255,8 +1244,8 @@ function Model3DTestbenchDialog({
                   </p>
                   <div className="aspect-square rounded-md overflow-hidden bg-black">
                     <video
-                      src={resolveIpfsUrl(turntable.mediaUrl)}
-                      poster={resolveIpfsUrl(turntable.thumbnailUrl) || undefined}
+                      src={resolveIpfsUrlPreferred(turntable.mediaUrl)}
+                      poster={turntablePosterUrl}
                       className="w-full h-full object-cover"
                       controls
                       muted
@@ -1581,15 +1570,11 @@ function WikiPage() {
               }`}
             >
               {u.image_url ? (
-                <img
-                  src={resolveIpfsUrl(u.image_url)}
+                <SmartImage
+                  src={u.image_url}
                   alt=""
-                  loading="lazy"
                   decoding="async"
                   className="h-5 w-5 rounded object-cover flex-shrink-0"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
                 />
               ) : (
                 <div className="h-5 w-5 rounded bg-gradient-to-br from-violet-500/30 to-purple-500/30 flex items-center justify-center flex-shrink-0">
@@ -1651,15 +1636,11 @@ function WikiPage() {
                   }`}
                 >
                   {u.image_url ? (
-                    <img
-                      src={resolveIpfsUrl(u.image_url)}
+                    <SmartImage
+                      src={u.image_url}
                       alt=""
-                      loading="lazy"
                       decoding="async"
                       className="h-6 w-6 rounded object-cover flex-shrink-0"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
                     />
                   ) : (
                     <div className="h-6 w-6 rounded bg-gradient-to-br from-violet-500/30 to-purple-500/30 flex items-center justify-center flex-shrink-0">
@@ -1686,10 +1667,9 @@ function WikiPage() {
       {universeInfo && (
         <div className="mb-6 flex items-center gap-3 rounded-lg border border-violet-500/30 bg-gradient-to-r from-violet-500/10 to-purple-500/10 p-4">
           {universeInfo.image_url && (
-            <img
-              src={resolveIpfsUrl(universeInfo.image_url)}
+            <SmartImage
+              src={universeInfo.image_url}
               alt=""
-              loading="lazy"
               decoding="async"
               className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
             />

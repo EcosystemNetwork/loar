@@ -46,7 +46,7 @@ import {
 } from '@/components/StyleControls';
 import { STYLE_PRESETS } from '@/components/sandbox/constants';
 import { RANDOM_NAME_SEEDS, pickRandom, baseArtPromptForKind } from '@/lib/random-entity';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 
 type EntityKind =
   | 'person'
@@ -1333,8 +1333,8 @@ function EntityCreateForm() {
       {universeInfo && (
         <div className="mb-6 flex items-center gap-3 rounded-lg border border-violet-500/30 bg-gradient-to-r from-violet-500/10 to-purple-500/10 p-4">
           {universeInfo.image_url && (
-            <img
-              src={resolveIpfsUrl(universeInfo.image_url)}
+            <SmartImage
+              src={universeInfo.image_url}
               alt=""
               className="h-10 w-10 rounded-lg object-cover flex-shrink-0"
             />
@@ -1554,8 +1554,8 @@ function EntityCreateForm() {
                                 </p>
                               </div>
                             ) : g.imageUrl ? (
-                              <img
-                                src={resolveIpfsUrl(g.imageUrl)}
+                              <SmartImage
+                                src={g.imageUrl}
                                 alt={g.label}
                                 className="w-full h-full object-cover"
                               />

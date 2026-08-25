@@ -34,7 +34,9 @@ import { ShotPresetPicker } from '@/components/ShotPresetPicker';
 import type { StylePresetId } from '@/components/style-presets';
 import type { ShotPresetId } from '@/components/shot-presets';
 import { STYLE_PRESETS } from '@/components/style-presets';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { useResolvedIpfsUrl } from '@/hooks/useResolvedIpfsUrl';
+import { SmartImage } from '@/components/SmartImage';
 
 export const Route = createFileRoute('/canvas/$canvasId')({
   component: CanvasEditorPage,
@@ -395,6 +397,7 @@ function SceneNode({ data, selected }: NodeProps<CanvasScene>) {
   const swatchColor = data.bundle.stylePreset
     ? STYLE_PRESETS.find((s) => s.id === data.bundle.stylePreset)?.color
     : null;
+  const posterUrl = useResolvedIpfsUrl(data.generatedImageUrl);
 
   return (
     <div
@@ -405,8 +408,8 @@ function SceneNode({ data, selected }: NodeProps<CanvasScene>) {
       <Handle type="target" position={Position.Top} />
       {data.generatedVideoUrl ? (
         <video
-          src={resolveIpfsUrl(data.generatedVideoUrl)}
-          poster={data.generatedImageUrl ? resolveIpfsUrl(data.generatedImageUrl) : undefined}
+          src={resolveIpfsUrlPreferred(data.generatedVideoUrl)}
+          poster={posterUrl}
           muted
           loop
           playsInline
@@ -414,11 +417,7 @@ function SceneNode({ data, selected }: NodeProps<CanvasScene>) {
           className="w-full h-28 object-cover"
         />
       ) : data.generatedImageUrl ? (
-        <img
-          src={resolveIpfsUrl(data.generatedImageUrl)}
-          alt="Scene"
-          className="w-full h-28 object-cover"
-        />
+        <SmartImage src={data.generatedImageUrl} alt="Scene" className="w-full h-28 object-cover" />
       ) : (
         <div
           className="w-full h-28 flex items-center justify-center text-[10px] text-muted-foreground"

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Music, Play, Pause, Plus, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Link } from '@tanstack/react-router';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 
 interface AudioTabProps {
   universeAddress?: string;
@@ -96,13 +96,10 @@ export function AudioTab({ universeAddress }: AudioTabProps) {
             <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
               <div className="aspect-square bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 relative flex items-center justify-center">
                 {item.thumbnailUrl ? (
-                  <img
-                    src={resolveIpfsUrl(item.thumbnailUrl)}
+                  <SmartImage
+                    src={item.thumbnailUrl}
                     alt={item.title}
                     className="absolute inset-0 w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
                   />
                 ) : (
                   <Music className="h-12 w-12 text-muted-foreground/40" />

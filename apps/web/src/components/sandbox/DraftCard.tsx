@@ -41,7 +41,8 @@ import {
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { toast } from 'sonner';
-import { resolveIpfsUrl, resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import type { DraftData, GenKind } from '@/types/sandbox.types';
 
 // ── Draft Card ─────────────────────────────────────────────────
@@ -125,8 +126,8 @@ export function DraftCard({ draft, onDelete, onReuse }: DraftCardProps) {
           </div>
         ) : draftKind === '3d-model' ? (
           draft.thumbnailUrl || draft.imageUrl ? (
-            <img
-              src={resolveIpfsUrl((draft.thumbnailUrl || draft.imageUrl)!)}
+            <SmartImage
+              src={(draft.thumbnailUrl || draft.imageUrl)!}
               alt={draft.title}
               className="w-full h-full object-cover"
             />
@@ -152,8 +153,8 @@ export function DraftCard({ draft, onDelete, onReuse }: DraftCardProps) {
             }}
           />
         ) : draft.imageUrl ? (
-          <img
-            src={resolveIpfsUrl(draft.imageUrl)}
+          <SmartImage
+            src={draft.imageUrl}
             alt={draft.title}
             className="w-full h-full object-cover"
           />

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { trpc } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Users } from 'lucide-react';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import { UserText } from '@/components/user-text';
 
 interface Character {
@@ -84,13 +84,10 @@ function CharacterPage() {
                   <Users className="h-16 w-16 text-muted-foreground/20" />
                 </div>
                 {character.image_url && (
-                  <img
-                    src={resolveIpfsUrl(character.image_url)}
+                  <SmartImage
+                    src={character.image_url}
                     alt={character.character_name}
                     className="absolute inset-0 w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
                   />
                 )}
               </div>

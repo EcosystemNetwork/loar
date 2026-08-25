@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { WikiEntity, EntityKind } from './types';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
@@ -112,9 +112,9 @@ export function CreatorsTab() {
               <CardContent className="flex gap-3 p-4 items-center">
                 <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-violet-500/30 to-fuchsia-500/30 flex items-center justify-center flex-shrink-0">
                   {p.avatarUrl ? (
-                    <img
-                      src={resolveIpfsUrl(p.avatarUrl)}
-                      alt={p.displayName || p.username}
+                    <SmartImage
+                      src={p.avatarUrl}
+                      alt={p.displayName || p.username || ''}
                       className="h-full w-full object-cover"
                     />
                   ) : (

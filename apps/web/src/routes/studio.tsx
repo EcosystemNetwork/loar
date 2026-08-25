@@ -14,7 +14,7 @@ import { useWalletAuth, awaitSessionValidation } from '@/lib/wallet-auth';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import {
   ponderGql,
   ponderQueryDefaults,
@@ -198,10 +198,10 @@ function StudioCard({ universe: u }: { universe: StudioUniverse }) {
       <Link to="/universe/$id/profile" params={{ id: u.id }} className="block">
         <div className="relative aspect-video bg-muted overflow-hidden">
           {cover ? (
-            <img
-              src={resolveIpfsUrl(cover)}
+            <SmartImage
+              src={cover}
               alt=""
-              className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
+              className="w-full h-full group-hover:scale-[1.02] transition-transform duration-500"
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-amber-900/60 via-stone-900 to-stone-950" />

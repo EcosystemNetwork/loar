@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Loader2, Mic, Sparkles } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import { StylePresetPicker } from '@/components/StylePresetPicker';
 import type { StylePresetId } from '@/components/style-presets';
 
@@ -252,7 +252,7 @@ export function TalkingScenePanel({ imageUrl, onComplete }: TalkingScenePanelPro
             Linked: image + voice + animation
           </Badge>
           <video
-            src={resolveIpfsUrl(create.data.videoUrl)}
+            src={resolveIpfsUrlPreferred(create.data.videoUrl)}
             controls
             className="w-full rounded max-h-48"
           />

@@ -39,7 +39,8 @@ import { UserText } from '@/components/user-text';
 import { DailyCheckin } from '@/components/DailyCheckin';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
 import { FaucetBanner } from '@/components/FaucetBanner';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import { Price, usePriceText } from '@/components/Price';
 import { useCreditBalance, useMyNFTs, useUniversesMetricsBatch } from '@/hooks/useRevenue';
 import { useTokenListData, type EnrichedToken } from '@/hooks/useTokens';
@@ -500,14 +501,14 @@ function RecentWorkCard({ item }: { item: any }) {
     <Card className="group overflow-hidden">
       <div className="aspect-video bg-muted relative">
         {item.thumbnailUrl ? (
-          <img
-            src={resolveIpfsUrl(item.thumbnailUrl)}
+          <SmartImage
+            src={item.thumbnailUrl}
             alt={item.title}
             className="w-full h-full object-cover"
           />
         ) : isVideo && item.mediaUrl ? (
           <video
-            src={resolveIpfsUrl(item.mediaUrl)}
+            src={resolveIpfsUrlPreferred(item.mediaUrl)}
             className="w-full h-full object-cover"
             muted
             loop
@@ -521,11 +522,7 @@ function RecentWorkCard({ item }: { item: any }) {
             }}
           />
         ) : item.mediaUrl ? (
-          <img
-            src={resolveIpfsUrl(item.mediaUrl)}
-            alt={item.title}
-            className="w-full h-full object-cover"
-          />
+          <SmartImage src={item.mediaUrl} alt={item.title} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
             No preview
@@ -594,8 +591,8 @@ function UniverseCard({
       <CardContent className="p-0">
         <div className="h-32 bg-gradient-to-br from-indigo-500/80 to-purple-600/80 relative">
           {(universe.image_url || universe.imageUrl) && (
-            <img
-              src={resolveIpfsUrl(universe.image_url || universe.imageUrl)}
+            <SmartImage
+              src={universe.image_url || universe.imageUrl}
               alt={universe.name}
               className="absolute inset-0 w-full h-full object-cover"
             />

@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { useGalleryLineage } from '@/hooks/useGallery';
 import { getIpfsUrlCandidatesPreferred, raceIpfsGateways, resolveIpfsUrl } from '@/utils/ipfs-url';
 import { ModelViewer } from '@/components/ModelViewer';
+import { SmartImage } from '@/components/SmartImage';
+import { useResolvedIpfsUrl } from '@/hooks/useResolvedIpfsUrl';
 
 interface MediaLightboxProps {
   content: {
@@ -106,6 +108,10 @@ export function MediaLightbox({ content, onClose, onNavigate }: MediaLightboxPro
   const modelSrc = rawMediaUrl ? resolveIpfsUrl(rawMediaUrl) || rawMediaUrl : undefined;
   const imageSrc = content?.mediaUrl || content?.imageUrl || content?.thumbnailUrl;
   const mediaSrc = isVideo ? videoSrc : isAudio ? audioSrc : is3D ? modelSrc : imageSrc;
+  // ModelViewer sets `poster` imperatively on a <model-viewer> element with no
+  // onError-driven retry of its own (unlike mediaSrc above), so it needs the
+  // same background gateway race useResolvedIpfsUrl gives <video poster>.
+  const modelPosterUrl = useResolvedIpfsUrl(content?.thumbnailUrl);
 
   // Lineage — only fetched when a node is open and likely has a family tree
   // (parent ref or source image set). Avoids a flood of requests for the
@@ -177,9 +183,7 @@ export function MediaLightbox({ content, onClose, onNavigate }: MediaLightboxPro
           ) : is3D && modelSrc ? (
             <ModelViewer
               src={modelSrc}
-              poster={
-                resolveIpfsUrl(content.thumbnailUrl || '') || content.thumbnailUrl || undefined
-              }
+              poster={modelPosterUrl}
               alt={content.title || '3D model'}
               className="w-[85vw] h-[75vh] max-w-[85vw] max-h-[75vh]"
             />
@@ -274,10 +278,10 @@ export function MediaLightbox({ content, onClose, onNavigate }: MediaLightboxPro
                     onClick={() => onNavigate?.(lineage.parent!)}
                     className="flex items-center gap-3 bg-white/5 hover:bg-white/10 rounded-lg p-2 w-full text-left transition-colors"
                   >
-                    <img
-                      src={resolveIpfsUrl(
+                    <SmartImage
+                      src={
                         lineage.parent.thumbnailUrl || lineage.parent.mediaUrl || '/placeholder.jpg'
-                      )}
+                      }
                       alt={lineage.parent.title}
                       className="w-16 h-10 object-cover rounded"
                     />
@@ -326,8 +330,8 @@ export function MediaLightbox({ content, onClose, onNavigate }: MediaLightboxPro
                       className="relative aspect-square overflow-hidden rounded bg-white/5 hover:ring-2 hover:ring-white/40 transition-all"
                       title={d.title}
                     >
-                      <img
-                        src={resolveIpfsUrl(d.thumbnailUrl || d.mediaUrl || '/placeholder.jpg')}
+                      <SmartImage
+                        src={d.thumbnailUrl || d.mediaUrl || '/placeholder.jpg'}
                         alt={d.title}
                         className="w-full h-full object-cover"
                       />

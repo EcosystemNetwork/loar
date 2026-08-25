@@ -52,6 +52,7 @@ export interface UseUniverseBlockchainReturn {
   isLoadingLeaves: boolean;
   isLoadingFullGraph: boolean;
   isLoadingCanonChain: boolean;
+  isLoadingOffChain: boolean;
   isLoadingAny: boolean;
 
   // Error states
@@ -242,7 +243,7 @@ export function useUniverseBlockchain({
   // ── Off-chain timeline nodes (Fun-Mode universes) ──
   // Only loads when this universe is explicitly off-chain. On-chain universes
   // never fall back to off-chain — keeps data sources strictly separated.
-  const { data: offChainData } = useQuery({
+  const { data: offChainData, isLoading: isLoadingOffChain } = useQuery({
     queryKey: ['offChainNodes', universeId],
     queryFn: () => trpcClient.offChainNodes.list.query({ universeId }),
     enabled: !!universeId && useOffChain,
@@ -390,7 +391,15 @@ export function useUniverseBlockchain({
     offChainData,
   ]);
 
-  const isLoadingAny = isLoadingLeaves || isLoadingFullGraph || isLoadingCanonChain;
+  // Include off-chain loading so callers waiting on `isLoadingAny` don't
+  // release their loading UI before the off-chain fetch (offChainNodes.list)
+  // has resolved for universes whose id happens to look like a 0x address
+  // but aren't actually on-chain (see universe/$id.tsx's loading guard,
+  // which used to key off the static `id.startsWith('0x')` heuristic and
+  // let the canvas render empty before this query even started — reported
+  // as nodes "disappearing right away").
+  const isLoadingAny =
+    isLoadingLeaves || isLoadingFullGraph || isLoadingCanonChain || isLoadingOffChain;
 
   return {
     graphData,
@@ -399,6 +408,7 @@ export function useUniverseBlockchain({
     isLoadingLeaves,
     isLoadingFullGraph,
     isLoadingCanonChain,
+    isLoadingOffChain,
     isLoadingAny,
     isError: isGraphError,
     graphError: graphFetchError ?? null,

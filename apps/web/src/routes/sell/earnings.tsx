@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useSellerStats } from '@/hooks/useListings';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { useVocab } from '@/hooks/use-vocab';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 
 export const Route = createFileRoute('/sell/earnings')({
   component: SellerEarningsPage,
@@ -92,8 +92,8 @@ function SellerEarningsPage() {
                       <div key={order.id} className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0 overflow-hidden">
                           {order.thumbnailUrl ? (
-                            <img
-                              src={resolveIpfsUrl(order.thumbnailUrl)}
+                            <SmartImage
+                              src={order.thumbnailUrl}
                               alt=""
                               className="w-full h-full object-cover"
                             />

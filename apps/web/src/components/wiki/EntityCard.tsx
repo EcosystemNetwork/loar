@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { FlagDialog } from './FlagDialog';
 import type { WikiEntity } from './types';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 
 const KIND_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   person: Users,
@@ -99,17 +99,13 @@ export function EntityCard({ entity, showActions = true }: EntityCardProps) {
               <KindIcon className="h-10 w-10 text-white/20" />
             </div>
             {entity.imageUrl && (
-              <img
-                src={resolveIpfsUrl(entity.imageUrl)}
+              <SmartImage
+                src={entity.imageUrl}
                 alt={entity.name}
-                loading="lazy"
                 decoding="async"
                 className="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-500"
                 onLoad={(e) => {
                   e.currentTarget.style.opacity = '1';
-                }}
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
                 }}
               />
             )}

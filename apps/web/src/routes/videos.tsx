@@ -23,8 +23,9 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import { SmartImage } from '@/components/SmartImage';
+import { useResolvedIpfsUrl } from '@/hooks/useResolvedIpfsUrl';
 
 export const Route = createFileRoute('/videos')({
   component: VideosPage,
@@ -361,6 +362,7 @@ function ShortCard({ item }: { item: any }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [muted, setMuted] = useState(true);
   const [playing, setPlaying] = useState(false);
+  const posterUrl = useResolvedIpfsUrl(item.thumbnailUrl);
 
   function handleMouseEnter() {
     setPlaying(true);
@@ -390,15 +392,15 @@ function ShortCard({ item }: { item: any }) {
             ref={videoRef}
             src={
               item.thumbnailUrl
-                ? resolveIpfsUrl(item.mediaUrl)
-                : `${resolveIpfsUrl(item.mediaUrl)}#t=0.5`
+                ? resolveIpfsUrlPreferred(item.mediaUrl)
+                : `${resolveIpfsUrlPreferred(item.mediaUrl)}#t=0.5`
             }
             className="w-full h-full object-cover"
             muted={muted}
             loop
             playsInline
             preload="metadata"
-            poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
+            poster={posterUrl}
           />
         ) : item.thumbnailUrl ? (
           <SmartImage
@@ -465,6 +467,7 @@ function LongCard({ item }: { item: any }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [muted, setMuted] = useState(true);
   const [playing, setPlaying] = useState(false);
+  const posterUrl = useResolvedIpfsUrl(item.thumbnailUrl);
 
   function handleMouseEnter() {
     setPlaying(true);
@@ -493,15 +496,15 @@ function LongCard({ item }: { item: any }) {
             ref={videoRef}
             src={
               item.thumbnailUrl
-                ? resolveIpfsUrl(item.mediaUrl)
-                : `${resolveIpfsUrl(item.mediaUrl)}#t=0.5`
+                ? resolveIpfsUrlPreferred(item.mediaUrl)
+                : `${resolveIpfsUrlPreferred(item.mediaUrl)}#t=0.5`
             }
             className="w-full h-full object-cover"
             muted={muted}
             loop
             playsInline
             preload="metadata"
-            poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
+            poster={posterUrl}
           />
         ) : item.thumbnailUrl ? (
           <SmartImage

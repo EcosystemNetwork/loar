@@ -33,7 +33,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { trpcClient } from '@/utils/trpc';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import {
   ponderGql,
   ponderQueryDefaults,
@@ -169,7 +169,7 @@ function UniverseProfilePage() {
       <section className="relative">
         <div className="relative h-[42vh] min-h-[320px] w-full overflow-hidden">
           {cover ? (
-            <img src={resolveIpfsUrl(cover)} alt="" className="h-full w-full object-cover" />
+            <SmartImage src={cover} alt="" className="h-full w-full object-cover" />
           ) : (
             <div className="h-full w-full bg-gradient-to-br from-amber-900/60 via-stone-900 to-stone-950" />
           )}
@@ -181,17 +181,9 @@ function UniverseProfilePage() {
             <div className="flex-shrink-0">
               <div className="h-32 w-32 overflow-hidden rounded-2xl border-4 border-black bg-stone-900 shadow-2xl sm:h-40 sm:w-40">
                 {portrait ? (
-                  <img
-                    src={resolveIpfsUrl(portrait)}
-                    alt={name}
-                    className="h-full w-full object-cover"
-                  />
+                  <SmartImage src={portrait} alt={name} className="h-full w-full object-cover" />
                 ) : cover ? (
-                  <img
-                    src={resolveIpfsUrl(cover)}
-                    alt={name}
-                    className="h-full w-full object-cover"
-                  />
+                  <SmartImage src={cover} alt={name} className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-stone-500">
                     <Sparkles className="h-10 w-10" />

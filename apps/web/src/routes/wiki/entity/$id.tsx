@@ -70,7 +70,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import { EndorseButton } from '@/components/curation/EndorseButton';
 
 // Firestore Timestamps serialize to {_seconds, _nanoseconds} over JSON, which
@@ -476,13 +476,10 @@ function RelationshipsCard({ entityId, isOwner }: { entityId: string; isOwner: b
                       className="w-full text-left px-2 py-1.5 text-sm hover:bg-muted rounded flex items-center gap-2"
                     >
                       {e.imageUrl ? (
-                        <img
-                          src={resolveIpfsUrl(e.imageUrl)}
+                        <SmartImage
+                          src={e.imageUrl}
                           alt=""
                           className="w-5 h-5 rounded-full object-cover"
-                          onError={(ev) => {
-                            ev.currentTarget.style.display = 'none';
-                          }}
                         />
                       ) : (
                         <div className="w-5 h-5 rounded-full bg-muted" />
@@ -564,13 +561,10 @@ function RelationshipsCard({ entityId, isOwner }: { entityId: string; isOwner: b
                       return <Icon className="w-4 h-4 text-muted-foreground/40" />;
                     })()}
                     {otherImage && (
-                      <img
+                      <SmartImage
                         src={otherImage}
                         alt=""
                         className="absolute inset-0 w-full h-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
                       />
                     )}
                   </div>
@@ -672,13 +666,10 @@ function ChildEntities({ entityId }: { entityId: string }) {
                 <div className="w-6 h-6 rounded bg-muted flex items-center justify-center relative overflow-hidden shrink-0">
                   <Icon className="w-4 h-4 text-muted-foreground/40" />
                   {child.imageUrl && (
-                    <img
-                      src={resolveIpfsUrl(child.imageUrl)}
+                    <SmartImage
+                      src={child.imageUrl}
                       alt=""
                       className="absolute inset-0 w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
                     />
                   )}
                 </div>
@@ -896,13 +887,10 @@ function EntityPage() {
             <CardContent className="p-4">
               <div className="aspect-square w-full overflow-hidden rounded-lg">
                 {safeUrl(entity.imageUrl) ? (
-                  <img
-                    src={resolveIpfsUrl(safeUrl(entity.imageUrl))}
+                  <SmartImage
+                    src={safeUrl(entity.imageUrl)}
                     alt={entity.name}
                     className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display = 'none';
-                    }}
                   />
                 ) : (
                   <div className="w-full h-full bg-muted flex flex-col items-center justify-center gap-3">
@@ -938,8 +926,8 @@ function EntityPage() {
                     >
                       <div className="aspect-square w-full bg-muted/50">
                         {v.imageUrl ? (
-                          <img
-                            src={resolveIpfsUrl(v.imageUrl)}
+                          <SmartImage
+                            src={v.imageUrl}
                             alt={v.label ?? `Variant ${idx + 1}`}
                             className="w-full h-full object-cover"
                           />

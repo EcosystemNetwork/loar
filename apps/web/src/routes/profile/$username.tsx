@@ -8,7 +8,8 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { trpcClient } from '@/utils/trpc';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import { UserText } from '@/components/user-text';
 
 import { Card, CardContent } from '@/components/ui/card';
@@ -380,21 +381,21 @@ function ContentCard({ item, accentColor }: { item: any; accentColor: string }) 
         {/* Thumbnail */}
         <div className="relative aspect-video bg-muted">
           {item.thumbnailUrl ? (
-            <img
-              src={resolveIpfsUrl(item.thumbnailUrl)}
+            <SmartImage
+              src={item.thumbnailUrl}
               alt={item.title}
               className="w-full h-full object-cover"
             />
           ) : isVideo ? (
             <video
-              src={resolveIpfsUrl(item.mediaUrl)}
+              src={resolveIpfsUrlPreferred(item.mediaUrl)}
               className="w-full h-full object-cover"
               muted
               preload="metadata"
             />
           ) : (
-            <img
-              src={resolveIpfsUrl(item.mediaUrl)}
+            <SmartImage
+              src={item.mediaUrl}
               alt={item.title}
               className="w-full h-full object-cover"
             />

@@ -28,7 +28,7 @@ import {
   Waves,
   Megaphone,
 } from 'lucide-react';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 
 export interface SelectedClip {
   videoUrl: string;
@@ -580,7 +580,7 @@ export function AudioToolbar({
                 <div className="space-y-2">
                   <p className="text-xs text-green-600 font-medium">Lip-sync complete!</p>
                   <video
-                    src={resolveIpfsUrl(lastResult.videoUrl)}
+                    src={resolveIpfsUrlPreferred(lastResult.videoUrl)}
                     controls
                     className="w-full rounded-lg aspect-video bg-black"
                   />

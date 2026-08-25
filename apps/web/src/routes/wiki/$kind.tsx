@@ -24,7 +24,7 @@ import {
   Cpu,
   Building2,
 } from 'lucide-react';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import { UserText } from '@/components/user-text';
 
 const VALID_KINDS = [
@@ -180,13 +180,10 @@ function WikiKindPage() {
                     })()}
                   </div>
                   {entity.imageUrl && (
-                    <img
-                      src={resolveIpfsUrl(entity.imageUrl)}
+                    <SmartImage
+                      src={entity.imageUrl}
                       alt={entity.name}
                       className="absolute inset-0 w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
                     />
                   )}
                 </div>

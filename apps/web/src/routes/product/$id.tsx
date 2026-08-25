@@ -31,7 +31,9 @@ import { BuyNFTDialog } from '@/components/BuyNFTDialog';
 import { useVocab } from '@/hooks/use-vocab';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getEvmAddresses, isZeroAddress } from '@/configs/addresses';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { useResolvedIpfsUrl } from '@/hooks/useResolvedIpfsUrl';
+import { SmartImage } from '@/components/SmartImage';
 import { ListingPrice, usePriceText } from '@/components/Price';
 
 const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS as Address | undefined;
@@ -76,6 +78,9 @@ function ProductDetailPage() {
   const chainId = useChainId();
   const LOAR_TOKEN_ADDRESS = getEvmAddresses(chainId)?.loarToken;
   const hasLoarToken = !!LOAR_TOKEN_ADDRESS && !isZeroAddress(LOAR_TOKEN_ADDRESS);
+  // Hooks must run unconditionally, before the isLoading/!listing early
+  // returns below — hence the optional chaining on a not-yet-loaded listing.
+  const posterUrl = useResolvedIpfsUrl((listing as any)?.thumbnailUrl);
 
   // Like system
   const { data: likedData } = useQuery(
@@ -255,14 +260,14 @@ function ProductDetailPage() {
           {l.mediaUrl || l.thumbnailUrl ? (
             l.mediaUrl?.endsWith('.mp4') || l.mediaUrl?.endsWith('.webm') ? (
               <video
-                src={resolveIpfsUrl(l.mediaUrl)}
+                src={resolveIpfsUrlPreferred(l.mediaUrl)}
                 controls
                 className="w-full h-full object-contain"
-                poster={resolveIpfsUrl(l.thumbnailUrl) || undefined}
+                poster={posterUrl}
               />
             ) : (
-              <img
-                src={resolveIpfsUrl(l.mediaUrl ?? l.thumbnailUrl)}
+              <SmartImage
+                src={l.mediaUrl ?? l.thumbnailUrl}
                 alt={l.title}
                 className="w-full h-full object-contain"
               />

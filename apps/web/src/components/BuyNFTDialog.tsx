@@ -16,7 +16,7 @@ import { Loader2, ShoppingCart, X, CheckCircle2, ExternalLink, Coins } from 'luc
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { getExplorerTxUrl } from '@/configs/chains';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import { Price, usePriceText } from '@/components/Price';
 
 // EpisodeNFT.mint ABI
@@ -170,8 +170,8 @@ export function BuyNFTDialog({ listing, onClose, onSuccess }: BuyNFTDialogProps)
         {/* Image */}
         {listing.imageUrl && (
           <div className="relative h-48 bg-muted">
-            <img
-              src={resolveIpfsUrl(listing.imageUrl)}
+            <SmartImage
+              src={listing.imageUrl}
               alt={listing.title}
               className="w-full h-full object-cover"
             />

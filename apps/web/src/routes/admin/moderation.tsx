@@ -29,7 +29,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { RiskBadge } from '@/components/vlm/RiskBadge';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 
 type ContentPreview = {
   id: string;
@@ -53,8 +54,8 @@ function ContentPreviewCard({ preview }: { preview: ContentPreview | null }) {
   const isVideo = preview.mediaType === 'video' || preview.mediaType === 'ai-video';
   const isImage =
     preview.mediaType === 'image' || preview.mediaType === 'ai-image' || preview.mediaType === '3d';
-  const mediaSrc = resolveIpfsUrl(preview.mediaUrl);
-  const posterSrc = resolveIpfsUrl(preview.thumbnailUrl);
+  const mediaSrc = resolveIpfsUrlPreferred(preview.mediaUrl);
+  const posterSrc = resolveIpfsUrlPreferred(preview.thumbnailUrl);
 
   return (
     <div className="mt-3 flex gap-3 p-2 rounded border bg-muted/30">
@@ -69,23 +70,17 @@ function ContentPreviewCard({ preview }: { preview: ContentPreview | null }) {
             preload="metadata"
             className="w-full h-full object-cover"
           />
-        ) : isImage && (posterSrc || mediaSrc) ? (
-          <img
-            src={posterSrc || mediaSrc}
+        ) : isImage && (preview.thumbnailUrl || preview.mediaUrl) ? (
+          <SmartImage
+            src={preview.thumbnailUrl || preview.mediaUrl}
             alt={preview.title || 'flagged content'}
             className="w-full h-full object-cover"
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = 'none';
-            }}
           />
-        ) : posterSrc ? (
-          <img
-            src={posterSrc}
+        ) : preview.thumbnailUrl ? (
+          <SmartImage
+            src={preview.thumbnailUrl}
             alt={preview.title || 'flagged content'}
             className="w-full h-full object-cover"
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = 'none';
-            }}
           />
         ) : (
           <span className="text-xs text-muted-foreground px-2 text-center">no preview</span>

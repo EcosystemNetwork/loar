@@ -23,7 +23,7 @@ import {
   XCircle,
   ListChecks,
 } from 'lucide-react';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 
 /** How many generations to load per page */
 const PAGE_SIZE = 20;
@@ -290,7 +290,7 @@ function GenerationsPanelImpl({
             <div className="relative aspect-video bg-black rounded-t-lg overflow-hidden">
               {playingId === item.id ? (
                 <video
-                  src={resolveIpfsUrl(item.permanentVideoUrl || item.videoUrl || item.url)}
+                  src={resolveIpfsUrlPreferred(item.permanentVideoUrl || item.videoUrl || item.url)}
                   className="w-full h-full object-cover"
                   autoPlay
                   muted

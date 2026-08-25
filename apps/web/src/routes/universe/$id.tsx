@@ -3031,7 +3031,18 @@ function UniverseTimelineEditorInner() {
   }
 
   // Loading state
-  if (isLoadingUniverse || (isBlockchainUniverse && (isLoadingLeaves || isLoadingFullGraph))) {
+  // NOTE: this used to gate on the static `isBlockchainUniverse` heuristic
+  // (id.startsWith('0x')) rather than the resolved on/off-chain mode. Once
+  // the universe doc loaded, `isOnChain` flips to `false` for off-chain
+  // universes that merely have a 0x-looking id (e.g. script-seeded fun-mode
+  // universes) — which disables the on-chain reads and makes
+  // isLoadingLeaves/isLoadingFullGraph both false immediately, releasing
+  // this spinner before the off-chain fetch (offChainNodes.list) had even
+  // started. The canvas would then render with zero nodes for an instant
+  // before real data arrived, reading as nodes "disappearing right away".
+  // `isLoadingAny` (from useUniverseBlockchain) already accounts for
+  // whichever branch — on-chain or off-chain — is actually active.
+  if (isLoadingUniverse || isLoadingAny) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">

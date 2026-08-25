@@ -98,6 +98,14 @@ async function processGenerationBody(
   await job.updateProgress(10);
   await generationsCol.doc(data.generationId).update({ status: 'running' });
 
+  // Populated by the `google` dispatch branch below with the exact BYOK/pool
+  // key used to create the file — Gemini Files API downloads are scoped to
+  // the key that created them, so the rehost fetch below must reuse this
+  // key rather than re-reading process.env.GOOGLE_API_KEY (which may be
+  // unset, or may simply be a different key than the one that generated
+  // this particular file).
+  let googleApiKeyForRehost: string | undefined;
+
   try {
     // Execute generation through circuit breaker
     const result = await breaker.execute(async () => {
@@ -142,6 +150,7 @@ async function processGenerationBody(
             videoUrl: undefined,
           };
         }
+        googleApiKeyForRehost = googleApiKey;
         const googleResult = await dispatchGoogleVeo(
           model,
           {
@@ -256,7 +265,11 @@ async function processGenerationBody(
       const manager = getStorageManager();
       const filename = `generation-${data.generationId}.mp4`;
       // Google's Gemini Files API (Google-direct Veo) scopes downloads to
-      // the API key that created them — an unauthenticated fetch 401s here.
+      // the API key that created them — an unauthenticated fetch, or one
+      // authenticated with a *different* key (e.g. the platform pool key
+      // when this file was generated with a user's BYOK key), 403s here.
+      // Reuse the exact key the dispatch used; only fall back to the pool
+      // env var if that key somehow never got captured.
       const isGeminiFilesHost = (() => {
         try {
           return new URL(result.videoUrl!).hostname === 'generativelanguage.googleapis.com';
@@ -264,11 +277,20 @@ async function processGenerationBody(
           return false;
         }
       })();
+      const geminiRehostKey = googleApiKeyForRehost || process.env.GOOGLE_API_KEY;
+      if (isGeminiFilesHost && !geminiRehostKey) {
+        // No key available to re-fetch this file at all — persisting the raw
+        // ephemeral URL below is guaranteed to 403 in every viewer's browser
+        // (Google requires the creating key on every download). Surface this
+        // loudly instead of silently falling through.
+        console.error(
+          `[worker] no Google API key available to rehost ${data.generationId} — ` +
+            `gallery/content doc will fall back to an ephemeral Gemini Files URL that will 403 for viewers`
+        );
+      }
       const response = await fetch(result.videoUrl!, {
         headers:
-          isGeminiFilesHost && process.env.GOOGLE_API_KEY
-            ? { 'x-goog-api-key': process.env.GOOGLE_API_KEY }
-            : undefined,
+          isGeminiFilesHost && geminiRehostKey ? { 'x-goog-api-key': geminiRehostKey } : undefined,
       });
       if (!response.ok) {
         throw new Error(`Source fetch failed: ${response.status} ${response.statusText}`);

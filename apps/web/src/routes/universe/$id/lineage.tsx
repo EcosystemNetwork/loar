@@ -15,7 +15,8 @@ import { createFileRoute, Link, useParams } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { trpcClient } from '@/utils/trpc';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -391,18 +392,14 @@ function UniverseLineagePage() {
               <Card className="p-3 hover:border-cyan-600 transition-colors">
                 <div className="flex items-start gap-3">
                   {ev.outputUrl && ev.outputKind === 'image' ? (
-                    <img
-                      src={resolveIpfsUrl(ev.outputUrl)}
+                    <SmartImage
+                      src={ev.outputUrl}
                       alt=""
                       className="h-16 w-16 rounded object-cover bg-zinc-900 flex-shrink-0"
-                      loading="lazy"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).style.display = 'none';
-                      }}
                     />
                   ) : ev.outputUrl && ev.outputKind === 'video' ? (
                     <video
-                      src={resolveIpfsUrl(ev.outputUrl)}
+                      src={resolveIpfsUrlPreferred(ev.outputUrl)}
                       muted
                       className="h-16 w-16 rounded object-cover bg-zinc-900 flex-shrink-0"
                     />

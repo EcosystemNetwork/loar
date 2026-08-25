@@ -16,7 +16,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import { Shield, EyeOff, Eye, Loader2, Search, Trash2 } from 'lucide-react';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 
 export const Route = createFileRoute('/admin/universes')({
@@ -166,8 +166,8 @@ function AdminUniversesDashboard() {
             <Card key={u.id} className={u.isHidden ? 'opacity-60' : undefined}>
               <CardContent className="p-4 flex items-center gap-4">
                 {u.image_url ? (
-                  <img
-                    src={resolveIpfsUrl(u.image_url)}
+                  <SmartImage
+                    src={u.image_url}
                     alt={u.name ?? u.id}
                     className="h-14 w-14 rounded object-cover flex-shrink-0"
                   />

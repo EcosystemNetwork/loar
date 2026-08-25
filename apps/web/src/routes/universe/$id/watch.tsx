@@ -13,7 +13,8 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { trpcClient } from '@/utils/trpc';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import {
   ponderGql,
   ponderQueryDefaults,
@@ -337,11 +338,7 @@ function WatchPage() {
       {/* ── Cinematic Hero ─────────────────────────── */}
       <section className="relative h-[75vh] min-h-[500px] max-h-[800px] overflow-hidden">
         {cover ? (
-          <img
-            src={resolveIpfsUrl(cover)}
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover"
-          />
+          <SmartImage src={cover} alt="" className="absolute inset-0 w-full h-full object-cover" />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-amber-950 via-stone-950 to-stone-950" />
         )}
@@ -509,7 +506,7 @@ function EpisodeCard({
   const isCurated = !!episode.fsEpisodeId;
   const isCanon = episode.fsIsCanon;
 
-  const videoSrc = episode.videoLink ? resolveIpfsUrl(episode.videoLink) : undefined;
+  const videoSrc = episode.videoLink ? resolveIpfsUrlPreferred(episode.videoLink) : undefined;
 
   const onMouseEnter = () => {
     const v = videoRef.current;
@@ -764,7 +761,7 @@ function SyncEpisodesBanner({
           if (!c?.videoLink) return null;
           return {
             nodeId: String(n.nodeId),
-            videoUrl: resolveIpfsUrl(c.videoLink),
+            videoUrl: resolveIpfsUrlPreferred(c.videoLink),
             plot: c.plot || '',
             creator: n.creator,
             createdAt: n.createdAt,

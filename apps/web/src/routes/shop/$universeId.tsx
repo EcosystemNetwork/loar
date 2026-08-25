@@ -33,7 +33,7 @@ import { formatEther } from 'viem';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { useVocab } from '@/hooks/use-vocab';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import { ListingPrice, Price } from '@/components/Price';
 
 export const Route = createFileRoute('/shop/$universeId')({
@@ -86,13 +86,10 @@ function UniverseShopPage() {
       <div className="relative">
         <div className="h-40 sm:h-52 md:h-64 bg-gradient-to-br from-primary/20 via-primary/5 to-background flex items-center justify-center overflow-hidden">
           {(universe as any)?.bannerUrl ? (
-            <img
-              src={resolveIpfsUrl((universe as any).bannerUrl)}
+            <SmartImage
+              src={(universe as any).bannerUrl}
               alt=""
               className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.display = 'none';
-              }}
             />
           ) : (
             <Store className="w-16 h-16 text-primary/20" />
@@ -101,8 +98,8 @@ function UniverseShopPage() {
         <div className="px-4 sm:px-6 pb-4 -mt-8 sm:-mt-10 relative max-w-4xl mx-auto">
           <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-4 border-background bg-muted flex items-center justify-center overflow-hidden shadow-lg">
             {(universe as any)?.thumbnailUrl ? (
-              <img
-                src={resolveIpfsUrl((universe as any).thumbnailUrl)}
+              <SmartImage
+                src={(universe as any).thumbnailUrl}
                 alt=""
                 className="w-full h-full object-cover"
               />
@@ -355,8 +352,8 @@ function ShopListingCard({ listing }: { listing: any }) {
       <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer">
         <div className="aspect-square bg-muted flex items-center justify-center">
           {listing.thumbnailUrl ? (
-            <img
-              src={resolveIpfsUrl(listing.thumbnailUrl)}
+            <SmartImage
+              src={listing.thumbnailUrl}
               alt={listing.title}
               className="w-full h-full object-cover"
             />

@@ -15,7 +15,7 @@
 import { useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import { InpaintCanvas, type InpaintCanvasHandle } from './InpaintCanvas';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -622,13 +622,10 @@ export function InpaintStudio({
                   className="w-full flex gap-2 p-1.5 rounded hover:bg-muted/10 text-left"
                 >
                   {j.outputUrl ? (
-                    <img
-                      src={resolveIpfsUrl(j.outputUrl)}
+                    <SmartImage
+                      src={j.outputUrl}
                       alt=""
                       className="w-10 h-10 rounded object-cover shrink-0"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).style.display = 'none';
-                      }}
                     />
                   ) : (
                     <div className="w-10 h-10 rounded bg-muted/20 shrink-0" />

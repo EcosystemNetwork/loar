@@ -9,7 +9,7 @@ import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-q
 import { trpcClient } from '@/utils/trpc';
 import { useWalletAuth, awaitSessionValidation } from '@/lib/wallet-auth';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -305,7 +305,7 @@ function ContentCard({
           />
         ) : isVideo && item.mediaUrl ? (
           <video
-            src={resolveIpfsUrl(item.mediaUrl)}
+            src={resolveIpfsUrlPreferred(item.mediaUrl)}
             className="w-full h-full object-cover"
             muted
             loop
@@ -402,7 +402,7 @@ function ContentRow({
             />
           ) : isVideo && item.mediaUrl ? (
             <video
-              src={resolveIpfsUrl(item.mediaUrl)}
+              src={resolveIpfsUrlPreferred(item.mediaUrl)}
               className="w-full h-full object-cover"
               muted
               playsInline

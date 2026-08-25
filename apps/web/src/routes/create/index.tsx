@@ -35,7 +35,7 @@ import {
   Sparkles,
   Fingerprint,
 } from 'lucide-react';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import { RandomUniverseBuilder } from '@/components/RandomUniverseBuilder';
 
 interface EntityTypeCard {
@@ -288,10 +288,11 @@ function CreateHub() {
       {universeInfo && (
         <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-violet-500/30 bg-gradient-to-r from-violet-500/10 to-purple-500/10 p-4">
           {universeInfo.image_url && (
-            <img
-              src={resolveIpfsUrl(universeInfo.image_url)}
+            <SmartImage
+              src={universeInfo.image_url}
               alt=""
-              className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
+              sizes="48px"
+              className="h-12 w-12 rounded-lg flex-shrink-0"
             />
           )}
           <div className="min-w-0 flex-1">
@@ -384,11 +385,11 @@ function CreateHub() {
                     className="flex items-center gap-3 p-3"
                   >
                     {img ? (
-                      <img
-                        src={resolveIpfsUrl(img)}
+                      <SmartImage
+                        src={img}
                         alt=""
-                        loading="lazy"
-                        className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
+                        sizes="48px"
+                        className="h-12 w-12 rounded-lg flex-shrink-0"
                       />
                     ) : (
                       <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-violet-500/40 to-purple-500/40 flex-shrink-0" />

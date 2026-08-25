@@ -42,7 +42,9 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { LoarIcon } from '@/components/loar-icons';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
+import { useResolvedIpfsUrl } from '@/hooks/useResolvedIpfsUrl';
 
 const CATEGORY_ICONS: Record<MediaCategory, React.ReactNode> = {
   image: <LoarIcon name="gallery" size={14} />,
@@ -159,18 +161,15 @@ function AttachmentRow({ item, variants, isOwner, onDetach, detaching }: Attachm
           {/* Inline image thumbnail */}
           {isImage(item) && item.url && (
             <a
-              href={resolveIpfsUrl(item.url)}
+              href={resolveIpfsUrlPreferred(item.url)}
               target="_blank"
               rel="noreferrer"
               className="shrink-0"
             >
-              <img
-                src={resolveIpfsUrl(item.url)}
+              <SmartImage
+                src={item.url}
                 alt={displayName}
                 className="w-12 h-12 rounded object-cover border"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.display = 'none';
-                }}
               />
             </a>
           )}
@@ -222,7 +221,7 @@ function AttachmentRow({ item, variants, isOwner, onDetach, detaching }: Attachm
           </div>
         </div>
         <div className="flex items-center gap-0.5 shrink-0">
-          <a href={resolveIpfsUrl(item.url)} target="_blank" rel="noreferrer">
+          <a href={resolveIpfsUrlPreferred(item.url)} target="_blank" rel="noreferrer">
             <Button variant="ghost" size="icon" className="h-7 w-7">
               <ExternalLink className="w-3 h-3" />
             </Button>
@@ -252,18 +251,15 @@ function AttachmentRow({ item, variants, isOwner, onDetach, detaching }: Attachm
               <div className="flex items-center gap-2 min-w-0">
                 {isImage(v) && v.url && (
                   <a
-                    href={resolveIpfsUrl(v.url)}
+                    href={resolveIpfsUrlPreferred(v.url)}
                     target="_blank"
                     rel="noreferrer"
                     className="shrink-0"
                   >
-                    <img
-                      src={resolveIpfsUrl(v.url)}
+                    <SmartImage
+                      src={v.url}
                       alt={v.label || v.originalFilename}
                       className="w-8 h-8 rounded object-cover border"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).style.display = 'none';
-                      }}
                     />
                   </a>
                 )}
@@ -292,7 +288,7 @@ function AttachmentRow({ item, variants, isOwner, onDetach, detaching }: Attachm
                 </div>
               </div>
               <div className="flex items-center gap-0.5 shrink-0">
-                <a href={resolveIpfsUrl(v.url)} target="_blank" rel="noreferrer">
+                <a href={resolveIpfsUrlPreferred(v.url)} target="_blank" rel="noreferrer">
                   <Button variant="ghost" size="icon" className="h-6 w-6">
                     <ExternalLink className="w-2.5 h-2.5" />
                   </Button>
@@ -327,18 +323,19 @@ export function MediaGallery({ targetType, targetId, isOwner }: MediaGalleryProp
   const { data: attachments = [], isLoading } = useMediaAttachments(targetType, targetId);
   const detach = useDetachMedia();
 
-  if (isLoading || attachments.length === 0) return null;
-
+  // Derived before the early returns below (not hooks themselves, but
+  // heroThumbnail feeds the useResolvedIpfsUrl hook call, which must run
+  // unconditionally on every render).
   const byCategory = groupByCategory(attachments as MediaAttachment[]);
-
-  if (Object.keys(byCategory).length === 0) return null;
-
-  // Find best GLB for the hero 3D viewer
   const all3d = byCategory['3d'] || [];
   const heroGlb = findBestGlb(all3d);
   const heroThumbnail = heroGlb
     ? findThumbnail(attachments as MediaAttachment[], heroGlb.generationId)
     : undefined;
+  const heroPosterUrl = useResolvedIpfsUrl(heroThumbnail);
+
+  if (isLoading || attachments.length === 0) return null;
+  if (Object.keys(byCategory).length === 0) return null;
 
   // Collect all images for a visual gallery strip
   const allImages = (byCategory['image'] || []).filter((a) => a.url);
@@ -359,18 +356,15 @@ export function MediaGallery({ targetType, targetId, isOwner }: MediaGalleryProp
             {allImages.map((img) => (
               <a
                 key={img.id}
-                href={resolveIpfsUrl(img.url)}
+                href={resolveIpfsUrlPreferred(img.url)}
                 target="_blank"
                 rel="noreferrer"
                 className="group relative aspect-square rounded-lg overflow-hidden border bg-muted/30 hover:ring-2 hover:ring-primary transition-all"
               >
-                <img
-                  src={resolveIpfsUrl(img.url)}
+                <SmartImage
+                  src={img.url}
                   alt={img.label || img.originalFilename}
                   className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).style.display = 'none';
-                  }}
                 />
                 <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <p className="text-white text-xs truncate">{img.label || img.originalFilename}</p>
@@ -394,8 +388,8 @@ export function MediaGallery({ targetType, targetId, isOwner }: MediaGalleryProp
             <span className="text-xs font-semibold uppercase tracking-wider">3D Model Preview</span>
           </div>
           <ModelViewer
-            src={resolveIpfsUrl(heroGlb.url)}
-            poster={resolveIpfsUrl(heroThumbnail)}
+            src={resolveIpfsUrlPreferred(heroGlb.url)}
+            poster={heroPosterUrl}
             alt={heroGlb.label || '3D Model'}
             className="aspect-square max-h-[400px]"
           />

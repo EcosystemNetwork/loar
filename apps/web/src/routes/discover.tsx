@@ -18,7 +18,9 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
 import { QueryState } from '@/components/QueryState';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
+import { useResolvedIpfsUrl } from '@/hooks/useResolvedIpfsUrl';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Search,
@@ -134,8 +136,8 @@ function DiscoverPage() {
                   className="group relative rounded-xl overflow-hidden bg-muted aspect-[3/4] hover:ring-2 hover:ring-primary/50 transition-all"
                 >
                   {item.thumbnailUrl || item.mediaUrl ? (
-                    <img
-                      src={resolveIpfsUrl(item.thumbnailUrl || item.mediaUrl)}
+                    <SmartImage
+                      src={item.thumbnailUrl || item.mediaUrl}
                       alt={item.title || 'Trending'}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
@@ -432,8 +434,8 @@ function UniverseCard({ universe }: { universe: any }) {
         <CardContent className="p-0">
           <div className="relative aspect-[4/5] bg-muted">
             {imageUrl ? (
-              <img
-                src={resolveIpfsUrl(imageUrl) || imageUrl}
+              <SmartImage
+                src={imageUrl}
                 alt={universe.name || 'Universe'}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
@@ -752,6 +754,7 @@ function MobileShortsGallery({ items }: { items: any[] }) {
 function MobileShortCard({ item, isActive }: { item: any; isActive: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [muted, setMuted] = useState(true);
+  const posterUrl = useResolvedIpfsUrl(item.thumbnailUrl);
 
   useEffect(() => {
     if (!videoRef.current) return;
@@ -779,17 +782,17 @@ function MobileShortCard({ item, isActive }: { item: any; isActive: boolean }) {
         {isVideo && item.mediaUrl ? (
           <video
             ref={videoRef}
-            src={resolveIpfsUrl(item.mediaUrl)}
+            src={resolveIpfsUrlPreferred(item.mediaUrl)}
             className="w-full h-full object-cover"
             muted={muted}
             loop
             playsInline
             preload="metadata"
-            poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
+            poster={posterUrl}
           />
         ) : item.thumbnailUrl ? (
-          <img
-            src={resolveIpfsUrl(item.thumbnailUrl)}
+          <SmartImage
+            src={item.thumbnailUrl}
             alt={item.title}
             className="w-full h-full object-cover"
           />
@@ -857,6 +860,7 @@ function DesktopShortsPlayer({ items }: { items: any[] }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const item = items[index];
+  const posterUrl = useResolvedIpfsUrl(item?.thumbnailUrl);
   const isVideo = item && (item.mediaType === 'video' || item.mediaType === 'ai-video');
 
   const go = useCallback(
@@ -902,17 +906,17 @@ function DesktopShortsPlayer({ items }: { items: any[] }) {
         {isVideo && item.mediaUrl ? (
           <video
             ref={videoRef}
-            src={resolveIpfsUrl(item.mediaUrl)}
+            src={resolveIpfsUrlPreferred(item.mediaUrl)}
             className="w-full h-full object-cover"
             muted={muted}
             loop
             playsInline
             autoPlay
-            poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
+            poster={posterUrl}
           />
         ) : item.thumbnailUrl ? (
-          <img
-            src={resolveIpfsUrl(item.thumbnailUrl)}
+          <SmartImage
+            src={item.thumbnailUrl}
             alt={item.title}
             className="w-full h-full object-cover"
           />
@@ -997,6 +1001,7 @@ function LongCard({ item }: { item: any }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [muted, setMuted] = useState(true);
   const [playing, setPlaying] = useState(false);
+  const posterUrl = useResolvedIpfsUrl(item.thumbnailUrl);
 
   const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
 
@@ -1020,17 +1025,17 @@ function LongCard({ item }: { item: any }) {
         {isVideo && item.mediaUrl ? (
           <video
             ref={videoRef}
-            src={resolveIpfsUrl(item.mediaUrl)}
+            src={resolveIpfsUrlPreferred(item.mediaUrl)}
             className="w-full h-full object-cover"
             muted={muted}
             loop
             playsInline
             preload="metadata"
-            poster={resolveIpfsUrl(item.thumbnailUrl) || undefined}
+            poster={posterUrl}
           />
         ) : item.thumbnailUrl ? (
-          <img
-            src={resolveIpfsUrl(item.thumbnailUrl)}
+          <SmartImage
+            src={item.thumbnailUrl}
             alt={item.title}
             className="w-full h-full object-cover"
           />
@@ -1199,21 +1204,21 @@ function ContentFeedCard({ item }: { item: any }) {
         <CardContent className="p-0">
           <div className="relative aspect-video bg-muted">
             {item.thumbnailUrl ? (
-              <img
-                src={resolveIpfsUrl(item.thumbnailUrl)}
+              <SmartImage
+                src={item.thumbnailUrl}
                 alt={item.title}
                 className="w-full h-full object-cover"
               />
             ) : isVideo ? (
               <video
-                src={resolveIpfsUrl(item.mediaUrl)}
+                src={resolveIpfsUrlPreferred(item.mediaUrl)}
                 className="w-full h-full object-cover"
                 muted
                 preload="metadata"
               />
             ) : (
-              <img
-                src={resolveIpfsUrl(item.mediaUrl)}
+              <SmartImage
+                src={item.mediaUrl}
                 alt={item.title}
                 className="w-full h-full object-cover"
               />

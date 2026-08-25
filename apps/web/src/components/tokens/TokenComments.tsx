@@ -24,7 +24,7 @@ import {
   ChevronDown,
   ImagePlus,
 } from 'lucide-react';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 
 interface Comment {
   id: string;
@@ -270,8 +270,8 @@ function CommentItem({
             <UserText>{comment.text}</UserText>
           </p>
           {comment.imageUrl && (
-            <img
-              src={resolveIpfsUrl(comment.imageUrl)}
+            <SmartImage
+              src={comment.imageUrl}
               alt=""
               className="mt-2 max-h-40 rounded-md object-cover"
             />

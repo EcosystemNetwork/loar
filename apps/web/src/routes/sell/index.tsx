@@ -22,7 +22,7 @@ import { useMyListings, useDelistListing } from '@/hooks/useListings';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import { useVocab } from '@/hooks/use-vocab';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 
 export const Route = createFileRoute('/sell/')({
   component: SellPage,
@@ -172,8 +172,8 @@ function SellerListingRow({
         <div className="flex gap-3">
           <div className="w-14 h-14 rounded-lg bg-muted flex items-center justify-center shrink-0 overflow-hidden">
             {listing.thumbnailUrl ? (
-              <img
-                src={resolveIpfsUrl(listing.thumbnailUrl)}
+              <SmartImage
+                src={listing.thumbnailUrl}
                 alt={listing.title}
                 className="w-full h-full object-cover"
               />

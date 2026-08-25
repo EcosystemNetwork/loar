@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, Wand2, Dices, Plus, Minus, Check, X, ExternalLink } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 import {
   rollRandomEntity,
   KIND_LABELS,
@@ -276,8 +276,8 @@ export function RandomUniverseBuilder({
               <div key={item.id} className="flex items-center gap-3 p-2 text-xs">
                 <div className="w-12 h-12 flex-shrink-0 rounded-md bg-muted/40 overflow-hidden flex items-center justify-center">
                   {item.rolled?.imageUrl ? (
-                    <img
-                      src={resolveIpfsUrl(item.rolled.imageUrl)}
+                    <SmartImage
+                      src={item.rolled.imageUrl}
                       alt=""
                       className="w-full h-full object-cover"
                     />

@@ -40,7 +40,7 @@ import {
   type EpisodeClip,
 } from '@/components/episode-studio/EpisodeClipTimeline';
 import { trpcClient, SERVER_URL } from '@/utils/trpc';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 
 export const Route = createFileRoute('/universe/$id/episode/$episodeId/studio')({
   component: EpisodeStudioPage,
@@ -440,7 +440,7 @@ function EpisodeStudioPage() {
                   className="group relative overflow-hidden rounded-lg border border-border"
                 >
                   <video
-                    src={resolveIpfsUrl(asset.videoUrl)}
+                    src={resolveIpfsUrlPreferred(asset.videoUrl)}
                     muted
                     preload="metadata"
                     className="aspect-video w-full object-cover"

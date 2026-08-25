@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
 import { Search, Users, Star, Briefcase, Shield, Plus } from 'lucide-react';
-import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { SmartImage } from '@/components/SmartImage';
 
 export const Route = createFileRoute('/agents/')({
   component: AgentDiscoveryPage,
@@ -126,8 +126,8 @@ function AgentDiscoveryPage() {
               <Card className="p-5 transition-colors hover:border-violet-500/50 hover:bg-zinc-900/50">
                 <div className="flex items-start gap-4">
                   {agent.avatarUrl ? (
-                    <img
-                      src={resolveIpfsUrl(agent.avatarUrl)}
+                    <SmartImage
+                      src={agent.avatarUrl}
                       alt={agent.displayName}
                       className="h-12 w-12 rounded-full object-cover"
                     />
