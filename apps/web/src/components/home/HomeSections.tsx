@@ -12,7 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
-import { proxiedImage, proxiedSrcSet } from '@/utils/img-proxy';
+import { proxiedImage } from '@/utils/img-proxy';
+import { SmartImage } from '@/components/SmartImage';
 
 import {
   Play,
@@ -170,17 +171,11 @@ export function UniverseCard({ universe }: { universe: EnrichedUniverse }) {
       {/* Tall poster image — prefer dedicated portrait crop */}
       <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-xl group-hover:shadow-primary/20">
         {universe.portraitImageURL || universe.imageURL || universe.tokenData?.imageURL ? (
-          <img
-            src={proxiedImage(
-              universe.portraitImageURL || universe.imageURL || universe.tokenData?.imageURL
-            )}
-            srcSet={proxiedSrcSet(
-              universe.portraitImageURL || universe.imageURL || universe.tokenData?.imageURL
-            )}
-            sizes="200px"
+          <SmartImage
+            src={universe.portraitImageURL || universe.imageURL || universe.tokenData?.imageURL}
             alt=""
-            loading="lazy"
-            className="w-full h-full object-cover"
+            sizes="200px"
+            className="w-full h-full"
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-amber-900/80 via-stone-900 to-stone-950" />
@@ -253,13 +248,11 @@ function WideCard({ universe }: { universe: EnrichedUniverse }) {
     >
       <div className="relative aspect-video rounded-xl overflow-hidden bg-muted ring-1 ring-white/5 group-hover:ring-primary/60 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl group-hover:shadow-primary/20">
         {universe.imageURL || universe.tokenData?.imageURL ? (
-          <img
-            src={proxiedImage(universe.imageURL || universe.tokenData?.imageURL)}
-            srcSet={proxiedSrcSet(universe.imageURL || universe.tokenData?.imageURL)}
-            sizes="(max-width: 768px) 50vw, 320px"
+          <SmartImage
+            src={universe.imageURL || universe.tokenData?.imageURL}
             alt=""
-            loading="lazy"
-            className="w-full h-full object-cover"
+            sizes="(max-width: 768px) 50vw, 320px"
+            className="w-full h-full"
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-amber-900/80 via-stone-900 to-stone-950" />
@@ -401,17 +394,14 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
           style={{ opacity: i === currentIndex ? 1 : 0 }}
         >
           {u.imageURL || u.tokenData?.imageURL ? (
-            <img
-              src={proxiedImage(u.imageURL || u.tokenData?.imageURL, 1600)}
-              srcSet={proxiedSrcSet(u.imageURL || u.tokenData?.imageURL)}
-              sizes="100vw"
-              {...({ fetchpriority: i === currentIndex ? 'high' : 'low' } as Record<
-                string,
-                string
-              >)}
+            <SmartImage
+              src={u.imageURL || u.tokenData?.imageURL}
               alt=""
-              className="w-full h-full object-cover scale-105"
+              sizes="100vw"
+              priority={i === currentIndex}
+              className="w-full h-full"
               style={{
+                transform: 'scale(1.05)',
                 animation:
                   i === currentIndex ? 'kenburns 12s ease-in-out infinite alternate' : 'none',
               }}
@@ -742,11 +732,10 @@ export function RecentEpisodes() {
               {/* Info */}
               <div className="flex gap-2 items-start px-0.5">
                 {ep.universe.imageURL ? (
-                  <img
-                    src={proxiedImage(ep.universe.imageURL, 96)}
+                  <SmartImage
+                    src={ep.universe.imageURL}
                     alt=""
-                    loading="lazy"
-                    className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5"
+                    className="w-8 h-8 rounded-full flex-shrink-0 mt-0.5"
                   />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex-shrink-0 mt-0.5" />
@@ -1033,13 +1022,11 @@ export function ContentCard({ item }: { item: any }) {
               }}
             />
           ) : (
-            <img
-              src={proxiedImage(item.thumbnailUrl || item.mediaUrl)}
-              srcSet={proxiedSrcSet(item.thumbnailUrl || item.mediaUrl)}
-              sizes="(max-width: 768px) 50vw, 320px"
+            <SmartImage
+              src={item.thumbnailUrl || item.mediaUrl}
               alt=""
-              loading="lazy"
-              className="w-full h-full object-cover"
+              sizes="(max-width: 768px) 50vw, 320px"
+              className="w-full h-full"
             />
           )
         ) : (
@@ -1241,14 +1228,11 @@ export function SearchOverlay({
                     >
                       <div className="w-10 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-600 to-purple-600">
                         {(u.portraitImageURL || u.imageURL || u.tokenData?.imageURL) && (
-                          <img
-                            src={proxiedImage(
-                              u.portraitImageURL || u.imageURL || u.tokenData?.imageURL,
-                              240
-                            )}
+                          <SmartImage
+                            src={u.portraitImageURL || u.imageURL || u.tokenData?.imageURL}
                             alt=""
-                            loading="lazy"
-                            className="w-full h-full object-cover"
+                            sizes="40px"
+                            className="w-full h-full"
                           />
                         )}
                       </div>
@@ -1300,11 +1284,11 @@ export function SearchOverlay({
                     >
                       <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-600 to-purple-600">
                         {(u.imageURL || u.tokenData?.imageURL) && (
-                          <img
-                            src={proxiedImage(u.imageURL || u.tokenData?.imageURL, 96)}
+                          <SmartImage
+                            src={u.imageURL || u.tokenData?.imageURL}
                             alt=""
-                            loading="lazy"
-                            className="w-full h-full object-cover"
+                            sizes="32px"
+                            className="w-full h-full"
                           />
                         )}
                       </div>
@@ -1381,11 +1365,10 @@ export function ContinueWatchingRow() {
               </div>
               <div className="flex gap-2 items-start px-0.5">
                 {ep.universe.imageURL ? (
-                  <img
-                    src={proxiedImage(ep.universe.imageURL, 96)}
+                  <SmartImage
+                    src={ep.universe.imageURL}
                     alt=""
-                    loading="lazy"
-                    className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5"
+                    className="w-8 h-8 rounded-full flex-shrink-0 mt-0.5"
                   />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex-shrink-0 mt-0.5" />
@@ -1467,11 +1450,10 @@ export function ForYouRow() {
             </div>
             <div className="flex gap-2 items-start px-0.5">
               {ep.universe.imageURL ? (
-                <img
-                  src={proxiedImage(ep.universe.imageURL, 96)}
+                <SmartImage
+                  src={ep.universe.imageURL}
                   alt=""
-                  loading="lazy"
-                  className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5"
+                  className="w-8 h-8 rounded-full flex-shrink-0 mt-0.5"
                 />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex-shrink-0 mt-0.5" />

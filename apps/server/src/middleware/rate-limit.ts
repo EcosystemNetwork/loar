@@ -209,11 +209,38 @@ export function rateLimiter(opts: { windowMs: number; max: number; name: string 
 
     if (result.blocked) {
       c.header('Retry-After', String(Math.ceil(opts.windowMs / 1000)));
-      return c.json({ error: 'Too many requests' }, 429);
+      return c.json(trpcRateLimitBody(c), 429);
     }
 
     await next();
   };
+}
+
+/**
+ * 429 body for a blocked request. Plain `{ error: string }` for ordinary
+ * routes, but /trpc/* needs a tRPC-envelope-shaped body instead: the batch
+ * client (httpBatchLink) parses every response — success or error — as
+ * either a single envelope or an array of them (one per batched procedure,
+ * e.g. `/trpc/entities.list,universes.adminInfo,tokenGates.list?batch=1`).
+ * A bare `{ error: string }` fails that parse and surfaces client-side as
+ * an opaque "Unable to transform response from server" instead of a
+ * legible rate-limit error. Mirrors the error shape aiRateLimiter already
+ * uses for its (single-procedure) AI routes, replicated per batched
+ * procedure here.
+ */
+function trpcRateLimitBody(c: Context): unknown {
+  if (!c.req.path.startsWith('/trpc/')) {
+    return { error: 'Too many requests' };
+  }
+  const envelope = {
+    error: {
+      message: 'Too many requests. Please wait before trying again.',
+      code: -32029,
+      data: { code: 'TOO_MANY_REQUESTS', httpStatus: 429 },
+    },
+  };
+  const procedureCount = c.req.path.slice('/trpc/'.length).split(',').filter(Boolean).length || 1;
+  return procedureCount > 1 ? Array(procedureCount).fill(envelope) : envelope;
 }
 
 /**

@@ -108,6 +108,46 @@ const KNOWN_GATEWAY_HOSTS = new Set<string>([
   'nftstorage.link',
 ]);
 
+// ── Concurrency gate ────────────────────────────────────────────────────
+//
+// A media-heavy page (market/discover/gallery) can mount dozens of
+// SmartImage/useResolvedIpfsUrl instances at once, each resolving a
+// distinct CID. Per-CID dedup (inFlightResolves, below) only collapses
+// *repeat* requests for the same CID — it does nothing for 20+ genuinely
+// different thumbnails loading together, which otherwise fan out into a
+// burst of simultaneous requests against both our own /api/ipfs/resolve
+// endpoint (per-IP rate-limited server-side) and public IPFS gateways
+// (rate-limited/flaky on their own, see raceIpfsGateways). Two small
+// semaphores cap how many of each run at once; a large page queues the
+// rest instead of firing everything in the same tick.
+function createSemaphore(max: number) {
+  let active = 0;
+  const queue: Array<() => void> = [];
+  const release = () => {
+    active--;
+    const next = queue.shift();
+    if (next) next();
+  };
+  return function acquire(): Promise<() => void> {
+    if (active < max) {
+      active++;
+      return Promise.resolve(release);
+    }
+    return new Promise((resolve) => {
+      queue.push(() => {
+        active++;
+        resolve(release);
+      });
+    });
+  };
+}
+
+// Gates calls to our own /api/ipfs/resolve endpoint.
+const acquireResolveSlot = createSemaphore(6);
+// Gates whole raceIpfsGateways() sessions (each fans out to ~4 public
+// gateways), independently of the resolve gate above.
+const acquireGatewayRaceSlot = createSemaphore(6);
+
 // Extract the "<cid>[/sub/path][?query]" portion of a known IPFS URL.
 // Returns null if the URL isn't an IPFS gateway URL we recognize.
 function extractIpfsPath(url: string): { cidPath: string } | null {
@@ -207,6 +247,11 @@ export async function raceIpfsGateways(
   if (candidates.length === 1) return candidates[0];
 
   const timeoutMs = opts.timeoutMs ?? 4000;
+  const release = await acquireGatewayRaceSlot();
+  if (opts.signal?.aborted) {
+    release();
+    return candidates[0];
+  }
 
   return new Promise((resolve) => {
     let settled = false;
@@ -221,6 +266,7 @@ export async function raceIpfsGateways(
     const finish = (result: string) => {
       if (settled) return;
       settled = true;
+      release();
       for (const c of controllers) {
         try {
           c.abort();
@@ -302,6 +348,7 @@ export async function resolveIpfsUrlAsync(url?: string | null): Promise<string> 
   if (inFlight) return inFlight;
 
   const promise = (async () => {
+    const release = await acquireResolveSlot();
     try {
       const res = await fetch(`${SERVER_URL}/api/ipfs/resolve?url=${encodeURIComponent(url)}`, {
         credentials: 'include',
@@ -317,6 +364,7 @@ export async function resolveIpfsUrlAsync(url?: string | null): Promise<string> 
     } catch {
       return resolveIpfsUrl(url);
     } finally {
+      release();
       inFlightResolves.delete(cacheKey);
     }
   })();
