@@ -7,6 +7,13 @@ const MAX_HOPS = 6;
 const HOP_ATTR = 'data-ipfs-hops';
 
 function advance(el: HTMLImageElement | HTMLVideoElement | HTMLSourceElement): boolean {
+  // SmartImage owns its own React-state candidate chain and onError handler.
+  // If we also rotate this element's `src` here, we do it out from under
+  // React (direct DOM mutation + stopImmediatePropagation), desyncing
+  // SmartImage's `candidateIdx` from what's actually loaded and burning the
+  // shared MAX_HOPS budget on hops React doesn't know happened — see the
+  // comment on SmartImage's <img data-smart-image>.
+  if (el.getAttribute('data-smart-image') === 'true') return false;
   const maybeCurrentSrc = (el as HTMLImageElement | HTMLVideoElement).currentSrc;
   const current = el.getAttribute('src') || maybeCurrentSrc || '';
   if (!isIpfsGatewayUrl(current)) return false;

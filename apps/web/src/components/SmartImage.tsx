@@ -174,6 +174,16 @@ export function SmartImage({
       {activeSrc && (
         <img
           {...rest}
+          // Tells the global onerror gateway-rotator (install-ipfs-fallback.ts)
+          // to leave this element alone — SmartImage already owns a full
+          // candidate-chain retry via handleError below. Without this, the
+          // capture-phase global listener fires first on every failure,
+          // silently rewrites `src` and calls stopImmediatePropagation(),
+          // and desyncs from React's `candidateIdx` (which never advances) —
+          // both burning down the shared MAX_HOPS budget until they exhaust
+          // it before every real gateway has actually been tried, showing
+          // "Couldn't load image" even though live gateways remained.
+          data-smart-image="true"
           src={activeSrc}
           srcSet={srcSet}
           sizes={sizes}
