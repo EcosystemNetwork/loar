@@ -99,7 +99,7 @@ async function loadUniverses(ids: string[]): Promise<Map<string, UniverseDoc>> {
   for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
   const out = new Map<string, UniverseDoc>();
   for (const chunk of chunks) {
-    const refs = chunk.map((id) => db!.collection('universes').doc(id));
+    const refs = chunk.map((id) => db!.collection('cinematicUniverses').doc(id));
     const snaps = await db.getAll(...refs);
     for (const snap of snaps) {
       if (snap.exists) out.set(snap.id, { ...(snap.data() as UniverseDoc), id: snap.id });
