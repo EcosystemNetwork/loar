@@ -83,6 +83,16 @@ export interface PlatformConfig {
   /** Maximum credits a wallet may spend in a rolling 24-hour window. */
   dailySpendCapCredits: number;
 
+  // ── Homepage curation ─────────────────────────────────────────────
+  /**
+   * Universe addresses (lowercase 0x…), in display order, pinned to the
+   * front of the homepage hero billboard and the scrolling activity ticker.
+   * Empty = both fall back to their automatic ranking heuristic (node count
+   * + token presence). Read publicly via `universes.getFeatured` — keep this
+   * field free of anything sensitive, unlike the rest of this config.
+   */
+  featuredUniverseIds: string[];
+
   // ── Metadata ─────────────────────────────────────────────────────
   updatedAt?: Date;
   updatedBy?: string;
@@ -118,6 +128,8 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
   monthlySpendCapCredits: 2000,
   dailySpendCapEnabled: true,
   dailySpendCapCredits: 500,
+
+  featuredUniverseIds: [],
 };
 
 // ── Simple in-process cache (TTL: 60 s) ──────────────────────────────────

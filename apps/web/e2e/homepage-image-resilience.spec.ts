@@ -78,6 +78,60 @@ async function pinFixtureUniverse(page: Page) {
   );
 }
 
+// A non-IPFS cover image — mirrors real data: a universe whose fal.ai cover
+// generation failed at creation time and fell back to a plain https
+// placeholder URL (scripts/create-dostopian-universe.ts) instead of an
+// ipfs:// one. "Dostopia: The Iron Faith" is a real example of this in
+// production (see the incident this test guards against).
+const NON_IPFS_IMAGE_URL = 'https://images.example.com/placeholder-cover.jpg';
+const NON_IPFS_FIXTURE_UNIVERSE = {
+  ...FIXTURE_UNIVERSE,
+  id: 'e2e-fixture-universe-non-ipfs',
+  address: '0x00000000000000000000000000000000000e3e',
+  name: 'E2E Non-IPFS Cover Fixture',
+  image_url: NON_IPFS_IMAGE_URL,
+};
+
+async function pinNonIpfsFixtureUniverse(page: Page) {
+  await page.route('**/trpc/universes.getAll**', (route: Route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        { result: { data: { success: true, data: [NON_IPFS_FIXTURE_UNIVERSE] } } },
+      ]),
+    })
+  );
+  await page.route('**/graphql', (route: Route) =>
+    route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ errors: [{ message: 'e2e: ponder intentionally offline' }] }),
+    })
+  );
+  // The real https host resolves fine on its own — SmartImage should just
+  // render it directly, never through the resize proxy.
+  await page.route(`**/${new URL(NON_IPFS_IMAGE_URL).host}/**`, (route: Route) =>
+    route.fulfill({ status: 200, contentType: 'image/png', body: PIXEL_PNG })
+  );
+  // Mirror the server's real SSRF guard (apps/server's /api/img host
+  // allowlist): any non-IPFS-gateway host gets a 400. If SmartImage's
+  // srcset ever asks the proxy for this host again, the <img> fails with no
+  // fallback candidate — exactly the "Couldn't load image" bug being
+  // guarded against here.
+  await page.route('**/api/img**', (route: Route) => {
+    const upstream = new URL(route.request().url()).searchParams.get('url') || '';
+    if (upstream.includes(new URL(NON_IPFS_IMAGE_URL).host)) {
+      return route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'host not allowed' }),
+      });
+    }
+    return route.continue();
+  });
+}
+
 /**
  * Simulates the primary IPFS gateway (ipfs.io) being completely dead — both
  * the client-side HEAD probe (raceIpfsGateways) and any request our own
@@ -188,6 +242,43 @@ test.describe('Homepage — Image Resilience', () => {
       timeout: 10_000,
     });
   });
+
+  test('a universe card with a non-IPFS cover image renders directly, not through the resize proxy', async ({
+    page,
+  }) => {
+    // Regression guard for the "Dostopia: The Iron Faith" incident: its cover
+    // is a plain https placeholder (fal.ai generation failed at seed time, see
+    // scripts/create-dostopian-universe.ts), not an ipfs:// URL. SmartImage's
+    // buildResizeSrcSet() used to route *every* src through the server's
+    // `/api/img` resize proxy unconditionally; the proxy's SSRF host
+    // allowlist 400s ("host not allowed") on anything that isn't a known IPFS
+    // gateway, which fails the <img> with no fallback candidate and renders
+    // the terminal "Couldn't load image" state — for an image that was live
+    // and reachable the whole time.
+    await pinNonIpfsFixtureUniverse(page);
+    await page.goto('/');
+
+    const card = page.getByText('E2E Non-IPFS Cover Fixture').first();
+    await expect(card).toBeVisible({ timeout: 15_000 });
+
+    const cardImg = page
+      .locator('div', { has: page.getByText('E2E Non-IPFS Cover Fixture', { exact: true }) })
+      .locator('img')
+      .first();
+    await expect(cardImg).toBeVisible({ timeout: 10_000 });
+
+    await expect
+      .poll(async () => cardImg.evaluate((img: HTMLImageElement) => img.naturalWidth), {
+        timeout: 10_000,
+        message:
+          'non-IPFS cover image never painted — likely routed through the resize proxy and 400ed on its SSRF guard',
+      })
+      .toBeGreaterThan(0);
+
+    // The negative assertion that actually pins the bug: the "Couldn't load
+    // image" terminal state must never appear for this card.
+    await expect(page.getByText('Couldn’t load image')).toHaveCount(0);
+  });
 });
 
 /**
@@ -203,4 +294,18 @@ test.describe('Homepage — Image Resilience', () => {
  *
  * Restoring the SmartImage fix made both pass. See PR discussion for the
  * full before/after test output.
+ *
+ * Second incident, same day: "Dostopia: The Iron Faith" was reported showing
+ * no thumbnail in production even with the SmartImage fix live. Root cause
+ * was different from the above — SmartImage.tsx's buildResizeSrcSet() routed
+ * *every* image through the server's /api/img resize proxy unconditionally,
+ * with no host guard (unlike utils/img-proxy.ts's proxyable(), which only
+ * proxies recognized IPFS gateway URLs). The proxy's SSRF allowlist 400s
+ * ("host not allowed") on a non-IPFS host, which fails the <img> via its
+ * srcset with no fallback candidate. Confirmed live against production:
+ * `GET /api/img?url=<Unsplash cover>&w=320 → 400 {"error":"host not
+ * allowed"}`. Reproduced with the 'a universe card with a non-IPFS cover
+ * image...' test above (`git stash` the SmartImage.tsx guard fix — 5
+ * "Couldn't load image" cards). Fixed by gating buildResizeSrcSet() on
+ * isIpfsGatewayUrl(src), same as img-proxy.ts.
  */

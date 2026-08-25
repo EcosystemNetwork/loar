@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { decode as decodeBlurhash } from 'blurhash';
 import { cn } from '@/lib/utils';
-import { getIpfsUrlCandidatesPreferred, raceIpfsGateways } from '@/utils/ipfs-url';
+import {
+  getIpfsUrlCandidatesPreferred,
+  isIpfsGatewayUrl,
+  raceIpfsGateways,
+} from '@/utils/ipfs-url';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export interface SmartImageProps extends Omit<
@@ -36,11 +40,15 @@ const SERVER_URL = (import.meta.env.VITE_SERVER_URL || '').replace(/\/$/, '');
 /**
  * Build a srcset pointing at the server resize proxy. The proxy returns a
  * resized + format-negotiated image (`?url=...&w=...&format=auto`). We omit
- * srcset entirely if the server URL isn't configured — the bare src still
- * works through the IPFS gateway directly.
+ * srcset entirely if the server URL isn't configured, or if `src` isn't a
+ * recognized IPFS gateway URL — the proxy's SSRF guard 400s
+ * ("host not allowed") on anything else (e.g. a plain https:// placeholder
+ * cover image), and an errored srcset candidate fails the whole <img> with
+ * no bare-`src` fallback (see handleError below). Mirrors the same guard in
+ * `utils/img-proxy.ts`'s `proxyable()`.
  */
 function buildResizeSrcSet(src: string): string | undefined {
-  if (!SERVER_URL) return undefined;
+  if (!SERVER_URL || !isIpfsGatewayUrl(src)) return undefined;
   return RESIZE_WIDTHS.map(
     (w) => `${SERVER_URL}/api/img?url=${encodeURIComponent(src)}&w=${w} ${w}w`
   ).join(', ');

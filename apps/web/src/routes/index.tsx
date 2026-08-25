@@ -141,6 +141,14 @@ function HomeComponent() {
 
   const ponderOnline = !!ponderUniverses;
 
+  // ─── Admin-curated featured universes (hero billboard + activity ticker) ───
+  const { data: featuredConfig } = useQuery({
+    queryKey: ['universes', 'featured-config'],
+    queryFn: () => trpcClient.universes.getFeatured.query(),
+    staleTime: 60_000,
+  });
+  const featuredUniverseIds = featuredConfig?.featuredUniverseIds;
+
   // ─── Merge: Firestore base + optional Ponder enrichment ───
   const universes = useMemo(() => {
     // Normalize Firestore docs into the shape UI cards expect
@@ -241,7 +249,7 @@ function HomeComponent() {
 
       {ponderOnline && (
         <div className="shrink-0">
-          <ActivityTicker />
+          <ActivityTicker featuredUniverseIds={featuredUniverseIds} />
         </div>
       )}
 
@@ -280,7 +288,11 @@ function HomeComponent() {
 
       {/* Hero: skeleton during load, real billboard once data arrives */}
       <div className="shrink-0">
-        {universesLoading ? <HeroSkeleton /> : <HeroBillboard universes={universes} />}
+        {universesLoading ? (
+          <HeroSkeleton />
+        ) : (
+          <HeroBillboard universes={universes} featuredUniverseIds={featuredUniverseIds} />
+        )}
       </div>
 
       {/*

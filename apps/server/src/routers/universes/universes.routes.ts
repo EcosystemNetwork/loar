@@ -20,6 +20,7 @@ import {
 import { isUniverseAdmin, isUniverseAdminStrict, getSafeInfo } from '../../lib/safe-admin';
 import { db } from '../../lib/firebase';
 import { generateNonce, consumeNonce } from '../../lib/siwe';
+import { getPlatformConfig } from '../../services/platformConfig';
 
 const createUniverseSchema = z.object({
   address: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address'),
@@ -135,6 +136,17 @@ export const universesRouter = router({
   /** Get all universes. Private universes appear only for the viewing owner. */
   getAll: publicProcedure.query(async ({ ctx }) => {
     return await getAllUniverses({ viewerAddress: ctx.user?.address });
+  }),
+
+  /**
+   * Admin-curated universe addresses (in order) pinned to the front of the
+   * homepage hero billboard and scrolling activity ticker. Public — this is
+   * the only slice of `platformConfig` safe to expose to unauthenticated
+   * visitors; everything else in that doc stays behind `admin.getConfig`.
+   */
+  getFeatured: publicProcedure.query(async () => {
+    const cfg = await getPlatformConfig();
+    return { featuredUniverseIds: cfg.featuredUniverseIds ?? [] };
   }),
 
   /** Discover universes with search, sorting, and pagination. */

@@ -7,7 +7,7 @@
  * query result is the source of truth.
  */
 import { createFileRoute, redirect } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,9 @@ import {
   Check,
   X,
   Sparkles,
+  Star,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 
 export const Route = createFileRoute('/admin/ops')({
@@ -252,6 +255,9 @@ function OpsDashboard() {
         </CardContent>
       </Card>
 
+      {/* Featured homepage content (hero billboard + activity ticker) */}
+      <FeaturedUniversesSection />
+
       {/* Retro auto-canon for fun universes */}
       <RetroCanonSection />
 
@@ -414,6 +420,191 @@ function AbuseFlagsSection() {
               </tbody>
             </table>
           </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+type AdminUniverseRow = { id: string; name?: string; creator?: string };
+
+/**
+ * Featured homepage content — the universes pinned, in order, to the front
+ * of the homepage Hero Billboard and the scrolling Activity Ticker.
+ *
+ * Both surfaces read this same list (`admin.getConfig().featuredUniverseIds`
+ * → publicly re-exposed as `universes.getFeatured`), so there is one place
+ * to curate what the landing page opens with. Empty = both fall back to
+ * their automatic ranking heuristic.
+ */
+function FeaturedUniversesSection() {
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState('');
+  const [draft, setDraft] = useState<string[] | null>(null);
+
+  const { data: cfg, isLoading: cfgLoading } = useQuery({
+    queryKey: ['admin-config'],
+    queryFn: () => trpcClient.admin.getConfig.query(),
+  });
+
+  const { data: universesData, isLoading: universesLoading } = useQuery({
+    queryKey: ['admin-universes'],
+    queryFn: () => trpcClient.universes.adminList.query(),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (patch: Record<string, unknown>) => trpcClient.admin.updateConfig.mutate(patch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-config'] });
+      toast.success('Featured universes updated');
+      setDraft(null);
+    },
+    onError: (err: Error) => toast.error(`Update failed: ${err.message}`),
+  });
+
+  const saved = cfg?.featuredUniverseIds ?? [];
+  const current = draft ?? saved;
+
+  const universes = useMemo(
+    () => (universesData?.data ?? []) as AdminUniverseRow[],
+    [universesData]
+  );
+  const byId = useMemo(() => new Map(universes.map((u) => [u.id.toLowerCase(), u])), [universes]);
+
+  const results = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return [];
+    return universes
+      .filter(
+        (u) =>
+          !current.some((id) => id.toLowerCase() === u.id.toLowerCase()) &&
+          (u.name?.toLowerCase().includes(term) || u.id.toLowerCase().includes(term))
+      )
+      .slice(0, 8);
+  }, [universes, search, current]);
+
+  function add(id: string) {
+    if (current.length >= 10) {
+      toast.error('Maximum 10 featured universes');
+      return;
+    }
+    setDraft([...current, id]);
+    setSearch('');
+  }
+  function remove(id: string) {
+    setDraft(current.filter((x) => x.toLowerCase() !== id.toLowerCase()));
+  }
+  function move(index: number, dir: -1 | 1) {
+    const target = index + dir;
+    if (target < 0 || target >= current.length) return;
+    const next = [...current];
+    [next[index], next[target]] = [next[target], next[index]];
+    setDraft(next);
+  }
+
+  const dirty = draft !== null && JSON.stringify(draft) !== JSON.stringify(saved);
+  const loading = cfgLoading || universesLoading;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Star className="h-5 w-5" /> Featured universes (hero &amp; ticker)
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-muted-foreground text-sm">
+          Pins these universes, in this order, to the front of the homepage hero billboard and the
+          scrolling activity ticker. Leave empty to fall back to automatic ranking (node count +
+          token presence).
+        </p>
+
+        {loading && <Loader2 className="h-5 w-5 animate-spin" />}
+
+        {!loading && (
+          <>
+            {current.length === 0 && (
+              <p className="text-muted-foreground text-sm italic">
+                No universes pinned — using automatic ranking.
+              </p>
+            )}
+            <div className="space-y-2">
+              {current.map((id, i) => {
+                const u = byId.get(id.toLowerCase());
+                return (
+                  <div
+                    key={id}
+                    className="flex items-center justify-between gap-3 rounded-md border p-2.5"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{u?.name || 'Unknown universe'}</div>
+                      <div className="text-muted-foreground truncate font-mono text-xs">{id}</div>
+                    </div>
+                    <div className="flex shrink-0 gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => move(i, -1)}
+                        disabled={i === 0}
+                      >
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => move(i, 1)}
+                        disabled={i === current.length - 1}
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => remove(id)}>
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="relative">
+              <Label htmlFor="featured-search">Add a universe</Label>
+              <Input
+                id="featured-search"
+                placeholder="Search by name or address…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              {results.length > 0 && (
+                <div className="bg-popover absolute z-10 mt-1 w-full rounded-md border shadow-md">
+                  {results.map((u) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      className="hover:bg-muted flex w-full items-center justify-between px-3 py-2 text-left text-sm"
+                      onClick={() => add(u.id)}
+                    >
+                      <span className="truncate">{u.name || 'Unnamed universe'}</span>
+                      <span className="text-muted-foreground ml-2 shrink-0 font-mono text-xs">
+                        {u.id.slice(0, 10)}…
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Button
+              onClick={() => updateMutation.mutate({ featuredUniverseIds: current })}
+              disabled={!dirty || updateMutation.isPending}
+            >
+              {updateMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              Save
+            </Button>
+          </>
         )}
       </CardContent>
     </Card>

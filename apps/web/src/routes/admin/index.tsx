@@ -171,7 +171,7 @@ function AdminHub() {
     {
       to: '/admin/ops',
       title: 'Ops',
-      description: 'Feature kill switches, spend caps, abuse flags, retro auto-canon.',
+      description: 'Feature kill switches, spend caps, abuse flags, featured homepage content.',
       icon: Power,
       badge: () => <OpsBadge enabled={gated} />,
     },

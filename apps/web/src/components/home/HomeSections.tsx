@@ -315,14 +315,40 @@ export function HeroSkeleton() {
 /* ──────────────────────────────────────────
  * Hero Billboard (Netflix-style)
  * ────────────────────────────────────────── */
-export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) {
+export function HeroBillboard({
+  universes,
+  featuredUniverseIds,
+}: {
+  universes: EnrichedUniverse[];
+  /** Admin-curated universe addresses, in order — see `admin/ops` "Featured universes". */
+  featuredUniverseIds?: string[];
+}) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const navigate = useNavigate();
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   const featured = useMemo(() => {
-    const FEATURED_FIRST = 'space fleet';
     const eligible = universes.filter((u) => u.tokenData || u.nodeCount > 0);
+
+    // Admin curation takes priority: pin the picked universes, in order,
+    // then fill remaining slots from the automatic pool.
+    if (featuredUniverseIds && featuredUniverseIds.length > 0) {
+      const byId = new Map(universes.map((u) => [u.id?.toLowerCase(), u]));
+      const pinned = featuredUniverseIds
+        .map((id) => byId.get(id.toLowerCase()))
+        .filter((u): u is EnrichedUniverse => !!u);
+      if (pinned.length > 0) {
+        const pinnedIds = new Set(pinned.map((u) => u.id.toLowerCase()));
+        const rest = (eligible.length > 0 ? eligible : universes).filter(
+          (u) => !pinnedIds.has(u.id.toLowerCase())
+        );
+        return [...pinned, ...rest].slice(0, 5);
+      }
+    }
+
+    // No admin curation (or none of the pinned universes still exist) —
+    // fall back to the automatic heuristic.
+    const FEATURED_FIRST = 'space fleet';
     const pool = eligible.length > 0 ? eligible : universes;
     const sorted = [...pool].sort((a, b) => {
       const aHit = a.name?.toLowerCase().trim() === FEATURED_FIRST ? -1 : 0;
@@ -330,7 +356,7 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
       return aHit - bHit;
     });
     return sorted.slice(0, 5);
-  }, [universes]);
+  }, [universes, featuredUniverseIds]);
 
   // Auto-advance every 8 seconds
   useEffect(() => {
@@ -508,7 +534,12 @@ export function HeroBillboard({ universes }: { universes: EnrichedUniverse[] }) 
 /* ──────────────────────────────────────────
  * Live Activity Ticker
  * ────────────────────────────────────────── */
-export function ActivityTicker() {
+export function ActivityTicker({
+  featuredUniverseIds,
+}: {
+  /** Admin-curated universe addresses, in order — see `admin/ops` "Featured universes". */
+  featuredUniverseIds?: string[];
+} = {}) {
   const { data: nodesData } = useQuery({
     queryKey: ['ponder', 'nodes', 'recent-20'],
     queryFn: () =>
@@ -550,15 +581,27 @@ export function ActivityTicker() {
     const contentMap = new Map<string, NodeContent>();
     nodeContentData.forEach((c) => contentMap.set(c.id, c));
 
-    // Rank all universes (pin "space fleet" first, then score by nodeCount +
-    // token presence) and feed the entire ranked list to the marquee. The
-    // ticker needs as much content as possible so a single "copy" reliably
-    // spans the viewport — otherwise the -50% loop shows a gap.
-    const isPinned = (u: Universe) => u.name?.trim().toLowerCase() === 'space fleet';
+    // Rank all universes (pin admin-curated featured universes first, in
+    // order — falling back to the "space fleet" heuristic when none are
+    // configured — then score the rest by nodeCount + token presence) and
+    // feed the entire ranked list to the marquee. The ticker needs as much
+    // content as possible so a single "copy" reliably spans the viewport —
+    // otherwise the -50% loop shows a gap.
+    const pinnedOrder = new Map((featuredUniverseIds ?? []).map((id, i) => [id.toLowerCase(), i]));
+    const isPinned = (u: Universe) =>
+      pinnedOrder.size > 0
+        ? pinnedOrder.has(u.id.toLowerCase())
+        : u.name?.trim().toLowerCase() === 'space fleet';
     const score = (u: Universe) =>
       (u.nodeCount || 0) * 100 +
       (u.tokenAddress && u.tokenAddress !== '0x0000000000000000000000000000000000000000' ? 50 : 0);
     const pinned = universesData.filter(isPinned);
+    if (pinnedOrder.size > 0) {
+      pinned.sort(
+        (a, b) =>
+          (pinnedOrder.get(a.id.toLowerCase()) ?? 0) - (pinnedOrder.get(b.id.toLowerCase()) ?? 0)
+      );
+    }
     const rest = universesData.filter((u) => !isPinned(u)).sort((a, b) => score(b) - score(a));
     const ranked = [...pinned, ...rest];
 
@@ -593,7 +636,7 @@ export function ActivityTicker() {
         createdAt: recentNode?.createdAt || u.createdAt,
       };
     });
-  }, [nodesData, nodeContentData, universesData]);
+  }, [nodesData, nodeContentData, universesData, featuredUniverseIds]);
 
   // Marquee math: the `ticker` keyframe translates from 0 to -50%, so the
   // rendered list must be exactly 2 identical halves — when the first half

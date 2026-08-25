@@ -70,6 +70,13 @@ const configPatchSchema = z.object({
   // Per-wallet monthly spend cap (measured in credits across a rolling 30 days).
   monthlySpendCapEnabled: z.boolean().optional(),
   monthlySpendCapCredits: z.number().int().min(0).max(1_000_000).optional(),
+
+  // Homepage hero billboard + activity ticker curation — universe addresses,
+  // in display order. Empty array clears curation back to automatic ranking.
+  featuredUniverseIds: z
+    .array(z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid universe address'))
+    .max(10)
+    .optional(),
 });
 
 // ── Router ────────────────────────────────────────────────────────────────
