@@ -96,8 +96,17 @@ app.get('/metrics', async (c) => {
 // Record request counts + durations for everything else.
 app.use('/*', metricsMiddleware());
 
-// Rate limiting: 100 requests per minute per IP
-app.use('/*', rateLimiter({ windowMs: 60_000, max: 100, name: 'blanket' }));
+// Rate limiting: general backstop across every route that doesn't have its
+// own dedicated bucket below (notably all of /trpc/*, which carries the bulk
+// of normal page-navigation traffic — each route transition fires several
+// batched tRPC calls). 100/min was sized back when this bucket was
+// (accidentally) shared with every other rateLimiter() mount, so it was
+// effectively refilled by ipfs/img/auth traffic too. Now that buckets are
+// namespaced (see rate-limit.ts), this one absorbs 100% of /trpc/* traffic
+// alone and 100/min turned out too tight for a single active session doing
+// normal multi-page navigation — bumped for headroom. Abuse-sensitive routes
+// keep their own tight dedicated buckets below regardless of this value.
+app.use('/*', rateLimiter({ windowMs: 60_000, max: 300, name: 'blanket' }));
 
 app.use(logger());
 
