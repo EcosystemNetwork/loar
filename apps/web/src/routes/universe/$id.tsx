@@ -283,6 +283,13 @@ function UniverseTimelineEditorInner() {
   // added/removed (or on the first successful load).
   const lastFitSignatureRef = useRef<string | null>(null);
 
+  // Id of a node that just finished a video upload/generation and should keep
+  // the viewport hovering over it. Set by handleCreateEvent right before the
+  // node lands in state; consumed (and cleared) by the graph-rebuild effect
+  // below the next time it re-fits — so that re-fit centers on this node
+  // instead of zooming out to fit the whole graph.
+  const focusNodeIdRef = useRef<string | null>(null);
+
   // The graph is rebuilt from blockchain data + a tree-layout algorithm on
   // every load, which would otherwise discard any manual rearrangement.
   const { applySavedPositions, savePosition } = useGraphLayout(id, 'universe');
@@ -2511,6 +2518,7 @@ function UniverseTimelineEditorInner() {
       }
       // For branches: keep all existing nodes and just add the new ones
 
+      focusNodeIdRef.current = newEventId;
       setNodes([...filteredNodes, newEventNode as any, newAddNode as any]);
       setEdges([...filteredEdges, ...newEdges]);
       setEventCounter((prev) => prev + 1);
@@ -2899,9 +2907,25 @@ function UniverseTimelineEditorInner() {
       .join(',');
     if (lastFitSignatureRef.current !== fitSignature) {
       lastFitSignatureRef.current = fitSignature;
-      requestAnimationFrame(() => {
-        fitView({ padding: 0.15, duration: 300 });
-      });
+
+      // If this rebuild was triggered by a node the user was just working on
+      // (e.g. a video finished uploading/generating), keep the viewport
+      // hovering over that node instead of zooming out to fit everything.
+      const focusNodeId = focusNodeIdRef.current;
+      const focusNode = focusNodeId ? finalNodes.find((n) => n.id === focusNodeId) : undefined;
+      if (focusNode) {
+        focusNodeIdRef.current = null;
+        requestAnimationFrame(() => {
+          setCenter(focusNode.position.x + 160, focusNode.position.y + 136, {
+            zoom: 1,
+            duration: 400,
+          });
+        });
+      } else {
+        requestAnimationFrame(() => {
+          fitView({ padding: 0.15, duration: 300 });
+        });
+      }
     }
   }, [
     graphData,
@@ -2915,6 +2939,7 @@ function UniverseTimelineEditorInner() {
     getArchivedNodeIds,
     getStoredEvents,
     fitView,
+    setCenter,
     applySavedPositions,
   ]);
 

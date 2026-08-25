@@ -34,6 +34,10 @@ const TRUSTED_MEDIA = [
   // to actually load, so this is a safety net, not the primary path).
   'https://generativelanguage.googleapis.com',
   'https://*.firebasestorage.app',
+  // Legacy Firebase Storage download-URL host (v0/b/.../o/... with a token
+  // query param) — img-src already trusts this; media-src needs it too so
+  // video/audio objects served the same way aren't blocked.
+  'https://firebasestorage.googleapis.com',
   'https://*.pinata.cloud',
   'https://gateway.pinata.cloud',
   'https://*.mypinata.cloud',
