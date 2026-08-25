@@ -276,6 +276,12 @@ export async function raceIpfsGateways(
 
 const SERVER_URL = (import.meta.env.VITE_SERVER_URL || '').replace(/\/$/, '');
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+// In-flight dedup: multiple elements resolving the same CID concurrently
+// (e.g. a grid of thumbnails sharing a CID, or an effect that fires twice)
+// share one fetch instead of each racing their own /api/ipfs/resolve call —
+// avoids doubling load on the server's per-IP rate limit for no benefit,
+// since they'd all resolve to the same signed URL anyway.
+const inFlightResolves = new Map<string, Promise<string>>();
 
 export async function resolveIpfsUrlAsync(url?: string | null): Promise<string> {
   if (!url) return '';
@@ -288,21 +294,31 @@ export async function resolveIpfsUrlAsync(url?: string | null): Promise<string> 
 
   if (!SERVER_URL) return resolveIpfsUrl(url);
 
-  try {
-    const res = await fetch(`${SERVER_URL}/api/ipfs/resolve?url=${encodeURIComponent(url)}`, {
-      credentials: 'include',
-    });
-    if (!res.ok) return resolveIpfsUrl(url);
-    const json = (await res.json()) as { url?: string; expiresAt?: number };
-    if (!json.url) return resolveIpfsUrl(url);
-    signedUrlCache.set(cacheKey, {
-      url: json.url,
-      expiresAt: json.expiresAt ?? Date.now() + 60_000,
-    });
-    return json.url;
-  } catch {
-    return resolveIpfsUrl(url);
-  }
+  const inFlight = inFlightResolves.get(cacheKey);
+  if (inFlight) return inFlight;
+
+  const promise = (async () => {
+    try {
+      const res = await fetch(`${SERVER_URL}/api/ipfs/resolve?url=${encodeURIComponent(url)}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) return resolveIpfsUrl(url);
+      const json = (await res.json()) as { url?: string; expiresAt?: number };
+      if (!json.url) return resolveIpfsUrl(url);
+      signedUrlCache.set(cacheKey, {
+        url: json.url,
+        expiresAt: json.expiresAt ?? Date.now() + 60_000,
+      });
+      return json.url;
+    } catch {
+      return resolveIpfsUrl(url);
+    } finally {
+      inFlightResolves.delete(cacheKey);
+    }
+  })();
+
+  inFlightResolves.set(cacheKey, promise);
+  return promise;
 }
 
 // Sync candidate chain, preferring our own dedicated gateway when it's already

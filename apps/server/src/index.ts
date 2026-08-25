@@ -97,7 +97,7 @@ app.get('/metrics', async (c) => {
 app.use('/*', metricsMiddleware());
 
 // Rate limiting: 100 requests per minute per IP
-app.use('/*', rateLimiter({ windowMs: 60_000, max: 100 }));
+app.use('/*', rateLimiter({ windowMs: 60_000, max: 100, name: 'blanket' }));
 
 app.use(logger());
 
@@ -121,7 +121,7 @@ app.route('/api/stripe', stripeWebhookRoutes);
 // transient backend 504 + a handful of failed-login retries emptied it and
 // locked the user out of logging in with a 429. Per-route isolation prevents
 // that cascade while keeping the sensitive endpoints tightly capped.
-app.use('/auth/*', rateLimiter({ windowMs: 60_000, max: 120 }));
+app.use('/auth/*', rateLimiter({ windowMs: 60_000, max: 120, name: 'auth' }));
 
 // Tight per-route buckets for the sensitive / expensive endpoints. These MUST
 // be registered before the route mounts below so the middleware wraps the
@@ -130,22 +130,31 @@ app.use('/auth/*', rateLimiter({ windowMs: 60_000, max: 120 }));
 // nonce: each call is a Firestore write — an attacker on the shared bucket
 //   could otherwise pull ~29k nonces/day per IP, burning quota + outrunning the
 //   15-min cleanup sweep. Legit clients call it once per login, so 6/min is ample.
-app.use('/auth/nonce', rateLimiter({ windowMs: 60_000, max: 6 }));
+app.use('/auth/nonce', rateLimiter({ windowMs: 60_000, max: 6, name: 'auth-nonce' }));
 // verify: SIWE signature verification — wallet-auth entry point. Tighter than
 //   the old 20/min blanket; one honest login needs a single call.
-app.use('/auth/verify', rateLimiter({ windowMs: 60_000, max: 15 }));
+app.use('/auth/verify', rateLimiter({ windowMs: 60_000, max: 15, name: 'auth-verify' }));
 // register: sends an OTP email — IP backstop for the per-email 3-per-15min cap;
 //   blunts cross-email enumeration / mail-bombing from one source. The per-email
 //   cap is the real mail-bomb guard, so keep this IP limit loose enough that a
 //   few honest retries — or several legit users behind one NAT/CGNAT IP — don't
 //   collide and get 429'd mid-signin.
-app.use('/auth/circle/register', rateLimiter({ windowMs: 60_000, max: 20 }));
+app.use(
+  '/auth/circle/register',
+  rateLimiter({ windowMs: 60_000, max: 20, name: 'auth-circle-register' })
+);
 // verify-otp: OTP brute-force backstop (the per-OTP 5-attempt cap also applies).
-app.use('/auth/circle/verify-otp', rateLimiter({ windowMs: 60_000, max: 15 }));
+app.use(
+  '/auth/circle/verify-otp',
+  rateLimiter({ windowMs: 60_000, max: 15, name: 'auth-circle-verify-otp' })
+);
 // social: each call verifies a real Google idToken + provisions/looks-up a
 //   Circle wallet. 15/min leaves room for a few honest retries during a backend
 //   blip without the old lockout, while still capping token-replay abuse.
-app.use('/auth/circle/social', rateLimiter({ windowMs: 60_000, max: 15 }));
+app.use(
+  '/auth/circle/social',
+  rateLimiter({ windowMs: 60_000, max: 15, name: 'auth-circle-social' })
+);
 
 app.route('/auth', authRoutes);
 
@@ -172,7 +181,7 @@ app.route('/api/ens', ensRoutes);
 // `transferWithAuthorization` (RPC + gas paid by the platform signer) on an
 // UNAUTHENTICATED request. An attacker rotating IPs/addresses on the shared
 // 100/min IP bucket could burn RPC quota + gas, so cap /api/x402/* tightly.
-app.use('/api/x402/*', rateLimiter({ windowMs: 60_000, max: 15 }));
+app.use('/api/x402/*', rateLimiter({ windowMs: 60_000, max: 15, name: 'x402' }));
 const { x402Routes } = await import('./routes/x402');
 app.route('/api/x402', x402Routes);
 
@@ -181,14 +190,14 @@ app.route('/api/x402', x402Routes);
 // signed gateway URL they can use directly. Public, rate-limited by shared
 // IP bucket below.
 const { ipfsRoutes } = await import('./routes/ipfs');
-app.use('/api/ipfs/*', rateLimiter({ windowMs: 60_000, max: 120 }));
+app.use('/api/ipfs/*', rateLimiter({ windowMs: 60_000, max: 120, name: 'ipfs' }));
 app.route('/api/ipfs', ipfsRoutes);
 
 // Image resize proxy (sharp). Powers SmartImage's srcset on the web app —
 // snaps requested widths to a fixed ladder, content-negotiates webp/avif,
 // LRU-caches in-process. Public, gateway-allowlisted, rate-limited.
 const { imgResizeRoutes } = await import('./routes/img-resize');
-app.use('/api/img/*', rateLimiter({ windowMs: 60_000, max: 240 }));
+app.use('/api/img/*', rateLimiter({ windowMs: 60_000, max: 240, name: 'img' }));
 app.route('/api/img', imgResizeRoutes);
 
 // Admin cost ledger CSV download (admin-address-gated). Lives outside tRPC
@@ -204,7 +213,7 @@ app.route('/api', mcpGatewayRoutes);
 // Paymaster proxy (POST /api/paymaster/sponsor). Pluggable provider —
 // pimlico / biconomy based on env. Stricter rate limit because each call
 // translates to a vendor-side spend.
-app.use('/api/paymaster/*', rateLimiter({ windowMs: 60_000, max: 20 }));
+app.use('/api/paymaster/*', rateLimiter({ windowMs: 60_000, max: 20, name: 'paymaster' }));
 const { paymasterRoutes } = await import('./routes/paymaster');
 app.route('/api/paymaster', paymasterRoutes);
 
@@ -293,7 +302,7 @@ function detectMimeFromMagic(header: Buffer): string | null {
 
 // Direct file upload endpoint (multipart form, bypasses tRPC for large files)
 // Stricter rate limit: 10 uploads per minute per IP
-app.use('/api/upload', rateLimiter({ windowMs: 60_000, max: 10 }));
+app.use('/api/upload', rateLimiter({ windowMs: 60_000, max: 10, name: 'upload' }));
 app.post('/api/upload', async (c) => {
   const { getCookie } = await import('hono/cookie');
   const cookieToken = getCookie(c, 'siwe-session');
@@ -540,7 +549,7 @@ app.post('/api/upload', async (c) => {
 // Works for any clip URL — generated, merged, or imported — and for an
 // episode's final `exportUrl`. SSRF-validated like every other server-side
 // fetch of a user-supplied URL in this codebase (see url-validator.ts).
-app.use('/api/clips/download', rateLimiter({ windowMs: 60_000, max: 30 }));
+app.use('/api/clips/download', rateLimiter({ windowMs: 60_000, max: 30, name: 'clips-download' }));
 app.get('/api/clips/download', async (c) => {
   const url = c.req.query('url');
   const filenameParam = c.req.query('filename');
@@ -591,7 +600,7 @@ app.get('/api/clips/download', async (c) => {
 // ── Public DMCA takedown REST endpoint ─────────────────────────────
 // External reporters can't use tRPC, so this mirrors moderation.submitTakedown as REST.
 // Strict rate limit: 3 requests per minute per IP to prevent mass-flagging abuse
-app.use('/api/takedown', rateLimiter({ windowMs: 60_000, max: 3 }));
+app.use('/api/takedown', rateLimiter({ windowMs: 60_000, max: 3, name: 'takedown' }));
 app.post('/api/takedown', async (c) => {
   // Enforces 17 U.S.C. § 512(c)(3)(A) statutory elements. See moderation
   // router for the same schema applied to the tRPC path.
@@ -725,7 +734,7 @@ app.post('/api/takedown', async (c) => {
 // ── Public DMCA counter-notice REST endpoint (no auth required) ──────
 // Respondents can file a counter-notice to dispute a takedown per 17 U.S.C. § 512(g).
 // Rate limit: 3 requests per minute per IP
-app.use('/api/counter-notice', rateLimiter({ windowMs: 60_000, max: 3 }));
+app.use('/api/counter-notice', rateLimiter({ windowMs: 60_000, max: 3, name: 'counter-notice' }));
 app.post('/api/counter-notice', async (c) => {
   const counterNoticeSchema = z.object({
     takedownRequestId: z.string().min(1),

@@ -187,12 +187,21 @@ export function getClientKey(c: Context): string {
 
 // ── Middleware ───────────────────────────────────────────────────────────
 
-export function rateLimiter(opts: { windowMs: number; max: number }) {
+export function rateLimiter(opts: { windowMs: number; max: number; name: string }) {
   return async (c: Context, next: Next) => {
     // Don't rate-limit CORS preflight requests
     if (c.req.method === 'OPTIONS') return next();
 
-    const key = getClientKey(c);
+    // Namespaced by bucket name so distinct mounts (blanket /*, /auth/*,
+    // /api/ipfs/*, ...) each draw from their own bucket per IP instead of
+    // silently colliding on bare getClientKey(c) — see index.ts call sites
+    // for the "consumes from BOTH the per-route bucket AND the blanket"
+    // layering this restores. Without this prefix every rateLimiter()
+    // mount for the same client shared one bucket, so a single request
+    // could burn 2-3 tokens across stacked mounts and the tighter/looser
+    // per-route `max` values were meaningless (whichever mount initialized
+    // the bucket first won).
+    const key = `${opts.name}:${getClientKey(c)}`;
     const result = await getStore().consume(key, opts.windowMs, opts.max);
 
     c.header('X-RateLimit-Limit', String(opts.max));
