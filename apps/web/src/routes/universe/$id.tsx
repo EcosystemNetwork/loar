@@ -396,6 +396,13 @@ function UniverseTimelineEditorInner() {
   // Canvas tool mode: 'hand' = pan on drag, 'select' = drag-to-select rectangle
   const [canvasTool, setCanvasTool] = useState<'hand' | 'select'>('hand');
 
+  // True while a rubber-band selection drag is in progress. Selection change
+  // events fire on every frame the drag rectangle crosses a node, which would
+  // otherwise mount/unmount the bulk toolbar (and replay its enter animation)
+  // repeatedly mid-drag. Gate the toolbar on this so it only appears once the
+  // drag settles, on mouse-up.
+  const [isRubberBandSelecting, setIsRubberBandSelecting] = useState(false);
+
   // Multi-select state
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
   // Generic confirm dialog — replaces window.confirm() so destructive actions
@@ -3106,6 +3113,8 @@ function UniverseTimelineEditorInner() {
               panOnScroll
               selectionOnDrag={canvasTool === 'select'}
               selectionMode={SelectionMode.Partial}
+              onSelectionStart={() => setIsRubberBandSelecting(true)}
+              onSelectionEnd={() => setIsRubberBandSelecting(false)}
               multiSelectionKeyCode="Shift"
               deleteKeyCode={null}
               fitView
@@ -3669,8 +3678,11 @@ function UniverseTimelineEditorInner() {
                 </div>
               </Panel>
 
-              {/* Selection Toolbar — appears when nodes are selected */}
-              {selectedNodeIds.size > 0 && !showSearch && (
+              {/* Selection Toolbar — appears when nodes are selected. Held back
+                  during an active rubber-band drag to avoid remounting/animating
+                  on every intermediate selection-change event; see
+                  isRubberBandSelecting. */}
+              {selectedNodeIds.size > 0 && !showSearch && !isRubberBandSelecting && (
                 <Panel position="top-center">
                   <BulkOperationsToolbar
                     selectedNodeIds={selectedNodeIds}
