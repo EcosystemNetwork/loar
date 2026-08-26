@@ -106,7 +106,26 @@ app.use('/*', metricsMiddleware());
 // alone and 100/min turned out too tight for a single active session doing
 // normal multi-page navigation — bumped for headroom. Abuse-sensitive routes
 // keep their own tight dedicated buckets below regardless of this value.
-app.use('/*', rateLimiter({ windowMs: 60_000, max: 300, name: 'blanket' }));
+//
+// EXCLUDED: /api/img/* and /api/ipfs/* already have their own dedicated,
+// appropriately-sized buckets below (240/min, 120/min — see mounts further
+// down) sized for their legitimate high volume. SmartImage fires up to 6
+// resize requests per image for its srcset (RESIZE_WIDTHS, see
+// apps/web/src/components/SmartImage.tsx), so a single media-heavy page
+// (e.g. a universe editor rendering many thumbnails) can burn through
+// hundreds of /api/img requests in a burst. Letting those ALSO draw from
+// this 300/min blanket meant that burst alone could exhaust it, after which
+// completely unrelated /trpc/* batches sharing that IP (credits.getBalance,
+// social.getUnreadCount, ...) started 429ing too — surfacing client-side as
+// an opaque "Unable to transform response from server" instead of anything
+// pointing at image loading.
+const blanketLimiter = rateLimiter({ windowMs: 60_000, max: 300, name: 'blanket' });
+app.use('/*', async (c, next) => {
+  if (c.req.path.startsWith('/api/img/') || c.req.path.startsWith('/api/ipfs/')) {
+    return next();
+  }
+  return blanketLimiter(c, next);
+});
 
 app.use(logger());
 
