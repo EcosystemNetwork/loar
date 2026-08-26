@@ -1,9 +1,11 @@
 /**
  * /settings/api-keys — Bring-Your-Own-Key (BYOK) for external providers.
  *
- * Currently supports ByteDance ModelArk (Seedance / Seedream / Seed 2.0).
- * Keys are encrypted at rest server-side; never returned to the client. UI
- * shows only the trailing 4 chars of a stored key for confirmation.
+ * BYOK is required, not optional: dispatch has no platform-pool fallback —
+ * a model stays locked (see ApiKeyGateModal) until the user adds their own
+ * key for its provider here. Keys are encrypted at rest server-side; never
+ * returned to the client. UI shows only the trailing 4 chars of a stored
+ * key for confirmation.
  */
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
@@ -17,94 +19,14 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ApiKeyManager } from '@/components/agents/ApiKeyManager';
-import { ArrowRight, Bot, ExternalLink, KeyRound, ShieldCheck, Trash2 } from 'lucide-react';
+import { PROVIDER_META, type Provider } from '@/lib/providerMeta';
+import { ArrowRight, Bot, ExternalLink, KeyRound, Lock, ShieldCheck, Trash2 } from 'lucide-react';
 
 export const Route = createFileRoute('/settings/api-keys')({
   component: ApiKeysPage,
 });
 
-type Provider = 'bytedance' | 'zai' | 'openai' | 'google' | 'fal' | 'elevenlabs' | 'meshy';
-
-const PROVIDER_META: Record<
-  Provider,
-  {
-    label: string;
-    blurb: string;
-    docsUrl: string;
-    placeholder: string;
-    fallbackNote: string;
-  }
-> = {
-  bytedance: {
-    label: 'ByteDance ModelArk',
-    blurb:
-      'Powers Seedance 2.0 (video), Seedream 5.0 (images), Seed 2.0 (planning), and OmniHuman talking-scenes. Plug in your own key and the platform spends your ModelArk credits instead of ours.',
-    docsUrl: 'https://docs.byteplus.com/en/docs/ModelArk/',
-    placeholder: 'Paste your ModelArk API key…',
-    fallbackNote:
-      'When no key is set, generation runs on the platform key (subject to shared quotas).',
-  },
-  zai: {
-    label: 'Z.AI (GLM)',
-    blurb:
-      'Powers GLM-4.6 / GLM-5.x reasoning, GLM-5V vision, CogView-4 image, CogVideoX-3 video, GLM-ASR transcription, and Web Search / Web Reader tools. Used by /lab/zai, the worldbuild planner, canon-consistency checks, and the governance agent.',
-    docsUrl: 'https://docs.z.ai/llms.txt',
-    placeholder: 'Paste your Z.AI API key…',
-    fallbackNote:
-      'When no key is set, Z.AI calls run on the platform key (ZAI_API_KEY). Plug in your own to spend your own quota.',
-  },
-  google: {
-    label: 'Google AI (Imagen + Gemini)',
-    blurb:
-      'Powers Imagen 4 / nano-banana-pro image generation, Gemini 2.5 Pro video analysis, character image analysis, and prompt enhancement. The default image model across the studio.',
-    docsUrl: 'https://ai.google.dev/gemini-api/docs/api-key',
-    placeholder: 'Paste your Google AI Studio key (AIza…)…',
-    fallbackNote:
-      'When no key is set, Google calls run on the platform key (GOOGLE_API_KEY). Plug in your own to spend your own quota.',
-  },
-  fal: {
-    label: 'fal.ai',
-    blurb:
-      "Powers FLUX, Veo3, Sora 2, Kling, Runway Gen-3, WAN, PixVerse, Stable Audio, MusicGen, LoRA training, inpainting/outpainting, upscaling, frame interpolation, and background removal. The studio's broadest provider.",
-    docsUrl: 'https://fal.ai/dashboard/keys',
-    placeholder: 'Paste your fal.ai key (uuid:secret)…',
-    fallbackNote:
-      'When no key is set, FAL calls run on the platform key (FAL_KEY). Plug in your own to spend your own quota.',
-  },
-  elevenlabs: {
-    label: 'ElevenLabs',
-    blurb:
-      'Powers text-to-speech, voice cloning, voice design, sound effects, and the talking-scene pipeline. Voice/audio backbone for narration and dialogue.',
-    docsUrl: 'https://elevenlabs.io/app/settings/api-keys',
-    placeholder: 'Paste your ElevenLabs API key…',
-    fallbackNote:
-      'When no key is set, ElevenLabs calls run on the platform key (ELEVENLABS_API_KEY). Plug in your own to spend your own quota.',
-  },
-  meshy: {
-    label: 'Meshy (3D)',
-    blurb:
-      'Powers text-to-3D, image-to-3D, multi-image-to-3D, and re-texturing in the character pipeline. Generates GLB / FBX / OBJ assets for the studio.',
-    docsUrl: 'https://www.meshy.ai/api',
-    placeholder: 'Paste your Meshy API key (msy_…)…',
-    fallbackNote:
-      'When no key is set, Meshy calls run on the platform key (MESHY_API_KEY). Plug in your own to spend your own quota.',
-  },
-  openai: {
-    label: 'OpenAI',
-    blurb:
-      'Used as a fallback LLM and for select OpenAI-only features (GPT-Image, embeddings, transcription).',
-    docsUrl: 'https://platform.openai.com/api-keys',
-    placeholder: 'Paste your OpenAI key (sk-…)…',
-    fallbackNote:
-      'When no key is set, OpenAI calls run on the platform key (OPENAI_API_KEY). Plug in your own to spend your own quota.',
-  },
-};
-
-// The new `providers.upsertKey` mutation tests every key against the provider
-// before persisting — bad keys never hit disk. The legacy "test then save"
-// double-call pattern is no longer needed.
-const TESTABLE_PROVIDERS = new Set<Provider>(['bytedance', 'zai']);
-void TESTABLE_PROVIDERS;
+const ALL_PROVIDERS = Object.keys(PROVIDER_META) as Provider[];
 
 function ApiKeysPage() {
   const { address } = useWalletAuth();
@@ -130,7 +52,11 @@ function ApiKeysPage() {
         <p className="text-muted-foreground text-sm mt-2">
           Plug in <strong className="text-foreground">your own</strong> third-party provider keys
           (OpenAI, Google, fal, …) and the platform routes your generation calls through them. Keys
-          are encrypted at rest with AES-256-GCM and never returned to the browser.
+          are encrypted at rest with AES-256-GCM and never returned to the browser.{' '}
+          <strong className="text-foreground">
+            A model is locked until you add a key for its provider
+          </strong>{' '}
+          — there's no shared platform key to fall back on.
         </p>
       </div>
 
@@ -176,13 +102,9 @@ function ApiKeysPage() {
         </p>
       </div>
 
-      <ProviderCard provider="bytedance" />
-      <ProviderCard provider="zai" />
-      <ProviderCard provider="google" />
-      <ProviderCard provider="fal" />
-      <ProviderCard provider="elevenlabs" />
-      <ProviderCard provider="meshy" />
-      <ProviderCard provider="openai" />
+      {ALL_PROVIDERS.map((provider) => (
+        <ProviderCard key={provider} provider={provider} />
+      ))}
 
       <Card className="bg-zinc-950/40 border-white/5">
         <CardContent className="pt-6 text-xs text-muted-foreground space-y-2">
@@ -192,8 +114,9 @@ function ApiKeysPage() {
             sees the trailing 4 chars of a stored key for confirmation.
           </p>
           <p>
-            We never log, mirror, or share your keys. To rotate, paste a new value. To stop using
-            BYOK, click "Remove" — the platform falls back to the shared key.
+            We never log, mirror, or share your keys. To rotate, paste a new value. Removing a key
+            re-locks every model on that provider — there is no shared platform key it falls back
+            to.
           </p>
         </CardContent>
       </Card>
@@ -261,7 +184,13 @@ function ProviderCard({ provider }: { provider: Provider }) {
                   Active
                 </Badge>
               ) : (
-                <Badge variant="secondary">Using platform key</Badge>
+                <Badge
+                  variant="secondary"
+                  className="bg-zinc-500/20 text-zinc-400 border-zinc-500/30 gap-1"
+                >
+                  <Lock className="h-2.5 w-2.5" />
+                  Locked
+                </Badge>
               )}
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">{meta.blurb}</p>
@@ -301,7 +230,10 @@ function ProviderCard({ provider }: { provider: Provider }) {
             </p>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground italic">{meta.fallbackNote}</p>
+          <p className="text-sm text-muted-foreground italic flex items-center gap-1.5">
+            <Lock className="h-3 w-3 flex-shrink-0" />
+            {meta.lockedNote}
+          </p>
         )}
 
         <div className="space-y-2">

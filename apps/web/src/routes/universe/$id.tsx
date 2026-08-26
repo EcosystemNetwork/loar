@@ -146,6 +146,7 @@ import type { ContextMenuState } from '@/components/flow/types';
 import { getSceneNodes } from '@/components/flow/types';
 import { VideoTrimmer } from '@/components/segments/VideoTrimmer';
 import type { VideoSegment } from '@/types/segments';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
 // Custom MiniMap node — shape varies by node type
 function MiniMapNode({
@@ -258,6 +259,7 @@ function UniverseTimelineEditorInner() {
   const { id } = useParams({ from: '/universe/$id' });
   const navigate = useNavigate();
   const chainId = useChainId();
+  const { generationEnabled } = useFeatureFlags();
 
   // Timeline flow state
   const [nodes, setNodes, onNodesChangeBase] = useNodesState([]);
@@ -595,6 +597,9 @@ function UniverseTimelineEditorInner() {
     isLoadingFullGraph,
     isLoadingCanonChain,
     isLoadingAny,
+    isError: isGraphError,
+    graphError,
+    graphErrorReason,
     refetchLeaves,
     refetchFullGraph,
     refetchCanonChain,
@@ -730,6 +735,9 @@ function UniverseTimelineEditorInner() {
       saveToDatabase?: boolean;
       detailedVisualDescription?: string;
     }) => {
+      if (!generationEnabled) {
+        throw new Error('AI generation is temporarily disabled. Please check back soon.');
+      }
       const result = await trpcClient.image.generateCharacter.mutate({
         ...input,
         saveToDatabase: input.saveToDatabase ?? false,
@@ -1455,6 +1463,11 @@ function UniverseTimelineEditorInner() {
     async (eventId: string) => {
       if (!eventId || regeneratingEventId) return;
 
+      if (!generationEnabled) {
+        toast.error('AI generation is temporarily disabled. Please check back soon.');
+        return;
+      }
+
       // Load the event's generation context from localStorage
       const eventsData = getStoredEvents();
       const eventData = eventsData[eventId];
@@ -1607,7 +1620,7 @@ function UniverseTimelineEditorInner() {
         setRegeneratingEventId(null);
       }
     },
-    [getStoredEvents, setStoredEvents, setNodes, regeneratingEventId]
+    [getStoredEvents, setStoredEvents, setNodes, regeneratingEventId, generationEnabled]
   );
 
   // Switch to a different version of a video on a node
@@ -3080,6 +3093,48 @@ function UniverseTimelineEditorInner() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p>Loading universe timeline...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // On-chain graph fetch failed — this used to render an *empty* canvas with
+  // zero indication anything had gone wrong (isError/graphError were fetched
+  // by useUniverseBlockchain but never read here). The most common trigger:
+  // `getFullGraph()` hard-reverts once a universe passes 500 total nodes
+  // ever created (Universe.sol), and if this universe's contract predates
+  // the getGraphPage() pagination fallback, that fallback fails too — see
+  // graphErrorReason's doc comment in useUniverseBlockchain.ts.
+  if (isGraphError) {
+    const isLegacyContract = graphErrorReason === 'pagination-unsupported';
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center space-y-4 max-w-md px-6">
+          <p className="text-lg font-medium">Couldn&apos;t load this universe&apos;s story graph</p>
+          <p className="text-sm text-muted-foreground">
+            {isLegacyContract
+              ? "This universe has grown too large for its deployed contract's data reader, and its on-chain contract doesn't support the newer paginated one either. Retrying won't help — this needs a fix on our end."
+              : 'The on-chain data provider returned an error. This is usually transient (a rate-limited or momentarily unreachable RPC provider).'}
+          </p>
+          {graphError?.message && (
+            <p className="text-xs text-muted-foreground/70 font-mono break-all">
+              {graphError.message}
+            </p>
+          )}
+          {!isLegacyContract && (
+            <button
+              type="button"
+              className="rounded-md border border-primary/30 bg-primary/10 px-4 py-2 text-sm hover:bg-primary/20"
+              onClick={() => {
+                refetchLatestNodeId();
+                refetchFullGraph();
+                refetchLeaves();
+                refetchCanonChain();
+              }}
+            >
+              Retry
+            </button>
+          )}
         </div>
       </div>
     );

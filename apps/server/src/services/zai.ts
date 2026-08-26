@@ -256,11 +256,19 @@ const DEFAULT_TRANSCRIBE_MODEL = 'gemini-2-5-flash-transcribe';
 
 // ── Key resolution ───────────────────────────────────────────────────────
 
+/**
+ * Required — no `GOOGLE_API_KEY` env fallback. Callers must route through
+ * `resolveProviderKey(uid, 'google')` (see lib/byok.ts) so BYOK lookup runs
+ * and the key is always the caller's own (see openai.ts's Auditor note M5,
+ * which closed this same hole first). `isConfigured()` below is unaffected
+ * — it stays a platform-env informational readout for the Lab's status/
+ * diagnostic endpoints, not an authorization path.
+ */
 function resolveKey(apiKey?: string): string {
-  const key = apiKey?.trim() || process.env.GOOGLE_API_KEY?.trim();
+  const key = apiKey?.trim();
   if (!key) {
     throw new Error(
-      'GOOGLE_API_KEY is not configured. Set it in the root .env, or have the user paste a Google AI key in /settings/api-keys (BYOK).'
+      'No Google AI API key available — add one at /settings/api-keys to use the Model Lab.'
     );
   }
   return key;

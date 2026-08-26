@@ -13,8 +13,33 @@ import {
   acquireKeyConcurrencySlot,
   releaseKeyConcurrencySlot,
 } from './apiKeys';
+import { NoKeyAvailableError } from '../services/provider-keys';
 
-export const t = initTRPC.context<Context>().create();
+export const t = initTRPC.context<Context>().create({
+  /**
+   * Surface BYOK-required failures structurally instead of as an opaque
+   * 500. Every generation dispatch throws `NoKeyAvailableError` (directly,
+   * or as `error.cause` when tRPC wraps an unexpected throw) once a user
+   * lacks a key for the model's provider — since dispatch is BYOK-only
+   * end-to-end (no server-pool fallback), this is the single choke point
+   * that lets the client reliably detect "show the add-key modal" instead
+   * of pattern-matching error strings per call site.
+   */
+  errorFormatter({ shape, error }) {
+    const cause = error.cause;
+    if (cause instanceof NoKeyAvailableError) {
+      return {
+        ...shape,
+        data: {
+          ...shape.data,
+          byokRequired: true,
+          provider: cause.provider,
+        },
+      };
+    }
+    return shape;
+  },
+});
 
 export const router = t.router;
 

@@ -58,8 +58,14 @@ interface FileRetrieveResponse {
   base_resp?: { status_code: number; status_msg: string };
 }
 
+/**
+ * Required — no `MINIMAX_API_KEY` env fallback. Callers must route through
+ * `resolveProviderKey(userId, 'minimax')` so BYOK lookup runs and the key
+ * is always the caller's own (see openai.ts's Auditor note M5, which
+ * closed this same hole first).
+ */
 function resolveApiKey(suppliedKey?: string): string | null {
-  return suppliedKey || process.env.MINIMAX_API_KEY || null;
+  return suppliedKey || null;
 }
 
 async function createTask(apiKey: string, opts: MinimaxVideoOptions): Promise<CreateTaskResponse> {
@@ -118,7 +124,7 @@ class MinimaxService {
       return {
         id: '',
         status: 'failed',
-        error: 'MINIMAX_API_KEY is not configured — set one in env or BYOK',
+        error: 'No MiniMax API key available — add one at /settings/api-keys to use this model.',
       };
     }
 

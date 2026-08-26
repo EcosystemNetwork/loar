@@ -8,6 +8,7 @@
 
 import { Link } from '@tanstack/react-router';
 import { useWalletAuth } from '@/lib/wallet-auth';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { Button } from '@/components/ui/button';
 import { QA_EVENTS } from '@/lib/qa-events';
 import { useState, useEffect } from 'react';
@@ -17,6 +18,7 @@ const DISMISS_KEY = 'loar-onboarding-dismissed';
 
 export function GettingStartedPopup() {
   const { isConnected, isAuthenticated } = useWalletAuth();
+  const { mintingEnabled } = useFeatureFlags();
   const [dismissed, setDismissed] = useState(() => localStorage.getItem(DISMISS_KEY) === '1');
   const [visible, setVisible] = useState(false);
 
@@ -134,7 +136,7 @@ export function GettingStartedPopup() {
                       <p className="text-xs text-muted-foreground mt-0.5">{step.description}</p>
 
                       {/* Action for current step */}
-                      {isCurrent && i === 1 && (
+                      {isCurrent && i === 1 && mintingEnabled && (
                         <Link to="/cinematicUniverseCreate" className="inline-block mt-3">
                           <Button size="sm" className="gap-1.5 text-xs" onClick={handleDismiss}>
                             Create Universe

@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Loader2, Sparkles, ImagePlus, Box, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
+import { requireProviderKey } from '@/lib/apiKeyGate';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -105,6 +106,17 @@ export function PersonaMeshy3DGenerator({
       pollStartRef.current = Date.now();
       pollNext(result.generationId);
     } catch (err) {
+      // 3D generation is BYOK-only (Meshy) — pop the "connect your key"
+      // modal and retry once instead of just failing.
+      const provider = (err as any)?.data?.byokRequired ? (err as any).data.provider : undefined;
+      if (provider) {
+        setStatus('idle');
+        const saved = await requireProviderKey(provider, {
+          reason: err instanceof Error ? err.message : undefined,
+        });
+        if (saved) return startTextTo3D();
+        return;
+      }
       setStatus('failed');
       setFailureReason(err instanceof Error ? err.message : 'Generation failed');
       toast.error(err instanceof Error ? err.message : 'Generation failed');
@@ -128,6 +140,15 @@ export function PersonaMeshy3DGenerator({
       pollStartRef.current = Date.now();
       pollNext(result.generationId);
     } catch (err) {
+      const provider = (err as any)?.data?.byokRequired ? (err as any).data.provider : undefined;
+      if (provider) {
+        setStatus('idle');
+        const saved = await requireProviderKey(provider, {
+          reason: err instanceof Error ? err.message : undefined,
+        });
+        if (saved) return startImageTo3D();
+        return;
+      }
       setStatus('failed');
       setFailureReason(err instanceof Error ? err.message : 'Generation failed');
       toast.error(err instanceof Error ? err.message : 'Generation failed');

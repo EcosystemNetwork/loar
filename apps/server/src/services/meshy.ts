@@ -179,15 +179,19 @@ export interface MeshyAnimationTask {
 // ── Service ───────────────────────────────────────────────────────────
 
 class MeshyService {
-  private apiKey: string | undefined;
-
-  constructor() {
-    this.apiKey = process.env.MESHY_API_KEY;
-  }
-
+  /**
+   * Required — no `MESHY_API_KEY` env fallback. Callers must route through
+   * `resolveProviderKey(userId, 'meshy')` so BYOK lookup runs and the key
+   * is always the caller's own (see openai.ts's Auditor note M5, which
+   * closed this same hole first).
+   */
   private resolveKey(override?: string): string {
-    const key = override?.trim() || this.apiKey;
-    if (!key) throw new Error('MESHY_API_KEY is not configured');
+    const key = override?.trim();
+    if (!key) {
+      throw new Error(
+        'No Meshy API key available — add one at /settings/api-keys to use this model.'
+      );
+    }
     return key;
   }
 
@@ -544,12 +548,6 @@ class MeshyService {
       await new Promise((r) => setTimeout(r, pollIntervalMs));
     }
     throw new Error(`Meshy animation task ${taskId} timed out after ${maxWaitMs / 1000}s`);
-  }
-
-  // ── Health check ──────────────────────────────────────────────────────
-
-  isConfigured(): boolean {
-    return !!this.apiKey;
   }
 }
 

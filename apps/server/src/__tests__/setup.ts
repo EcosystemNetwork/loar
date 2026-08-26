@@ -170,6 +170,15 @@ vi.mock('viem', async (importOriginal) => {
 });
 
 // Stub platformConfig
+class MockFeatureDisabledError extends Error {
+  readonly code = 'FEATURE_DISABLED';
+  readonly feature: string;
+  constructor(feature: string) {
+    super(`The ${feature} feature is temporarily disabled by the platform. Try again later.`);
+    this.feature = feature;
+    this.name = 'FeatureDisabledError';
+  }
+}
 vi.mock('../services/platformConfig', () => ({
   getPlatformConfig: vi.fn().mockResolvedValue({
     fiatMargin: 1.35,
@@ -177,5 +186,20 @@ vi.mock('../services/platformConfig', () => ({
     loarCreditBonusFraction: 0.1,
     baseCreditCostUsd: 0.008,
     ethPriceUsd: 3000,
+    generationEnabled: true,
+    mintingEnabled: true,
+    purchaseEnabled: true,
+    registrationEnabled: true,
   }),
+  // All kill switches default to enabled here — tests that need to exercise
+  // the disabled path mock this module themselves (see abuse-guards.test.ts).
+  isFeatureEnabled: vi.fn().mockResolvedValue(true),
+  assertFeatureEnabled: vi.fn().mockResolvedValue(undefined),
+  getPublicFeatureFlags: vi.fn().mockResolvedValue({
+    generationEnabled: true,
+    mintingEnabled: true,
+    purchaseEnabled: true,
+    registrationEnabled: true,
+  }),
+  FeatureDisabledError: MockFeatureDisabledError,
 }));

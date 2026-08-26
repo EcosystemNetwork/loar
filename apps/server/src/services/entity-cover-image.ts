@@ -265,6 +265,15 @@ async function generateEntityCoverImage(entity: EntityForCover): Promise<string>
   const config = getEntityPromptConfig(entity.kind);
   const prompt = config.buildPrompt(entity.name, entity.description || '', entity.metadata || {});
 
+  // System-triggered enrichment (fire-and-forget backfill on entity
+  // creation, not a user-selected "generate with this model" action) — the
+  // one deliberate exception that still spends the platform's own Google
+  // key. `googleImagenService.generate` itself has no env fallback; every
+  // other caller must thread a BYOK key resolved via `resolveProviderKey`.
+  const platformKey = process.env.GOOGLE_API_KEY;
+  if (!platformKey) {
+    throw new Error('GOOGLE_API_KEY is not configured — cover image backfill unavailable');
+  }
   const result = await googleImagenService.generate({
     prompt,
     model: 'nano-banana-pro-preview',
@@ -272,6 +281,7 @@ async function generateEntityCoverImage(entity: EntityForCover): Promise<string>
     numberOfImages: 1,
     aspectRatio: config.aspectRatio,
     personGeneration: config.personGeneration,
+    apiKey: platformKey,
   });
 
   if (!result.images.length) {

@@ -32,6 +32,7 @@ import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 import { TRPCError } from '@trpc/server';
 import { withReservation } from '../../services/credits';
+import { exists as hasProviderKey, NoKeyAvailableError } from '../../services/provider-keys';
 
 // ── Collections ──────────────────────────────────────────────────────
 
@@ -533,12 +534,27 @@ export const characterPipelineRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // Verify services are configured
-      if (!googleImagenService.isConfigured()) {
-        throw new Error('Google Imagen is not configured (GOOGLE_API_KEY missing)');
+      // BYOK-only: this pipeline burns ~10 min of polling, so we check the
+      // *user's own* keys synchronously before enqueueing — failing fast
+      // here (and letting the client pop the "add key" modal) beats
+      // discovering a missing key deep inside the async job.
+      const [hasGoogleKey, hasMeshyKey] = await Promise.all([
+        hasProviderKey(ctx.user.uid, 'google'),
+        hasProviderKey(ctx.user.uid, 'meshy'),
+      ]);
+      if (!hasGoogleKey) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Add a Google AI API key in Settings to run the character pipeline.',
+          cause: new NoKeyAvailableError('google'),
+        });
       }
-      if (!meshyService.isConfigured()) {
-        throw new Error('Meshy is not configured (MESHY_API_KEY missing)');
+      if (!hasMeshyKey) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Add a Meshy API key in Settings to run the character pipeline.',
+          cause: new NoKeyAvailableError('meshy'),
+        });
       }
 
       const pipelineId = randomUUID();

@@ -96,7 +96,7 @@ importers:
     devDependencies:
       forge-std:
         specifier: github:foundry-rs/forge-std
-        version: https://codeload.github.com/foundry-rs/forge-std/tar.gz/680ee6692649dcc7c617e05b2144932618264a83
+        version: https://codeload.github.com/foundry-rs/forge-std/tar.gz/da5b326fb2d7f69e87c3ea95f3fcc3ab49a38549
       solhint-community:
         specifier: 4.0.0
         version: 4.0.0(typescript@5.9.3)
@@ -641,6 +641,9 @@ importers:
       vite:
         specifier: 6.4.3
         version: 6.4.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.3)(yaml@2.9.0)
+      vitest:
+        specifier: ^4.1.2
+        version: 4.1.7(@opentelemetry/api@1.9.1)(@types/node@22.19.19)(vite@6.4.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/abis:
     dependencies:
@@ -1976,7 +1979,7 @@ packages:
 
   '@expo/bunyan@4.0.1':
     resolution: {integrity: sha512-+Lla7nYSiHZirgK+U/uYzsLv/X+HaJienbD5AKX1UQZHYfWaP+9uuQluRB4GrEVWF0GZ7vEVp/jzaOT9k/SQlg==}
-    engines: {'0': node >=0.10.0}
+    engines: {node: '>=0.10.0'}
 
   '@expo/cli@0.22.28':
     resolution: {integrity: sha512-lvt72KNitGuixYD2l3SZmRKVu2G4zJpmg5V7WfUBNpmUU5oODBw/6qmiJ6kSLAlfDozscUk+BBGknBBzxUrwrA==}
@@ -7547,8 +7550,8 @@ packages:
     resolution: {integrity: sha512-gIXjKqtFuWEgzFRJA9WCQeSJLZDjgJUOMCMzxtvFq/37KojM1BFGufqsCy0r4qSQmYLsZYMeyRqzIWOMup03sw==}
     engines: {node: '>=14'}
 
-  forge-std@https://codeload.github.com/foundry-rs/forge-std/tar.gz/680ee6692649dcc7c617e05b2144932618264a83:
-    resolution: {tarball: https://codeload.github.com/foundry-rs/forge-std/tar.gz/680ee6692649dcc7c617e05b2144932618264a83}
+  forge-std@https://codeload.github.com/foundry-rs/forge-std/tar.gz/da5b326fb2d7f69e87c3ea95f3fcc3ab49a38549:
+    resolution: {tarball: https://codeload.github.com/foundry-rs/forge-std/tar.gz/da5b326fb2d7f69e87c3ea95f3fcc3ab49a38549}
     version: 1.16.2
 
   form-data-encoder@1.7.2:
@@ -21305,7 +21308,7 @@ snapshots:
       cross-spawn: 7.0.6
       signal-exit: 4.1.0
 
-  forge-std@https://codeload.github.com/foundry-rs/forge-std/tar.gz/680ee6692649dcc7c617e05b2144932618264a83: {}
+  forge-std@https://codeload.github.com/foundry-rs/forge-std/tar.gz/da5b326fb2d7f69e87c3ea95f3fcc3ab49a38549: {}
 
   form-data-encoder@1.7.2: {}
 

@@ -1,12 +1,11 @@
 /**
  * Resolve which API key to use for a given (user, provider) request.
  *
- * Resolution order:
- *   1. If the user has an enabled BYOK key for this provider, return it
- *      with `source: 'byok'`.
- *   2. Else if the server pool has an env-configured key, return it with
- *      `source: 'server'`.
- *   3. Else throw — neither path is available, the caller cannot dispatch.
+ * BYOK-only: if the user has an enabled key for this provider, return it
+ * with `source: 'byok'`. Otherwise throw `NoKeyAvailableError` — there is
+ * no server-pool fallback, so every dispatch spends the requesting user's
+ * own quota (retired in favor of the platform-key fallback this module
+ * used to offer).
  *
  * Callers should not cache the resolved key — every dispatch should
  * re-resolve so disabled/rotated keys are picked up immediately.
@@ -34,25 +33,19 @@ export class NoKeyAvailableError extends Error {
 
 export async function resolveProviderKey(userId: string, provider: string): Promise<ResolvedKey> {
   if (!isKnownProvider(provider)) throw new UnknownProviderError(provider);
-  const entry = PROVIDER_REGISTRY[provider];
 
-  // BYOK first
+  // BYOK only — the server-pool env-var fallback was retired so every
+  // dispatch spends the requesting user's own quota. `serverPoolAvailable`
+  // below still reports whether an env key is configured (ops/health
+  // display only); it is never used to authorize a dispatch.
   if (await exists(userId, provider)) {
     try {
       const apiKey = await loadPlaintext(userId, provider);
       return { apiKey, source: 'byok', provider };
     } catch {
-      // Falls through to server pool — disabled keys throw NotFound and
-      // we treat that as "no BYOK", not an error.
+      // Disabled/corrupt BYOK key — treat the same as "no BYOK key", not
+      // an env fallback.
     }
-  }
-
-  // Server pool fallback. Trim because `FOO_API_KEY=" "` from a misconfigured
-  // deploy would otherwise resolve "server" and the dispatcher would ship a
-  // literal space to the provider, taking up a cost-ledger slot before 401.
-  const serverKey = process.env[entry.serverPoolEnvVar]?.trim();
-  if (serverKey && serverKey.length > 0) {
-    return { apiKey: serverKey, source: 'server', provider };
   }
 
   throw new NoKeyAvailableError(provider);

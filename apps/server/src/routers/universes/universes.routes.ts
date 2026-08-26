@@ -21,6 +21,7 @@ import { isUniverseAdmin, isUniverseAdminStrict, getSafeInfo } from '../../lib/s
 import { db } from '../../lib/firebase';
 import { generateNonce, consumeNonce } from '../../lib/siwe';
 import { getPlatformConfig } from '../../services/platformConfig';
+import { assertFeatureEnabledOrForbidden } from '../../lib/feature-guards';
 
 const createUniverseSchema = z.object({
   address: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address'),
@@ -65,6 +66,8 @@ export const universesRouter = router({
 
   /** Create a new universe (wallet-based auth via signature + server nonce). */
   create: protectedProcedure.input(createUniverseSchema).mutation(async ({ input, ctx }) => {
+    await assertFeatureEnabledOrForbidden('minting');
+
     const { verifyMessage } = await import('viem');
 
     const isValid = await verifyMessage({

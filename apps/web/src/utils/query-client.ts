@@ -57,6 +57,21 @@ export const queryClient = new QueryClient({
   },
   mutationCache: new MutationCache({
     onError: (error: any, _variables, _context, mutation) => {
+      // BYOK gate — every generation dispatch is BYOK-only server-side (see
+      // errorFormatter in apps/server/src/lib/trpc.ts), so any mutation
+      // anywhere can fail with `data.byokRequired` + `data.provider`. Pop
+      // the "connect your key" modal for it regardless of whether the
+      // mutation defines its own onError (most generation hooks do, for
+      // their own status-card UI) — this is a distinct, actionable recovery
+      // path those hooks don't know how to offer.
+      if (error?.data?.byokRequired && error?.data?.provider) {
+        void import('../lib/apiKeyGate').then(({ requireProviderKey }) => {
+          void requireProviderKey(error.data.provider, {
+            reason: 'This model needs your own API key to run.',
+          });
+        });
+      }
+
       // Skip if the mutation already has its own onError handler
       if (mutation.options.onError) return;
 

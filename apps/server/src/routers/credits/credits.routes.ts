@@ -14,7 +14,8 @@ import { db } from '../../lib/firebase';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { FIAT_MARGIN, LOAR_MARGIN, LOAR_TO_USD } from '../../services/video-models';
-import { getPlatformConfig } from '../../services/platformConfig';
+import { getPlatformConfig, getPublicFeatureFlags } from '../../services/platformConfig';
+import { assertFeatureEnabledOrForbidden } from '../../lib/feature-guards';
 import { verifyStripePayment } from './stripe.routes';
 import { claimTxHash } from '../../services/tx-verify';
 import { reconcileSingleOrder, reconcileOrders } from '../../services/order-reconciliation';
@@ -485,6 +486,8 @@ export const creditsRouter = router({
         })
     )
     .mutation(async ({ input, ctx }) => {
+      await assertFeatureEnabledOrForbidden('purchase');
+
       // Use live pricing so ETH amounts reflect current ETH/USD rate
       const livePackages = await buildPackagesFromConfig();
       const pkg = livePackages.find((p) => p.id === input.packageId);
@@ -632,6 +635,8 @@ export const creditsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      await assertFeatureEnabledOrForbidden('purchase');
+
       const livePackages = await buildPackagesFromConfig();
       const pkg = livePackages.find((p) => p.id === input.packageId);
       if (!pkg || !pkg.active) throw new Error('Package not found or inactive');
@@ -958,6 +963,13 @@ export const creditsRouter = router({
         },
       };
     }),
+
+  // ── Feature kill switches (public-safe subset) ──────────────────
+  // Lets any page — signed in or not — hide UI for a feature an admin has
+  // flipped off in /admin/ops (testnet launch: hide "Buy Credits" while
+  // purchasing isn't ready, etc), without needing admin auth to check.
+
+  getFeatureFlags: publicProcedure.query(() => getPublicFeatureFlags()),
 
   // ── ETH Price (for frontend conversion) ────────────────────────
 

@@ -37,6 +37,7 @@ import { STYLE_PRESETS } from '@/components/style-presets';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import { useResolvedIpfsUrl } from '@/hooks/useResolvedIpfsUrl';
 import { SmartImage } from '@/components/SmartImage';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
 export const Route = createFileRoute('/canvas/$canvasId')({
   component: CanvasEditorPage,
@@ -67,6 +68,7 @@ interface CanvasScene {
 function CanvasEditorPage() {
   const { canvasId } = useParams({ from: '/canvas/$canvasId' });
   const { address } = useWalletAuth();
+  const { generationEnabled } = useFeatureFlags();
   const queryClient = useQueryClient();
   // ownerUid is lowercased address — derive once and compare.
   const myUid = address?.toLowerCase();
@@ -179,25 +181,29 @@ function CanvasEditorPage() {
   );
 
   // Per-node image generation — call existing image.generateImage with bundled prompt
-  const generateImageForScene = useCallback(async (scene: CanvasScene) => {
-    const prompt = scene.bundle.prompt?.trim();
-    if (!prompt) throw new Error(`Scene "${scene.id}" has no prompt`);
-    const result: any = await trpcClient.image.generateImage.mutate({
-      prompt,
-      model: 'fal-ai/nano-banana',
-      imageSize: 'landscape_16_9',
-      numImages: 1,
-      stylePreset: scene.bundle.stylePreset ?? null,
-    });
-    if (result.status !== 'completed' || !result.imageUrl) {
-      throw new Error(result.error || 'Image generation failed');
-    }
-    await trpcClient.canvas.updateScene.mutate({
-      id: scene.id,
-      generatedImageUrl: result.imageUrl,
-    });
-    return result.imageUrl as string;
-  }, []);
+  const generateImageForScene = useCallback(
+    async (scene: CanvasScene) => {
+      if (!generationEnabled) throw new Error('AI generation is temporarily disabled.');
+      const prompt = scene.bundle.prompt?.trim();
+      if (!prompt) throw new Error(`Scene "${scene.id}" has no prompt`);
+      const result: any = await trpcClient.image.generateImage.mutate({
+        prompt,
+        model: 'fal-ai/nano-banana',
+        imageSize: 'landscape_16_9',
+        numImages: 1,
+        stylePreset: scene.bundle.stylePreset ?? null,
+      });
+      if (result.status !== 'completed' || !result.imageUrl) {
+        throw new Error(result.error || 'Image generation failed');
+      }
+      await trpcClient.canvas.updateScene.mutate({
+        id: scene.id,
+        generatedImageUrl: result.imageUrl,
+      });
+      return result.imageUrl as string;
+    },
+    [generationEnabled]
+  );
 
   const generateMutation = useMutation({
     mutationFn: (scene: CanvasScene) => generateImageForScene(scene),
@@ -217,6 +223,7 @@ function CanvasEditorPage() {
       scene: CanvasScene;
       sourceImageUrl: string;
     }) => {
+      if (!generationEnabled) throw new Error('AI generation is temporarily disabled.');
       const prompt = scene.bundle.prompt?.trim();
       if (!prompt) throw new Error('Add a prompt to this scene first');
       const result: any = await trpcClient.generation.veo3ImageToVideo.mutate({

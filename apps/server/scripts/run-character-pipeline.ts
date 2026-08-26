@@ -225,7 +225,9 @@ async function processCharacter(
   index: number,
   db: FirebaseFirestore.Firestore,
   googleImagenService: any,
-  meshyService: any
+  meshyService: any,
+  googleApiKey: string,
+  meshyApiKey: string
 ): Promise<CharResult> {
   const label = `[${index + 1}/${CHARACTERS.length}] ${char.name}`;
   console.log(`\n${'═'.repeat(60)}`);
@@ -268,6 +270,7 @@ async function processCharacter(
     name: char.name,
     description: char.description,
     style: char.style,
+    apiKey: googleApiKey,
   });
   const imagenMs = Date.now() - imagenStart;
 
@@ -314,10 +317,17 @@ async function processCharacter(
     aiModel: 'meshy-6',
     topology: 'triangle',
     targetPolycount: 30000,
+    apiKey: meshyApiKey,
   });
   console.log(`${label} | Meshy task: ${meshyTaskId} — polling...`);
 
-  const meshyTask = await meshyService.waitForTask(meshyTaskId, 'image-to-3d', 15 * 60 * 1000);
+  const meshyTask = await meshyService.waitForTask(
+    meshyTaskId,
+    'image-to-3d',
+    15 * 60 * 1000,
+    5000,
+    meshyApiKey
+  );
   const meshy3dMs = Date.now() - meshy3dStart;
   console.log(`${label} | Textured 3D model generated in ${(meshy3dMs / 1000).toFixed(0)}s`);
 
@@ -391,12 +401,17 @@ async function main() {
   if (!db) throw new Error('Firebase not available — check FIREBASE_SERVICE_ACCOUNT_PATH');
   console.log('  Firebase connected');
 
+  // Ops script — runs with the platform's own env keys, not a user's BYOK
+  // key (there's no requesting user). Neither service has an internal env
+  // fallback, so we read + thread the keys explicitly here.
   const { googleImagenService } = await import('../src/services/google-imagen.js');
-  if (!googleImagenService.isConfigured()) throw new Error('GOOGLE_API_KEY not set');
+  const googleApiKey = process.env.GOOGLE_API_KEY;
+  if (!googleApiKey) throw new Error('GOOGLE_API_KEY not set');
   console.log('  Google Imagen ready');
 
   const { meshyService } = await import('../src/services/meshy.js');
-  if (!meshyService.isConfigured()) throw new Error('MESHY_API_KEY not set');
+  const meshyApiKey = process.env.MESHY_API_KEY;
+  if (!meshyApiKey) throw new Error('MESHY_API_KEY not set');
   console.log('  Meshy ready\n');
 
   // ── Process all characters sequentially ──────────────────────────
@@ -410,7 +425,9 @@ async function main() {
         i,
         db,
         googleImagenService,
-        meshyService
+        meshyService,
+        googleApiKey,
+        meshyApiKey
       );
       results.push(result);
     } catch (err) {

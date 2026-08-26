@@ -40,7 +40,11 @@ async function main() {
   console.log('  Firebase connected');
 
   const { meshyService } = await import('../src/services/meshy.js');
-  if (!meshyService.isConfigured()) throw new Error('MESHY_API_KEY not set');
+  // Ops script — runs with the platform's own env key, not a user's BYOK
+  // key (there's no requesting user). `meshyService` has no internal env
+  // fallback, so we read + thread it explicitly here.
+  const meshyApiKey = process.env.MESHY_API_KEY;
+  if (!meshyApiKey) throw new Error('MESHY_API_KEY not set');
   console.log('  Meshy ready\n');
 
   const attachmentsCol = db.collection('mediaAttachments');
@@ -120,10 +124,17 @@ async function main() {
         aiModel: 'meshy-6',
         topology: 'triangle',
         targetPolycount: 15000,
+        apiKey: meshyApiKey,
       });
       console.log(`    Task: ${meshyTaskId} — polling...`);
 
-      const meshyTask = await meshyService.waitForTask(meshyTaskId, 'image-to-3d', 25 * 60 * 1000);
+      const meshyTask = await meshyService.waitForTask(
+        meshyTaskId,
+        'image-to-3d',
+        25 * 60 * 1000,
+        5000,
+        meshyApiKey
+      );
       const glbUrl = meshyTask.modelUrls?.glb;
       if (!glbUrl) throw new Error('Meshy returned no GLB');
       console.log(`    3D model ready`);
@@ -139,10 +150,16 @@ async function main() {
         artStyle: 'realistic',
         enablePbr: true,
         resolution: 2048,
+        apiKey: meshyApiKey,
       });
       console.log(`    Task: ${textureTaskId} — polling...`);
 
-      const textureTask = await meshyService.waitForTextureTask(textureTaskId, 20 * 60 * 1000);
+      const textureTask = await meshyService.waitForTextureTask(
+        textureTaskId,
+        20 * 60 * 1000,
+        5000,
+        meshyApiKey
+      );
       console.log(`    Textures applied!`);
 
       // ── Step 3: Attach textured models ────────────────────────────

@@ -34,6 +34,7 @@ import {
   assertContentHashOperable,
   assertCanonReadyForMonetization,
 } from '../../lib/content-status';
+import { assertFeatureEnabledOrForbidden } from '../../lib/feature-guards';
 
 // On-chain TX verification (receipt fetch + from/to/value binding + dedup) is
 // delegated to verifyAndClaimTx, which owns the {1, 11155111} chain allowlist.
@@ -81,6 +82,8 @@ export const nftRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      await assertFeatureEnabledOrForbidden('minting');
+
       try {
         const { actingUid } = await resolveActingUid(ctx.user.uid, input.onBehalfOfUid, 'nft');
 

@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import { proxiedImage } from '@/utils/img-proxy';
 import { SmartImage } from '@/components/SmartImage';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
 import {
   Play,
@@ -326,6 +327,7 @@ export function HeroBillboard({
   const [currentIndex, setCurrentIndex] = useState(0);
   const navigate = useNavigate();
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
+  const { mintingEnabled } = useFeatureFlags();
 
   const featured = useMemo(() => {
     const eligible = universes.filter((u) => u.tokenData || u.nodeCount > 0);
@@ -385,14 +387,20 @@ export function HeroBillboard({
           <p className="text-base sm:text-lg md:text-xl text-white/60 mb-8 max-w-lg mx-auto px-4 font-light">
             Create, own, and trade narrative universes on-chain
           </p>
-          <Button
-            size="lg"
-            className="rounded-full px-8 text-base"
-            onClick={() => navigate({ to: '/cinematicUniverseCreate' })}
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            Create Your First Universe
-          </Button>
+          {mintingEnabled ? (
+            <Button
+              size="lg"
+              className="rounded-full px-8 text-base"
+              onClick={() => navigate({ to: '/cinematicUniverseCreate' })}
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Create Your First Universe
+            </Button>
+          ) : (
+            <Badge variant="outline" className="text-sm px-4 py-1.5">
+              Universe creation coming soon
+            </Badge>
+          )}
         </div>
       </div>
     );
@@ -1124,6 +1132,7 @@ export function ContentCard({ item }: { item: any }) {
  * ────────────────────────────────────────── */
 export function CreateBanner() {
   const navigate = useNavigate();
+  const { mintingEnabled } = useFeatureFlags();
 
   return (
     <section className="px-4 md:px-12 py-12">
@@ -1138,14 +1147,20 @@ export function CreateBanner() {
               Create AI-powered narrative worlds. Launch tokens. Build community.
             </p>
           </div>
-          <Button
-            size="lg"
-            className="rounded-full px-8 text-base font-bold"
-            onClick={() => navigate({ to: '/cinematicUniverseCreate' })}
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            Create Universe
-          </Button>
+          {mintingEnabled ? (
+            <Button
+              size="lg"
+              className="rounded-full px-8 text-base font-bold"
+              onClick={() => navigate({ to: '/cinematicUniverseCreate' })}
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Create Universe
+            </Button>
+          ) : (
+            <Badge variant="outline" className="text-sm px-4 py-1.5">
+              Coming soon
+            </Badge>
+          )}
         </div>
       </div>
     </section>

@@ -30,6 +30,7 @@ import {
   Type,
 } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
+import { requireProviderKey } from '@/lib/apiKeyGate';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -514,11 +515,24 @@ export function CaptionsPanel({ episodeId }: CaptionsPanelProps) {
                 id="caption-model"
                 className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
                 value={modelId}
-                onChange={(e) => setModelId(e.target.value)}
+                onChange={async (e) => {
+                  const picked = (modelsQuery.data ?? []).find((m) => m.id === e.target.value);
+                  if (picked && !picked.usableByMe) {
+                    // Locked options are selectable (not `disabled`) precisely so
+                    // this can fire — a truly `disabled` <option> can't be picked
+                    // at all, which hid the "add key" reason from ever showing.
+                    const saved = await requireProviderKey(picked.provider, {
+                      reason: `${picked.displayName} needs your own ${picked.provider} API key to run.`,
+                    });
+                    if (!saved) return;
+                    await queryClient.invalidateQueries({ queryKey: ['providers', 'listModels'] });
+                  }
+                  setModelId(e.target.value);
+                }}
                 disabled={modelsQuery.isPending}
               >
                 {(modelsQuery.data ?? []).map((m) => (
-                  <option key={m.id} value={m.id} disabled={!m.usableByMe}>
+                  <option key={m.id} value={m.id}>
                     {m.displayName}
                     {m.usableByMe ? '' : ' · API key required'}
                   </option>
@@ -579,12 +593,22 @@ export function CaptionsPanel({ episodeId }: CaptionsPanelProps) {
               {!selectedModel.usableByMe && (
                 <p className="flex items-center gap-1 text-amber-500">
                   {selectedModel.unusableReason}
-                  <a
-                    href="/settings/api-keys"
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const saved = await requireProviderKey(selectedModel.provider, {
+                        reason: `${selectedModel.displayName} needs your own ${selectedModel.provider} API key to run.`,
+                      });
+                      if (saved) {
+                        await queryClient.invalidateQueries({
+                          queryKey: ['providers', 'listModels'],
+                        });
+                      }
+                    }}
                     className="ml-1 inline-flex items-center gap-1 underline"
                   >
                     Add key <ExternalLink className="size-3" />
-                  </a>
+                  </button>
                 </p>
               )}
             </div>

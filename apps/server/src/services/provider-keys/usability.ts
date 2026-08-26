@@ -2,21 +2,19 @@
  * Model usability — answers "can *this* user actually dispatch to this
  * model right now?" for a model catalog entry.
  *
- * A model is usable when either:
- *   - the caller has their own (enabled) BYOK key for the model's provider, or
- *   - the platform's server-pool key for that provider is configured
- *     (`serverPoolEnvVar` set) AND the model opts into the server pool
- *     (per-model `serverPoolAvailable` flag, defaults to true for configs
- *     that don't carry the field).
+ * BYOK-only: a model is usable only when the caller has their own (enabled)
+ * key for the model's provider on file. The platform server-pool key is no
+ * longer a usability path — `resolveProviderKey` (dispatcher.ts) never
+ * falls back to it either, so this flag matches what dispatch will actually
+ * allow.
  *
  * Centralized here so every model catalog endpoint (image, video, tts,
  * audio, editing, transcription, …) reports the same `usableByMe` /
- * `unusableReason` shape the frontend renders as a "Coming Soon" state —
- * BYOK always unlocks a model regardless of platform credit.
+ * `unusableReason` shape the frontend renders as a locked state with a
+ * "connect your key" prompt.
  */
 import { isKnownProvider } from './registry';
 import { listForUser } from './store';
-import { serverPoolAvailable } from './dispatcher';
 import { PROVIDER_REGISTRY } from './registry';
 
 /**
@@ -52,7 +50,12 @@ export async function getByokProviderSet(userId: string | null | undefined): Pro
 export function computeModelUsability(
   provider: string,
   byokProviders: Set<string>,
-  modelServerPoolAvailable = true
+  /**
+   * Kept for call-site compatibility (every catalog endpoint still passes
+   * the model's `serverPoolAvailable` flag) but no longer consulted — the
+   * server pool never grants usability now that dispatch is BYOK-only.
+   */
+  _modelServerPoolAvailable = true
 ): ModelUsability {
   if (NO_KEY_REQUIRED_PROVIDERS.has(provider)) {
     return { usableByMe: true, unusableReason: null, sourceOnDispatch: 'server' };
@@ -61,13 +64,11 @@ export function computeModelUsability(
     return { usableByMe: false, unusableReason: 'Unknown provider', sourceOnDispatch: null };
   }
   const hasByok = byokProviders.has(provider);
-  const hasServer = modelServerPoolAvailable && serverPoolAvailable(provider);
-  const usableByMe = hasByok || hasServer;
   return {
-    usableByMe,
-    unusableReason: usableByMe
+    usableByMe: hasByok,
+    unusableReason: hasByok
       ? null
       : `Add a ${PROVIDER_REGISTRY[provider].displayName} API key in Settings to enable this model.`,
-    sourceOnDispatch: hasByok ? 'byok' : hasServer ? 'server' : null,
+    sourceOnDispatch: hasByok ? 'byok' : null,
   };
 }

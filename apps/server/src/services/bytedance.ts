@@ -148,99 +148,43 @@ const POLL_INTERVAL_MS = 5000;
 // ── Service ──────────────────────────────────────────────────────────────
 
 export class ByteDanceService {
-  private apiKeys: string[] | null = null;
-  private activeKeyIdx = 0;
-
-  private ensureConfigured(): string[] {
-    if (!this.apiKeys) {
-      const raw = process.env.BYTEDANCE_API_KEY || '';
-      this.apiKeys = raw
-        .split(',')
-        .map((k) => k.trim())
-        .filter(Boolean);
-    }
-    if (this.apiKeys.length === 0) {
-      throw new Error(
-        'BYTEDANCE_API_KEY environment variable is required for ByteDance generation'
-      );
-    }
-    return this.apiKeys;
-  }
-
+  /**
+   * Required — no `BYTEDANCE_API_KEY` env pool / rotation fallback.
+   * Callers must route through `resolveProviderKey(userId, 'bytedance')`
+   * so BYOK lookup runs and the key is always the caller's own (see
+   * openai.ts's Auditor note M5, which closed this same hole first).
+   */
   private async request<T>(
     path: string,
     options: RequestInit = {},
     overrideKey?: string
   ): Promise<T> {
-    // BYOK path — single user-supplied key, no rotation, errors surface as-is
-    // so the user sees their own credential failures (auth, balance, rate-limit)
-    // instead of silently falling through to the platform key.
-    if (overrideKey && overrideKey.trim().length > 0) {
-      const url = `${BASE_URL}${path}`;
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${overrideKey.trim()}`,
-          ...options.headers,
-        },
-      });
-      if (response.ok) return response.json() as Promise<T>;
-      const body = await response.text().catch(() => '');
-      let detail = '';
-      try {
-        const parsed = JSON.parse(body);
-        detail = parsed.error?.message || parsed.message || parsed.detail || body;
-      } catch {
-        detail = body;
-      }
-      throw new Error(`ByteDance API error ${response.status} (BYOK): ${detail}`.slice(0, 500));
+    const key = overrideKey?.trim();
+    if (!key) {
+      throw new Error(
+        'No ByteDance ModelArk API key available — add one at /settings/api-keys to use this model.'
+      );
     }
 
-    const keys = this.ensureConfigured();
     const url = `${BASE_URL}${path}`;
-    let lastErr: Error | null = null;
-
-    for (let i = 0; i < keys.length; i++) {
-      const idx = (this.activeKeyIdx + i) % keys.length;
-      const apiKey = keys[idx];
-
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-          ...options.headers,
-        },
-      });
-
-      if (response.ok) {
-        if (idx !== this.activeKeyIdx) {
-          console.log(`[ByteDance] Rotated to backup key #${idx + 1}/${keys.length}`);
-          this.activeKeyIdx = idx;
-        }
-        return response.json() as Promise<T>;
-      }
-
-      const body = await response.text().catch(() => '');
-      let detail = '';
-      try {
-        const parsed = JSON.parse(body);
-        detail = parsed.error?.message || parsed.message || parsed.detail || body;
-      } catch {
-        detail = body;
-      }
-      const err = new Error(`ByteDance API error ${response.status}: ${detail}`.slice(0, 500));
-
-      const rotatable =
-        response.status === 401 || response.status === 403 || response.status === 429;
-      if (!rotatable || keys.length === 1) throw err;
-
-      console.warn(`[ByteDance] Key #${idx + 1} failed (${response.status}), trying next`);
-      lastErr = err;
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${key}`,
+        ...options.headers,
+      },
+    });
+    if (response.ok) return response.json() as Promise<T>;
+    const body = await response.text().catch(() => '');
+    let detail = '';
+    try {
+      const parsed = JSON.parse(body);
+      detail = parsed.error?.message || parsed.message || parsed.detail || body;
+    } catch {
+      detail = body;
     }
-
-    throw lastErr ?? new Error('ByteDance API error: all keys exhausted');
+    throw new Error(`ByteDance API error ${response.status}: ${detail}`.slice(0, 500));
   }
 
   // ── Video Generation (Seedance 2.0) ──────────────────────────────────

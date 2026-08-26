@@ -106,6 +106,7 @@ import { ModelSelector } from '@/components/ModelSelector';
 import { VoiceModifyPanel } from '@/components/editing/VoiceModifyPanel';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { resolveIpfsUrl } from '@/utils/ipfs-url';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
 export const Route = createFileRoute('/sandbox')({
   component: SandboxPage,
@@ -113,6 +114,7 @@ export const Route = createFileRoute('/sandbox')({
 
 function SandboxPage() {
   const { isAuthenticated, isAuthenticating } = useWalletAuth();
+  const { generationEnabled } = useFeatureFlags();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -413,6 +415,10 @@ function SandboxPage() {
         retryOf?: Generation;
       }
     ) => {
+      if (!generationEnabled) {
+        toast.error('AI generation is temporarily disabled. Please check back soon.');
+        return;
+      }
       const id = makeId();
       // Style ref → switch to image_to_image. The image route uses the
       // reference for composition + style guidance.
@@ -459,7 +465,7 @@ function SandboxPage() {
         inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1);
       }
     },
-    [autoSaveDraft, updateGen]
+    [autoSaveDraft, updateGen, generationEnabled]
   );
 
   const runVideoGen = useCallback(
@@ -479,6 +485,10 @@ function SandboxPage() {
         retryOf?: Generation;
       }
     ) => {
+      if (!generationEnabled) {
+        toast.error('AI generation is temporarily disabled. Please check back soon.');
+        return;
+      }
       const id = makeId();
       const hasImage = !!opts.sourceImageUrl;
       const mode = hasImage ? 'image_to_video' : 'text_to_video';
@@ -540,7 +550,7 @@ function SandboxPage() {
         inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1);
       }
     },
-    [autoSaveDraft, updateGen]
+    [autoSaveDraft, updateGen, generationEnabled]
   );
 
   // ── Voice (TTS + SFX) ─────────────────────────────────────────────────
@@ -549,6 +559,10 @@ function SandboxPage() {
       text: string,
       opts: { voiceId: string; flavor: 'tts' | 'sfx'; sfxDurationSec?: number }
     ) => {
+      if (!generationEnabled) {
+        toast.error('AI generation is temporarily disabled. Please check back soon.');
+        return;
+      }
       const id = makeId();
       const flavorLabel = opts.flavor === 'tts' ? 'TTS' : 'SFX';
       const stub: Generation = {
@@ -591,12 +605,16 @@ function SandboxPage() {
         inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1);
       }
     },
-    [autoSaveDraft, updateGen]
+    [autoSaveDraft, updateGen, generationEnabled]
   );
 
   // ── Audio (text→music) ────────────────────────────────────────────────
   const runAudioGen = useCallback(
     async (p: string, opts: { durationSec: number; genre?: string }) => {
+      if (!generationEnabled) {
+        toast.error('AI generation is temporarily disabled. Please check back soon.');
+        return;
+      }
       const id = makeId();
       const stub: Generation = {
         id,
@@ -629,7 +647,7 @@ function SandboxPage() {
         inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1);
       }
     },
-    [autoSaveDraft, updateGen]
+    [autoSaveDraft, updateGen, generationEnabled]
   );
 
   // ── 3D (async via Meshy) ──────────────────────────────────────────────
@@ -642,6 +660,10 @@ function SandboxPage() {
         imageUrl?: string;
       }
     ) => {
+      if (!generationEnabled) {
+        toast.error('AI generation is temporarily disabled. Please check back soon.');
+        return;
+      }
       const id = makeId();
       const stub: Generation = {
         id,
@@ -723,7 +745,7 @@ function SandboxPage() {
         inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1);
       }
     },
-    [autoSaveDraft, updateGen]
+    [autoSaveDraft, updateGen, generationEnabled]
   );
 
   // ── Talking scene (image + dialogue → lip-synced video) ──────────────
@@ -735,6 +757,10 @@ function SandboxPage() {
       motionPrompt?: string;
       durationSec: number;
     }) => {
+      if (!generationEnabled) {
+        toast.error('AI generation is temporarily disabled. Please check back soon.');
+        return;
+      }
       const id = makeId();
       const stub: Generation = {
         id,
@@ -769,7 +795,7 @@ function SandboxPage() {
         inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1);
       }
     },
-    [autoSaveDraft, updateGen]
+    [autoSaveDraft, updateGen, generationEnabled]
   );
 
   // Run an image or video edit operation. Each op creates a fresh Generation

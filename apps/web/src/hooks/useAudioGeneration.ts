@@ -35,7 +35,7 @@ export interface UseAudioGenerationProps {
 
 export function useAudioGeneration({ entityId, universeId }: UseAudioGenerationProps = {}) {
   const [isGenerating, setIsGenerating] = useState(false);
-  const { checkCredits, invalidateBalance } = useCreditCheck();
+  const { checkCredits, checkGenerationEnabled, invalidateBalance } = useCreditCheck();
 
   // Fetch available models
   const { data: models = [] } = useQuery({
@@ -99,6 +99,7 @@ export function useAudioGeneration({ entityId, universeId }: UseAudioGenerationP
       genre?: string;
       style?: string;
     }) => {
+      if (!checkGenerationEnabled()) return null;
       if (!checkCredits('music_standard')) return null;
 
       setIsGenerating(true);
@@ -109,7 +110,7 @@ export function useAudioGeneration({ entityId, universeId }: UseAudioGenerationP
         setIsGenerating(false);
       }
     },
-    [generateMutation, checkCredits]
+    [generateMutation, checkCredits, checkGenerationEnabled]
   );
 
   // Fetch generation history

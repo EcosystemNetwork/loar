@@ -7,6 +7,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { trpcClient } from '@/utils/trpc';
 import { toast } from 'sonner';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
 const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
 const stripePromise = STRIPE_PK ? loadStripe(STRIPE_PK) : null;
@@ -186,6 +187,7 @@ function CardPaymentSection({
 export function CreditStore({ onClose }: { onClose?: () => void }) {
   const [selectedPkg, setSelectedPkg] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const { purchaseEnabled } = useFeatureFlags();
 
   const { data: packages, isLoading } = useQuery({
     queryKey: ['creditPackages'],
@@ -255,8 +257,12 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
         )}
       </div>
 
-      {/* Package Grid */}
-      {isLoading ? (
+      {/* Purchasing disabled by admin (/admin/ops "Credit purchase" kill switch) */}
+      {!purchaseEnabled ? (
+        <div className="text-center text-zinc-400 text-sm py-8 border border-zinc-700 rounded-lg bg-zinc-800/30">
+          Credit purchasing is temporarily unavailable. Check back soon.
+        </div>
+      ) : isLoading ? (
         <div className="text-center text-zinc-500 py-8">Loading packages...</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -304,7 +310,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
       )}
 
       {/* Purchase Button */}
-      {selectedPkg && (
+      {purchaseEnabled && selectedPkg && (
         <div className="pt-2">
           {(() => {
             const pkg = pkgs.find((p) => p.id === selectedPkg);

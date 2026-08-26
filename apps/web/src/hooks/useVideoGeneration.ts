@@ -81,7 +81,7 @@ export function useVideoGeneration({
   universeId,
 }: UseVideoGenerationProps): UseVideoGenerationReturn {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
-  const { checkCredits, invalidateBalance } = useCreditCheck();
+  const { checkCredits, checkGenerationEnabled, invalidateBalance } = useCreditCheck();
 
   // Video generation mutation with multiple models
   const generateVideoMutation = useMutation({
@@ -302,7 +302,8 @@ ${videoRatio === '1:1' ? "[!] ISSUE: You selected 1:1 which Sora doesn't support
     async (generatedImageUrl: string | null, uploadedUrl: string | null) => {
       setStatusMessage(null); // Clear any previous messages
 
-      // Pre-flight credit check — fail fast before expensive generation
+      // Pre-flight kill-switch + credit check — fail fast before expensive generation
+      if (!checkGenerationEnabled()) return;
       if (!checkCredits('video_standard')) return;
 
       setIsGeneratingVideo(true);
@@ -417,6 +418,7 @@ ${videoRatio === '1:1' ? "[!] ISSUE: You selected 1:1 which Sora doesn't support
       setStatusMessage,
       onVideoGenerated,
       checkCredits,
+      checkGenerationEnabled,
       invalidateBalance,
       sceneControls,
       universeId,

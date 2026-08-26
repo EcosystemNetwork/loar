@@ -33,7 +33,12 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
   const [hasError, setHasError] = useState(false);
 
   // Get the full graph from the blockchain — universeId IS the contract address
-  const { graphData: fullGraph } = useUniverseBlockchain({
+  const {
+    graphData: fullGraph,
+    isError: isGraphError,
+    graphErrorReason,
+    refetchFullGraph,
+  } = useUniverseBlockchain({
     universeId,
     contractAddress: universeId.startsWith('0x') ? universeId : undefined,
     isBlockchainUniverse: universeId.startsWith('0x'),
@@ -297,6 +302,44 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
   };
 
   const isLeaf = currentNode?.nextIds.length === 0;
+
+  // On-chain graph fetch failed — before this, a universe over
+  // getFullGraph()'s 500-node cap (or whose contract predates the
+  // getGraphPage() pagination fallback) would land here with an empty
+  // nodeMap and just... show a black screen with no video and no
+  // explanation. Surface it instead of silently falling through.
+  if (isGraphError) {
+    return (
+      <div className="relative w-full h-screen bg-black flex items-center justify-center">
+        <div className="text-center max-w-sm px-6">
+          <AlertTriangle className="w-10 h-10 text-amber-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-white mb-1">Couldn&apos;t load this story</h3>
+          <p className="text-sm text-zinc-400 mb-5">
+            {graphErrorReason === 'pagination-unsupported'
+              ? "This universe's story graph is too large for its deployed contract to serve, and it doesn't support the newer paginated reader either."
+              : 'The on-chain data provider returned an error — this is usually transient.'}
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            {graphErrorReason !== 'pagination-unsupported' && (
+              <button
+                onClick={() => refetchFullGraph()}
+                className="px-5 py-2.5 bg-violet-600 hover:bg-violet-700 rounded-xl text-white font-medium transition-colors"
+              >
+                Retry
+              </button>
+            )}
+            <Link
+              to="/universe/$id/watch"
+              params={{ id: universeId }}
+              className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-white font-medium transition-colors"
+            >
+              Back to universe
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-screen bg-black flex items-center justify-center">

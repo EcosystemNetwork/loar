@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
 import { CreditStore } from '@/components/CreditStore';
 import { useCreditBalance, useCreditHistory } from '@/hooks/useRevenue';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
@@ -39,6 +40,7 @@ function CreditsPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useWalletAuth();
   const [showStore, setShowStore] = useState(false);
+  const { purchaseEnabled } = useFeatureFlags();
 
   const { data: balance, isLoading: balanceLoading } = useCreditBalance();
   const { data: txHistory, isLoading: historyLoading } = useCreditHistory(30);
@@ -66,7 +68,7 @@ function CreditsPage() {
           <Zap className="w-4 h-4 text-amber-400" />
           Credits
         </h1>
-        {!showStore && (
+        {!showStore && purchaseEnabled && (
           <Button size="sm" className="ml-auto" onClick={() => setShowStore(true)}>
             Buy Credits
           </Button>

@@ -7,12 +7,20 @@
  */
 
 import { useMemo } from 'react';
-import { useReadContract } from 'wagmi';
+import { useReadContract, useReadContracts } from 'wagmi';
 import { useQuery } from '@tanstack/react-query';
 import { universeAbi } from '@loar/abis/generated';
 import { type Address } from 'viem';
 import { ponderGql, ponderQueryDefaults } from '@/utils/ponder-api';
 import { trpcClient } from '@/utils/trpc';
+import {
+  type GraphFetchFailureReason,
+  type RawGraphTuple,
+  classifyGraphFetchFailure,
+  mergeGraphPages,
+  planGraphPages,
+  shouldPaginateGraph,
+} from './universeGraphPaging';
 
 export interface GraphData {
   nodeIds: readonly (string | number | bigint)[];
@@ -58,6 +66,13 @@ export interface UseUniverseBlockchainReturn {
   // Error states
   isError: boolean;
   graphError: Error | null;
+  /**
+   * Why the graph fetch failed, so callers can show a specific message
+   * instead of a generic "couldn't load, try again" — see
+   * `classifyGraphFetchFailure()` in `universeGraphPaging.ts` for what each
+   * value means. Always `'none'` when `isError` is false.
+   */
+  graphErrorReason: GraphFetchFailureReason;
 
   // Refetch functions
   refetchLeaves: () => Promise<any>;
@@ -86,16 +101,88 @@ function useUniverseLeaves(contractAddress?: string) {
   });
 }
 
-function useUniverseFullGraph(contractAddress?: string) {
-  return useReadContract({
+/**
+ * Fetches the on-chain node graph, transparently falling back to paginated
+ * `getGraphPage()` reads once a universe outgrows `getFullGraph()`'s
+ * hardcoded cap (`Universe.sol`: `require(latestNodeId <= 500, ...)`).
+ *
+ * Before this fix, only `getFullGraph()` was ever called — any universe over
+ * the cap got a guaranteed on-chain revert on every load, with no fallback
+ * and (upstream in `useUniverseBlockchain`) no error ever surfaced to the
+ * UI: the timeline editor, event pages, and the branching player all just
+ * rendered a permanently empty graph with zero indication anything had
+ * failed. `failureReason` lets callers tell a transient RPC hiccup (safe to
+ * retry as-is) apart from a universe whose *contract* doesn't support
+ * pagination at all (see the field's own doc comment).
+ *
+ * `latestNodeId` must come from a read the caller already has independently
+ * (see `useUniverseBlockchain` below) — `undefined` means "not loaded yet".
+ * While unknown, this optimistically attempts the direct call (cheap, and
+ * correct for the overwhelming majority of universes); if it later resolves
+ * to a value over the cap, the paginated branch takes over and the direct
+ * call's now-irrelevant (always-reverting) result is ignored.
+ */
+function useUniverseFullGraph(contractAddress?: string, latestNodeId?: number) {
+  const latestNodeIdKnown = latestNodeId !== undefined;
+  const needsPagination = latestNodeIdKnown && shouldPaginateGraph(latestNodeId);
+
+  const direct = useReadContract({
     abi: universeAbi,
     address: (contractAddress || '0x') as Address,
     functionName: 'getFullGraph',
     query: {
-      enabled: !!contractAddress,
+      enabled: !!contractAddress && !needsPagination,
       retry: 1, // getFullGraph can hit gas limits on large universes
     },
   });
+
+  // planGraphPages() is pure and cheap, but memoize anyway so the
+  // `contracts` array passed to useReadContracts stays referentially stable
+  // across renders where nothing actually changed (wagmi/react-query key off
+  // this array's contents, but a fresh array identity every render is still
+  // wasted work for a query with potentially several page calls in it).
+  const pageRequests = useMemo(
+    () => (needsPagination ? planGraphPages(latestNodeId as number) : []),
+    [needsPagination, latestNodeId]
+  );
+
+  const paged = useReadContracts({
+    contracts: pageRequests.map(({ startId, count }) => ({
+      abi: universeAbi,
+      address: (contractAddress || '0x') as Address,
+      functionName: 'getGraphPage',
+      args: [BigInt(startId), BigInt(count)],
+    })),
+    // All-or-nothing: a single failed page means the merged graph would be
+    // missing nodes that surviving pages' previousNodes/children arrays
+    // still reference — a corrupt partial graph is worse than a clear error.
+    allowFailure: false,
+    query: {
+      enabled: !!contractAddress && needsPagination && pageRequests.length > 0,
+      retry: 1,
+    },
+  });
+
+  const isLoading = needsPagination ? paged.isLoading : direct.isLoading;
+  const isError = needsPagination ? paged.isError : direct.isError;
+  const error = needsPagination ? paged.error : direct.error;
+  const refetch = needsPagination ? paged.refetch : direct.refetch;
+
+  const data = useMemo(() => {
+    if (!needsPagination) return direct.data;
+    if (!paged.data) return undefined;
+    return mergeGraphPages(paged.data as unknown as RawGraphTuple[]);
+  }, [needsPagination, direct.data, paged.data]);
+
+  return {
+    data,
+    isLoading,
+    isError,
+    error,
+    /** See classifyGraphFetchFailure()'s doc comment for what each value means. */
+    failureReason: classifyGraphFetchFailure(isError, needsPagination),
+    refetch,
+  };
 }
 
 function useUniverseCanonChain(contractAddress?: string) {
@@ -195,19 +282,10 @@ export function useUniverseBlockchain({
     isLoading: isLoadingLeaves,
     refetch: refetchLeaves,
   } = useUniverseLeaves(onChainContractAddress);
-  const {
-    data: fullGraphData,
-    isLoading: isLoadingFullGraph,
-    isError: isGraphError,
-    error: graphFetchError,
-    refetch: refetchFullGraph,
-  } = useUniverseFullGraph(onChainContractAddress);
-  const {
-    data: canonChainData,
-    isLoading: isLoadingCanonChain,
-    refetch: refetchCanonChain,
-  } = useUniverseCanonChain(onChainContractAddress);
 
+  // Read independently of getFullGraph/getGraphPage — this is what decides
+  // *which* of those two to use (see useUniverseFullGraph's doc comment), so
+  // it must not depend on either succeeding first.
   const { data: latestNodeIdData, refetch: refetchLatestNodeId } = useReadContract({
     abi: universeAbi,
     address: onChainContractAddress as Address,
@@ -216,8 +294,22 @@ export function useUniverseBlockchain({
       enabled: !!onChainContractAddress,
     },
   });
+  const latestNodeIdKnown = latestNodeIdData !== undefined;
+  const latestNodeId = latestNodeIdKnown ? Number(latestNodeIdData) : 0;
 
-  const latestNodeId = latestNodeIdData ? Number(latestNodeIdData) : 0;
+  const {
+    data: fullGraphData,
+    isLoading: isLoadingFullGraph,
+    isError: isGraphError,
+    error: graphFetchError,
+    failureReason: graphErrorReason,
+    refetch: refetchFullGraph,
+  } = useUniverseFullGraph(onChainContractAddress, latestNodeIdKnown ? latestNodeId : undefined);
+  const {
+    data: canonChainData,
+    isLoading: isLoadingCanonChain,
+    refetch: refetchCanonChain,
+  } = useUniverseCanonChain(onChainContractAddress);
 
   // Fetch resolved content from Ponder indexer (on-chain only)
   const { data: contentMap } = useNodeContents(onChainContractAddress);
@@ -412,6 +504,7 @@ export function useUniverseBlockchain({
     isLoadingAny,
     isError: isGraphError,
     graphError: graphFetchError ?? null,
+    graphErrorReason,
     refetchLeaves,
     refetchFullGraph,
     refetchCanonChain,

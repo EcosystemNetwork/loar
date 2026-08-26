@@ -10,6 +10,7 @@ import Loader from '@/components/loader';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import AdminToolbar from '@/components/admin-toolbar';
 import { CookieConsent } from '@/components/CookieConsent';
+import { ApiKeyGateModal } from '@/components/ApiKeyGateModal';
 import Header from '@/components/header';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -193,6 +194,7 @@ function RootComponent() {
         <Toaster richColors position="top-right" toastOptions={{ duration: 5000 }} />
         <AdminToolbar />
         <CookieConsent />
+        <ApiKeyGateModal />
       </ThemeProvider>
       {import.meta.env.DEV && <TanStackRouterDevtools position="bottom-left" />}
       {import.meta.env.DEV && (

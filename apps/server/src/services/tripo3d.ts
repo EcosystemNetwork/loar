@@ -87,19 +87,19 @@ interface UploadResponse {
 }
 
 class Tripo3dService {
-  private envKey: string | undefined;
-
-  constructor() {
-    this.envKey = process.env.TRIPO_API_KEY;
-  }
-
-  isConfigured(): boolean {
-    return !!this.envKey;
-  }
-
+  /**
+   * Required — no `TRIPO_API_KEY` env fallback. Callers must route through
+   * `resolveProviderKey(userId, 'tripo')` so BYOK lookup runs and the key
+   * is always the caller's own (see openai.ts's Auditor note M5, which
+   * closed this same hole first).
+   */
   private resolveKey(override?: string): string {
-    const key = override?.trim() || this.envKey;
-    if (!key) throw new Error('TRIPO_API_KEY is not configured');
+    const key = override?.trim();
+    if (!key) {
+      throw new Error(
+        'No Tripo3D API key available — add one at /settings/api-keys to use this model.'
+      );
+    }
     return key;
   }
 

@@ -208,6 +208,26 @@ export async function assertFeatureEnabled(feature: FeatureKey): Promise<void> {
   }
 }
 
+/**
+ * Public-safe subset of the kill switches — for client UI gating (hiding a
+ * "Buy Credits" button, disabling a mint action, etc). Everything else in
+ * PlatformConfig (margins, treasury math) stays admin-only.
+ */
+export async function getPublicFeatureFlags(): Promise<
+  Pick<
+    PlatformConfig,
+    'generationEnabled' | 'mintingEnabled' | 'purchaseEnabled' | 'registrationEnabled'
+  >
+> {
+  const cfg = await getPlatformConfig();
+  return {
+    generationEnabled: cfg.generationEnabled,
+    mintingEnabled: cfg.mintingEnabled,
+    purchaseEnabled: cfg.purchaseEnabled,
+    registrationEnabled: cfg.registrationEnabled,
+  };
+}
+
 export class FeatureDisabledError extends Error {
   readonly code = 'FEATURE_DISABLED';
   readonly feature: FeatureKey;

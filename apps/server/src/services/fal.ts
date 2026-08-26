@@ -167,12 +167,17 @@ class FalService {
    * it before each subscribe to scope the upcoming call to the right key.
    * In a multi-user request burst this is racy at the millisecond level, which
    * is acceptable for the demo and tracked as a known limitation.
+   *
+   * `apiKey` is required — no `FAL_KEY` env fallback. Callers must route
+   * through `resolveProviderKey(userId, 'fal')` so BYOK lookup runs and the
+   * key is always the caller's own (see openai.ts's Auditor note M5, which
+   * closed this same hole first).
    */
   private configureCall(apiKey?: string) {
-    const key = apiKey?.trim() || process.env.FAL_KEY;
+    const key = apiKey?.trim();
     if (!key) {
       throw new Error(
-        'FAL_KEY is not configured — set the env var or supply a user key via /settings/api-keys'
+        'No fal.ai API key available — add one at /settings/api-keys to use this model.'
       );
     }
     fal.config({ credentials: key });

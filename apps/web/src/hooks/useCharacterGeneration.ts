@@ -51,7 +51,7 @@ export function useCharacterGeneration({
   setStatusMessage,
 }: UseCharacterGenerationProps): UseCharacterGenerationReturn {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const { checkCredits, invalidateBalance } = useCreditCheck();
+  const { checkCredits, checkGenerationEnabled, invalidateBalance } = useCreditCheck();
 
   // Image generation mutation using Nano Banana for editing
   const generateImageMutation = useMutation({
@@ -165,6 +165,7 @@ export function useCharacterGeneration({
   // Handle image generation for the event
   const handleGenerateEventImage = useCallback(async () => {
     if (!videoDescription.trim()) return;
+    if (!checkGenerationEnabled()) return;
     if (!checkCredits('image')) return;
 
     setStatusMessage(null); // Clear any previous messages
@@ -177,11 +178,18 @@ export function useCharacterGeneration({
     } finally {
       setIsGeneratingImage(false);
     }
-  }, [videoDescription, generateImageMutation, setStatusMessage, checkCredits]);
+  }, [
+    videoDescription,
+    generateImageMutation,
+    setStatusMessage,
+    checkCredits,
+    checkGenerationEnabled,
+  ]);
 
   // Handle character frame generation for image-to-video
   const handleGenerateCharacterFrame = useCallback(async () => {
     if (!videoDescription.trim() || selectedImageCharacters.length === 0) return;
+    if (!checkGenerationEnabled()) return;
     if (!checkCredits('image')) return;
 
     setStatusMessage(null);
@@ -265,6 +273,7 @@ export function useCharacterGeneration({
     setGeneratedImageUrl,
     setStatusMessage,
     checkCredits,
+    checkGenerationEnabled,
   ]);
 
   return {

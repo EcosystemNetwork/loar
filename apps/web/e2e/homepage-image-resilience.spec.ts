@@ -20,10 +20,62 @@
  * test and the test passed for the wrong reason even against the unfixed
  * code. Pinning the fixture is what makes the fault injection below actually
  * exercise the vulnerable path deterministically.
+ *
+ * `universes.getAll` is mocked via `mockTrpcBatchProcedure` (below), not a
+ * plain `page.route('**\/trpc/universes.getAll**', ...)` glob — tRPC's
+ * httpBatchLink combines every query firing in the same tick into one
+ * request whose path is a comma-joined procedure list (e.g.
+ * `/trpc/credits.getFeatureFlags,universes.getAll,universes.getFeatured`).
+ * A glob anchored on `/trpc/universes.getAll` only matches when it happens
+ * to be first in that list, so this suite silently ran against the real
+ * seed data (not the fixture) once other homepage queries started sharing
+ * the same batch tick — reproduced 2026-08-25 by another change adding a
+ * `credits.getFeatureFlags` fetch to `HeroBillboard`; all three tests here
+ * "passed" for the wrong reason (there was no gateway outage to recover
+ * from because the mocked non-IPFS fixture image never loaded in the first
+ * place). `mockTrpcBatchProcedure` finds the procedure by name wherever it
+ * lands in the batch, and proxies every *other* procedure in the same
+ * request through to the real server so it doesn't matter what else ends up
+ * batched alongside it, now or in the future.
  */
 
 import { test, expect } from './fixtures';
 import type { Page, Route } from '@playwright/test';
+
+/**
+ * Mocks one tRPC query procedure's result within a (possibly batched)
+ * `httpBatchLink` request, regardless of what other procedures share the
+ * same batch or what order they're in. Every other procedure in the batch
+ * is proxied through to the real server unmodified — this mock only ever
+ * touches the one slot it's asked to.
+ */
+async function mockTrpcBatchProcedure(page: Page, procedureName: string, resultData: unknown) {
+  await page.route('**/trpc/**', async (route: Route) => {
+    const url = new URL(route.request().url());
+    const procedures = url.pathname.split('/trpc/')[1]?.split(',') ?? [];
+    const index = procedures.indexOf(procedureName);
+    if (index === -1) return route.continue();
+
+    // Fetch the real batch response so every *other* procedure in it still
+    // gets genuine data — only splice in our fixture at this procedure's
+    // own index.
+    const response = await route.fetch();
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      return route.continue();
+    }
+    if (!Array.isArray(body) || index >= body.length) return route.continue();
+
+    body[index] = { result: { data: resultData } };
+    await route.fulfill({
+      status: response.status(),
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    });
+  });
+}
 
 // 1x1 transparent PNG — stands in for a real gateway response body so the
 // test doesn't depend on any real image bytes existing anywhere.
@@ -58,13 +110,10 @@ const FIXTURE_UNIVERSE = {
 
 /** Pin the homepage's universe list to a single deterministic fixture. */
 async function pinFixtureUniverse(page: Page) {
-  await page.route('**/trpc/universes.getAll**', (route: Route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify([{ result: { data: { success: true, data: [FIXTURE_UNIVERSE] } } }]),
-    })
-  );
+  await mockTrpcBatchProcedure(page, 'universes.getAll', {
+    success: true,
+    data: [FIXTURE_UNIVERSE],
+  });
   // Ponder enrichment is optional/silent-fail by design (see ponder-api.ts) —
   // returning a GraphQL error response makes the app treat it as offline
   // and keep our Firestore-sourced imageURL as-is, instead of depending on
@@ -93,15 +142,10 @@ const NON_IPFS_FIXTURE_UNIVERSE = {
 };
 
 async function pinNonIpfsFixtureUniverse(page: Page) {
-  await page.route('**/trpc/universes.getAll**', (route: Route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify([
-        { result: { data: { success: true, data: [NON_IPFS_FIXTURE_UNIVERSE] } } },
-      ]),
-    })
-  );
+  await mockTrpcBatchProcedure(page, 'universes.getAll', {
+    success: true,
+    data: [NON_IPFS_FIXTURE_UNIVERSE],
+  });
   await page.route('**/graphql', (route: Route) =>
     route.fulfill({
       status: 500,

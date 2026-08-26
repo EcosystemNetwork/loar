@@ -1,7 +1,13 @@
 /**
  * BYOK key resolver — thin facade that returns the plaintext key string for
- * a (user, provider) pair, or `undefined` if neither a user-supplied BYOK
- * key nor the server's env-configured pool key is available.
+ * a (user, provider) pair, or `undefined` if the user has no BYOK key on
+ * file for that provider.
+ *
+ * BYOK-only: there is no server env-configured pool fallback here (the
+ * env-var fallback was retired — every dispatch now spends the requesting
+ * user's own quota). A missing/anonymous `uid` or a missing key both
+ * resolve to `undefined`; callers already treat that as "cannot dispatch"
+ * (see the `if (!apiKey) …` guard at every call site).
  *
  * Backed by `services/provider-keys/dispatcher.ts`. The legacy `userSecrets`
  * collection is retired; this facade preserves the historical signature so
@@ -12,9 +18,10 @@
  * Usage:
  *
  *   const apiKey = await resolveProviderKey(ctx.userId, 'fal');
+ *   if (!apiKey) throw new TRPCError({ code: 'FORBIDDEN', message: '…add a fal.ai key…' });
  *   await falService.generateImage({ ...input, apiKey });
  *
- * For dispatch metadata (`source: 'byok' | 'server'`, fingerprint), import
+ * For dispatch metadata (`source: 'byok'`, fingerprint), import
  * `resolveProviderKey` from `services/provider-keys` instead.
  */
 import {
@@ -31,39 +38,22 @@ import type { ProviderId } from '../services/provider-keys/types';
  */
 export type SecretProvider = ProviderId;
 
-const ENV_VAR_BY_PROVIDER: Record<SecretProvider, string> = {
-  bytedance: 'BYTEDANCE_API_KEY',
-  zai: 'ZAI_API_KEY',
-  openai: 'OPENAI_API_KEY',
-  google: 'GOOGLE_API_KEY',
-  fal: 'FAL_KEY',
-  elevenlabs: 'ELEVENLABS_API_KEY',
-  meshy: 'MESHY_API_KEY',
-  tripo: 'TRIPO_API_KEY',
-  assemblyai: 'ASSEMBLYAI_API_KEY',
-  deepgram: 'DEEPGRAM_API_KEY',
-  groq: 'GROQ_API_KEY',
-  minimax: 'MINIMAX_API_KEY',
-};
-
 export async function resolveProviderKey(
   uid: string | undefined | null,
   provider: SecretProvider
 ): Promise<string | undefined> {
   if (!isKnownProvider(provider)) return undefined;
-  if (uid) {
-    try {
-      const { apiKey } = await resolveResolvedKey(uid, provider);
-      return apiKey;
-    } catch (err) {
-      // NoKeyAvailable just means no BYOK key + no env pool — fall through
-      // to direct env read below. Anything else (Firestore down etc.) we
-      // still try env so anonymous service paths keep working.
-      if (!(err instanceof NoKeyAvailableError)) {
-        // Best-effort fallthrough — never blow up the caller.
-      }
+  if (!uid) return undefined;
+  try {
+    const { apiKey } = await resolveResolvedKey(uid, provider);
+    return apiKey;
+  } catch (err) {
+    // NoKeyAvailableError means no BYOK key on file — expected, not a bug.
+    // Any other error (Firestore down, decrypt failure) is also treated as
+    // "cannot dispatch" rather than silently reading a platform env key.
+    if (!(err instanceof NoKeyAvailableError)) {
+      console.error(`[byok] resolveProviderKey(${provider}) failed unexpectedly:`, err);
     }
+    return undefined;
   }
-  const envKey = process.env[ENV_VAR_BY_PROVIDER[provider]]?.trim();
-  return envKey || undefined;
 }

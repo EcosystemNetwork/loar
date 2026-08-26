@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
 type MotionPresetId = 'push_in' | 'orbit' | 'crash_zoom' | 'dolly' | 'walk_up';
 type Intensity = 'subtle' | 'standard' | 'pronounced';
@@ -110,6 +111,7 @@ interface AnimateImagePanelProps {
 }
 
 export function AnimateImagePanel({ imageUrl, onComplete }: AnimateImagePanelProps) {
+  const { generationEnabled } = useFeatureFlags();
   const [presetId, setPresetId] = useState<MotionPresetId>('push_in');
   const [intensity, setIntensity] = useState<Intensity>('standard');
   const [prompt, setPrompt] = useState('');
@@ -269,9 +271,14 @@ export function AnimateImagePanel({ imageUrl, onComplete }: AnimateImagePanelPro
         />
       </div>
 
+      {!generationEnabled && (
+        <p className="text-xs text-amber-400">
+          AI generation is temporarily disabled. Check back soon.
+        </p>
+      )}
       <Button
         className="w-full"
-        disabled={!imageUrl || animate.isPending}
+        disabled={!imageUrl || animate.isPending || !generationEnabled}
         onClick={() => animate.mutate()}
       >
         {animate.isPending ? (

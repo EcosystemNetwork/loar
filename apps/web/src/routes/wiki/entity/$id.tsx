@@ -17,6 +17,7 @@ import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { toast } from 'sonner';
 import { UserText } from '@/components/user-text';
 import { trpcClient } from '@/utils/trpc';
+import { requireProviderKey } from '@/lib/apiKeyGate';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -804,7 +805,19 @@ function EntityPage() {
       queryClient.invalidateQueries({ queryKey: ['entity', id] });
       queryClient.invalidateQueries({ queryKey: ['media-attachments', 'entity', id] });
     } catch (err: any) {
-      toast.error(err.message ?? 'Failed to launch pipeline');
+      // The 3D pipeline needs the caller's own Google + Meshy keys (see
+      // characterPipeline.launch's pre-flight check) — pop the "connect
+      // your key" modal and retry once instead of just toasting a dead end.
+      const provider = err?.data?.byokRequired ? err.data.provider : undefined;
+      if (provider) {
+        const saved = await requireProviderKey(provider, { reason: err.message });
+        if (saved) {
+          setLaunchingPipeline(false);
+          return handleLaunchPipeline();
+        }
+      } else {
+        toast.error(err.message ?? 'Failed to launch pipeline');
+      }
     } finally {
       setLaunchingPipeline(false);
     }

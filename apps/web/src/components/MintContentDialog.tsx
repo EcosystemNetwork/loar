@@ -20,6 +20,7 @@ import { Loader2, Sparkles, X, CheckCircle2, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
 // Inline ABI for EpisodeEditionCollection.mint — will use generated ABI once contracts deployed
 const EPISODE_EDITION_ABI = [
@@ -69,6 +70,7 @@ export function MintContentDialog({
   onSuccess,
 }: MintContentDialogProps) {
   const { address, isConnected } = useAccount();
+  const { mintingEnabled } = useFeatureFlags();
   const v = useVocab();
   const mint = useMintContent();
   const recordMint = useRecordMint();
@@ -179,6 +181,23 @@ export function MintContentDialog({
       toast.error(err?.message ?? 'Minting failed');
       setStep('form');
     }
+  }
+
+  // Minting disabled by admin (/admin/ops "Minting" kill switch)
+  if (!mintingEnabled) {
+    return (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 w-full max-w-md p-6 text-center">
+          <h2 className="text-xl font-bold text-white mb-2">Minting Unavailable</h2>
+          <p className="text-sm text-zinc-400 mb-6">
+            Minting content as an NFT is temporarily disabled. Check back soon.
+          </p>
+          <Button onClick={onClose} className="w-full">
+            Close
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (step === 'done') {

@@ -118,6 +118,9 @@ jobs:
       - name: Type check (web)
         run: pnpm --filter web check-types
 
+      - name: Run unit tests (web)
+        run: pnpm --filter web run test:unit
+
       - name: Build web
         run: pnpm --filter web build
 

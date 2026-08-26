@@ -294,7 +294,11 @@ async function main() {
     process.exit(1);
   }
   const { googleImagenService } = await import('../src/services/google-imagen.js');
-  if (!googleImagenService.isConfigured()) {
+  // Ops script — runs with the platform's own env key, not a user's BYOK
+  // key (there's no requesting user). `googleImagenService.generate` has
+  // no internal env fallback, so we read + thread it explicitly here.
+  const googleApiKey = process.env.GOOGLE_API_KEY;
+  if (!googleApiKey) {
     console.error('ERROR: GOOGLE_API_KEY is not set.');
     process.exit(1);
   }
@@ -411,6 +415,7 @@ async function main() {
           numberOfImages: 1,
           aspectRatio: config.aspectRatio,
           personGeneration: config.personGeneration,
+          apiKey: googleApiKey,
         });
       } catch (firstErr) {
         const msg = (firstErr as Error).message;
@@ -429,6 +434,7 @@ async function main() {
             numberOfImages: 1,
             aspectRatio: config.aspectRatio,
             personGeneration: config.personGeneration,
+            apiKey: googleApiKey,
           });
         } else {
           throw firstErr;

@@ -48,6 +48,7 @@ import {
   type SegmentGenerationConfig,
 } from '@/components/segments/AddSegmentDialog';
 import type { VideoSegment, MultiSegmentEvent } from '@/types/segments';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { migrateLegacyEvent, generateSegmentId, sortSegments } from '@/types/segments';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 
@@ -93,12 +94,19 @@ function CharacterThumb({ src, name }: { src?: string | null; name?: string }) {
 function EventPage() {
   const { universe: universeId, event: eventId } = useParams({ from: '/event/$universe/$event' });
   const navigate = useNavigate();
+  const { generationEnabled } = useFeatureFlags();
 
   const isBlockchainUniverse = universeId?.startsWith('0x');
   const contractAddress = isBlockchainUniverse ? universeId : undefined;
 
   // Fetch blockchain graph data with Ponder-resolved content (URLs + descriptions)
-  const { graphData, isLoadingAny: isLoadingGraph } = useUniverseBlockchain({
+  const {
+    graphData,
+    isLoadingAny: isLoadingGraph,
+    isError: isGraphError,
+    graphErrorReason,
+    refetchFullGraph,
+  } = useUniverseBlockchain({
     universeId,
     contractAddress,
     isBlockchainUniverse: !!isBlockchainUniverse,
@@ -248,6 +256,10 @@ function EventPage() {
   // Handle adding a new segment via generation (text-to-video only from segment dialog)
   const handleGenerateSegment = useCallback(
     async (config: SegmentGenerationConfig) => {
+      if (!generationEnabled) {
+        alert('AI generation is temporarily disabled. Please check back soon.');
+        return;
+      }
       setIsGeneratingSegment(true);
       try {
         // All segment dialog generations use text-to-video via the unified generateVideo route
@@ -303,7 +315,7 @@ function EventPage() {
         setIsGeneratingSegment(false);
       }
     },
-    [eventId, eventSegments, persistSegments]
+    [eventId, eventSegments, persistSegments, generationEnabled]
   );
 
   // Handle segment reorder
@@ -429,6 +441,38 @@ function EventPage() {
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Home
             </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // On-chain graph fetch failed (e.g. getFullGraph()/getGraphPage() both
+  // reverted) — surface it instead of falling through to "eventIndex === -1"
+  // below, which would otherwise read as a generic "event not found" even
+  // though the real cause is the whole graph never loaded.
+  if (isGraphError) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="p-8 text-center">
+            <h2 className="text-2xl font-bold mb-4">Couldn&apos;t load this event</h2>
+            <p className="text-muted-foreground mb-4">
+              {graphErrorReason === 'pagination-unsupported'
+                ? "This universe's story graph is too large for its deployed contract to serve, and it doesn't support the newer paginated reader either."
+                : 'The on-chain data provider returned an error — this is usually transient.'}
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              {graphErrorReason !== 'pagination-unsupported' && (
+                <Button variant="outline" onClick={() => refetchFullGraph()}>
+                  Retry
+                </Button>
+              )}
+              <Button onClick={() => navigate({ to: `/universe/${universeId}/watch` })}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Universe
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

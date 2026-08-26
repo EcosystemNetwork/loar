@@ -1188,6 +1188,11 @@ app.use(
     onError: ({ error, path, type }) => {
       if (error.code !== 'INTERNAL_SERVER_ERROR') return;
       const cause = error.cause instanceof Error ? error.cause : undefined;
+      // A user dispatching without a BYOK key is expected control flow (the
+      // client shows the add-key modal), not a bug — same treatment as
+      // FeatureDisabledError in lib/feature-guards.ts. Skip the noisy
+      // 500-shaped log + Sentry report for it.
+      if (cause?.name === 'NoKeyAvailableError') return;
       console.error(
         `[trpc] ${type} ${path ?? '<unknown>'} failed: ` +
           redactSecrets(cause?.message ?? error.message)

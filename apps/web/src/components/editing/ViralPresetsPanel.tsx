@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Loader2, Sparkles, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
 interface ViralPresetsPanelProps {
   imageUrl: string | null;
@@ -50,6 +51,7 @@ const CATEGORY_TINT: Record<string, string> = {
 };
 
 export function ViralPresetsPanel({ imageUrl, onComplete }: ViralPresetsPanelProps) {
+  const { generationEnabled } = useFeatureFlags();
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [prompt, setPrompt] = useState('');
   const [generatingId, setGeneratingId] = useState<string | null>(null);
@@ -117,9 +119,11 @@ export function ViralPresetsPanel({ imageUrl, onComplete }: ViralPresetsPanelPro
           <div className="flex-1">
             <p className="text-xs font-medium">One-click viral looks</p>
             <p className="text-[10px] text-muted-foreground">
-              {imageUrl
-                ? 'Click a preset to animate your image with that vibe.'
-                : 'Load an image in the Input tab for image-to-video, or hit Apply for pure text-to-video.'}
+              {!generationEnabled
+                ? 'AI generation is temporarily disabled. Check back soon.'
+                : imageUrl
+                  ? 'Click a preset to animate your image with that vibe.'
+                  : 'Load an image in the Input tab for image-to-video, or hit Apply for pure text-to-video.'}
             </p>
           </div>
         </div>
@@ -162,8 +166,12 @@ export function ViralPresetsPanel({ imageUrl, onComplete }: ViralPresetsPanelPro
             return (
               <Card
                 key={p.id}
-                className="p-3 hover:border-purple-500/50 transition-colors cursor-pointer"
-                onClick={() => !apply.isPending && apply.mutate(p.id)}
+                className={
+                  generationEnabled
+                    ? 'p-3 hover:border-purple-500/50 transition-colors cursor-pointer'
+                    : 'p-3 opacity-50 cursor-not-allowed'
+                }
+                onClick={() => generationEnabled && !apply.isPending && apply.mutate(p.id)}
               >
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">

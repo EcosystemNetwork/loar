@@ -11,35 +11,77 @@ const PUBLIC_GATEWAY = 'https://ipfs.io';
 // Pinata's public gateway is kept in the fallback chain — it sometimes
 // recovers — but is not used as the sync default.
 const PINATA_PUBLIC_GATEWAY = 'https://gateway.pinata.cloud';
-const CONFIGURED_GATEWAY = (import.meta.env.VITE_PINATA_GATEWAY_URL || PUBLIC_GATEWAY)
-  .trim()
-  .replace(/\/$/, '');
 const PREFER_PUBLIC =
   String(import.meta.env.VITE_PINATA_PREFER_PUBLIC || '')
     .trim()
     .toLowerCase() === 'true';
 
-let CONFIGURED_HOST = '';
-try {
-  CONFIGURED_HOST = new URL(CONFIGURED_GATEWAY).host;
-} catch {
-  CONFIGURED_HOST = '';
+/**
+ * Decides which gateway every synchronous URL rewrite (rewriteBrokenDedicatedGatewayUrl,
+ * the `ipfs://` branch of resolveIpfsUrl) should target, given the raw
+ * `VITE_PINATA_GATEWAY_URL` build value.
+ *
+ * MUST fall back to `publicGateway` whenever `configuredGatewayRaw` doesn't
+ * parse as an absolute URL — not just when it happens to resolve to a known
+ * `.mypinata.cloud` host. Before this fix, an env var missing its `https://`
+ * scheme (e.g. a copy-paste error dropping the protocol, or a stray trailing
+ * character after the host) made `new URL(...)` throw, `configuredHost` come
+ * back `''`, `isDedicatedGateway` come back `false` (since `''` doesn't end
+ * in `.mypinata.cloud`) — and the code concluded there was nothing to bypass,
+ * so it used the raw, unparseable string as `activeGateway` anyway.
+ * `rewriteBrokenDedicatedGatewayUrl` then baked that broken, schemeless
+ * string into every `.mypinata.cloud` video/image URL app-wide — and because
+ * it no longer parses as a URL at all, `isIpfsGatewayUrl()` can't recognize
+ * it as a gateway URL either, so `install-ipfs-fallback.ts`'s global
+ * onerror rotator can't recover it back to a working gateway — every single
+ * piece of media on the affected host permanently fails, all the way down
+ * to a "Couldn't load"/"Add Video" placeholder, with no console error
+ * pointing at the actual cause. See `apps/web/src/utils/__tests__/ipfs-url.test.ts`
+ * for the exact reproduction.
+ */
+export function resolveActiveGateway(
+  configuredGatewayRaw: string | undefined,
+  preferPublic: boolean,
+  publicGateway: string
+): { activeGateway: string; activeHost: string; isDedicatedGateway: boolean } {
+  const configuredGateway = (configuredGatewayRaw || publicGateway).trim().replace(/\/$/, '');
+
+  let configuredHost = '';
+  let configuredGatewayValid = false;
+  try {
+    configuredHost = new URL(configuredGateway).host;
+    configuredGatewayValid = true;
+  } catch {
+    configuredHost = '';
+    configuredGatewayValid = false;
+  }
+
+  const isDedicatedGateway = configuredHost.endsWith('.mypinata.cloud');
+  // Dedicated `.mypinata.cloud` gateways require a server-signed URL (see
+  // resolveIpfsUrlAsync) — bypass to the public gateway for synchronous URL
+  // composition. An unparseable configured value is bypassed unconditionally:
+  // an invalid URL is never safe to use as a prefix, dedicated or not.
+  const bypassDedicated = preferPublic || isDedicatedGateway || !configuredGatewayValid;
+
+  let publicGatewayHost = '';
+  try {
+    publicGatewayHost = new URL(publicGateway).host;
+  } catch {
+    publicGatewayHost = '';
+  }
+
+  return {
+    activeGateway: bypassDedicated ? publicGateway : configuredGateway,
+    activeHost: bypassDedicated ? publicGatewayHost : configuredHost,
+    isDedicatedGateway,
+  };
 }
 
-const IS_DEDICATED_GATEWAY = CONFIGURED_HOST.endsWith('.mypinata.cloud');
-// Dedicated `.mypinata.cloud` gateways require a server-signed URL (see
-// resolveIpfsUrlAsync). Fall back to the public gateway for synchronous
-// URL composition.
-const BYPASS_DEDICATED = PREFER_PUBLIC || IS_DEDICATED_GATEWAY;
-
-const ACTIVE_GATEWAY = BYPASS_DEDICATED ? PUBLIC_GATEWAY : CONFIGURED_GATEWAY;
-let PUBLIC_GATEWAY_HOST = '';
-try {
-  PUBLIC_GATEWAY_HOST = new URL(PUBLIC_GATEWAY).host;
-} catch {
-  PUBLIC_GATEWAY_HOST = '';
-}
-const ACTIVE_HOST = BYPASS_DEDICATED ? PUBLIC_GATEWAY_HOST : CONFIGURED_HOST;
+const { activeGateway: ACTIVE_GATEWAY, activeHost: ACTIVE_HOST } = resolveActiveGateway(
+  import.meta.env.VITE_PINATA_GATEWAY_URL,
+  PREFER_PUBLIC,
+  PUBLIC_GATEWAY
+);
 
 function appendToken(url: string): string {
   // The Pinata gateway token is server-side only, so strip any stale

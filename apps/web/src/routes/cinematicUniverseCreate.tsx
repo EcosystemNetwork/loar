@@ -65,6 +65,7 @@ import {
 } from '@/configs/chains';
 import { Price, usePriceText } from '@/components/Price';
 import { ModelSelector } from '@/components/ModelSelector';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
 export const Route = createFileRoute('/cinematicUniverseCreate')({
   // WEB-6: block entry until /auth/me confirms the session. The component
@@ -93,6 +94,7 @@ enum DeploymentStep {
 function CinematicUniverseCreate() {
   const { address, isConnected, isAuthenticated, isAuthenticating } = useWalletAuth();
   const navigate = useNavigate();
+  const { mintingEnabled } = useFeatureFlags();
 
   const chainId = useChainId();
   const { data: balance } = useBalance({ address });
@@ -805,6 +807,28 @@ function CinematicUniverseCreate() {
     return (
       <div className="h-full flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Minting disabled by admin (/admin/ops "Minting" kill switch) — check before
+  // the wallet-connect gate so it's visible even to a disconnected visitor.
+  if (!mintingEnabled) {
+    return (
+      <div className="h-full flex items-center justify-center bg-background">
+        <Card className="w-full max-w-md">
+          <CardContent className="text-center space-y-4 p-8">
+            <AlertCircle className="h-16 w-16 mx-auto mb-4 text-yellow-600" />
+            <h2 className="text-2xl font-bold">Universe Creation Unavailable</h2>
+            <p className="text-muted-foreground">
+              Creating new universes is temporarily disabled. Check back soon.
+            </p>
+            <Button size="lg" variant="outline" onClick={() => (window.location.href = '/')}>
+              <ArrowLeft className="h-5 w-5 mr-2" />
+              Back Home
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

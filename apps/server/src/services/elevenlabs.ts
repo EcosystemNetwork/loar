@@ -227,15 +227,31 @@ export interface CloneVoiceResult {
 }
 
 class ElevenLabsService {
-  private apiKey: string | undefined;
+  /**
+   * The platform's own workspace key — used ONLY for browsing our shared
+   * ElevenLabs voice catalog (`listVoices` with no override), which isn't a
+   * per-user chargeable generation. Every actual generation method below
+   * goes through `resolveKey`, which has no env fallback.
+   */
+  private platformKey: string | undefined;
 
   constructor() {
-    this.apiKey = process.env.ELEVENLABS_API_KEY;
+    this.platformKey = process.env.ELEVENLABS_API_KEY;
   }
 
+  /**
+   * Required — no `ELEVENLABS_API_KEY` env fallback. Callers must route
+   * through `resolveProviderKey(userId, 'elevenlabs')` so BYOK lookup runs
+   * and the key is always the caller's own (see openai.ts's Auditor note
+   * M5, which closed this same hole first).
+   */
   private resolveKey(override?: string): string {
-    const key = override?.trim() || this.apiKey;
-    if (!key) throw new Error('ELEVENLABS_API_KEY is not configured');
+    const key = override?.trim();
+    if (!key) {
+      throw new Error(
+        'No ElevenLabs API key available — add one at /settings/api-keys to use this feature.'
+      );
+    }
     return key;
   }
 
@@ -719,7 +735,15 @@ class ElevenLabsService {
   // ── Voice Library ─────────────────────────────────────────────────────
 
   async listVoices(apiKey?: string): Promise<ElevenLabsVoice[]> {
-    const key = this.resolveKey(apiKey);
+    // Workspace catalog browse, not a generation — falls back to the
+    // platform key so users can see what voice ids exist before they've
+    // added their own BYOK key.
+    const key = apiKey?.trim() || this.platformKey;
+    if (!key) {
+      throw new Error(
+        'No ElevenLabs API key available — add one at /settings/api-keys to use this feature.'
+      );
+    }
 
     const response = await fetch(`${BASE_URL}/voices`, {
       headers: { 'xi-api-key': key },
@@ -738,8 +762,9 @@ class ElevenLabsService {
 
   // ── Health check ──────────────────────────────────────────────────────
 
+  /** True when the platform's own workspace key is configured (catalog browsing only). */
   isConfigured(): boolean {
-    return !!this.apiKey;
+    return !!this.platformKey;
   }
 }
 
