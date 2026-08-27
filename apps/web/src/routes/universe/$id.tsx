@@ -3000,6 +3000,12 @@ function UniverseTimelineEditorInner() {
   // Handle node selection — shift+click toggles multi-select without navigating
   const onNodeClick = useCallback(
     (event: React.MouseEvent, node: any) => {
+      // Still-generating placeholder — total no-op, same as the old
+      // per-node handler. Checked first (before shift-toggle too) so a
+      // pending node can't be shift-selected into a bulk op, and never
+      // opens the scene panel with nothing real to show/save.
+      if (node.data.isPending) return;
+
       // Shift+click = toggle selection, don't navigate
       if (event.shiftKey && node.data.nodeType === 'scene') {
         setSelectedNodeIds((prev) => {
@@ -3027,10 +3033,24 @@ function UniverseTimelineEditorInner() {
 
         // Navigate to event page with specific event
         const universeId = node.data.universeId || id;
-        // Use blockchainNodeId if available (for blockchain nodes), otherwise use eventId
-        const eventId = node.data.blockchainNodeId || node.data.eventId;
+        // Use blockchainNodeId if available (for blockchain nodes), otherwise use
+        // eventId. `!== undefined` (not `||`) so a genesis/root node with
+        // blockchainNodeId === 0 doesn't fall through to eventId.
+        let eventId: string | number | undefined =
+          node.data.blockchainNodeId !== undefined ? node.data.blockchainNodeId : node.data.eventId;
+        // Draft branch nodes get a letter-suffixed id (e.g. "4b") before
+        // they're confirmed on-chain — see handleCreateEvent's `branchLetter`.
+        // That id isn't a real event page yet; strip exactly one trailing
+        // letter so we land one level up the draft chain — the immediate
+        // parent's (already-saved) page — rather than jumping straight to
+        // the numeric root. A nested draft branched off an unsaved draft
+        // (e.g. "4bb", branched off still-unsaved "4b") should land on
+        // "4b", not "4".
+        if (typeof eventId === 'string') {
+          eventId = eventId.replace(/[a-z]$/i, '') || eventId;
+        }
 
-        if (eventId && universeId) {
+        if (eventId !== undefined && eventId !== '' && universeId) {
           navigate({ to: `/event/${universeId}/${eventId}` });
         }
       }
@@ -3188,6 +3208,7 @@ function UniverseTimelineEditorInner() {
               onDrop={handleDrop}
               onDragOver={handleDragOver}
               nodeTypes={nodeTypes}
+              onNodeClick={onNodeClick}
               onNodeContextMenu={handleNodeContextMenu}
               panOnDrag={canvasTool === 'hand'}
               panOnScroll

@@ -231,33 +231,6 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
     return () => videoElement.removeEventListener('timeupdate', onTimeUpdate);
   }, [videoElement, data.trimStart, data.trimEnd]);
 
-  const handleClick = () => {
-    if (!data.universeId || data.isPending) return;
-
-    // Use blockchainNodeId if available (the actual blockchain node ID)
-    // Otherwise fall back to parsing eventId
-    let eventIdToUse: string | number;
-
-    if (data.blockchainNodeId !== undefined) {
-      // Use the actual blockchain node ID
-      eventIdToUse = data.blockchainNodeId;
-    } else if (data.eventId) {
-      // Fallback: Extract numeric ID from eventId (e.g., "4b" -> 4, "10" -> 10)
-      eventIdToUse = data.eventId;
-      if (typeof eventIdToUse === 'string') {
-        const match = eventIdToUse.match(/^\d+/);
-        if (match) {
-          eventIdToUse = match[0];
-        }
-      }
-    } else {
-      return;
-    }
-
-    const eventUrl = `/event/${data.universeId}/${eventIdToUse}`;
-    window.location.href = eventUrl;
-  };
-
   // Add Event Node - just a + button
   if (data.nodeType === 'add') {
     return (
@@ -268,7 +241,13 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
             variant="outline"
             size="sm"
             className="w-12 h-12 p-0 border-2 border-dashed border-primary/60 hover:border-primary hover:bg-primary/10 rounded-full transition-all duration-200"
-            onClick={() => data.onAddScene?.('after', data.eventId)}
+            onClick={(e) => {
+              // Don't let this bubble to ReactFlow's node click handling —
+              // an 'add' node isn't a real event and shouldn't become the
+              // app's `selectedNode` (see universe/$id.tsx's onNodeClick).
+              e.stopPropagation();
+              data.onAddScene?.('after', data.eventId);
+            }}
             title="Add new event"
           >
             <Plus className="h-6 w-6 text-primary" />
@@ -295,7 +274,6 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
         <div
           className={`w-80 h-72 rounded-lg border-2 bg-card hover:bg-card/80 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden ${data.isRoot ? 'ring-2 ring-primary/50' : ''} ${data.isSelected ? 'ring-2 ring-blue-500/70' : ''}`}
           style={{ borderColor: data.isSelected ? '#3b82f6' : data.timelineColor || '#10b981' }}
-          onClick={handleClick}
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
         >

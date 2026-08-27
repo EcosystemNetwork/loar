@@ -178,7 +178,7 @@ function AdminHub() {
     {
       to: '/admin/moderation',
       title: 'Moderation',
-      description: 'Flagged content, DMCA takedowns, audit log.',
+      description: 'Turn any content on/off, flagged content, DMCA takedowns, audit log.',
       icon: FlagTriangleRight,
       badge: () => <ModerationBadge enabled={gated} />,
     },

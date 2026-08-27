@@ -424,6 +424,68 @@ export const moderationRouter = router({
       const snap = await query.get();
       return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     }),
+
+  // ── Admin: browse & toggle ALL content ───────────────────────
+  // The review queue only surfaces content that was flagged or hit with a
+  // takedown. This lists every content item so an admin can turn any piece
+  // on (contentStatus: 'active') or off ('hidden') directly, via
+  // `updateContentStatus`. Cursor-paginated, newest first.
+  //
+  // Free-text filtering happens client-side on the returned page (Firestore
+  // has no substring search). A `search` that is an exact content ID
+  // resolves that one doc directly and bypasses pagination.
+  listAllContent: adminProcedure
+    .input(
+      z.object({
+        search: z.string().trim().max(200).optional(),
+        limit: z.number().min(1).max(100).default(50),
+        cursor: z.string().optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const col = contentCol();
+      if (!col) return { items: [], nextCursor: null as string | null };
+
+      const toRow = (doc: FirebaseFirestore.DocumentSnapshot) => {
+        const data = doc.data() ?? {};
+        return {
+          id: doc.id,
+          title: (data.title as string | undefined) ?? null,
+          mediaUrl: (data.mediaUrl as string | undefined) ?? null,
+          thumbnailUrl: (data.thumbnailUrl as string | undefined) ?? null,
+          mediaType: (data.mediaType as string | undefined) ?? null,
+          classification: (data.classification as string | undefined) ?? null,
+          visibility: (data.visibility as string | undefined) ?? null,
+          contentStatus: (data.contentStatus as string | undefined) ?? 'active',
+          creatorUid: (data.creatorUid as string | undefined) ?? null,
+          views: (data.views as number | undefined) ?? 0,
+          likes: (data.likes as number | undefined) ?? 0,
+          createdAt:
+            (data.createdAt as { toDate?: () => Date } | undefined)?.toDate?.()?.toISOString?.() ??
+            (typeof data.createdAt === 'string' ? data.createdAt : null),
+        };
+      };
+
+      // Exact content-ID lookup — skip pagination entirely.
+      if (input.search) {
+        const direct = await col.doc(input.search).get();
+        if (direct.exists) return { items: [toRow(direct)], nextCursor: null as string | null };
+      }
+
+      let query: FirebaseFirestore.Query = col.orderBy('createdAt', 'desc');
+      if (input.cursor) {
+        const cursorDoc = await col.doc(input.cursor).get();
+        if (cursorDoc.exists) query = query.startAfter(cursorDoc);
+      }
+
+      const snap = await query.limit(input.limit + 1).get();
+      const rows = snap.docs.map(toRow);
+      const hasMore = rows.length > input.limit;
+      return {
+        items: rows.slice(0, input.limit),
+        nextCursor: hasMore ? (rows[input.limit - 1]?.id ?? null) : null,
+      };
+    }),
 });
 
 /**

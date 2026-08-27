@@ -8,9 +8,10 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { trpcClient } from '@/utils/trpc';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import {
@@ -27,6 +28,7 @@ import {
   Clock,
   AlertTriangle,
   Sparkles,
+  Search,
 } from 'lucide-react';
 import { RiskBadge } from '@/components/vlm/RiskBadge';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
@@ -180,6 +182,7 @@ function ModerationDashboard() {
     }) => trpcClient.moderation.updateContentStatus.mutate(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mod-flags'] });
+      queryClient.invalidateQueries({ queryKey: ['mod-all-content'] });
       toast.success('Content status updated');
     },
   });
@@ -285,6 +288,7 @@ function ModerationDashboard() {
               </Badge>
             ) : null}
           </TabsTrigger>
+          <TabsTrigger value="content">All Content</TabsTrigger>
           <TabsTrigger value="audit">Audit Log</TabsTrigger>
         </TabsList>
 
@@ -434,6 +438,11 @@ function ModerationDashboard() {
           )}
         </TabsContent>
 
+        {/* All Content Tab — browse every content item and turn it on/off */}
+        <TabsContent value="content">
+          <AllContentTab />
+        </TabsContent>
+
         {/* Audit Log Tab */}
         <TabsContent value="audit">
           {!(auditLog as any[])?.length ? (
@@ -464,6 +473,177 @@ function ModerationDashboard() {
           )}
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+/**
+ * All Content tab — lists every content item (not just flagged ones) and
+ * lets an admin turn each piece on (contentStatus: 'active') or off
+ * ('hidden'). "Off" content is filtered out of every public read path.
+ *
+ * The text box filters the already-loaded pages client-side; pressing
+ * Enter also asks the server to resolve an exact content ID.
+ */
+function AllContentTab() {
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState('');
+  const [submittedSearch, setSubmittedSearch] = useState('');
+
+  const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = useInfiniteQuery({
+    queryKey: ['mod-all-content', submittedSearch],
+    queryFn: ({ pageParam }: { pageParam?: string }) =>
+      trpcClient.moderation.listAllContent.query({
+        search: submittedSearch || undefined,
+        limit: 50,
+        cursor: pageParam,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage: any) => lastPage.nextCursor ?? undefined,
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: (vars: { contentId: string; turnOn: boolean }) =>
+      trpcClient.moderation.updateContentStatus.mutate({
+        contentId: vars.contentId,
+        newStatus: vars.turnOn ? 'active' : 'hidden',
+      }),
+    onSuccess: (_res, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['mod-all-content'] });
+      queryClient.invalidateQueries({ queryKey: ['mod-flags'] });
+      toast.success(vars.turnOn ? 'Content turned on' : 'Content turned off');
+    },
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : 'Failed to update content');
+    },
+  });
+
+  const items: any[] = ((data as any)?.pages ?? []).flatMap((p: any) => p.items as any[]);
+  const term = search.trim().toLowerCase();
+  const filtered = term
+    ? items.filter(
+        (c) =>
+          c.id?.toLowerCase().includes(term) ||
+          c.title?.toLowerCase().includes(term) ||
+          c.creatorUid?.toLowerCase().includes(term)
+      )
+    : items;
+
+  const isOff = (status: string) => status !== 'active' && status !== 'reinstated';
+  const onCount = items.filter((c) => !isOff(c.contentStatus)).length;
+  const offCount = items.length - onCount;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-xs text-muted-foreground">
+          {items.length} loaded · {onCount} on · {offCount} off. Turning content off removes it from
+          every public list, feed, and page. Reversible.
+        </p>
+      </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          setSubmittedSearch(search.trim());
+        }}
+        className="relative"
+      >
+        <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Filter by title / creator, or paste a content ID and press Enter"
+          className="pl-9"
+        />
+      </form>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="animate-spin" />
+        </div>
+      ) : !filtered.length ? (
+        <Card>
+          <CardContent className="p-8 text-center text-muted-foreground">
+            No content found
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {filtered.map((c: any) => {
+            const off = isOff(c.contentStatus);
+            return (
+              <Card key={c.id} className={off ? 'opacity-60' : undefined}>
+                <CardContent className="p-3 flex items-center gap-3">
+                  <div className="w-16 h-16 flex-shrink-0 rounded overflow-hidden bg-black/40 flex items-center justify-center">
+                    {c.thumbnailUrl || c.mediaUrl ? (
+                      <SmartImage
+                        src={c.thumbnailUrl || c.mediaUrl}
+                        alt={c.title || 'content'}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground text-center px-1">
+                        no preview
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1 text-xs space-y-1">
+                    <p className="font-semibold truncate text-sm">{c.title || 'Untitled'}</p>
+                    <div className="flex flex-wrap gap-1">
+                      {c.mediaType && (
+                        <Badge variant="outline" className="text-[10px]">
+                          {c.mediaType}
+                        </Badge>
+                      )}
+                      <Badge variant={off ? 'destructive' : 'outline'} className="text-[10px]">
+                        {off ? `off · ${c.contentStatus}` : 'on'}
+                      </Badge>
+                    </div>
+                    <p className="text-muted-foreground font-mono truncate">{c.id}</p>
+                    {c.creatorUid && (
+                      <p className="text-muted-foreground font-mono truncate">
+                        creator: {c.creatorUid}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={off ? 'outline' : 'ghost'}
+                    className="h-8 flex-shrink-0"
+                    onClick={() => toggleMutation.mutate({ contentId: c.id, turnOn: off })}
+                    disabled={toggleMutation.isPending}
+                  >
+                    {off ? (
+                      <>
+                        <Eye className="h-3 w-3 mr-1 text-green-500" />
+                        <span className="text-xs">Turn on</span>
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff className="h-3 w-3 mr-1 text-yellow-500" />
+                        <span className="text-xs">Turn off</span>
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
+          {hasNextPage ? (
+            <div className="flex justify-center pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+              >
+                {isFetchingNextPage ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Load more'}
+              </Button>
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
