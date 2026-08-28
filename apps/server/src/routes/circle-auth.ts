@@ -6,13 +6,16 @@
  * POST /auth/circle/social      — Google social login (idToken → wallet + JWT)
  * GET  /auth/circle/me          — Current session info
  *
- * Each user gets a Circle-managed EOA wallet. The server holds the signing keys
- * via Circle's KMS — users only need email/social credentials.
+ * Each user gets a Circle-managed EVM wallet, and — when Solana is configured
+ * (`isCircleSolanaConfigured()`) — a Circle-managed Solana wallet too, both
+ * provisioned at sign-up. The server holds the signing keys via Circle's KMS;
+ * users only need email/social credentials.
  */
 import { Hono } from 'hono';
 import { setCookie } from 'hono/cookie';
 import { issueSessionToken } from '../lib/siwe';
 import { getOrCreateWallet, isCircleConfigured, type CircleWallet } from '../lib/circle-wallets';
+import { getOrCreateSolanaWallet, isCircleSolanaConfigured } from '../lib/circle-solana';
 import { verifyGoogleIdToken, isGoogleOAuthConfigured } from '../lib/oauth-verify';
 import { sendOtpEmail, isEmailConfigured } from '../lib/email';
 import { recordAuthEvent } from '../lib/metrics';
@@ -267,6 +270,27 @@ async function getOrCreateUserAccount(
   return { account, wallet };
 }
 
+/**
+ * Provision the user's Circle DCW Solana wallet at sign-up, alongside the EVM
+ * one. Keyed by the lowercased EVM address so it's the same wallet the lazy
+ * `GET /api/solana/wallet` path resolves (`auth.user.uid` = `sub.toLowerCase()`).
+ * Idempotent, so calling it on every login also backfills pre-existing users.
+ *
+ * Non-fatal: a Circle outage / rate-limit here must not block login. On failure
+ * the session just ships without a `sol` claim and the lazy path retries later.
+ * Returns the Solana address, or undefined when Solana isn't configured / failed.
+ */
+async function provisionSolanaWalletAtSignup(evmAddress: string): Promise<string | undefined> {
+  if (!isCircleSolanaConfigured()) return undefined;
+  try {
+    const solWallet = await getOrCreateSolanaWallet(evmAddress.toLowerCase());
+    return solWallet.address;
+  } catch (err) {
+    console.error('[AUTH] Solana wallet provisioning failed (non-fatal):', err);
+    return undefined;
+  }
+}
+
 // ── Cookie helpers ──────────────────────────────────────────────────────────
 
 function setSessionCookie(c: any, token: string) {
@@ -372,8 +396,11 @@ circleAuthRoutes.post('/verify-otp', async (c) => {
     // Create or retrieve the user's Circle EVM wallet.
     const { account, wallet } = await getOrCreateUserAccount(email, 'email');
 
-    // Issue JWT — EVM address as the session subject.
-    const token = await issueSessionToken(wallet.address);
+    // Provision the Solana wallet at sign-up too (non-fatal, gated on config).
+    const solanaAddress = await provisionSolanaWalletAtSignup(wallet.address);
+
+    // Issue JWT — EVM address as the session subject, Solana address as a claim.
+    const token = await issueSessionToken(wallet.address, solanaAddress ? { solanaAddress } : {});
     setSessionCookie(c, token);
 
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
@@ -398,6 +425,7 @@ circleAuthRoutes.post('/verify-otp', async (c) => {
       email,
       walletId: wallet.walletId,
       expiresAt: payload.exp * 1000,
+      ...(solanaAddress ? { solanaAddress } : {}),
       ...(isMobile ? { token } : {}),
     });
   } catch (err) {
@@ -457,7 +485,11 @@ circleAuthRoutes.post('/social', async (c) => {
 
   try {
     const { account, wallet } = await getOrCreateUserAccount(email, provider);
-    const token = await issueSessionToken(wallet.address);
+
+    // Provision the Solana wallet at sign-up too (non-fatal, gated on config).
+    const solanaAddress = await provisionSolanaWalletAtSignup(wallet.address);
+
+    const token = await issueSessionToken(wallet.address, solanaAddress ? { solanaAddress } : {});
     setSessionCookie(c, token);
 
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
@@ -478,6 +510,7 @@ circleAuthRoutes.post('/social', async (c) => {
       email,
       walletId: wallet.walletId,
       expiresAt: payload.exp * 1000,
+      ...(solanaAddress ? { solanaAddress } : {}),
       ...(isMobile ? { token } : {}),
     });
   } catch (err) {

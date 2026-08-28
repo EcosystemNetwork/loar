@@ -21,6 +21,20 @@ vi.mock('../lib/circle-wallets', async (importOriginal) => {
   };
 });
 
+// Stub Circle Solana. Default: not configured, so the existing tests see the
+// EVM-only path unchanged. Individual tests flip `isCircleSolanaConfigured`.
+const mockGetOrCreateSolanaWallet = vi.fn(async () => ({
+  walletId: 'sw-xyz',
+  address: 'SoLaNaAddr1111111111111111111111111111111111',
+  cluster: 'devnet' as const,
+  blockchain: 'SOL-DEVNET' as const,
+}));
+const mockIsCircleSolanaConfigured = vi.fn(() => false);
+vi.mock('../lib/circle-solana', () => ({
+  isCircleSolanaConfigured: () => mockIsCircleSolanaConfigured(),
+  getOrCreateSolanaWallet: (...args: unknown[]) => mockGetOrCreateSolanaWallet(...(args as [])),
+}));
+
 // Disable analytics (side-effect module that does `import('../lib/analytics')`
 // lazily inside route handlers).
 vi.mock('../lib/analytics', () => ({
@@ -129,6 +143,9 @@ function installOtpStore() {
 describe('/auth/circle/register + verify-otp', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks doesn't reset implementations — restore the Solana-config
+    // gate to its default (off) so per-test overrides don't leak.
+    mockIsCircleSolanaConfigured.mockReturnValue(false);
     // NODE_ENV=test means handlers return _devOtp we can grab in the response.
     process.env.NODE_ENV = 'test';
   });
@@ -160,6 +177,75 @@ describe('/auth/circle/register + verify-otp', () => {
     const verBody = await verify.json();
     expect(verBody.address).toMatch(/^0x/);
     expect(verBody.email).toBe(email);
+    // Solana not configured in this test → no eager provisioning, no sol claim.
+    expect(verBody.solanaAddress).toBeUndefined();
+    expect(mockGetOrCreateSolanaWallet).not.toHaveBeenCalled();
+  });
+
+  it('provisions a Solana wallet at sign-up when Solana is configured', async () => {
+    mockIsCircleSolanaConfigured.mockReturnValue(true);
+    installOtpStore();
+    const app = await loadApp();
+    const email = 'sol@example.com';
+
+    const register = await app.fetch(
+      new Request('http://x/auth/circle/register', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+    );
+    const regBody = await register.json();
+
+    const verify = await app.fetch(
+      new Request('http://x/auth/circle/verify-otp', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-mobile-client': '1' },
+        body: JSON.stringify({ email, code: regBody._devOtp }),
+      })
+    );
+    expect(verify.status).toBe(200);
+    const verBody = await verify.json();
+
+    // Solana wallet was provisioned, keyed by the lowercased EVM address.
+    expect(mockGetOrCreateSolanaWallet).toHaveBeenCalledWith(
+      '0xabcabcabcabcabcabcabcabcabcabcabcabcabc0'
+    );
+    // Address is echoed in the response...
+    expect(verBody.solanaAddress).toBe('SoLaNaAddr1111111111111111111111111111111111');
+    // ...and carried as the `sol` claim in the JWT.
+    const claims = JSON.parse(Buffer.from(verBody.token.split('.')[1], 'base64').toString());
+    expect(claims.sol).toBe('SoLaNaAddr1111111111111111111111111111111111');
+    expect(claims.sub).toMatch(/^0x/); // EVM stays the primary identity
+  });
+
+  it('login still succeeds if Solana provisioning throws (non-fatal)', async () => {
+    mockIsCircleSolanaConfigured.mockReturnValue(true);
+    mockGetOrCreateSolanaWallet.mockRejectedValueOnce(new Error('circle 429'));
+    installOtpStore();
+    const app = await loadApp();
+    const email = 'solfail@example.com';
+
+    const register = await app.fetch(
+      new Request('http://x/auth/circle/register', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+    );
+    const regBody = await register.json();
+
+    const verify = await app.fetch(
+      new Request('http://x/auth/circle/verify-otp', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email, code: regBody._devOtp }),
+      })
+    );
+    expect(verify.status).toBe(200);
+    const verBody = await verify.json();
+    expect(verBody.address).toMatch(/^0x/);
+    expect(verBody.solanaAddress).toBeUndefined();
   });
 
   it('rejects a wrong OTP with 401 and bumps attempts', async () => {
