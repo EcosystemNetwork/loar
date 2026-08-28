@@ -279,7 +279,10 @@ function CinematicUniverseCreate() {
     const opt = chainOptionById(optionId);
     if (!opt) return;
     setChainSelection(opt.selection);
-    if (opt.selection.chainId !== chainId) {
+    // This form deploys via the EVM UniverseManager launchpad — a Solana
+    // selection is a no-op here (Solana universe creation goes through a
+    // different path). Only EVM selections drive a wallet chain switch.
+    if (opt.selection.kind === 'evm' && opt.selection.chainId !== chainId) {
       switchChain({ chainId: opt.selection.chainId });
     }
   };
@@ -1011,7 +1014,11 @@ function CinematicUniverseCreate() {
                   <div>
                     <Label className="text-sm font-semibold mb-2 block">Deploy on</Label>
                     <Select
-                      value={evmChainIdToSelectionId(chainSelection.chainId)}
+                      value={
+                        chainSelection.kind === 'evm'
+                          ? evmChainIdToSelectionId(chainSelection.chainId)
+                          : `solana:${chainSelection.cluster}`
+                      }
                       onValueChange={handleChainSelect}
                       disabled={deploymentStep !== DeploymentStep.IDLE}
                     >

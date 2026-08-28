@@ -65,17 +65,49 @@ jobs:
           avm use 0.31.1
           anchor --version
 
-      - name: Generate program keypairs (if missing)
+      - name: Generate program keypairs + sync declare_id!
         working-directory: apps/programs
         run: |
+          # The real deploy keypairs are never committed (target/ is gitignored)
+          # — they are the program upgrade authority and live offline. For CI we
+          # mint throwaway keypairs for every workspace member, then `anchor keys
+          # sync` rewrites each declare_id!() + the [programs.*] tables to match.
+          # This edits the working tree inside the runner only; it is never
+          # committed. The canonical devnet IDs stay intact in git.
           mkdir -p target/deploy
-          for prog in universe episode payment; do
+          progs="universe episode payment rights licensing split_router staking \
+                 credit_manager subscription remix_fees bonding_curve canon_market \
+                 fee_locker premium_actions collab_manager"
+          for prog in $progs; do
             kp="target/deploy/${prog}-keypair.json"
-            if [ ! -f "$kp" ]; then
-              solana-keygen new --no-bip39-passphrase --silent --outfile "$kp"
-            fi
+            [ -f "$kp" ] || solana-keygen new --no-bip39-passphrase --silent --outfile "$kp"
           done
+          anchor keys sync
+          git diff --stat  # visibility only — not committed
+
+      - name: Start funded local validator
+        working-directory: apps/programs
+        run: |
+          # Deploying 15 programs peaks well above the default provider-wallet
+          # balance anchor's own validator provides. Start our own with the
+          # deployer as --mint (seeds it with 500M SOL) and point anchor at it.
+          DEPLOYER="$(solana address)"
+          solana-test-validator --reset --quiet \
+            --ledger .anchor/test-ledger \
+            --mint "$DEPLOYER" \
+            --bind-address 0.0.0.0 --rpc-port 8899 &
+          echo "VALIDATOR_PID=$!" >> "$GITHUB_ENV"
+          for i in $(seq 1 30); do
+            solana cluster-version --url http://127.0.0.1:8899 >/dev/null 2>&1 && break
+            sleep 2
+          done
+          solana config set --url http://127.0.0.1:8899
+          solana balance
 
       - name: Anchor test
         working-directory: apps/programs
-        run: anchor test --skip-lint
+        run: anchor test --skip-lint --skip-local-validator
+
+      - name: Stop local validator
+        if: always()
+        run: kill "${VALIDATOR_PID}" 2>/dev/null || true

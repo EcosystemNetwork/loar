@@ -74,10 +74,16 @@ const EXPLORER_NAMES: Record<number, string> = {
 // Unified chain selector model
 // ---------------------------------------------------------------------------
 
-export type ChainSelection = { kind: 'evm'; chainId: SupportedEvmChainId };
+// Solana clusters — CAIP-2 `solana:<genesisHashPrefix>`. Kept as the short
+// cluster name here for the picker; `@loar/abis/chain` owns the genesis map.
+export type SolanaCluster = 'devnet' | 'mainnet-beta' | 'testnet';
+
+export type ChainSelection =
+  | { kind: 'evm'; chainId: SupportedEvmChainId }
+  | { kind: 'solana'; cluster: SolanaCluster };
 
 export interface ChainOption {
-  /** Stable string id for <Select> values: "eip155:11155111". */
+  /** Stable string id for <Select> values: "eip155:11155111" or "solana:devnet". */
   id: string;
   selection: ChainSelection;
   label: string;
@@ -91,8 +97,37 @@ function evmOption(chainId: SupportedEvmChainId): ChainOption {
   };
 }
 
+const SOLANA_CLUSTER_LABELS: Record<SolanaCluster, string> = {
+  'mainnet-beta': 'Solana',
+  devnet: 'Solana Devnet',
+  testnet: 'Solana Testnet',
+};
+
+function solanaOption(cluster: SolanaCluster): ChainOption {
+  return {
+    id: `solana:${cluster}`,
+    selection: { kind: 'solana', cluster },
+    label: SOLANA_CLUSTER_LABELS[cluster],
+  };
+}
+
+/**
+ * The active Solana cluster, or null when Solana isn't configured for this
+ * build. Gated on `VITE_SOLANA_CLUSTER` so the picker only shows Solana once
+ * the server + programs are wired (parity restoration Phase 7).
+ */
+export const ACTIVE_SOLANA_CLUSTER: SolanaCluster | null = ((): SolanaCluster | null => {
+  const v = import.meta.env.VITE_SOLANA_CLUSTER as string | undefined;
+  return v === 'devnet' || v === 'mainnet-beta' || v === 'testnet' ? v : null;
+})();
+
+export const SOLANA_ENABLED = ACTIVE_SOLANA_CLUSTER !== null;
+
 /** Single source of truth for the chain picker UI (universe create + sandbox). */
-export const SUPPORTED_CHAINS: ChainOption[] = [...SUPPORTED_EVM_CHAIN_IDS.map(evmOption)];
+export const SUPPORTED_CHAINS: ChainOption[] = [
+  ...SUPPORTED_EVM_CHAIN_IDS.map(evmOption),
+  ...(ACTIVE_SOLANA_CLUSTER ? [solanaOption(ACTIVE_SOLANA_CLUSTER)] : []),
+];
 
 export function chainOptionById(id: string): ChainOption | undefined {
   return SUPPORTED_CHAINS.find((c) => c.id === id);
@@ -101,6 +136,26 @@ export function chainOptionById(id: string): ChainOption | undefined {
 /** EVM chainId → CAIP-2 selector id ("eip155:11155111"). */
 export function evmChainIdToSelectionId(chainId: number): string {
   return `eip155:${chainId}`;
+}
+
+/** CAIP-2-ish selector id → ChainSelection. Returns null on unknown/disabled. */
+export function selectionIdToSelection(id: string): ChainSelection | null {
+  return chainOptionById(id)?.selection ?? null;
+}
+
+/** Narrowing helpers so consumers don't re-derive the discriminant. */
+export function isEvmSelection(s: ChainSelection): s is Extract<ChainSelection, { kind: 'evm' }> {
+  return s.kind === 'evm';
+}
+export function isSolanaSelection(
+  s: ChainSelection
+): s is Extract<ChainSelection, { kind: 'solana' }> {
+  return s.kind === 'solana';
+}
+
+/** CAIP-2 namespace for a selection ('evm' kind maps to the CAIP-2 'eip155'). */
+export function selectionNamespace(s: ChainSelection): 'eip155' | 'solana' {
+  return s.kind === 'evm' ? 'eip155' : 'solana';
 }
 
 /** Default selection when nothing is stored — EVM first chain (preserves prior behavior). */
