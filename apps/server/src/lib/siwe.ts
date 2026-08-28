@@ -126,8 +126,24 @@ const ALLOWED_CHAIN_IDS = new Set(
 const MAX_SIWE_LIFETIME_MS = 10 * 60 * 1000;
 
 export interface SiweSessionPayload extends JWTPayload {
-  sub: string; // checksummed wallet address
+  sub: string; // checksummed EVM address, or Solana base58 address when ns='solana'
   iat: number;
+  /** Chain namespace of the primary identity (`sub`). Absent ⇒ 'eip155' (legacy tokens). */
+  ns?: 'eip155' | 'solana';
+  /** Linked EVM address, when the primary identity is Solana or a wallet pair is linked. */
+  evm?: string;
+  /** Linked Solana base58 address, when the session also represents a Solana wallet. */
+  sol?: string;
+}
+
+/** Options for {@link issueSessionToken}. All optional ⇒ EVM-only behaviour, backward compatible. */
+export interface IssueSessionOpts {
+  /** Chain namespace of the primary identity (`sub`). Defaults to 'eip155'. */
+  namespace?: 'eip155' | 'solana';
+  /** Linked EVM address to embed as the `evm` claim (checksummed). */
+  evmAddress?: string;
+  /** Linked Solana base58 address to embed as the `sol` claim. */
+  solanaAddress?: string;
 }
 
 /** Generate a cryptographically random nonce and store it with a 2-minute TTL. */
@@ -333,14 +349,24 @@ export async function verifySiweSignature(
  *
  * `address` is checksummed via getAddress() and stored as `sub`.
  */
-export async function issueSessionToken(address: string): Promise<string> {
+export async function issueSessionToken(
+  address: string,
+  opts: IssueSessionOpts = {}
+): Promise<string> {
   const jti = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
     b.toString(16).padStart(2, '0')
   ).join('');
 
-  const sub = getAddress(address);
+  // For EVM (default) the address is checksummed via getAddress() and stored as
+  // `sub`. For Solana (`opts.namespace='solana'`) the base58 pubkey is stored
+  // verbatim — getAddress() would reject it.
+  const ns = opts.namespace ?? 'eip155';
+  const sub = ns === 'eip155' ? getAddress(address) : address;
 
   const claims: Record<string, unknown> = { sub };
+  if (ns !== 'eip155') claims.ns = ns;
+  if (opts.evmAddress) claims.evm = getAddress(opts.evmAddress);
+  if (opts.solanaAddress) claims.sol = opts.solanaAddress;
 
   return new SignJWT(claims)
     .setProtectedHeader({ alg: 'HS256' })
@@ -452,7 +478,12 @@ export async function refreshSessionToken(token: string): Promise<string | null>
     await revokeToken(result.payload.jti);
   }
 
-  return issueSessionToken(result.payload.sub);
+  // Preserve the chain namespace + linked-wallet claims across refresh.
+  return issueSessionToken(result.payload.sub, {
+    namespace: result.payload.ns,
+    evmAddress: result.payload.evm,
+    solanaAddress: result.payload.sol,
+  });
 }
 
 /** Construct a SIWE-compliant message string. */

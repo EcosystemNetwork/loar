@@ -26,6 +26,10 @@ interface CreateUniverseInput {
   mintTxHash?: string;
   unstoppableDomain?: string | null;
   chainId?: number;
+  /** Chain namespace — 'eip155' for EVM, 'solana' for Solana. Defaults to 'eip155'. */
+  chainNamespace?: 'eip155' | 'solana';
+  /** Solana cluster when chainNamespace === 'solana'. */
+  solanaCluster?: 'devnet' | 'mainnet-beta' | 'testnet';
   /** 'fun' = sandbox, starts private until owner launches it publicly.
    *  'monetized' = launchpad universe, public from mint. */
   universeType?: 'fun' | 'monetized';
@@ -39,8 +43,10 @@ const collection = () => {
 
 export async function createUniverse(input: CreateUniverseInput) {
   try {
+    const namespace = input.chainNamespace ?? 'eip155';
     // EVM addresses are case-insensitive — we lowercase them as the doc id.
-    const id = input.address.toLowerCase();
+    // Solana addresses (base58) are case-sensitive; preserve the original.
+    const id = namespace === 'eip155' ? input.address.toLowerCase() : input.address;
 
     const existing = await collection().doc(id).get();
     if (existing.exists) {
@@ -55,10 +61,11 @@ export async function createUniverse(input: CreateUniverseInput) {
 
     const data = {
       address: input.address,
-      creator: input.creator.toLowerCase(),
+      creator: namespace === 'eip155' ? input.creator.toLowerCase() : input.creator,
       name: input.name ?? null,
-      tokenAddress: input.tokenAddress.toLowerCase(),
-      governanceAddress: input.governanceAddress.toLowerCase(),
+      tokenAddress: namespace === 'eip155' ? input.tokenAddress.toLowerCase() : input.tokenAddress,
+      governanceAddress:
+        namespace === 'eip155' ? input.governanceAddress.toLowerCase() : input.governanceAddress,
       image_url: input.imageUrl,
       portrait_image_url: input.portraitImageUrl ?? null,
       description: input.description,
@@ -66,6 +73,8 @@ export async function createUniverse(input: CreateUniverseInput) {
       mintTxHash: input.mintTxHash ?? null,
       unstoppableDomain: input.unstoppableDomain ?? null,
       chainId: input.chainId ?? null,
+      chainNamespace: namespace,
+      solanaCluster: namespace === 'solana' ? (input.solanaCluster ?? 'devnet') : null,
       hasPrivateSection: true,
       isMultiSig: false,
       multiSigAddress: null,

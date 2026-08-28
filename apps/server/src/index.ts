@@ -190,6 +190,37 @@ app.route('/auth', authRoutes);
 const { circleAuthRoutes } = await import('./routes/circle-auth');
 app.route('/auth/circle', circleAuthRoutes);
 
+// SIWS — Sign-In With Solana. Issues JWTs with ns='solana' for users
+// connecting via Phantom/Solflare/Backpack. Reuses /auth/nonce upstream and
+// the shared /auth/* rate-limit bucket (SIWS verify cost ≈ SIWE verify).
+const { siwsAuthRoutes } = await import('./routes/siws-auth');
+app.route('/auth/solana', siwsAuthRoutes);
+
+// Solana wallet provisioning + tx status (Circle DCW Solana).
+const { solanaRoutes } = await import('./routes/solana');
+app.route('/api/solana', solanaRoutes);
+
+// Solana Pay — payment intents + on-chain settlement detection. Tighter
+// limit: /status hits Helius RPC, /intent does a Firestore write.
+app.use('/api/solana-pay/*', rateLimiter({ windowMs: 60_000, max: 30, name: 'solana-pay' }));
+const { solanaPayRoutes } = await import('./routes/solana-pay');
+app.route('/api/solana-pay', solanaPayRoutes);
+
+// Squads multisig — Solana parity with Gnosis Safe for shared Universe ownership.
+app.use('/api/squads/*', rateLimiter({ windowMs: 60_000, max: 30, name: 'squads' }));
+const { squadsRoutes } = await import('./routes/squads');
+app.route('/api/squads', squadsRoutes);
+
+// $LOAR cross-chain bridge (EVM ↔ Solana). Custodial backend today; returns
+// 503 until bridge env vars are set. Auto-switches to Wormhole NTT when its
+// manager contracts are configured.
+app.use('/api/bridge/*', rateLimiter({ windowMs: 60_000, max: 20, name: 'bridge' }));
+const { bridgeRoutes } = await import('./routes/bridge');
+app.route('/api/bridge', bridgeRoutes);
+// Boot-time audit: warns if bridge env vars are partially set.
+const { auditBridgeConfig } = await import('./lib/bridge-custodial');
+auditBridgeConfig();
+
 // Circle transaction proxy — server-side contract execution via Circle KMS
 const { txProxyRoutes } = await import('./routes/tx-proxy');
 app.route('/api/tx', txProxyRoutes);
