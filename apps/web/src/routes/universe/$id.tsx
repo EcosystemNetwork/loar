@@ -51,6 +51,8 @@ import {
   MousePointer2,
   Film,
   Scissors,
+  Pencil,
+  ExternalLink,
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
@@ -2998,64 +3000,65 @@ function UniverseTimelineEditorInner() {
   }, [selectedNodeIds, nodeFilter.matchingNodeIds, setNodes]);
 
   // Handle node selection — shift+click toggles multi-select without navigating
-  const onNodeClick = useCallback(
-    (event: React.MouseEvent, node: any) => {
-      // Still-generating placeholder — total no-op, same as the old
-      // per-node handler. Checked first (before shift-toggle too) so a
-      // pending node can't be shift-selected into a bulk op, and never
-      // opens the scene panel with nothing real to show/save.
-      if (node.data.isPending) return;
+  const onNodeClick = useCallback((event: React.MouseEvent, node: any) => {
+    // Still-generating placeholder — total no-op, same as the old
+    // per-node handler. Checked first (before shift-toggle too) so a
+    // pending node can't be shift-selected into a bulk op, and never
+    // opens the scene panel with nothing real to show/save.
+    if (node.data.isPending) return;
 
-      // Shift+click = toggle selection, don't navigate
-      if (event.shiftKey && node.data.nodeType === 'scene') {
-        setSelectedNodeIds((prev) => {
-          const next = new Set(prev);
-          if (next.has(node.id)) {
-            next.delete(node.id);
-          } else {
-            next.add(node.id);
-          }
-          return next;
-        });
-        return;
+    // Shift+click = toggle selection, don't navigate
+    if (event.shiftKey && node.data.nodeType === 'scene') {
+      setSelectedNodeIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(node.id)) {
+          next.delete(node.id);
+        } else {
+          next.add(node.id);
+        }
+        return next;
+      });
+      return;
+    }
+
+    setSelectedNode(node);
+    if (node.data.nodeType === 'scene') {
+      setSelectedEventTitle(node.data.label);
+      // Extract description string from object if needed
+      const rawDesc = node.data.description;
+      const description =
+        rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
+          ? String((rawDesc as any).description)
+          : String(rawDesc || '');
+      setSelectedEventDescription(description);
+      // A plain click opens the node in-place — the scene panel on the right
+      // (with its top toolbar: open full page, edit video, regenerate,
+      // delete) is driven off `selectedNode`. It used to navigate straight
+      // to /event/<universe>/<node>, which yanked the user off the timeline
+      // before they could see or edit anything. Full-page navigation now
+      // lives on the panel's "Open" button (see openSelectedNodeEventPage).
+    }
+  }, []);
+
+  // Resolve a scene node to its /event/<universe>/<eventId> page and go there.
+  // Shared by the scene panel's toolbar. `blockchainNodeId !== undefined`
+  // (not `||`) so a genesis/root node with id 0 doesn't fall through to
+  // eventId; draft branch ids get one trailing letter stripped (e.g. "4b" →
+  // "4", "4bb" → "4b") so we land on the nearest already-saved page.
+  const openSelectedNodeEventPage = useCallback(
+    (node: Node<TimelineNodeData> | null) => {
+      if (!node || node.data.nodeType !== 'scene') return;
+      const universeId = node.data.universeId || id;
+      let eventId: string | number | undefined =
+        node.data.blockchainNodeId !== undefined ? node.data.blockchainNodeId : node.data.eventId;
+      if (typeof eventId === 'string') {
+        eventId = eventId.replace(/[a-z]$/i, '') || eventId;
       }
-
-      setSelectedNode(node);
-      if (node.data.nodeType === 'scene') {
-        setSelectedEventTitle(node.data.label);
-        // Extract description string from object if needed
-        const rawDesc = node.data.description;
-        const description =
-          rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
-            ? String((rawDesc as any).description)
-            : String(rawDesc || '');
-        setSelectedEventDescription(description);
-
-        // Navigate to event page with specific event
-        const universeId = node.data.universeId || id;
-        // Use blockchainNodeId if available (for blockchain nodes), otherwise use
-        // eventId. `!== undefined` (not `||`) so a genesis/root node with
-        // blockchainNodeId === 0 doesn't fall through to eventId.
-        let eventId: string | number | undefined =
-          node.data.blockchainNodeId !== undefined ? node.data.blockchainNodeId : node.data.eventId;
-        // Draft branch nodes get a letter-suffixed id (e.g. "4b") before
-        // they're confirmed on-chain — see handleCreateEvent's `branchLetter`.
-        // That id isn't a real event page yet; strip exactly one trailing
-        // letter so we land one level up the draft chain — the immediate
-        // parent's (already-saved) page — rather than jumping straight to
-        // the numeric root. A nested draft branched off an unsaved draft
-        // (e.g. "4bb", branched off still-unsaved "4b") should land on
-        // "4b", not "4".
-        if (typeof eventId === 'string') {
-          eventId = eventId.replace(/[a-z]$/i, '') || eventId;
-        }
-
-        if (eventId !== undefined && eventId !== '' && universeId) {
-          navigate({ to: `/event/${universeId}/${eventId}` });
-        }
+      if (eventId !== undefined && eventId !== '' && universeId) {
+        navigate({ to: `/event/${universeId}/${eventId}` });
       }
     },
-    [id]
+    [id, navigate]
   );
 
   // Update selected node data
@@ -3107,7 +3110,18 @@ function UniverseTimelineEditorInner() {
   // before real data arrived, reading as nodes "disappearing right away".
   // `isLoadingAny` (from useUniverseBlockchain) already accounts for
   // whichever branch — on-chain or off-chain — is actually active.
-  if (isLoadingUniverse || isLoadingAny) {
+  //
+  // The extra `isOnChain === undefined` gate matters for ids that merely
+  // *look* on-chain (start with 0x) but are script-seeded fun-mode
+  // universes: until the universe doc lands, `isOnChain` is undefined and
+  // the hook runs in on-chain mode, firing contract reads against the id as
+  // if it were a Timeline contract. When the doc resolves `isOnChain` flips
+  // to false and the hook hard-switches its data source to the off-chain
+  // node list. Without this gate the canvas renders once in on-chain mode
+  // (briefly showing stale/partial nodes from an earlier deploy, then
+  // nothing) before the off-chain list arrives — the reported "content
+  // loads, nodes vanish, then everything pops back in" flash.
+  if (isLoadingUniverse || (isBlockchainUniverse && isOnChain === undefined) || isLoadingAny) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -4034,9 +4048,10 @@ function UniverseTimelineEditorInner() {
           !showCreatorsRoom &&
           !showCastManager && (
             <div className="w-[320px] border-l border-zinc-800 bg-zinc-950 overflow-hidden flex flex-col shrink-0">
+              {/* Identity row */}
               <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
-                <span className="text-sm text-zinc-400 truncate">
-                  {selectedNode.data.displayName || selectedNode.data.eventId}
+                <span className="text-sm font-medium text-zinc-200 truncate">
+                  {selectedNode.data.displayName || `Event ${selectedNode.data.eventId}`}
                 </span>
                 <div className="flex items-center gap-1 shrink-0">
                   <Button
@@ -4053,10 +4068,58 @@ function UniverseTimelineEditorInner() {
                     size="sm"
                     onClick={() => setSelectedNode(null)}
                     className="text-zinc-500 hover:text-white h-6 w-6 p-0"
+                    title="Close"
                   >
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
+              </div>
+              {/* Action toolbar */}
+              <div className="flex items-center gap-1 px-2 py-1.5 border-b border-zinc-800 bg-zinc-900/60">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleEditScene(selectedNode.data.eventId || '')}
+                  className="h-7 px-2 text-xs text-zinc-300 hover:text-white gap-1.5"
+                  title="Change or trim the video"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Edit video
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleRegenerateScene(selectedNode.data.eventId || '')}
+                  disabled={!!regeneratingEventId}
+                  className="h-7 px-2 text-xs text-zinc-300 hover:text-white gap-1.5"
+                  title="Regenerate this scene's video"
+                >
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 ${
+                      regeneratingEventId === selectedNode.data.eventId ? 'animate-spin' : ''
+                    }`}
+                  />
+                  Regenerate
+                </Button>
+                <div className="flex-1" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => openSelectedNodeEventPage(selectedNode)}
+                  className="h-7 w-7 p-0 text-zinc-400 hover:text-white"
+                  title="Open full event page"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDeleteNode(selectedNode.data.eventId || '')}
+                  className="h-7 w-7 p-0 text-red-400/80 hover:text-red-400 hover:bg-red-500/10"
+                  title="Delete this node"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
               </div>
               <div className="flex-1 overflow-y-auto p-3">
                 {/* Motion Brush overlay */}

@@ -335,12 +335,26 @@ export function useUniverseBlockchain({
   // ── Off-chain timeline nodes (Fun-Mode universes) ──
   // Only loads when this universe is explicitly off-chain. On-chain universes
   // never fall back to off-chain — keeps data sources strictly separated.
-  const { data: offChainData, isLoading: isLoadingOffChain } = useQuery({
+  const {
+    data: offChainData,
+    isLoading: rqIsLoadingOffChain,
+    status: offChainStatus,
+  } = useQuery({
     queryKey: ['offChainNodes', universeId],
     queryFn: () => trpcClient.offChainNodes.list.query({ universeId }),
     enabled: !!universeId && useOffChain,
     staleTime: 30_000,
   });
+  // react-query's `isLoading` is `isPending && isFetching`, so on the single
+  // render where this query flips disabled→enabled (the universe doc just
+  // resolved `isOnChain` to false for a 0x-looking fun-mode id) it's still
+  // `false` — the fetch hasn't been kicked off yet. That one frame let the
+  // canvas mount with zero nodes before the off-chain list arrived, reading
+  // as the timeline loading, blanking, then re-populating. Treat "enabled but
+  // not yet settled" as loading. The query is guaranteed to settle (success
+  // or error) whenever `useOffChain` is true, so this can't hang.
+  const isLoadingOffChain =
+    rqIsLoadingOffChain || (useOffChain && !!universeId && offChainStatus === 'pending');
 
   const graphData = useMemo(() => {
     // ── On-chain branch ──

@@ -29,6 +29,11 @@ const account = privateKeyToAccount(PRIVATE_KEY);
 // ── Universe address — update after deployment ──────────────────────────
 const UNIVERSE_ADDR = process.env.SPACE_FLEET_ADDR ?? '0x0000000000000000000000000000000000000000';
 
+// ── Image model — pinned to Nano Banana ────────────────────────────────
+// Override with IMAGE_MODEL_ID (e.g. 'nano-banana-google-ga' for the
+// Gemini 2.5 Flash Image "original Nano Banana", or 'nano-banana-pro').
+const IMAGE_MODEL_ID = process.env.IMAGE_MODEL_ID ?? 'nano-banana';
+
 // ── Entity definitions ──────────────────────────────────────────────────
 interface EntityDef {
   name: string;
@@ -553,6 +558,7 @@ async function main() {
   console.log('  SPACE FLEET — Wiki Population');
   console.log('  Pilot Episode: "Nothing to See Here"');
   console.log('  ' + ENTITIES.length + ' entities across all categories');
+  console.log('  Image model: ' + IMAGE_MODEL_ID + ' (Nano Banana)');
   console.log('═'.repeat(60));
 
   if (UNIVERSE_ADDR === '0x0000000000000000000000000000000000000000') {
@@ -590,8 +596,9 @@ async function main() {
           task: 'text_to_image',
           imageSize: 'square_hd',
           numImages: 1,
-          routingMode: 'auto',
-          qualityTarget: 'premium',
+          routingMode: 'manual',
+          selectedModelId: IMAGE_MODEL_ID,
+          allowFallback: false,
           universeId: UNIVERSE_ADDR,
         },
         token
