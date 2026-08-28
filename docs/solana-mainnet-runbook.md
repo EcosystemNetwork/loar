@@ -1,6 +1,8 @@
 # Solana Mainnet Runbook
 
-> **⚠️ STATUS: PLANNED / FUTURE CHAIN — NOT YET ACTIVE.** Solana is not part of the current LOAR build. LOAR runs on **Ethereum only** today (Sepolia testnet — contracts live; Mainnet wired). The Solana stack described here was prototyped on **devnet** and has been **removed from the active codebase and archived for a future restore** (branch `archive/solana-base-support`, tag `solana-base-snapshot`). This runbook is the design spec for taking Solana from devnet prototype to `mainnet-beta` once the integration is brought back online — it does not describe a live deployment. Script paths and `solana-addresses.ts` references below point at the archived prototype.
+> **⚠️ STATUS: RESTORATION IN PROGRESS (2026-08-27) — see [solana-parity-restoration-plan.md](./solana-parity-restoration-plan.md).** The Solana stack is being restored to `main` for true multi-chain parity (Phases 1–5 landed: Anchor programs, indexer, server, web, mobile; devnet redeploy + on-chain verification pending Phase 7). The note that follows is retained as historical context — it describes the archived devnet prototype this restoration is rebuilt from.
+>
+> _(original status)_ Solana is not part of the current LOAR build. LOAR runs on **Ethereum only** today (Sepolia testnet — contracts live; Mainnet wired). The Solana stack described here was prototyped on **devnet** and has been **removed from the active codebase and archived for a future restore** (branch `archive/solana-base-support`, tag `solana-base-snapshot`). This runbook is the design spec for taking Solana from devnet prototype to `mainnet-beta` once the integration is brought back online — it does not describe a live deployment. Script paths and `solana-addresses.ts` references below point at the archived prototype.
 
 Migration path from the archived devnet prototype to `mainnet-beta`.
 Devnet program IDs + addresses were committed in

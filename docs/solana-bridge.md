@@ -1,6 +1,8 @@
 # $LOAR Cross-chain Bridge
 
-> **⚠️ STATUS: PLANNED / FUTURE CHAIN — NOT YET ACTIVE.** The Solana side of this bridge is not part of the current LOAR build. LOAR runs on **Ethereum only** today (Sepolia testnet — contracts live; Mainnet wired). This cross-chain bridge was prototyped on **devnet** and has been **removed from the active codebase and archived for a future restore** (branch `archive/solana-base-support`, tag `solana-base-snapshot`). This document is the design + trust-model spec for when the Solana bridge is brought back online — it does not describe anything currently running. Route and script paths below refer to the archived prototype.
+> **⚠️ STATUS: RESTORATION IN PROGRESS (2026-08-27) — see [solana-parity-restoration-plan.md](./solana-parity-restoration-plan.md).** The Solana stack is being restored to `main` for true multi-chain parity (Phases 1–5 landed: Anchor programs, indexer, server, web, mobile; devnet redeploy + on-chain verification pending Phase 7). The note that follows is retained as historical context — it describes the archived devnet prototype this restoration is rebuilt from.
+>
+> _(original status)_ The Solana side of this bridge is not part of the current LOAR build. LOAR runs on **Ethereum only** today (Sepolia testnet — contracts live; Mainnet wired). This cross-chain bridge was prototyped on **devnet** and has been **removed from the active codebase and archived for a future restore** (branch `archive/solana-base-support`, tag `solana-base-snapshot`). This document is the design + trust-model spec for when the Solana bridge is brought back online — it does not describe anything currently running. Route and script paths below refer to the archived prototype.
 
 Two backends, designed to be picked at runtime by env config:
 
