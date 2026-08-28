@@ -1,0 +1,24 @@
+[package]
+name = "licensing"
+version = "0.1.0"
+description = "LOAR Licensing program — Solana sister to apps/contracts/src/revenue/ContentLicensing.sol (BUY only in v1)"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "licensing"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "rights/idl-build"]
+
+[dependencies]
+anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
+# Depend on the rights crate to import the `Rights` account + `RightsType` enum
+# so we can enforce `is_monetizable()` at registration without duplicating the
+# schema. `cpi` feature strips the entrypoint — we only need the types.
+rights = { path = "../rights", features = ["cpi"] }

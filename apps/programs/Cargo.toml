@@ -1,0 +1,29 @@
+[workspace]
+resolver = "2"
+members = [
+  "programs/universe",
+  "programs/episode",
+  "programs/payment",
+  "programs/rights",
+  "programs/licensing",
+  "programs/split_router",
+  "programs/staking",
+  "programs/credit_manager",
+  "programs/subscription",
+  "programs/remix_fees",
+  "programs/bonding_curve",
+  "programs/canon_market",
+  "programs/fee_locker",
+  "programs/premium_actions",
+  "programs/collab_manager",
+]
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1

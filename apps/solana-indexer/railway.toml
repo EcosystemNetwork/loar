@@ -1,0 +1,26 @@
+# Railway deploy config for the LOAR Solana indexer.
+#
+# Use: from the repo root, point Railway's "Root Directory" at apps/solana-indexer
+# and Railway will pick up this file. The Dockerfile builds from the monorepo
+# root (it needs pnpm-workspace.yaml + packages/abis), so the build context
+# must be the repo root — set "Build Context" to ".." in Railway settings.
+#
+# Required env vars (set in Railway dashboard):
+#   FIREBASE_SERVICE_ACCOUNT     JSON string, Firebase Admin
+#   HELIUS_WEBHOOK_SECRET        shared with the webhook config in Helius
+#   UNIVERSE_PROGRAM_ID          6YTQVSeauk4x5gycMM2wzkR8mdHEnHAYsz3Ygg26UPtD
+#   EPISODE_PROGRAM_ID           voLiAXoYbq8go1CUS9UshQRZnNu9Y44qNBZ6czgn8Bs
+#   SOLANA_CLUSTER               devnet | mainnet-beta
+#   LOG_LEVEL                    info (default) | debug
+#   NODE_ENV                     production
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "apps/solana-indexer/Dockerfile"
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
+# Match the Dockerfile EXPOSE — Railway probes whatever port we advertise.
+healthcheckPath = "/healthz"
+healthcheckTimeout = 10

@@ -1,0 +1,23 @@
+[package]
+name = "split_router"
+version = "0.1.0"
+description = "LOAR SplitRouter — Solana sister to apps/contracts/src/SplitRouter.sol"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "split_router"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+# `init-if-needed` is required for `set_splits`: first call creates the Splits
+# PDA, subsequent calls update it. PDA uniqueness via entity_hash seed
+# prevents re-init attacks.
+anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }

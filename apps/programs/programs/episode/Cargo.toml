@@ -1,0 +1,21 @@
+[package]
+name = "episode"
+version = "0.1.0"
+description = "LOAR Episode program — cNFT mints (Bubblegum CPI) + canon promotion path"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "episode"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+anchor-lang = "0.31.1"
+universe = { path = "../universe", features = ["cpi"] }

@@ -1,0 +1,25 @@
+[package]
+name = "canon_market"
+version = "0.1.0"
+description = "LOAR CanonMarketplace — Solana sister to apps/contracts/src/revenue/CanonMarketplace.sol"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "canon_market"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "universe/idl-build", "bonding_curve/idl-build"]
+
+[dependencies]
+anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
+anchor-spl = { version = "0.31.1", features = ["token", "associated_token"] }
+universe = { path = "../universe", features = ["cpi"] }
+# Source the universe's voting-token mint from the Curve PDA — guarantees
+# canon votes use the canonical bonding-curve-minted token (CANON-01 analog).
+bonding_curve = { path = "../bonding_curve", features = ["cpi"] }

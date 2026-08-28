@@ -4,6 +4,8 @@ packages:
   - 'apps/indexer'
   - 'apps/event-listener'
   - 'apps/contracts'
+  - 'apps/programs'
+  - 'apps/solana-indexer'
   - 'apps/mcp'
   - 'apps/mcp-gateway'
   - 'apps/mobile'

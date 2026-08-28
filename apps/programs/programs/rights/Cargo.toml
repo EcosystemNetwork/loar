@@ -1,0 +1,23 @@
+[package]
+name = "rights"
+version = "0.1.0"
+description = "LOAR Rights program — Solana attestation-driven cache for apps/contracts/src/RightsRegistry.sol"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "rights"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+# `init-if-needed` is required for the rights PDA write path: the first
+# attestation creates the Rights account, subsequent ones update it. PDA
+# uniqueness via the content_hash seed prevents re-init attacks.
+anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
