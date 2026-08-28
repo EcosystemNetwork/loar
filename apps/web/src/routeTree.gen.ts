@@ -19,6 +19,7 @@ import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
 import { Route as StudioControlledRouteImport } from './routes/studio-controlled'
 import { Route as StudioRouteImport } from './routes/studio'
 import { Route as StatusRouteImport } from './routes/status'
+import { Route as SolanaRouteImport } from './routes/solana'
 import { Route as SeriesRouteImport } from './routes/series'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SandboxRouteImport } from './routes/sandbox'
@@ -47,6 +48,7 @@ import { Route as ComingSoonRouteImport } from './routes/coming-soon'
 import { Route as CinematicUniverseCreateRouteImport } from './routes/cinematicUniverseCreate'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as CanvasRouteImport } from './routes/canvas'
+import { Route as BridgeRouteImport } from './routes/bridge'
 import { Route as ArcRouteImport } from './routes/arc'
 import { Route as AdReferenceRouteImport } from './routes/ad-reference'
 import { Route as ActivityRouteImport } from './routes/activity'
@@ -192,6 +194,11 @@ const StatusRoute = StatusRouteImport.update({
   path: '/status',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SolanaRoute = SolanaRouteImport.update({
+  id: '/solana',
+  path: '/solana',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SeriesRoute = SeriesRouteImport.update({
   id: '/series',
   path: '/series',
@@ -330,6 +337,11 @@ const CheckoutRoute = CheckoutRouteImport.update({
 const CanvasRoute = CanvasRouteImport.update({
   id: '/canvas',
   path: '/canvas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BridgeRoute = BridgeRouteImport.update({
+  id: '/bridge',
+  path: '/bridge',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ArcRoute = ArcRouteImport.update({
@@ -812,6 +824,7 @@ export interface FileRoutesByFullPath {
   '/activity': typeof ActivityRoute
   '/ad-reference': typeof AdReferenceRoute
   '/arc': typeof ArcRoute
+  '/bridge': typeof BridgeRoute
   '/canvas': typeof CanvasRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
@@ -840,6 +853,7 @@ export interface FileRoutesByFullPath {
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
   '/series': typeof SeriesRoute
+  '/solana': typeof SolanaRoute
   '/status': typeof StatusRoute
   '/studio': typeof StudioRouteWithChildren
   '/studio-controlled': typeof StudioControlledRoute
@@ -946,6 +960,7 @@ export interface FileRoutesByTo {
   '/activity': typeof ActivityRoute
   '/ad-reference': typeof AdReferenceRoute
   '/arc': typeof ArcRoute
+  '/bridge': typeof BridgeRoute
   '/canvas': typeof CanvasRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
@@ -974,6 +989,7 @@ export interface FileRoutesByTo {
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
   '/series': typeof SeriesRoute
+  '/solana': typeof SolanaRoute
   '/status': typeof StatusRoute
   '/studio': typeof StudioRouteWithChildren
   '/studio-controlled': typeof StudioControlledRoute
@@ -1081,6 +1097,7 @@ export interface FileRoutesById {
   '/activity': typeof ActivityRoute
   '/ad-reference': typeof AdReferenceRoute
   '/arc': typeof ArcRoute
+  '/bridge': typeof BridgeRoute
   '/canvas': typeof CanvasRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
@@ -1109,6 +1126,7 @@ export interface FileRoutesById {
   '/sandbox': typeof SandboxRoute
   '/search': typeof SearchRoute
   '/series': typeof SeriesRoute
+  '/solana': typeof SolanaRoute
   '/status': typeof StatusRoute
   '/studio': typeof StudioRouteWithChildren
   '/studio-controlled': typeof StudioControlledRoute
@@ -1217,6 +1235,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/ad-reference'
     | '/arc'
+    | '/bridge'
     | '/canvas'
     | '/checkout'
     | '/cinematicUniverseCreate'
@@ -1245,6 +1264,7 @@ export interface FileRouteTypes {
     | '/sandbox'
     | '/search'
     | '/series'
+    | '/solana'
     | '/status'
     | '/studio'
     | '/studio-controlled'
@@ -1351,6 +1371,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/ad-reference'
     | '/arc'
+    | '/bridge'
     | '/canvas'
     | '/checkout'
     | '/cinematicUniverseCreate'
@@ -1379,6 +1400,7 @@ export interface FileRouteTypes {
     | '/sandbox'
     | '/search'
     | '/series'
+    | '/solana'
     | '/status'
     | '/studio'
     | '/studio-controlled'
@@ -1485,6 +1507,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/ad-reference'
     | '/arc'
+    | '/bridge'
     | '/canvas'
     | '/checkout'
     | '/cinematicUniverseCreate'
@@ -1513,6 +1536,7 @@ export interface FileRouteTypes {
     | '/sandbox'
     | '/search'
     | '/series'
+    | '/solana'
     | '/status'
     | '/studio'
     | '/studio-controlled'
@@ -1620,6 +1644,7 @@ export interface RootRouteChildren {
   ActivityRoute: typeof ActivityRoute
   AdReferenceRoute: typeof AdReferenceRoute
   ArcRoute: typeof ArcRoute
+  BridgeRoute: typeof BridgeRoute
   CanvasRoute: typeof CanvasRouteWithChildren
   CheckoutRoute: typeof CheckoutRoute
   CinematicUniverseCreateRoute: typeof CinematicUniverseCreateRoute
@@ -1648,6 +1673,7 @@ export interface RootRouteChildren {
   SandboxRoute: typeof SandboxRoute
   SearchRoute: typeof SearchRoute
   SeriesRoute: typeof SeriesRoute
+  SolanaRoute: typeof SolanaRoute
   StatusRoute: typeof StatusRoute
   StudioRoute: typeof StudioRouteWithChildren
   StudioControlledRoute: typeof StudioControlledRoute
@@ -1803,6 +1829,13 @@ declare module '@tanstack/react-router' {
       path: '/status'
       fullPath: '/status'
       preLoaderRoute: typeof StatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/solana': {
+      id: '/solana'
+      path: '/solana'
+      fullPath: '/solana'
+      preLoaderRoute: typeof SolanaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/series': {
@@ -1999,6 +2032,13 @@ declare module '@tanstack/react-router' {
       path: '/canvas'
       fullPath: '/canvas'
       preLoaderRoute: typeof CanvasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bridge': {
+      id: '/bridge'
+      path: '/bridge'
+      fullPath: '/bridge'
+      preLoaderRoute: typeof BridgeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/arc': {
@@ -2776,6 +2816,7 @@ const rootRouteChildren: RootRouteChildren = {
   ActivityRoute: ActivityRoute,
   AdReferenceRoute: AdReferenceRoute,
   ArcRoute: ArcRoute,
+  BridgeRoute: BridgeRoute,
   CanvasRoute: CanvasRouteWithChildren,
   CheckoutRoute: CheckoutRoute,
   CinematicUniverseCreateRoute: CinematicUniverseCreateRoute,
@@ -2804,6 +2845,7 @@ const rootRouteChildren: RootRouteChildren = {
   SandboxRoute: SandboxRoute,
   SearchRoute: SearchRoute,
   SeriesRoute: SeriesRoute,
+  SolanaRoute: SolanaRoute,
   StatusRoute: StatusRoute,
   StudioRoute: StudioRouteWithChildren,
   StudioControlledRoute: StudioControlledRoute,
