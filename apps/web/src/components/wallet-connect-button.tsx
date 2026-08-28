@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useWalletAuth, getAuthEmail } from '@/lib/wallet-auth';
+import { useCircleSolanaAddress } from '@/hooks/useCircleSolanaAddress';
 import { useUnstoppableDomain, formatDisplayName } from '@/hooks/useUnstoppableDomain';
 
 interface WalletConnectButtonProps {
@@ -17,11 +18,19 @@ interface WalletConnectButtonProps {
 }
 
 export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ className = '' }) => {
-  const { address, isAuthenticated, signOut } = useWalletAuth();
+  const { address, solanaAddress: sessionSolana, isAuthenticated, signOut } = useWalletAuth();
   const { name: udName } = useUnstoppableDomain(address);
   const displayName = formatDisplayName(address, udName);
   const email = getAuthEmail();
   const [showMenu, setShowMenu] = useState(false);
+
+  // Prefer the address stored at sign-up; fall back to the lazy Circle lookup
+  // for sessions created before Solana was wired (or before this field existed).
+  // The fetch only fires when the menu is open and we don't already have one.
+  const { address: fetchedSolana } = useCircleSolanaAddress(
+    isAuthenticated && showMenu && !sessionSolana
+  );
+  const solanaAddress = sessionSolana ?? fetchedSolana ?? undefined;
 
   if (isAuthenticated && address) {
     return (
@@ -66,6 +75,12 @@ export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ classN
                 <p className="text-xs text-white/50">Wallet (EVM)</p>
                 <p className="text-xs text-white/60 font-mono break-all">{address}</p>
               </div>
+              {solanaAddress && (
+                <div className="px-4 py-3 border-b border-white/10">
+                  <p className="text-xs text-white/50">Wallet (Solana)</p>
+                  <p className="text-xs text-white/60 font-mono break-all">{solanaAddress}</p>
+                </div>
+              )}
               <button
                 onClick={() => {
                   setShowMenu(false);

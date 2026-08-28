@@ -17,6 +17,7 @@ const ADDRESS_KEY = 'siwe-address';
 const EXPIRY_KEY = 'siwe-expiry';
 const EMAIL_KEY = 'circle-email';
 const WALLET_ID_KEY = 'circle-wallet-id';
+const SOLANA_ADDRESS_KEY = 'circle-solana-address'; // set at sign-up when Solana is configured
 const AUTH_PROVIDER_KEY = 'auth-provider'; // 'circle' | 'siwe'
 
 const SERVER_URL = BASE_SERVER_URL || 'http://localhost:3000';
@@ -44,9 +45,18 @@ function getServerSnapshot(): string | null {
   return null;
 }
 
+function getSolanaSnapshot(): string | null {
+  return localStorage.getItem(SOLANA_ADDRESS_KEY);
+}
+
 /** Get the authenticated wallet address (for UI display). */
 export function getSiweAddress(): string | null {
   return localStorage.getItem(ADDRESS_KEY);
+}
+
+/** The Circle-managed Solana address, when one was provisioned at sign-up. */
+export function getAuthSolanaAddress(): string | null {
+  return localStorage.getItem(SOLANA_ADDRESS_KEY);
 }
 
 /**
@@ -69,7 +79,13 @@ export function getSiweToken(): string | null {
   return hasSession() ? '__httpOnly__' : null;
 }
 
-function setSession(address: string, expiresAt: number, email?: string, walletId?: string) {
+function setSession(
+  address: string,
+  expiresAt: number,
+  email?: string,
+  walletId?: string,
+  solanaAddress?: string
+) {
   // Security: if a *different* user is signing in over an existing session in
   // the same tab (e.g. user B logs in via email/social without user A signing
   // out first), wipe the React Query cache before storing the new identity.
@@ -87,6 +103,10 @@ function setSession(address: string, expiresAt: number, email?: string, walletId
   localStorage.setItem(EXPIRY_KEY, String(expiresAt));
   if (email) localStorage.setItem(EMAIL_KEY, email);
   if (walletId) localStorage.setItem(WALLET_ID_KEY, walletId);
+  // Solana address is present only when the server has Solana configured. Clear
+  // any stale value on a same-tab identity switch; set the fresh one otherwise.
+  if (solanaAddress) localStorage.setItem(SOLANA_ADDRESS_KEY, solanaAddress);
+  else localStorage.removeItem(SOLANA_ADDRESS_KEY);
   emitChange();
   // Stitch pre-login anonymous analytics to this wallet. Fire-and-forget.
   void import('./analytics').then(({ identifyUser, track }) => {
@@ -128,6 +148,7 @@ export function clearSiweSession(revoke = false) {
   localStorage.removeItem(EXPIRY_KEY);
   localStorage.removeItem(EMAIL_KEY);
   localStorage.removeItem(WALLET_ID_KEY);
+  localStorage.removeItem(SOLANA_ADDRESS_KEY);
   localStorage.removeItem(AUTH_PROVIDER_KEY);
   emitChange();
 
@@ -275,7 +296,13 @@ export async function requestEmailOTP(
 export async function verifyEmailOTP(
   email: string,
   code: string
-): Promise<{ address: string; email: string; walletId: string; expiresAt: number }> {
+): Promise<{
+  address: string;
+  email: string;
+  walletId: string;
+  expiresAt: number;
+  solanaAddress?: string;
+}> {
   const res = await fetch(`${SERVER_URL}/auth/circle/verify-otp`, {
     method: 'POST',
     credentials: 'include',
@@ -290,7 +317,7 @@ export async function verifyEmailOTP(
 
   const result = await res.json();
   localStorage.setItem(AUTH_PROVIDER_KEY, 'circle');
-  setSession(result.address, result.expiresAt, result.email, result.walletId);
+  setSession(result.address, result.expiresAt, result.email, result.walletId, result.solanaAddress);
   return result;
 }
 
@@ -302,7 +329,13 @@ export async function verifyEmailOTP(
 export async function socialLogin(
   provider: 'google',
   idToken: string
-): Promise<{ address: string; email: string; walletId: string; expiresAt: number }> {
+): Promise<{
+  address: string;
+  email: string;
+  walletId: string;
+  expiresAt: number;
+  solanaAddress?: string;
+}> {
   const res = await fetch(`${SERVER_URL}/auth/circle/social`, {
     method: 'POST',
     credentials: 'include',
@@ -317,7 +350,7 @@ export async function socialLogin(
 
   const result = await res.json();
   localStorage.setItem(AUTH_PROVIDER_KEY, 'circle');
-  setSession(result.address, result.expiresAt, result.email, result.walletId);
+  setSession(result.address, result.expiresAt, result.email, result.walletId, result.solanaAddress);
   return result;
 }
 
@@ -350,6 +383,12 @@ export function useWalletAuth() {
   const address = storedAddress as `0x${string}` | undefined;
   const isConnected = validated && !!storedAddress;
   const isAuthenticated = validated && !!storedAddress;
+
+  // Circle-managed Solana address — present only when the server has Solana
+  // configured and provisioned one at sign-up. `undefined` on EVM-only builds
+  // and for pre-Solana sessions until the user signs in again.
+  const solanaSnapshot = useSyncExternalStore(subscribe, getSolanaSnapshot, getServerSnapshot);
+  const solanaAddress = (solanaSnapshot ?? undefined) as string | undefined;
 
   /** Sign in with email OTP (Circle flow). */
   const signInWithEmail = useCallback(async (email: string, code: string) => {
@@ -386,6 +425,7 @@ export function useWalletAuth() {
 
   return {
     address,
+    solanaAddress,
     isConnected,
     isAuthenticated,
     /**
