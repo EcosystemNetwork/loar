@@ -122,6 +122,7 @@ Current state: `LoarLpLockerMultiple` locks LP **permanently** (no time-based un
   - See: `apps/server/src/middleware/rate-limit.ts`
 
 - [x] **#8 Multi-Chain Cleanup** — Removed Solana, SUI, Base, and bridge scaffolding (Ethereum only; Solana + Base are planned future chains, prototyped and archived in branch `archive/solana-base-support`)
+  - **Superseded 2026-08-27:** the Solana stack has since been restored to `main` for true multi-chain parity (Anchor programs, indexer, server routes, web chain selector, custodial bridge). It stays dormant until the build sets `SOLANA_RPC_URL` / `VITE_SOLANA_CLUSTER`. Devnet redeploy is Phase 7 — see [solana-parity-restoration-plan.md](./solana-parity-restoration-plan.md). SUI and Base remain out.
 
 ---
 
