@@ -24,8 +24,8 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pino from 'pino';
-import { decodeEventsFromTx } from './anchor-events';
-import { KNOWN_PROGRAM_IDS, PROGRAMS } from './program-registry';
+import { decodeEventsFromTx } from './anchor-events.js';
+import { KNOWN_PROGRAM_IDS, PROGRAMS } from './program-registry.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

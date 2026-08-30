@@ -1,0 +1,1065 @@
+{
+  "address": "5JdzozEXeto8CRgUZmLqrtwkGtt8smpaM4vhahW1gNLs",
+  "metadata": {
+    "name": "remix_fees",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "LOAR RemixFees — Solana sister to apps/contracts/src/revenue/RemixFees.sol"
+  },
+  "instructions": [
+    {
+      "name": "accept_admin",
+      "discriminator": [112, 42, 45, 90, 116, 181, 13, 170],
+      "accounts": [
+        {
+          "name": "new_admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114, 101, 109, 105, 120, 95, 102, 101, 101, 115, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "charge_remix_fee",
+      "docs": [
+        "Pay the remix fee for content from `universe`. Splits 3 ways:",
+        "- creator share → `original_creator` ATA",
+        "- LP share      → `liquidity_pool` ATA",
+        "- treasury      → `treasury` ATA",
+        "",
+        "Uses `universe_fee.fee` when custom set, else `config.default_remix_fee`."
+      ],
+      "discriminator": [254, 163, 18, 246, 203, 112, 121, 74],
+      "accounts": [
+        {
+          "name": "remixer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114, 101, 109, 105, 120, 95, 102, 101, 101, 115, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "loar_mint"
+        },
+        {
+          "name": "universe_account"
+        },
+        {
+          "name": "universe_fee",
+          "docs": [
+            "Optional per-universe fee override. Default-state account works fine",
+            "when the universe hasn't set a custom fee (custom_fee = false)."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [117, 110, 105, 118, 101, 114, 115, 101, 95, 102, 101, 101]
+              },
+              {
+                "kind": "arg",
+                "path": "universe"
+              }
+            ]
+          }
+        },
+        {
+          "name": "remixer_ata",
+          "docs": ["Remixer's $LOAR ATA (source)."],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "remixer"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28,
+                  180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "loar_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142, 13, 131, 11, 90, 19,
+                153, 218, 255, 16, 132, 4, 142, 123, 216, 219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "original_creator",
+          "docs": ["`universe_account.creator` in handler."]
+        },
+        {
+          "name": "creator_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "original_creator"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28,
+                  180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "loar_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142, 13, 131, 11, 90, 19,
+                153, 218, 255, 16, 132, 4, 142, 123, 216, 219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "lp_ata",
+          "docs": [
+            "LP ATA receives lp_cut. `lp_ata.owner` is validated to match",
+            "`config.liquidity_pool` in handler."
+          ],
+          "writable": true
+        },
+        {
+          "name": "treasury_ata",
+          "docs": [
+            "Treasury ATA receives treasury_cut. `treasury_ata.owner` is validated",
+            "to match `config.treasury` in handler."
+          ],
+          "writable": true
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "_universe",
+          "type": "pubkey"
+        },
+        {
+          "name": "content_hash",
+          "type": {
+            "array": ["u8", 32]
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize_config",
+      "discriminator": [208, 127, 21, 1, 194, 190, 196, 70],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "loar_mint"
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114, 101, 109, 105, 120, 95, 102, 101, 101, 115, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "treasury",
+          "type": "pubkey"
+        },
+        {
+          "name": "liquidity_pool",
+          "type": "pubkey"
+        },
+        {
+          "name": "default_remix_fee",
+          "type": "u64"
+        },
+        {
+          "name": "min_remix_fee",
+          "type": "u64"
+        },
+        {
+          "name": "creator_share_bps",
+          "type": "u16"
+        },
+        {
+          "name": "lp_share_bps",
+          "type": "u16"
+        },
+        {
+          "name": "treasury_share_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "pause",
+      "discriminator": [211, 22, 221, 251, 74, 121, 193, 47],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114, 101, 109, 105, 120, 95, 102, 101, 101, 115, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_default_fee",
+      "discriminator": [150, 137, 197, 111, 176, 227, 201, 110],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114, 101, 109, 105, 120, 95, 102, 101, 101, 115, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "default_fee",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_liquidity_pool",
+      "discriminator": [172, 60, 24, 87, 141, 99, 99, 121],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114, 101, 109, 105, 120, 95, 102, 101, 101, 115, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "lp",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_min_fee",
+      "discriminator": [114, 198, 35, 3, 41, 196, 194, 246],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114, 101, 109, 105, 120, 95, 102, 101, 101, 115, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "min_fee",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_split_bps",
+      "discriminator": [112, 236, 94, 252, 59, 91, 88, 11],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114, 101, 109, 105, 120, 95, 102, 101, 101, 115, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "creator_share_bps",
+          "type": "u16"
+        },
+        {
+          "name": "lp_share_bps",
+          "type": "u16"
+        },
+        {
+          "name": "treasury_share_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "set_treasury",
+      "discriminator": [57, 97, 196, 95, 195, 206, 106, 136],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114, 101, 109, 105, 120, 95, 102, 101, 101, 115, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "treasury",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_universe_fee",
+      "docs": [
+        "Set a per-universe remix fee. Caller must be the universe's current",
+        "creator (read live from Universe PDA) OR the admin."
+      ],
+      "discriminator": [38, 84, 43, 233, 245, 114, 31, 245],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114, 101, 109, 105, 120, 95, 102, 101, 101, 115, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "universe_account"
+        },
+        {
+          "name": "universe_fee",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [117, 110, 105, 118, 101, 114, 115, 101, 95, 102, 101, 101]
+              },
+              {
+                "kind": "arg",
+                "path": "universe"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "_universe",
+          "type": "pubkey"
+        },
+        {
+          "name": "fee",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "transfer_admin",
+      "discriminator": [42, 242, 66, 106, 228, 10, 111, 156],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114, 101, 109, 105, 120, 95, 102, 101, 101, 115, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "unpause",
+      "discriminator": [169, 144, 4, 38, 10, 141, 188, 255],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114, 101, 109, 105, 120, 95, 102, 101, 101, 115, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [155, 12, 170, 224, 30, 250, 204, 130]
+    },
+    {
+      "name": "Universe",
+      "discriminator": [86, 112, 227, 226, 88, 47, 242, 113]
+    },
+    {
+      "name": "UniverseFee",
+      "discriminator": [48, 78, 107, 156, 233, 48, 193, 132]
+    }
+  ],
+  "events": [
+    {
+      "name": "AdminTransferProposed",
+      "discriminator": [203, 168, 175, 51, 239, 104, 20, 85]
+    },
+    {
+      "name": "AdminTransferred",
+      "discriminator": [255, 147, 182, 5, 199, 217, 38, 179]
+    },
+    {
+      "name": "ConfigInitialized",
+      "discriminator": [181, 49, 200, 156, 19, 167, 178, 91]
+    },
+    {
+      "name": "DefaultFeeUpdated",
+      "discriminator": [24, 157, 176, 84, 53, 135, 232, 155]
+    },
+    {
+      "name": "LpUpdated",
+      "discriminator": [7, 235, 21, 229, 36, 1, 216, 31]
+    },
+    {
+      "name": "MinFeeUpdated",
+      "discriminator": [221, 25, 29, 132, 65, 42, 213, 254]
+    },
+    {
+      "name": "Paused",
+      "discriminator": [172, 248, 5, 253, 49, 255, 255, 232]
+    },
+    {
+      "name": "RemixFeeCharged",
+      "discriminator": [14, 244, 76, 232, 11, 67, 44, 54]
+    },
+    {
+      "name": "SplitUpdated",
+      "discriminator": [110, 85, 143, 135, 98, 156, 185, 91]
+    },
+    {
+      "name": "TreasuryUpdated",
+      "discriminator": [80, 239, 54, 168, 43, 38, 85, 145]
+    },
+    {
+      "name": "UniverseFeeUpdated",
+      "discriminator": [81, 108, 125, 95, 6, 6, 160, 150]
+    },
+    {
+      "name": "Unpaused",
+      "discriminator": [156, 150, 47, 174, 120, 216, 93, 117]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Only the configured admin may perform this action"
+    },
+    {
+      "code": 6001,
+      "name": "NotCreatorOrAdmin",
+      "msg": "Caller must be the universe creator or admin"
+    },
+    {
+      "code": 6002,
+      "name": "ZeroAddress",
+      "msg": "Address cannot be the zero pubkey"
+    },
+    {
+      "code": 6003,
+      "name": "ZeroHash",
+      "msg": "Content hash cannot be all zeros"
+    },
+    {
+      "code": 6004,
+      "name": "FeeBelowMin",
+      "msg": "Fee is below the configured minimum"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidSplitTotal",
+      "msg": "Split shares must sum to exactly 10000 basis points"
+    },
+    {
+      "code": 6006,
+      "name": "MintMismatch",
+      "msg": "Provided LOAR mint does not match Config.loar_mint"
+    },
+    {
+      "code": 6007,
+      "name": "UniverseMismatch",
+      "msg": "Universe argument does not match supplied Universe account"
+    },
+    {
+      "code": 6008,
+      "name": "CreatorMismatch",
+      "msg": "Original creator pubkey does not match Universe.creator"
+    },
+    {
+      "code": 6009,
+      "name": "TreasuryMismatch",
+      "msg": "Treasury ATA owner does not match Config.treasury"
+    },
+    {
+      "code": 6010,
+      "name": "LpMismatch",
+      "msg": "LP ATA owner does not match Config.liquidity_pool"
+    },
+    {
+      "code": 6011,
+      "name": "MathOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6012,
+      "name": "Paused",
+      "msg": "Program is paused"
+    },
+    {
+      "code": 6013,
+      "name": "AlreadyPaused",
+      "msg": "Cannot pause: already paused"
+    },
+    {
+      "code": 6014,
+      "name": "NotPaused",
+      "msg": "Cannot unpause: not paused"
+    }
+  ],
+  "types": [
+    {
+      "name": "AdminTransferProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdminTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "loar_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "liquidity_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "default_remix_fee",
+            "type": "u64"
+          },
+          {
+            "name": "min_remix_fee",
+            "type": "u64"
+          },
+          {
+            "name": "creator_share_bps",
+            "type": "u16"
+          },
+          {
+            "name": "lp_share_bps",
+            "type": "u16"
+          },
+          {
+            "name": "treasury_share_bps",
+            "type": "u16"
+          },
+          {
+            "name": "total_remix_fees",
+            "type": "u64"
+          },
+          {
+            "name": "total_remixes",
+            "type": "u64"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "loar_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "liquidity_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "default_remix_fee",
+            "type": "u64"
+          },
+          {
+            "name": "min_remix_fee",
+            "type": "u64"
+          },
+          {
+            "name": "creator_share_bps",
+            "type": "u16"
+          },
+          {
+            "name": "lp_share_bps",
+            "type": "u16"
+          },
+          {
+            "name": "treasury_share_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DefaultFeeUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "default_fee",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LpUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_lp",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MinFeeUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "min_fee",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Paused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "RemixFeeCharged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "remixer",
+            "type": "pubkey"
+          },
+          {
+            "name": "original_creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          },
+          {
+            "name": "to_creator",
+            "type": "u64"
+          },
+          {
+            "name": "to_lp",
+            "type": "u64"
+          },
+          {
+            "name": "to_treasury",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SplitUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator_share_bps",
+            "type": "u16"
+          },
+          {
+            "name": "lp_share_bps",
+            "type": "u16"
+          },
+          {
+            "name": "treasury_share_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TreasuryUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_treasury",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Universe",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "plot_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "visibility",
+            "type": {
+              "defined": {
+                "name": "Visibility"
+              }
+            }
+          },
+          {
+            "name": "canon_count",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UniverseFee",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          },
+          {
+            "name": "custom_fee",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UniverseFeeUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Unpaused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "Visibility",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Private"
+          },
+          {
+            "name": "Public"
+          }
+        ]
+      }
+    }
+  ]
+}

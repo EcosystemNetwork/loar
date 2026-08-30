@@ -1,0 +1,527 @@
+{
+  "address": "6YTQVSeauk4x5gycMM2wzkR8mdHEnHAYsz3Ygg26UPtD",
+  "metadata": {
+    "name": "universe",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "LOAR Universe program — Solana sister to apps/contracts/src/Universe.sol"
+  },
+  "instructions": [
+    {
+      "name": "accept_admin",
+      "docs": ["Step 2 of admin transfer — pending admin accepts. Atomic flip."],
+      "discriminator": [112, 42, 45, 90, 116, 181, 13, 170],
+      "accounts": [
+        {
+          "name": "new_admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [117, 110, 105, 118, 101, 114, 115, 101, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "canonize_episode",
+      "docs": [
+        "Bump canon counter. Called by the `episode` program via CPI when",
+        "an episode is canonized."
+      ],
+      "discriminator": [165, 190, 245, 48, 62, 142, 250, 218],
+      "accounts": [
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "universe",
+          "writable": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [117, 110, 105, 118, 101, 114, 115, 101, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_config",
+      "docs": ["Initialize the singleton config. Callable exactly once per program."],
+      "discriminator": [208, 127, 21, 1, 194, 190, 196, 70],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [117, 110, 105, 118, 101, 114, 115, 101, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_universe",
+      "docs": [
+        "Initialize a Universe. Idempotent on (creator, content_hash) — the PDA",
+        "derivation prevents duplicate creation."
+      ],
+      "discriminator": [122, 246, 79, 134, 70, 174, 143, 171],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "universe",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [117, 110, 105, 118, 101, 114, 115, 101]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "arg",
+                "path": "content_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [117, 110, 105, 118, 101, 114, 115, 101, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "content_hash",
+          "type": {
+            "array": ["u8", 32]
+          }
+        },
+        {
+          "name": "plot_hash",
+          "type": {
+            "array": ["u8", 32]
+          }
+        },
+        {
+          "name": "visibility",
+          "type": {
+            "defined": {
+              "name": "Visibility"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "pause",
+      "discriminator": [211, 22, 221, 251, 74, 121, 193, 47],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [117, 110, 105, 118, 101, 114, 115, 101, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "publish_universe",
+      "docs": ["Promote a private universe to public (launchpad gate flips on)."],
+      "discriminator": [131, 56, 173, 137, 70, 87, 2, 53],
+      "accounts": [
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "universe",
+          "writable": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [117, 110, 105, 118, 101, 114, 115, 101, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "transfer_admin",
+      "docs": ["Step 1 of admin transfer — current admin proposes the new admin."],
+      "discriminator": [42, 242, 66, 106, 228, 10, 111, 156],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [117, 110, 105, 118, 101, 114, 115, 101, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "unpause",
+      "discriminator": [169, 144, 4, 38, 10, 141, 188, 255],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [117, 110, 105, 118, 101, 114, 115, 101, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [155, 12, 170, 224, 30, 250, 204, 130]
+    },
+    {
+      "name": "Universe",
+      "discriminator": [86, 112, 227, 226, 88, 47, 242, 113]
+    }
+  ],
+  "events": [
+    {
+      "name": "AdminTransferProposed",
+      "discriminator": [203, 168, 175, 51, 239, 104, 20, 85]
+    },
+    {
+      "name": "AdminTransferred",
+      "discriminator": [255, 147, 182, 5, 199, 217, 38, 179]
+    },
+    {
+      "name": "ConfigInitialized",
+      "discriminator": [181, 49, 200, 156, 19, 167, 178, 91]
+    },
+    {
+      "name": "Paused",
+      "discriminator": [172, 248, 5, 253, 49, 255, 255, 232]
+    },
+    {
+      "name": "UniverseCreated",
+      "discriminator": [244, 82, 63, 148, 26, 10, 53, 67]
+    },
+    {
+      "name": "UniversePublished",
+      "discriminator": [183, 190, 187, 156, 153, 102, 42, 34]
+    },
+    {
+      "name": "Unpaused",
+      "discriminator": [156, 150, 47, 174, 120, 216, 93, 117]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Only the universe creator or admin may perform this action"
+    },
+    {
+      "code": 6001,
+      "name": "AlreadyPublic",
+      "msg": "Universe is already public"
+    },
+    {
+      "code": 6002,
+      "name": "CounterOverflow",
+      "msg": "Canon counter overflowed"
+    },
+    {
+      "code": 6003,
+      "name": "Paused",
+      "msg": "Program is paused"
+    },
+    {
+      "code": 6004,
+      "name": "AlreadyPaused",
+      "msg": "Cannot pause: already paused"
+    },
+    {
+      "code": 6005,
+      "name": "NotPaused",
+      "msg": "Cannot unpause: not paused"
+    },
+    {
+      "code": 6006,
+      "name": "ZeroAddress",
+      "msg": "Address cannot be the zero pubkey"
+    }
+  ],
+  "types": [
+    {
+      "name": "AdminTransferProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdminTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Paused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "Universe",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "plot_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "visibility",
+            "type": {
+              "defined": {
+                "name": "Visibility"
+              }
+            }
+          },
+          {
+            "name": "canon_count",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UniverseCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "plot_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "visibility",
+            "type": {
+              "defined": {
+                "name": "Visibility"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "UniversePublished",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "universe",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Unpaused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "Visibility",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Private"
+          },
+          {
+            "name": "Public"
+          }
+        ]
+      }
+    }
+  ]
+}

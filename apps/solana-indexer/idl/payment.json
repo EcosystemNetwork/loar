@@ -1,0 +1,1386 @@
+{
+  "address": "9xWo4djcHmGFkJnLQF9phdpsUhj6BQFW6yR8sHUsKVbj",
+  "metadata": {
+    "name": "payment",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "LOAR Payment program — Solana sister to apps/contracts/src/PaymentRouter.sol"
+  },
+  "instructions": [
+    {
+      "name": "accept_ownership",
+      "docs": ["Step 2 of ownership transfer — pending owner accepts. Atomic flip."],
+      "discriminator": [172, 23, 43, 13, 238, 213, 85, 150],
+      "accounts": [
+        {
+          "name": "new_owner",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim",
+      "docs": ["Creator pulls their accrued SOL."],
+      "discriminator": [62, 198, 214, 193, 213, 159, 108, 210],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true,
+          "relations": ["claim_sol"]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [115, 111, 108, 95, 118, 97, 117, 108, 116]
+              }
+            ]
+          }
+        },
+        {
+          "name": "claim_sol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 108, 97, 105, 109, 95, 115, 111, 108]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_spl",
+      "docs": ["Creator pulls accrued $LOAR."],
+      "discriminator": [178, 141, 219, 41, 138, 211, 162, 60],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true,
+          "relations": ["claim_loar"]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "loar_vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [108, 111, 97, 114, 95, 118, 97, 117, 108, 116]
+              }
+            ]
+          }
+        },
+        {
+          "name": "loar_mint"
+        },
+        {
+          "name": "claim_loar",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 108, 97, 105, 109, 95, 108, 111, 97, 114]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_ata",
+          "writable": true
+        },
+        {
+          "name": "creator_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "loar_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142, 13, 131, 11, 90, 19,
+                153, 218, 255, 16, 132, 4, 142, 123, 216, 219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_treasury_sol",
+      "docs": ["Owner pulls accrued treasury SOL to the treasury address."],
+      "discriminator": [84, 25, 205, 249, 131, 73, 82, 227],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [115, 111, 108, 95, 118, 97, 117, 108, 116]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_treasury_spl",
+      "docs": ["Owner pulls accrued treasury $LOAR to the treasury's ATA."],
+      "discriminator": [19, 196, 75, 96, 169, 98, 24, 251],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "loar_vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [108, 111, 97, 114, 95, 118, 97, 117, 108, 116]
+              }
+            ]
+          }
+        },
+        {
+          "name": "loar_mint"
+        },
+        {
+          "name": "treasury"
+        },
+        {
+          "name": "vault_ata",
+          "writable": true
+        },
+        {
+          "name": "treasury_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "treasury"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "loar_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142, 13, 131, 11, 90, 19,
+                153, 218, 255, 16, 132, 4, 142, 123, 216, 219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize",
+      "docs": ["Initialize the singleton config. Callable exactly once."],
+      "discriminator": [175, 175, 109, 31, 13, 152, 155, 237],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_vault",
+          "docs": [
+            "SOL vault — program-owned account whose lamports are the unclaimed",
+            "SOL balance (rent-exempt minimum kept on top of accrued accumulators)."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [115, 111, 108, 95, 118, 97, 117, 108, 116]
+              }
+            ]
+          }
+        },
+        {
+          "name": "loar_vault",
+          "docs": ["LOAR vault authority PDA — owns the program's $LOAR ATA."],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [108, 111, 97, 114, 95, 118, 97, 117, 108, 116]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "treasury",
+          "type": "pubkey"
+        },
+        {
+          "name": "default_fee_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "lock_loar_mint",
+      "docs": ["One-way switch: once locked, the $LOAR mint cannot change again."],
+      "discriminator": [123, 235, 180, 228, 244, 156, 92, 141],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "pause",
+      "discriminator": [211, 22, 221, 251, 74, 121, 193, 47],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "route",
+      "docs": [
+        "Route SOL: split between creator (accrues) and treasury (accrues).",
+        "`fee_bps_override` lets a caller pin the platform fee; uses",
+        "`config.default_fee_bps` when `None`."
+      ],
+      "discriminator": [229, 23, 203, 151, 122, 227, 173, 42],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "creator",
+          "docs": [
+            "data is read from it. Permission to receive funds is derived from",
+            "matching the seeds, not the account state."
+          ]
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [115, 111, 108, 95, 118, 97, 117, 108, 116]
+              }
+            ]
+          }
+        },
+        {
+          "name": "claim_sol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 108, 97, 105, 109, 95, 115, 111, 108]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "fee_bps_override",
+          "type": {
+            "option": "u16"
+          }
+        }
+      ]
+    },
+    {
+      "name": "route_spl",
+      "docs": [
+        "Route $LOAR. Fee_bps minus `loar_fee_discount_bps` (saturating). The",
+        "caller's token account is debited; vault is credited; creator + treasury",
+        "accumulators move."
+      ],
+      "discriminator": [0, 211, 128, 62, 27, 227, 9, 173],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "creator"
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "loar_vault",
+          "docs": ["LOAR vault PDA — authority of vault_ata."],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [108, 111, 97, 114, 95, 118, 97, 117, 108, 116]
+              }
+            ]
+          }
+        },
+        {
+          "name": "loar_mint"
+        },
+        {
+          "name": "payer_ata",
+          "writable": true
+        },
+        {
+          "name": "vault_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "loar_vault"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "loar_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142, 13, 131, 11, 90, 19,
+                153, 218, 255, 16, 132, 4, 142, 123, 216, 219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "claim_loar",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 108, 97, 105, 109, 95, 108, 111, 97, 114]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "fee_bps_override",
+          "type": {
+            "option": "u16"
+          }
+        }
+      ]
+    },
+    {
+      "name": "route_spl_to_treasury",
+      "docs": ["Route $LOAR 100% to treasury accumulator."],
+      "discriminator": [107, 159, 7, 2, 249, 191, 124, 116],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "loar_vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [108, 111, 97, 114, 95, 118, 97, 117, 108, 116]
+              }
+            ]
+          }
+        },
+        {
+          "name": "loar_mint"
+        },
+        {
+          "name": "payer_ata",
+          "writable": true
+        },
+        {
+          "name": "vault_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "loar_vault"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "loar_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142, 13, 131, 11, 90, 19,
+                153, 218, 255, 16, 132, 4, 142, 123, 216, 219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "route_to_treasury",
+      "docs": ["Route SOL with 100% to treasury (e.g. credit purchases, ad spend)."],
+      "discriminator": [70, 104, 108, 133, 212, 114, 67, 23],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [115, 111, 108, 95, 118, 97, 117, 108, 116]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_default_fee",
+      "discriminator": [150, 137, 197, 111, 176, 227, 201, 110],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_fee_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "set_loar_fee_discount",
+      "discriminator": [214, 0, 194, 251, 129, 142, 40, 5],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "discount_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "set_loar_mint",
+      "discriminator": [230, 68, 97, 148, 4, 70, 207, 193],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_treasury",
+      "discriminator": [57, 97, 196, 95, 195, 206, 106, 136],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_treasury",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "transfer_ownership",
+      "docs": ["Step 1 of ownership transfer — owner proposes the new owner."],
+      "discriminator": [65, 177, 215, 73, 53, 45, 99, 47],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_owner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "unpause",
+      "discriminator": [169, 144, 4, 38, 10, 141, 188, 255],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "ClaimLoar",
+      "discriminator": [37, 205, 217, 133, 212, 32, 155, 222]
+    },
+    {
+      "name": "ClaimSol",
+      "discriminator": [240, 169, 169, 195, 102, 222, 80, 43]
+    },
+    {
+      "name": "Config",
+      "discriminator": [155, 12, 170, 224, 30, 250, 204, 130]
+    },
+    {
+      "name": "LoarVault",
+      "discriminator": [12, 131, 166, 93, 155, 100, 82, 53]
+    },
+    {
+      "name": "SolVault",
+      "discriminator": [21, 132, 230, 103, 19, 209, 129, 248]
+    }
+  ],
+  "events": [
+    {
+      "name": "Claimed",
+      "discriminator": [217, 192, 123, 72, 108, 150, 248, 33]
+    },
+    {
+      "name": "DefaultFeeUpdated",
+      "discriminator": [24, 157, 176, 84, 53, 135, 232, 155]
+    },
+    {
+      "name": "Initialized",
+      "discriminator": [208, 213, 115, 98, 115, 82, 201, 209]
+    },
+    {
+      "name": "LoarFeeDiscountUpdated",
+      "discriminator": [65, 40, 94, 174, 246, 240, 30, 208]
+    },
+    {
+      "name": "LoarMintLocked",
+      "discriminator": [80, 241, 227, 73, 105, 87, 169, 41]
+    },
+    {
+      "name": "LoarMintUpdated",
+      "discriminator": [76, 197, 169, 211, 209, 240, 8, 109]
+    },
+    {
+      "name": "OwnershipTransferProposed",
+      "discriminator": [150, 120, 242, 14, 83, 116, 104, 71]
+    },
+    {
+      "name": "OwnershipTransferred",
+      "discriminator": [172, 61, 205, 183, 250, 50, 38, 98]
+    },
+    {
+      "name": "Paused",
+      "discriminator": [172, 248, 5, 253, 49, 255, 255, 232]
+    },
+    {
+      "name": "PaymentRouted",
+      "discriminator": [27, 197, 122, 1, 89, 184, 87, 209]
+    },
+    {
+      "name": "TreasuryUpdated",
+      "discriminator": [80, 239, 54, 168, 43, 38, 85, 145]
+    },
+    {
+      "name": "Unpaused",
+      "discriminator": [156, 150, 47, 174, 120, 216, 93, 117]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Only the program owner may perform this action"
+    },
+    {
+      "code": 6001,
+      "name": "Paused",
+      "msg": "Routing is paused"
+    },
+    {
+      "code": 6002,
+      "name": "AlreadyPaused",
+      "msg": "Cannot pause: already paused"
+    },
+    {
+      "code": 6003,
+      "name": "NotPaused",
+      "msg": "Cannot unpause: not paused"
+    },
+    {
+      "code": 6004,
+      "name": "FeeTooHigh",
+      "msg": "Fee exceeds MAX_FEE_BPS (10%)"
+    },
+    {
+      "code": 6005,
+      "name": "DiscountTooHigh",
+      "msg": "Discount exceeds MAX_FEE_BPS (10%)"
+    },
+    {
+      "code": 6006,
+      "name": "LoarMintNotSet",
+      "msg": "$LOAR mint is not configured"
+    },
+    {
+      "code": 6007,
+      "name": "LoarMintLocked",
+      "msg": "$LOAR mint is permanently locked"
+    },
+    {
+      "code": 6008,
+      "name": "WrongLoarMint",
+      "msg": "Provided mint does not match config.loar_mint"
+    },
+    {
+      "code": 6009,
+      "name": "WrongTreasury",
+      "msg": "Provided treasury does not match config.treasury"
+    },
+    {
+      "code": 6010,
+      "name": "ZeroAmount",
+      "msg": "Amount must be greater than zero"
+    },
+    {
+      "code": 6011,
+      "name": "ZeroAddress",
+      "msg": "Address cannot be the zero pubkey"
+    },
+    {
+      "code": 6012,
+      "name": "NothingToClaim",
+      "msg": "Nothing to claim"
+    },
+    {
+      "code": 6013,
+      "name": "InsufficientVault",
+      "msg": "Vault has insufficient lamports"
+    },
+    {
+      "code": 6014,
+      "name": "MathOverflow",
+      "msg": "Arithmetic overflow / division error"
+    }
+  ],
+  "types": [
+    {
+      "name": "ClaimLoar",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClaimSol",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Claimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "currency",
+            "type": {
+              "defined": {
+                "name": "Currency"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "loar_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "default_fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "loar_fee_discount_bps",
+            "type": "u16"
+          },
+          {
+            "name": "loar_locked",
+            "type": "bool"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "treasury_claimable_sol",
+            "type": "u64"
+          },
+          {
+            "name": "treasury_claimable_loar",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "sol_vault_bump",
+            "type": "u8"
+          },
+          {
+            "name": "loar_vault_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Currency",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Sol"
+          },
+          {
+            "name": "Loar"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DefaultFeeUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "new_fee_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Initialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "default_fee_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LoarFeeDiscountUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "discount_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LoarMintLocked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LoarMintUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "new_mint",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LoarVault",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipTransferProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "new_owner",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_owner",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Paused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "PaymentRouted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator_amount",
+            "type": "u64"
+          },
+          {
+            "name": "platform_amount",
+            "type": "u64"
+          },
+          {
+            "name": "fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "currency",
+            "type": {
+              "defined": {
+                "name": "Currency"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SolVault",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TreasuryUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_treasury",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Unpaused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    }
+  ]
+}

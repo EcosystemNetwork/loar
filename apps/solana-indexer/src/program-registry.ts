@@ -9,16 +9,35 @@
  *   1. Env var (mainnet override differs from committed devnet IDL.address)
  *   2. IDL.address (devnet default committed to repo)
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BorshEventCoder, type Idl } from '@coral-xyz/anchor';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+/**
+ * IDL lookup. The 15 IDLs are vendored into `apps/solana-indexer/idl/` (emitted
+ * by `anchor build` → `pnpm sync:idl`) so the Docker image is self-contained —
+ * `apps/programs/target/` is gitignored and never reaches the container. The
+ * monorepo `apps/programs/target/idl/` path stays as a fallback so a dev running
+ * straight from a fresh `anchor build` still works. `__dirname` is
+ * `…/src` under tsx and `…/dist/src` after `tsc`, hence two candidates each.
+ */
 function loadIdl(name: string): Idl {
-  const path = resolve(__dirname, '../../programs/target/idl/', `${name}.json`);
-  return JSON.parse(readFileSync(path, 'utf8')) as Idl;
+  const candidates = [
+    resolve(__dirname, '../idl', `${name}.json`), // tsx:  src/ → idl/
+    resolve(__dirname, '../../idl', `${name}.json`), // node: dist/src/ → idl/
+    resolve(__dirname, '../../programs/target/idl', `${name}.json`), // tsx:  → apps/programs/target/idl
+    resolve(__dirname, '../../../programs/target/idl', `${name}.json`), // node: → apps/programs/target/idl
+  ];
+  const hit = candidates.find((p) => existsSync(p));
+  if (!hit) {
+    throw new Error(
+      `IDL for "${name}" not found. Run \`pnpm -F @loar/programs build && pnpm -F @loar/solana-indexer sync:idl\`. Looked in:\n  ${candidates.join('\n  ')}`
+    );
+  }
+  return JSON.parse(readFileSync(hit, 'utf8')) as Idl;
 }
 
 export interface RegisteredProgram {

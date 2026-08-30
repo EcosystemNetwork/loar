@@ -1,0 +1,1411 @@
+{
+  "address": "2T6WzMCrSRLzUp6zwPhWPuguk84pDqozs6VwrykTR25u",
+  "metadata": {
+    "name": "canon_market",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "LOAR CanonMarketplace — Solana sister to apps/contracts/src/revenue/CanonMarketplace.sol"
+  },
+  "instructions": [
+    {
+      "name": "accept_admin",
+      "discriminator": [112, 42, 45, 90, 116, 181, 13, 170],
+      "accounts": [
+        {
+          "name": "new_admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 97, 110, 111, 110, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_submission_refund",
+      "docs": ["Submitter claims their submission-fee refund — only on Expired state."],
+      "discriminator": [206, 194, 106, 113, 129, 190, 28, 54],
+      "accounts": [
+        {
+          "name": "submitter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "submission",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 97, 110, 111, 110, 95, 115, 117, 98, 109, 105, 115, 115, 105, 111, 110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "submission.universe",
+                "account": "Submission"
+              },
+              {
+                "kind": "account",
+                "path": "submission.content_hash",
+                "account": "Submission"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_vote_lock",
+      "docs": [
+        "Voter claims their locked tokens after finalize. Available regardless",
+        "of which terminal state was reached."
+      ],
+      "discriminator": [150, 98, 202, 9, 90, 118, 27, 250],
+      "accounts": [
+        {
+          "name": "voter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "submission",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 97, 110, 111, 110, 95, 115, 117, 98, 109, 105, 115, 115, 105, 111, 110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "submission.universe",
+                "account": "Submission"
+              },
+              {
+                "kind": "account",
+                "path": "submission.content_hash",
+                "account": "Submission"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_mint"
+        },
+        {
+          "name": "vote_vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 97, 110, 111, 110, 95, 118, 111, 116, 101, 95, 118, 97, 117, 108, 116]
+              },
+              {
+                "kind": "account",
+                "path": "submission"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "vote_vault_authority"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28,
+                  180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142, 13, 131, 11, 90, 19,
+                153, 218, 255, 16, 132, 4, 142, 123, 216, 219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "voter_token_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "voter"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28,
+                  180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142, 13, 131, 11, 90, 19,
+                153, 218, 255, 16, 132, 4, 142, 123, 216, 219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "vote_lock",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 97, 110, 111, 110, 95, 118, 111, 116, 101, 95, 108, 111, 99, 107]
+              },
+              {
+                "kind": "account",
+                "path": "submission"
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "finalize",
+      "docs": [
+        "Finalize a submission after its deadline. Permissionless. Transitions",
+        "state to Accepted / Rejected / Expired based on tallies."
+      ],
+      "discriminator": [171, 61, 218, 56, 127, 115, 12, 217],
+      "accounts": [
+        {
+          "name": "submission",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 97, 110, 111, 110, 95, 115, 117, 98, 109, 105, 115, 115, 105, 111, 110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "submission.universe",
+                "account": "Submission"
+              },
+              {
+                "kind": "account",
+                "path": "submission.content_hash",
+                "account": "Submission"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "docs": ["against `config.treasury` via the address constraint."],
+          "writable": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 97, 110, 111, 110, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_config",
+      "discriminator": [208, 127, 21, 1, 194, 190, 196, 70],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 97, 110, 111, 110, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "treasury",
+          "type": "pubkey"
+        },
+        {
+          "name": "submission_fee_lamports",
+          "type": "u64"
+        },
+        {
+          "name": "voting_period_secs",
+          "type": "i64"
+        },
+        {
+          "name": "quorum_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "pause",
+      "discriminator": [211, 22, 221, 251, 74, 121, 193, 47],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 97, 110, 111, 110, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_params",
+      "discriminator": [27, 234, 178, 52, 147, 2, 187, 141],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 97, 110, 111, 110, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "submission_fee_lamports",
+          "type": "u64"
+        },
+        {
+          "name": "voting_period_secs",
+          "type": "i64"
+        },
+        {
+          "name": "quorum_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "submit",
+      "docs": [
+        "Submit a canon proposal for `content_hash` in `universe`. Pays",
+        "`submission_fee_lamports` SOL to the program's treasury vault."
+      ],
+      "discriminator": [88, 166, 102, 181, 162, 127, 170, 48],
+      "accounts": [
+        {
+          "name": "submitter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 97, 110, 111, 110, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "universe_account"
+        },
+        {
+          "name": "curve",
+          "docs": [
+            "The bonding-curve PDA for this universe. We source the canonical",
+            "voting-token mint from here — caller can't pass a sockpuppet."
+          ]
+        },
+        {
+          "name": "submission",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 97, 110, 111, 110, 95, 115, 117, 98, 109, 105, 115, 115, 105, 111, 110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "universe_account"
+              },
+              {
+                "kind": "arg",
+                "path": "content_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_vault",
+          "docs": [
+            "the first vote — we just derive its address here so the bump can be",
+            "stored on the submission."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 97, 110, 111, 110, 95, 118, 111, 116, 101, 95, 118, 97, 117, 108, 116]
+              },
+              {
+                "kind": "account",
+                "path": "submission"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "content_hash",
+          "type": {
+            "array": ["u8", 32]
+          }
+        },
+        {
+          "name": "episode_record",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "transfer_admin",
+      "discriminator": [42, 242, 66, 106, 228, 10, 111, 156],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 97, 110, 111, 110, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "unpause",
+      "discriminator": [169, 144, 4, 38, 10, 141, 188, 255],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 97, 110, 111, 110, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "vote",
+      "docs": [
+        "Vote on a submission. Locks `amount` of universe tokens into the",
+        "per-voter VoteLock PDA + the per-submission token vault. Votes can",
+        "be added (same direction) but NOT switched — calling vote() again",
+        "with opposite direction reverts."
+      ],
+      "discriminator": [227, 110, 155, 23, 136, 126, 172, 25],
+      "accounts": [
+        {
+          "name": "voter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 97, 110, 111, 110, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "submission",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 97, 110, 111, 110, 95, 115, 117, 98, 109, 105, 115, 115, 105, 111, 110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "submission.universe",
+                "account": "Submission"
+              },
+              {
+                "kind": "account",
+                "path": "submission.content_hash",
+                "account": "Submission"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_mint"
+        },
+        {
+          "name": "vote_vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 97, 110, 111, 110, 95, 118, 111, 116, 101, 95, 118, 97, 117, 108, 116]
+              },
+              {
+                "kind": "account",
+                "path": "submission"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_vault",
+          "docs": [
+            "Vote vault ATA: holds locked tokens for this submission. Lazy-init",
+            "on first vote."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "vote_vault_authority"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28,
+                  180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142, 13, 131, 11, 90, 19,
+                153, 218, 255, 16, 132, 4, 142, 123, 216, 219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "voter_token_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "voter"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28,
+                  180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142, 13, 131, 11, 90, 19,
+                153, 218, 255, 16, 132, 4, 142, 123, 216, 219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "vote_lock",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 97, 110, 111, 110, 95, 118, 111, 116, 101, 95, 108, 111, 99, 107]
+              },
+              {
+                "kind": "account",
+                "path": "submission"
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "support",
+          "type": "bool"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [155, 12, 170, 224, 30, 250, 204, 130]
+    },
+    {
+      "name": "Curve",
+      "discriminator": [191, 180, 249, 66, 180, 71, 51, 182]
+    },
+    {
+      "name": "Submission",
+      "discriminator": [58, 194, 159, 158, 75, 102, 178, 197]
+    },
+    {
+      "name": "Universe",
+      "discriminator": [86, 112, 227, 226, 88, 47, 242, 113]
+    },
+    {
+      "name": "VoteLock",
+      "discriminator": [83, 95, 46, 43, 238, 13, 207, 97]
+    }
+  ],
+  "events": [
+    {
+      "name": "AdminTransferProposed",
+      "discriminator": [203, 168, 175, 51, 239, 104, 20, 85]
+    },
+    {
+      "name": "AdminTransferred",
+      "discriminator": [255, 147, 182, 5, 199, 217, 38, 179]
+    },
+    {
+      "name": "ConfigInitialized",
+      "discriminator": [181, 49, 200, 156, 19, 167, 178, 91]
+    },
+    {
+      "name": "ParamsUpdated",
+      "discriminator": [2, 163, 138, 99, 135, 11, 136, 169]
+    },
+    {
+      "name": "Paused",
+      "discriminator": [172, 248, 5, 253, 49, 255, 255, 232]
+    },
+    {
+      "name": "SubmissionCreated",
+      "discriminator": [27, 207, 175, 100, 160, 225, 121, 79]
+    },
+    {
+      "name": "SubmissionFinalized",
+      "discriminator": [212, 38, 73, 189, 88, 7, 72, 89]
+    },
+    {
+      "name": "SubmissionRefunded",
+      "discriminator": [80, 38, 232, 20, 36, 159, 199, 139]
+    },
+    {
+      "name": "Unpaused",
+      "discriminator": [156, 150, 47, 174, 120, 216, 93, 117]
+    },
+    {
+      "name": "VoteLockClaimed",
+      "discriminator": [129, 75, 171, 113, 44, 184, 116, 106]
+    },
+    {
+      "name": "Voted",
+      "discriminator": [189, 74, 101, 127, 109, 214, 95, 130]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Only the configured admin or owner may perform this action"
+    },
+    {
+      "code": 6001,
+      "name": "ZeroAddress",
+      "msg": "Address cannot be the zero pubkey"
+    },
+    {
+      "code": 6002,
+      "name": "ZeroHash",
+      "msg": "Content hash cannot be all zeros"
+    },
+    {
+      "code": 6003,
+      "name": "ZeroAmount",
+      "msg": "Amount must be greater than zero"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidVotingPeriod",
+      "msg": "voting_period_secs out of [1h, 30d] range"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidQuorum",
+      "msg": "quorum_bps must be in (0, 10000]"
+    },
+    {
+      "code": 6006,
+      "name": "UniverseMismatch",
+      "msg": "Universe argument does not match supplied Universe account"
+    },
+    {
+      "code": 6007,
+      "name": "MintMismatch",
+      "msg": "Provided token mint does not match Submission.token_mint"
+    },
+    {
+      "code": 6008,
+      "name": "TreasuryMismatch",
+      "msg": "Treasury account does not match Config.treasury"
+    },
+    {
+      "code": 6009,
+      "name": "NotActive",
+      "msg": "Submission is not active (already finalized or non-existent)"
+    },
+    {
+      "code": 6010,
+      "name": "NotFinalized",
+      "msg": "Submission has not been finalized yet"
+    },
+    {
+      "code": 6011,
+      "name": "VotingEnded",
+      "msg": "Voting period has ended"
+    },
+    {
+      "code": 6012,
+      "name": "VotingNotEnded",
+      "msg": "Voting period has not ended yet"
+    },
+    {
+      "code": 6013,
+      "name": "DirectionConflict",
+      "msg": "Cannot switch vote direction — submit a separate vote first"
+    },
+    {
+      "code": 6014,
+      "name": "AlreadyClaimed",
+      "msg": "Vote lock has already been claimed"
+    },
+    {
+      "code": 6015,
+      "name": "RefundNotAvailable",
+      "msg": "Refund not available for the current submission state"
+    },
+    {
+      "code": 6016,
+      "name": "NotSubmitter",
+      "msg": "Caller is not the submitter of this proposal"
+    },
+    {
+      "code": 6017,
+      "name": "EscrowUnderfunded",
+      "msg": "Submission escrow underfunded — should be impossible if state is consistent"
+    },
+    {
+      "code": 6018,
+      "name": "RentExemptionViolated",
+      "msg": "Post-withdrawal submission balance fell below rent-exempt minimum"
+    },
+    {
+      "code": 6019,
+      "name": "MathOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6020,
+      "name": "Paused",
+      "msg": "Program is paused"
+    },
+    {
+      "code": 6021,
+      "name": "AlreadyPaused",
+      "msg": "Cannot pause: already paused"
+    },
+    {
+      "code": 6022,
+      "name": "NotPaused",
+      "msg": "Cannot unpause: not paused"
+    }
+  ],
+  "types": [
+    {
+      "name": "AdminTransferProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdminTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "submission_fee_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "voting_period_secs",
+            "type": "i64"
+          },
+          {
+            "name": "quorum_bps",
+            "type": "u16"
+          },
+          {
+            "name": "next_submission_id",
+            "type": "u64"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "submission_fee_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "voting_period_secs",
+            "type": "i64"
+          },
+          {
+            "name": "quorum_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Curve",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_curve_supply",
+            "type": "u64"
+          },
+          {
+            "name": "graduation_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "slope_scaled",
+            "type": "u128"
+          },
+          {
+            "name": "max_buy_tokens",
+            "type": "u64"
+          },
+          {
+            "name": "max_cumulative_buy",
+            "type": "u64"
+          },
+          {
+            "name": "tokens_sold",
+            "type": "u64"
+          },
+          {
+            "name": "sol_raised",
+            "type": "u64"
+          },
+          {
+            "name": "graduated",
+            "type": "bool"
+          },
+          {
+            "name": "trading_halted",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "token_vault_bump",
+            "type": "u8"
+          },
+          {
+            "name": "sol_vault_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ParamsUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "submission_fee_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "voting_period_secs",
+            "type": "i64"
+          },
+          {
+            "name": "quorum_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Paused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "Submission",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "submitter",
+            "type": "pubkey"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "episode_record",
+            "type": "pubkey"
+          },
+          {
+            "name": "submission_fee",
+            "type": "u64"
+          },
+          {
+            "name": "submitted_at",
+            "type": "i64"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          },
+          {
+            "name": "finalized_at",
+            "type": "i64"
+          },
+          {
+            "name": "quorum_threshold",
+            "type": "u64"
+          },
+          {
+            "name": "votes_for",
+            "type": "u64"
+          },
+          {
+            "name": "votes_against",
+            "type": "u64"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "SubmissionState"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vote_vault_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubmissionCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "episode_record",
+            "type": "pubkey"
+          },
+          {
+            "name": "submitter",
+            "type": "pubkey"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          },
+          {
+            "name": "quorum_threshold",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubmissionFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "episode_record",
+            "type": "pubkey"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "SubmissionState"
+              }
+            }
+          },
+          {
+            "name": "votes_for",
+            "type": "u64"
+          },
+          {
+            "name": "votes_against",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubmissionRefunded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "submitter",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubmissionState",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Accepted"
+          },
+          {
+            "name": "Rejected"
+          },
+          {
+            "name": "Expired"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Universe",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "plot_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "visibility",
+            "type": {
+              "defined": {
+                "name": "Visibility"
+              }
+            }
+          },
+          {
+            "name": "canon_count",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Unpaused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "Visibility",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Private"
+          },
+          {
+            "name": "Public"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VoteLock",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "voter",
+            "type": "pubkey"
+          },
+          {
+            "name": "submission",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "support",
+            "type": "bool"
+          },
+          {
+            "name": "claimed",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VoteLockClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "submission_id",
+            "type": "u64"
+          },
+          {
+            "name": "voter",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Voted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "submission_id",
+            "type": "u64"
+          },
+          {
+            "name": "voter",
+            "type": "pubkey"
+          },
+          {
+            "name": "support",
+            "type": "bool"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "new_for",
+            "type": "u64"
+          },
+          {
+            "name": "new_against",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,647 @@
+{
+  "address": "NDpYpB49e3yzEcsPK1o34h9Zgrw9CPnVTnZLvDowL4m",
+  "metadata": {
+    "name": "rights",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "LOAR Rights program — Solana attestation-driven cache for apps/contracts/src/RightsRegistry.sol"
+  },
+  "instructions": [
+    {
+      "name": "accept_admin",
+      "docs": ["Step 2 of admin transfer — pending admin accepts. Atomic flip."],
+      "discriminator": [112, 42, 45, 90, 116, 181, 13, 170],
+      "accounts": [
+        {
+          "name": "new_admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [114, 105, 103, 104, 116, 115, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "accept_rights_operator",
+      "discriminator": [79, 146, 82, 215, 97, 8, 159, 238],
+      "accounts": [
+        {
+          "name": "new_operator",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [114, 105, 103, 104, 116, 115, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_config",
+      "docs": ["Initialize the singleton config. Callable exactly once per program."],
+      "discriminator": [208, 127, 21, 1, 194, 190, 196, 70],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [114, 105, 103, 104, 116, 115, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "rights_operator",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "pause",
+      "discriminator": [211, 22, 221, 251, 74, 121, 193, 47],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [114, 105, 103, 104, 116, 115, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_rights_via_attestation",
+      "docs": [
+        "Write a rights classification for `content_hash`, attesting that the",
+        "platform's canonical EVM RightsRegistry has this content recorded as",
+        "`rights_type` at the time of attestation.",
+        "",
+        "Mirrors `RightsRegistry.setRights`/`setRightsWithCreatorSig` /",
+        "`confirmFreeze` / `emergencyFreeze` / `unfreeze` — the operator picks",
+        "the resulting RightsType and the program records it without",
+        "re-validating the creator signature (validation already happened on",
+        "EVM; this is a cache write).",
+        "",
+        "Idempotency: `version` must be strictly greater than any prior",
+        "version recorded for this content_hash. The server is responsible for",
+        "emitting monotonic versions per content_hash (typically the EVM",
+        "block.number * MAX_LOG_INDEX + log_index, or any monotonic counter)."
+      ],
+      "discriminator": [50, 141, 216, 190, 251, 206, 41, 246],
+      "accounts": [
+        {
+          "name": "operator",
+          "docs": [
+            "The platform's rights operator — only key allowed to write rights.",
+            "Constrained against `config.rights_operator` so a wrong signer fails",
+            "loudly instead of silently writing cache state."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [114, 105, 103, 104, 116, 115, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "rights",
+          "docs": [
+            "Rights cache PDA. Unique per content_hash via the seed; `init_if_needed`",
+            "is safe because the seed uniqueness prevents re-init attacks."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [114, 105, 103, 104, 116, 115]
+              },
+              {
+                "kind": "arg",
+                "path": "content_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "content_hash",
+          "type": {
+            "array": ["u8", 32]
+          }
+        },
+        {
+          "name": "rights_type",
+          "type": {
+            "defined": {
+              "name": "RightsType"
+            }
+          }
+        },
+        {
+          "name": "creator",
+          "type": "pubkey"
+        },
+        {
+          "name": "evm_creator",
+          "type": {
+            "array": ["u8", 20]
+          }
+        },
+        {
+          "name": "version",
+          "type": "u64"
+        },
+        {
+          "name": "evm_tx_hash",
+          "type": {
+            "array": ["u8", 32]
+          }
+        },
+        {
+          "name": "evm_block_number",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "transfer_admin",
+      "docs": ["Step 1 of admin transfer — current admin proposes the new admin."],
+      "discriminator": [42, 242, 66, 106, 228, 10, 111, 156],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [114, 105, 103, 104, 116, 115, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "transfer_rights_operator",
+      "discriminator": [132, 62, 167, 215, 221, 116, 128, 64],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [114, 105, 103, 104, 116, 115, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_operator",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "unpause",
+      "discriminator": [169, 144, 4, 38, 10, 141, 188, 255],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [114, 105, 103, 104, 116, 115, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [155, 12, 170, 224, 30, 250, 204, 130]
+    },
+    {
+      "name": "Rights",
+      "discriminator": [79, 187, 86, 85, 243, 213, 103, 234]
+    }
+  ],
+  "events": [
+    {
+      "name": "AdminTransferProposed",
+      "discriminator": [203, 168, 175, 51, 239, 104, 20, 85]
+    },
+    {
+      "name": "AdminTransferred",
+      "discriminator": [255, 147, 182, 5, 199, 217, 38, 179]
+    },
+    {
+      "name": "ConfigInitialized",
+      "discriminator": [181, 49, 200, 156, 19, 167, 178, 91]
+    },
+    {
+      "name": "Paused",
+      "discriminator": [172, 248, 5, 253, 49, 255, 255, 232]
+    },
+    {
+      "name": "RightsOperatorTransferProposed",
+      "discriminator": [200, 220, 206, 175, 143, 105, 51, 110]
+    },
+    {
+      "name": "RightsOperatorTransferred",
+      "discriminator": [38, 143, 71, 133, 160, 67, 162, 5]
+    },
+    {
+      "name": "RightsSetViaAttestation",
+      "discriminator": [177, 96, 2, 212, 74, 47, 87, 133]
+    },
+    {
+      "name": "Unpaused",
+      "discriminator": [156, 150, 47, 174, 120, 216, 93, 117]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Only the configured admin or rights_operator may perform this action"
+    },
+    {
+      "code": 6001,
+      "name": "ZeroHash",
+      "msg": "Content hash cannot be all zeros"
+    },
+    {
+      "code": 6002,
+      "name": "VersionNotMonotonic",
+      "msg": "Version must be strictly greater than any prior attestation for this content"
+    },
+    {
+      "code": 6003,
+      "name": "ZeroVersion",
+      "msg": "Initial attestation must have version > 0"
+    },
+    {
+      "code": 6004,
+      "name": "Paused",
+      "msg": "Program is paused"
+    },
+    {
+      "code": 6005,
+      "name": "AlreadyPaused",
+      "msg": "Cannot pause: already paused"
+    },
+    {
+      "code": 6006,
+      "name": "NotPaused",
+      "msg": "Cannot unpause: not paused"
+    },
+    {
+      "code": 6007,
+      "name": "ZeroAddress",
+      "msg": "Address cannot be the zero pubkey"
+    }
+  ],
+  "types": [
+    {
+      "name": "AdminTransferProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdminTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "rights_operator",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_rights_operator",
+            "type": "pubkey"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "rights_operator",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Paused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "Rights",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "rights_type",
+            "type": {
+              "defined": {
+                "name": "RightsType"
+              }
+            }
+          },
+          {
+            "name": "creator",
+            "docs": [
+              "Solana creator pubkey if the content originates on Solana, else",
+              "Pubkey::default(). Used by Solana-native monetization programs to",
+              "route payouts when the creator's primary wallet is Solana."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "evm_creator",
+            "docs": [
+              "20-byte EVM address from the canonical RightsRegistry.contentCreator",
+              "mapping. Always populated — this is the cross-chain provenance link."
+            ],
+            "type": {
+              "array": ["u8", 20]
+            }
+          },
+          {
+            "name": "version",
+            "docs": ["Strictly monotonic per content_hash. Older attestations are rejected."],
+            "type": "u64"
+          },
+          {
+            "name": "evm_tx_hash",
+            "docs": ["EVM tx hash that emitted the canonical RightsSet event for forensics."],
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "evm_block_number",
+            "docs": ["EVM block number for forensics."],
+            "type": "u64"
+          },
+          {
+            "name": "last_attested_slot",
+            "docs": ["Solana slot when this attestation landed."],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RightsOperatorTransferProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "new_operator",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RightsOperatorTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_operator",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_operator",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RightsSetViaAttestation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "rights_type",
+            "type": {
+              "defined": {
+                "name": "RightsType"
+              }
+            }
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "evm_creator",
+            "type": {
+              "array": ["u8", 20]
+            }
+          },
+          {
+            "name": "version",
+            "type": "u64"
+          },
+          {
+            "name": "evm_tx_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "evm_block_number",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RightsType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Unset"
+          },
+          {
+            "name": "Fun"
+          },
+          {
+            "name": "Original"
+          },
+          {
+            "name": "Licensed"
+          },
+          {
+            "name": "PublicDomain"
+          },
+          {
+            "name": "Frozen"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Unpaused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    }
+  ]
+}
