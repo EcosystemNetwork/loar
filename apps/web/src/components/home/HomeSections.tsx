@@ -828,7 +828,8 @@ export function Top10Strip({ universes }: { universes: EnrichedUniverse[] }) {
   return (
     <section className="py-6">
       <SectionHeader icon={Flame} title="Top 10 Universes" subtitle="Most active this week" />
-      <ScrollRow>
+      {/* Static grid — all 10 cards visible at once, no scroll container */}
+      <div className="flex flex-wrap gap-3 px-4 md:px-12">
         {sorted.map((u) => (
           <div
             key={u.id}
@@ -847,7 +848,7 @@ export function Top10Strip({ universes }: { universes: EnrichedUniverse[] }) {
             <UniverseCard universe={u} />
           </div>
         ))}
-      </ScrollRow>
+      </div>
     </section>
   );
 }
