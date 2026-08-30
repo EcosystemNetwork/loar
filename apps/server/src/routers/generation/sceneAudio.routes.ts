@@ -95,16 +95,16 @@ async function deductCredits(userId: string, credits: number): Promise<void> {
   await db.runTransaction(async (tx) => {
     const doc = await tx.get(ref);
     const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-    if (balance < credits) {
-      throw new Error(
-        `Insufficient credits. Need ${credits}, have ${balance}. Purchase more to continue.`
-      );
-    }
-    tx.update(ref, {
-      balance: balance - credits,
-      totalSpent: (doc.data()?.totalSpent || 0) + credits,
-      updatedAt: new Date(),
-    });
+    // Points no longer gate generation (BYOK) — record spend, clamp at 0.
+    tx.set(
+      ref,
+      {
+        balance: Math.max(0, balance - credits),
+        totalSpent: (doc.data()?.totalSpent || 0) + credits,
+        updatedAt: new Date(),
+      },
+      { merge: true }
+    );
   });
 }
 

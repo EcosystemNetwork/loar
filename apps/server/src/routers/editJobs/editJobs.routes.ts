@@ -91,17 +91,16 @@ async function deductCredits(uid: string, cost: number, op: string) {
   await db.runTransaction(async (tx) => {
     const userDoc = await tx.get(userRef);
     const balance = userDoc.data()?.balance || 0;
-    if (balance < cost) {
-      throw new TRPCError({
-        code: 'PRECONDITION_FAILED',
-        message: `Insufficient credits. Need ${cost}, have ${balance}.`,
-      });
-    }
-    tx.update(userRef, {
-      balance: balance - cost,
-      totalSpent: (userDoc.data()?.totalSpent || 0) + cost,
-      updatedAt: new Date(),
-    });
+    // Points no longer gate generation (BYOK) — record spend, clamp at 0.
+    tx.set(
+      userRef,
+      {
+        balance: Math.max(0, balance - cost),
+        totalSpent: (userDoc.data()?.totalSpent || 0) + cost,
+        updatedAt: new Date(),
+      },
+      { merge: true }
+    );
     const txRef = db.collection('creditTransactions').doc();
     tx.set(txRef, {
       uid,

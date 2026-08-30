@@ -35,7 +35,7 @@ const VOCAB_MAP = {
   'smart-contract': { web2: 'Automated agreement', web3: 'Smart contract' },
   governance: { web2: 'Community voting', web3: 'Governance' },
   dao: { web2: 'Community', web3: 'DAO' },
-  stake: { web2: 'Lock credits', web3: 'Stake' },
+  stake: { web2: 'Lock points', web3: 'Stake' },
   staking: { web2: 'Credit Locking', web3: 'Staking' },
   'stake-loar': { web2: 'Lock $LOAR', web3: 'Stake $LOAR' },
   unstake: { web2: 'Unlock', web3: 'Unstake' },

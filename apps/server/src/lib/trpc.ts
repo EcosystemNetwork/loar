@@ -2,6 +2,7 @@
  * tRPC initialization and base procedure definitions.
  * Exports public (unauthenticated) and protected (auth-required) procedures.
  */
+import { randomUUID } from 'node:crypto';
 import { initTRPC, TRPCError } from '@trpc/server';
 import { getAddress } from 'viem';
 import type { Context } from './context';
@@ -71,6 +72,10 @@ const costScopeMiddleware = t.middleware(async ({ ctx, path, next }) => {
       apiKeyId: u?.apiKeyId ?? null,
       aiAgentId: u?.aiAgentId ?? null,
       route: `trpc:${path}`,
+      // One id per inbound tRPC call — correlates ledger / prompt-log /
+      // points-award rows produced while handling this request. (REST and
+      // worker scopes already set their own.)
+      requestId: randomUUID(),
     },
     () => next()
   );

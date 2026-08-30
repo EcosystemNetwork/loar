@@ -49,24 +49,13 @@ export function useCreditCheck() {
   );
 
   /**
-   * Check if the user has enough credits for a generation type.
-   * Shows a toast error if insufficient. Returns true if OK to proceed.
+   * Points no longer gate generation — users bring their own provider keys.
+   * Kept as a no-op (always allows) so existing call sites don't need to
+   * change; `credits` / `getCost` are still exposed for display.
    */
-  const checkCredits = useCallback(
-    (generationType: string, creditOverride?: number): boolean => {
-      const cost = creditOverride ?? getCost(generationType);
-      if (cost === 0) return true; // unknown cost — let server validate
-
-      if (credits < cost) {
-        toast.error(
-          `Not enough credits. You need ${cost} credits for this generation but only have ${credits}. Purchase more credits to continue.`
-        );
-        return false;
-      }
-      return true;
-    },
-    [credits, getCost]
-  );
+  const checkCredits = useCallback((_generationType: string, _creditOverride?: number): boolean => {
+    return true;
+  }, []);
 
   /**
    * Check if AI generation is currently enabled platform-wide.

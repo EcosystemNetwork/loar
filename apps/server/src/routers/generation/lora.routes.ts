@@ -118,17 +118,16 @@ export const loraRouter = router({
       await db!.runTransaction(async (tx) => {
         const doc = await tx.get(userCreditsRef);
         const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-        if (balance < TRAINING_COST_CREDITS) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: `Insufficient credits. Need ${TRAINING_COST_CREDITS}, have ${balance}`,
-          });
-        }
-        tx.update(userCreditsRef, {
-          balance: balance - TRAINING_COST_CREDITS,
-          totalSpent: (doc.data()?.totalSpent || 0) + TRAINING_COST_CREDITS,
-          updatedAt: new Date(),
-        });
+        // Points no longer gate generation (BYOK) — record spend, clamp at 0.
+        tx.set(
+          userCreditsRef,
+          {
+            balance: Math.max(0, balance - TRAINING_COST_CREDITS),
+            totalSpent: (doc.data()?.totalSpent || 0) + TRAINING_COST_CREDITS,
+            updatedAt: new Date(),
+          },
+          { merge: true }
+        );
       });
 
       // Create model record
@@ -359,14 +358,16 @@ export const loraRouter = router({
       await db!.runTransaction(async (tx) => {
         const doc = await tx.get(userCreditsRef);
         const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-        if (balance < LORA_GEN_CREDITS) {
-          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Insufficient credits' });
-        }
-        tx.update(userCreditsRef, {
-          balance: balance - LORA_GEN_CREDITS,
-          totalSpent: (doc.data()?.totalSpent || 0) + LORA_GEN_CREDITS,
-          updatedAt: new Date(),
-        });
+        // Points no longer gate generation (BYOK) — record spend, clamp at 0.
+        tx.set(
+          userCreditsRef,
+          {
+            balance: Math.max(0, balance - LORA_GEN_CREDITS),
+            totalSpent: (doc.data()?.totalSpent || 0) + LORA_GEN_CREDITS,
+            updatedAt: new Date(),
+          },
+          { merge: true }
+        );
       });
 
       const FAL_KEY = process.env.FAL_KEY;

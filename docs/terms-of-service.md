@@ -2,7 +2,7 @@
 
 > **Status**: Draft scaffold for legal review. All clauses marked [LEGAL REVIEW REQUIRED] need attorney sign-off before publication.
 >
-> **Last updated**: 2026-04-17
+> **Last updated**: 2026-08-29
 >
 > **Effective date**: [TO BE SET ON PUBLICATION]
 >
@@ -88,7 +88,11 @@ AI-generated content may be hashed (SHA-256) and the hash stored on-chain for pr
 
 AI model providers may change, become unavailable, or modify their outputs. The Platform does not guarantee continuous availability of any specific AI model or generation capability.
 
-[LEGAL REVIEW REQUIRED] Review AI output ownership claims under current copyright guidance (US Copyright Office, EU AI Act). Determine whether additional disclaimers are needed regarding AI training data provenance. Assess liability for AI-generated content that infringes third-party rights.
+### 4.6 Use of Generations for Model Training
+
+You acknowledge and agree that LOAR, together with its affiliates, service providers, and research partners, may use your prompts, generation parameters, and the resulting AI-generated outputs — along with any other content you create on the Platform — to develop, train, fine-tune, evaluate, benchmark, and improve machine learning models, datasets, and AI systems and Platform features. Content generated on the Platform may be incorporated into datasets used for these purposes. This right is granted under the license in Section 5.4, survives termination of your account, and applies to content created both before and after the effective date of these Terms.
+
+[LEGAL REVIEW REQUIRED] Review AI output ownership claims under current copyright guidance (US Copyright Office, EU AI Act). Determine whether additional disclaimers are needed regarding AI training data provenance. Assess liability for AI-generated content that infringes third-party rights. Confirm whether an opt-out or separate consent is required for training use of user content in the EU (GDPR Art. 6/9, EU AI Act) and other jurisdictions, and whether retroactive application to pre-existing content is enforceable.
 
 ---
 
@@ -119,7 +123,9 @@ By uploading or generating content on the Platform, you grant LOAR a non-exclusi
 - Include your content in Platform marketing materials (with attribution).
 - Process your content through AI systems for features you initiate (e.g., style transfer, character extraction).
 
-This license does not transfer ownership. You may request removal of off-chain content at any time (subject to Section 7 regarding on-chain data).
+You further grant LOAR a perpetual, irrevocable, worldwide, royalty-free, sublicensable, and transferable license to use, host, reproduce, modify, and create derivative works from any content you upload, create, or generate on the Platform — including prompts, generation parameters, and AI outputs — for the purpose of developing, training, fine-tuning, evaluating, and improving machine learning models, datasets, and AI systems and Platform features, whether operated by LOAR or by its affiliates, service providers, or research partners. This training license survives termination of your account and any removal of your content from the Platform.
+
+Except for the training license described in the preceding paragraph, this license does not transfer ownership. You may request removal of off-chain content from the Platform at any time (subject to Section 7 regarding on-chain data); such removal does not require LOAR to delete or retract models, datasets, or derivative works already trained on or created from that content.
 
 [LEGAL REVIEW REQUIRED] Define scope of platform license precisely. Review enforceability of fan content limitations. Determine whether DMCA safe harbor provisions apply to AI-generated derivative works.
 

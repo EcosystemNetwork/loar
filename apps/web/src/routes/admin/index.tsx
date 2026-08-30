@@ -30,6 +30,7 @@ import {
   Activity,
   ArrowRight,
   Users,
+  Database,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -144,6 +145,18 @@ function UsersBadge({ enabled }: { enabled: boolean }) {
   return <Badge variant="outline">{total} users</Badge>;
 }
 
+function PromptsBadge({ enabled }: { enabled: boolean }) {
+  const { data } = useQuery({
+    queryKey: ['admin-hub', 'prompts-stats'],
+    queryFn: () => trpcClient.admin.prompts.stats.query({ days: 30 }),
+    enabled,
+    staleTime: 60_000,
+  });
+  const total = (data as any)?.total;
+  if (total == null) return null;
+  return <Badge variant="outline">{total.toLocaleString()} prompts</Badge>;
+}
+
 function MainnetBadge({ enabled }: { enabled: boolean }) {
   const { data } = useQuery({
     queryKey: ['admin-hub', 'mainnet'],
@@ -220,6 +233,13 @@ function AdminHub() {
       title: 'MCP Usage',
       description: 'Observability for the MCP agent integration.',
       icon: Activity,
+    },
+    {
+      to: '/admin/prompts',
+      title: 'Prompt Corpus',
+      description: 'Every user-submitted generation prompt. Browse, search, export NDJSON.',
+      icon: Database,
+      badge: () => <PromptsBadge enabled={gated} />,
     },
   ];
 

@@ -89,7 +89,7 @@ const moreGroupsBase: MoreGroup[] = [
   {
     label: 'Wallet & Billing',
     links: [
-      { to: '/credits', label: 'Credits' },
+      { to: '/credits', label: 'Points' },
       { to: '/swap', label: 'Swap' },
       { to: '/subscriptions', label: 'Subscriptions' },
       { to: '/pricing', label: 'Pricing' },
@@ -99,6 +99,7 @@ const moreGroupsBase: MoreGroup[] = [
   {
     label: 'Earn',
     links: [
+      { to: '/points-leaderboard', label: 'Points Leaderboard' },
       { to: '/bounties', label: 'Bounties' },
       { to: '/sell', label: 'Sell' },
       { to: '/residency', label: 'Residency', beta: true },

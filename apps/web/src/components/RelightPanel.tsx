@@ -90,7 +90,7 @@ export function RelightPanel({
       onSuccess: (data: any) => {
         const imgs: string[] = data.images ?? (data.imageUrl ? [data.imageUrl] : []);
         setResults(imgs);
-        toast.success(`Relight complete · ${data.creditsCharged} credits`);
+        toast.success(`Relight complete · ${data.creditsCharged} points`);
         onSuccess?.({ jobId: data.jobId, imageUrl: data.imageUrl, images: imgs });
       },
       onError: (err: any) => {

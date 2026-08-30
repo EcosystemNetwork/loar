@@ -14,7 +14,14 @@
  * Code blocks are kept verbatim: they are content, not control flow, and
  * the model treats them as text. Removing them broke a huge fraction of
  * legitimate prompts (script samples, syntax demos, etc.).
+ *
+ * Side effect: every call also feeds the platform prompt corpus via
+ * `capturePrompt` (services/prompt-log). That call is fire-and-forget, never
+ * throws, and no-ops for system / non-generation callers — see that module.
  */
+
+import { capturePrompt } from '../services/prompt-log';
+import { awardGenerationPoints } from '../services/points';
 
 // Role-impersonation only at LINE START. Mid-sentence "system:" /
 // "user:" tokens are normal English / UI strings.
@@ -46,5 +53,16 @@ export function sanitizePrompt(prompt: string): string {
     .trim();
 
   // Length cap — 10 000 characters is generous for any legitimate prompt.
-  return sanitized.slice(0, 10_000);
+  const capped = sanitized.slice(0, 10_000);
+
+  // Feed the platform prompt corpus. No-ops unless this is an attributable
+  // user request on a generation route; never throws.
+  capturePrompt(capped);
+
+  // Award the per-generation points bonus. Same gating as capturePrompt
+  // (attributable user + generation route), deduped per request; never
+  // throws, fire-and-forget.
+  awardGenerationPoints();
+
+  return capped;
 }

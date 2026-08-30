@@ -8,14 +8,15 @@
  * path) once the job completes.
  *
  * Concurrency: Firestore transaction ensures only one reserve wins when
- * multiple requests race against the same bucket — loser receives
- * `InsufficientCreditsError`.
+ * multiple requests race against the same bucket. Points no longer gate
+ * generation (BYOK) — a zero balance still succeeds; spend is recorded for
+ * display only and the balance is clamped at 0.
  */
 import { randomUUID } from 'crypto';
 import { FieldValue, type Transaction } from 'firebase-admin/firestore';
 import { db } from '../../lib/firebase';
 import { assertGenerationAllowed } from '../../lib/generation-guards';
-import { InsufficientCreditsError, type ReserveInput, type ReserveResult } from './types';
+import { type ReserveInput, type ReserveResult } from './types';
 
 function userCreditsRef(userId: string) {
   if (!db) throw new Error('Firebase is not configured');
@@ -44,10 +45,10 @@ export async function reserve(input: ReserveInput): Promise<ReserveResult> {
   const balanceAfter = await db.runTransaction(async (tx: Transaction) => {
     const snap = await tx.get(creditsRef);
     const balance = snap.exists ? ((snap.data()?.balance as number) ?? 0) : 0;
-    if (balance < input.estimatedCredits) {
-      throw new InsufficientCreditsError(input.estimatedCredits, balance);
-    }
-    const newBalance = balance - input.estimatedCredits;
+    // Points no longer gate generation — users bring their own provider keys.
+    // We still record spend for analytics / display, but never reject a job
+    // for an empty balance and never let the balance go negative.
+    const newBalance = Math.max(0, balance - input.estimatedCredits);
     tx.set(
       creditsRef,
       {

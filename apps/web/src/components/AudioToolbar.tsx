@@ -197,7 +197,7 @@ export function AudioToolbar({
         label: `Music — ${musicPrompt.slice(0, 40)}`,
       }),
     onSuccess: (data: any) => {
-      toast.success(`Background music created! ${data.credits} credits`);
+      toast.success(`Background music created! ${data.credits} points`);
       setLastResult({ type: 'music', audioUrl: data.audioUrl });
       queryClient.invalidateQueries({ queryKey: ['sound-nodes', universeId] });
       onSoundNodeCreated?.();
@@ -218,7 +218,7 @@ export function AudioToolbar({
         label: `SFX — ${sfxPrompt.slice(0, 40)}`,
       }),
     onSuccess: (data: any) => {
-      toast.success(`Sound effect created! ${data.credits} credits`);
+      toast.success(`Sound effect created! ${data.credits} points`);
       setLastResult({ type: 'sfx', audioUrl: data.audioUrl });
       queryClient.invalidateQueries({ queryKey: ['sound-nodes', universeId] });
       onSoundNodeCreated?.();
@@ -259,7 +259,7 @@ export function AudioToolbar({
       return { ...lipsyncResult, dialogueUrl: dialogueResult.audioUrl };
     },
     onSuccess: (data: any) => {
-      toast.success(`Lip-sync complete! ${data.credits} credits`);
+      toast.success(`Lip-sync complete! ${data.credits} points`);
       setLastResult({
         type: 'lipsync',
         videoUrl: data.videoUrl,
@@ -374,7 +374,7 @@ export function AudioToolbar({
               {/* Generate button */}
               <div className="flex items-center justify-between">
                 <span className="text-[10px] text-muted-foreground">
-                  ~6 credits | Spans {selectedClips.length} clip
+                  ~6 points | Spans {selectedClips.length} clip
                   {selectedClips.length > 1 ? 's' : ''}
                 </span>
                 <Button
@@ -471,7 +471,7 @@ export function AudioToolbar({
               {/* Generate button */}
               <div className="flex items-center justify-between">
                 <span className="text-[10px] text-muted-foreground">
-                  ~8 credits | Spans {selectedClips.length} clip
+                  ~8 points | Spans {selectedClips.length} clip
                   {selectedClips.length > 1 ? 's' : ''}
                 </span>
                 <Button
@@ -558,7 +558,7 @@ export function AudioToolbar({
               {/* Lip-sync button */}
               <div className="flex items-center justify-between">
                 <span className="text-[10px] text-muted-foreground">
-                  ~7 credits (TTS + lip-sync) | Uses CV model to re-render mouth movements
+                  ~7 points (TTS + lip-sync) | Uses CV model to re-render mouth movements
                 </span>
                 <Button
                   size="sm"

@@ -121,7 +121,9 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
 
   generationEnabled: true,
   mintingEnabled: true,
-  purchaseEnabled: true,
+  // Points are no longer sold — generation is BYOK. Webhook/reconciliation
+  // stay wired up for in-flight orders; admins can re-enable if needed.
+  purchaseEnabled: false,
   registrationEnabled: true,
 
   monthlySpendCapEnabled: true,

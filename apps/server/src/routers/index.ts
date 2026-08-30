@@ -129,6 +129,7 @@ import { indexerRouter } from './indexer/indexer.routes';
 import { notebookRouter } from './notebook/notebook.index';
 import { physicsRouter } from './physics/physics.index';
 import { curationRouter } from './curation/curation.index';
+import { pointsRouter } from './points/points.routes';
 import { zaiRouter } from './zai/zai.routes';
 import { watchSessionsRouter } from './watchSessions/watchSessions.routes';
 import { providersRouter } from './providers/providers.routes';
@@ -419,6 +420,9 @@ export const appRouter = router({
 
   // ── Curation (endorsements + leaderboards — positive taste layer) ────
   curation: curationRouter,
+
+  // ── Points (gamification score + leaderboard) ──────────────────────
+  points: pointsRouter,
 
   // ── Watch sessions (per-episode resume + analytics) ────────────────
   watchSessions: watchSessionsRouter,

@@ -35,7 +35,10 @@ export function useFeatureFlags(): FeatureFlags & { isLoading: boolean } {
   return {
     generationEnabled: data?.generationEnabled ?? ALL_ENABLED.generationEnabled,
     mintingEnabled: data?.mintingEnabled ?? ALL_ENABLED.mintingEnabled,
-    purchaseEnabled: data?.purchaseEnabled ?? ALL_ENABLED.purchaseEnabled,
+    // Points are no longer purchased — generation runs on the user's own
+    // provider keys (BYOK). The buy-points UI stays hidden regardless of the
+    // server flag; the Stripe webhook is left intact for in-flight orders.
+    purchaseEnabled: false,
     registrationEnabled: data?.registrationEnabled ?? ALL_ENABLED.registrationEnabled,
     isLoading,
   };
