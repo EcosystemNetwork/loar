@@ -63,25 +63,28 @@ const failure = {
   latencyMs: 1500,
 };
 
+// Credits/points are retired (BYOK) — `finalizeGenerationFailure` no longer
+// touches any balance; it only marks the generation failed and always
+// reports 'not_charged'.
 describe('finalizeGenerationFailure', () => {
-  it('refunds a generation only once when processing is replayed', async () => {
+  it('marks the generation failed without refunding, and is replay-safe', async () => {
     const { db, state } = createDb({
       userCredits: { 'user-1': { balance: 87, totalSpent: 13 } },
       videoGenerations: { 'generation-1': { status: 'running' } },
     });
 
-    expect(await finalizeGenerationFailure(db, failure)).toBe('refunded');
-    expect(await finalizeGenerationFailure(db, failure)).toBe('already_refunded');
+    expect(await finalizeGenerationFailure(db, failure)).toBe('not_charged');
+    expect(await finalizeGenerationFailure(db, failure)).toBe('not_charged');
 
-    expect(state.userCredits['user-1']).toMatchObject({ balance: 100, totalSpent: 0 });
+    // Balance is never touched now.
+    expect(state.userCredits['user-1']).toEqual({ balance: 87, totalSpent: 13 });
     expect(state.videoGenerations['generation-1']).toMatchObject({
       status: 'failed',
       failureReason: 'provider failed',
-      creditsRefunded: 13,
     });
   });
 
-  it('commits the refund and failed status atomically across a retry', async () => {
+  it('commits the failed status atomically across a retry', async () => {
     const { db, state, failNextTransaction } = createDb({
       userCredits: { 'user-1': { balance: 87, totalSpent: 13 } },
       videoGenerations: { 'generation-1': { status: 'running' } },
@@ -92,8 +95,8 @@ describe('finalizeGenerationFailure', () => {
     expect(state.userCredits['user-1']).toEqual({ balance: 87, totalSpent: 13 });
     expect(state.videoGenerations['generation-1']).toEqual({ status: 'running' });
 
-    expect(await finalizeGenerationFailure(db, failure)).toBe('refunded');
-    expect(state.userCredits['user-1']).toMatchObject({ balance: 100, totalSpent: 0 });
+    expect(await finalizeGenerationFailure(db, failure)).toBe('not_charged');
+    expect(state.userCredits['user-1']).toEqual({ balance: 87, totalSpent: 13 });
     expect(state.videoGenerations['generation-1']).toMatchObject({ status: 'failed' });
   });
 });

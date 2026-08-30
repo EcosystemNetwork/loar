@@ -24,17 +24,15 @@
  *   Composite:       2 credits
  *   Full pipeline:   sum of above per scene
  */
-import { router, protectedProcedure, requirePermission, expensiveProcedure } from '../../lib/trpc';
+import { router, protectedProcedure, expensiveProcedure } from '../../lib/trpc';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
-import { FieldValue } from 'firebase-admin/firestore';
 import { elevenLabsService } from '../../services/elevenlabs';
 import { falService } from '../../services/fal';
 import { lipSyncService } from '../../services/lipsync';
 import { firebaseStorageService } from '../../services/firebase-storage';
 import { trackQuests } from '../../services/quest-tracker';
-import { logFailedRefund } from '../../lib/refund-audit';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 import { TRPCError } from '@trpc/server';
@@ -80,56 +78,16 @@ const soundNodesCol = () => {
   return db.collection('soundNodes');
 };
 
-const userCreditsCol = () => {
-  if (!db) throw new Error('Firebase is not configured');
-  return db.collection('userCredits');
-};
-
 // ── Credit helpers ──────────────────────────────────────────────────────
 
-async function deductCredits(userId: string, credits: number): Promise<void> {
-  if (!db) throw new Error('Firebase is not configured');
+async function deductCredits(userId: string, _credits: number): Promise<void> {
+  // Credits/points retired — generation is BYOK. Kill switch only.
   const { assertGenerationAllowed } = await import('../../lib/generation-guards');
-  await assertGenerationAllowed(userId, credits);
-  const ref = userCreditsCol().doc(userId);
-  await db.runTransaction(async (tx) => {
-    const doc = await tx.get(ref);
-    const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-    // Points no longer gate generation (BYOK) — record spend, clamp at 0.
-    tx.set(
-      ref,
-      {
-        balance: Math.max(0, balance - credits),
-        totalSpent: (doc.data()?.totalSpent || 0) + credits,
-        updatedAt: new Date(),
-      },
-      { merge: true }
-    );
-  });
+  await assertGenerationAllowed(userId, 0);
 }
 
-async function refundCredits(userId: string, credits: number, jobId?: string): Promise<void> {
-  const ref = userCreditsCol().doc(userId);
-  const { recordCreditsTx, recordAiGeneration } = await import('../../lib/metrics');
-  try {
-    await ref.update({
-      balance: FieldValue.increment(credits),
-      totalSpent: FieldValue.increment(-credits),
-      updatedAt: new Date(),
-    });
-    recordCreditsTx('refund', 'success');
-  } catch (err) {
-    recordCreditsTx('refund', 'failure');
-    console.error(`CRITICAL: Scene audio credit refund failed for ${userId}:`, err);
-    logFailedRefund({
-      userId,
-      credits,
-      source: 'sceneAudio',
-      generationId: jobId ?? 'unknown',
-      error: err instanceof Error ? err.message : 'Unknown',
-    });
-  }
-  recordAiGeneration('elevenlabs', 'sceneAudio', 'failure');
+async function refundCredits(_userId: string, _credits: number, _jobId?: string): Promise<void> {
+  // Credits/points retired — nothing to refund.
 }
 
 // ── Upload helper ───────────────────────────────────────────────────────

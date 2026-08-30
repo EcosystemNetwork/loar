@@ -126,9 +126,12 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
   purchaseEnabled: false,
   registrationEnabled: true,
 
-  monthlySpendCapEnabled: true,
+  // Credits/points retired (BYOK) — spend caps no longer apply. Kept in the
+  // config shape so admin tooling and `assertSpendAllowed` still compile;
+  // flip back on only if a metered tier is reintroduced.
+  monthlySpendCapEnabled: false,
   monthlySpendCapCredits: 2000,
-  dailySpendCapEnabled: true,
+  dailySpendCapEnabled: false,
   dailySpendCapCredits: 500,
 
   featuredUniverseIds: [],

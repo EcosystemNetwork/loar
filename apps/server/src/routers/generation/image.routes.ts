@@ -82,20 +82,8 @@ function imageCostProviderFor(p: ImageModelConfig['provider']): CostProvider {
  * both pass the check, and both write B-cost — leaving the user with
  * cost × (N-1) free credits for N concurrent calls.
  */
-async function deductLegacyCredits(uid: string, cost: number): Promise<void> {
-  if (!db) return;
-  const userRef = db.collection('userCredits').doc(uid);
-  await db.runTransaction(async (tx) => {
-    const doc = await tx.get(userRef);
-    const balance: number = doc.data()?.balance || 0;
-    // Points no longer gate generation (BYOK) — record spend, clamp at 0,
-    // never reject.
-    tx.set(
-      userRef,
-      { balance: Math.max(0, balance - cost), updatedAt: new Date() },
-      { merge: true }
-    );
-  });
+async function deductLegacyCredits(_uid: string, _cost: number): Promise<void> {
+  // Credits/points retired — generation is BYOK. No-op.
 }
 import { googleImagenService } from '../../services/google-imagen';
 import { recordAssetEventAsync } from '../../services/lineage';

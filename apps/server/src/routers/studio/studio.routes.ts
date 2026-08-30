@@ -40,7 +40,6 @@
  *   studio.estimatePackCost   — Pre-flight cost for a capability set
  */
 import { router, protectedProcedure, publicProcedure } from '../../lib/trpc';
-import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
@@ -55,7 +54,6 @@ import {
 } from '../../services/video-models';
 import { firebaseStorageService } from '../../services/firebase-storage';
 import { trackQuests } from '../../services/quest-tracker';
-import { logFailedRefund } from '../../lib/refund-audit';
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 import { TRPCError } from '@trpc/server';
@@ -138,49 +136,14 @@ const studioJobsCol = () => {
 
 // ── Credit helpers ────────────────────────────────────────────────────
 
-async function deductCredits(userId: string, credits: number): Promise<void> {
+async function deductCredits(userId: string, _credits: number): Promise<void> {
+  // Credits/points retired — generation is BYOK. Kill switch only.
   const { assertGenerationAllowed } = await import('../../lib/generation-guards');
-  await assertGenerationAllowed(userId, credits);
-  const ref = db.collection('userCredits').doc(userId);
-  await db.runTransaction(async (tx) => {
-    const doc = await tx.get(ref);
-    const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-    // Points no longer gate generation (BYOK) — record spend, clamp at 0.
-    tx.set(
-      ref,
-      {
-        balance: Math.max(0, balance - credits),
-        totalSpent: (doc.data()?.totalSpent || 0) + credits,
-        updatedAt: new Date(),
-      },
-      { merge: true }
-    );
-  });
+  await assertGenerationAllowed(userId, 0);
 }
 
-async function refundCredits(userId: string, credits: number): Promise<void> {
-  if (credits <= 0) return;
-  const ref = db.collection('userCredits').doc(userId);
-  const { recordCreditsTx, recordAiGeneration } = await import('../../lib/metrics');
-  try {
-    await ref.update({
-      balance: FieldValue.increment(credits),
-      totalSpent: FieldValue.increment(-credits),
-      updatedAt: new Date(),
-    });
-    recordCreditsTx('refund', 'success');
-  } catch (err) {
-    recordCreditsTx('refund', 'failure');
-    console.error(`CRITICAL: Studio pack credit refund failed for ${userId}:`, err);
-    logFailedRefund({
-      userId,
-      credits,
-      source: 'studio',
-      generationId: 'pack',
-      error: err instanceof Error ? err.message : 'Unknown',
-    });
-  }
-  recordAiGeneration('multi', 'studio', 'failure');
+async function refundCredits(_userId: string, _credits: number): Promise<void> {
+  // Credits/points retired — nothing to refund.
 }
 
 // ── Task runners ──────────────────────────────────────────────────────

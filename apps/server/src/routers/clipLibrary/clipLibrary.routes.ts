@@ -63,36 +63,14 @@ const renderClipInputSchema = z.object({
 const RENDER_BASE_CREDITS = 3;
 const RENDER_PER_CLIP_CREDITS = 1;
 
-async function deductCredits(uid: string, credits: number): Promise<void> {
-  if (!db) return;
+async function deductCredits(uid: string, _credits: number): Promise<void> {
+  // Credits/points retired — generation is BYOK. Kill switch only.
   const { assertGenerationAllowed } = await import('../../lib/generation-guards');
-  await assertGenerationAllowed(uid, credits);
-  const ref = db.collection('userCredits').doc(uid);
-  await db.runTransaction(async (tx) => {
-    const doc = await tx.get(ref);
-    const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-    // Points no longer gate generation (BYOK) — record spend, clamp at 0.
-    tx.set(
-      ref,
-      {
-        balance: Math.max(0, balance - credits),
-        totalSpent: (doc.data()?.totalSpent || 0) + credits,
-        updatedAt: new Date(),
-      },
-      { merge: true }
-    );
-  });
+  await assertGenerationAllowed(uid, 0);
 }
 
-async function refundCredits(uid: string, credits: number): Promise<void> {
-  if (!db) return;
-  const { FieldValue } = await import('firebase-admin/firestore');
-  const ref = db.collection('userCredits').doc(uid);
-  await ref.update({
-    balance: FieldValue.increment(credits),
-    totalSpent: FieldValue.increment(-credits),
-    updatedAt: new Date(),
-  });
+async function refundCredits(_uid: string, _credits: number): Promise<void> {
+  // Credits/points retired — nothing to refund.
 }
 
 async function requireCollaborator(

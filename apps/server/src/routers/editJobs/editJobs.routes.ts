@@ -14,7 +14,6 @@
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { TRPCError } from '@trpc/server';
-import { FieldValue } from 'firebase-admin/firestore';
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { getStorageManager } from '../../services/storage/manager';
@@ -83,50 +82,14 @@ async function assertSessionOwner(uid: string, sessionId: string) {
 
 // ── Credits (mirrors editing.routes.ts pattern) ─────────────────────────
 
-async function deductCredits(uid: string, cost: number, op: string) {
-  if (!db) return;
+async function deductCredits(uid: string, _cost: number, _op: string) {
+  // Credits/points retired — generation is BYOK. Kill switch only.
   const { assertGenerationAllowed } = await import('../../lib/generation-guards');
-  await assertGenerationAllowed(uid, cost);
-  const userRef = db.collection('userCredits').doc(uid);
-  await db.runTransaction(async (tx) => {
-    const userDoc = await tx.get(userRef);
-    const balance = userDoc.data()?.balance || 0;
-    // Points no longer gate generation (BYOK) — record spend, clamp at 0.
-    tx.set(
-      userRef,
-      {
-        balance: Math.max(0, balance - cost),
-        totalSpent: (userDoc.data()?.totalSpent || 0) + cost,
-        updatedAt: new Date(),
-      },
-      { merge: true }
-    );
-    const txRef = db.collection('creditTransactions').doc();
-    tx.set(txRef, {
-      uid,
-      type: 'spend',
-      generationType: `editCanvas_${op}`,
-      credits: -cost,
-      source: 'editCanvas',
-      createdAt: new Date(),
-    });
-  });
+  await assertGenerationAllowed(uid, 0);
 }
 
-async function refundCredits(uid: string, cost: number) {
-  if (!db) return;
-  try {
-    await db
-      .collection('userCredits')
-      .doc(uid)
-      .update({
-        balance: FieldValue.increment(cost),
-        totalSpent: FieldValue.increment(-cost),
-        updatedAt: new Date(),
-      });
-  } catch (err) {
-    console.error(`[editJobs refund] Failed to refund ${cost} to ${uid}:`, err);
-  }
+async function refundCredits(_uid: string, _cost: number) {
+  // Credits/points retired — nothing to refund.
 }
 
 // ── Throttle ────────────────────────────────────────────────────────────
