@@ -1052,6 +1052,24 @@ function UniverseTimelineEditorInner() {
   const handleDeleteSelected = useCallback(() => {
     if (selectedNodeIds.size === 0) return;
 
+    // Refuse a delete that would clear every scene from the canvas. For
+    // on-chain / off-chain nodes "delete" is a local soft-archive, and the
+    // archive list has no restore UI — a Select-All → Delete wipes the whole
+    // editor on the next load with no error, looking like data loss (this is
+    // exactly how universes ended up with a blank editor). The graph rebuild
+    // now also ignores an all-covering archive list as a safety net, but
+    // don't create that state in the first place.
+    const sceneNodesOnCanvas = nodesRef.current.filter((n: any) => n.data?.nodeType === 'scene');
+    const selectedSceneCount = sceneNodesOnCanvas.filter((n: any) =>
+      selectedNodeIds.has(n.id)
+    ).length;
+    if (sceneNodesOnCanvas.length > 0 && selectedSceneCount >= sceneNodesOnCanvas.length) {
+      toast.error("Can't delete every scene", {
+        description: 'Leave at least one node, or use per-node delete.',
+      });
+      return;
+    }
+
     const archived = getArchivedNodeIds();
     const eventsData = getStoredEvents();
 

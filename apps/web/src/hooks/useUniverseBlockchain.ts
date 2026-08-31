@@ -382,6 +382,19 @@ export function useUniverseBlockchain({
           if (mediaOverrides?.[Number(nid)]?.hidden) hiddenIdSet.add(nid);
         }
 
+        // Never hide the entire graph. If a bad/bulk `nodeMedia` override run
+        // has `hidden: true` on every node, dropping them all leaves the
+        // timeline editor and player with a blank canvas and no error —
+        // indistinguishable from data loss. Fall back to showing everything
+        // and let the caller sort it out. (Mirrors the local-archive-list
+        // guard in universe/$id.tsx's graph rebuild.)
+        if (rawNodeIds.length > 0 && hiddenIdSet.size >= rawNodeIds.length) {
+          console.warn(
+            `[useUniverseBlockchain] every node has a hidden media override (${hiddenIdSet.size}/${rawNodeIds.length}); ignoring so the graph isn't blank.`
+          );
+          hiddenIdSet.clear();
+        }
+
         const keptIndices: number[] = [];
         for (let i = 0; i < rawNodeIds.length; i++) {
           if (!hiddenIdSet.has(String(rawNodeIds[i]))) keptIndices.push(i);
