@@ -366,7 +366,16 @@ export async function raceIpfsGateways(
 // Successful lookups are cached in-memory per session to keep render paths
 // snappy. Failures fall through to the public-gateway URL.
 
-const SERVER_URL = (import.meta.env.VITE_SERVER_URL || '').replace(/\/$/, '');
+// Mirrors SERVER_URL resolution in utils/query-client.ts (itself a mirror of
+// utils/trpc.ts). Without the PROD fallback, a production build that ships
+// without VITE_SERVER_URL leaves this empty — resolveIpfsUrlAsync then never
+// calls /api/ipfs/resolve, so every piece of media is stuck on the public
+// gateways (ipfs.io / gateway.pinata.cloud), which rate-limit (429) and time
+// out (504) under real traffic. The rest of the app dodges this via the
+// query-client fallback; IPFS resolution needs the same safety net.
+const PROD_SERVER_URL = 'https://api.loar.fun';
+const RAW_SERVER_URL = (import.meta.env.VITE_SERVER_URL ?? '').trim().replace(/\/$/, '');
+const SERVER_URL = RAW_SERVER_URL || (import.meta.env.PROD ? PROD_SERVER_URL : '');
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 // In-flight dedup: multiple elements resolving the same CID concurrently
 // (e.g. a grid of thumbnails sharing a CID, or an effect that fires twice)
