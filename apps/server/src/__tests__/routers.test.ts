@@ -232,3 +232,48 @@ describe('synapse router', () => {
     ).rejects.toThrow(TRPCError);
   });
 });
+
+// ---------------------------------------------------------------------------
+// points (gamification leaderboard — read-only)
+// ---------------------------------------------------------------------------
+describe('points router', () => {
+  it('config is public and exposes the award amounts', async () => {
+    const caller = createPublicCaller();
+    const result = await caller.points.config();
+    expect(result).toEqual({ perUniverse: 10, perGeneration: 10 });
+  });
+
+  it('leaderboard is public and returns a leaderboard array', async () => {
+    const caller = createPublicCaller();
+    const result = await caller.points.leaderboard();
+    expect(result).toHaveProperty('leaderboard');
+    expect(Array.isArray(result.leaderboard)).toBe(true);
+  });
+
+  it('leaderboard rejects a limit below 1', async () => {
+    const caller = createPublicCaller();
+    await expect(caller.points.leaderboard({ limit: 0 })).rejects.toThrow();
+  });
+
+  it('leaderboard rejects a limit above 100', async () => {
+    const caller = createPublicCaller();
+    await expect(caller.points.leaderboard({ limit: 101 })).rejects.toThrow();
+  });
+
+  it('me rejects unauthenticated callers', async () => {
+    const caller = createPublicCaller();
+    await expect(caller.points.me()).rejects.toThrow(TRPCError);
+  });
+
+  it('me returns a zeroed standing for an authenticated caller with no points', async () => {
+    const caller = createAuthCaller();
+    const result = await caller.points.me();
+    expect(result).toEqual({
+      userId: 'test-uid',
+      points: 0,
+      universeCount: 0,
+      generationCount: 0,
+      rank: null,
+    });
+  });
+});
