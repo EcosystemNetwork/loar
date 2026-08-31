@@ -186,6 +186,22 @@ function RootComponent() {
                 <Link to="/testnet" className="hover:text-foreground transition-colors">
                   Testnet
                 </Link>
+                <a
+                  href="https://t.me/+AXD-XK8SVvw5MTIx"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-foreground transition-colors"
+                >
+                  Telegram
+                </a>
+                <a
+                  href="https://x.com/LOAR_FUN"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-foreground transition-colors"
+                >
+                  X
+                </a>
               </div>
             </footer>
           )}
