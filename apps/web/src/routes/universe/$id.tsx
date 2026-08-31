@@ -2630,8 +2630,25 @@ function UniverseTimelineEditorInner() {
     const blockchainNodes: Node<TimelineNodeData>[] = [];
     const blockchainEdges: Edge[] = [];
 
-    // Load archived (soft-deleted) node IDs
-    const archivedNodeIds = getArchivedNodeIds();
+    // Load archived (soft-deleted) node IDs. Guard against a stale or
+    // accidental "archive everything" (e.g. Select-All → Delete, then a
+    // reload) — archived ids live only in this browser's localStorage, there
+    // is no UI to view or restore them, and the rebuild below silently drops
+    // every match. If the archive list covers every node the universe
+    // actually has, the editor canvas goes permanently blank with no error,
+    // reading as data loss (the public /watch page is unaffected — it never
+    // consults this key). When that happens, ignore the archive list for
+    // this render so the real nodes come back.
+    const storedArchivedNodeIds = getArchivedNodeIds();
+    const wouldHideEveryNode =
+      storedArchivedNodeIds.size > 0 &&
+      graphData.nodeIds.every((n) => storedArchivedNodeIds.has(normalizeNodeId(n).toString()));
+    if (wouldHideEveryNode) {
+      console.warn(
+        `[universe ${id}] local archive list covers all ${graphData.nodeIds.length} node(s); ignoring it so the canvas isn't blank. Clear localStorage key "universe_archived_nodes_${id}" to reset.`
+      );
+    }
+    const archivedNodeIds = wouldHideEveryNode ? new Set<string>() : storedArchivedNodeIds;
 
     // Colors for different types
     const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
