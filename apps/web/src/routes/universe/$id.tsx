@@ -3139,7 +3139,11 @@ function UniverseTimelineEditorInner() {
   // ever created (Universe.sol), and if this universe's contract predates
   // the getGraphPage() pagination fallback, that fallback fails too — see
   // graphErrorReason's doc comment in useUniverseBlockchain.ts.
-  if (isGraphError) {
+  // Guard on `isOnChain` too: a universe that resolved to off-chain mode has
+  // no meaningful on-chain graph error (see useUniverseBlockchain, which now
+  // masks this — belt-and-braces here so a future regression there can't
+  // blank the editor for off-chain fun-mode universes).
+  if (isGraphError && isOnChain) {
     const isLegacyContract = graphErrorReason === 'pagination-unsupported';
     return (
       <div className="flex items-center justify-center min-h-screen">

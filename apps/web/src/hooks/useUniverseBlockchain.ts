@@ -507,6 +507,18 @@ export function useUniverseBlockchain({
   const isLoadingAny =
     isLoadingLeaves || isLoadingFullGraph || isLoadingCanonChain || isLoadingOffChain;
 
+  // Only surface on-chain graph errors when we're actually in on-chain mode.
+  // While the universe doc is still loading, `isOnChain` is undefined and this
+  // hook runs on-chain reads against the raw universe id. For an off-chain
+  // fun-mode universe with a 0x-looking id that isn't a deployed contract,
+  // those reads settle to an error — and react-query keeps that errored state
+  // even after the query is disabled once the doc resolves the universe as
+  // off-chain. That stale error used to blank the editor (its `isGraphError`
+  // screen) for such universes whenever the doc read was slow enough to lose
+  // the race (e.g. a large lore blob). Once `useOnChain` is false the active
+  // data source is the off-chain node list, which has its own error handling.
+  const graphErrorActive = useOnChain && isGraphError;
+
   return {
     graphData,
     latestNodeId,
@@ -516,9 +528,9 @@ export function useUniverseBlockchain({
     isLoadingCanonChain,
     isLoadingOffChain,
     isLoadingAny,
-    isError: isGraphError,
-    graphError: graphFetchError ?? null,
-    graphErrorReason,
+    isError: graphErrorActive,
+    graphError: graphErrorActive ? (graphFetchError ?? null) : null,
+    graphErrorReason: graphErrorActive ? graphErrorReason : 'none',
     refetchLeaves,
     refetchFullGraph,
     refetchCanonChain,
