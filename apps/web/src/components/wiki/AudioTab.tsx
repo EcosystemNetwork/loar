@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,6 +17,18 @@ export function AudioTab({ universeAddress }: AudioTabProps) {
   const [search, setSearch] = useState('');
   const [playingId, setPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Stop playback when the tab unmounts (user switches tabs / navigates away)
+  // or when the universe filter changes — otherwise the <Audio> instance keeps
+  // playing with no UI left to pause it, and the playing track may no longer be
+  // in the list. Cleanup runs on unmount and before each universe change.
+  useEffect(() => {
+    return () => {
+      audioRef.current?.pause();
+      audioRef.current = null;
+      setPlayingId(null);
+    };
+  }, [universeAddress]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['wiki', 'audio', universeAddress],

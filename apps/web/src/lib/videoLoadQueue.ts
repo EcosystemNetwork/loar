@@ -53,9 +53,13 @@ class VideoLoadQueue {
 
 /**
  * Singleton queue shared across all gallery video cards.
- * Concurrency 6 matches the browser's per-origin connection cap and lets a
- * full above-the-fold row (4-column grid) load in parallel so the page looks
- * even instead of staggered. Combined with intersection-based gating in
- * useVideoLoad, off-screen cards still wait their turn.
+ *
+ * Concurrency 12: the IPFS gateway (w3s.link) is HTTP/2, so requests multiplex
+ * over a single connection and the old HTTP/1.1 "6 per origin" cap doesn't
+ * apply. 6 was throttling the first visible screenful into slow batches —
+ * tiles trickled in one row at a time. 12 lets the whole above-the-fold grid
+ * (~8–12 tiles, bounded by useVideoLoad's 300px intersection gate) start
+ * loading at once, so the page fills evenly instead of staggered. Off-screen
+ * cards still wait their turn, and the per-slot watchdog frees stuck loads.
  */
-export const videoLoadQueue = new VideoLoadQueue(6);
+export const videoLoadQueue = new VideoLoadQueue(12);
