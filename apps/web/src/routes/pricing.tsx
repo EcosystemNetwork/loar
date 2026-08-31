@@ -160,7 +160,7 @@ function PricingPage() {
     },
     onSuccess: (data) => {
       toast.success(
-        `Subscribed to ${data.tierName}! ${data.creditsIssued.toLocaleString()} credits added.`
+        `Subscribed to ${data.tierName}! ${data.creditsIssued.toLocaleString()} points added.`
       );
       queryClient.invalidateQueries({ queryKey: ['my-subscription'] });
       queryClient.invalidateQueries({ queryKey: ['credit-balance'] });
@@ -190,7 +190,7 @@ function PricingPage() {
         <div className="text-center mb-12">
           <h1 className="text-3xl md:text-5xl font-bold mb-3 tracking-tight">PICK YOUR PLAN</h1>
           <p className="text-muted-foreground text-sm md:text-base max-w-xl mx-auto">
-            Create AI-powered cinematic universes with monthly credits.
+            Create AI-powered cinematic universes with monthly points.
             <br />
             Upgrade anytime. Cancel anytime.
           </p>
@@ -274,7 +274,7 @@ function PricingPage() {
                     <div className="flex items-center gap-2 mt-3 mb-1">
                       <span className="text-sm text-muted-foreground">
                         <Zap className="h-3.5 w-3.5 inline mr-1" />
-                        {tier.monthlyCredits.toLocaleString()} credits/mo
+                        {tier.monthlyCredits.toLocaleString()} points/mo
                       </span>
                     </div>
                   </div>
@@ -356,14 +356,14 @@ function PricingPage() {
         {/* Bottom section */}
         <div className="text-center mt-12 space-y-4">
           <p className="text-muted-foreground text-sm">
-            Need more credits? You can always{' '}
+            Want to see your usage? Check your{' '}
             <button
               onClick={() => navigate({ to: '/credits' })}
               className="text-primary underline underline-offset-2 hover:text-primary/80"
             >
-              buy credit top-ups
-            </button>{' '}
-            alongside your subscription.
+              points balance
+            </button>
+            .
           </p>
 
           {mySub && mySub.status === 'active' && (

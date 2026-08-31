@@ -290,7 +290,7 @@ export function VideoEditingToolbar({
                 {TOOLS.find((t) => t.id === activeTool)?.label}
               </h3>
               <Badge variant="secondary" className="text-[10px]">
-                {getModelCost(activeTool)} credits
+                {getModelCost(activeTool)} points
               </Badge>
             </div>
             <Button variant="ghost" size="sm" onClick={() => setActiveTool(null)}>
@@ -323,7 +323,9 @@ export function VideoEditingToolbar({
                         <Badge variant="outline" className="text-[9px]">
                           {m.tier}
                         </Badge>
-                        <span className="text-[10px] text-muted-foreground">{m.creditCost} cr</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {m.creditCost} pts
+                        </span>
                       </div>
                     </SelectItem>
                   ))}

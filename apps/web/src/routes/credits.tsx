@@ -1,5 +1,6 @@
 /**
- * Credits — full-page credit balance, purchase, and history.
+ * Points — full-page points balance and history. Generation is BYOK, so
+ * points are informational only; purchasing is disabled (see purchaseEnabled).
  */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { ArrowLeft, Zap, TrendingUp, TrendingDown, Gift, Coins } from 'lucide-react';
@@ -66,11 +67,11 @@ function CreditsPage() {
         </Button>
         <h1 className="font-bold flex items-center gap-2">
           <Zap className="w-4 h-4 text-amber-400" />
-          Credits
+          Points
         </h1>
         {!showStore && purchaseEnabled && (
           <Button size="sm" className="ml-auto" onClick={() => setShowStore(true)}>
-            Buy Credits
+            Buy Points
           </Button>
         )}
       </div>
@@ -90,22 +91,19 @@ function CreditsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
-                      Available Credits
+                      Available Points
                     </p>
                     {balanceLoading ? (
                       <div className="h-10 w-24 bg-muted animate-pulse rounded" />
                     ) : (
-                      <p
-                        className={`text-4xl font-bold ${isLow ? 'text-red-400' : 'text-amber-400'}`}
-                      >
+                      <p className="text-4xl font-bold text-amber-400">
                         {credits.toLocaleString()}
                       </p>
                     )}
-                    {isLow && (
-                      <p className="text-xs text-red-400 mt-1">
-                        Running low — top up to keep creating
-                      </p>
-                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Points track usage. Generation runs on your own provider keys — no balance
+                      required.
+                    </p>
                   </div>
                   <div className="text-right space-y-1 text-xs text-muted-foreground">
                     {balance && (
@@ -160,7 +158,7 @@ function CreditsPage() {
                           {key.replace(/_/g, ' ')}
                         </span>
                         <Badge variant="outline" className="text-xs ml-2 shrink-0">
-                          {value as number} cr
+                          {value as number} pts
                         </Badge>
                       </div>
                     ))}
@@ -230,7 +228,7 @@ function CreditsPage() {
                               className={`text-sm font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}
                             >
                               {isPositive ? '+' : '-'}
-                              {totalCredits.toLocaleString()} cr
+                              {totalCredits.toLocaleString()} pts
                             </p>
                             {tx.createdAt && (
                               <p className="text-[10px] text-muted-foreground">

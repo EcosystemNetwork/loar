@@ -65,7 +65,7 @@ function UsagePage() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-semibold">{data.totalCredits.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground mt-1">credits</p>
+            <p className="text-xs text-muted-foreground mt-1">points</p>
           </CardContent>
         </Card>
 
@@ -77,9 +77,7 @@ function UsagePage() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-semibold">{serverCredits.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              calls billed against your LOAR credits
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">calls tracked against your points</p>
           </CardContent>
         </Card>
 
@@ -124,7 +122,7 @@ function UsagePage() {
                     </div>
                     <div className="text-right">
                       <div className="font-semibold">{row.totalCredits.toLocaleString()}</div>
-                      <div className="text-xs text-muted-foreground">credits</div>
+                      <div className="text-xs text-muted-foreground">points</div>
                     </div>
                   </div>
                 ))}
@@ -134,7 +132,7 @@ function UsagePage() {
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        BYOK calls bill a flat 1-credit routing fee regardless of duration. Platform-paid calls bill
+        BYOK calls log a flat 1-point routing entry regardless of duration. Platform-paid calls bill
         at the per-minute price of the chosen model.
       </p>
     </div>

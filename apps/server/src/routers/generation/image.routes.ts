@@ -82,20 +82,8 @@ function imageCostProviderFor(p: ImageModelConfig['provider']): CostProvider {
  * both pass the check, and both write B-cost — leaving the user with
  * cost × (N-1) free credits for N concurrent calls.
  */
-async function deductLegacyCredits(uid: string, cost: number): Promise<void> {
-  if (!db) return;
-  const userRef = db.collection('userCredits').doc(uid);
-  await db.runTransaction(async (tx) => {
-    const doc = await tx.get(userRef);
-    const balance: number = doc.data()?.balance || 0;
-    if (balance < cost) {
-      throw new TRPCError({
-        code: 'PRECONDITION_FAILED',
-        message: `Insufficient credits. Need ${cost}, have ${balance}. Purchase more credits to continue.`,
-      });
-    }
-    tx.update(userRef, { balance: balance - cost, updatedAt: new Date() });
-  });
+async function deductLegacyCredits(_uid: string, _cost: number): Promise<void> {
+  // Credits/points retired — generation is BYOK. No-op.
 }
 import { googleImagenService } from '../../services/google-imagen';
 import { recordAssetEventAsync } from '../../services/lineage';
@@ -943,31 +931,27 @@ export const imageRouter = router({
         });
       }
       const userCreditsRef = db.collection('userCredits').doc(ctx.user.uid);
-      let insufficientCredits = false;
       try {
         await db.runTransaction(async (tx) => {
           const doc = await tx.get(userCreditsRef);
           const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-          if (balance < totalCredits) {
-            insufficientCredits = true;
-            throw new Error(
-              `Insufficient credits. Need ${totalCredits}, have ${balance}. Purchase more credits to continue.`
-            );
-          }
-          tx.update(userCreditsRef, {
-            balance: balance - totalCredits,
-            totalSpent: (doc.data()?.totalSpent || 0) + totalCredits,
-            updatedAt: new Date(),
-          });
+          // Points no longer gate generation (BYOK) — record spend for
+          // display, clamp the balance at 0, never reject the job.
+          tx.set(
+            userCreditsRef,
+            {
+              balance: Math.max(0, balance - totalCredits),
+              totalSpent: (doc.data()?.totalSpent || 0) + totalCredits,
+              updatedAt: new Date(),
+            },
+            { merge: true }
+          );
         });
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Credit deduction failed';
+        const message = err instanceof Error ? err.message : 'Points ledger update failed';
         await imageGenerationsCol()
           .doc(genId)
           .update({ status: 'failed', failureReason: message, completedAt: new Date() });
-        if (insufficientCredits) {
-          throw new TRPCError({ code: 'PRECONDITION_FAILED', message });
-        }
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message });
       }
 
@@ -1408,29 +1392,26 @@ export const imageRouter = router({
         });
       }
       const userCreditsRef = db.collection('userCredits').doc(ctx.user.uid);
-      let insufficientCredits = false;
       try {
         await db.runTransaction(async (tx) => {
           const doc = await tx.get(userCreditsRef);
           const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-          if (balance < totalCredits) {
-            insufficientCredits = true;
-            throw new Error(`Insufficient credits. Need ${totalCredits}, have ${balance}.`);
-          }
-          tx.update(userCreditsRef, {
-            balance: balance - totalCredits,
-            totalSpent: (doc.data()?.totalSpent || 0) + totalCredits,
-            updatedAt: new Date(),
-          });
+          // Points no longer gate generation (BYOK) — record spend, clamp at 0.
+          tx.set(
+            userCreditsRef,
+            {
+              balance: Math.max(0, balance - totalCredits),
+              totalSpent: (doc.data()?.totalSpent || 0) + totalCredits,
+              updatedAt: new Date(),
+            },
+            { merge: true }
+          );
         });
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Credit deduction failed';
+        const message = err instanceof Error ? err.message : 'Points ledger update failed';
         await imageGenerationsCol()
           .doc(genId)
           .update({ status: 'failed', failureReason: message, completedAt: new Date() });
-        if (insufficientCredits) {
-          throw new TRPCError({ code: 'PRECONDITION_FAILED', message });
-        }
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message });
       }
 

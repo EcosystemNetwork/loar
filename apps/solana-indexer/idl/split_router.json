@@ -1,0 +1,738 @@
+{
+  "address": "7hcFnt2Tgzi1Sc3PDWqAQRFb6BoRmEtmoizBSLaYCGkr",
+  "metadata": {
+    "name": "split_router",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "LOAR SplitRouter — Solana sister to apps/contracts/src/SplitRouter.sol"
+  },
+  "instructions": [
+    {
+      "name": "accept_admin",
+      "discriminator": [112, 42, 45, 90, 116, 181, 13, 170],
+      "accounts": [
+        {
+          "name": "new_admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 112, 108, 105, 116, 95, 114, 111, 117, 116, 101, 114, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_config",
+      "discriminator": [208, 127, 21, 1, 194, 190, 196, 70],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 112, 108, 105, 116, 95, 114, 111, 117, 116, 101, 114, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "treasury",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "pause",
+      "discriminator": [211, 22, 221, 251, 74, 121, 193, 47],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 112, 108, 105, 116, 95, 114, 111, 117, 116, 101, 114, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "route_with_splits",
+      "docs": [
+        "Route `amount` lamports from the payer through the configured splits.",
+        "",
+        "Recipients are passed as `remaining_accounts` in the same order as",
+        "stored in the Splits PDA. The treasury account (config.treasury) must",
+        "be passed in the named accounts. Last recipient receives any rounding",
+        "dust so no lamports are stranded in the payer's account."
+      ],
+      "discriminator": [143, 142, 255, 47, 80, 113, 130, 209],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 112, 108, 105, 116, 95, 114, 111, 117, 116, 101, 114, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "splits",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [115, 112, 108, 105, 116, 115]
+              },
+              {
+                "kind": "account",
+                "path": "splits.entity_hash",
+                "account": "Splits"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "docs": ["`config.treasury` in the handler — mismatch trips TreasuryMismatch."],
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "platform_fee_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "set_splits",
+      "docs": [
+        "Set the splits configuration for an entity. The caller (signer) is",
+        "recorded as the owner. The Splits PDA is unique per entity_hash, so",
+        "`init_if_needed` is safe — the seed prevents re-init attacks.",
+        "",
+        "On first call: caller is recorded as owner. On subsequent calls:",
+        "caller must match the stored owner, and the 1-day cooldown must have",
+        "elapsed since the last change."
+      ],
+      "discriminator": [175, 2, 86, 49, 225, 202, 232, 189],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 112, 108, 105, 116, 95, 114, 111, 117, 116, 101, 114, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "splits",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [115, 112, 108, 105, 116, 115]
+              },
+              {
+                "kind": "arg",
+                "path": "entity_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "entity_hash",
+          "type": {
+            "array": ["u8", 32]
+          }
+        },
+        {
+          "name": "recipients",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "SplitInput"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_treasury",
+      "discriminator": [57, 97, 196, 95, 195, 206, 106, 136],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 112, 108, 105, 116, 95, 114, 111, 117, 116, 101, 114, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_treasury",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "transfer_admin",
+      "discriminator": [42, 242, 66, 106, 228, 10, 111, 156],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 112, 108, 105, 116, 95, 114, 111, 117, 116, 101, 114, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "transfer_split_ownership",
+      "docs": ["Transfer split ownership for an entity. Current owner only."],
+      "discriminator": [31, 67, 105, 212, 178, 5, 81, 11],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "splits",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [115, 112, 108, 105, 116, 115]
+              },
+              {
+                "kind": "account",
+                "path": "splits.entity_hash",
+                "account": "Splits"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_owner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "unpause",
+      "discriminator": [169, 144, 4, 38, 10, 141, 188, 255],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 112, 108, 105, 116, 95, 114, 111, 117, 116, 101, 114, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [155, 12, 170, 224, 30, 250, 204, 130]
+    },
+    {
+      "name": "Splits",
+      "discriminator": [108, 68, 238, 198, 23, 99, 85, 143]
+    }
+  ],
+  "events": [
+    {
+      "name": "AdminTransferProposed",
+      "discriminator": [203, 168, 175, 51, 239, 104, 20, 85]
+    },
+    {
+      "name": "AdminTransferred",
+      "discriminator": [255, 147, 182, 5, 199, 217, 38, 179]
+    },
+    {
+      "name": "ConfigInitialized",
+      "discriminator": [181, 49, 200, 156, 19, 167, 178, 91]
+    },
+    {
+      "name": "Paused",
+      "discriminator": [172, 248, 5, 253, 49, 255, 255, 232]
+    },
+    {
+      "name": "SplitOwnershipTransferred",
+      "discriminator": [11, 126, 251, 121, 56, 96, 69, 56]
+    },
+    {
+      "name": "SplitPayment",
+      "discriminator": [180, 177, 130, 180, 120, 199, 251, 63]
+    },
+    {
+      "name": "SplitsConfigured",
+      "discriminator": [63, 35, 114, 216, 79, 141, 93, 127]
+    },
+    {
+      "name": "TreasuryUpdated",
+      "discriminator": [80, 239, 54, 168, 43, 38, 85, 145]
+    },
+    {
+      "name": "Unpaused",
+      "discriminator": [156, 150, 47, 174, 120, 216, 93, 117]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Only the configured admin or split owner may perform this action"
+    },
+    {
+      "code": 6001,
+      "name": "NotSplitOwner",
+      "msg": "Caller is not the registered split owner for this entity"
+    },
+    {
+      "code": 6002,
+      "name": "ZeroHash",
+      "msg": "Entity hash cannot be all zeros"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidSplitTotal",
+      "msg": "Splits must sum to exactly 10000 basis points"
+    },
+    {
+      "code": 6004,
+      "name": "TooManyRecipients",
+      "msg": "Recipient count must be between 1 and MAX_RECIPIENTS (10)"
+    },
+    {
+      "code": 6005,
+      "name": "ZeroBps",
+      "msg": "Recipient bps must be greater than zero"
+    },
+    {
+      "code": 6006,
+      "name": "ZeroAddress",
+      "msg": "Address cannot be the zero pubkey"
+    },
+    {
+      "code": 6007,
+      "name": "ZeroAmount",
+      "msg": "Amount must be greater than zero"
+    },
+    {
+      "code": 6008,
+      "name": "FeeTooHigh",
+      "msg": "Platform fee exceeds the MAX_FEE_BPS cap (5000 = 50%)"
+    },
+    {
+      "code": 6009,
+      "name": "CooldownActive",
+      "msg": "Split-change cooldown still active (must wait 1 day between reconfigurations)"
+    },
+    {
+      "code": 6010,
+      "name": "NoSplitsConfigured",
+      "msg": "No splits configured for this entity"
+    },
+    {
+      "code": 6011,
+      "name": "RecipientCountMismatch",
+      "msg": "remaining_accounts length does not equal recipient_count"
+    },
+    {
+      "code": 6012,
+      "name": "RecipientMismatch",
+      "msg": "remaining_accounts ordering does not match stored recipients"
+    },
+    {
+      "code": 6013,
+      "name": "TreasuryMismatch",
+      "msg": "Provided treasury account does not match Config.treasury"
+    },
+    {
+      "code": 6014,
+      "name": "Overflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6015,
+      "name": "Paused",
+      "msg": "Program is paused"
+    },
+    {
+      "code": 6016,
+      "name": "AlreadyPaused",
+      "msg": "Cannot pause: already paused"
+    },
+    {
+      "code": 6017,
+      "name": "NotPaused",
+      "msg": "Cannot unpause: not paused"
+    }
+  ],
+  "types": [
+    {
+      "name": "AdminTransferProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdminTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Paused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "SplitInput",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SplitOwnershipTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "entity_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "old_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_owner",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SplitPayment",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "entity_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "total_amount",
+            "type": "u64"
+          },
+          {
+            "name": "recipient_count",
+            "type": "u8"
+          },
+          {
+            "name": "platform_fee_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Splits",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "entity_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient_count",
+            "type": "u8"
+          },
+          {
+            "name": "recipients",
+            "docs": [
+              "Recipients in stored order. Caller must pass remaining_accounts in",
+              "this exact order at route time."
+            ],
+            "type": {
+              "array": ["pubkey", 10]
+            }
+          },
+          {
+            "name": "bps",
+            "docs": ["Basis-points share per recipient. Sums to 10000."],
+            "type": {
+              "array": ["u16", 10]
+            }
+          },
+          {
+            "name": "last_changed_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SplitsConfigured",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "entity_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient_count",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TreasuryUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_treasury",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Unpaused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    }
+  ]
+}

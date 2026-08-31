@@ -181,3 +181,20 @@ export function getExplorerTxUrl(chainId: number, txHash: string): string {
   const baseUrl = BLOCK_EXPLORER_URLS[chainId] ?? BLOCK_EXPLORER_URLS[SUPPORTED_EVM_CHAIN_IDS[0]];
   return `${baseUrl}/tx/${txHash}`;
 }
+
+// ---------------------------------------------------------------------------
+// Solana explorer helpers — explorer.solana.com takes a `?cluster=` query for
+// anything other than mainnet-beta.
+// ---------------------------------------------------------------------------
+
+function solanaClusterQuery(cluster: SolanaCluster): string {
+  return cluster === 'mainnet-beta' ? '' : `?cluster=${cluster}`;
+}
+
+export function getSolanaExplorerAddressUrl(cluster: SolanaCluster, address: string): string {
+  return `https://explorer.solana.com/address/${address}${solanaClusterQuery(cluster)}`;
+}
+
+export function getSolanaExplorerTxUrl(cluster: SolanaCluster, signature: string): string {
+  return `https://explorer.solana.com/tx/${signature}${solanaClusterQuery(cluster)}`;
+}

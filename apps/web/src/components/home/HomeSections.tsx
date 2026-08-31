@@ -11,8 +11,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
-import { proxiedImage } from '@/utils/img-proxy';
+import { HomeEpisodeVideo } from '@/components/home/HomeEpisodeVideo';
 import { SmartImage } from '@/components/SmartImage';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
@@ -737,23 +736,7 @@ export function RecentEpisodes() {
               <div className="relative aspect-video rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all">
                 {ep.videoUrl ? (
                   <>
-                    <video
-                      src={`${resolveIpfsUrlPreferred(ep.videoUrl)}#t=0.1`}
-                      poster={proxiedImage(ep.thumbnailUrl) || undefined}
-                      className="w-full h-full object-cover"
-                      muted
-                      loop
-                      playsInline
-                      preload="metadata"
-                      onMouseEnter={(e) => {
-                        const p = e.currentTarget.play();
-                        if (p) p.catch(() => {});
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.pause();
-                        e.currentTarget.currentTime = 0;
-                      }}
-                    />
+                    <HomeEpisodeVideo videoUrl={ep.videoUrl} thumbnailUrl={ep.thumbnailUrl} />
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30 pointer-events-none">
                       <Play className="h-8 w-8 text-white fill-white" />
                     </div>
@@ -828,7 +811,8 @@ export function Top10Strip({ universes }: { universes: EnrichedUniverse[] }) {
   return (
     <section className="py-6">
       <SectionHeader icon={Flame} title="Top 10 Universes" subtitle="Most active this week" />
-      <ScrollRow>
+      {/* Static grid — all 10 cards visible at once, no scroll container */}
+      <div className="flex flex-wrap gap-3 px-4 md:px-12">
         {sorted.map((u) => (
           <div
             key={u.id}
@@ -847,7 +831,7 @@ export function Top10Strip({ universes }: { universes: EnrichedUniverse[] }) {
             <UniverseCard universe={u} />
           </div>
         ))}
-      </ScrollRow>
+      </div>
     </section>
   );
 }
@@ -1055,23 +1039,7 @@ export function ContentCard({ item }: { item: any }) {
       <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-xl group-hover:shadow-primary/20">
         {item.thumbnailUrl || item.mediaUrl ? (
           isVideo && item.mediaUrl ? (
-            <video
-              src={`${resolveIpfsUrlPreferred(item.mediaUrl)}#t=0.1`}
-              poster={proxiedImage(item.thumbnailUrl) || undefined}
-              className="w-full h-full object-cover"
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              onMouseEnter={(e) => {
-                const p = e.currentTarget.play();
-                if (p) p.catch(() => {});
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.pause();
-                e.currentTarget.currentTime = 0;
-              }}
-            />
+            <HomeEpisodeVideo videoUrl={item.mediaUrl} thumbnailUrl={item.thumbnailUrl} />
           ) : (
             <SmartImage
               src={item.thumbnailUrl || item.mediaUrl}
@@ -1401,13 +1369,12 @@ export function ContinueWatchingRow() {
             >
               <div className="relative aspect-video rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all">
                 {ep.videoUrl ? (
-                  <video
-                    src={`${resolveIpfsUrlPreferred(ep.videoUrl)}#t=${Math.max(0, resume - 1)}`}
-                    poster={proxiedImage(ep.thumbnailUrl) || undefined}
-                    className="w-full h-full object-cover"
-                    muted
-                    playsInline
-                    preload="metadata"
+                  <HomeEpisodeVideo
+                    videoUrl={ep.videoUrl}
+                    thumbnailUrl={ep.thumbnailUrl}
+                    startTime={Math.max(0, resume - 1)}
+                    loop={false}
+                    hoverPlay={false}
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-900/40 to-rose-900/40">
@@ -1480,23 +1447,7 @@ export function ForYouRow() {
           >
             <div className="relative aspect-video rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all">
               {ep.videoUrl ? (
-                <video
-                  src={`${resolveIpfsUrlPreferred(ep.videoUrl)}#t=0.1`}
-                  poster={proxiedImage(ep.thumbnailUrl) || undefined}
-                  className="w-full h-full object-cover"
-                  muted
-                  loop
-                  playsInline
-                  preload="metadata"
-                  onMouseEnter={(e) => {
-                    const p = e.currentTarget.play();
-                    if (p) p.catch(() => {});
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.pause();
-                    e.currentTarget.currentTime = 0;
-                  }}
-                />
+                <HomeEpisodeVideo videoUrl={ep.videoUrl} thumbnailUrl={ep.thumbnailUrl} />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-violet-900/40 to-pink-900/40">
                   <Sparkles className="h-8 w-8 text-white/60" />

@@ -9,8 +9,8 @@
  * Exits 0 on success, non-zero on any assertion failure.
  */
 import bs58 from 'bs58';
-import { decodeAnchorEvent } from '../src/anchor-events';
-import { PROGRAM_BY_ID } from '../src/program-registry';
+import { decodeAnchorEvent } from '../src/anchor-events.js';
+import { PROGRAM_BY_ID } from '../src/program-registry.js';
 
 function fail(msg: string): never {
   console.error('FAIL:', msg);

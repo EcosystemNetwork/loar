@@ -63,37 +63,14 @@ const renderClipInputSchema = z.object({
 const RENDER_BASE_CREDITS = 3;
 const RENDER_PER_CLIP_CREDITS = 1;
 
-async function deductCredits(uid: string, credits: number): Promise<void> {
-  if (!db) return;
+async function deductCredits(uid: string, _credits: number): Promise<void> {
+  // Credits/points retired — generation is BYOK. Kill switch only.
   const { assertGenerationAllowed } = await import('../../lib/generation-guards');
-  await assertGenerationAllowed(uid, credits);
-  const ref = db.collection('userCredits').doc(uid);
-  await db.runTransaction(async (tx) => {
-    const doc = await tx.get(ref);
-    const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-    if (balance < credits) {
-      throw new TRPCError({
-        code: 'PRECONDITION_FAILED',
-        message: `Insufficient credits. Need ${credits}, have ${balance}.`,
-      });
-    }
-    tx.update(ref, {
-      balance: balance - credits,
-      totalSpent: (doc.data()?.totalSpent || 0) + credits,
-      updatedAt: new Date(),
-    });
-  });
+  await assertGenerationAllowed(uid, 0);
 }
 
-async function refundCredits(uid: string, credits: number): Promise<void> {
-  if (!db) return;
-  const { FieldValue } = await import('firebase-admin/firestore');
-  const ref = db.collection('userCredits').doc(uid);
-  await ref.update({
-    balance: FieldValue.increment(credits),
-    totalSpent: FieldValue.increment(-credits),
-    updatedAt: new Date(),
-  });
+async function refundCredits(_uid: string, _credits: number): Promise<void> {
+  // Credits/points retired — nothing to refund.
 }
 
 async function requireCollaborator(

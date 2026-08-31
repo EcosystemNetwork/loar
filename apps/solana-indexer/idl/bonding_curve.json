@@ -1,0 +1,1015 @@
+{
+  "address": "seJzMSz9EkVYuNN9Nu3eJF3UgepeWzfgGvDnzrp2Uiw",
+  "metadata": {
+    "name": "bonding_curve",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "LOAR BondingCurve — Solana sister to apps/contracts/src/BondingCurve.sol"
+  },
+  "instructions": [
+    {
+      "name": "buy",
+      "docs": [
+        "Buy universe tokens with SOL. Buyer pays `sol_in_max`, receives up",
+        "to `max_buy_tokens` curve tokens; any unused SOL is refunded",
+        "atomically."
+      ],
+      "discriminator": [102, 6, 61, 18, 1, 218, 235, 234],
+      "accounts": [
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "curve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 117, 114, 118, 101]
+              },
+              {
+                "kind": "account",
+                "path": "curve.universe",
+                "account": "Curve"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_mint"
+        },
+        {
+          "name": "token_vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 117, 114, 118, 101, 95, 116, 111, 107, 101, 110, 95, 118, 97, 117, 108, 116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "curve.universe",
+                "account": "Curve"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "token_vault_authority"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28,
+                  180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142, 13, 131, 11, 90, 19,
+                153, 218, 255, 16, 132, 4, 142, 123, 216, 219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "buyer_token_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "buyer"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28,
+                  180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142, 13, 131, 11, 90, 19,
+                153, 218, 255, 16, 132, 4, 142, 123, 216, 219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "sol_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 117, 114, 118, 101, 95, 115, 111, 108, 95, 118, 97, 117, 108, 116]
+              },
+              {
+                "kind": "account",
+                "path": "curve.universe",
+                "account": "Curve"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_stat",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 117, 114, 118, 101, 95, 98, 117, 121, 101, 114, 95, 115, 116, 97, 116]
+              },
+              {
+                "kind": "account",
+                "path": "curve"
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "sol_in_max",
+          "type": "u64"
+        },
+        {
+          "name": "min_tokens_out",
+          "type": "u64"
+        },
+        {
+          "name": "deadline",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "halt_trading",
+      "docs": [
+        "Halt trading. Universe creator only. v1 has no timelock — pure",
+        "admin pause. v2 will add the EVM CURVE-02 48h timelock once an",
+        "on-chain time-governance primitive lands."
+      ],
+      "discriminator": [102, 130, 229, 143, 230, 101, 230, 210],
+      "accounts": [
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "curve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 117, 114, 118, 101]
+              },
+              {
+                "kind": "account",
+                "path": "curve.universe",
+                "account": "Curve"
+              }
+            ]
+          }
+        },
+        {
+          "name": "universe_account"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_curve",
+      "docs": [
+        "Initialize a bonding curve for a universe. Caller (universe creator)",
+        "must pre-mint `total_curve_supply` of the universe's SPL token into",
+        "the curve's token vault BEFORE calling this — Anchor's",
+        "`associated_token::amount = total_curve_supply` constraint enforces",
+        "that on entry."
+      ],
+      "discriminator": [170, 84, 186, 253, 131, 149, 95, 213],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "universe_account"
+        },
+        {
+          "name": "token_mint"
+        },
+        {
+          "name": "curve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 117, 114, 118, 101]
+              },
+              {
+                "kind": "account",
+                "path": "universe_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 117, 114, 118, 101, 95, 116, 111, 107, 101, 110, 95, 118, 97, 117, 108, 116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "universe_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_vault",
+          "docs": [
+            "Token vault ATA — must hold exactly `total_curve_supply` at init.",
+            "Caller pre-mints into this ATA before calling."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "token_vault_authority"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28,
+                  180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142, 13, 131, 11, 90, 19,
+                153, 218, 255, 16, 132, 4, 142, 123, 216, 219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "sol_vault",
+          "docs": ["SOL vault — system-owned PDA receives buyer SOL."],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 117, 114, 118, 101, 95, 115, 111, 108, 95, 118, 97, 117, 108, 116]
+              },
+              {
+                "kind": "account",
+                "path": "universe_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "total_curve_supply",
+          "type": "u64"
+        },
+        {
+          "name": "graduation_lamports",
+          "type": "u64"
+        },
+        {
+          "name": "max_buy_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "mark_graduated",
+      "docs": [
+        "Mark the curve as graduated. Locks trading. Once graduated, caller is",
+        "expected to seed an external LP (Raydium / Meteora / Orca) using the",
+        "`unsold_tokens + sol_vault_balance`. v1 does NOT perform the LP",
+        "CPI — that's a v2 follow-up that needs a chosen AMM partner."
+      ],
+      "discriminator": [125, 72, 57, 129, 59, 15, 247, 251],
+      "accounts": [
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "curve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 117, 114, 118, 101]
+              },
+              {
+                "kind": "account",
+                "path": "curve.universe",
+                "account": "Curve"
+              }
+            ]
+          }
+        },
+        {
+          "name": "universe_account"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "resume_trading",
+      "discriminator": [146, 46, 212, 86, 69, 159, 30, 65],
+      "accounts": [
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "curve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 117, 114, 118, 101]
+              },
+              {
+                "kind": "account",
+                "path": "curve.universe",
+                "account": "Curve"
+              }
+            ]
+          }
+        },
+        {
+          "name": "universe_account"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "sell",
+      "docs": [
+        "Sell `token_amount` curve tokens back to the curve. Receives the",
+        "integral price minus a 1% fee that stays in reserve."
+      ],
+      "discriminator": [51, 230, 133, 164, 1, 127, 131, 173],
+      "accounts": [
+        {
+          "name": "seller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "curve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 117, 114, 118, 101]
+              },
+              {
+                "kind": "account",
+                "path": "curve.universe",
+                "account": "Curve"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_mint"
+        },
+        {
+          "name": "token_vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 117, 114, 118, 101, 95, 116, 111, 107, 101, 110, 95, 118, 97, 117, 108, 116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "curve.universe",
+                "account": "Curve"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "token_vault_authority"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28,
+                  180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142, 13, 131, 11, 90, 19,
+                153, 218, 255, 16, 132, 4, 142, 123, 216, 219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "seller_token_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "seller"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28,
+                  180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142, 13, 131, 11, 90, 19,
+                153, 218, 255, 16, 132, 4, 142, 123, 216, 219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "sol_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 117, 114, 118, 101, 95, 115, 111, 108, 95, 118, 97, 117, 108, 116]
+              },
+              {
+                "kind": "account",
+                "path": "curve.universe",
+                "account": "Curve"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "token_amount",
+          "type": "u64"
+        },
+        {
+          "name": "min_sol_out",
+          "type": "u64"
+        },
+        {
+          "name": "deadline",
+          "type": "i64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "BuyerStat",
+      "discriminator": [57, 160, 70, 9, 152, 189, 246, 129]
+    },
+    {
+      "name": "Curve",
+      "discriminator": [191, 180, 249, 66, 180, 71, 51, 182]
+    },
+    {
+      "name": "SolVault",
+      "discriminator": [21, 132, 230, 103, 19, 209, 129, 248]
+    },
+    {
+      "name": "Universe",
+      "discriminator": [86, 112, 227, 226, 88, 47, 242, 113]
+    }
+  ],
+  "events": [
+    {
+      "name": "CurveInitialized",
+      "discriminator": [190, 125, 131, 238, 194, 229, 201, 66]
+    },
+    {
+      "name": "Graduated",
+      "discriminator": [51, 241, 66, 50, 140, 245, 156, 192]
+    },
+    {
+      "name": "TokensPurchased",
+      "discriminator": [214, 119, 105, 186, 114, 205, 228, 181]
+    },
+    {
+      "name": "TokensSold",
+      "discriminator": [217, 83, 68, 137, 134, 225, 94, 45]
+    },
+    {
+      "name": "TradingHalted",
+      "discriminator": [194, 240, 194, 255, 28, 104, 149, 25]
+    },
+    {
+      "name": "TradingResumed",
+      "discriminator": [168, 64, 26, 121, 28, 18, 207, 141]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "NotCreator",
+      "msg": "Only the universe creator may perform this action"
+    },
+    {
+      "code": 6001,
+      "name": "ZeroAmount",
+      "msg": "Amount must be greater than zero"
+    },
+    {
+      "code": 6002,
+      "name": "SlopeIsZero",
+      "msg": "Slope computation rounded to zero — supply too large for graduation target"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidMaxBuy",
+      "msg": "max_buy_bps must be in (0, 5000]"
+    },
+    {
+      "code": 6004,
+      "name": "MintMismatch",
+      "msg": "Provided token mint does not match Curve.token_mint"
+    },
+    {
+      "code": 6005,
+      "name": "UniverseMismatch",
+      "msg": "Provided universe does not match Curve.universe"
+    },
+    {
+      "code": 6006,
+      "name": "SlippageExceeded",
+      "msg": "Slippage exceeded — insufficient output amount"
+    },
+    {
+      "code": 6007,
+      "name": "ExceedsMaxBuy",
+      "msg": "Buy exceeds per-tx max_buy_tokens cap"
+    },
+    {
+      "code": 6008,
+      "name": "ExceedsCumulativeCap",
+      "msg": "Buy exceeds per-address cumulative cap (4× max_buy_tokens)"
+    },
+    {
+      "code": 6009,
+      "name": "CostExceedsBudget",
+      "msg": "Computed cost exceeds the supplied sol_in_max budget"
+    },
+    {
+      "code": 6010,
+      "name": "InsufficientCurveSupply",
+      "msg": "Sell amount exceeds tokens_sold on the curve"
+    },
+    {
+      "code": 6011,
+      "name": "VaultUnderfunded",
+      "msg": "SOL vault has insufficient lamports for this sell — should be impossible if state is consistent"
+    },
+    {
+      "code": 6012,
+      "name": "Graduated",
+      "msg": "Curve has already graduated"
+    },
+    {
+      "code": 6013,
+      "name": "NotGraduationReady",
+      "msg": "Cannot graduate: sol_raised below graduation_lamports"
+    },
+    {
+      "code": 6014,
+      "name": "TradingHalted",
+      "msg": "Trading is halted"
+    },
+    {
+      "code": 6015,
+      "name": "AlreadyHalted",
+      "msg": "Cannot halt: already halted"
+    },
+    {
+      "code": 6016,
+      "name": "NotHalted",
+      "msg": "Cannot resume: not halted"
+    },
+    {
+      "code": 6017,
+      "name": "Expired",
+      "msg": "Transaction deadline elapsed"
+    },
+    {
+      "code": 6018,
+      "name": "MathOverflow",
+      "msg": "Arithmetic overflow"
+    }
+  ],
+  "types": [
+    {
+      "name": "BuyerStat",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "curve",
+            "type": "pubkey"
+          },
+          {
+            "name": "cumulative_bought",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Curve",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_curve_supply",
+            "type": "u64"
+          },
+          {
+            "name": "graduation_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "slope_scaled",
+            "type": "u128"
+          },
+          {
+            "name": "max_buy_tokens",
+            "type": "u64"
+          },
+          {
+            "name": "max_cumulative_buy",
+            "type": "u64"
+          },
+          {
+            "name": "tokens_sold",
+            "type": "u64"
+          },
+          {
+            "name": "sol_raised",
+            "type": "u64"
+          },
+          {
+            "name": "graduated",
+            "type": "bool"
+          },
+          {
+            "name": "trading_halted",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "token_vault_bump",
+            "type": "u8"
+          },
+          {
+            "name": "sol_vault_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CurveInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_curve_supply",
+            "type": "u64"
+          },
+          {
+            "name": "graduation_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "slope_scaled",
+            "type": "u64"
+          },
+          {
+            "name": "max_buy_tokens",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Graduated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "sol_raised",
+            "type": "u64"
+          },
+          {
+            "name": "tokens_sold",
+            "type": "u64"
+          },
+          {
+            "name": "unsold_tokens",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SolVault",
+      "docs": [
+        "Empty marker — gives the SOL vault PDA a program-owned container so",
+        "lamports above the rent-exempt minimum belong to the program."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "TokensPurchased",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "sol_paid",
+            "type": "u64"
+          },
+          {
+            "name": "tokens_received",
+            "type": "u64"
+          },
+          {
+            "name": "new_tokens_sold",
+            "type": "u64"
+          },
+          {
+            "name": "new_sol_raised",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokensSold",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "seller",
+            "type": "pubkey"
+          },
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "tokens_sold_back",
+            "type": "u64"
+          },
+          {
+            "name": "sol_received",
+            "type": "u64"
+          },
+          {
+            "name": "new_tokens_sold",
+            "type": "u64"
+          },
+          {
+            "name": "new_sol_raised",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TradingHalted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "universe",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TradingResumed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "universe",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Universe",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "plot_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "visibility",
+            "type": {
+              "defined": {
+                "name": "Visibility"
+              }
+            }
+          },
+          {
+            "name": "canon_count",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Visibility",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Private"
+          },
+          {
+            "name": "Public"
+          }
+        ]
+      }
+    }
+  ]
+}

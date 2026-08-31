@@ -1,0 +1,1465 @@
+{
+  "address": "71rtSGzuBENiQa1cdmBbrN5F496CGQ46TnRGbGNpQ3xs",
+  "metadata": {
+    "name": "credit_manager",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "LOAR CreditManager — Solana sister to apps/contracts/src/revenue/CreditManager.sol"
+  },
+  "instructions": [
+    {
+      "name": "accept_admin",
+      "discriminator": [112, 42, 45, 90, 116, 181, 13, 170],
+      "accounts": [
+        {
+          "name": "new_admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 109, 97, 110, 97, 103, 101, 114, 95, 99, 111,
+                  110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "accept_platform",
+      "discriminator": [124, 244, 17, 88, 187, 84, 8, 26],
+      "accounts": [
+        {
+          "name": "new_platform",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 109, 97, 110, 97, 103, 101, 114, 95, 99, 111,
+                  110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_package",
+      "docs": ["Create a credit package. Admin-only."],
+      "discriminator": [26, 217, 117, 112, 128, 181, 142, 59],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 109, 97, 110, 97, 103, 101, 114, 95, 99, 111,
+                  110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "package",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [112, 97, 99, 107, 97, 103, 101]
+              },
+              {
+                "kind": "account",
+                "path": "config.next_package_id",
+                "account": "Config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "credits",
+          "type": "u64"
+        },
+        {
+          "name": "price_lamports",
+          "type": "u64"
+        },
+        {
+          "name": "price_loar",
+          "type": "u64"
+        },
+        {
+          "name": "bonus_credits",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "grant_credits",
+      "docs": [
+        "Grant credits. Platform-only. Rate-limited by daily total + per-user",
+        "cumulative cap (CREDIT-01 / CREDIT-06 analog)."
+      ],
+      "discriminator": [179, 42, 133, 139, 107, 197, 60, 164],
+      "accounts": [
+        {
+          "name": "platform",
+          "signer": true
+        },
+        {
+          "name": "recipient"
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 109, 97, 110, 97, 103, 101, 114, 95, 99, 111,
+                  110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_credits",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [117, 115, 101, 114, 95, 99, 114, 101, 100, 105, 116, 115]
+              },
+              {
+                "kind": "account",
+                "path": "recipient"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "reason",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "docs": ["Initialize the singleton config + SOL/LOAR treasury vaults."],
+      "discriminator": [175, 175, 109, 31, 13, 152, 155, 237],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "loar_mint"
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 109, 97, 110, 97, 103, 101, 114, 95, 99, 111,
+                  110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_vault",
+          "docs": [
+            "SOL vault — program-owned account; lamports accrue from buyer SOL",
+            "purchases. The 8-byte discriminator + InitSpace empty body keeps the",
+            "account rent-exempt; lamports on top are sweepable by admin via a",
+            "future `sweep_sol` ix (v2). Same shape as `payment::SolVault`."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 115, 111, 108, 95, 118, 97, 117, 108, 116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "loar_vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 108, 111, 97, 114, 95, 118, 97, 117, 108, 116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "loar_vault_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "loar_vault"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28,
+                  180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "loar_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142, 13, 131, 11, 90, 19,
+                153, 218, 255, 16, 132, 4, 142, 123, 216, 219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "platform",
+          "type": "pubkey"
+        },
+        {
+          "name": "daily_grant_limit",
+          "type": "u64"
+        },
+        {
+          "name": "max_grant_per_user",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "pause",
+      "discriminator": [211, 22, 221, 251, 74, 121, 193, 47],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 109, 97, 110, 97, 103, 101, 114, 95, 99, 111,
+                  110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "purchase_with_loar",
+      "docs": ["Purchase credits by paying $LOAR (Token-2022)."],
+      "discriminator": [249, 79, 9, 135, 152, 42, 158, 55],
+      "accounts": [
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 109, 97, 110, 97, 103, 101, 114, 95, 99, 111,
+                  110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "loar_mint"
+        },
+        {
+          "name": "package",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [112, 97, 99, 107, 97, 103, 101]
+              },
+              {
+                "kind": "arg",
+                "path": "package_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "loar_vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 108, 111, 97, 114, 95, 118, 97, 117, 108, 116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "loar_vault_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "loar_vault"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28,
+                  180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "loar_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142, 13, 131, 11, 90, 19,
+                153, 218, 255, 16, 132, 4, 142, 123, 216, 219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "buyer_loar_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "buyer"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28,
+                  180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "loar_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142, 13, 131, 11, 90, 19,
+                153, 218, 255, 16, 132, 4, 142, 123, 216, 219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "user_credits",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [117, 115, 101, 114, 95, 99, 114, 101, 100, 105, 116, 115]
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "package_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "purchase_with_sol",
+      "docs": [
+        "Purchase credits by paying SOL. Routes the SOL to the program's",
+        "`sol_vault` PDA which the admin can sweep to treasury later."
+      ],
+      "discriminator": [27, 238, 240, 155, 170, 180, 26, 118],
+      "accounts": [
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 109, 97, 110, 97, 103, 101, 114, 95, 99, 111,
+                  110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "package",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [112, 97, 99, 107, 97, 103, 101]
+              },
+              {
+                "kind": "arg",
+                "path": "package_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 115, 111, 108, 95, 118, 97, 117, 108, 116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_credits",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [117, 115, 101, 114, 95, 99, 114, 101, 100, 105, 116, 115]
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "package_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_grant_limits",
+      "discriminator": [128, 12, 205, 21, 138, 164, 16, 86],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 109, 97, 110, 97, 103, 101, 114, 95, 99, 111,
+                  110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "daily_grant_limit",
+          "type": "u64"
+        },
+        {
+          "name": "max_grant_per_user",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_package_active",
+      "docs": ["Set package active flag. Admin-only."],
+      "discriminator": [224, 101, 148, 5, 28, 120, 227, 221],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 109, 97, 110, 97, 103, 101, 114, 95, 99, 111,
+                  110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "package",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [112, 97, 99, 107, 97, 103, 101]
+              },
+              {
+                "kind": "account",
+                "path": "package.id",
+                "account": "Package"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "active",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "spend_credits",
+      "docs": ["Spend credits. Platform-only. Mirrors EVM `spendCredits`."],
+      "discriminator": [71, 37, 166, 174, 77, 85, 195, 253],
+      "accounts": [
+        {
+          "name": "platform",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 109, 97, 110, 97, 103, 101, 114, 95, 99, 111,
+                  110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_credits",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [117, 115, 101, 114, 95, 99, 114, 101, 100, 105, 116, 115]
+              },
+              {
+                "kind": "account",
+                "path": "user_credits.user",
+                "account": "UserCredits"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "generation_type",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "sweep_sol",
+      "docs": [
+        "Sweep accrued SOL from the program-owned `sol_vault` PDA to a",
+        "destination account. Admin-only. Mirrors `payment::claim_treasury_sol`.",
+        "Enforces the rent-exempt floor on the vault so the runtime cannot",
+        "garbage-collect the account and take the discriminator with it."
+      ],
+      "discriminator": [48, 81, 27, 227, 28, 145, 224, 204],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 109, 97, 110, 97, 103, 101, 114, 95, 99, 111,
+                  110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 115, 111, 108, 95, 118, 97, 117, 108, 116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "destination",
+          "docs": ["No data deserialized; balance-only manipulation."],
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "transfer_admin",
+      "discriminator": [42, 242, 66, 106, 228, 10, 111, 156],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 109, 97, 110, 97, 103, 101, 114, 95, 99, 111,
+                  110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "transfer_platform",
+      "discriminator": [4, 88, 19, 229, 137, 221, 84, 3],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 109, 97, 110, 97, 103, 101, 114, 95, 99, 111,
+                  110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_platform",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "unpause",
+      "discriminator": [169, 144, 4, 38, 10, 141, 188, 255],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99, 114, 101, 100, 105, 116, 95, 109, 97, 110, 97, 103, 101, 114, 95, 99, 111,
+                  110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [155, 12, 170, 224, 30, 250, 204, 130]
+    },
+    {
+      "name": "Package",
+      "discriminator": [203, 12, 246, 255, 184, 43, 206, 39]
+    },
+    {
+      "name": "SolVault",
+      "discriminator": [21, 132, 230, 103, 19, 209, 129, 248]
+    },
+    {
+      "name": "UserCredits",
+      "discriminator": [206, 31, 152, 218, 151, 248, 15, 234]
+    }
+  ],
+  "events": [
+    {
+      "name": "AdminTransferProposed",
+      "discriminator": [203, 168, 175, 51, 239, 104, 20, 85]
+    },
+    {
+      "name": "AdminTransferred",
+      "discriminator": [255, 147, 182, 5, 199, 217, 38, 179]
+    },
+    {
+      "name": "CreditsGranted",
+      "discriminator": [128, 66, 160, 5, 222, 142, 108, 212]
+    },
+    {
+      "name": "CreditsPurchasedWithLoar",
+      "discriminator": [59, 73, 90, 182, 104, 208, 17, 28]
+    },
+    {
+      "name": "CreditsPurchasedWithSol",
+      "discriminator": [142, 85, 242, 192, 34, 12, 192, 18]
+    },
+    {
+      "name": "CreditsSpent",
+      "discriminator": [118, 38, 248, 135, 219, 159, 130, 226]
+    },
+    {
+      "name": "GrantLimitsUpdated",
+      "discriminator": [92, 15, 98, 43, 233, 48, 183, 161]
+    },
+    {
+      "name": "Initialized",
+      "discriminator": [208, 213, 115, 98, 115, 82, 201, 209]
+    },
+    {
+      "name": "PackageActiveChanged",
+      "discriminator": [112, 92, 159, 133, 18, 39, 72, 98]
+    },
+    {
+      "name": "PackageCreated",
+      "discriminator": [120, 199, 211, 93, 235, 33, 84, 100]
+    },
+    {
+      "name": "Paused",
+      "discriminator": [172, 248, 5, 253, 49, 255, 255, 232]
+    },
+    {
+      "name": "PlatformTransferProposed",
+      "discriminator": [165, 212, 88, 224, 186, 145, 99, 160]
+    },
+    {
+      "name": "PlatformTransferred",
+      "discriminator": [73, 234, 174, 236, 56, 191, 152, 197]
+    },
+    {
+      "name": "SolSwept",
+      "discriminator": [215, 28, 230, 93, 80, 53, 147, 252]
+    },
+    {
+      "name": "Unpaused",
+      "discriminator": [156, 150, 47, 174, 120, 216, 93, 117]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Only the configured admin may perform this action"
+    },
+    {
+      "code": 6001,
+      "name": "NotPlatform",
+      "msg": "Only the configured platform key may perform this action"
+    },
+    {
+      "code": 6002,
+      "name": "ZeroAddress",
+      "msg": "Address cannot be the zero pubkey"
+    },
+    {
+      "code": 6003,
+      "name": "ZeroAmount",
+      "msg": "Amount must be greater than zero"
+    },
+    {
+      "code": 6004,
+      "name": "ZeroPrice",
+      "msg": "Price must be greater than zero in at least one currency"
+    },
+    {
+      "code": 6005,
+      "name": "NameTooLong",
+      "msg": "Name exceeds the maximum length"
+    },
+    {
+      "code": 6006,
+      "name": "MintMismatch",
+      "msg": "Provided LOAR mint does not match Config.loar_mint"
+    },
+    {
+      "code": 6007,
+      "name": "PackageMismatch",
+      "msg": "Package ID argument does not match the supplied package PDA"
+    },
+    {
+      "code": 6008,
+      "name": "PackageInactive",
+      "msg": "Package is inactive"
+    },
+    {
+      "code": 6009,
+      "name": "PackageNotForSol",
+      "msg": "Package is not configured for SOL purchases"
+    },
+    {
+      "code": 6010,
+      "name": "PackageNotForLoar",
+      "msg": "Package is not configured for $LOAR purchases"
+    },
+    {
+      "code": 6011,
+      "name": "InsufficientCredits",
+      "msg": "Insufficient credit balance"
+    },
+    {
+      "code": 6012,
+      "name": "DailyGrantLimitExceeded",
+      "msg": "Daily grant limit exceeded"
+    },
+    {
+      "code": 6013,
+      "name": "MaxGrantPerUserExceeded",
+      "msg": "Per-user cumulative grant cap exceeded"
+    },
+    {
+      "code": 6014,
+      "name": "MathOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6015,
+      "name": "Paused",
+      "msg": "Program is paused"
+    },
+    {
+      "code": 6016,
+      "name": "AlreadyPaused",
+      "msg": "Cannot pause: already paused"
+    },
+    {
+      "code": 6017,
+      "name": "NotPaused",
+      "msg": "Cannot unpause: not paused"
+    },
+    {
+      "code": 6018,
+      "name": "InsufficientVault",
+      "msg": "SOL vault has insufficient lamports above the rent-exempt floor"
+    }
+  ],
+  "types": [
+    {
+      "name": "AdminTransferProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdminTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "platform",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_platform",
+            "type": "pubkey"
+          },
+          {
+            "name": "loar_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "daily_grant_limit",
+            "type": "u64"
+          },
+          {
+            "name": "max_grant_per_user",
+            "type": "u64"
+          },
+          {
+            "name": "current_grant_day",
+            "type": "u64"
+          },
+          {
+            "name": "granted_today",
+            "type": "u64"
+          },
+          {
+            "name": "next_package_id",
+            "type": "u64"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "sol_vault_bump",
+            "type": "u8"
+          },
+          {
+            "name": "loar_vault_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreditsGranted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "new_balance",
+            "type": "u64"
+          },
+          {
+            "name": "reason",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreditsPurchasedWithLoar",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "package_id",
+            "type": "u64"
+          },
+          {
+            "name": "credits",
+            "type": "u64"
+          },
+          {
+            "name": "bonus",
+            "type": "u64"
+          },
+          {
+            "name": "paid_loar",
+            "type": "u64"
+          },
+          {
+            "name": "new_balance",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreditsPurchasedWithSol",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "package_id",
+            "type": "u64"
+          },
+          {
+            "name": "credits",
+            "type": "u64"
+          },
+          {
+            "name": "bonus",
+            "type": "u64"
+          },
+          {
+            "name": "paid_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "new_balance",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreditsSpent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "new_balance",
+            "type": "u64"
+          },
+          {
+            "name": "generation_type",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GrantLimitsUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "daily_grant_limit",
+            "type": "u64"
+          },
+          {
+            "name": "max_grant_per_user",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Initialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "platform",
+            "type": "pubkey"
+          },
+          {
+            "name": "loar_mint",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Package",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "credits",
+            "type": "u64"
+          },
+          {
+            "name": "price_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "price_loar",
+            "type": "u64"
+          },
+          {
+            "name": "bonus_credits",
+            "type": "u64"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PackageActiveChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "package_id",
+            "type": "u64"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PackageCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "package_id",
+            "type": "u64"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "credits",
+            "type": "u64"
+          },
+          {
+            "name": "price_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "price_loar",
+            "type": "u64"
+          },
+          {
+            "name": "bonus_credits",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Paused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "PlatformTransferProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "new_platform",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlatformTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_platform",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_platform",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SolSwept",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "destination",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SolVault",
+      "docs": [
+        "Empty marker — exists only to give the SOL vault PDA a program-owned",
+        "container so lamports above the rent-exempt minimum belong to the program."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "Unpaused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "UserCredits",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "balance",
+            "type": "u64"
+          },
+          {
+            "name": "total_purchased",
+            "type": "u64"
+          },
+          {
+            "name": "total_spent",
+            "type": "u64"
+          },
+          {
+            "name": "total_bonus_received",
+            "type": "u64"
+          },
+          {
+            "name": "granted_total",
+            "docs": ["Cumulative grants — never reset by spending. Caps `max_grant_per_user`."],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

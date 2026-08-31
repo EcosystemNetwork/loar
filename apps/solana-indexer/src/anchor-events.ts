@@ -18,7 +18,7 @@
  *     ported programs auto-index without touching this file.
  */
 import bs58 from 'bs58';
-import { KNOWN_PROGRAM_IDS, PROGRAM_BY_ID, type RegisteredProgram } from './program-registry';
+import { KNOWN_PROGRAM_IDS, PROGRAM_BY_ID, type RegisteredProgram } from './program-registry.js';
 
 // ── Generic + typed surfaces ────────────────────────────────────────────────
 

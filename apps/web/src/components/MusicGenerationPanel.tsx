@@ -231,7 +231,7 @@ export function MusicGenerationPanel({
           <div className="flex items-center gap-3 text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
             <span className="flex items-center gap-1">
               <Coins className="h-3 w-3" />
-              {costEstimate.credits} credits
+              {costEstimate.credits} points
             </span>
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />

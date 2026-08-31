@@ -22,6 +22,7 @@ import { db } from '../../lib/firebase';
 import { generateNonce, consumeNonce } from '../../lib/siwe';
 import { getPlatformConfig } from '../../services/platformConfig';
 import { assertFeatureEnabledOrForbidden } from '../../lib/feature-guards';
+import { awardUniverseCreationPoints } from '../../services/points';
 
 const createUniverseSchema = z.object({
   address: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address'),
@@ -119,6 +120,10 @@ export const universesRouter = router({
         chainId: input.chainId,
       })
     );
+
+    // Points bonus for creating a universe. Idempotent per address,
+    // never throws — a points failure must not fail universe creation.
+    void awardUniverseCreationPoints(ctx.user.uid, input.address);
 
     return result;
   }),

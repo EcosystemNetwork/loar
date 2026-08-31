@@ -166,7 +166,7 @@ export function VoiceModifyPanel({
       if (result.status === 'completed' && result.audioUrl) {
         const label =
           vars.presetId ?? voices.find((v) => v.voice_id === vars.voiceId)?.name ?? 'modified';
-        toast.success(`Voice modified (${result.creditsCharged} credits)`);
+        toast.success(`Voice modified (${result.creditsCharged} points)`);
         onComplete(result.audioUrl, result.generationId, label);
       } else {
         toast.error('Modify did not return audio');
@@ -314,7 +314,7 @@ export function VoiceModifyPanel({
         </label>
         {costEstimate.data && (
           <p className="text-[10px] text-muted-foreground">
-            Cost per modify: {costEstimate.data.credits} credits ($
+            Cost per modify: {costEstimate.data.credits} points ($
             {costEstimate.data.fiatPriceUsd.toFixed(2)})
           </p>
         )}

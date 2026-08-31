@@ -124,12 +124,12 @@ export function ListingPrice({
   }
   if (cur === 'LOAR') {
     if (!web3Mode) {
-      return <span className={className}>{num.toLocaleString()} credits</span>;
+      return <span className={className}>{num.toLocaleString()} points</span>;
     }
     return <span className={className}>{num.toLocaleString()} $LOAR</span>;
   }
   if (cur === 'CREDITS') {
-    return <span className={className}>{num.toLocaleString()} credits</span>;
+    return <span className={className}>{num.toLocaleString()} points</span>;
   }
   // Unknown currency — display as-is, but in web2 try to show USD if it parses as a number we can convert via ETH rate (fallback)
   void rate;

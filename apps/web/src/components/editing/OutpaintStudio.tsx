@@ -174,7 +174,7 @@ export function OutpaintStudio({
     onSuccess: (data) => {
       setResultUrl(data.imageUrl);
       toast.success(`Reframed to ${data.targetAspect}`, {
-        description: `${data.creditsCharged} credits · ${data.provider}`,
+        description: `${data.creditsCharged} points · ${data.provider}`,
       });
       if (data.imageUrl) onResult?.(data.imageUrl);
       queryClient.invalidateQueries({ queryKey: ['gallery'] });
@@ -353,7 +353,7 @@ export function OutpaintStudio({
               <>
                 <Sparkles className="mr-2 h-4 w-4" />
                 Reframe
-                {cost ? ` · ${cost.credits} credits` : ''}
+                {cost ? ` · ${cost.credits} points` : ''}
               </>
             )}
           </Button>

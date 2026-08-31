@@ -762,11 +762,8 @@ export const creditsRouter = router({
           const poolBalance = (poolDoc.data()?.balance as number) || 0;
           const poolSpent = (poolDoc.data()?.totalSpent as number) || 0;
 
-          if (poolBalance < cost) {
-            throw new Error(
-              `Universe credit pool is too low. Need ${cost}, available ${poolBalance}. Ask the universe admin to top up the pool.`
-            );
-          }
+          // Points no longer gate generation (BYOK). The pool balance is
+          // tracked for display only — never block a spend, never go negative.
 
           // Verify membership inside transaction — re-read to prevent TOCTOU
           const memberDocId = `${universeId}-${callerUid}`;
@@ -810,7 +807,7 @@ export const creditsRouter = router({
           tx.set(
             poolRef,
             {
-              balance: poolBalance - cost,
+              balance: Math.max(0, poolBalance - cost),
               totalSpent: poolSpent + cost,
               updatedAt: new Date(),
             },
@@ -846,20 +843,18 @@ export const creditsRouter = router({
         const userRef = creditsCol().doc(ctx.user.uid);
         const userDoc = await tx.get(userRef);
 
-        if (!userDoc.exists) throw new Error('No credits available. Purchase credits first.');
-        const data = userDoc.data()!;
+        const data = (userDoc.data() ?? {}) as Record<string, number | undefined>;
         const balance = data.balance || 0;
-        if (balance < cost) {
-          throw new Error(
-            `Insufficient credits. Need ${cost}, have ${balance}. Purchase more credits to continue.`
-          );
-        }
-
-        tx.update(userRef, {
-          balance: balance - cost,
-          totalSpent: (data.totalSpent || 0) + cost,
-          updatedAt: new Date(),
-        });
+        // Points no longer gate generation (BYOK) — record spend, clamp at 0.
+        tx.set(
+          userRef,
+          {
+            balance: Math.max(0, balance - cost),
+            totalSpent: (data.totalSpent || 0) + cost,
+            updatedAt: new Date(),
+          },
+          { merge: true }
+        );
 
         // Use a deterministic ID to prevent duplicate spend records
         const spendDocRef = creditTxCol().doc(

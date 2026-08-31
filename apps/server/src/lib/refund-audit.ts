@@ -28,7 +28,6 @@ export async function finalizeGenerationFailure(
   input: GenerationFailureInput
 ): Promise<GenerationFailureResult> {
   const generationRef = firestore.collection('videoGenerations').doc(input.generationId);
-  const creditsRef = firestore.collection('userCredits').doc(input.userId);
 
   return firestore.runTransaction(async (tx: Transaction) => {
     const generationDoc = await tx.get(generationRef);
@@ -39,34 +38,15 @@ export async function finalizeGenerationFailure(
     if (generation.status === 'completed') return 'already_completed';
 
     const completedAt = new Date();
-    if (input.creditsCharged <= 0) {
-      tx.update(generationRef, {
-        status: 'failed',
-        failureReason: input.failureReason,
-        latencyMs: input.latencyMs,
-        completedAt,
-      });
-      return 'not_charged';
-    }
-
-    const creditsDoc = await tx.get(creditsRef);
-    if (!creditsDoc.exists) throw new Error(`Credit account ${input.userId} not found`);
-
-    const credits = creditsDoc.data() ?? {};
-    tx.update(creditsRef, {
-      balance: Number(credits.balance ?? 0) + input.creditsCharged,
-      totalSpent: Number(credits.totalSpent ?? 0) - input.creditsCharged,
-      updatedAt: completedAt,
-    });
+    // Credits/points retired — generation is BYOK, nothing was charged, so
+    // there is nothing to refund. Just mark the generation failed.
     tx.update(generationRef, {
       status: 'failed',
       failureReason: input.failureReason,
       latencyMs: input.latencyMs,
       completedAt,
-      creditsRefunded: input.creditsCharged,
-      creditsRefundedAt: completedAt,
     });
-    return 'refunded';
+    return 'not_charged';
   });
 }
 

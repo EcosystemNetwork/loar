@@ -141,44 +141,15 @@ const BACKFILL_GAP_MS = 24 * 60 * 60 * 1000;
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
-async function deductCredits(uid: string, credits: number): Promise<void> {
-  if (!db) return;
+async function deductCredits(uid: string, _credits: number): Promise<void> {
+  // Credits/points retired — generation is BYOK. Only the admin generation
+  // kill switch still applies; nothing is charged.
   const { assertGenerationAllowed } = await import('../../lib/generation-guards');
-  await assertGenerationAllowed(uid, credits);
-  const ref = db.collection('userCredits').doc(uid);
-  await db.runTransaction(async (tx) => {
-    const doc = await tx.get(ref);
-    const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-    if (balance < credits) {
-      throw new TRPCError({
-        code: 'PRECONDITION_FAILED',
-        message: `Insufficient credits. Need ${credits}, have ${balance}.`,
-      });
-    }
-    tx.update(ref, {
-      balance: balance - credits,
-      totalSpent: (doc.data()?.totalSpent || 0) + credits,
-      updatedAt: new Date(),
-    });
-  });
+  await assertGenerationAllowed(uid, 0);
 }
 
-async function refundCredits(uid: string, credits: number): Promise<void> {
-  if (!db) return;
-  const ref = db.collection('userCredits').doc(uid);
-  const { recordCreditsTx, recordAiGeneration } = await import('../../lib/metrics');
-  try {
-    await ref.update({
-      balance: FieldValue.increment(credits),
-      totalSpent: FieldValue.increment(-credits),
-      updatedAt: new Date(),
-    });
-    recordCreditsTx('refund', 'success');
-  } catch (err) {
-    recordCreditsTx('refund', 'failure');
-    throw err;
-  }
-  recordAiGeneration('multi', 'episodes', 'failure');
+async function refundCredits(_uid: string, _credits: number): Promise<void> {
+  // Credits/points retired — nothing to refund.
 }
 
 // ── Background export ───────────────────────────────────────────────────

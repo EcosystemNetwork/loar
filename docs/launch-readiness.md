@@ -1,7 +1,14 @@
 # LOAR — Launch Readiness Scorecard
 
+> **⚠️ Solana rows below are stale (pre-2026-08-27).** Solana is no longer
+> "archived" — the stack was restored to `main` over 2026-08-27/28 (Phases 1–6:
+> Anchor programs, indexer, server, web, mobile). Devnet redeploy + on-chain
+> verification (Phase 7) is still open. Current status:
+> [solana-parity-restoration-plan.md](./solana-parity-restoration-plan.md) §6.
+> The EVM Sepolia / mainnet content on this page is unaffected.
+
 **Last reviewed:** 2026-05-17
-**Verdict:** Testnet beta live on Ethereum Sepolia (the only live network; target mainnet is Ethereum Mainnet). Mainnet blocked on legal (3 items), operational handoffs (≥11 items), and external audit (1 pass). All internal-code blockers (C1–C4) are now closed. Base and Solana are planned future chains (prototyped, archived in branch `archive/solana-base-support`).
+**Verdict:** Testnet beta live on Ethereum Sepolia (the only live network; target mainnet is Ethereum Mainnet). Mainnet blocked on legal (3 items), operational handoffs (≥11 items), and external audit (1 pass). All internal-code blockers (C1–C4) are now closed. Base is a planned future chain (prototyped, archived in branch `archive/solana-base-support`); Solana parity is being restored — see the banner above.
 
 ## Verification snapshot (2026-05-15)
 

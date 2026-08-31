@@ -872,64 +872,15 @@ async function markRehostNeeded(generationId: string, reason: string) {
 const LEGACY_CREDIT_COSTS = { image: 3, video: 13, character: 8, edit: 3 } as const;
 
 /** Deduct credits from user balance. Throws if insufficient. */
-async function deductCredits(uid: string, cost: number, generationType: string): Promise<void> {
-  if (!db) return;
-
+async function deductCredits(uid: string, _cost: number, _generationType: string): Promise<void> {
+  // Credits/points retired — generation is BYOK. Kill switch only.
   const { assertGenerationAllowed } = await import('../../lib/generation-guards');
-  const { invalidateSpendCache } = await import('../../services/spend-cap');
-  await assertGenerationAllowed(uid, cost);
-
-  const userRef = db.collection('userCredits').doc(uid);
-
-  await db.runTransaction(async (transaction) => {
-    const userDoc = await transaction.get(userRef);
-    const balance = userDoc.data()?.balance || 0;
-
-    if (balance < cost) {
-      throw new TRPCError({
-        code: 'PRECONDITION_FAILED',
-        message: `Insufficient credits. Need ${cost}, have ${balance}. Purchase more credits to continue.`,
-      });
-    }
-
-    transaction.update(userRef, {
-      balance: balance - cost,
-      totalSpent: (userDoc.data()?.totalSpent || 0) + cost,
-      updatedAt: new Date(),
-    });
-
-    const txRef = db.collection('creditTransactions').doc();
-    transaction.set(txRef, {
-      uid,
-      type: 'spend',
-      generationType,
-      credits: -cost,
-      source: 'generation_legacy',
-      createdAt: new Date(),
-    });
-  });
-
-  // Invalidate spend-cache so the next assertSpendAllowed reflects this charge
-  // within the 30s window that normally uses cached totals.
-  invalidateSpendCache(uid);
+  await assertGenerationAllowed(uid, 0);
 }
 
-/** Refund credits on generation failure. Best-effort — never throws. */
-async function refundCredits(uid: string, cost: number): Promise<void> {
-  if (!db) return;
-  try {
-    const { FieldValue } = await import('firebase-admin/firestore');
-    await db
-      .collection('userCredits')
-      .doc(uid)
-      .update({
-        balance: FieldValue.increment(cost),
-        totalSpent: FieldValue.increment(-cost),
-        updatedAt: new Date(),
-      });
-  } catch (err) {
-    console.error(`[refundCredits] Failed to refund ${cost} to ${uid}:`, err);
-  }
+/** Credits/points retired — nothing to refund. */
+async function refundCredits(_uid: string, _cost: number): Promise<void> {
+  // no-op
 }
 
 const videoGenerationsCol = () => {
@@ -1391,17 +1342,16 @@ export const generationRouter = router({
             const userCreditsDoc = await tx.get(userCreditsRef);
             const currentBalance = userCreditsDoc.exists ? userCreditsDoc.data()?.balance || 0 : 0;
 
-            if (currentBalance < creditsCharged) {
-              throw new Error(
-                `Insufficient credits. Need ${creditsCharged}, have ${currentBalance}. Purchase more credits to continue.`
-              );
-            }
-
-            tx.update(userCreditsRef, {
-              balance: currentBalance - creditsCharged,
-              totalSpent: (userCreditsDoc.data()?.totalSpent || 0) + creditsCharged,
-              updatedAt: new Date(),
-            });
+            // Points no longer gate generation (BYOK) — record spend, clamp at 0.
+            tx.set(
+              userCreditsRef,
+              {
+                balance: Math.max(0, currentBalance - creditsCharged),
+                totalSpent: (userCreditsDoc.data()?.totalSpent || 0) + creditsCharged,
+                updatedAt: new Date(),
+              },
+              { merge: true }
+            );
 
             // Mirror what `deductCredits` does — write the spend row that
             // spend-cap.ts sums for monthly/daily ceilings. Without this row

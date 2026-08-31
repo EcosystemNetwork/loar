@@ -1,0 +1,853 @@
+{
+  "address": "HTQhzknwF5mnnhHVSaF5ckRbeviwX2UuwayPNjiQybTp",
+  "metadata": {
+    "name": "licensing",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "LOAR Licensing program — Solana sister to apps/contracts/src/revenue/ContentLicensing.sol (BUY only in v1)"
+  },
+  "instructions": [
+    {
+      "name": "accept_admin",
+      "discriminator": [112, 42, 45, 90, 116, 181, 13, 170],
+      "accounts": [
+        {
+          "name": "new_admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108, 105, 99, 101, 110, 115, 105, 110, 103, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "buy_content",
+      "docs": [
+        "Permanent sale. Buyer pays `buy_price_lamports` to the creator and",
+        "receives a BuyerDeal PDA recording the purchase. `content_owner`",
+        "(derived off-chain from the latest BuyerDeal) updates on this call.",
+        "",
+        "v1: payment goes directly to the creator's wallet. Platform-fee",
+        "routing via the `payment` program CPI is a v2 follow-up — keeping",
+        "the v1 surface small enough to audit independently of payment."
+      ],
+      "discriminator": [139, 214, 48, 8, 243, 48, 10, 29],
+      "accounts": [
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "creator",
+          "docs": [
+            "Creator account (recipient of the SOL transfer). Validated against",
+            "`registration.creator` inside the instruction body — a forged pubkey",
+            "trips the CreatorMismatch error before any lamports move.",
+            "data deserialization required and we verify the pubkey above."
+          ],
+          "writable": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108, 105, 99, 101, 110, 115, 105, 110, 103, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "registration",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [114, 101, 103, 105, 115, 116, 114, 97, 116, 105, 111, 110]
+              },
+              {
+                "kind": "account",
+                "path": "registration.content_hash",
+                "account": "Registration"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_deal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [98, 117, 121, 101, 114, 95, 100, 101, 97, 108]
+              },
+              {
+                "kind": "account",
+                "path": "registration.content_hash",
+                "account": "Registration"
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "deactivate_content",
+      "docs": ["Deactivate a registration. Creator-only. Idempotent."],
+      "discriminator": [93, 88, 148, 17, 198, 120, 81, 31],
+      "accounts": [
+        {
+          "name": "creator",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108, 105, 99, 101, 110, 115, 105, 110, 103, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "registration",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [114, 101, 103, 105, 115, 116, 114, 97, 116, 105, 111, 110]
+              },
+              {
+                "kind": "account",
+                "path": "registration.content_hash",
+                "account": "Registration"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_config",
+      "docs": ["Initialize the singleton config. Callable exactly once per program."],
+      "discriminator": [208, 127, 21, 1, 194, 190, 196, 70],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108, 105, 99, 101, 110, 115, 105, 110, 103, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "pause",
+      "discriminator": [211, 22, 221, 251, 74, 121, 193, 47],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108, 105, 99, 101, 110, 115, 105, 110, 103, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "register_content",
+      "docs": [
+        "Register a content piece for sale. Gated by rights cache: the",
+        "`Rights` PDA for this content_hash must exist and return",
+        "`is_monetizable()` = true.",
+        "",
+        "Idempotency: PDA derivation locks one Registration per content_hash.",
+        "Re-registration of the same hash by the same creator is allowed via",
+        "`update_pricing`."
+      ],
+      "discriminator": [170, 55, 41, 115, 252, 248, 38, 144],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108, 105, 99, 101, 110, 115, 105, 110, 103, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "rights",
+          "docs": [
+            "Rights cache PDA from the rights program. Anchor's `Account<Rights>`",
+            "type enforces the owner-program check — only an account owned by the",
+            "rights program deserializes successfully. The seed constraint ties it",
+            "to the same content_hash we're registering, so the caller can't pass",
+            "a Rights record for a different (already-monetizable) content piece."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [114, 105, 103, 104, 116, 115]
+              },
+              {
+                "kind": "arg",
+                "path": "content_hash"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                5, 111, 177, 64, 65, 97, 187, 184, 129, 23, 169, 1, 38, 102, 240, 116, 85, 161, 132,
+                189, 22, 243, 8, 79, 121, 40, 177, 11, 101, 96, 216, 22
+              ]
+            }
+          }
+        },
+        {
+          "name": "registration",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [114, 101, 103, 105, 115, 116, 114, 97, 116, 105, 111, 110]
+              },
+              {
+                "kind": "arg",
+                "path": "content_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "content_hash",
+          "type": {
+            "array": ["u8", 32]
+          }
+        },
+        {
+          "name": "universe",
+          "type": "pubkey"
+        },
+        {
+          "name": "buy_price_lamports",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "transfer_admin",
+      "discriminator": [42, 242, 66, 106, 228, 10, 111, 156],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108, 105, 99, 101, 110, 115, 105, 110, 103, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "unpause",
+      "discriminator": [169, 144, 4, 38, 10, 141, 188, 255],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108, 105, 99, 101, 110, 115, 105, 110, 103, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_pricing",
+      "docs": ["Update the buy price for already-registered content. Creator-only."],
+      "discriminator": [157, 225, 208, 150, 23, 153, 253, 18],
+      "accounts": [
+        {
+          "name": "creator",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108, 105, 99, 101, 110, 115, 105, 110, 103, 95, 99, 111, 110, 102, 105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "registration",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [114, 101, 103, 105, 115, 116, 114, 97, 116, 105, 111, 110]
+              },
+              {
+                "kind": "account",
+                "path": "registration.content_hash",
+                "account": "Registration"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_buy_price_lamports",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "BuyerDeal",
+      "discriminator": [62, 170, 38, 24, 49, 167, 166, 211]
+    },
+    {
+      "name": "Config",
+      "discriminator": [155, 12, 170, 224, 30, 250, 204, 130]
+    },
+    {
+      "name": "Registration",
+      "discriminator": [158, 129, 230, 90, 93, 95, 101, 55]
+    },
+    {
+      "name": "Rights",
+      "discriminator": [79, 187, 86, 85, 243, 213, 103, 234]
+    }
+  ],
+  "events": [
+    {
+      "name": "AdminTransferProposed",
+      "discriminator": [203, 168, 175, 51, 239, 104, 20, 85]
+    },
+    {
+      "name": "AdminTransferred",
+      "discriminator": [255, 147, 182, 5, 199, 217, 38, 179]
+    },
+    {
+      "name": "ConfigInitialized",
+      "discriminator": [181, 49, 200, 156, 19, 167, 178, 91]
+    },
+    {
+      "name": "ContentBought",
+      "discriminator": [133, 77, 245, 18, 66, 165, 175, 96]
+    },
+    {
+      "name": "ContentDeactivated",
+      "discriminator": [173, 248, 28, 167, 111, 198, 72, 170]
+    },
+    {
+      "name": "ContentRegistered",
+      "discriminator": [234, 59, 220, 137, 21, 89, 2, 148]
+    },
+    {
+      "name": "Paused",
+      "discriminator": [172, 248, 5, 253, 49, 255, 255, 232]
+    },
+    {
+      "name": "PricingUpdated",
+      "discriminator": [29, 21, 233, 77, 53, 198, 67, 37]
+    },
+    {
+      "name": "Unpaused",
+      "discriminator": [156, 150, 47, 174, 120, 216, 93, 117]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Only the configured creator or admin may perform this action"
+    },
+    {
+      "code": 6001,
+      "name": "ZeroHash",
+      "msg": "Content hash cannot be all zeros"
+    },
+    {
+      "code": 6002,
+      "name": "ZeroPrice",
+      "msg": "Price must be greater than zero"
+    },
+    {
+      "code": 6003,
+      "name": "NotMonetizable",
+      "msg": "Content is not monetizable per the rights cache (Unset/Fun/Frozen)"
+    },
+    {
+      "code": 6004,
+      "name": "Inactive",
+      "msg": "Registration is inactive"
+    },
+    {
+      "code": 6005,
+      "name": "NotForSale",
+      "msg": "Content is not listed for sale"
+    },
+    {
+      "code": 6006,
+      "name": "CreatorMismatch",
+      "msg": "Creator pubkey does not match the registration's recorded creator"
+    },
+    {
+      "code": 6007,
+      "name": "Paused",
+      "msg": "Program is paused"
+    },
+    {
+      "code": 6008,
+      "name": "AlreadyPaused",
+      "msg": "Cannot pause: already paused"
+    },
+    {
+      "code": 6009,
+      "name": "NotPaused",
+      "msg": "Cannot unpause: not paused"
+    },
+    {
+      "code": 6010,
+      "name": "ZeroAddress",
+      "msg": "Address cannot be the zero pubkey"
+    }
+  ],
+  "types": [
+    {
+      "name": "AdminTransferProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdminTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BuyerDeal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "price_paid",
+            "type": "u64"
+          },
+          {
+            "name": "purchased_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ContentBought",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "price_paid",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ContentDeactivated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ContentRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "buy_price_lamports",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Paused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "PricingUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "buy_price_lamports",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Registration",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "buy_price_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Rights",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "rights_type",
+            "type": {
+              "defined": {
+                "name": "RightsType"
+              }
+            }
+          },
+          {
+            "name": "creator",
+            "docs": [
+              "Solana creator pubkey if the content originates on Solana, else",
+              "Pubkey::default(). Used by Solana-native monetization programs to",
+              "route payouts when the creator's primary wallet is Solana."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "evm_creator",
+            "docs": [
+              "20-byte EVM address from the canonical RightsRegistry.contentCreator",
+              "mapping. Always populated — this is the cross-chain provenance link."
+            ],
+            "type": {
+              "array": ["u8", 20]
+            }
+          },
+          {
+            "name": "version",
+            "docs": ["Strictly monotonic per content_hash. Older attestations are rejected."],
+            "type": "u64"
+          },
+          {
+            "name": "evm_tx_hash",
+            "docs": ["EVM tx hash that emitted the canonical RightsSet event for forensics."],
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "evm_block_number",
+            "docs": ["EVM block number for forensics."],
+            "type": "u64"
+          },
+          {
+            "name": "last_attested_slot",
+            "docs": ["Solana slot when this attestation landed."],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RightsType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Unset"
+          },
+          {
+            "name": "Fun"
+          },
+          {
+            "name": "Original"
+          },
+          {
+            "name": "Licensed"
+          },
+          {
+            "name": "PublicDomain"
+          },
+          {
+            "name": "Frozen"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Unpaused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    }
+  ]
+}

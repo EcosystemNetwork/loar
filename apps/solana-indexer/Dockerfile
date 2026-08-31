@@ -18,9 +18,12 @@ COPY packages/abis/package.json ./packages/abis/
 RUN npm pkg set scripts.prepare="echo skip"
 RUN pnpm install --frozen-lockfile
 
-# Copy source. abis is needed for the @loar/abis/chain import.
+# Copy source. abis is needed for the @loar/abis/chain import. The vendored
+# IDLs (apps/solana-indexer/idl/) must ship in the image — apps/programs/target/
+# is gitignored and never reaches the build context.
 COPY apps/solana-indexer/src ./apps/solana-indexer/src
 COPY apps/solana-indexer/scripts ./apps/solana-indexer/scripts
+COPY apps/solana-indexer/idl ./apps/solana-indexer/idl
 COPY apps/solana-indexer/tsconfig.json ./apps/solana-indexer/
 COPY packages/abis ./packages/abis
 

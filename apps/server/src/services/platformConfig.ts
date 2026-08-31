@@ -121,12 +121,17 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
 
   generationEnabled: true,
   mintingEnabled: true,
-  purchaseEnabled: true,
+  // Points are no longer sold — generation is BYOK. Webhook/reconciliation
+  // stay wired up for in-flight orders; admins can re-enable if needed.
+  purchaseEnabled: false,
   registrationEnabled: true,
 
-  monthlySpendCapEnabled: true,
+  // Credits/points retired (BYOK) — spend caps no longer apply. Kept in the
+  // config shape so admin tooling and `assertSpendAllowed` still compile;
+  // flip back on only if a metered tier is reintroduced.
+  monthlySpendCapEnabled: false,
   monthlySpendCapCredits: 2000,
-  dailySpendCapEnabled: true,
+  dailySpendCapEnabled: false,
   dailySpendCapCredits: 500,
 
   featuredUniverseIds: [],

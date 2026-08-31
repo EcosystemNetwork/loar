@@ -1,0 +1,985 @@
+{
+  "address": "6j9GBZXsdiGTJc7zJbJr3gJsibYQhJUDp2ZCDRBNzo2h",
+  "metadata": {
+    "name": "collab_manager",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "LOAR CollabManager — Solana sister to apps/contracts/src/revenue/CollabManager.sol"
+  },
+  "instructions": [
+    {
+      "name": "accept_admin",
+      "discriminator": [112, 42, 45, 90, 116, 181, 13, 170],
+      "accounts": [
+        {
+          "name": "new_admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 108, 108, 97, 98, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "accept_collab",
+      "docs": ["Universe B's creator accepts. Stays in ACCEPTED until activated."],
+      "discriminator": [205, 72, 91, 29, 109, 145, 155, 24],
+      "accounts": [
+        {
+          "name": "acceptor",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 108, 108, 97, 98, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "universe_b"
+        },
+        {
+          "name": "collab",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 108, 108, 97, 98]
+              },
+              {
+                "kind": "account",
+                "path": "collab.id",
+                "account": "Collab"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "activate_collab",
+      "docs": [
+        "Activate an accepted collab — either creator can fire. Sets start_time",
+        "= now, end_time = now + duration_secs, status = Active."
+      ],
+      "discriminator": [251, 119, 192, 173, 236, 243, 197, 46],
+      "accounts": [
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 108, 108, 97, 98, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "collab",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 108, 108, 97, 98]
+              },
+              {
+                "kind": "account",
+                "path": "collab.id",
+                "account": "Collab"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancel_collab",
+      "docs": ["Cancel — proposer only, only while PROPOSED."],
+      "discriminator": [32, 46, 198, 42, 225, 94, 67, 205],
+      "accounts": [
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 108, 108, 97, 98, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "collab",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 108, 108, 97, 98]
+              },
+              {
+                "kind": "account",
+                "path": "collab.id",
+                "account": "Collab"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "complete_collab",
+      "docs": [
+        "Mark complete — either participant after end_time, or admin anytime",
+        "(e.g. early wind-down by mutual agreement off-chain)."
+      ],
+      "discriminator": [27, 36, 45, 193, 42, 248, 143, 160],
+      "accounts": [
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 108, 108, 97, 98, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "collab",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 108, 108, 97, 98]
+              },
+              {
+                "kind": "account",
+                "path": "collab.id",
+                "account": "Collab"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_config",
+      "discriminator": [208, 127, 21, 1, 194, 190, 196, 70],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 108, 108, 97, 98, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "platform",
+          "type": "pubkey"
+        },
+        {
+          "name": "platform_fee_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "pause",
+      "discriminator": [211, 22, 221, 251, 74, 121, 193, 47],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 108, 108, 97, 98, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "propose_collab",
+      "docs": [
+        "Universe A's creator proposes a collab with Universe B.",
+        "`collab_id` is the auto-incrementing id from Config.next_collab_id;",
+        "caller passes the expected id (read just before) for PDA derivation."
+      ],
+      "discriminator": [66, 11, 148, 75, 196, 150, 18, 119],
+      "accounts": [
+        {
+          "name": "proposer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 108, 108, 97, 98, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "universe_a"
+        },
+        {
+          "name": "universe_b"
+        },
+        {
+          "name": "collab",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 108, 108, 97, 98]
+              },
+              {
+                "kind": "arg",
+                "path": "collab_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "collab_id",
+          "type": "u64"
+        },
+        {
+          "name": "revenue_share_bps",
+          "type": "u16"
+        },
+        {
+          "name": "duration_secs",
+          "type": "i64"
+        },
+        {
+          "name": "metadata_uri",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "record_episode",
+      "docs": [
+        "Platform records an episode + the revenue it generated. v1 just",
+        "accrues totals; routing the revenue to creators is a v2 follow-up",
+        "that CPIs into `programs/payment` once both creator payout wallets",
+        "are wired through."
+      ],
+      "discriminator": [217, 145, 195, 198, 61, 229, 94, 109],
+      "accounts": [
+        {
+          "name": "platform",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 108, 108, 97, 98, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "collab",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 108, 108, 97, 98]
+              },
+              {
+                "kind": "account",
+                "path": "collab.id",
+                "account": "Collab"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "episode_revenue_lamports",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "transfer_admin",
+      "discriminator": [42, 242, 66, 106, 228, 10, 111, 156],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 108, 108, 97, 98, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "unpause",
+      "discriminator": [169, 144, 4, 38, 10, 141, 188, 255],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 108, 108, 97, 98, 95, 99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Collab",
+      "discriminator": [195, 165, 108, 119, 66, 66, 64, 166]
+    },
+    {
+      "name": "Config",
+      "discriminator": [155, 12, 170, 224, 30, 250, 204, 130]
+    },
+    {
+      "name": "Universe",
+      "discriminator": [86, 112, 227, 226, 88, 47, 242, 113]
+    }
+  ],
+  "events": [
+    {
+      "name": "AdminTransferProposed",
+      "discriminator": [203, 168, 175, 51, 239, 104, 20, 85]
+    },
+    {
+      "name": "AdminTransferred",
+      "discriminator": [255, 147, 182, 5, 199, 217, 38, 179]
+    },
+    {
+      "name": "CollabAccepted",
+      "discriminator": [96, 26, 131, 233, 230, 9, 194, 24]
+    },
+    {
+      "name": "CollabActivated",
+      "discriminator": [205, 122, 158, 73, 74, 226, 169, 104]
+    },
+    {
+      "name": "CollabCancelled",
+      "discriminator": [36, 176, 129, 251, 63, 235, 60, 109]
+    },
+    {
+      "name": "CollabCompleted",
+      "discriminator": [23, 135, 230, 103, 34, 21, 139, 5]
+    },
+    {
+      "name": "CollabEpisodeRecorded",
+      "discriminator": [60, 95, 231, 253, 252, 58, 6, 212]
+    },
+    {
+      "name": "CollabProposed",
+      "discriminator": [127, 251, 170, 215, 59, 11, 178, 219]
+    },
+    {
+      "name": "ConfigInitialized",
+      "discriminator": [181, 49, 200, 156, 19, 167, 178, 91]
+    },
+    {
+      "name": "Paused",
+      "discriminator": [172, 248, 5, 253, 49, 255, 255, 232]
+    },
+    {
+      "name": "Unpaused",
+      "discriminator": [156, 150, 47, 174, 120, 216, 93, 117]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Only the configured admin may perform this action"
+    },
+    {
+      "code": 6001,
+      "name": "NotProposer",
+      "msg": "Caller is not the proposer of this collab"
+    },
+    {
+      "code": 6002,
+      "name": "NotParticipant",
+      "msg": "Caller is not a participant (proposer or acceptor)"
+    },
+    {
+      "code": 6003,
+      "name": "NotUniverseACreator",
+      "msg": "Caller is not Universe A's creator"
+    },
+    {
+      "code": 6004,
+      "name": "NotUniverseBCreator",
+      "msg": "Caller is not Universe B's creator"
+    },
+    {
+      "code": 6005,
+      "name": "NotPlatform",
+      "msg": "Only the configured platform key may perform this action"
+    },
+    {
+      "code": 6006,
+      "name": "ZeroAddress",
+      "msg": "Address cannot be the zero pubkey"
+    },
+    {
+      "code": 6007,
+      "name": "SameUniverse",
+      "msg": "Cannot collab a universe with itself"
+    },
+    {
+      "code": 6008,
+      "name": "UniverseMismatch",
+      "msg": "Universe argument does not match supplied Universe account"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidStatus",
+      "msg": "Collab status doesn't allow this action"
+    },
+    {
+      "code": 6010,
+      "name": "CollabNotActive",
+      "msg": "Collab is not active"
+    },
+    {
+      "code": 6011,
+      "name": "CompletionNotReady",
+      "msg": "Cannot complete: end_time has not been reached (admin override available)"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidShare",
+      "msg": "revenue_share_a_bps must be in [0, 10000]"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidDuration",
+      "msg": "duration_secs must be in [1h, 1yr]"
+    },
+    {
+      "code": 6014,
+      "name": "MetadataTooLong",
+      "msg": "Metadata URI exceeds 200 chars"
+    },
+    {
+      "code": 6015,
+      "name": "FeeTooHigh",
+      "msg": "Platform fee exceeds 5000 bps (50%)"
+    },
+    {
+      "code": 6016,
+      "name": "IdMismatch",
+      "msg": "collab_id arg does not match Config.next_collab_id"
+    },
+    {
+      "code": 6017,
+      "name": "MathOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6018,
+      "name": "RevenueExceedsCap",
+      "msg": "episode_revenue_lamports exceeds the per-episode sanity cap"
+    },
+    {
+      "code": 6019,
+      "name": "Paused",
+      "msg": "Program is paused"
+    },
+    {
+      "code": 6020,
+      "name": "AlreadyPaused",
+      "msg": "Cannot pause: already paused"
+    },
+    {
+      "code": 6021,
+      "name": "NotPaused",
+      "msg": "Cannot unpause: not paused"
+    }
+  ],
+  "types": [
+    {
+      "name": "AdminTransferProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdminTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Collab",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "universe_a",
+            "type": "pubkey"
+          },
+          {
+            "name": "universe_b",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposer",
+            "type": "pubkey"
+          },
+          {
+            "name": "acceptor",
+            "type": "pubkey"
+          },
+          {
+            "name": "revenue_share_a_bps",
+            "type": "u16"
+          },
+          {
+            "name": "duration_secs",
+            "type": "i64"
+          },
+          {
+            "name": "metadata_uri",
+            "type": "string"
+          },
+          {
+            "name": "total_revenue",
+            "type": "u64"
+          },
+          {
+            "name": "episode_count",
+            "type": "u64"
+          },
+          {
+            "name": "proposed_at",
+            "type": "i64"
+          },
+          {
+            "name": "start_time",
+            "type": "i64"
+          },
+          {
+            "name": "end_time",
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "CollabStatus"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CollabAccepted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "acceptor",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CollabActivated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "start_time",
+            "type": "i64"
+          },
+          {
+            "name": "end_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CollabCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CollabCompleted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "total_revenue",
+            "type": "u64"
+          },
+          {
+            "name": "episode_count",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CollabEpisodeRecorded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "episode_count",
+            "type": "u64"
+          },
+          {
+            "name": "episode_revenue_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "total_revenue",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CollabProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "universe_a",
+            "type": "pubkey"
+          },
+          {
+            "name": "universe_b",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposer",
+            "type": "pubkey"
+          },
+          {
+            "name": "revenue_share_a_bps",
+            "type": "u16"
+          },
+          {
+            "name": "duration_secs",
+            "type": "i64"
+          },
+          {
+            "name": "metadata_uri",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CollabStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Proposed"
+          },
+          {
+            "name": "Accepted"
+          },
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Completed"
+          },
+          {
+            "name": "Cancelled"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "platform",
+            "type": "pubkey"
+          },
+          {
+            "name": "platform_fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "next_collab_id",
+            "type": "u64"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "platform",
+            "type": "pubkey"
+          },
+          {
+            "name": "platform_fee_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Paused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "Universe",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "plot_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "visibility",
+            "type": {
+              "defined": {
+                "name": "Visibility"
+              }
+            }
+          },
+          {
+            "name": "canon_count",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Unpaused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "Visibility",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Private"
+          },
+          {
+            "name": "Public"
+          }
+        ]
+      }
+    }
+  ]
+}

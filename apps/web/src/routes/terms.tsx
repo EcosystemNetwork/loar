@@ -17,7 +17,7 @@ function TermsPage() {
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-6 py-16">
         <h1 className="text-3xl font-bold mb-2">Terms of Service</h1>
-        <p className="text-sm text-muted-foreground mb-8">Last updated: April 17, 2026</p>
+        <p className="text-sm text-muted-foreground mb-8">Last updated: August 29, 2026</p>
 
         <div className="prose prose-invert max-w-none space-y-6 text-muted-foreground">
           <section>
@@ -132,6 +132,20 @@ function TermsPage() {
               allow for removal from caches and backups.
             </p>
             <p>
+              <strong>Model training license.</strong> You additionally grant the Company a
+              perpetual, irrevocable, worldwide, royalty-free, sublicensable, and transferable
+              license to use, host, reproduce, modify, and create derivative works from any content
+              you upload, create, or generate on the Platform — including images, videos, 3D models,
+              audio, text, story universes, prompts, generation parameters, and AI outputs — for the
+              purpose of developing, training, fine-tuning, evaluating, benchmarking, and improving
+              machine learning models, datasets, and artificial intelligence systems, whether
+              operated by the Company or by its affiliates, service providers, or research partners.
+              This license survives termination of your account and any removal of your content from
+              the Platform, and it applies to content created both before and after the effective
+              date of these Terms. If you do not want your content used for these purposes, you must
+              not upload or generate it on the Platform.
+            </p>
+            <p>
               Misclassification of content rights — whether intentional or negligent — may result in
               content removal, suspension of Platform access, forfeiture of associated revenue, and
               potential legal liability.
@@ -160,6 +174,14 @@ function TermsPage() {
             <p>
               Generation parameters, prompts, and model selections are logged for moderation,
               billing, and quality assurance purposes.
+            </p>
+            <p>
+              You acknowledge and agree that the Company and its service providers and research
+              partners may use your prompts, generation parameters, and the resulting AI-generated
+              outputs — together with any other content you create on the Platform — to train,
+              fine-tune, evaluate, and improve AI models, datasets, and Platform features, as
+              further described in Section 5. Content generated on the Platform may be included in
+              datasets used for these purposes.
             </p>
           </section>
 

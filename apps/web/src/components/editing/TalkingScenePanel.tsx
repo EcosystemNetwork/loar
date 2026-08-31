@@ -209,7 +209,7 @@ export function TalkingScenePanel({ imageUrl, onComplete }: TalkingScenePanelPro
             <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
               Total cost
             </span>
-            <span className="text-xs font-medium">{costEstimate.data.totalCredits} credits</span>
+            <span className="text-xs font-medium">{costEstimate.data.totalCredits} points</span>
           </div>
           <div className="text-[10px] text-muted-foreground mt-1 space-y-0.5">
             <div className="flex justify-between">

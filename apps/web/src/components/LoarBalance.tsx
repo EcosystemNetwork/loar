@@ -104,7 +104,7 @@ export function LoarBalance() {
           </>
         )}
         <span className="text-amber-400 font-bold">{credits}</span>
-        <span className="text-zinc-500">credits</span>
+        <span className="text-zinc-500">points</span>
         {isLow && <span className="text-[9px] text-red-400">LOW</span>}
       </button>
 
@@ -114,7 +114,7 @@ export function LoarBalance() {
             className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm"
             role="dialog"
             aria-modal="true"
-            aria-label="Credit Store"
+            aria-label="Points"
             onClick={(e) => {
               if (e.target === e.currentTarget) setShowStore(false);
             }}

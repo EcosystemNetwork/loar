@@ -131,7 +131,7 @@ async function uploadBlob(blob: Blob, filename: string): Promise<string> {
 
 // Strip internal-sounding bits (stack traces, provider names) from server error
 // messages before showing them in a toast. Keeps the signal — "upload failed",
-// "insufficient credits" — without leaking operational details.
+// "insufficient points" — without leaking operational details.
 function toastableError(err: unknown, fallback = 'Something went wrong'): string {
   if (!err) return fallback;
   const raw = err instanceof Error ? err.message : String(err);
@@ -567,7 +567,7 @@ export function InpaintStudio({
                     <SelectItem key={m.id} value={m.id}>
                       {m.displayName}{' '}
                       <span className="text-[10px] text-muted-foreground ml-1">
-                        {m.creditCost} cr
+                        {m.creditCost} pts
                       </span>
                     </SelectItem>
                   ))}
@@ -590,7 +590,7 @@ export function InpaintStudio({
             ) : (
               <>
                 <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                {modeConfig.label} · {creditCost} cr
+                {modeConfig.label} · {creditCost} pts
               </>
             )}
           </Button>

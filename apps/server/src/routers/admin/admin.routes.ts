@@ -20,6 +20,7 @@ import { sendSlackAlert } from '../../lib/slack';
 import { adminCostRouter } from './cost.routes';
 import { adminMcpUsageRouter } from './mcpUsage.routes';
 import { adminAnalyticsRouter } from './analytics.routes';
+import { adminPromptsRouter } from './prompts.routes';
 
 // Kill-switch fields that warrant a Slack alert when flipped.
 const ALERT_FIELDS = [
@@ -91,6 +92,9 @@ export const adminRouter = router({
 
   // ── Site-wide analytics (users, signups, engagement) ──────────────
   analytics: adminAnalyticsRouter,
+
+  // ── Platform prompt corpus (every user-submitted generation prompt) ─
+  prompts: adminPromptsRouter,
 
   // ── Read current config ───────────────────────────────────────────
 

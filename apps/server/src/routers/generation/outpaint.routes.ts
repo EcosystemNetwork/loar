@@ -362,29 +362,26 @@ export const outpaintRouter = router({
 
       // ── Deduct credits (atomic) ───────────────────────────────────────
       const userCreditsRef = db.collection('userCredits').doc(ctx.user.uid);
-      let insufficient = false;
       try {
         await db.runTransaction(async (tx) => {
           const doc = await tx.get(userCreditsRef);
           const balance = doc.exists ? doc.data()?.balance || 0 : 0;
-          if (balance < cost) {
-            insufficient = true;
-            throw new Error(
-              `Insufficient credits. Need ${cost}, have ${balance}. Purchase more credits to continue.`
-            );
-          }
-          tx.update(userCreditsRef, {
-            balance: balance - cost,
-            totalSpent: (doc.data()?.totalSpent || 0) + cost,
-            updatedAt: new Date(),
-          });
+          // Points no longer gate generation (BYOK) — record spend, clamp at 0.
+          tx.set(
+            userCreditsRef,
+            {
+              balance: Math.max(0, balance - cost),
+              totalSpent: (doc.data()?.totalSpent || 0) + cost,
+              updatedAt: new Date(),
+            },
+            { merge: true }
+          );
         });
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Credit deduction failed';
+        const message = err instanceof Error ? err.message : 'Points ledger update failed';
         await outpaintJobsCol()
           .doc(jobId)
           .update({ status: 'failed', failureReason: message, completedAt: new Date() });
-        if (insufficient) throw new TRPCError({ code: 'PRECONDITION_FAILED', message });
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message });
       }
 

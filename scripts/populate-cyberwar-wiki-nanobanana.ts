@@ -18,21 +18,36 @@
  *
  * Other flags:
  *   --dry-run       Generate nothing, write nothing — just print the plan.
+ *   --no-fallback   Do not let image.generate substitute a fal model when the
+ *                   selected model is unavailable — fail the image instead.
+ *   --chain=X       Force the auth chain: `evm` (SIWE) or `solana` (SIWS).
+ *                   Default: auto-detected from the PRIVATE_KEY shape.
  *   --limit=N       Cap the number of entities touched in --covers / --new-entities.
  *   --only=Name     Restrict --covers / --new-entities to entities whose name
  *                   contains this substring (case-insensitive).
  *
+ * Auth works with either an EVM or a Solana key — but signing in is not the
+ * same as being allowed to write. --covers / --hero / --episodes edit
+ * existing Cyber War content and require the caller to be its creator, so
+ * they only work with that universe's EVM owner key (or a Solana wallet
+ * linked to it via /auth/solana/link). A standalone Solana key is only
+ * useful with --new-entities against a Solana-owned universe (UNIVERSE_ADDRESS).
+ *
  * Env:
- *   PRIVATE_KEY            (required) wallet key. For --covers / --hero it must
- *                          be the creator / universe admin, or those writes 403.
+ *   PRIVATE_KEY            (required) EVM hex or Solana base58/json/hex key.
+ *                          For writes it must own the target universe / entity.
+ *   AUTH_CHAIN             `evm` | `solana` — same as --chain. Default: auto-detect.
+ *   SOLANA_CLUSTER         SIWS cluster (default: mainnet-beta). devnet | testnet.
+ *   UNIVERSE_ADDRESS       Target universe (default: the Cyber War EVM address).
  *   SERVER_URL             tRPC base (default: VITE_SERVER_URL or http://localhost:3000)
- *   WEB_ORIGIN             origin used for the SIWE domain + Origin header
+ *   WEB_ORIGIN             origin used for the SIWx domain + Origin header
  *                          (default: http://localhost:5173). For staging/prod set
  *                          this to the deployed web origin, which must be in the
  *                          server's SIWE_ALLOWED_DOMAINS + CORS_ORIGIN.
  *   CHAIN_ID               SIWE chain id (default: 11155111 / Sepolia)
  *   NANO_BANANA_MODEL      image-model registry id (default: nano-banana).
- *                          Use nano-banana-google-ga for Gemini 2.5 Flash Image direct.
+ *                          Use nano-banana-google-ga for Gemini 2.5 Flash Image direct,
+ *                          or nano-banana-pro-google for Gemini 3 Pro Image.
  *   PINATA_GATEWAY_URL     used only for logging video URLs (default: gateway.pinata.cloud)
  *
  * Usage:
@@ -40,22 +55,30 @@
  *   pnpm tsx scripts/populate-cyberwar-wiki-nanobanana.ts --covers --dry-run
  *   SERVER_URL=https://api.loar.fun WEB_ORIGIN=https://loar.fun \
  *     pnpm tsx scripts/populate-cyberwar-wiki-nanobanana.ts --new-entities
+ *   AUTH_CHAIN=solana UNIVERSE_ADDRESS=<solPubkey> \
+ *     pnpm tsx scripts/populate-cyberwar-wiki-nanobanana.ts --new-entities
  */
 import dotenv from 'dotenv';
 import path from 'path';
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
-import { getAddress } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
+import { resolveAuth, detectAuthChain, type AuthChain, type SolanaCluster } from './lib/wiki-auth';
+
+const args = process.argv.slice(2);
+const has = (f: string) => args.includes(f);
+const val = (f: string) => {
+  const a = args.find((x) => x.startsWith(`${f}=`));
+  return a ? a.slice(f.length + 1) : undefined;
+};
 
 // ── Config ────────────────────────────────────────────────────────────
 const rawKey = process.env.PRIVATE_KEY ?? '';
 if (!rawKey) {
-  console.error('PRIVATE_KEY is required (wallet that owns the Cyber War universe / entities).');
+  console.error(
+    'PRIVATE_KEY is required — the EVM or Solana key of the wallet that owns the target universe.'
+  );
   process.exit(1);
 }
-const PRIVATE_KEY = (rawKey.startsWith('0x') ? rawKey : `0x${rawKey}`) as `0x${string}`;
-const account = privateKeyToAccount(PRIVATE_KEY);
 
 const SERVER_URL = (
   process.env.SERVER_URL ??
@@ -70,16 +93,23 @@ const PINATA_GW = (process.env.PINATA_GATEWAY_URL ?? 'https://gateway.pinata.clo
   ''
 );
 
-const UNIVERSE_ADDR = '0x341fFa19c0EC8D2C8eF42A360cf799949844262e';
+// Chain of the signing key: --chain / AUTH_CHAIN forces it, else auto-detect
+// from the key shape (64-hex → evm, base58 / json / 128-hex → solana).
+const AUTH_CHAIN = ((val('--chain') ?? process.env.AUTH_CHAIN)?.toLowerCase() ||
+  detectAuthChain(rawKey)) as AuthChain;
+const SOLANA_CLUSTER = (process.env.SOLANA_CLUSTER ?? 'mainnet-beta') as SolanaCluster;
 
-const args = process.argv.slice(2);
-const has = (f: string) => args.includes(f);
-const val = (f: string) => {
-  const a = args.find((x) => x.startsWith(`${f}=`));
-  return a ? a.slice(f.length + 1) : undefined;
-};
+// Cyber War by default; override to target a different (e.g. Solana-owned)
+// universe. The --covers / --hero / --episodes phases still expect Cyber War
+// content, so a different universe is really only useful with --new-entities.
+const UNIVERSE_ADDR = process.env.UNIVERSE_ADDRESS ?? '0x341fFa19c0EC8D2C8eF42A360cf799949844262e';
+
 const DRY_RUN = has('--dry-run');
 const FORCE = has('--force');
+// By default image.generate is allowed to substitute a fal model when the
+// selected model (e.g. nano-banana-pro-google) is unavailable. Pass
+// --no-fallback to make such failures loud instead of silently downgrading.
+const ALLOW_FALLBACK = !has('--no-fallback');
 const LIMIT = val('--limit') ? Number(val('--limit')) : Infinity;
 const ONLY = val('--only')?.toLowerCase();
 
@@ -114,7 +144,7 @@ const KIND_FRAMING: Record<string, string> = {
   organization: 'headquarters or command tableau, insignia prominent, atmospheric',
 };
 
-// ── SIWE auth + tRPC helpers ──────────────────────────────────────────
+// ── SIWx auth + tRPC helpers ──────────────────────────────────────────
 function log(step: string, msg: string) {
   console.log(`[${step}] ${msg}`);
 }
@@ -122,42 +152,22 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function buildSiweMessage(nonce: string): string {
-  const domain = new URL(WEB_ORIGIN).host;
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + 5 * 60 * 1000);
-  return [
-    `${domain} wants you to sign in with your Ethereum account:`,
-    getAddress(account.address),
-    '',
-    'Sign in to LOAR',
-    '',
-    `URI: ${WEB_ORIGIN}`,
-    `Version: 1`,
-    `Chain ID: ${CHAIN_ID}`,
-    `Nonce: ${nonce}`,
-    `Issued At: ${now.toISOString()}`,
-    `Expiration Time: ${expiresAt.toISOString()}`,
-  ].join('\n');
-}
-
+/** Sign in with the configured chain (EVM SIWE or Solana SIWS) and return the JWT. */
 async function getAuthToken(): Promise<string> {
-  const nonceRes = await fetch(`${SERVER_URL}/auth/nonce`);
-  const { nonce } = (await nonceRes.json()) as { nonce: string };
-  const message = buildSiweMessage(nonce);
-  const signature = await account.signMessage({ message });
-  const verifyRes = await fetch(`${SERVER_URL}/auth/verify`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Origin: WEB_ORIGIN },
-    body: JSON.stringify({ message, signature }),
+  const auth = await resolveAuth({
+    serverUrl: SERVER_URL,
+    webOrigin: WEB_ORIGIN,
+    privateKey: rawKey,
+    chain: AUTH_CHAIN,
+    evmChainId: CHAIN_ID,
+    solanaCluster: SOLANA_CLUSTER,
   });
-  const setCookie = verifyRes.headers.get('set-cookie') ?? '';
-  const match = setCookie.match(/siwe-session=([^;]+)/);
-  if (!match) {
-    const body = await verifyRes.text().catch(() => '');
-    throw new Error(`SIWE verify failed (${verifyRes.status}): ${body.slice(0, 200)}`);
-  }
-  return match[1];
+  const who =
+    auth.chain === 'solana' && auth.evmAddress
+      ? `${auth.address} → linked EVM ${auth.evmAddress}`
+      : auth.address;
+  log('AUTH', `${auth.chain.toUpperCase()} signer: ${who}`);
+  return auth.token;
 }
 
 async function tRPCMutate<T>(procedure: string, input: unknown, token: string): Promise<T> {
@@ -208,7 +218,7 @@ async function genImage(
           numImages: 1,
           routingMode: 'manual',
           selectedModelId: NANO_BANANA_MODEL,
-          allowFallback: true,
+          allowFallback: ALLOW_FALLBACK,
           useWikiContext: false,
           universeId: UNIVERSE_ADDR,
         },
@@ -730,20 +740,26 @@ async function main() {
   console.log(`  server   : ${SERVER_URL}`);
   console.log(`  origin   : ${WEB_ORIGIN}`);
   console.log(`  model    : ${NANO_BANANA_MODEL}`);
-  console.log(`  wallet   : ${account.address}`);
+  console.log(`  universe : ${UNIVERSE_ADDR}`);
+  console.log(
+    `  auth     : ${AUTH_CHAIN}${AUTH_CHAIN === 'solana' ? ` (${SOLANA_CLUSTER})` : ` (chain ${CHAIN_ID})`}`
+  );
   console.log(
     `  phases   : ${Object.entries(phases)
       .filter(([, v]) => v)
       .map(([k]) => k)
       .join(', ')}`
   );
-  console.log(`  dry-run  : ${DRY_RUN}${FORCE ? '   force: true' : ''}`);
+  console.log(
+    `  dry-run  : ${DRY_RUN}${FORCE ? '   force: true' : ''}${
+      ALLOW_FALLBACK ? '' : '   no-fallback: true'
+    }`
+  );
   if (LIMIT !== Infinity) console.log(`  limit    : ${LIMIT}`);
   if (ONLY) console.log(`  only     : ${ONLY}`);
 
-  log('AUTH', 'authenticating (SIWE)...');
+  log('AUTH', `authenticating (${AUTH_CHAIN === 'solana' ? 'SIWS' : 'SIWE'})...`);
   const token = await getAuthToken();
-  log('AUTH', `authenticated as ${account.address}`);
 
   if (phases.covers) await runCovers(token);
   if (phases.newEntities) await runNewEntities(token);

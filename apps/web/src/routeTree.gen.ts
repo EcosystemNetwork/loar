@@ -28,6 +28,7 @@ import { Route as ResidencyRouteImport } from './routes/residency'
 import { Route as RelightRouteImport } from './routes/relight'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as PointsLeaderboardRouteImport } from './routes/points-leaderboard'
 import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as NotebookRouteImport } from './routes/notebook'
 import { Route as MyWorksRouteImport } from './routes/my-works'
@@ -113,6 +114,7 @@ import { Route as AdplacementsNewRouteImport } from './routes/adplacements/new'
 import { Route as AdplacementsSlotIdRouteImport } from './routes/adplacements/$slotId'
 import { Route as AdminUniversesRouteImport } from './routes/admin/universes'
 import { Route as AdminResidencyRouteImport } from './routes/admin/residency'
+import { Route as AdminPromptsRouteImport } from './routes/admin/prompts'
 import { Route as AdminOpsRouteImport } from './routes/admin/ops'
 import { Route as AdminModerationRouteImport } from './routes/admin/moderation'
 import { Route as AdminMcpUsageRouteImport } from './routes/admin/mcp-usage'
@@ -237,6 +239,11 @@ const PrivacyRoute = PrivacyRouteImport.update({
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
   path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PointsLeaderboardRoute = PointsLeaderboardRouteImport.update({
+  id: '/points-leaderboard',
+  path: '/points-leaderboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NotificationsRoute = NotificationsRouteImport.update({
@@ -664,6 +671,11 @@ const AdminResidencyRoute = AdminResidencyRouteImport.update({
   path: '/admin/residency',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminPromptsRoute = AdminPromptsRouteImport.update({
+  id: '/admin/prompts',
+  path: '/admin/prompts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminOpsRoute = AdminOpsRouteImport.update({
   id: '/admin/ops',
   path: '/admin/ops',
@@ -845,6 +857,7 @@ export interface FileRoutesByFullPath {
   '/my-works': typeof MyWorksRoute
   '/notebook': typeof NotebookRouteWithChildren
   '/notifications': typeof NotificationsRoute
+  '/points-leaderboard': typeof PointsLeaderboardRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/relight': typeof RelightRoute
@@ -871,6 +884,7 @@ export interface FileRoutesByFullPath {
   '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/admin/ops': typeof AdminOpsRoute
+  '/admin/prompts': typeof AdminPromptsRoute
   '/admin/residency': typeof AdminResidencyRoute
   '/admin/universes': typeof AdminUniversesRoute
   '/adplacements/$slotId': typeof AdplacementsSlotIdRoute
@@ -981,6 +995,7 @@ export interface FileRoutesByTo {
   '/my-works': typeof MyWorksRoute
   '/notebook': typeof NotebookRouteWithChildren
   '/notifications': typeof NotificationsRoute
+  '/points-leaderboard': typeof PointsLeaderboardRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/relight': typeof RelightRoute
@@ -1007,6 +1022,7 @@ export interface FileRoutesByTo {
   '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/admin/ops': typeof AdminOpsRoute
+  '/admin/prompts': typeof AdminPromptsRoute
   '/admin/residency': typeof AdminResidencyRoute
   '/admin/universes': typeof AdminUniversesRoute
   '/adplacements/$slotId': typeof AdplacementsSlotIdRoute
@@ -1118,6 +1134,7 @@ export interface FileRoutesById {
   '/my-works': typeof MyWorksRoute
   '/notebook': typeof NotebookRouteWithChildren
   '/notifications': typeof NotificationsRoute
+  '/points-leaderboard': typeof PointsLeaderboardRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/relight': typeof RelightRoute
@@ -1144,6 +1161,7 @@ export interface FileRoutesById {
   '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/admin/ops': typeof AdminOpsRoute
+  '/admin/prompts': typeof AdminPromptsRoute
   '/admin/residency': typeof AdminResidencyRoute
   '/admin/universes': typeof AdminUniversesRoute
   '/adplacements/$slotId': typeof AdplacementsSlotIdRoute
@@ -1256,6 +1274,7 @@ export interface FileRouteTypes {
     | '/my-works'
     | '/notebook'
     | '/notifications'
+    | '/points-leaderboard'
     | '/pricing'
     | '/privacy'
     | '/relight'
@@ -1282,6 +1301,7 @@ export interface FileRouteTypes {
     | '/admin/mcp-usage'
     | '/admin/moderation'
     | '/admin/ops'
+    | '/admin/prompts'
     | '/admin/residency'
     | '/admin/universes'
     | '/adplacements/$slotId'
@@ -1392,6 +1412,7 @@ export interface FileRouteTypes {
     | '/my-works'
     | '/notebook'
     | '/notifications'
+    | '/points-leaderboard'
     | '/pricing'
     | '/privacy'
     | '/relight'
@@ -1418,6 +1439,7 @@ export interface FileRouteTypes {
     | '/admin/mcp-usage'
     | '/admin/moderation'
     | '/admin/ops'
+    | '/admin/prompts'
     | '/admin/residency'
     | '/admin/universes'
     | '/adplacements/$slotId'
@@ -1528,6 +1550,7 @@ export interface FileRouteTypes {
     | '/my-works'
     | '/notebook'
     | '/notifications'
+    | '/points-leaderboard'
     | '/pricing'
     | '/privacy'
     | '/relight'
@@ -1554,6 +1577,7 @@ export interface FileRouteTypes {
     | '/admin/mcp-usage'
     | '/admin/moderation'
     | '/admin/ops'
+    | '/admin/prompts'
     | '/admin/residency'
     | '/admin/universes'
     | '/adplacements/$slotId'
@@ -1665,6 +1689,7 @@ export interface RootRouteChildren {
   MyWorksRoute: typeof MyWorksRoute
   NotebookRoute: typeof NotebookRouteWithChildren
   NotificationsRoute: typeof NotificationsRoute
+  PointsLeaderboardRoute: typeof PointsLeaderboardRoute
   PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
   RelightRoute: typeof RelightRoute
@@ -1691,6 +1716,7 @@ export interface RootRouteChildren {
   AdminMcpUsageRoute: typeof AdminMcpUsageRoute
   AdminModerationRoute: typeof AdminModerationRoute
   AdminOpsRoute: typeof AdminOpsRoute
+  AdminPromptsRoute: typeof AdminPromptsRoute
   AdminResidencyRoute: typeof AdminResidencyRoute
   AdminUniversesRoute: typeof AdminUniversesRoute
   AdplacementsSlotIdRoute: typeof AdplacementsSlotIdRoute
@@ -1892,6 +1918,13 @@ declare module '@tanstack/react-router' {
       path: '/pricing'
       fullPath: '/pricing'
       preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/points-leaderboard': {
+      id: '/points-leaderboard'
+      path: '/points-leaderboard'
+      fullPath: '/points-leaderboard'
+      preLoaderRoute: typeof PointsLeaderboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/notifications': {
@@ -2489,6 +2522,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminResidencyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/prompts': {
+      id: '/admin/prompts'
+      path: '/admin/prompts'
+      fullPath: '/admin/prompts'
+      preLoaderRoute: typeof AdminPromptsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/ops': {
       id: '/admin/ops'
       path: '/admin/ops'
@@ -2837,6 +2877,7 @@ const rootRouteChildren: RootRouteChildren = {
   MyWorksRoute: MyWorksRoute,
   NotebookRoute: NotebookRouteWithChildren,
   NotificationsRoute: NotificationsRoute,
+  PointsLeaderboardRoute: PointsLeaderboardRoute,
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
   RelightRoute: RelightRoute,
@@ -2863,6 +2904,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminMcpUsageRoute: AdminMcpUsageRoute,
   AdminModerationRoute: AdminModerationRoute,
   AdminOpsRoute: AdminOpsRoute,
+  AdminPromptsRoute: AdminPromptsRoute,
   AdminResidencyRoute: AdminResidencyRoute,
   AdminUniversesRoute: AdminUniversesRoute,
   AdplacementsSlotIdRoute: AdplacementsSlotIdRoute,

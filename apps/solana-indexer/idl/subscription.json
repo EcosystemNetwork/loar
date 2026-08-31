@@ -1,0 +1,1006 @@
+{
+  "address": "Hnnkuf933sv2rEucpCLaLbXxA1zPNxTNpUsp1WX9Fwbm",
+  "metadata": {
+    "name": "subscription",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "LOAR SubscriptionManager — Solana sister to apps/contracts/src/revenue/SubscriptionManager.sol"
+  },
+  "instructions": [
+    {
+      "name": "accept_admin",
+      "discriminator": [112, 42, 45, 90, 116, 181, 13, 170],
+      "accounts": [
+        {
+          "name": "new_admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 117, 98, 115, 99, 114, 105, 112, 116, 105, 111, 110, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "accept_platform",
+      "discriminator": [124, 244, 17, 88, 187, 84, 8, 26],
+      "accounts": [
+        {
+          "name": "new_platform",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 117, 98, 115, 99, 114, 105, 112, 116, 105, 111, 110, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancel_subscription",
+      "docs": ["Cancel a subscription — sets `expires_at = now`. No refund in v1."],
+      "discriminator": [60, 139, 189, 242, 191, 208, 143, 18],
+      "accounts": [
+        {
+          "name": "subscriber",
+          "signer": true
+        },
+        {
+          "name": "subscription",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [115, 117, 98, 115, 99, 114, 105, 112, 116, 105, 111, 110]
+              },
+              {
+                "kind": "account",
+                "path": "subscriber"
+              },
+              {
+                "kind": "arg",
+                "path": "universe"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "_universe",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "configure_tier",
+      "docs": [
+        "Configure or update a tier for a universe. Caller must be the",
+        "universe's current creator (read live from the Universe PDA)."
+      ],
+      "discriminator": [228, 28, 174, 168, 146, 75, 112, 209],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 117, 98, 115, 99, 114, 105, 112, 116, 105, 111, 110, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "universe_account",
+          "docs": [
+            "Universe PDA from the `universe` program — Anchor's Account<Universe>",
+            "constraint verifies the account is owned by the universe program, so",
+            "a forged record from another program won't deserialize."
+          ]
+        },
+        {
+          "name": "tier",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "_universe",
+          "type": "pubkey"
+        },
+        {
+          "name": "tier_id",
+          "type": "u8"
+        },
+        {
+          "name": "price_per_month_lamports",
+          "type": "u64"
+        },
+        {
+          "name": "perks",
+          "type": "u8"
+        },
+        {
+          "name": "credit_bonus",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "deactivate_tier",
+      "discriminator": [20, 133, 85, 128, 147, 156, 145, 16],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 117, 98, 115, 99, 114, 105, 112, 116, 105, 111, 110, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "universe_account",
+          "docs": [
+            "Universe PDA from the `universe` program — Anchor's Account<Universe>",
+            "constraint verifies the account is owned by the universe program, so",
+            "a forged record from another program won't deserialize."
+          ]
+        },
+        {
+          "name": "tier",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "_universe",
+          "type": "pubkey"
+        },
+        {
+          "name": "tier_id",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "initialize_config",
+      "discriminator": [208, 127, 21, 1, 194, 190, 196, 70],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 117, 98, 115, 99, 114, 105, 112, 116, 105, 111, 110, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "platform",
+          "type": "pubkey"
+        },
+        {
+          "name": "platform_fee_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "pause",
+      "discriminator": [211, 22, 221, 251, 74, 121, 193, 47],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 117, 98, 115, 99, 114, 105, 112, 116, 105, 111, 110, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_platform_fee",
+      "discriminator": [19, 70, 111, 182, 156, 58, 208, 203],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 117, 98, 115, 99, 114, 105, 112, 116, 105, 111, 110, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "platform_fee_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "subscribe",
+      "docs": [
+        "Subscribe (or extend) to a tier. Pays `months × price_per_month`",
+        "lamports; platform fee goes to `platform` wallet, remainder to",
+        "the universe creator."
+      ],
+      "discriminator": [254, 28, 191, 138, 156, 179, 183, 53],
+      "accounts": [
+        {
+          "name": "subscriber",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 117, 98, 115, 99, 114, 105, 112, 116, 105, 111, 110, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "universe_account"
+        },
+        {
+          "name": "tier"
+        },
+        {
+          "name": "subscription",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [115, 117, 98, 115, 99, 114, 105, 112, 116, 105, 111, 110]
+              },
+              {
+                "kind": "account",
+                "path": "subscriber"
+              },
+              {
+                "kind": "arg",
+                "path": "universe"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator",
+          "docs": ["inside the handler — guards against rerouted payouts."],
+          "writable": true
+        },
+        {
+          "name": "platform_treasury",
+          "docs": ["Constrained to `config.platform` in the account constraint."],
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "_universe",
+          "type": "pubkey"
+        },
+        {
+          "name": "tier_id",
+          "type": "u8"
+        },
+        {
+          "name": "months",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "transfer_admin",
+      "discriminator": [42, 242, 66, 106, 228, 10, 111, 156],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 117, 98, 115, 99, 114, 105, 112, 116, 105, 111, 110, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "transfer_platform",
+      "discriminator": [4, 88, 19, 229, 137, 221, 84, 3],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 117, 98, 115, 99, 114, 105, 112, 116, 105, 111, 110, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_platform",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "unpause",
+      "discriminator": [169, 144, 4, 38, 10, 141, 188, 255],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115, 117, 98, 115, 99, 114, 105, 112, 116, 105, 111, 110, 95, 99, 111, 110, 102,
+                  105, 103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [155, 12, 170, 224, 30, 250, 204, 130]
+    },
+    {
+      "name": "Subscription",
+      "discriminator": [64, 7, 26, 135, 102, 132, 98, 33]
+    },
+    {
+      "name": "Tier",
+      "discriminator": [18, 149, 18, 34, 50, 201, 207, 55]
+    },
+    {
+      "name": "Universe",
+      "discriminator": [86, 112, 227, 226, 88, 47, 242, 113]
+    }
+  ],
+  "events": [
+    {
+      "name": "AdminTransferProposed",
+      "discriminator": [203, 168, 175, 51, 239, 104, 20, 85]
+    },
+    {
+      "name": "AdminTransferred",
+      "discriminator": [255, 147, 182, 5, 199, 217, 38, 179]
+    },
+    {
+      "name": "ConfigInitialized",
+      "discriminator": [181, 49, 200, 156, 19, 167, 178, 91]
+    },
+    {
+      "name": "Paused",
+      "discriminator": [172, 248, 5, 253, 49, 255, 255, 232]
+    },
+    {
+      "name": "PlatformFeeUpdated",
+      "discriminator": [210, 134, 201, 4, 92, 228, 80, 26]
+    },
+    {
+      "name": "PlatformTransferProposed",
+      "discriminator": [165, 212, 88, 224, 186, 145, 99, 160]
+    },
+    {
+      "name": "PlatformTransferred",
+      "discriminator": [73, 234, 174, 236, 56, 191, 152, 197]
+    },
+    {
+      "name": "Subscribed",
+      "discriminator": [135, 59, 105, 76, 190, 236, 138, 228]
+    },
+    {
+      "name": "SubscriptionCancelled",
+      "discriminator": [158, 216, 233, 205, 138, 62, 176, 239]
+    },
+    {
+      "name": "TierConfigured",
+      "discriminator": [92, 53, 248, 12, 188, 191, 141, 204]
+    },
+    {
+      "name": "TierDeactivated",
+      "discriminator": [183, 22, 251, 206, 137, 173, 186, 21]
+    },
+    {
+      "name": "Unpaused",
+      "discriminator": [156, 150, 47, 174, 120, 216, 93, 117]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Only the configured admin may perform this action"
+    },
+    {
+      "code": 6001,
+      "name": "NotCreatorOrPlatform",
+      "msg": "Caller must be the universe creator or platform"
+    },
+    {
+      "code": 6002,
+      "name": "ZeroAddress",
+      "msg": "Address cannot be the zero pubkey"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidTier",
+      "msg": "tier_id must be < 4 (FREE/BASIC/PREMIUM/VIP)"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidMonths",
+      "msg": "months must be in [1, 120]"
+    },
+    {
+      "code": 6005,
+      "name": "TierNotActive",
+      "msg": "Tier is not active"
+    },
+    {
+      "code": 6006,
+      "name": "TierMismatch",
+      "msg": "Tier ID arg does not match the supplied Tier PDA"
+    },
+    {
+      "code": 6007,
+      "name": "TierChangeBlocked",
+      "msg": "Tier change on an active subscription is blocked — cancel first or wait for expiry"
+    },
+    {
+      "code": 6008,
+      "name": "UniverseMismatch",
+      "msg": "Universe arg does not match the supplied Universe account"
+    },
+    {
+      "code": 6009,
+      "name": "CreatorMismatch",
+      "msg": "Creator account does not match Universe.creator"
+    },
+    {
+      "code": 6010,
+      "name": "TreasuryMismatch",
+      "msg": "Platform treasury account does not match Config.platform"
+    },
+    {
+      "code": 6011,
+      "name": "NoActiveSubscription",
+      "msg": "No active subscription to cancel"
+    },
+    {
+      "code": 6012,
+      "name": "PriceTooHigh",
+      "msg": "Price per month exceeds MAX_PRICE_PER_MONTH_LAMPORTS (100 SOL)"
+    },
+    {
+      "code": 6013,
+      "name": "FeeTooHigh",
+      "msg": "Platform fee exceeds MAX_FEE_BPS (5000 = 50%)"
+    },
+    {
+      "code": 6014,
+      "name": "MathOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6015,
+      "name": "Paused",
+      "msg": "Program is paused"
+    },
+    {
+      "code": 6016,
+      "name": "AlreadyPaused",
+      "msg": "Cannot pause: already paused"
+    },
+    {
+      "code": 6017,
+      "name": "NotPaused",
+      "msg": "Cannot unpause: not paused"
+    }
+  ],
+  "types": [
+    {
+      "name": "AdminTransferProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdminTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "platform",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_platform",
+            "type": "pubkey"
+          },
+          {
+            "name": "platform_fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "platform",
+            "type": "pubkey"
+          },
+          {
+            "name": "platform_fee_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Paused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "PlatformFeeUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "platform_fee_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlatformTransferProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "new_platform",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlatformTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_platform",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_platform",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Subscribed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "tier_id",
+            "type": "u8"
+          },
+          {
+            "name": "months",
+            "type": "u8"
+          },
+          {
+            "name": "paid_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "extended",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Subscription",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "tier_id",
+            "type": "u8"
+          },
+          {
+            "name": "started_at",
+            "type": "i64"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubscriptionCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "universe",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Tier",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "tier_id",
+            "type": "u8"
+          },
+          {
+            "name": "price_per_month_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "perks",
+            "docs": ["Bitmask: early_access=1, voting_boost=2, premium_content=4, behind_scenes=8"],
+            "type": "u8"
+          },
+          {
+            "name": "credit_bonus",
+            "type": "u16"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TierConfigured",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "tier_id",
+            "type": "u8"
+          },
+          {
+            "name": "price_per_month_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "perks",
+            "type": "u8"
+          },
+          {
+            "name": "credit_bonus",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TierDeactivated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "universe",
+            "type": "pubkey"
+          },
+          {
+            "name": "tier_id",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Universe",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "plot_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "visibility",
+            "type": {
+              "defined": {
+                "name": "Visibility"
+              }
+            }
+          },
+          {
+            "name": "canon_count",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Unpaused",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "Visibility",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Private"
+          },
+          {
+            "name": "Public"
+          }
+        ]
+      }
+    }
+  ]
+}
