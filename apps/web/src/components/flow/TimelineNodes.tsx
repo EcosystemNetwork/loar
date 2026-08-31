@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { LoarIcon } from '@/components/loar-icons';
 import { useState, useEffect, memo } from 'react';
-import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { resolveIpfsUrlAsync } from '@/utils/ipfs-url';
 import type { StylePresetId } from '../style-presets';
 
 // ── Scene Control Types (mirrors server scene-controls/types.ts) ──────
@@ -175,13 +175,53 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
   const [videoError, setVideoError] = useState(false);
 
-  // Storage URLs are direct HTTP URLs, no conversion needed
+  // Gateway URL the <video> actually loads from. Opening the editor mounts
+  // ~40 of these at once; a raw `.mypinata.cloud` URL needs a server-held
+  // token, and the old sync path pointed every <source> at the public
+  // gateways (ipfs.io / gateway.pinata.cloud) instead — 40 parallel
+  // `preload="metadata"` fetches that 429/504'd and left thumbnails blank
+  // ("Add Video"). Resolve to our own server-signed dedicated gateway (206,
+  // ~0.5s, not rate-limited) before mounting any <video>, so there are no
+  // failed media requests and every thumbnail actually paints.
+  const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string | undefined>(undefined);
+
   useEffect(() => {
-    // Simply use the video URL directly — Firebase Storage provides HTTP URLs
     setDisplayVideoUrl(data.videoUrl || null);
     setVideoError(false);
-    setIsLoadingStorage(false);
+    if (!data.videoUrl) {
+      setResolvedVideoUrl(undefined);
+      setIsLoadingStorage(false);
+      return;
+    }
+    let cancelled = false;
+    setResolvedVideoUrl(undefined);
+    setIsLoadingStorage(true);
+    // resolveIpfsUrlAsync never issues a failed media request: it hits our
+    // own /api/ipfs/resolve (semaphore-gated), serves a warm per-CID cache,
+    // and falls back to the public gateway URL only when there's no server
+    // or the lookup fails. Non-IPFS URLs (Firebase Storage) pass straight
+    // through.
+    resolveIpfsUrlAsync(data.videoUrl)
+      .then((best) => {
+        if (cancelled) return;
+        setResolvedVideoUrl(best || data.videoUrl || undefined);
+        setIsLoadingStorage(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setResolvedVideoUrl(data.videoUrl || undefined);
+        setIsLoadingStorage(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [data.videoUrl]);
+
+  // <source> children don't reload when their src attribute changes — nudge
+  // the element once the resolved URL lands.
+  useEffect(() => {
+    if (resolvedVideoUrl && videoElement) videoElement.load();
+  }, [resolvedVideoUrl, videoElement]);
 
   // Handle video play/pause based on hover state
   useEffect(() => {
@@ -280,14 +320,14 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
           {/* Video Preview - Fixed size with proper containment and hover effects */}
           <div className="w-full h-52 bg-black relative overflow-hidden">
             {isLoadingStorage && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
+              <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto mb-1"></div>
-                  <p className="text-white text-xs">Loading...</p>
+                  <p className="text-white text-xs">Loading…</p>
                 </div>
               </div>
             )}
-            {displayVideoUrl && !videoError ? (
+            {displayVideoUrl && resolvedVideoUrl && !videoError ? (
               <>
                 <video
                   ref={setVideoElement}
@@ -301,8 +341,8 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
                   }}
                   onError={() => setVideoError(true)}
                 >
-                  <source src={resolveIpfsUrlPreferred(displayVideoUrl)} type="video/mp4" />
-                  <source src={resolveIpfsUrlPreferred(displayVideoUrl)} />
+                  <source src={resolvedVideoUrl} type="video/mp4" />
+                  <source src={resolvedVideoUrl} />
                 </video>
 
                 {/* Hover overlay — edit + regenerate actions */}
