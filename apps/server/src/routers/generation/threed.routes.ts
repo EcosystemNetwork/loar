@@ -35,6 +35,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { createAttachment } from '../media/media.handlers';
 import { logFailedRefund } from '../../lib/refund-audit';
 import { publishToGallery } from '../../lib/gallery-publish';
+import { rehostModelBundle } from '../../lib/rehost-ephemeral';
 import { withReservation } from '../../services/credits';
 import type { MeshyTaskOutput } from '../../services/meshy';
 
@@ -242,12 +243,20 @@ async function completeThreeDTask(opts: {
 
     trackQuests(opts.userId, [{ questId: 'first_3d_generation' }]);
 
+    // Meshy's CDN URLs are CloudFront-signed and expire within days — rehost
+    // every format + thumbnail/video to permanent storage before persisting.
+    const perm = await rehostModelBundle(
+      { modelUrls: task.modelUrls, thumbnailUrl: task.thumbnailUrl, videoUrl: task.videoUrl },
+      opts.prompt || opts.genId,
+      opts.userId
+    );
+
     await threeDGenCol().doc(opts.genId).update({
       status: 'completed',
       meshyTaskId: opts.meshyTaskId,
-      modelUrls: task.modelUrls,
-      thumbnailUrl: task.thumbnailUrl,
-      videoUrl: task.videoUrl,
+      modelUrls: perm.modelUrls,
+      thumbnailUrl: perm.thumbnailUrl,
+      videoUrl: perm.videoUrl,
       completedAt: new Date(),
     });
 
@@ -255,14 +264,14 @@ async function completeThreeDTask(opts: {
       creator: opts.userId,
       entityId: opts.entityId,
       generationId: opts.genId,
-      modelUrls: task.modelUrls ?? ({} as MeshyTaskOutput),
-      thumbnailUrl: task.thumbnailUrl,
+      modelUrls: perm.modelUrls as MeshyTaskOutput,
+      thumbnailUrl: perm.thumbnailUrl ?? undefined,
       type: opts.generationType,
     });
 
     // Gallery publish — use GLB as the canonical model URL. Skipped silently
     // if GLB is missing (provider occasionally omits it for failed textures).
-    const glbUrl = task.modelUrls?.glb;
+    const glbUrl = perm.modelUrls.glb;
     if (glbUrl) {
       const title = opts.prompt?.slice(0, 100) || 'Generated 3D Model';
       void publishToGallery({
@@ -271,7 +280,7 @@ async function completeThreeDTask(opts: {
         mediaType: '3d',
         title,
         description: opts.prompt ?? '',
-        thumbnailUrl: task.thumbnailUrl ?? null,
+        thumbnailUrl: perm.thumbnailUrl,
         universeId: opts.universeId ?? null,
         generationId: opts.genId,
         generationModel: `meshy:${opts.generationType}`,
@@ -289,9 +298,9 @@ async function completeThreeDTask(opts: {
       kind: '3d',
       payload: {
         status: 'completed',
-        modelUrls: task.modelUrls ?? null,
-        thumbnailUrl: task.thumbnailUrl ?? null,
-        videoUrl: task.videoUrl ?? null,
+        modelUrls: perm.modelUrls ?? null,
+        thumbnailUrl: perm.thumbnailUrl,
+        videoUrl: perm.videoUrl,
         generationType: opts.generationType,
         creditsCharged: opts.credits,
       },
@@ -1375,17 +1384,28 @@ async function completeMeshyRiggingTask(opts: {
     const apiKey = await resolveProviderKey(opts.userId, 'meshy');
     const task = await meshyService.waitForRigging(opts.meshyTaskId, 15 * 60 * 1000, 5000, apiKey);
 
-    const glbUrl = task.riggedModelUrls?.glb;
-    if (!glbUrl) {
+    if (!task.riggedModelUrls?.glb) {
       throw new Error('Meshy rigging completed without a GLB output');
     }
+
+    // Meshy CDN URLs expire — rehost the rigged GLB/FBX + thumbnail first.
+    const perm = await rehostModelBundle(
+      {
+        modelUrls: { glb: task.riggedModelUrls.glb, fbx: task.riggedModelUrls.fbx },
+        thumbnailUrl: task.thumbnailUrl,
+      },
+      `${opts.sourceTitle}-rigged`,
+      opts.userId
+    );
+    const glbUrl = perm.modelUrls.glb ?? task.riggedModelUrls.glb;
 
     await threeDGenCol()
       .doc(opts.genId)
       .update({
         status: 'completed',
         riggedGlbUrl: glbUrl,
-        thumbnailUrl: task.thumbnailUrl ?? null,
+        riggedFbxUrl: perm.modelUrls.fbx ?? task.riggedModelUrls.fbx ?? null,
+        thumbnailUrl: perm.thumbnailUrl,
         completedAt: new Date(),
       });
 
@@ -1395,7 +1415,7 @@ async function completeMeshyRiggingTask(opts: {
       mediaType: '3d',
       title: `${opts.sourceTitle} — rigged (humanoid)`,
       description: 'Auto-rigged humanoid skeleton, ready for animation library presets.',
-      thumbnailUrl: task.thumbnailUrl ?? null,
+      thumbnailUrl: perm.thumbnailUrl,
       universeId: opts.universeId,
       generationId: `rig:meshy:${opts.meshyTaskId}`,
       generationModel: 'meshy-rigging',
@@ -1438,17 +1458,24 @@ async function completeMeshyAnimationTask(opts: {
       apiKey
     );
 
-    const glbUrl = task.animationGlbUrl;
-    if (!glbUrl) {
+    if (!task.animationGlbUrl) {
       throw new Error('Meshy animation completed without a GLB output');
     }
+
+    // Meshy CDN URLs expire — rehost the animated GLB + thumbnail first.
+    const perm = await rehostModelBundle(
+      { modelUrls: { glb: task.animationGlbUrl }, thumbnailUrl: task.thumbnailUrl },
+      `${stripRigSuffix(opts.riggedTitle)}-${opts.actionName}`,
+      opts.userId
+    );
+    const glbUrl = perm.modelUrls.glb ?? task.animationGlbUrl;
 
     await threeDGenCol()
       .doc(opts.genId)
       .update({
         status: 'completed',
         animationGlbUrl: glbUrl,
-        thumbnailUrl: task.thumbnailUrl ?? null,
+        thumbnailUrl: perm.thumbnailUrl,
         completedAt: new Date(),
       });
 
@@ -1458,7 +1485,7 @@ async function completeMeshyAnimationTask(opts: {
       mediaType: '3d',
       title: `${stripRigSuffix(opts.riggedTitle)} — ${opts.actionName}`,
       description: `${opts.actionName} animation applied to the rigged model.`,
-      thumbnailUrl: task.thumbnailUrl ?? null,
+      thumbnailUrl: perm.thumbnailUrl,
       universeId: opts.universeId,
       generationId: `anim:meshy:${opts.meshyTaskId}`,
       generationModel: `meshy-animation:${opts.actionRef}`,
@@ -1499,10 +1526,18 @@ async function completeTripoRiggingTask(opts: {
       5000,
       apiKey
     );
-    const glbUrl = task.output?.model || task.output?.pbr_model;
-    if (!glbUrl) {
+    const rawGlbUrl = task.output?.model || task.output?.pbr_model;
+    if (!rawGlbUrl) {
       throw new Error('Tripo rigging completed without a GLB output');
     }
+
+    // Tripo3D output URLs are signed and expire — rehost before persisting.
+    const perm = await rehostModelBundle(
+      { modelUrls: { glb: rawGlbUrl } },
+      `${opts.sourceTitle}-rigged-${opts.rigType}`,
+      opts.userId
+    );
+    const glbUrl = perm.modelUrls.glb ?? rawGlbUrl;
 
     await threeDGenCol().doc(opts.genId).update({
       status: 'completed',
@@ -1558,10 +1593,18 @@ async function completeTripoAnimationTask(opts: {
       5000,
       apiKey
     );
-    const glbUrl = task.output?.model || task.output?.pbr_model;
-    if (!glbUrl) {
+    const rawGlbUrl = task.output?.model || task.output?.pbr_model;
+    if (!rawGlbUrl) {
       throw new Error('Tripo animation completed without a GLB output');
     }
+
+    // Tripo3D output URLs are signed and expire — rehost before persisting.
+    const perm = await rehostModelBundle(
+      { modelUrls: { glb: rawGlbUrl } },
+      `${stripRigSuffix(opts.riggedTitle)}-${opts.actionName}`,
+      opts.userId
+    );
+    const glbUrl = perm.modelUrls.glb ?? rawGlbUrl;
 
     await threeDGenCol().doc(opts.genId).update({
       status: 'completed',

@@ -1,8 +1,8 @@
 /**
  * Rehosting utility — any URL from an AI provider's CDN (fal.media, volces,
- * Replicate, DALL-E signed URLs, etc.) will 403 once the signature expires.
- * Call this before persisting such a URL anywhere (gallery, entity, offChain
- * node) so we always store a permanent Pinata URL instead.
+ * Replicate, DALL-E signed URLs, Meshy, Tripo3D, etc.) will 403 once the
+ * signature expires. Call this before persisting such a URL anywhere (gallery,
+ * entity, offChain node) so we always store a permanent Pinata URL instead.
  */
 
 const EPHEMERAL_HOSTS = [
@@ -13,6 +13,9 @@ const EPHEMERAL_HOSTS = [
   'oaidalleapiprodscus.blob.core.windows.net', // OpenAI DALL-E
   'ark-acg', // ByteDance TOS prefix
   'generativelanguage.googleapis.com', // Google-direct Veo/Gemini Files API — key-scoped, expires
+  'assets.meshy.ai', // Meshy 3D — GLB/FBX/USDZ/thumbnail URLs, CloudFront-signed, expire
+  'tripo-data', // Tripo3D 3D — tripo-data.rg1.data.tripo3d.ai + legacy tripo-data.cdn.bcebos.com, signed, expire
+  'data.tripo3d.ai', // Tripo3D data domain (any region subdomain), signed, expire
 ];
 
 export function isEphemeralUrl(url: string | null | undefined): boolean {
@@ -65,4 +68,66 @@ export async function rehostEphemeralUrl(
     lastErr
   );
   return { url, rehosted: false };
+}
+
+export interface RehostableModelOutput {
+  glb?: string;
+  fbx?: string;
+  obj?: string;
+  mtl?: string;
+  usdz?: string;
+}
+
+/**
+ * Rehost a 3D model output bundle (Meshy image/text-to-3D, retexture, auto-rig,
+ * animation — any provider) so no expiring CDN URL is persisted. Every present
+ * format plus the optional thumbnail/video is pushed through `rehostEphemeralUrl`:
+ * non-ephemeral URLs pass through untouched and any single rehost failure falls
+ * back to the original URL, so the bundle is always usable. `slug` seeds the
+ * stored filename (entity name, prompt, or generation id).
+ */
+export async function rehostModelBundle(
+  input: {
+    modelUrls?: RehostableModelOutput | null;
+    thumbnailUrl?: string | null;
+    videoUrl?: string | null;
+  },
+  slug: string,
+  uploaderUid: string
+): Promise<{
+  modelUrls: RehostableModelOutput;
+  thumbnailUrl: string | null;
+  videoUrl: string | null;
+}> {
+  const safeSlug =
+    (slug || 'model').replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) ||
+    'model';
+  const src = input.modelUrls ?? {};
+  const out: RehostableModelOutput = {};
+  const formats: Array<keyof RehostableModelOutput> = ['glb', 'fbx', 'obj', 'mtl', 'usdz'];
+
+  await Promise.all([
+    ...formats.map(async (fmt) => {
+      const url = src[fmt];
+      if (!url) return;
+      const { url: permanent } = await rehostEphemeralUrl(
+        url,
+        `${safeSlug}.${fmt}`,
+        uploaderUid
+      );
+      out[fmt] = permanent;
+    }),
+  ]);
+
+  let thumbnailUrl = input.thumbnailUrl ?? null;
+  if (thumbnailUrl) {
+    thumbnailUrl = (await rehostEphemeralUrl(thumbnailUrl, `${safeSlug}-thumb.png`, uploaderUid))
+      .url;
+  }
+  let videoUrl = input.videoUrl ?? null;
+  if (videoUrl) {
+    videoUrl = (await rehostEphemeralUrl(videoUrl, `${safeSlug}-turntable.mp4`, uploaderUid)).url;
+  }
+
+  return { modelUrls: out, thumbnailUrl, videoUrl };
 }

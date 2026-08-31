@@ -28,6 +28,7 @@ import { getStorageManager } from '../../services/storage';
 import { FieldValue } from 'firebase-admin/firestore';
 import { logFailedRefund } from '../../lib/refund-audit';
 import { publishToGallery } from '../../lib/gallery-publish';
+import { rehostModelBundle } from '../../lib/rehost-ephemeral';
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 import { TRPCError } from '@trpc/server';
@@ -257,12 +258,26 @@ async function executePipeline(opts: {
     const glbUrl = meshyTask.modelUrls?.glb;
     if (!glbUrl) throw new Error('Meshy 3D conversion did not return a GLB model');
 
+    // Meshy's CDN URLs expire within days — rehost every format + thumbnail to
+    // permanent storage before persisting them anywhere. `glbUrl` above stays
+    // the raw Meshy URL and is only used as the retexture input below (letting
+    // Meshy fetch its own CDN is the most reliable path for step 3).
+    const perm3d = await rehostModelBundle(
+      {
+        modelUrls: meshyTask.modelUrls,
+        thumbnailUrl: meshyTask.thumbnailUrl,
+        videoUrl: meshyTask.videoUrl,
+      },
+      `${entityName}-untextured`,
+      userId
+    );
+
     // Attach 3D model files to entity
     const modelFormats: [string, string | undefined][] = [
-      ['glb', meshyTask.modelUrls?.glb],
-      ['fbx', meshyTask.modelUrls?.fbx],
-      ['obj', meshyTask.modelUrls?.obj],
-      ['usdz', meshyTask.modelUrls?.usdz],
+      ['glb', perm3d.modelUrls.glb],
+      ['fbx', perm3d.modelUrls.fbx],
+      ['obj', perm3d.modelUrls.obj],
+      ['usdz', perm3d.modelUrls.usdz],
     ];
 
     for (const [format, url] of modelFormats) {
@@ -283,13 +298,13 @@ async function executePipeline(opts: {
       }).catch((err) => console.error(`[pipeline] 3D ${format} attach failed:`, err));
     }
 
-    if (meshyTask.thumbnailUrl) {
+    if (perm3d.thumbnailUrl) {
       await createAttachment(userId, {
         contentHash: `pipeline:${pipelineId}:3d:thumbnail`,
         originalFilename: 'thumbnail-3d.png',
         mimeType: 'image/png',
         size: 0,
-        url: meshyTask.thumbnailUrl,
+        url: perm3d.thumbnailUrl,
         targetType: 'entity',
         targetId: entityId,
         targetName: entityName,
@@ -306,9 +321,9 @@ async function executePipeline(opts: {
 
     await updatePipeline(pipelineId, {
       currentStep: 'meshy_3d_complete',
-      modelUrls: meshyTask.modelUrls,
-      thumbnailUrl: meshyTask.thumbnailUrl,
-      videoUrl: meshyTask.videoUrl,
+      modelUrls: perm3d.modelUrls,
+      thumbnailUrl: perm3d.thumbnailUrl,
+      videoUrl: perm3d.videoUrl,
       stepProgress: '3D model generated successfully',
     });
 
@@ -349,12 +364,24 @@ async function executePipeline(opts: {
       meshyKey
     );
 
+    // Rehost the textured result off Meshy's expiring CDN before it lands in
+    // attachments, the gallery, or the pipeline record.
+    const permTex = await rehostModelBundle(
+      {
+        modelUrls: textureTask.modelUrls,
+        thumbnailUrl: textureTask.thumbnailUrl,
+        videoUrl: textureTask.videoUrl,
+      },
+      `${entityName}-textured`,
+      userId
+    );
+
     // Attach textured model files
     const texturedFormats: [string, string | undefined][] = [
-      ['glb', textureTask.modelUrls?.glb],
-      ['fbx', textureTask.modelUrls?.fbx],
-      ['obj', textureTask.modelUrls?.obj],
-      ['usdz', textureTask.modelUrls?.usdz],
+      ['glb', permTex.modelUrls.glb],
+      ['fbx', permTex.modelUrls.fbx],
+      ['obj', permTex.modelUrls.obj],
+      ['usdz', permTex.modelUrls.usdz],
     ];
 
     for (const [format, url] of texturedFormats) {
@@ -375,13 +402,13 @@ async function executePipeline(opts: {
       }).catch((err) => console.error(`[pipeline] textured ${format} attach failed:`, err));
     }
 
-    if (textureTask.thumbnailUrl) {
+    if (permTex.thumbnailUrl) {
       await createAttachment(userId, {
         contentHash: `pipeline:${pipelineId}:textured:thumbnail`,
         originalFilename: 'thumbnail-textured.png',
         mimeType: 'image/png',
         size: 0,
-        url: textureTask.thumbnailUrl,
+        url: permTex.thumbnailUrl,
         targetType: 'entity',
         targetId: entityId,
         targetName: entityName,
@@ -392,12 +419,12 @@ async function executePipeline(opts: {
       }).catch((err) => console.error('[pipeline] textured thumbnail attach failed:', err));
     }
 
-    const texturedGlbUrl = textureTask.modelUrls?.glb;
+    const texturedGlbUrl = permTex.modelUrls.glb;
     if (texturedGlbUrl) {
       void publishToGallery({
         creatorUid: userId,
         mediaUrl: texturedGlbUrl,
-        thumbnailUrl: textureTask.thumbnailUrl || meshyTask.thumbnailUrl || imageUrl,
+        thumbnailUrl: permTex.thumbnailUrl || perm3d.thumbnailUrl || imageUrl,
         mediaType: '3d',
         title: `${entityName} — 3D model`,
         description: entityDescription,
@@ -412,11 +439,11 @@ async function executePipeline(opts: {
 
     // Turntable preview of the textured model — published as a video so
     // users can see the rotating PBR result in the wiki gallery.
-    if (textureTask.videoUrl) {
+    if (permTex.videoUrl) {
       void publishToGallery({
         creatorUid: userId,
-        mediaUrl: textureTask.videoUrl,
-        thumbnailUrl: textureTask.thumbnailUrl || imageUrl,
+        mediaUrl: permTex.videoUrl,
+        thumbnailUrl: permTex.thumbnailUrl || imageUrl,
         mediaType: 'video',
         title: `${entityName} — 3D turntable`,
         description: `Rotating preview of ${entityName}'s 3D model.`,
@@ -431,9 +458,9 @@ async function executePipeline(opts: {
     await updatePipeline(pipelineId, {
       currentStep: 'completed',
       status: 'completed',
-      texturedModelUrls: textureTask.modelUrls,
-      texturedThumbnailUrl: textureTask.thumbnailUrl,
-      texturedVideoUrl: textureTask.videoUrl,
+      texturedModelUrls: permTex.modelUrls,
+      texturedThumbnailUrl: permTex.thumbnailUrl,
+      texturedVideoUrl: permTex.videoUrl,
       stepProgress: 'Character pipeline complete!',
       completedAt: new Date(),
     });
@@ -452,9 +479,9 @@ async function executePipeline(opts: {
         status: 'completed',
         entityId,
         entityName,
-        texturedModelUrls: textureTask.modelUrls ?? null,
-        texturedThumbnailUrl: textureTask.thumbnailUrl ?? null,
-        texturedVideoUrl: textureTask.videoUrl ?? null,
+        texturedModelUrls: permTex.modelUrls ?? null,
+        texturedThumbnailUrl: permTex.thumbnailUrl,
+        texturedVideoUrl: permTex.videoUrl,
         creditsCharged: credits,
       },
     });
