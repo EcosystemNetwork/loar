@@ -230,8 +230,13 @@ contract UniverseTest is Test {
     function createChain(uint256 count) internal {
         uint256 previous = 0;
         for (uint256 i = 1; i <= count; i++) {
-            previous =
-                universe.createNode(keccak256(abi.encodePacked("content", i)), keccak256(abi.encodePacked("plot", i)), previous, "link", "plot");
+            previous = universe.createNode(
+                keccak256(abi.encodePacked("content", i)),
+                keccak256(abi.encodePacked("plot", i)),
+                previous,
+                "link",
+                "plot"
+            );
         }
     }
 
