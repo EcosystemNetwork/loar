@@ -12,10 +12,13 @@
 [![Ethereum Sepolia](https://img.shields.io/badge/Network-Ethereum%20Sepolia-blue)](https://sepolia.etherscan.io/)
 [![Target: Ethereum Mainnet](https://img.shields.io/badge/Target-Ethereum%20Mainnet-627EEA)](https://etherscan.io/)
 [![Coming soon: Solana + Base](https://img.shields.io/badge/Coming%20soon-Solana%20%2B%20Base-9945FF)](#-multi-chain-roadmap--solana--base-coming-soon)
+[![$LOAR on pump.fun](https://img.shields.io/badge/%24LOAR-live%20on%20pump.fun-9945FF)](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb)
+
+**[Website](https://loar.fun)** · **[$LOAR token](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb)** · **[Telegram](https://t.me/+AXD-XK8SVvw5MTIx)** · **[X / Twitter](https://x.com/LOAR_FUN)**
 
 </div>
 
-> **Last updated:** June 14, 2026 | **Status:** Testnet Alpha (Ethereum Sepolia — contracts live + verified; Ethereum Mainnet wired for swaps/auth). **Solana & Base are planned future chains** — see the [multi-chain roadmap](#-multi-chain-roadmap--solana--base-coming-soon).
+> **Last updated:** August 31, 2026 | **Status:** Testnet Alpha (Ethereum Sepolia — contracts live + verified; Ethereum Mainnet wired for swaps/auth). The **$LOAR token is live on Solana** via a [pump.fun](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb) bonding-curve launch; the full Solana protocol and Base remain **planned future chains** — see the [multi-chain roadmap](#-multi-chain-roadmap--solana--base-coming-soon).
 
 ---
 
@@ -38,9 +41,13 @@ See **[HACKATHON.md](HACKATHON.md)** for the 2-min demo script, architecture dia
 
 ## 🛣️ Multi-chain roadmap — Solana & Base (coming soon)
 
-> **Today, LOAR runs on Ethereum only:** Sepolia testnet (contracts live + verified
-> on-chain) with Ethereum Mainnet wired for swaps/auth. **Solana and Base are
-> planned future chains — not yet active.** Both were prototyped end-to-end
+> **Today, the LOAR protocol runs on Ethereum only:** Sepolia testnet (contracts
+> live + verified on-chain) with Ethereum Mainnet wired for swaps/auth. The one
+> thing live on Solana is the **$LOAR token itself**, launched on
+> [pump.fun](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb)
+> (mint `2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb`) — a standalone
+> bonding-curve launch, not wired into the protocol yet. **The Solana protocol
+> and Base are planned future chains — not yet active.** Both were prototyped end-to-end
 > (Solana devnet programs, Base Sepolia deploys) and have since been removed from
 > the active codebase and **archived for a future restore** (branch
 > `archive/solana-base-support`, tag `solana-base-snapshot`). The tables below
@@ -57,18 +64,18 @@ routes that build instructions server-side and sign through Circle KMS. $LOAR
 would be bridged across chains; the 28-week parity plan tracks 12 Anchor program
 ports + Wormhole NTT before mainnet-beta.
 
-| Planned feature                  | What it would be                                                                                                              |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| **Compressed-NFT episode mints** | Bubblegum cNFTs (~$0.0001/mint) via the `episode` Anchor program — atomic with the on-chain episode record                    |
-| **Canon promotion**              | Flips `is_canon` + mints a parallel Metaplex Core asset (marketplace-tradable, 5% royalty)                                    |
-| **$LOAR Token-2022**             | 1B supply, Pausable + Metadata extensions, mint **permanently locked** via one-way `lock_loar_mint`                           |
-| **Payment program**              | Solana sister of `PaymentRouter.sol` — pull-style accumulators per creator, two-step ownership, `transfer_checked` everywhere |
-| **Solana Pay → cNFT auto-mint**  | One button: scan QR → pay 0.01 SOL → cNFT lands in wallet, payment tx pinned into lineage                                     |
-| **Cross-chain bridge**           | Custodial lock-and-mint (per-tx + per-user caps, idempotency keys, balance prechecks), Wormhole NTT for production            |
-| **Cross-chain attestation**      | Ed25519 receipt per mint linking Solana cNFT ↔ EVM Universe — verifiable offline                                              |
-| **Squads multisig**              | Solana parity with Gnosis Safe for shared Universe ownership — `create` / `propose` / `approve` / `execute`                   |
-| **Unified Circle DCW auth**      | One SIWE session signs on both chains; Circle KMS provisions EVM + Solana addresses automatically (no Phantom/Solflare)       |
-| **MCP tools for AI agents**      | Solana tools (`mint_episode`, `canonize`, `pay_intent`, `pay_status`, `activity`, `get_attestation`) — scope-gated            |
+| Planned feature                  | What it would be                                                                                                                                                                                                                 |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Compressed-NFT episode mints** | Bubblegum cNFTs (~$0.0001/mint) via the `episode` Anchor program — atomic with the on-chain episode record                                                                                                                       |
+| **Canon promotion**              | Flips `is_canon` + mints a parallel Metaplex Core asset (marketplace-tradable, 5% royalty)                                                                                                                                       |
+| **$LOAR Token-2022**             | Native SPL replacement for the current [pump.fun $LOAR](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb): 1B supply, Pausable + Metadata extensions, mint **permanently locked** via one-way `lock_loar_mint` |
+| **Payment program**              | Solana sister of `PaymentRouter.sol` — pull-style accumulators per creator, two-step ownership, `transfer_checked` everywhere                                                                                                    |
+| **Solana Pay → cNFT auto-mint**  | One button: scan QR → pay 0.01 SOL → cNFT lands in wallet, payment tx pinned into lineage                                                                                                                                        |
+| **Cross-chain bridge**           | Custodial lock-and-mint (per-tx + per-user caps, idempotency keys, balance prechecks), Wormhole NTT for production                                                                                                               |
+| **Cross-chain attestation**      | Ed25519 receipt per mint linking Solana cNFT ↔ EVM Universe — verifiable offline                                                                                                                                                 |
+| **Squads multisig**              | Solana parity with Gnosis Safe for shared Universe ownership — `create` / `propose` / `approve` / `execute`                                                                                                                      |
+| **Unified Circle DCW auth**      | One SIWE session signs on both chains; Circle KMS provisions EVM + Solana addresses automatically (no Phantom/Solflare)                                                                                                          |
+| **MCP tools for AI agents**      | Solana tools (`mint_episode`, `canonize`, `pay_intent`, `pay_status`, `activity`, `get_attestation`) — scope-gated                                                                                                               |
 
 The prototype reached Solana **devnet** (universe / episode / payment programs +
 Token-2022 $LOAR + Squads + custodial bridge + attestation + MCP tools). Those
@@ -87,6 +94,19 @@ Base (Base Sepolia → Base Mainnet) was wired as a second EVM target via the sa
 multi-chain contract address registry and chain-selector UI. It has been
 deprecated from the active build pending a future restore; Base contracts will be
 re-deployed and re-wired when the chain is brought back online.
+
+---
+
+## Links & Community
+
+| Link            | URL                                                                                                |
+| --------------- | -------------------------------------------------------------------------------------------------- |
+| **Website**     | [LOAR.FUN](https://loar.fun)                                                                       |
+| **$LOAR token** | [pump.fun/coin/2xowaGYF…dpTYb](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb) |
+| **Telegram**    | [t.me/+AXD-XK8SVvw5MTIx](https://t.me/+AXD-XK8SVvw5MTIx)                                           |
+| **X / Twitter** | [@LOAR_FUN](https://x.com/LOAR_FUN)                                                                |
+
+**$LOAR** launched on [pump.fun](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb) (Solana) — mint `2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb`. This is the live, tradable $LOAR token today. The on-chain LOAR protocol (universes, governance, revenue contracts) still runs on Ethereum Sepolia; a native Solana Token-2022 $LOAR and cross-chain bridge are part of the [multi-chain roadmap](#-multi-chain-roadmap--solana--base-coming-soon).
 
 ---
 
@@ -145,7 +165,7 @@ We classify every feature by what actually works end-to-end today, not what has 
 | **Content Upload**                     | IP classification (Fan vs Creator-Owned vs Rights-Cleared), copyright declarations, license selection                                                                                                                                                                                                                                                    |
 | **Content Discovery**                  | Search/filter by classification, media type, tags. Creator gallery + content feed                                                                                                                                                                                                                                                                        |
 | **Character Wiki**                     | Browse, search, filter characters by collection/traits. Individual character pages                                                                                                                                                                                                                                                                       |
-| **Blockchain Indexer**                 | Ponder v0.15 indexing all contract events into 29 GraphQL tables                                                                                                                                                                                                                                                                                         |
+| **Blockchain Indexer**                 | Ponder v0.15 indexing all contract events into 37 GraphQL tables                                                                                                                                                                                                                                                                                         |
 | **ETH Purchase Flow**                  | Product detail page sends real ETH on-chain to seller via wagmi `sendTransaction` before recording the order                                                                                                                                                                                                                                             |
 | **Identity NFTs**                      | Minted by UniverseManager per universe creator. Tracks co-creators and multi-sig signers                                                                                                                                                                                                                                                                 |
 | **TimelockController Governance**      | `UniverseTimelockGovernor` with 24-hour execution delay for major proposals. Per-universe Governor with configurable voting delay/period/quorum                                                                                                                                                                                                          |
@@ -227,14 +247,14 @@ These features have working smart contracts, backend APIs, AND frontend UIs, but
               ┌─────────────────────┐  ┌──────────────────────┐
               │   API Server        │  │  Ethereum (EVM)      │
               │   Hono + tRPC       │  │  69 contracts        │
-              │   60+ routers       │  │  (proxied +          │
-              │   400+ procedures   │  │  upgradeable)        │
+              │   80+ routers       │  │  (proxied +          │
+              │   800+ procedures   │  │  upgradeable)        │
               │   Port 3000         │  └──────────┬───────────┘
               │                     │             │ events
               └──────────┬──────────┘             ▼
                          │               ┌──────────────────┐
                          ▼               │  Ponder Indexer   │
-              ┌──────────────────┐       │  29 tables        │
+              ┌──────────────────┐       │  37 tables        │
               │  Firestore       │       │  GraphQL API      │
               │  (user data,     │       │  Port 42069       │
               │   content meta,  │       └──────────────────┘
@@ -245,8 +265,8 @@ These features have working smart contracts, backend APIs, AND frontend UIs, but
 | App              | Stack                                                    | Description                                           |
 | ---------------- | -------------------------------------------------------- | ----------------------------------------------------- |
 | `apps/web`       | React 18, Vite, TanStack Router/Query, wagmi, Circle DCW | Frontend SPA (65 routes)                              |
-| `apps/server`    | Hono, tRPC, Firebase Admin (Firestore)                   | API server (60+ routers, 400+ procedures)             |
-| `apps/indexer`   | Ponder v0.15, GraphQL                                    | Blockchain event indexer (29 tables)                  |
+| `apps/server`    | Hono, tRPC, Firebase Admin (Firestore)                   | API server (80+ routers, 800+ procedures)             |
+| `apps/indexer`   | Ponder v0.15, GraphQL                                    | Blockchain event indexer (37 tables)                  |
 | `apps/contracts` | Foundry, Solidity ^0.8.30                                | EVM smart contracts (Ethereum Sepolia, 69 contracts)  |
 | `apps/mcp`       | MCP Server                                               | AI agent gateway (25 tools for MCP-compatible agents) |
 | `apps/mobile`    | Expo 52, React Native, NativeWind                        | iOS + Android app                                     |
@@ -680,8 +700,8 @@ Required GitHub secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `WORK_DIR`.
 loar/
 ├── apps/
 │   ├── web/             # React 18 SPA (Vite + TanStack Router, 65+ routes)
-│   ├── server/          # Hono + tRPC API (90+ routers, 500+ procedures)
-│   ├── indexer/         # Ponder v0.15 blockchain indexer (29 tables)
+│   ├── server/          # Hono + tRPC API (80+ routers, 800+ procedures)
+│   ├── indexer/         # Ponder v0.15 blockchain indexer (37 tables)
 │   ├── contracts/       # Foundry/Solidity EVM (69 contracts, upgradeable, Ethereum Sepolia)
 │   ├── mcp/             # MCP server — AI agent gateway (25+ tools)
 │   └── mobile/          # Expo 52 / React Native (iOS + Android, Circle DCW)
@@ -712,3 +732,11 @@ loar/
 ## License
 
 MIT
+
+---
+
+<div align="center">
+
+**[LOAR.FUN](https://loar.fun)** · **[$LOAR on pump.fun](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb)** · **[Telegram](https://t.me/+AXD-XK8SVvw5MTIx)** · **[X / Twitter](https://x.com/LOAR_FUN)**
+
+</div>
