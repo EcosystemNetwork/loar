@@ -265,6 +265,15 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          # Disable the Foundry cache. Its restore-keys prefix
+          # (`<os>-foundry-chain-fork-contracts-`) also matches the Mythril
+          # job's cache in security.yml, so this job was restoring that job's
+          # workspace state on top of the checkout and `forge build` compiled
+          # a stale `test/BondingCurve.t.sol` that exists nowhere in git.
+          # This job forks no chain and reuses no fuzz corpus — the cache is
+          # pure downside here.
+          cache: false
 
       - name: Forge fmt
         run: forge fmt --check
