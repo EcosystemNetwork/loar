@@ -1,9 +1,13 @@
 /**
- * LoarBalance — Compact credit balance widget for the header/navbar.
- * Shows on-chain $LOAR token balance and off-chain credit balance.
+ * LoarBalance — Compact points widget for the header/navbar. Shows the
+ * on-chain $LOAR token balance and the off-chain points score; clicking it
+ * opens the points leaderboard. Generation is BYOK, so points are not
+ * purchasable — the CreditStore modal is kept only for the QA/admin
+ * `OPEN_CREDIT_STORE` event, never the user-facing click.
  */
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useReadContract } from 'wagmi';
 import { formatUnits } from 'viem';
@@ -42,6 +46,7 @@ function useLoarTokenBalance() {
 
 export function LoarBalance() {
   const [showStore, setShowStore] = useState(false);
+  const navigate = useNavigate();
   const { isAuthenticated } = useWalletAuth();
   const { web3Mode } = useWeb3Mode();
   const tokenBalance = useLoarTokenBalance();
@@ -84,11 +89,11 @@ export function LoarBalance() {
   return (
     <>
       <button
-        onClick={() => setShowStore(true)}
+        onClick={() => navigate({ to: '/points-leaderboard' })}
         aria-label={
           web3Mode
-            ? `${tokenBalance ?? '—'} $LOAR tokens, ${credits} credits. Click to buy more.`
-            : `${credits} credits. Click to buy more.`
+            ? `${tokenBalance ?? '—'} $LOAR tokens, ${credits} points. View the leaderboard.`
+            : `${credits} points. View the leaderboard.`
         }
         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
           isLow

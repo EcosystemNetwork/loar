@@ -89,7 +89,7 @@ const moreGroupsBase: MoreGroup[] = [
   {
     label: 'Wallet & Billing',
     links: [
-      { to: '/credits', label: 'Points' },
+      { to: '/credits', label: 'Points Balance' },
       { to: '/swap', label: 'Swap' },
       { to: '/subscriptions', label: 'Subscriptions' },
       { to: '/pricing', label: 'Pricing' },
