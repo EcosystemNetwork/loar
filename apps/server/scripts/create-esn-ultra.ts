@@ -182,7 +182,11 @@ async function generateCoverImage(): Promise<string> {
   console.log(`  [COVER] Got ${(buf.length / 1024).toFixed(0)} KB — pinning to IPFS...`);
 
   const form = new FormData();
-  form.append('file', new Blob([buf], { type: mimeType }), `esn-ultra-cover.${ext}`);
+  form.append(
+    'file',
+    new Blob([new Uint8Array(buf)], { type: mimeType }),
+    `esn-ultra-cover.${ext}`
+  );
   form.append('pinataMetadata', JSON.stringify({ name: 'esn-ultra-universe-cover' }));
 
   const pin = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
