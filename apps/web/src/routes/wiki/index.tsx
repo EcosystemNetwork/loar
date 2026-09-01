@@ -316,7 +316,9 @@ function TrendingTile({ item }: { item: any }) {
     isAudio || is3D
       ? item.thumbnailUrl || item.imageUrl || null
       : item.thumbnailUrl || item.imageUrl || item.mediaUrl || '/placeholder.jpg';
-  const { videoRef, ready, onLoaded } = useVideoLoad(isVideo ? item.mediaUrl : undefined);
+  const { videoRef, ready, resolvedSrc, onLoaded } = useVideoLoad(
+    isVideo ? item.mediaUrl : undefined
+  );
   const [loaded, setLoaded] = useState(false);
   const posterUrl = useResolvedIpfsUrl(item.thumbnailUrl || item.imageUrl);
   return (
@@ -325,7 +327,9 @@ function TrendingTile({ item }: { item: any }) {
         <>
           <video
             ref={videoRef}
-            src={ready ? `${resolveIpfsUrlPreferred(item.mediaUrl)}#t=0.5` : undefined}
+            src={
+              ready ? `${resolvedSrc || resolveIpfsUrlPreferred(item.mediaUrl)}#t=0.5` : undefined
+            }
             className={`w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
             muted
             loop
