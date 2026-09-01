@@ -22,23 +22,6 @@
 
 ---
 
-## 🏆 Hackathon Submission — AI Lab: Seed Agents Challenge
-
-**LOAR is an autonomous studio for original IP.** Seed agents read story canon, plan multi-scene episodes, and generate them with character consistency on Seedance — then the community votes which episodes become canonical, on-chain.
-
-| What we use                               | Where it shows up                                     |
-| ----------------------------------------- | ----------------------------------------------------- |
-| **Seedance 2.0** (T2V, I2V, ref-to-video) | Episode + clip generation across the studio           |
-| **Seedream 5.0**                          | Keyframe / storyboard generation, character portraits |
-| **Seed 2.0** (chat completions)           | Episode planner, prompt enhancement, dialog scripting |
-| **Seed Speech / OmniHuman**               | Talking-scene flow for character-to-camera moments    |
-
-**🔑 Bring-Your-Own-Key:** Every user can plug in their own ModelArk API key at [/settings/api-keys](apps/web/src/routes/settings.api-keys.tsx). Keys are encrypted at rest with AES-256-GCM and never returned to the client. Judges can demo on their own credits.
-
-See **[HACKATHON.md](HACKATHON.md)** for the 2-min demo script, architecture diagram, track positioning, and submission-form copy.
-
----
-
 ## 🛣️ Multi-chain roadmap — Solana & Base (coming soon)
 
 > **Today, the LOAR protocol runs on Ethereum only:** Sepolia testnet (contracts
@@ -137,6 +120,71 @@ LOAR uses a **hybrid architecture** by design. Here's what lives where and why:
 - The discovery layer (wiki, search, analytics, moderation) is centralized and would need to be rebuilt or replaced by the community.
 - We chose this tradeoff intentionally: fully on-chain content storage is cost-prohibitive for video, and centralized metadata enables the UX creators need (search, moderation, real-time collaboration).
 - The long-term goal is progressive decentralization — universe content is editable and lives in the cloud until creators commit it on-chain, at which point it becomes permanent and verifiable.
+
+---
+
+## AI Models
+
+LOAR routes **~70 model IDs across 9 integration providers** — fal AI (the bulk), Google (Vertex + Gemini), OpenAI, Anthropic, ElevenLabs, ByteDance, Z.AI (BYOK), Meshy, Tripo3D — spanning video, image, audio, 3D, and language. **Smart Auto** picks a model per generation by quality / speed / cost preference with deterministic fallback; every generation form also exposes a manual model dropdown. BYOK models appear once the user adds their own provider key at [/settings/api-keys](apps/web/src/routes/settings.api-keys.tsx).
+
+Full call-site inventory: [docs/ai-models.md](docs/ai-models.md). Per-model USD cost, fiat / $LOAR price, and credit cost: [docs/pricing.md](docs/pricing.md).
+
+### Video (~32 model IDs)
+
+| Family           | Variants                                                      | Provider         | Tier     |
+| ---------------- | ------------------------------------------------------------- | ---------------- | -------- |
+| **Veo 3.1**      | full / lite / std × t2v / i2v (6 IDs)                         | Google           | Premium  |
+| **Sora 2**       | sora2 t2v / i2v, sora2-pro t2v / i2v                          | OpenAI           | Premium  |
+| **Kling**        | kling t2v / i2v, kling3-i2v, kling-video-v3, v2.5 turbo / pro | Kuaishou         | Standard |
+| **Seedance 2**   | t2v, i2v, fast-t2v, fast-i2v, ref, fast-ref                   | ByteDance        | Standard |
+| **Wan**          | wan 2.5 t2v / i2v, wan 2.7 t2v / i2v                          | Alibaba          | Standard |
+| **PixVerse V6**  | t2v, i2v                                                      | PixVerse         | Standard |
+| **Runway Gen-3** | runway-gen3                                                   | Runway           | Standard |
+| **LTX**          | ltx-video                                                     | Lightricks       | Budget   |
+| **HunYuan**      | hunyuan                                                       | Tencent          | Budget   |
+| **CogVideoX**    | cogvideox, cogvideox-3                                        | Zhipu            | Budget   |
+| **ViduQ1**       | viduq1 t2v / i2v                                              | Vidu (Z.AI BYOK) | Standard |
+
+### Image (~17 model IDs)
+
+| Family          | Variants                                                | Provider       | Tier     |
+| --------------- | ------------------------------------------------------- | -------------- | -------- |
+| **FLUX**        | schnell, dev, pro, 1.1 Pro, 2 Pro, kontext-pro, inpaint | BFL            | All      |
+| **Imagen 4**    | 4.0 standard, 4.0 ultra, 4.0 fast                       | Google Vertex  | Premium  |
+| **Nano Banana** | nano-banana, nano-banana-2, nano-banana-pro             | fal            | Budget   |
+| **Recraft V4**  | recraft-v4                                              | Recraft        | Standard |
+| **Ideogram V3** | ideogram-v3                                             | Ideogram       | Standard |
+| **Seedream V5** | seedream-v5, seedream-5-direct                          | ByteDance      | Standard |
+| **GPT Image**   | gpt-image                                               | OpenAI         | Standard |
+| **Qwen Image**  | qwen-image                                              | Alibaba (BYOK) | Standard |
+| **GLM Image**   | glm-image                                               | Z.AI (BYOK)    | Standard |
+
+### Audio
+
+| Model                             | Provider          | Purpose                                              |
+| --------------------------------- | ----------------- | ---------------------------------------------------- |
+| **stable-audio**                  | Stability via fal | Episode theme / ambient music                        |
+| **MusicGen Large + Stereo Large** | Meta via fal      | Long-form music generation                           |
+| **ElevenLabs voices**             | ElevenLabs        | Dialogue, voice cloning (IVC), voice design, dubbing |
+| **Kokoro TTS**                    | Kokoro via fal    | Cheap, consistent character voice samples            |
+| **seed-tts-1.0**                  | ByteDance         | Alternate TTS path                                   |
+| **Whisper**                       | OpenAI via fal    | Caption transcription (SRT / VTT)                    |
+
+### 3D
+
+| Model               | Provider | Purpose                                                       |
+| ------------------- | -------- | ------------------------------------------------------------- |
+| **Meshy 4 / 5 / 6** | Meshy    | Text-to-3D, image-to-3D, humanoid auto-rig, animation library |
+| **Tripo3D**         | Tripo    | Non-humanoid auto-rig (quadruped, avian, aquatic, etc.)       |
+
+### Language models / agents
+
+| Family          | IDs                             | Provider    | Purpose                                              |
+| --------------- | ------------------------------- | ----------- | ---------------------------------------------------- |
+| **Gemini 2.5**  | 2.5 Pro, 2.5 Flash              | Google      | VLM continuity subsystem, wiki + lore generation     |
+| **GPT-4o-mini** | gpt-4o-mini                     | OpenAI      | Storyline / wiki narrative generation                |
+| **GLM**         | glm-4.7, glm-5.1, glm-5-turbo   | Z.AI (BYOK) | Chat / reasoning / worldbuilding                     |
+| **Claude**      | Opus 4.x, Sonnet 4.x, Haiku 4.x | Anthropic   | Claude Agent SDK pathway + platform editorial agents |
 
 ---
 
@@ -496,6 +544,7 @@ Required GitHub secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `WORK_DIR`.
 
 | Document                                                                             | Description                                                                                                                                                                                                                                             |
 | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Hackathon Submission](HACKATHON.md)                                                 | AI Lab: Seed Agents Challenge — demo script, track positioning, submission copy                                                                                                                                                                         |
 | [MVP Scope](docs/mvp.md)                                                             | What's in the MVP, what's deferred, success criteria                                                                                                                                                                                                    |
 | [Roadmap](docs/roadmap.md)                                                           | 3 milestones with concrete deliverables                                                                                                                                                                                                                 |
 | [Creator Journey](docs/creator-journey.md)                                           | Step-by-step from wallet connect to revenue                                                                                                                                                                                                             |
