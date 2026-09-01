@@ -18,65 +18,7 @@
 
 </div>
 
-> **Last updated:** August 31, 2026 | **Status:** Testnet Alpha (Ethereum Sepolia — contracts live + verified; Ethereum Mainnet wired for swaps/auth). The **$LOAR token is live on Solana** via a [pump.fun](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb) bonding-curve launch; the full Solana protocol and Base remain **planned future chains** — see the [multi-chain roadmap](#-multi-chain-roadmap--solana--base-coming-soon).
-
----
-
-## 🛣️ Multi-chain roadmap — Solana & Base (coming soon)
-
-> **Today, the LOAR protocol runs on Ethereum only:** Sepolia testnet (contracts
-> live + verified on-chain) with Ethereum Mainnet wired for swaps/auth. The one
-> thing live on Solana is the **$LOAR token itself**, launched on
-> [pump.fun](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb)
-> (mint `2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb`) — a standalone
-> bonding-curve launch, not wired into the protocol yet. **The Solana protocol
-> and Base are planned future chains — not yet active.** Both were prototyped end-to-end
-> (Solana devnet programs, Base Sepolia deploys) and have since been removed from
-> the active codebase and **archived for a future restore** (branch
-> `archive/solana-base-support`, tag `solana-base-snapshot`). The tables below
-> describe the intended design for when these chains come online — they do not
-> reflect anything live in the current build.
-
-### Solana (planned)
-
-The intended model: Circle Developer-Controlled Wallets auto-provision **one
-server-custodied identity that signs on both chains** — no Phantom/Solflare
-adapter, no second seed phrase. The same SIWE session JWT would authorize EVM
-writes via `useCircleWrite` and Solana writes via dedicated `/api/solana/*`
-routes that build instructions server-side and sign through Circle KMS. $LOAR
-would be bridged across chains; the 28-week parity plan tracks 12 Anchor program
-ports + Wormhole NTT before mainnet-beta.
-
-| Planned feature                  | What it would be                                                                                                                                                                                                                 |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Compressed-NFT episode mints** | Bubblegum cNFTs (~$0.0001/mint) via the `episode` Anchor program — atomic with the on-chain episode record                                                                                                                       |
-| **Canon promotion**              | Flips `is_canon` + mints a parallel Metaplex Core asset (marketplace-tradable, 5% royalty)                                                                                                                                       |
-| **$LOAR Token-2022**             | Native SPL replacement for the current [pump.fun $LOAR](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb): 1B supply, Pausable + Metadata extensions, mint **permanently locked** via one-way `lock_loar_mint` |
-| **Payment program**              | Solana sister of `PaymentRouter.sol` — pull-style accumulators per creator, two-step ownership, `transfer_checked` everywhere                                                                                                    |
-| **Solana Pay → cNFT auto-mint**  | One button: scan QR → pay 0.01 SOL → cNFT lands in wallet, payment tx pinned into lineage                                                                                                                                        |
-| **Cross-chain bridge**           | Custodial lock-and-mint (per-tx + per-user caps, idempotency keys, balance prechecks), Wormhole NTT for production                                                                                                               |
-| **Cross-chain attestation**      | Ed25519 receipt per mint linking Solana cNFT ↔ EVM Universe — verifiable offline                                                                                                                                                 |
-| **Squads multisig**              | Solana parity with Gnosis Safe for shared Universe ownership — `create` / `propose` / `approve` / `execute`                                                                                                                      |
-| **Unified Circle DCW auth**      | One SIWE session signs on both chains; Circle KMS provisions EVM + Solana addresses automatically (no Phantom/Solflare)                                                                                                          |
-| **MCP tools for AI agents**      | Solana tools (`mint_episode`, `canonize`, `pay_intent`, `pay_status`, `activity`, `get_attestation`) — scope-gated                                                                                                               |
-
-The prototype reached Solana **devnet** (universe / episode / payment programs +
-Token-2022 $LOAR + Squads + custodial bridge + attestation + MCP tools). Those
-deployments are **archived, not live** — they live on the `archive/solana-base-support`
-branch and will be restored and re-deployed when Solana support is brought back online.
-
-**Design docs (future work):** [`docs/solana-overview.md`](docs/solana-overview.md) (umbrella),
-[`docs/solana-bridge.md`](docs/solana-bridge.md) (bridge),
-[`docs/solana-mainnet-runbook.md`](docs/solana-mainnet-runbook.md) (devnet → mainnet),
-[`docs/prd-solana-parity.md`](docs/prd-solana-parity.md) (28-week EVM parity plan),
-[`docs/prd-solana-native-sdk-glue.md`](docs/prd-solana-native-sdk-glue.md) (native SDK glue layer).
-
-### Base (planned)
-
-Base (Base Sepolia → Base Mainnet) was wired as a second EVM target via the same
-multi-chain contract address registry and chain-selector UI. It has been
-deprecated from the active build pending a future restore; Base contracts will be
-re-deployed and re-wired when the chain is brought back online.
+> **Last updated:** August 31, 2026 | **Status:** Testnet Alpha. LOAR is a **multi-modal AI creation suite** — video, image, audio, 3D, and language models (~70 model IDs, 9 providers) — wrapped in an on-chain ownership, governance, and revenue layer. The protocol runs on **Ethereum Sepolia** today (contracts live + verified; Mainnet wired for swaps/auth). Chain details: [Smart Contracts](#smart-contracts-sepolia) · [multi-chain roadmap](#-multi-chain-roadmap--solana--base-coming-soon).
 
 ---
 
@@ -89,13 +31,23 @@ re-deployed and re-wired when the chain is brought back online.
 | **Telegram**    | [t.me/+AXD-XK8SVvw5MTIx](https://t.me/+AXD-XK8SVvw5MTIx)                                           |
 | **X / Twitter** | [@LOAR_FUN](https://x.com/LOAR_FUN)                                                                |
 
-**$LOAR** launched on [pump.fun](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb) (Solana) — mint `2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb`. This is the live, tradable $LOAR token today. The on-chain LOAR protocol (universes, governance, revenue contracts) still runs on Ethereum Sepolia; a native Solana Token-2022 $LOAR and cross-chain bridge are part of the [multi-chain roadmap](#-multi-chain-roadmap--solana--base-coming-soon).
+$LOAR is live and tradable on [pump.fun](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb) (Solana, mint `2xowaGYF…dpTYb`); a native Token-2022 $LOAR + bridge are in the [multi-chain roadmap](#-multi-chain-roadmap--solana--base-coming-soon).
 
 ---
 
 ## What is LOAR?
 
-LOAR is a platform where creators deploy cinematic universes as smart contracts, generate AI video/image content, build branching narratives, and set up multiple revenue streams — all governed by token holders.
+LOAR is a platform where creators build cinematic universes with a **full multi-modal AI stack**, then own and monetize them on-chain:
+
+- **Video** — Veo 3.1, Sora 2, Kling, Seedance 2, Wan 2.5/2.7, PixVerse V6, Runway Gen-3, LTX, HunYuan, CogVideoX, ViduQ1 (~32 model IDs)
+- **Image** — FLUX, Imagen 4, Nano Banana, Recraft V4, Ideogram V3, Seedream V5, GPT Image, Qwen Image, GLM Image (~17 model IDs)
+- **Audio** — ElevenLabs (voice clone / design / dubbing), stable-audio, MusicGen, Kokoro TTS, seed-tts, Whisper captions
+- **3D** — Meshy 4/5/6 (text/image-to-3D, auto-rig, animation), Tripo3D
+- **Language** — Gemini 2.5, Claude, GPT-4o-mini, GLM (wiki, lore, storyline, agents, VLM continuity)
+
+**Smart Auto** routes each generation across **~70 model IDs / 9 providers** by quality / speed / cost, with deterministic fallback and a manual model dropdown on every form. No single model is the default — see the full [AI Models](#ai-models) catalog.
+
+On top of that: deploy each universe as a smart contract, build branching narratives, and wire up multiple revenue streams — all governed by token holders.
 
 **One-liner:** "YouTube meets DAO meets AI studio" — creators own the IP, communities govern the canon, tokens capture the value.
 
@@ -400,6 +352,64 @@ Per-universe NFT instances are deployed as **Beacon Proxies**. Upgrading a beaco
 - **UUPS Singletons**: Deploy new implementation, call `proxy.upgradeToAndCall(newImpl, "")`. Only the contract owner can upgrade.
 - **Beacon NFTs**: Deploy new implementation, call `beacon.upgradeTo(newImpl)`. All universe instances upgrade at once.
 - All contracts use OpenZeppelin Upgradeable v5.0.2 with `Initializable` + `ReentrancyGuardUpgradeable`.
+
+---
+
+## 🛣️ Multi-chain roadmap — Solana & Base (coming soon)
+
+> **Today, the LOAR protocol runs on Ethereum only:** Sepolia testnet (contracts
+> live + verified on-chain) with Ethereum Mainnet wired for swaps/auth. The one
+> thing live on Solana is the **$LOAR token itself**, launched on
+> [pump.fun](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb)
+> (mint `2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb`) — a standalone
+> bonding-curve launch, not wired into the protocol yet. **The Solana protocol
+> and Base are planned future chains — not yet active.** Both were prototyped end-to-end
+> (Solana devnet programs, Base Sepolia deploys) and have since been removed from
+> the active codebase and **archived for a future restore** (branch
+> `archive/solana-base-support`, tag `solana-base-snapshot`). The tables below
+> describe the intended design for when these chains come online — they do not
+> reflect anything live in the current build.
+
+### Solana (planned)
+
+The intended model: Circle Developer-Controlled Wallets auto-provision **one
+server-custodied identity that signs on both chains** — no Phantom/Solflare
+adapter, no second seed phrase. The same SIWE session JWT would authorize EVM
+writes via `useCircleWrite` and Solana writes via dedicated `/api/solana/*`
+routes that build instructions server-side and sign through Circle KMS. $LOAR
+would be bridged across chains; the 28-week parity plan tracks 12 Anchor program
+ports + Wormhole NTT before mainnet-beta.
+
+| Planned feature                  | What it would be                                                                                                                                                                                                                 |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Compressed-NFT episode mints** | Bubblegum cNFTs (~$0.0001/mint) via the `episode` Anchor program — atomic with the on-chain episode record                                                                                                                       |
+| **Canon promotion**              | Flips `is_canon` + mints a parallel Metaplex Core asset (marketplace-tradable, 5% royalty)                                                                                                                                       |
+| **$LOAR Token-2022**             | Native SPL replacement for the current [pump.fun $LOAR](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb): 1B supply, Pausable + Metadata extensions, mint **permanently locked** via one-way `lock_loar_mint` |
+| **Payment program**              | Solana sister of `PaymentRouter.sol` — pull-style accumulators per creator, two-step ownership, `transfer_checked` everywhere                                                                                                    |
+| **Solana Pay → cNFT auto-mint**  | One button: scan QR → pay 0.01 SOL → cNFT lands in wallet, payment tx pinned into lineage                                                                                                                                        |
+| **Cross-chain bridge**           | Custodial lock-and-mint (per-tx + per-user caps, idempotency keys, balance prechecks), Wormhole NTT for production                                                                                                               |
+| **Cross-chain attestation**      | Ed25519 receipt per mint linking Solana cNFT ↔ EVM Universe — verifiable offline                                                                                                                                                 |
+| **Squads multisig**              | Solana parity with Gnosis Safe for shared Universe ownership — `create` / `propose` / `approve` / `execute`                                                                                                                      |
+| **Unified Circle DCW auth**      | One SIWE session signs on both chains; Circle KMS provisions EVM + Solana addresses automatically (no Phantom/Solflare)                                                                                                          |
+| **MCP tools for AI agents**      | Solana tools (`mint_episode`, `canonize`, `pay_intent`, `pay_status`, `activity`, `get_attestation`) — scope-gated                                                                                                               |
+
+The prototype reached Solana **devnet** (universe / episode / payment programs +
+Token-2022 $LOAR + Squads + custodial bridge + attestation + MCP tools). Those
+deployments are **archived, not live** — they live on the `archive/solana-base-support`
+branch and will be restored and re-deployed when Solana support is brought back online.
+
+**Design docs (future work):** [`docs/solana-overview.md`](docs/solana-overview.md) (umbrella),
+[`docs/solana-bridge.md`](docs/solana-bridge.md) (bridge),
+[`docs/solana-mainnet-runbook.md`](docs/solana-mainnet-runbook.md) (devnet → mainnet),
+[`docs/prd-solana-parity.md`](docs/prd-solana-parity.md) (28-week EVM parity plan),
+[`docs/prd-solana-native-sdk-glue.md`](docs/prd-solana-native-sdk-glue.md) (native SDK glue layer).
+
+### Base (planned)
+
+Base (Base Sepolia → Base Mainnet) was wired as a second EVM target via the same
+multi-chain contract address registry and chain-selector UI. It has been
+deprecated from the active build pending a future restore; Base contracts will be
+re-deployed and re-wired when the chain is brought back online.
 
 ---
 
