@@ -6,9 +6,9 @@ describe('isEphemeralUrl — 3D provider CDNs', () => {
     expect(isEphemeralUrl('https://assets.meshy.ai/x/tasks/y/output/model.glb?Expires=1')).toBe(
       true
     );
-    expect(
-      isEphemeralUrl('https://tripo-data.rg1.data.tripo3d.ai/tcli_x/model.glb?sig=abc')
-    ).toBe(true);
+    expect(isEphemeralUrl('https://tripo-data.rg1.data.tripo3d.ai/tcli_x/model.glb?sig=abc')).toBe(
+      true
+    );
     expect(isEphemeralUrl('https://tripo-data.cdn.bcebos.com/x/model.glb')).toBe(true);
   });
 
@@ -36,7 +36,11 @@ describe('rehostModelBundle', () => {
       usdz: 'https://cdn.example.com/a.usdz',
     };
     const out = await rehostModelBundle(
-      { modelUrls, thumbnailUrl: 'https://cdn.example.com/t.png', videoUrl: 'https://cdn.example.com/v.mp4' },
+      {
+        modelUrls,
+        thumbnailUrl: 'https://cdn.example.com/t.png',
+        videoUrl: 'https://cdn.example.com/v.mp4',
+      },
       'Some Entity',
       uid
     );

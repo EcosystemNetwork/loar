@@ -52,5 +52,12 @@ pubsub-debug.log
 # Rescued ephemeral media awaiting rehost (see scripts/backfill-ephemeral-generations.ts)
 rescued-media/
 
+# One-off local repair/cleanup scripts and seeder cover images dropped in the
+# repo root — throwaway, not source. A concurrent process has committed these before.
+zzz-*.mjs
+zzz-*.cjs
+zzz-*.ts
+/*-cover.png
+
 # Local Netlify folder
 .netlify

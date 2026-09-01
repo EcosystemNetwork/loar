@@ -1470,14 +1470,12 @@ async function completeMeshyAnimationTask(opts: {
     );
     const glbUrl = perm.modelUrls.glb ?? task.animationGlbUrl;
 
-    await threeDGenCol()
-      .doc(opts.genId)
-      .update({
-        status: 'completed',
-        animationGlbUrl: glbUrl,
-        thumbnailUrl: perm.thumbnailUrl,
-        completedAt: new Date(),
-      });
+    await threeDGenCol().doc(opts.genId).update({
+      status: 'completed',
+      animationGlbUrl: glbUrl,
+      thumbnailUrl: perm.thumbnailUrl,
+      completedAt: new Date(),
+    });
 
     void publishToGallery({
       creatorUid: opts.userId,

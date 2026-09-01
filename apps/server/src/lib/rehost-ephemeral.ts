@@ -100,8 +100,10 @@ export async function rehostModelBundle(
   videoUrl: string | null;
 }> {
   const safeSlug =
-    (slug || 'model').replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) ||
-    'model';
+    (slug || 'model')
+      .replace(/[^a-zA-Z0-9._-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'model';
   const src = input.modelUrls ?? {};
   const out: RehostableModelOutput = {};
   const formats: Array<keyof RehostableModelOutput> = ['glb', 'fbx', 'obj', 'mtl', 'usdz'];
@@ -110,11 +112,7 @@ export async function rehostModelBundle(
     ...formats.map(async (fmt) => {
       const url = src[fmt];
       if (!url) return;
-      const { url: permanent } = await rehostEphemeralUrl(
-        url,
-        `${safeSlug}.${fmt}`,
-        uploaderUid
-      );
+      const { url: permanent } = await rehostEphemeralUrl(url, `${safeSlug}.${fmt}`, uploaderUid);
       out[fmt] = permanent;
     }),
   ]);

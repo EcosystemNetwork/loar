@@ -9,6 +9,8 @@ CLAUDE.md
 apps/server/src/services/comfyui-workflows
 *.gen.ts
 apps/contracts
+# Anchor/Rust build output — not source, and prettier chokes on the emitted .ts type files
+apps/programs/target
 pnpm-lock.yaml
 dataconnect
 src/dataconnect-generated
