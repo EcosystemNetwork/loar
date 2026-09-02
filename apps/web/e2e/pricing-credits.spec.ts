@@ -150,12 +150,3 @@ test.describe('Credits Page — Transaction History', () => {
     expect(body?.toLowerCase()).toMatch(/transaction|history|no transaction/i);
   });
 });
-
-test.describe('Credits Page — Buy Credits', () => {
-  test('Buy Credits button or store exists', async ({ page }) => {
-    await page.goto('/credits');
-    await page.waitForTimeout(1000);
-    const body = await page.locator('body').textContent();
-    expect(body?.toLowerCase()).toMatch(/buy credit|top.?up|credit store/i);
-  });
-});

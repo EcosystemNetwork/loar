@@ -45,9 +45,17 @@ import type { Page, Route } from '@playwright/test';
 /**
  * Mocks one tRPC query procedure's result within a (possibly batched)
  * `httpBatchLink` request, regardless of what other procedures share the
- * same batch or what order they're in. Every other procedure in the batch
- * is proxied through to the real server unmodified — this mock only ever
- * touches the one slot it's asked to.
+ * same batch or what order they're in.
+ *
+ * When a real backend is reachable, every *other* procedure in the batch is
+ * proxied through to it unmodified — this mock only touches the one slot
+ * it's asked to. When it isn't (CI runs the web app as a bare `vite` server
+ * with no `apps/server` behind it — `route.fetch()` then ECONNREFUSEs), the
+ * whole batch envelope is synthesized instead: the target procedure gets
+ * the fixture, every sibling gets `{ result: { data: null } }`. The
+ * homepage treats all of those as absent/optional (Ponder enrichment,
+ * feature flags, admin-curated featured list) and still renders the hero
+ * from `universes.getAll`, which is the slot under test here.
  */
 async function mockTrpcBatchProcedure(page: Page, procedureName: string, resultData: unknown) {
   await page.route('**/trpc/**', async (route: Route) => {
@@ -56,21 +64,29 @@ async function mockTrpcBatchProcedure(page: Page, procedureName: string, resultD
     const index = procedures.indexOf(procedureName);
     if (index === -1) return route.continue();
 
-    // Fetch the real batch response so every *other* procedure in it still
-    // gets genuine data — only splice in our fixture at this procedure's
-    // own index.
-    const response = await route.fetch();
+    let status = 200;
     let body: unknown;
     try {
+      const response = await route.fetch();
+      status = response.status();
       body = await response.json();
     } catch {
-      return route.continue();
+      body = undefined; // no backend reachable — fall through to synth below
     }
-    if (!Array.isArray(body) || index >= body.length) return route.continue();
 
-    body[index] = { result: { data: resultData } };
+    // No usable upstream batch → build a minimal valid one (no transformer
+    // is configured on httpBatchLink, so entries are plain
+    // `{ result: { data } }`).
+    if (!Array.isArray(body)) {
+      body = procedures.map(() => ({ result: { data: null } }));
+    }
+    while ((body as unknown[]).length <= index) {
+      (body as unknown[]).push({ result: { data: null } });
+    }
+
+    (body as unknown[])[index] = { result: { data: resultData } };
     await route.fulfill({
-      status: response.status(),
+      status,
       contentType: 'application/json',
       body: JSON.stringify(body),
     });
