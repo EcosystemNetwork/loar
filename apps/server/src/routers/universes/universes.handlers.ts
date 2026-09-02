@@ -125,7 +125,14 @@ export async function createUniverse(input: CreateUniverseInput) {
 
 export async function getUniverse(id: string) {
   try {
-    const doc = await collection().doc(id.toLowerCase()).get();
+    // EVM addresses are stored lowercased; Solana PDAs (base58) are stored
+    // case-sensitively (see createUniverse). Try the id as given first so
+    // base58 ids resolve, then fall back to the lowercased form for EVM
+    // addresses and mixed-case EVM input.
+    let doc = await collection().doc(id).get();
+    if (!doc.exists && id !== id.toLowerCase()) {
+      doc = await collection().doc(id.toLowerCase()).get();
+    }
 
     if (!doc.exists) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Universe not found' });
