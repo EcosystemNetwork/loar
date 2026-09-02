@@ -40,7 +40,10 @@ export async function reconcileUsersFromAccounts(): Promise<ReconcileResult> {
     db.collection('userAccounts').count().get(),
     db.collection('users').count().get(),
   ]);
-  if (accountsCount.data().count <= usersCount.data().count) return result;
+  const nAccounts = accountsCount.data().count;
+  const nUsers = usersCount.data().count;
+  console.log(`[reconcile-users] users=${nUsers} userAccounts=${nAccounts}`);
+  if (nAccounts <= nUsers) return result;
 
   let last: FirebaseFirestore.QueryDocumentSnapshot | null = null;
   for (;;) {
