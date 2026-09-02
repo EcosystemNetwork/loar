@@ -176,6 +176,7 @@ function AdminDashboard() {
   const o = overview as
     | {
         totalUsers: number;
+        registeredAccounts: number;
         newUsers: { today: number; last7d: number; last30d: number };
         dailyActiveWallets: number;
         loginsLast24h: number;
@@ -213,6 +214,9 @@ function AdminDashboard() {
             </div>
             <p className={`text-2xl font-bold ${loadingOverview ? 'text-muted-foreground' : ''}`}>
               {fmtNum(o?.totalUsers)}
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              {fmtNum(o?.registeredAccounts)} registered accounts
             </p>
           </CardContent>
         </Card>

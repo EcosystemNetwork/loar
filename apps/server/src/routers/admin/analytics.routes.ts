@@ -30,16 +30,29 @@ export const adminAnalyticsRouter = router({
     const usersCol = db.collection('users');
     const loginsCol = db.collection('walletLogins');
 
-    const [totalUsers, newToday, new7d, new30d, universes, episodes, loginsLast24h] =
-      await Promise.all([
-        usersCol.count().get(),
-        usersCol.where('firstLoginAt', '>=', daysAgo(1)).count().get(),
-        usersCol.where('firstLoginAt', '>=', daysAgo(7)).count().get(),
-        usersCol.where('firstLoginAt', '>=', daysAgo(30)).count().get(),
-        db.collection('cinematicUniverses').count().get(),
-        db.collection('episodes').count().get(),
-        loginsCol.where('loginAt', '>=', daysAgo(1)).count().get(),
-      ]);
+    const [
+      totalUsers,
+      newToday,
+      new7d,
+      new30d,
+      universes,
+      episodes,
+      loginsLast24h,
+      registeredAccounts,
+    ] = await Promise.all([
+      usersCol.count().get(),
+      usersCol.where('firstLoginAt', '>=', daysAgo(1)).count().get(),
+      usersCol.where('firstLoginAt', '>=', daysAgo(7)).count().get(),
+      usersCol.where('firstLoginAt', '>=', daysAgo(30)).count().get(),
+      db.collection('cinematicUniverses').count().get(),
+      db.collection('episodes').count().get(),
+      loginsCol.where('loginAt', '>=', daysAgo(1)).count().get(),
+      // Cross-check: email / Google signups are written here synchronously by
+      // the auth handlers. Should track `users` total 1:1 now that `recordLogin`
+      // runs server-side (apps/server/src/lib/record-login.ts); a gap means the
+      // pre-fix backfill hasn't run or wallet-only users exist.
+      db.collection('userAccounts').count().get(),
+    ]);
 
     // Distinct active wallets in the last 24h. Bounded window, so it's safe
     // to read the docs and dedupe (count() alone can't dedupe) — same
@@ -53,6 +66,7 @@ export const adminAnalyticsRouter = router({
 
     return {
       totalUsers: totalUsers.data().count,
+      registeredAccounts: registeredAccounts.data().count,
       newUsers: {
         today: newToday.data().count,
         last7d: new7d.data().count,

@@ -1459,6 +1459,13 @@ import('./jobs/cost-alerts')
   .then(({ startCostAlertJob }) => startCostAlertJob())
   .catch((err) => console.warn('[cost-alerts] failed to start:', err));
 
+// Keep the `users` collection (what /admin/dashboard counts) in sync with
+// `userAccounts`. Runs by default — cheap, idempotent, count-guarded. Disable
+// with USER_RECONCILE_OFF=1. See apps/server/src/jobs/reconcile-users.ts.
+import('./jobs/reconcile-users')
+  .then(({ startUserReconcileJob }) => startUserReconcileJob())
+  .catch((err) => console.warn('[reconcile-users] failed to start:', err));
+
 const port = env.PORT;
 
 console.log(`Starting server on port ${port}`);

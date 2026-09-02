@@ -26,7 +26,7 @@
  */
 import { publicProcedure, protectedProcedure, router } from '../lib/trpc';
 import { z } from 'zod';
-import { db, firebaseAvailable } from '../lib/firebase';
+import { recordLogin } from '../lib/record-login';
 
 // ── Domain routers ──────────────────────────────────────────────────────
 import { universesRouter } from './universes/universes.routes';
@@ -38,7 +38,7 @@ import { imageRouter } from './generation/image.routes';
 import { marketplaceRouter } from './marketplace/marketplace.routes';
 import { nftRouter } from './nft/nft.routes';
 import { listingsRouter } from './listings/listings.routes';
-import { creditsRouter, grantCreditsInTxn } from './credits/credits.routes';
+import { creditsRouter } from './credits/credits.routes';
 import { subscriptionsRouter } from './subscriptions/subscriptions.routes';
 import { analyticsRouter } from './analytics/analytics.routes';
 import { adsRouter } from './ads/ads.routes';
@@ -140,16 +140,6 @@ import { marketingRouter } from './marketing/marketing.routes';
 import { royaltySplitsRouter } from './royaltySplits/royaltySplits.routes';
 import { mainnetReadinessRouter } from './mainnetReadiness/mainnetReadiness.routes';
 
-// ── Wallet login tracking (analytics domain) ───────────────────────────
-const getWalletLoginsCol = () => (firebaseAvailable ? db.collection('walletLogins') : null);
-const getUsersCol = () => (firebaseAvailable ? db.collection('users') : null);
-
-/**
- * One-time signup bonus granted on first wallet login.
- * 500 credits ≈ $5 of generation value at the retail Starter rate.
- */
-const SIGNUP_CREDIT_GRANT = Number(process.env.SIGNUP_CREDIT_GRANT ?? 500);
-
 // ── Root router ─────────────────────────────────────────────────────────
 export const appRouter = router({
   // ── System ──────────────────────────────────────────────────────────
@@ -160,6 +150,10 @@ export const appRouter = router({
     user: { uid: ctx.user.uid, address: ctx.user.address, email: ctx.user.email },
   })),
 
+  // Best-effort client backstop. The authoritative call now happens
+  // server-side in the auth handlers (apps/server/src/routes/circle-auth.ts)
+  // via the same `recordLogin` helper, so a swallowed failure here no longer
+  // drops a user from the `/admin/dashboard` counts.
   trackWalletLogin: publicProcedure
     .input(
       z.object({
@@ -168,62 +162,7 @@ export const appRouter = router({
         connector: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
-      const walletLoginsCol = getWalletLoginsCol();
-      const usersCol = getUsersCol();
-      if (!walletLoginsCol || !usersCol) {
-        return { ok: true };
-      }
-
-      const now = new Date();
-      const addressLower = input.address.toLowerCase();
-
-      await walletLoginsCol.add({
-        address: addressLower,
-        chainId: input.chainId,
-        connector: input.connector || 'unknown',
-        loginAt: now,
-        userAgent: '',
-      });
-
-      // Atomically create the user doc + grant signup credits on first login.
-      // A transaction is needed so two concurrent first-login requests can't
-      // both pass the `!exists` check and double-grant.
-      const isNewUser = await db.runTransaction(async (tx) => {
-        const userRef = usersCol.doc(addressLower);
-        const userDoc = await tx.get(userRef);
-
-        if (userDoc.exists) {
-          tx.update(userRef, {
-            lastLoginAt: now,
-            loginCount: (userDoc.data()?.loginCount || 0) + 1,
-            chainId: input.chainId,
-          });
-          return false;
-        }
-
-        await grantCreditsInTxn(
-          tx,
-          addressLower,
-          SIGNUP_CREDIT_GRANT,
-          'signup',
-          'Welcome bonus — free credits to get started'
-        );
-
-        tx.set(userRef, {
-          address: addressLower,
-          firstLoginAt: now,
-          lastLoginAt: now,
-          loginCount: 1,
-          chainId: input.chainId,
-          connector: input.connector || 'unknown',
-          signupCreditsGranted: SIGNUP_CREDIT_GRANT,
-        });
-        return true;
-      });
-
-      return { ok: true, newUser: isNewUser, creditsGranted: isNewUser ? SIGNUP_CREDIT_GRANT : 0 };
-    }),
+    .mutation(({ input }) => recordLogin(input)),
 
   // ── Indexer reads (replaces Ponder GraphQL) ─────────────────────────
   indexer: indexerRouter,

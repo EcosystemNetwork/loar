@@ -20,6 +20,7 @@ import { verifyGoogleIdToken, isGoogleOAuthConfigured } from '../lib/oauth-verif
 import { sendOtpEmail, isEmailConfigured } from '../lib/email';
 import { recordAuthEvent } from '../lib/metrics';
 import { db, firebaseAvailable } from '../lib/firebase';
+import { recordLogin } from '../lib/record-login';
 import crypto from 'node:crypto';
 
 export const circleAuthRoutes = new Hono();
@@ -291,6 +292,23 @@ async function provisionSolanaWalletAtSignup(evmAddress: string): Promise<string
   }
 }
 
+/**
+ * Record the session in the `users` / `walletLogins` analytics collections so
+ * `/admin/dashboard` counts this signup. Non-fatal: a Firestore hiccup here
+ * must not block login — the client `trackWalletLogin` call is a backstop.
+ */
+async function recordLoginAtAuth(
+  evmAddress: string,
+  email: string,
+  provider: 'email' | 'google'
+): Promise<void> {
+  try {
+    await recordLogin({ address: evmAddress, email, provider, connector: provider });
+  } catch (err) {
+    console.error('[AUTH] recordLogin failed (non-fatal):', err);
+  }
+}
+
 // ── Cookie helpers ──────────────────────────────────────────────────────────
 
 function setSessionCookie(c: any, token: string) {
@@ -399,6 +417,9 @@ circleAuthRoutes.post('/verify-otp', async (c) => {
     // Provision the Solana wallet at sign-up too (non-fatal, gated on config).
     const solanaAddress = await provisionSolanaWalletAtSignup(wallet.address);
 
+    // Land this signup in the `users` collection server-side (non-fatal).
+    await recordLoginAtAuth(wallet.address, email, 'email');
+
     // Issue JWT — EVM address as the session subject, Solana address as a claim.
     const token = await issueSessionToken(wallet.address, solanaAddress ? { solanaAddress } : {});
     setSessionCookie(c, token);
@@ -488,6 +509,9 @@ circleAuthRoutes.post('/social', async (c) => {
 
     // Provision the Solana wallet at sign-up too (non-fatal, gated on config).
     const solanaAddress = await provisionSolanaWalletAtSignup(wallet.address);
+
+    // Land this signup in the `users` collection server-side (non-fatal).
+    await recordLoginAtAuth(wallet.address, email, provider);
 
     const token = await issueSessionToken(wallet.address, solanaAddress ? { solanaAddress } : {});
     setSessionCookie(c, token);
