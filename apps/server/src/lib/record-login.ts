@@ -19,8 +19,17 @@ import { grantCreditsInTxn } from '../routers/credits/credits.routes';
 /**
  * One-time signup bonus granted on first login.
  * 500 credits ≈ $5 of generation value at the retail Starter rate.
+ *
+ * Guarded against a malformed env value: a non-numeric `SIGNUP_CREDIT_GRANT`
+ * would otherwise be `NaN`, and a `NaN` credit write throws inside the grant
+ * transaction — which historically took the `users` doc down with it and
+ * under-reported `/admin/dashboard` growth.
  */
-export const SIGNUP_CREDIT_GRANT = Number(process.env.SIGNUP_CREDIT_GRANT ?? 500);
+const RAW_SIGNUP_CREDIT_GRANT = Number(process.env.SIGNUP_CREDIT_GRANT ?? 500);
+export const SIGNUP_CREDIT_GRANT =
+  Number.isFinite(RAW_SIGNUP_CREDIT_GRANT) && RAW_SIGNUP_CREDIT_GRANT >= 0
+    ? RAW_SIGNUP_CREDIT_GRANT
+    : 500;
 
 export interface RecordLoginInput {
   /** Canonical EVM address (the JWT `sub`). Case-insensitive; stored lowercased. */
@@ -41,10 +50,16 @@ export interface RecordLoginResult {
 
 /**
  * Append a `walletLogins` audit row and upsert the `users/{address}` doc,
- * granting signup credits atomically on first login. Idempotent per address:
- * calling it on every login just bumps `lastLoginAt` / `loginCount`. Safe to
- * call from multiple entrypoints for the same session — the transaction stops
- * two concurrent first logins from double-granting.
+ * then grant the one-time signup bonus on first login. Idempotent per address:
+ * calling it on every login just bumps `lastLoginAt` / `loginCount`.
+ *
+ * The `users` upsert and the credit grant run in **separate** transactions on
+ * purpose. The `users` doc is the source of truth for `/admin/dashboard`
+ * counts and must never be rolled back by a credit-ledger failure — the
+ * previous single-transaction version silently dropped a user from the totals
+ * whenever `grantCreditsInTxn` threw (e.g. a `NaN` grant, ledger contention).
+ * The grant is idempotent via the `signupCreditsGranted` flag, so two
+ * concurrent first logins still can't double-grant.
  */
 export async function recordLogin(input: RecordLoginInput): Promise<RecordLoginResult> {
   if (!firebaseAvailable) return { ok: true, newUser: false, creditsGranted: 0 };
@@ -62,6 +77,7 @@ export async function recordLogin(input: RecordLoginInput): Promise<RecordLoginR
     userAgent: '',
   });
 
+  // 1) Analytics row. No credit dependency — this must land for every session.
   const isNewUser = await db.runTransaction(async (tx) => {
     const userRef = db.collection('users').doc(address);
     const userDoc = await tx.get(userRef);
@@ -77,14 +93,6 @@ export async function recordLogin(input: RecordLoginInput): Promise<RecordLoginR
       return false;
     }
 
-    await grantCreditsInTxn(
-      tx,
-      address,
-      SIGNUP_CREDIT_GRANT,
-      'signup',
-      'Welcome bonus — free credits to get started'
-    );
-
     tx.set(userRef, {
       address,
       firstLoginAt: now,
@@ -92,16 +100,39 @@ export async function recordLogin(input: RecordLoginInput): Promise<RecordLoginR
       loginCount: 1,
       chainId,
       connector,
-      signupCreditsGranted: SIGNUP_CREDIT_GRANT,
+      signupCreditsGranted: 0,
       ...(input.email ? { email: input.email } : {}),
       ...(input.provider ? { authProvider: input.provider } : {}),
     });
     return true;
   });
 
-  return {
-    ok: true,
-    newUser: isNewUser,
-    creditsGranted: isNewUser ? SIGNUP_CREDIT_GRANT : 0,
-  };
+  if (!isNewUser) return { ok: true, newUser: false, creditsGranted: 0 };
+
+  // 2) Best-effort one-time signup grant. A failure here leaves the user
+  //    recorded (step 1) and just logs — the reconcile sweep / a later login
+  //    do not retry the grant, so this is the one place it can be lost, which
+  //    is the right trade vs. dropping the user from platform stats.
+  let creditsGranted = 0;
+  try {
+    creditsGranted = await db.runTransaction(async (tx) => {
+      const userRef = db.collection('users').doc(address);
+      const userDoc = await tx.get(userRef);
+      if (!userDoc.exists || (userDoc.data()?.signupCreditsGranted || 0) > 0) return 0;
+
+      await grantCreditsInTxn(
+        tx,
+        address,
+        SIGNUP_CREDIT_GRANT,
+        'signup',
+        'Welcome bonus — free credits to get started'
+      );
+      tx.update(userRef, { signupCreditsGranted: SIGNUP_CREDIT_GRANT });
+      return SIGNUP_CREDIT_GRANT;
+    });
+  } catch (err) {
+    console.error('[recordLogin] signup credit grant failed (user still recorded):', err);
+  }
+
+  return { ok: true, newUser: true, creditsGranted };
 }
