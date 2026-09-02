@@ -33,6 +33,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { trpcClient } from '@/utils/trpc';
+import { normalizeUniverseId } from '@/lib/utils';
 import { SmartImage } from '@/components/SmartImage';
 import {
   ponderGql,
@@ -55,7 +56,9 @@ function shortenAddress(addr?: string | null): string {
 
 function UniverseProfilePage() {
   const { id } = useParams({ from: '/universe/$id/profile' });
-  const idLower = id.toLowerCase();
+  // Canonical id: lowercased for EVM `0x…` addresses, verbatim for Solana
+  // base58 PDAs (lowercasing those breaks every lookup and internal link).
+  const idLower = normalizeUniverseId(id);
   const [editorOpen, setEditorOpen] = useState(false);
 
   const universeQuery = useQuery({

@@ -134,6 +134,20 @@ export async function getUniverse(id: string) {
       doc = await collection().doc(id.toLowerCase()).get();
     }
 
+    // Last resort: a base58 Solana PDA that some caller lowercased before
+    // building the URL (older `/watch` and `/profile` links did this). The
+    // original case can't be recovered from the id alone, so match
+    // case-insensitively against stored doc ids. Skipped for EVM addresses
+    // (`0x` + 40 hex), which are already canonically lowercased.
+    if (!doc.exists && !/^0x[0-9a-f]{40}$/.test(id)) {
+      const target = id.toLowerCase();
+      const snapshot = await collection().select().limit(5000).get();
+      const match = snapshot.docs.find((d) => d.id.toLowerCase() === target);
+      if (match) {
+        doc = await match.ref.get();
+      }
+    }
+
     if (!doc.exists) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Universe not found' });
     }

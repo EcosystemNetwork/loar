@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { trpcClient } from '@/utils/trpc';
+import { normalizeUniverseId } from '@/lib/utils';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import { SmartImage } from '@/components/SmartImage';
 import {
@@ -46,7 +47,9 @@ export const Route = createFileRoute('/universe/$id/watch')({
 
 function WatchPage() {
   const { id } = useParams({ from: '/universe/$id/watch' });
-  const idLower = id.toLowerCase();
+  // Canonical id: lowercased for EVM `0x…` addresses, verbatim for Solana
+  // base58 PDAs (lowercasing those breaks every lookup and internal link).
+  const idLower = normalizeUniverseId(id);
   const navigate = useNavigate();
 
   // Firestore universe (authoritative metadata)
