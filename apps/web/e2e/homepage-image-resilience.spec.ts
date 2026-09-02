@@ -209,7 +209,16 @@ async function simulateDegradedPrimaryGateway(page: Page) {
   );
   await page.route(`https://w3s.link/ipfs/${TEST_CID}**`, (route: Route) => route.abort());
   await page.route(`https://${LIVE_FALLBACK_HOST}/ipfs/${TEST_CID}**`, (route: Route) =>
-    route.fulfill({ status: 200, contentType: 'text/plain', body: 'ok' })
+    // `raceIpfsGateways()` probes this with `fetch(…, { mode: 'cors' })`, so the
+    // mocked response must carry a permissive ACAO header or the browser rejects
+    // it as a CORS failure and the probe "fails" instead of winning the race —
+    // the local run tolerated the timing, CI (serial, cold) did not.
+    route.fulfill({
+      status: 200,
+      contentType: 'text/plain',
+      headers: { 'access-control-allow-origin': '*' },
+      body: 'ok',
+    })
   );
 
   // Server-signed dedicated-gateway resolve — force it to fail so the test
@@ -231,7 +240,12 @@ async function simulateDegradedPrimaryGateway(page: Page) {
     if (upstream.includes(DEAD_GATEWAY_HOST)) {
       return route.fulfill({ status: 502, contentType: 'text/plain', body: 'gateway down' });
     }
-    return route.fulfill({ status: 200, contentType: 'image/png', body: PIXEL_PNG });
+    return route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      headers: { 'access-control-allow-origin': '*' },
+      body: PIXEL_PNG,
+    });
   });
 }
 
@@ -276,7 +290,12 @@ test.describe('Homepage — Image Resilience', () => {
     // just be present in the DOM with a src that 502'd.
     await expect
       .poll(async () => heroImg.evaluate((img: HTMLImageElement) => img.naturalWidth), {
-        timeout: 10_000,
+        // Recovery is a multi-hop <img> onError chain (ipfs.io → next
+        // candidate → /api/img pixel); on a cold, single-worker CI runner
+        // that walk is a good deal slower than locally. The original bug was
+        // a permanent 502 with no retry at all, so a generous ceiling here
+        // still can't pass against the unfixed code.
+        timeout: 30_000,
         message: 'hero image never painted — primary-gateway failure was not recovered from',
       })
       .toBeGreaterThan(0);
