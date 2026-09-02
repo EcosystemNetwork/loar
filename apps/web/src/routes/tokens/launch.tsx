@@ -1,16 +1,27 @@
 /**
  * Minimal Token Launch — pump.fun-style quick-launch (name + symbol + image).
  *
- * Wraps the UniverseManager createUniverseWithToken() call with sensible defaults
- * so creators who don't need the full cinematic worldbuilding wizard can launch
- * a token in one transaction. For the full experience (characters, episodes,
- * lore), `/cinematicUniverseCreate` is still linked at the bottom.
+ * EVM: wraps the UniverseManager createUniverseWithToken() call with sensible
+ * defaults so creators who don't need the full cinematic worldbuilding wizard
+ * can launch a token in one transaction.
+ *
+ * Solana: when the build is wired for Solana (`VITE_SOLANA_CLUSTER`), the chain
+ * picker offers it too. There is no wallet-adapter / mint-fee step — the server
+ * signs the Anchor `initialize_universe` ix with the caller's Circle-managed
+ * wallet and creates a `monetized` universe PDA (the SPL token mint is a
+ * follow-up step on the universe page).
+ *
+ * For the full experience (characters, episodes, lore),
+ * `/cinematicUniverseCreate` is still linked at the bottom.
  */
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useState, useMemo } from 'react';
 import { useChainId } from 'wagmi';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { useUniverseManager, useDefaultDeploymentConfig } from '@/hooks/useUniverseManager';
+import { useSolanaUniverseInit } from '@/hooks/useSolanaUniverseInit';
+import { ChainSelector } from '@/components/ChainSelector';
+import { SUPPORTED_CHAINS, DEFAULT_CHAIN_SELECTION, type ChainSelection } from '@/configs/chains';
 import { DirectUpload } from '@/components/DirectUpload';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -42,6 +53,18 @@ function LaunchTokenPage() {
   const { createUniverseWithToken, mintFee, mintFeeLoading, isPending, error } =
     useUniverseManager();
   const defaults = useDefaultDeploymentConfig();
+  const solanaInit = useSolanaUniverseInit();
+
+  // Chain picker — EVM chains always, plus the active Solana cluster when the
+  // build sets `VITE_SOLANA_CLUSTER`. Seed from the wallet's current chain so
+  // the dropdown matches reality on first render.
+  const [chainSelection, setChainSelection] = useState<ChainSelection>(() => {
+    const match = SUPPORTED_CHAINS.find(
+      (c) => c.selection.kind === 'evm' && c.selection.chainId === chainId
+    );
+    return match?.selection ?? DEFAULT_CHAIN_SELECTION;
+  });
+  const isSolana = chainSelection.kind === 'solana';
 
   const [name, setName] = useState('');
   const [symbol, setSymbol] = useState('');
@@ -54,14 +77,21 @@ function LaunchTokenPage() {
     const issues: string[] = [];
     if (!name.trim()) issues.push('Name required');
     else if (name.length > 50) issues.push('Name too long (max 50)');
+    // Solana init doesn't mint the SPL token here, so the ticker is optional on
+    // that path (it's set when the token is minted from the universe page).
     const trimmedSymbol = symbol.trim().toUpperCase();
-    if (!trimmedSymbol) issues.push('Symbol required');
-    else if (!SYMBOL_REGEX.test(trimmedSymbol))
+    if (!trimmedSymbol) {
+      if (!isSolana) issues.push('Symbol required');
+    } else if (!SYMBOL_REGEX.test(trimmedSymbol)) {
       issues.push('Symbol must be 3–10 uppercase letters or numbers');
+    }
     if (!imageURL) issues.push('Image required');
     if (description.length > 280) issues.push('Description too long (max 280)');
+    // The Solana initialize ix seeds the PDA from a hash of name + description,
+    // so the server requires a non-empty description on that path.
+    if (isSolana && !description.trim()) issues.push('Description required on Solana');
     return issues;
-  }, [name, symbol, imageURL, description]);
+  }, [name, symbol, imageURL, description, isSolana]);
 
   const defaultsReady =
     defaults.defaultHook && defaults.defaultLocker && defaults.defaultPairedToken;
@@ -69,17 +99,43 @@ function LaunchTokenPage() {
   const canSubmit =
     isConnected &&
     validation.length === 0 &&
-    defaultsReady &&
-    !isPending &&
-    status !== 'submitting';
+    status !== 'submitting' &&
+    (isSolana ? !solanaInit.isPending : defaultsReady && !isPending);
 
   const handleLaunch = async () => {
-    if (!address || !defaultsReady) return;
-    setLocalError(null);
-    setStatus('submitting');
+    if (!address) return;
 
     const trimmedSymbol = symbol.trim().toUpperCase();
     const trimmedName = name.trim();
+
+    // ── Solana path ──────────────────────────────────────────────────────
+    // No wallet chain, no mint fee, no token step — the server signs the
+    // Anchor ix with the caller's Circle-managed wallet and writes the
+    // Firestore mirror itself. The SPL mint is a follow-up on the universe.
+    if (isSolana) {
+      setLocalError(null);
+      setStatus('submitting');
+      try {
+        const res = await solanaInit.initializeUniverse({
+          name: trimmedName,
+          imageUrl: imageURL,
+          description: description.trim(),
+          universeType: 'monetized',
+        });
+        setStatus('success');
+        setTimeout(() => {
+          navigate({ to: '/universe/$id', params: { id: res.universePda } });
+        }, 2500);
+      } catch (err: any) {
+        setLocalError(err?.message ?? 'Launch failed');
+        setStatus('error');
+      }
+      return;
+    }
+
+    if (!defaultsReady) return;
+    setLocalError(null);
+    setStatus('submitting');
 
     try {
       await createUniverseWithToken(
@@ -161,9 +217,18 @@ function LaunchTokenPage() {
               Quick-launch in one transaction
             </p>
             <ul className="text-xs text-muted-foreground space-y-0.5 pl-5 list-disc">
-              <li>Fixed 1B supply, bonding-curve sale then Uniswap v4 graduation</li>
-              <li>LP permanently locked on-chain after graduation</li>
-              <li>Default 80% curve / 10% creator / 5% treasury / 5% community</li>
+              {isSolana ? (
+                <>
+                  <li>Creates a monetized universe PDA — signed server-side, no gas</li>
+                  <li>Mint the SPL token from the universe page once it&apos;s live</li>
+                </>
+              ) : (
+                <>
+                  <li>Fixed 1B supply, bonding-curve sale then Uniswap v4 graduation</li>
+                  <li>LP permanently locked on-chain after graduation</li>
+                  <li>Default 80% curve / 10% creator / 5% treasury / 5% community</li>
+                </>
+              )}
               <li>
                 Need characters, episodes, lore?{' '}
                 <Link to="/cinematicUniverseCreate" className="underline hover:text-foreground">
@@ -177,6 +242,9 @@ function LaunchTokenPage() {
         {/* Form */}
         <Card>
           <CardContent className="p-5 space-y-4">
+            {/* Chain picker — renders nothing unless the build has >1 chain */}
+            <ChainSelector value={chainSelection} onChange={setChainSelection} />
+
             {/* Name */}
             <div className="space-y-1.5">
               <Label htmlFor="token-name" className="text-sm font-medium">
@@ -194,7 +262,8 @@ function LaunchTokenPage() {
             {/* Symbol */}
             <div className="space-y-1.5">
               <Label htmlFor="token-symbol" className="text-sm font-medium">
-                Ticker Symbol
+                Ticker Symbol{' '}
+                {isSolana && <span className="text-muted-foreground font-normal">(optional)</span>}
               </Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
@@ -250,10 +319,13 @@ function LaunchTokenPage() {
               )}
             </div>
 
-            {/* Description (optional) */}
+            {/* Description — optional on EVM, required on Solana (PDA seed) */}
             <div className="space-y-1.5">
               <Label htmlFor="token-desc" className="text-sm font-medium">
-                Description <span className="text-muted-foreground font-normal">(optional)</span>
+                Description{' '}
+                <span className="text-muted-foreground font-normal">
+                  {isSolana ? '(required)' : '(optional)'}
+                </span>
               </Label>
               <Textarea
                 id="token-desc"
@@ -268,8 +340,8 @@ function LaunchTokenPage() {
               </p>
             </div>
 
-            {/* Mint fee */}
-            {feeEth !== null && (
+            {/* Mint fee — EVM only */}
+            {!isSolana && feeEth !== null && (
               <div className="flex items-center justify-between text-xs p-3 rounded-md bg-muted/40">
                 <span className="text-muted-foreground">Launch fee</span>
                 <span className="font-mono tabular-nums">
@@ -297,23 +369,28 @@ function LaunchTokenPage() {
             {status === 'submitting' && (
               <div className="p-3 rounded-md bg-blue-500/10 border border-blue-500/20 flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Confirm the transaction in your wallet…
+                {isSolana
+                  ? 'Creating your universe on Solana…'
+                  : 'Confirm the transaction in your wallet…'}
               </div>
             )}
             {status === 'success' && (
               <div className="p-3 rounded-md bg-green-500/10 border border-green-500/20 flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
                 <CheckCircle2 className="h-4 w-4" />
-                Token launched! Redirecting to the launchpad…
+                {isSolana ? 'Universe launched! Redirecting…' : 'Token launched! Redirecting…'}
               </div>
             )}
-            {status === 'error' && (localError || error) && (
+            {status === 'error' && (localError || error || solanaInit.error) && (
               <div className="p-3 rounded-md bg-red-500/10 border border-red-500/20 text-xs text-red-600 dark:text-red-400">
-                {localError ?? (error as any)?.message ?? 'Launch failed'}
+                {localError ??
+                  (error as any)?.message ??
+                  solanaInit.error?.message ??
+                  'Launch failed'}
               </div>
             )}
 
-            {/* Network hint */}
-            {!defaultsReady && (
+            {/* Network hint — EVM only (Solana deploys server-side) */}
+            {!isSolana && !defaultsReady && (
               <div className="p-3 rounded-md bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
                 <AlertTriangle className="h-3.5 w-3.5" />
                 Current network is not supported. Switch to Ethereum Sepolia or mainnet.
@@ -331,7 +408,7 @@ function LaunchTokenPage() {
                 onClick={handleLaunch}
                 disabled={!canSubmit}
               >
-                {status === 'submitting' || isPending ? (
+                {status === 'submitting' || isPending || solanaInit.isPending ? (
                   <>
                     <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                     Launching…
@@ -339,13 +416,13 @@ function LaunchTokenPage() {
                 ) : (
                   <>
                     <Rocket className="h-5 w-5 mr-2" />
-                    Launch Token
+                    {isSolana ? 'Launch Universe' : 'Launch Token'}
                   </>
                 )}
               </Button>
             )}
 
-            {mintFeeLoading && (
+            {!isSolana && mintFeeLoading && (
               <p className="text-[10px] text-center text-muted-foreground">
                 Loading on-chain launch fee…
               </p>
@@ -353,15 +430,17 @@ function LaunchTokenPage() {
           </CardContent>
         </Card>
 
-        {/* LP + supply disclosure */}
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Badge variant="secondary" className="text-[10px] gap-1 justify-center py-2">
-            <Zap className="h-3 w-3" /> LP Locked Forever
-          </Badge>
-          <Badge variant="secondary" className="text-[10px] gap-1 justify-center py-2">
-            Fixed 1B Supply
-          </Badge>
-        </div>
+        {/* LP + supply disclosure — EVM bonding-curve launch only */}
+        {!isSolana && (
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Badge variant="secondary" className="text-[10px] gap-1 justify-center py-2">
+              <Zap className="h-3 w-3" /> LP Locked Forever
+            </Badge>
+            <Badge variant="secondary" className="text-[10px] gap-1 justify-center py-2">
+              Fixed 1B Supply
+            </Badge>
+          </div>
+        )}
       </div>
     </div>
   );
