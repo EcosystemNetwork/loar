@@ -12,6 +12,7 @@ import { createPublicClient, http } from 'viem';
 import { mainnet, sepolia } from 'viem/chains';
 import { db } from './firebase';
 import { isAdminAddress } from './trpc';
+import { isEvmAddress, normalizeUniverseId } from './universe-id';
 
 // ── Chain clients (shared with privateSection.access.ts pattern) ──────
 const sepoliaClient = createPublicClient({
@@ -63,8 +64,11 @@ export async function isUniverseAdmin(
   callerAddress: string,
   chainId?: number
 ): Promise<boolean> {
-  const id = universeId.toLowerCase();
-  const caller = callerAddress.toLowerCase();
+  // EVM ids/addresses are case-insensitive (compare lowercased); Solana
+  // base58 ids/addresses are case-sensitive (compare verbatim).
+  const id = normalizeUniverseId(universeId);
+  const evmCaller = isEvmAddress(callerAddress);
+  const caller = evmCaller ? callerAddress.toLowerCase() : callerAddress;
 
   // Platform-level admin override — addresses listed in ADMIN_ADDRESSES /
   // ADMIN_WALLET get edit access to every universe regardless of creator
@@ -76,7 +80,8 @@ export async function isUniverseAdmin(
   if (!doc.exists) return false;
 
   const data = doc.data()!;
-  const creator = (data.creator as string | undefined)?.toLowerCase();
+  const creatorRaw = data.creator as string | undefined;
+  const creator = evmCaller ? creatorRaw?.toLowerCase() : creatorRaw;
 
   // Fast path — single-owner universe
   if (creator === caller) return true;
@@ -142,9 +147,11 @@ export async function getSafeInfo(
  * Backwards-compatible helper — returns the raw creator/admin address.
  */
 export async function getUniverseAdminAddress(universeId: string): Promise<string | null> {
-  const doc = await universesCol().doc(universeId.toLowerCase()).get();
+  const doc = await universesCol().doc(normalizeUniverseId(universeId)).get();
   if (!doc.exists) return null;
-  return (doc.data()?.creator as string | undefined)?.toLowerCase() ?? null;
+  const creator = doc.data()?.creator as string | undefined;
+  if (!creator) return null;
+  return isEvmAddress(creator) ? creator.toLowerCase() : creator;
 }
 
 // Minimal Ownable ABI for on-chain cross-checks.
@@ -178,7 +185,7 @@ export async function isUniverseAdminStrict(
   const baseline = await isUniverseAdmin(universeId, callerAddress, chainId);
   if (!baseline) return false;
 
-  const doc = await universesCol().doc(universeId.toLowerCase()).get();
+  const doc = await universesCol().doc(normalizeUniverseId(universeId)).get();
   if (!doc.exists) return false;
   const data = doc.data()!;
   const contractAddress = data.contractAddress as string | undefined;
@@ -224,7 +231,8 @@ export async function isUniverseCollaborator(
   if (!callerAddress) return false;
   if (await isUniverseAdmin(universeId, callerAddress, chainId)) return true;
 
-  const docId = `${universeId.toLowerCase()}-${callerAddress.toLowerCase()}`;
+  const caller = isEvmAddress(callerAddress) ? callerAddress.toLowerCase() : callerAddress;
+  const docId = `${normalizeUniverseId(universeId)}-${caller}`;
   const teamDoc = await db.collection('universeTeamMembers').doc(docId).get();
   if (!teamDoc.exists) return false;
   return teamDoc.data()?.status === 'active';

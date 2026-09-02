@@ -244,11 +244,11 @@ export function UniverseProfileEditor({ open, onOpenChange, universe }: Props) {
               id="universe-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              maxLength={1000}
+              maxLength={4000}
               rows={5}
               placeholder="What's this universe about? Setting, vibe, tone…"
             />
-            <p className="text-xs text-muted-foreground text-right">{description.length}/1000</p>
+            <p className="text-xs text-muted-foreground text-right">{description.length}/4000</p>
           </div>
 
           {/* Visibility */}

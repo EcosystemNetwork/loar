@@ -18,6 +18,7 @@ import {
   deleteUniverse,
 } from './universes.handlers';
 import { isUniverseAdmin, isUniverseAdminStrict, getSafeInfo } from '../../lib/safe-admin';
+import { normalizeUniverseId } from '../../lib/universe-id';
 import { db } from '../../lib/firebase';
 import { generateNonce, consumeNonce } from '../../lib/siwe';
 import { getPlatformConfig } from '../../services/platformConfig';
@@ -559,11 +560,12 @@ export const universesRouter = router({
         name: z.string().min(1).max(200).optional(),
         imageUrl: z.string().url('Invalid image URL').optional(),
         portraitImageUrl: z.string().url('Invalid portrait image URL').optional().nullable(),
-        description: z.string().min(1).max(1000).optional(),
+        description: z.string().min(1).max(4000).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const universeId = input.universeId.toLowerCase();
+      // EVM ids are stored lowercased; Solana base58 PDAs are case-sensitive.
+      const universeId = normalizeUniverseId(input.universeId);
       if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
         throw new Error('Only the universe admin can update metadata');
       }
