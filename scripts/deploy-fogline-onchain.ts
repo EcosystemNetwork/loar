@@ -59,7 +59,10 @@ if (!UNIVERSE_MANAGER) throw new Error('UNIVERSE_MANAGER required');
 
 // ── Firebase Init ───────────────────────────────────────────────────────
 const saPathEnv = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
-const saPath = path.resolve(process.cwd(), saPathEnv ?? 'firebase-sa-key-20260416.json');
+const saPath = path.resolve(
+  process.cwd(),
+  saPathEnv ?? `${process.env.HOME}/.config/loar/loar-db-sa.json`
+);
 const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
   ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
   : JSON.parse(readFileSync(saPath, 'utf-8'));

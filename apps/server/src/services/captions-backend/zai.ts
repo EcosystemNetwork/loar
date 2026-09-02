@@ -11,7 +11,7 @@
  */
 import type { CaptionSegment } from '../../lib/captions-format';
 import type { CaptionBackend, CaptionBackendInput, CaptionBackendResult } from './types';
-import { validateUploadUrl } from '../../lib/url-validator';
+import { safeFetch } from '../../lib/url-validator';
 import { redactSecrets } from '../../lib/redact-secrets';
 
 const ZAI_ENDPOINT = 'https://api.z.ai/api/paas/v4/audio/transcriptions';
@@ -37,8 +37,8 @@ export const zaiGlmAsrBackend: CaptionBackend = {
     let audioBuf: ArrayBuffer;
     let mimeType: string;
     try {
-      await validateUploadUrl(input.audioUrl);
-      const audioRes = await fetch(input.audioUrl, { signal: AbortSignal.timeout(120_000) });
+      // safeFetch: SSRF validation + IP pinning (no DNS-rebinding window).
+      const audioRes = await safeFetch(input.audioUrl, { signal: AbortSignal.timeout(120_000) });
       if (!audioRes.ok) {
         return {
           status: 'failed',

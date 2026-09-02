@@ -23,6 +23,28 @@ export const txProxyRoutes = new Hono();
 
 const COOKIE_NAME = 'siwe-session';
 
+/**
+ * F8: optional per-selector allowlist. The contract allowlist gates *which
+ * contract* the signing oracle will call, but not *which function* — a raw
+ * `data` payload or an arbitrary `{abi,functionName}` can still invoke any
+ * method on an allowlisted contract (e.g. an admin function the caller's
+ * Circle wallet happens to be authorised for). When
+ * `TX_PROXY_ALLOWED_SELECTORS` is set (comma-separated 4-byte hex, e.g.
+ * "0xa9059cbb,0x095ea7b3") only those function selectors are executed.
+ * Unset ⇒ allow any selector (no behaviour change).
+ */
+const ALLOWED_SELECTORS = new Set(
+  (process.env.TX_PROXY_ALLOWED_SELECTORS ?? '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => /^0x[0-9a-f]{8}$/.test(s))
+);
+
+/** First 4 bytes of calldata as `0x` + 8 lowercase hex, or null if too short. */
+function selectorOf(calldata: string): string | null {
+  return /^0x[0-9a-fA-F]{8}/.test(calldata) ? calldata.slice(0, 10).toLowerCase() : null;
+}
+
 /** Resolve the Circle wallet for the authenticated user. */
 async function resolveWallet(
   address: string
@@ -168,6 +190,17 @@ txProxyRoutes.post('/write', async (c) => {
       });
     }
 
+    // F8: enforce the optional function-selector allowlist.
+    const selector = selectorOf(calldata);
+    if (ALLOWED_SELECTORS.size > 0 && (!selector || !ALLOWED_SELECTORS.has(selector))) {
+      return c.json(
+        {
+          error: `Function selector ${selector ?? '(none)'} is not permitted by this deployment`,
+        },
+        403
+      );
+    }
+
     // Execute via Circle
     const result = await executeTransaction({
       walletId: wallet.walletId,
@@ -199,6 +232,7 @@ txProxyRoutes.post('/write', async (c) => {
               contractAddress: body.address,
               chainId,
               functionName: body.functionName ?? null,
+              selector: selector ?? null,
               createdAt: new Date(),
             });
           ownershipRecorded = true;

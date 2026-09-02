@@ -19,7 +19,7 @@
  * decision (rescue vs refund) can be made with real numbers.
  *
  * Usage: pnpm tsx scripts/scan-credit-losses-from-storage-outage.ts
- * Env:   FIREBASE_SERVICE_ACCOUNT_PATH (default firebase-sa-key-20260416.json)
+ * Env:   FIREBASE_SERVICE_ACCOUNT_PATH (default ~/.config/loar/loar-db-sa.json)
  */
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
@@ -77,7 +77,8 @@ async function scanGenerationCollection(db: Firestore, name: string) {
 }
 
 async function main() {
-  const keyPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? 'firebase-sa-key-20260416.json';
+  const keyPath =
+    process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? `${process.env.HOME}/.config/loar/loar-db-sa.json`;
   assertProdSafe(keyPath);
 
   const sa = JSON.parse(fs.readFileSync(keyPath, 'utf-8'));

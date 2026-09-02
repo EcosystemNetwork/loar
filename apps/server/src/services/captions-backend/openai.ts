@@ -16,7 +16,7 @@
  */
 import type { CaptionSegment, CaptionWord } from '../../lib/captions-format';
 import type { CaptionBackend, CaptionBackendInput, CaptionBackendResult } from './types';
-import { validateUploadUrl } from '../../lib/url-validator';
+import { safeFetch } from '../../lib/url-validator';
 import { redactSecrets } from '../../lib/redact-secrets';
 
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/audio/transcriptions';
@@ -108,8 +108,8 @@ function buildBackend(spec: OpenAIModelSpec): CaptionBackend {
       let mimeType: string;
       try {
         // SSRF guard before server-side audio fetch.
-        await validateUploadUrl(input.audioUrl);
-        const audioRes = await fetch(input.audioUrl, { signal: AbortSignal.timeout(120_000) });
+        // safeFetch: SSRF validation + IP pinning (no DNS-rebinding window).
+        const audioRes = await safeFetch(input.audioUrl, { signal: AbortSignal.timeout(120_000) });
         if (!audioRes.ok) {
           return {
             status: 'failed',

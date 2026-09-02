@@ -44,7 +44,7 @@ const walletClient = createWalletClient({
 // ── Firebase ────────────────────────────────────────────────────────────
 const saPath = path.resolve(
   process.cwd(),
-  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? 'firebase-sa-key-20260416.json'
+  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? `${process.env.HOME}/.config/loar/loar-db-sa.json`
 );
 const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
   ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)

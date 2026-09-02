@@ -41,8 +41,8 @@ export async function downloadAndNormalizeClip(
   workDir: string,
   index: number
 ): Promise<string> {
-  const { validateUploadUrl } = await import('../../lib/url-validator');
-  await validateUploadUrl(spec.videoUrl);
+  // safeFetch: SSRF validation + IP pinning (no DNS-rebinding window).
+  const { safeFetch } = await import('../../lib/url-validator');
 
   const ext = spec.videoUrl.includes('.webm') ? 'webm' : 'mp4';
   const clipPath = join(workDir, `clip-${String(index).padStart(3, '0')}.${ext}`);
@@ -51,7 +51,7 @@ export async function downloadAndNormalizeClip(
   const timeout = setTimeout(() => controller.abort(), 60_000);
   let res: Response;
   try {
-    res = await fetch(spec.videoUrl, { signal: controller.signal, redirect: 'error' });
+    res = await safeFetch(spec.videoUrl, { signal: controller.signal, redirect: 'error' });
   } finally {
     clearTimeout(timeout);
   }
@@ -68,9 +68,8 @@ export async function downloadAndNormalizeClip(
   const args = ['-y', '-i', clipPath];
 
   if (spec.audioUrl) {
-    await validateUploadUrl(spec.audioUrl);
     const audioPath = join(workDir, `audio-${String(index).padStart(3, '0')}.mp3`);
-    const audioRes = await fetch(spec.audioUrl, { redirect: 'error' });
+    const audioRes = await safeFetch(spec.audioUrl, { redirect: 'error' });
     if (audioRes.ok) {
       await writeFile(audioPath, Buffer.from(await audioRes.arrayBuffer()));
       args.push('-i', audioPath);

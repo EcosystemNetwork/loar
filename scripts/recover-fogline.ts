@@ -69,7 +69,7 @@ async function pinFromUrl(url: string, filename: string): Promise<string | null>
 async function main() {
   console.log(`mode: ${APPLY ? 'APPLY' : 'DRY RUN'}`);
 
-  const sa = JSON.parse(readFileSync('firebase-sa-key-20260416.json', 'utf-8'));
+  const sa = JSON.parse(readFileSync(`${process.env.HOME}/.config/loar/loar-db-sa.json`, 'utf-8'));
   const app = getApps()[0] || initializeApp({ credential: cert(sa) });
   const db = getFirestore(app);
   db.settings({ preferRest: true });

@@ -58,7 +58,7 @@ function sleep(ms: number): Promise<void> {
 function initFirebase() {
   const saPath = path.resolve(
     process.cwd(),
-    process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? 'firebase-sa-key-20260416.json'
+    process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? `${process.env.HOME}/.config/loar/loar-db-sa.json`
   );
   let sa: any;
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {

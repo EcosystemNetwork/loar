@@ -18,6 +18,10 @@ on:
     - cron: '17 * * * *' # hourly, offset 17m to avoid round-hour stampede
   workflow_dispatch: {} # manual trigger from the Actions tab
 
+# Probe-only — curls a prod endpoint and fails on drift. No repo write needed.
+permissions:
+  contents: read
+
 jobs:
   reconcile:
     runs-on: ubuntu-latest

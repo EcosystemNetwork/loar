@@ -22,21 +22,29 @@ env:
       startsWith(github.base_ref, 'release/')
     }}
 
+# Least privilege default for every job. Jobs that need more (SARIF upload,
+# PR comments) re-declare their own block below — a job-level `permissions:`
+# fully replaces this default, so those blocks must also restate `contents: read`
+# where `actions/checkout` is used.
+permissions:
+  contents: read
+
 jobs:
   contracts-security:
     name: Contract Security (Slither)
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       security-events: write
     defaults:
       run:
         working-directory: apps/contracts
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: recursive
 
-      - uses: foundry-rs/foundry-toolchain@v1
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
 
       - name: Install Soldeer dependencies
         run: forge soldeer install
@@ -81,7 +89,7 @@ jobs:
           exit 0
 
       - name: Upload Slither SARIF to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
         if: always() && hashFiles('apps/contracts/results.sarif') != ''
         with:
           sarif_file: apps/contracts/results.sarif
@@ -89,7 +97,7 @@ jobs:
 
       - name: Upload Slither SARIF artifact
         if: always() && hashFiles('apps/contracts/results.sarif') != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: slither-sarif-${{ github.run_id }}
           path: apps/contracts/results.sarif
@@ -173,7 +181,7 @@ jobs:
 
       - name: Upload storage-layout artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: storage-layouts-${{ github.run_id }}
           path: apps/contracts/storage-layouts/
@@ -186,11 +194,11 @@ jobs:
       run:
         working-directory: apps/contracts
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: recursive
 
-      - uses: foundry-rs/foundry-toolchain@v1
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
 
       - name: Install Soldeer dependencies
         run: forge soldeer install
@@ -231,13 +239,13 @@ jobs:
     name: Dependency Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
           version: 9.15.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: pnpm
@@ -255,8 +263,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # gitleaks-action posts inline PR annotations (GITLEAKS_ENABLE_COMMENTS)
+      pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # Fetch full history so we scan every commit on the branch, not
           # just the tip. gitleaks --log-opts below limits the scope to the
@@ -264,7 +274,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Fail the job on any finding. Set to `false` only for a time-

@@ -926,7 +926,7 @@ function mix(v: string, dlg: string | undefined, sx: string, mu: string | undefi
 async function fetchVideos(): Promise<Record<number, string>> {
   const saPath = path.resolve(
     process.cwd(),
-    process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? 'firebase-sa-key-20260416.json'
+    process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? `${process.env.HOME}/.config/loar/loar-db-sa.json`
   );
   const sa = process.env.FIREBASE_SERVICE_ACCOUNT
     ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)

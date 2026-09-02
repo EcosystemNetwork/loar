@@ -16,7 +16,7 @@
  *   pnpm tsx scripts/fix-monerochan-dead-gateway-urls.ts             # apply
  *
  * Env:
- *   FIREBASE_SERVICE_ACCOUNT_PATH  (default: firebase-sa-key-20260416.json)
+ *   FIREBASE_SERVICE_ACCOUNT_PATH  (default: ~/.config/loar/loar-db-sa.json)
  */
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
@@ -49,7 +49,7 @@ interface Change {
 async function main() {
   const saPath = path.resolve(
     process.cwd(),
-    process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? 'firebase-sa-key-20260416.json'
+    process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? `${process.env.HOME}/.config/loar/loar-db-sa.json`
   );
   const sa = JSON.parse(fs.readFileSync(saPath, 'utf-8'));
   const app = initializeApp({ credential: cert(sa) }, `mc-gw-fix-${Date.now()}`);

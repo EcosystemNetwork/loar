@@ -25,7 +25,9 @@ async function main() {
   if (existing) {
     db = getFirestore(existing);
   } else {
-    const sa = JSON.parse(readFileSync('firebase-sa-key-20260416.json', 'utf-8'));
+    const sa = JSON.parse(
+      readFileSync(`${process.env.HOME}/.config/loar/loar-db-sa.json`, 'utf-8')
+    );
     const app = initializeApp({ credential: cert(sa) });
     db = getFirestore(app);
     db.settings({ preferRest: true });

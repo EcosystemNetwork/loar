@@ -31,6 +31,19 @@ apps/*/.next/
 .env.local
 .env.*.local
 
+# F1: real Firebase Admin keys must never be uploaded by `railway up`
+firebase-sa-key-*.json
+firebase-service-account.json
+# F1/F6: emulator dumps (user data) + one-off local script output dropped at repo root
+firebase-export-*/
+firebase-export-*
+rescued-media/
+repair-broken-urls-*.json
+dead-gcs-urls-report-*.json
+rescue-gcs-hero-clips-*.json
+credit-loss-scan-*.json
+*-report-*.json
+
 # OS junk
 .DS_Store
 Thumbs.db

@@ -13,7 +13,7 @@
  * Env:
  *   PINATA_JWT                       (required)
  *   PINATA_GATEWAY_URL               (optional)
- *   FIREBASE_SERVICE_ACCOUNT_PATH    (default: firebase-sa-key-20260416.json)
+ *   FIREBASE_SERVICE_ACCOUNT_PATH    (default: ~/.config/loar/loar-db-sa.json)
  *   INGEST_SOURCES                   CSV override (absolute or relative dirs)
  *   INGEST_CREATOR_UID               creatorUid for content docs (default: 'recovery')
  *   INGEST_CONCURRENCY               parallel uploads (default: 3)
@@ -429,7 +429,8 @@ async function main() {
   try {
     const saPath = path.resolve(
       process.cwd(),
-      process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? 'firebase-sa-key-20260416.json'
+      process.env.FIREBASE_SERVICE_ACCOUNT_PATH ??
+        `${process.env.HOME}/.config/loar/loar-db-sa.json`
     );
     const sa = process.env.FIREBASE_SERVICE_ACCOUNT
       ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)

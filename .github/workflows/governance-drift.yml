@@ -32,6 +32,11 @@ on:
         required: false
         type: string
 
+# Read-only check — reads chain state via RPC, uploads a log artifact. No
+# repo write credentials needed.
+permissions:
+  contents: read
+
 jobs:
   verify-governance:
     runs-on: ubuntu-latest
@@ -40,10 +45,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
         with:
           version: stable
 
@@ -119,7 +124,7 @@ jobs:
 
       - name: Upload verifier output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: verify-output
           path: apps/contracts/verify-output.txt

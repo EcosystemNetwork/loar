@@ -35,7 +35,7 @@ import { db } from '../../lib/firebase';
 import { elevenLabsService, type ElevenLabsVoiceModel } from '../../services/elevenlabs';
 import { firebaseStorageService } from '../../services/firebase-storage';
 import { trackQuests } from '../../services/quest-tracker';
-import { validateUploadUrl } from '../../lib/url-validator';
+import { validateUploadUrl, safeFetch } from '../../lib/url-validator';
 import { createAttachment } from '../media/media.handlers';
 import { assertVoiceUsageAllowed } from '../../lib/likeness-access';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
@@ -115,8 +115,10 @@ async function fetchWithTimeout(url: string, timeoutMs = FETCH_TIMEOUT_MS): Prom
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    // redirect: 'error' prevents post-validation 3xx bounce to internal metadata endpoints.
-    const res = await fetch(url, { signal: controller.signal, redirect: 'error' });
+    // safeFetch: SSRF validation + IP pinning through the TCP connect, so DNS
+    // cannot rebind to an internal address between the check and the request.
+    // `redirect: 'error'` still blocks a post-connect 3xx bounce.
+    const res = await safeFetch(url, { signal: controller.signal, redirect: 'error' });
     return res;
   } finally {
     clearTimeout(timer);

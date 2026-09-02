@@ -128,7 +128,8 @@ async function main() {
 
   const sa = JSON.parse(
     fs.readFileSync(
-      process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? 'firebase-sa-key-20260416.json',
+      process.env.FIREBASE_SERVICE_ACCOUNT_PATH ??
+        `${process.env.HOME}/.config/loar/loar-db-sa.json`,
       'utf-8'
     )
   );

@@ -171,10 +171,10 @@ export interface ImageEditOptions extends OpenAICallOptions {
 
 async function urlOrBytesToBlob(input: Uint8Array | string): Promise<Blob> {
   if (typeof input === 'string') {
-    // SSRF guard: never let a caller-supplied URL hit an internal IP / loopback.
-    const { validateUploadUrl } = await import('../lib/url-validator');
-    await validateUploadUrl(input);
-    const r = await fetch(input);
+    // SSRF guard: safeFetch validates the URL AND pins the resolved IP through
+    // the TCP connect, closing the DNS-rebinding window between check and fetch.
+    const { safeFetch } = await import('../lib/url-validator');
+    const r = await safeFetch(input);
     if (!r.ok) throw new Error(`Failed to fetch image source: ${r.status}`);
     return await r.blob();
   }
@@ -662,9 +662,9 @@ class OpenAIService {
    * accepts this id as `input_reference` for image-to-video.
    */
   async uploadImageReferenceForSora(opts: { apiKey: string; imageUrl: string }): Promise<string> {
-    const { validateUploadUrl } = await import('../lib/url-validator');
-    await validateUploadUrl(opts.imageUrl);
-    const fetched = await fetch(opts.imageUrl, { signal: AbortSignal.timeout(30_000) });
+    // safeFetch: SSRF validation + IP pinning (no DNS-rebinding window).
+    const { safeFetch } = await import('../lib/url-validator');
+    const fetched = await safeFetch(opts.imageUrl, { signal: AbortSignal.timeout(30_000) });
     if (!fetched.ok) {
       throw new Error(`Sora: failed to fetch reference image (${fetched.status})`);
     }

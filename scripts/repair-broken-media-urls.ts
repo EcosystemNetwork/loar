@@ -12,7 +12,7 @@
  *   pnpm tsx scripts/repair-broken-media-urls.ts
  *
  * Env:
- *   FIREBASE_SERVICE_ACCOUNT_PATH  (default: firebase-sa-key-20260416.json)
+ *   FIREBASE_SERVICE_ACCOUNT_PATH  (default: ~/.config/loar/loar-db-sa.json)
  *   DRY_RUN=1                      survey + classify only, no writes
  *   REPAIR_CONCURRENCY             parallel HEAD checks + updates (default 8)
  *
@@ -124,7 +124,7 @@ async function main() {
   const sa = JSON.parse(
     fs.readFileSync(
       process.env.FIREBASE_SERVICE_ACCOUNT_PATH ??
-        '/home/god/Desktop/LOAR/loar/firebase-sa-key-20260416.json',
+        `${process.env.HOME}/.config/loar/loar-db-sa.json`,
       'utf-8'
     )
   );

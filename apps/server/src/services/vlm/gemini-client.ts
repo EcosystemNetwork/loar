@@ -15,7 +15,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GoogleAIFileManager } from '@google/generative-ai/server';
 import type { z } from 'zod';
-import { validateUploadUrl } from '../../lib/url-validator';
+import { safeFetch } from '../../lib/url-validator';
 import type { CostSummary, VlmModel } from './types';
 import { recordProviderCost, assertProviderAllowed } from '../cost-tracker';
 
@@ -54,12 +54,12 @@ function stripFences(text: string): string {
 }
 
 async function downloadToBuffer(url: string): Promise<Buffer> {
-  await validateUploadUrl(url);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
   try {
-    // redirect: 'error' prevents post-validation 3xx bounce to internal metadata endpoints.
-    const res = await fetch(url, { signal: controller.signal, redirect: 'error' });
+    // safeFetch: SSRF validation + IP pinning. `redirect: 'error'` still blocks
+    // a post-connect 3xx bounce; pinning blocks the DNS-rebinding race.
+    const res = await safeFetch(url, { signal: controller.signal, redirect: 'error' });
     if (!res.ok) {
       throw new Error(`Failed to fetch media: ${res.status} ${res.statusText}`);
     }

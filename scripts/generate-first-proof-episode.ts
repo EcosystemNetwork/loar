@@ -27,7 +27,8 @@ import { rehostVideoToPinata, isEphemeralVideoUrl } from './lib/rehost-video';
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 // ── Firebase Init ───────────────────────────────────────────────────────
-const saPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? 'firebase-sa-key-20260416.json';
+const saPath =
+  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? `${process.env.HOME}/.config/loar/loar-db-sa.json`;
 let firebaseApp: any;
 try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {

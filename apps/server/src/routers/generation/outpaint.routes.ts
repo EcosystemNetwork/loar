@@ -134,9 +134,9 @@ function buildOutpaintPrompt(input: ExpandInput): string {
 // ── Source image fetch ────────────────────────────────────────────────
 
 async function fetchAsInlineImage(url: string): Promise<{ base64: string; mimeType: string }> {
-  const { validateUploadUrl } = await import('../../lib/url-validator');
-  await validateUploadUrl(url);
-  const response = await fetch(url, { redirect: 'error' });
+  // safeFetch: SSRF validation + IP pinning (no DNS-rebinding window).
+  const { safeFetch } = await import('../../lib/url-validator');
+  const response = await safeFetch(url, { redirect: 'error' });
   if (!response.ok) {
     throw new Error(`Failed to fetch source image (${response.status})`);
   }

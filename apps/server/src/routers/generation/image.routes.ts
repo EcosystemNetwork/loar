@@ -1425,11 +1425,11 @@ export const imageRouter = router({
           strength: c.strength,
         }));
 
-        const { validateUploadUrl } = await import('../../lib/url-validator');
+        // safeFetch: SSRF validation + IP pinning (no DNS-rebinding window).
+        const { safeFetch } = await import('../../lib/url-validator');
         const inputImages = await Promise.all(
           controls.map(async (c) => {
-            await validateUploadUrl(c.guideImageUrl);
-            const res = await fetch(c.guideImageUrl, { redirect: 'error' });
+            const res = await safeFetch(c.guideImageUrl, { redirect: 'error' });
             if (!res.ok) {
               throw new Error(`Failed to fetch guide image: ${res.status} ${res.statusText}`);
             }

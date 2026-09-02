@@ -76,6 +76,30 @@ class RedisStore implements RateLimitStore {
   /** In-memory fallback used when Redis is unavailable (fail-closed, not fail-open) */
   private memoryFallback = new MemoryStore();
 
+  /**
+   * F9: INCR the window counter and set its expiry in the SAME atomic step.
+   * The old `MULTI incr/ttl` + follow-up `EXPIRE` had a gap: a crash (or a
+   * transient error) between the two left `rl:<key>` with no TTL, so once its
+   * counter passed `max` that key blocked the client forever (the Redis store
+   * has no stale-key sweep, unlike MemoryStore).
+   *
+   * The script also re-arms expiry if the key is somehow found without one
+   * (PTTL < 0 covers both "-1 no expiry" and the "-2 vanished" race), so a
+   * pre-existing wedged key self-heals on its next hit.
+   *
+   * Returns the post-increment counter value.
+   */
+  private static readonly CONSUME_LUA = `
+local c = redis.call('INCR', KEYS[1])
+if c == 1 then
+  redis.call('PEXPIRE', KEYS[1], ARGV[1])
+else
+  local t = redis.call('PTTL', KEYS[1])
+  if t < 0 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end
+end
+return c
+`;
+
   constructor() {
     // Client is managed by the shared redis.ts module
   }
@@ -92,18 +116,13 @@ class RedisStore implements RateLimitStore {
 
     try {
       const redisKey = `rl:${key}`;
-      const windowSec = Math.ceil(windowMs / 1000);
 
-      // Atomic increment + TTL via MULTI
-      const results = await client.multi().incr(redisKey).ttl(redisKey).exec();
-
-      const count = results[0][1] as number;
-      const ttl = results[1][1] as number;
-
-      // Set expiry on first request in window
-      if (ttl === -1) {
-        await client.expire(redisKey, windowSec);
-      }
+      const count = (await client.eval(
+        RedisStore.CONSUME_LUA,
+        1,
+        redisKey,
+        String(windowMs)
+      )) as number;
 
       if (count > max) {
         return { remaining: 0, blocked: true };

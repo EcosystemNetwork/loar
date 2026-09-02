@@ -42,6 +42,16 @@ credit-loss-scan-*.json
 *.rdb
 dump.rdb
 
+# Firestore emulator data exports — local dev DB state, may contain user data
+firebase-export-*/
+firebase-export-*
+
+# One-off script scratch output (see F6). Point new scripts here, not repo root.
+scripts/.out/
+
+# Local security-audit tooling output (cso skill / superstack)
+.superstack/
+
 # Firebase emulator debug logs
 firestore-debug.log
 firebase-debug.log

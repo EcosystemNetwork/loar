@@ -25,7 +25,7 @@
  *   pnpm tsx scripts/fix-hero-video-403s.ts
  *
  * Env:
- *   FIREBASE_SERVICE_ACCOUNT_PATH   (default: firebase-sa-key-20260416.json)
+ *   FIREBASE_SERVICE_ACCOUNT_PATH   (default: ~/.config/loar/loar-db-sa.json)
  *   FIREBASE_STORAGE_BUCKET         (default: <project_id from SA key>.firebasestorage.app)
  *   FIREBASE_STORAGE_TOKEN_SECRET / SIWE_JWT_SECRET   HMAC secret for the download token
  *     — must match what the running server uses, or generated links won't verify.
@@ -66,8 +66,7 @@ function extractKey(url: string, bucketName: string): string | null {
 
 async function main() {
   const saPath =
-    process.env.FIREBASE_SERVICE_ACCOUNT_PATH ??
-    '/home/god/Desktop/LOAR/loar/firebase-sa-key-20260416.json';
+    process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? `${process.env.HOME}/.config/loar/loar-db-sa.json`;
   const sa = JSON.parse(fs.readFileSync(saPath, 'utf-8'));
   const bucketName = process.env.FIREBASE_STORAGE_BUCKET || `${sa.project_id}.firebasestorage.app`;
 

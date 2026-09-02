@@ -17,7 +17,7 @@ const CREATOR = '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266';
 async function main() {
   const saPath = path.resolve(
     process.cwd(),
-    process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? 'firebase-sa-key-20260416.json'
+    process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? `${process.env.HOME}/.config/loar/loar-db-sa.json`
   );
   const sa = process.env.FIREBASE_SERVICE_ACCOUNT
     ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)

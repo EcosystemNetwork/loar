@@ -606,8 +606,16 @@ app.post('/api/upload', async (c) => {
 // saves a file instead of navigating to it (remote hosts don't reliably set
 // this themselves, and the `download` attribute is ignored cross-origin).
 // Works for any clip URL — generated, merged, or imported — and for an
-// episode's final `exportUrl`. SSRF-validated like every other server-side
-// fetch of a user-supplied URL in this codebase (see url-validator.ts).
+// episode's final `exportUrl`.
+//
+// SRV/F3: this route streams the fetched bytes straight back to the caller, so
+// an unauthenticated + unbounded `url` param is an open forward proxy (traffic
+// laundering through the server IP) and — via a DNS-rebinding race — an
+// internal-network probe. Hardening:
+//   1. Require a valid session (same bar as every other authed route).
+//   2. Only proxy hosts LOAR actually serves media from (isAllowedMediaHost).
+//   3. Fetch via safeFetch(), which pins the validated IP through the TCP
+//      connect so DNS cannot rebind between the check and the request (F2).
 app.use('/api/clips/download', rateLimiter({ windowMs: 60_000, max: 30, name: 'clips-download' }));
 app.get('/api/clips/download', async (c) => {
   const url = c.req.query('url');
@@ -616,18 +624,24 @@ app.get('/api/clips/download', async (c) => {
     return c.json({ code: 'BAD_REQUEST', message: 'Missing url' }, 400);
   }
 
-  try {
-    const { validateUploadUrl } = await import('./lib/url-validator');
-    const validated = await validateUploadUrl(url);
+  const { getCookie } = await import('hono/cookie');
+  const authedUser = await verifyAuth(c.req.raw.headers, getCookie(c, 'siwe-session'));
+  if (!authedUser) {
+    return c.json({ code: 'UNAUTHORIZED', message: 'Authentication required' }, 401);
+  }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30_000);
-    let upstream: Response;
-    try {
-      upstream = await fetch(url, { signal: controller.signal, redirect: 'error' });
-    } finally {
-      clearTimeout(timeout);
-    }
+  const { isAllowedMediaHost } = await import('./lib/media-hosts');
+  if (!isAllowedMediaHost(url)) {
+    return c.json({ code: 'FORBIDDEN', message: 'URL host is not an allowed media host' }, 403);
+  }
+
+  try {
+    const { safeFetch } = await import('./lib/url-validator');
+
+    const upstream = await safeFetch(url, {
+      signal: AbortSignal.timeout(30_000),
+      redirect: 'error',
+    });
     if (!upstream.ok || !upstream.body) {
       return c.json(
         { code: 'BAD_GATEWAY', message: `Upstream fetch failed: HTTP ${upstream.status}` },
@@ -635,7 +649,13 @@ app.get('/api/clips/download', async (c) => {
       );
     }
 
-    const rawName = filenameParam || validated.pathname.split('/').pop() || 'clip.mp4';
+    let pathname = '';
+    try {
+      pathname = new URL(url).pathname;
+    } catch {
+      /* host already validated above; ignore */
+    }
+    const rawName = filenameParam || pathname.split('/').pop() || 'clip.mp4';
     const safeName = sanitizeUploadFilename(rawName);
     const contentLength = upstream.headers.get('content-length');
 

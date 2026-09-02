@@ -137,6 +137,18 @@ function installOtpStore() {
     };
   });
 
+  // verifyOTP now runs its read→check→increment inside db.runTransaction (F7).
+  // Delegate the tx ops to whatever doc mock the caller resolved so the
+  // stateful otpStore above still drives the assertions.
+  (db as any).runTransaction = vi.fn().mockImplementation(async (fn: any) =>
+    fn({
+      get: (ref: any) => ref.get(),
+      set: (ref: any, data: any) => ref.set(data),
+      update: (ref: any, data: any) => ref.update(data),
+      delete: (ref: any) => ref.delete(),
+    })
+  );
+
   return { otpStore, issuanceLog, userAccountDocs };
 }
 

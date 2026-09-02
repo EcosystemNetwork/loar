@@ -74,14 +74,15 @@ export class SynapseService {
     return pieceCidString;
   }
   async uploadFromUrl(input: string): Promise<string> {
-    const { validateUploadUrl } = await import('../lib/url-validator');
-    await validateUploadUrl(input);
+    // safeFetch validates + pins the resolved IP through the TCP connect, so
+    // DNS cannot rebind to an internal address between the check and the fetch.
+    const { safeFetch } = await import('../lib/url-validator');
 
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-      const response = await fetch(input, {
+      const response = await safeFetch(input, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; FilecoinUploader/1.0)',
         },

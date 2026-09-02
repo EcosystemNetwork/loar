@@ -38,7 +38,7 @@ const PLATFORM_CREATOR = '0x80baf7fffc430cdaced4f1d673f4138d6d493077';
 function initDb() {
   const existing = getApps()[0];
   if (existing) return getFirestore(existing);
-  const sa = JSON.parse(readFileSync('firebase-sa-key-20260416.json', 'utf-8'));
+  const sa = JSON.parse(readFileSync(`${process.env.HOME}/.config/loar/loar-db-sa.json`, 'utf-8'));
   const app = initializeApp({ credential: cert(sa) });
   const db = getFirestore(app);
   db.settings({ preferRest: true });

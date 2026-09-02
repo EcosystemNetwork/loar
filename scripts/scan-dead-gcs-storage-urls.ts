@@ -23,7 +23,7 @@
  *   pnpm tsx scripts/scan-dead-gcs-storage-urls.ts --verify     # also HEAD-check each hit
  *
  * Env:
- *   FIREBASE_SERVICE_ACCOUNT_PATH   service account key (default: firebase-sa-key-20260416.json)
+ *   FIREBASE_SERVICE_ACCOUNT_PATH   service account key (default: ~/.config/loar/loar-db-sa.json)
  *   SCAN_CONCURRENCY                parallel HEAD checks when --verify is passed (default 8)
  *
  * Safety: refuses to run if FIRESTORE_EMULATOR_HOST is set, or if the
@@ -111,7 +111,8 @@ function assertProdSafe(keyPath: string) {
 }
 
 async function main() {
-  const keyPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? 'firebase-sa-key-20260416.json';
+  const keyPath =
+    process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? `${process.env.HOME}/.config/loar/loar-db-sa.json`;
   assertProdSafe(keyPath);
 
   const sa = JSON.parse(fs.readFileSync(keyPath, 'utf-8'));

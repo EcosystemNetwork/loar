@@ -160,29 +160,35 @@ async function verifyOTP(email: string, code: string): Promise<boolean> {
 
   if (firebaseAvailable) {
     const ref = db.collection('authOTPs').doc(normalizedEmail);
-    const doc = await ref.get();
-    if (!doc.exists) return false;
+    // F7: read → check → increment must be atomic. The previous get()+update()
+    // let concurrent verify requests each observe the same `attempts` value and
+    // all slip past the `>= 5` gate, diluting the per-OTP brute-force cap.
+    // Running it in a transaction serialises those attempts.
+    return db.runTransaction<boolean>(async (tx) => {
+      const doc = await tx.get(ref);
+      if (!doc.exists) return false;
 
-    const data = doc.data()!;
-    if (data.attempts >= 5) {
-      await ref.delete();
-      return false;
-    }
-    if (new Date() > data.expiresAt.toDate()) {
-      await ref.delete();
-      return false;
-    }
-    // Legacy plaintext migration: if an old doc still has `code`, compare
-    // against it once so active OTPs survive the deploy. Safe to remove after
-    // 5 min (OTP TTL) post-deploy.
-    const stored: string | undefined = data.hash ?? data.code;
-    if (!stored || !constantTimeEqual(stored, data.hash ? candidate : code)) {
-      await ref.update({ attempts: data.attempts + 1 });
-      return false;
-    }
+      const data = doc.data()!;
+      if (data.attempts >= 5) {
+        tx.delete(ref);
+        return false;
+      }
+      if (new Date() > data.expiresAt.toDate()) {
+        tx.delete(ref);
+        return false;
+      }
+      // Legacy plaintext migration: if an old doc still has `code`, compare
+      // against it once so active OTPs survive the deploy. Safe to remove after
+      // 5 min (OTP TTL) post-deploy.
+      const stored: string | undefined = data.hash ?? data.code;
+      if (!stored || !constantTimeEqual(stored, data.hash ? candidate : code)) {
+        tx.update(ref, { attempts: (data.attempts ?? 0) + 1 });
+        return false;
+      }
 
-    await ref.delete();
-    return true;
+      tx.delete(ref);
+      return true;
+    });
   }
 
   const entry = memOtps.get(normalizedEmail);

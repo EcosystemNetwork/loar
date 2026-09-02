@@ -333,7 +333,10 @@ async function main() {
 
   // ── Init Firebase ──────────────────────────────────────────────────
   const saPathEnv = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
-  const saPath = path.resolve(process.cwd(), saPathEnv ?? 'firebase-sa-key-20260416.json');
+  const saPath = path.resolve(
+    process.cwd(),
+    saPathEnv ?? `${process.env.HOME}/.config/loar/loar-db-sa.json`
+  );
   let serviceAccount: any;
 
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {

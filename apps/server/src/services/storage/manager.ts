@@ -7,7 +7,7 @@ import type {
   UploadTrace,
 } from './types';
 import { computeSha256, fetchToBuffer, getMimeType } from './types';
-import { validateUploadUrl } from '../../lib/url-validator';
+import { safeFetch } from '../../lib/url-validator';
 import { PinataProvider } from './ipfs';
 import { LighthouseProvider } from './lighthouse';
 import { FirebaseAdapter } from './firebase-adapter';
@@ -69,12 +69,15 @@ function buildProviders(): StorageProvider[] {
  */
 async function headVerify(url: string): Promise<boolean> {
   try {
-    // SSRF protection — reject private/internal addresses before making the request
-    await validateUploadUrl(url);
-
+    // safeFetch: SSRF validation + IP pinning (rejects private/internal
+    // addresses AND pins the resolved IP so DNS can't rebind before connect).
     const controller = new AbortController();
     const tid = setTimeout(() => controller.abort(), VERIFY_TIMEOUT_MS);
-    const res = await fetch(url, { method: 'HEAD', signal: controller.signal, redirect: 'error' });
+    const res = await safeFetch(url, {
+      method: 'HEAD',
+      signal: controller.signal,
+      redirect: 'error',
+    });
     clearTimeout(tid);
     return res.status >= 200 && res.status < 400;
   } catch {

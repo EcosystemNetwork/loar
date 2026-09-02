@@ -24,7 +24,7 @@
  *   DRY_RUN=1 pnpm tsx scripts/rescue-dead-gcs-hero-clips.ts   # probe + pin, no Firestore writes
  *   pnpm tsx scripts/rescue-dead-gcs-hero-clips.ts             # live: download, pin, update Firestore
  *
- * Env: FIREBASE_SERVICE_ACCOUNT_PATH (default firebase-sa-key-20260416.json),
+ * Env: FIREBASE_SERVICE_ACCOUNT_PATH (default ~/.config/loar/loar-db-sa.json),
  *      PINATA_JWT, PINATA_GATEWAY_URL (optional, defaults to public gateway)
  */
 import { initializeApp, cert } from 'firebase-admin/app';
@@ -126,7 +126,8 @@ async function pinBufferToPinata(
 }
 
 async function main() {
-  const keyPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? 'firebase-sa-key-20260416.json';
+  const keyPath =
+    process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? `${process.env.HOME}/.config/loar/loar-db-sa.json`;
   assertProdSafe(keyPath);
 
   const sa = JSON.parse(fs.readFileSync(keyPath, 'utf-8'));

@@ -122,7 +122,7 @@ function initDb(): Firestore {
   // key has no production access — the checked-in `local-emulator` key does not.
   const saPath = path.resolve(
     process.cwd(),
-    process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? 'firebase-sa-key-20260416.json'
+    process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? `${process.env.HOME}/.config/loar/loar-db-sa.json`
   );
   let credential;
   try {

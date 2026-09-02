@@ -20,6 +20,17 @@ README.md
 .env.test.local
 .env.production.local
 firebase-service-account.json
+# F1: match .gitignore's glob exactly — real Admin keys must never enter a build context
+firebase-sa-key-*.json
+# F1/F6: local Firestore emulator dumps (contain user data) + one-off script output
+firebase-export-*/
+firebase-export-*
+rescued-media/
+repair-broken-urls-*.json
+dead-gcs-urls-report-*.json
+rescue-gcs-hero-clips-*.json
+credit-loss-scan-*.json
+*-report-*.json
 .claude/
 .gitnexus/
 docs/

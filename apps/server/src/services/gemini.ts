@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GoogleAIFileManager } from '@google/generative-ai/server';
-import { validateUploadUrl } from '../lib/url-validator';
+import { safeFetch } from '../lib/url-validator';
 import { redactSecrets } from '../lib/redact-secrets';
 import { recordProviderCost, assertProviderAllowed } from './cost-tracker';
 import { routeLlmModel, dispatchLlmWithFallback } from './llm-models';
@@ -206,21 +206,12 @@ Generate a JSON response:
 Output valid JSON only. Be precise and factual.`;
 
   try {
-    // SSRF validation before downloading external URL
-    await validateUploadUrl(videoUrl);
-    // Download video to buffer first (required for uploadFile)
+    // safeFetch: SSRF validation + IP pinning (no DNS-rebinding window).
     console.log(`📤 Downloading video: ${videoUrl}`);
-    const videoController = new AbortController();
-    const videoTimeoutId = setTimeout(() => videoController.abort(), 60_000);
-    let videoResponse: Response;
-    try {
-      videoResponse = await fetch(videoUrl, {
-        signal: videoController.signal,
-        redirect: 'error',
-      });
-    } finally {
-      clearTimeout(videoTimeoutId);
-    }
+    const videoResponse = await safeFetch(videoUrl, {
+      signal: AbortSignal.timeout(60_000),
+      redirect: 'error',
+    });
     if (!videoResponse.ok) {
       throw new Error(`Failed to download video: ${videoResponse.statusText}`);
     }
@@ -386,21 +377,12 @@ CRITICAL RULES:
 Generate a detailed visual description in plain text (no JSON, no formatting).`;
 
   try {
-    // SSRF validation before downloading external URL
-    await validateUploadUrl(imageUrl);
-    // Download image with timeout
-    const imgController = new AbortController();
-    const imgTimeoutId = setTimeout(() => imgController.abort(), 60_000);
-    let imageBase64: string;
-    try {
-      const imgResponse = await fetch(imageUrl, {
-        signal: imgController.signal,
-        redirect: 'error',
-      });
-      imageBase64 = Buffer.from(await imgResponse.arrayBuffer()).toString('base64');
-    } finally {
-      clearTimeout(imgTimeoutId);
-    }
+    // safeFetch: SSRF validation + IP pinning (no DNS-rebinding window).
+    const imgResponse = await safeFetch(imageUrl, {
+      signal: AbortSignal.timeout(60_000),
+      redirect: 'error',
+    });
+    const imageBase64 = Buffer.from(await imgResponse.arrayBuffer()).toString('base64');
     // Generate content with image
     const result = await model.generateContent([
       {
@@ -831,9 +813,8 @@ export async function geminiChat(opts: GeminiChatOptions): Promise<GeminiChatRes
     for (const p of m.content) {
       if (p.type === 'text' && p.text) parts.push({ text: p.text });
       if (p.type === 'image_url' && p.imageUrl) {
-        // SSRF guard: reject internal/private/blocked hosts before fetching.
-        await validateUploadUrl(p.imageUrl);
-        const fetched = await fetch(p.imageUrl, { signal: AbortSignal.timeout(20_000) });
+        // safeFetch: SSRF validation + IP pinning (no DNS-rebinding window).
+        const fetched = await safeFetch(p.imageUrl, { signal: AbortSignal.timeout(20_000) });
         if (!fetched.ok) throw new Error(`Failed to fetch image: ${fetched.status}`);
         const mime = fetched.headers.get('content-type') ?? 'image/png';
         const buf = Buffer.from(await fetched.arrayBuffer());
@@ -961,9 +942,8 @@ async function veoCreate(opts: VeoGenerateOptions): Promise<VeoTask> {
     if (opts.imageUrl.startsWith('gs://')) {
       instance.image = { gcsUri: opts.imageUrl };
     } else {
-      // SSRF guard: validate before server-side fetch.
-      await validateUploadUrl(opts.imageUrl);
-      const fetched = await fetch(opts.imageUrl, { signal: AbortSignal.timeout(30_000) });
+      // safeFetch: SSRF validation + IP pinning (no DNS-rebinding window).
+      const fetched = await safeFetch(opts.imageUrl, { signal: AbortSignal.timeout(30_000) });
       if (!fetched.ok) {
         throw new Error(`Veo: failed to fetch source image (${fetched.status})`);
       }
@@ -1209,17 +1189,11 @@ export interface AdDecomposition {
 
 export async function decomposeAdVideo(videoUrl: string): Promise<AdDecomposition> {
   await ensureGeminiAllowed();
-  await validateUploadUrl(videoUrl);
-
-  // Download video bytes — same pattern as generateWikiFromVideo above.
-  const ctl = new AbortController();
-  const tid = setTimeout(() => ctl.abort(), 60_000);
-  let videoResponse: Response;
-  try {
-    videoResponse = await fetch(videoUrl, { signal: ctl.signal, redirect: 'error' });
-  } finally {
-    clearTimeout(tid);
-  }
+  // safeFetch: SSRF validation + IP pinning (no DNS-rebinding window).
+  const videoResponse = await safeFetch(videoUrl, {
+    signal: AbortSignal.timeout(60_000),
+    redirect: 'error',
+  });
   if (!videoResponse.ok) {
     throw new Error(`Failed to download reference video: ${videoResponse.statusText}`);
   }
