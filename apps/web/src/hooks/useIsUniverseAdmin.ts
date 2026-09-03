@@ -37,7 +37,10 @@ export interface UniverseAdminInfo {
   isError: boolean;
 }
 
-export function useIsUniverseAdmin(universeAddress: `0x${string}` | undefined): UniverseAdminInfo {
+export function useIsUniverseAdmin(
+  // EVM `0x…` address or Solana base58 PDA.
+  universeAddress: string | undefined
+): UniverseAdminInfo {
   const { address: connectedAddress } = useAccount();
 
   const { data, isLoading, isError } = useQuery(

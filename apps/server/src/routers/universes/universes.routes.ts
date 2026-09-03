@@ -18,7 +18,7 @@ import {
   deleteUniverse,
 } from './universes.handlers';
 import { isUniverseAdmin, isUniverseAdminStrict, getSafeInfo } from '../../lib/safe-admin';
-import { normalizeUniverseId } from '../../lib/universe-id';
+import { isEvmAddress, normalizeUniverseId } from '../../lib/universe-id';
 import { db } from '../../lib/firebase';
 import { generateNonce, consumeNonce } from '../../lib/siwe';
 import { getPlatformConfig } from '../../services/platformConfig';
@@ -429,13 +429,15 @@ export const universesRouter = router({
         universeId: z.string(),
         address: z
           .string()
-          .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid address')
+          .regex(/^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/, 'Invalid address')
           .optional(),
       })
     )
     .query(async ({ input }) => {
-      const id = input.universeId.toLowerCase();
-      const caller = input.address?.toLowerCase();
+      // EVM ids/addresses are case-insensitive; Solana base58 ones are not.
+      const id = normalizeUniverseId(input.universeId);
+      const evmCaller = !!input.address && isEvmAddress(input.address);
+      const caller = evmCaller ? input.address!.toLowerCase() : input.address;
 
       const doc = await db.collection('cinematicUniverses').doc(id).get();
       if (!doc.exists) {
@@ -450,7 +452,10 @@ export const universesRouter = router({
       }
 
       const data = doc.data()!;
-      const creator = (data.creator as string | undefined)?.toLowerCase();
+      const creatorRaw = data.creator as string | undefined;
+      // Match the caller's casing convention: lowercase for EVM, verbatim for
+      // a base58 Solana creator.
+      const creator = evmCaller ? creatorRaw?.toLowerCase() : creatorRaw;
       const chainId = data.chainId as number | undefined;
 
       if (data.isMultiSig && data.multiSigAddress) {
@@ -566,7 +571,11 @@ export const universesRouter = router({
     .mutation(async ({ input, ctx }) => {
       // EVM ids are stored lowercased; Solana base58 PDAs are case-sensitive.
       const universeId = normalizeUniverseId(input.universeId);
-      if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
+      // `ctx.user.uid` is the lowercased subject — fine for EVM (creator is
+      // stored lowercased) but lossy for a base58 Solana wallet. Prefer the
+      // verbatim address so the Solana creator check can match.
+      const caller = ctx.user.address ?? ctx.user.uid;
+      if (!(await isUniverseAdmin(universeId, caller))) {
         throw new Error('Only the universe admin can update metadata');
       }
 
