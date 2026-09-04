@@ -32,6 +32,7 @@ import {
   BookOpen,
   Zap,
   Eye,
+  Box,
 } from 'lucide-react';
 import { LoarIcon } from '@/components/loar-icons';
 import { GettingStartedPopup } from '@/components/GettingStartedBanner';
@@ -1029,6 +1030,13 @@ export function CommunityCreations() {
 
 export function ContentCard({ item }: { item: any }) {
   const isVideo = item.mediaType === 'ai-video' || item.mediaType === 'video';
+  // 3D content has no image-decodable `mediaUrl` (it's a .glb/.fbx binary) —
+  // only ever render `thumbnailUrl` (Meshy's rendered preview) as an <img>.
+  // See components/gallery/ContentCard.tsx's `is3D` branch for the pattern
+  // this mirrors; falling back to `mediaUrl` here fed a GLB URL straight into
+  // SmartImage, which always failed to load and showed "Couldn't load image"
+  // for every 3D item that had no thumbnail.
+  const is3D = item.mediaType === '3d';
 
   return (
     <Link
@@ -1037,7 +1045,21 @@ export function ContentCard({ item }: { item: any }) {
       className="group flex-shrink-0 w-[180px] md:w-[200px]"
     >
       <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-xl group-hover:shadow-primary/20">
-        {item.thumbnailUrl || item.mediaUrl ? (
+        {is3D ? (
+          item.thumbnailUrl ? (
+            <SmartImage
+              src={item.thumbnailUrl}
+              alt=""
+              sizes="(max-width: 768px) 50vw, 320px"
+              className="w-full h-full"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/15 to-rose-500/15" />
+              <Box className="relative h-10 w-10 text-amber-200/70" />
+            </div>
+          )
+        ) : item.thumbnailUrl || item.mediaUrl ? (
           isVideo && item.mediaUrl ? (
             <HomeEpisodeVideo videoUrl={item.mediaUrl} thumbnailUrl={item.thumbnailUrl} />
           ) : (
