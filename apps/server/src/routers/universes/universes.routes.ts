@@ -6,7 +6,13 @@
  */
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { publicProcedure, protectedProcedure, adminProcedure, router } from '../../lib/trpc';
+import {
+  publicProcedure,
+  protectedProcedure,
+  adminProcedure,
+  router,
+  isAdminAddress,
+} from '../../lib/trpc';
 import {
   createUniverse,
   getUniverse,
@@ -438,6 +444,10 @@ export const universesRouter = router({
       const id = normalizeUniverseId(input.universeId);
       const evmCaller = !!input.address && isEvmAddress(input.address);
       const caller = evmCaller ? input.address!.toLowerCase() : input.address;
+      // Platform admins (ADMIN_ADDRESSES / ADMIN_WALLET) can edit any
+      // universe — mirror the override in `isUniverseAdmin` so the profile
+      // editor's owner gate opens for them too.
+      const isPlatformAdmin = isAdminAddress(caller);
 
       const doc = await db.collection('cinematicUniverses').doc(id).get();
       if (!doc.exists) {
@@ -463,7 +473,8 @@ export const universesRouter = router({
         const safeInfo = await getSafeInfo(safeAddress, chainId);
         const owners = safeInfo?.owners ?? [];
         const threshold = safeInfo?.threshold ?? 0;
-        const isAdmin = !!caller && (caller === creator || owners.includes(caller));
+        const isAdmin =
+          isPlatformAdmin || (!!caller && (caller === creator || owners.includes(caller)));
         return {
           isAdmin,
           isSafe: true,
@@ -475,7 +486,7 @@ export const universesRouter = router({
       }
 
       return {
-        isAdmin: !!caller && caller === creator,
+        isAdmin: isPlatformAdmin || (!!caller && caller === creator),
         isSafe: false,
         adminAddress: creator,
         safeAddress: undefined as string | undefined,
