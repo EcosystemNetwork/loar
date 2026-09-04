@@ -9,7 +9,7 @@
  * and toggle auto-rotate without leaving the page.
  */
 import '@google/model-viewer';
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { Loader2, Maximize2, Minimize2, Play, Pause, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,6 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { getIpfsUrlCandidatesPreferred, raceIpfsGateways } from '@/utils/ipfs-url';
+
+// GLB loads can hang indefinitely against a rate-limited/offline gateway: a
+// 429/504 doesn't always surface as a clean `error` event on <model-viewer>
+// (the browser sometimes just stalls the request), so `error` alone leaves
+// the viewer spinning forever with no recovery — same failure mode
+// MediaLightbox already guards against for video/audio. Race the stall timer
+// against a real `load` event and advance to the next gateway either way.
+const STALL_MS = 10000;
 
 interface ModelViewerProps {
   /** URL to the GLB/GLTF model */
@@ -54,10 +63,49 @@ export function ModelViewer({
   const [autoRotate, setAutoRotate] = useState(true);
   const [exposure, setExposure] = useState(1);
 
+  // Same gateway fallback chain SmartImage/MediaLightbox already use for
+  // images and video — `src` here can be a raw ipfs:// URL or an
+  // already-resolved gateway URL either way, extractIpfsPath() recognizes both.
+  const srcCandidates = useMemo(() => getIpfsUrlCandidatesPreferred(src), [src]);
+  const [orderedCandidates, setOrderedCandidates] = useState<string[]>(srcCandidates);
+  const [candidateIndex, setCandidateIndex] = useState(0);
+
+  useEffect(() => {
+    setCandidateIndex(0);
+    setOrderedCandidates(srcCandidates);
+    if (srcCandidates.length <= 1) return;
+
+    let cancelled = false;
+    const controller = new AbortController();
+    raceIpfsGateways(src, { signal: controller.signal, timeoutMs: 2500 })
+      .then((best) => {
+        if (cancelled || !best) return;
+        setOrderedCandidates((prev) => [best, ...prev.filter((c) => c !== best)]);
+      })
+      .catch(() => {
+        /* race failed — orderedCandidates still has the sync fallback chain */
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+    // `srcCandidates` is a derived memo keyed on `src`; keying this effect on
+    // `src` avoids re-racing on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src]);
+
+  const resolvedSrc = orderedCandidates[candidateIndex] || src;
+
+  const handleLoadError = useCallback(() => {
+    setCandidateIndex((i) => (i + 1 < orderedCandidates.length ? i + 1 : i));
+  }, [orderedCandidates]);
+
   useEffect(() => {
     if (!viewerRef.current) return;
+    setLoading(true);
     const el = document.createElement('model-viewer') as any;
-    el.setAttribute('src', src);
+    el.setAttribute('src', resolvedSrc);
     if (poster) el.setAttribute('poster', poster);
     el.setAttribute('alt', alt);
     el.setAttribute('camera-controls', '');
@@ -73,6 +121,7 @@ export function ModelViewer({
     el.style.minHeight = '300px';
 
     el.addEventListener('load', () => {
+      clearTimeout(stallTimer);
       setLoading(false);
       // availableAnimations is populated after the GLB is parsed. Empty array
       // for static meshes — the controls hide themselves in that case.
@@ -90,19 +139,27 @@ export function ModelViewer({
         }
       }
     });
+    // A rate-limited/offline gateway (429/504) fires this reliably when the
+    // browser does surface it — advance to the next candidate rather than
+    // leaving the viewer stuck on a dead gateway.
+    el.addEventListener('error', handleLoadError);
 
     viewerRef.current.innerHTML = '';
     viewerRef.current.appendChild(el);
     modelElRef.current = el;
 
+    const stallTimer = setTimeout(handleLoadError, STALL_MS);
+
     return () => {
+      clearTimeout(stallTimer);
+      el.removeEventListener('error', handleLoadError);
       el.remove();
       modelElRef.current = null;
     };
     // We intentionally exclude autoRotate/exposure — those are imperatively
     // applied below so the model doesn't tear down and reload on every tweak.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [src, poster, alt, testbench]);
+  }, [resolvedSrc, poster, alt, testbench, handleLoadError]);
 
   // Reflect testbench control changes onto the live element without rebuilding.
   useEffect(() => {
