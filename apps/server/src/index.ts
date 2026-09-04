@@ -265,7 +265,11 @@ const { adminCostRoutes } = await import('./routes/admin-cost');
 app.route('/api/admin/cost', adminCostRoutes);
 
 // MCP Gateway service endpoints — called by apps/mcp-gateway for per-session
-// key minting. Service-key gated (not user-accessible).
+// key minting. Service-key gated (not user-accessible). R2-3: a dedicated tight
+// bucket on top of the service-key check — each mint miss is a Firestore write
+// + an apiKeys doc, so a leaked MCP_GATEWAY_SERVICE_KEY shouldn't also get the
+// blanket 300/min.
+app.use('/api/internal/*', rateLimiter({ windowMs: 60_000, max: 30, name: 'mcp-internal' }));
 const { mcpGatewayRoutes } = await import('./routes/mcp-gateway');
 app.route('/api', mcpGatewayRoutes);
 

@@ -16,6 +16,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { generateApiKey } from '../lib/apiKeys';
 import { db, firebaseAvailable } from '../lib/firebase';
+import { seal, unseal } from '../services/provider-keys/crypto';
 
 const ETH_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
@@ -45,12 +46,18 @@ function verifyServiceKey(presented: string | undefined | null): boolean {
 // server restarts and is shared across server replicas. TTL: 30 days;
 // on expiry we mint a new key and return that. The old key stays active
 // in the `apiKeys` collection until its own expiresAt — no forced revoke.
+//
+// R2-1: the key is stored SEALED (AES-256-GCM + KMS envelope, same as BYOK
+// provider keys), never as plaintext. `apiKeys` itself only keeps a SHA-256
+// hash; this cache must not be the one place a raw `loar_…` key sits readable.
 
 const OAUTH_KEY_TTL_DAYS = 30;
 
 interface OAuthKeyCacheDoc {
   walletAddress: string;
-  rawKey: string;
+  /** `seal()`-ed raw key. Legacy docs may instead carry a plaintext `rawKey`
+   *  field — those are ignored on read and overwritten on the next mint. */
+  encryptedKey: string;
   keyId: string;
   issuedAt: Date;
   expiresAt: Date;
@@ -73,16 +80,47 @@ async function getCachedKey(walletAddress: string): Promise<string | null> {
         ? d.expiresAt
         : new Date((d.expiresAt as any)?.toDate?.() ?? d.expiresAt);
     if (!expiresAt || expiresAt.getTime() <= Date.now()) return null;
-    return typeof d.rawKey === 'string' ? d.rawKey : null;
+    // Only sealed records are honoured. A legacy plaintext `rawKey` doc is
+    // treated as a cache miss so the next mint replaces it with a sealed one.
+    if (typeof d.encryptedKey !== 'string' || !d.encryptedKey) return null;
+    return await unseal(d.encryptedKey);
   } catch {
     return null;
   }
 }
 
-async function saveCachedKey(doc: OAuthKeyCacheDoc): Promise<void> {
+async function saveCachedKey(input: {
+  walletAddress: string;
+  rawKey: string;
+  keyId: string;
+  issuedAt: Date;
+  expiresAt: Date;
+}): Promise<void> {
   const col = cacheCol();
   if (!col) return;
-  await col.doc(doc.walletAddress).set(doc);
+  // Seal before persisting. If envelope crypto isn't configured in this
+  // deployment (no PROVIDER_KEY_KMS_KEY_ID / PROVIDER_KEY_MASTER_KEY), skip
+  // the cache rather than fall back to plaintext — the caller still gets its
+  // key, it just won't be reused across restarts.
+  let encryptedKey: string;
+  try {
+    encryptedKey = await seal(input.rawKey);
+  } catch (err) {
+    console.warn(
+      '[mcp-gateway] provider-key crypto unavailable — minted key NOT cached ' +
+        '(set PROVIDER_KEY_KMS_KEY_ID or PROVIDER_KEY_MASTER_KEY to enable reuse): ' +
+        (err instanceof Error ? err.message : 'unknown')
+    );
+    return;
+  }
+  const doc: OAuthKeyCacheDoc = {
+    walletAddress: input.walletAddress,
+    encryptedKey,
+    keyId: input.keyId,
+    issuedAt: input.issuedAt,
+    expiresAt: input.expiresAt,
+  };
+  await col.doc(input.walletAddress).set(doc);
 }
 
 // ── Hono routes ────────────────────────────────────────────────────────

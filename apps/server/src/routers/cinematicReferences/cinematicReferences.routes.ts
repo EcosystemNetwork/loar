@@ -127,20 +127,34 @@ export const cinematicReferencesRouter = router({
   }),
 
   /**
-   * Light "I used this" signal. Increments pinCount for trending sort,
-   * returns the reference's tags + title for the client to splice into a prompt.
+   * Light "I used this" signal. Bumps pinCount for the trending sort and
+   * returns the reference's tags + title for the client to splice into a
+   * prompt. R2-4: auth-required and deduped to one bump per user per
+   * reference (a `pins/{uid}` marker doc) so the trending rank can't be
+   * inflated by an anonymous script.
    */
-  pin: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ input, ctx }) => {
+  pin: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ input, ctx }) => {
+    const uid = ctx.user.uid;
     const ref = cinematicReferencesCol().doc(input.id);
-    const snap = await ref.get();
-    if (!snap.exists) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Reference not found' });
-    }
-    const data = snap.data() as CinematicReference;
-    if (data.visibility === 'private' && data.creatorUid !== ctx.user?.uid) {
-      throw new TRPCError({ code: 'FORBIDDEN', message: 'Reference is private' });
-    }
-    await ref.update({ pinCount: (data.pinCount || 0) + 1, updatedAt: new Date() });
+    const markerRef = ref.collection('pins').doc(uid);
+
+    const data = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Reference not found' });
+      }
+      const d = snap.data() as CinematicReference;
+      if (d.visibility === 'private' && d.creatorUid !== uid) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Reference is private' });
+      }
+      const marker = await tx.get(markerRef);
+      if (!marker.exists) {
+        tx.set(markerRef, { at: new Date() });
+        tx.update(ref, { pinCount: (d.pinCount || 0) + 1, updatedAt: new Date() });
+      }
+      return d;
+    });
+
     return {
       title: data.title,
       imageUrl: data.imageUrl,

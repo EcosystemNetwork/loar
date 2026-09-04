@@ -150,18 +150,33 @@ export const sceneTemplatesRouter = router({
     return tpl;
   }),
 
-  /** Increments use_count and returns the bundle for client application. */
-  use: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ input, ctx }) => {
+  /**
+   * Returns the bundle for client application and bumps useCount for the
+   * trending sort. R2-4: auth-required and deduped to one bump per user per
+   * template (a `uses/{uid}` marker doc) so rank can't be gamed anonymously.
+   */
+  use: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ input, ctx }) => {
+    const uid = ctx.user.uid;
     const ref = sceneTemplatesCol().doc(input.id);
-    const snap = await ref.get();
-    if (!snap.exists) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Template not found' });
-    }
-    const tpl = snap.data() as SceneTemplate;
-    if (tpl.visibility === 'private' && tpl.creatorUid !== ctx.user?.uid) {
-      throw new TRPCError({ code: 'FORBIDDEN', message: 'This template is private' });
-    }
-    await ref.update({ useCount: (tpl.useCount || 0) + 1, updatedAt: new Date() });
+    const markerRef = ref.collection('uses').doc(uid);
+
+    const tpl = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Template not found' });
+      }
+      const t = snap.data() as SceneTemplate;
+      if (t.visibility === 'private' && t.creatorUid !== uid) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'This template is private' });
+      }
+      const marker = await tx.get(markerRef);
+      if (!marker.exists) {
+        tx.set(markerRef, { at: new Date() });
+        tx.update(ref, { useCount: (t.useCount || 0) + 1, updatedAt: new Date() });
+      }
+      return t;
+    });
+
     return tpl.bundle;
   }),
 

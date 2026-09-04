@@ -21,6 +21,7 @@
 import { createPrivateKey, createPublicKey, sign, verify, generateKeyPairSync } from 'node:crypto';
 import bs58 from 'bs58';
 import { db, firebaseAvailable } from './firebase';
+import { seal, unseal } from '../services/provider-keys/crypto';
 
 /** SPKI DER prefix for raw 32-byte ed25519 pubkeys. RFC 8410. */
 const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
@@ -70,11 +71,39 @@ function loadKeyFromEnv(): AttestationKey | null {
 }
 
 /**
- * Generate a fresh ed25519 keypair and persist its base58 form. In production
- * the key should come from env (typically rotated via secrets manager); this
- * fallback exists so local dev + the Frontier demo work without setup.
+ * R2-2: persist the keypair with the private half SEALED (AES-256-GCM + KMS
+ * envelope, same as BYOK provider keys). `.set()` replaces the whole doc, so
+ * any legacy plaintext `privKeyB58` field is dropped. If envelope crypto isn't
+ * configured (no PROVIDER_KEY_KMS_KEY_ID / PROVIDER_KEY_MASTER_KEY), don't
+ * persist at all — a fresh key is generated per boot instead of a forgeable
+ * signing authority landing in Firestore in the clear.
  */
-function generateAndPersist(): AttestationKey {
+async function persistKey(key: AttestationKey): Promise<void> {
+  if (!firebaseAvailable) return;
+  let privKeyEncrypted: string;
+  try {
+    privKeyEncrypted = await seal(key.privKeyB58);
+  } catch (err) {
+    console.warn(
+      '[attestation] generated key NOT persisted (provider-key crypto unavailable — ' +
+        'set PROVIDER_KEY_KMS_KEY_ID or PROVIDER_KEY_MASTER_KEY, or set ' +
+        'ATTESTATION_PRIVATE_KEY): ' +
+        (err instanceof Error ? err.message : 'unknown')
+    );
+    return;
+  }
+  await db.collection('serverKeys').doc('attestation').set({
+    pubKeyB58: key.pubKeyB58,
+    privKeyEncrypted,
+    generatedAt: new Date(),
+  });
+}
+
+/**
+ * Generate a fresh ed25519 keypair (and persist it sealed). Production must
+ * supply ATTESTATION_PRIVATE_KEY via env — this fallback is dev/demo only.
+ */
+async function generateAndPersist(): Promise<AttestationKey> {
   const { privateKey } = generateKeyPairSync('ed25519');
   const privDer = privateKey.export({ format: 'der', type: 'pkcs8' }) as Buffer;
   const privBytes = privDer.subarray(16); // strip PKCS8 prefix → 32 bytes
@@ -86,20 +115,11 @@ function generateAndPersist(): AttestationKey {
     pubKeyB58: bs58.encode(pubBytes),
   };
 
-  // Best-effort persist so subsequent restarts produce verifiable receipts
-  // for the same signer. Production should set ATTESTATION_PRIVATE_KEY.
-  if (firebaseAvailable) {
-    void db.collection('serverKeys').doc('attestation').set({
-      pubKeyB58: key.pubKeyB58,
-      privKeyB58: key.privKeyB58,
-      generatedAt: new Date(),
-    });
-    console.warn(
-      `[attestation] generated fresh ed25519 key (signer=${key.pubKeyB58.slice(0, 8)}…). ` +
-        'For production, set ATTESTATION_PRIVATE_KEY env var.'
-    );
-  }
-
+  await persistKey(key);
+  console.warn(
+    `[attestation] generated fresh ed25519 key (signer=${key.pubKeyB58.slice(0, 8)}…). ` +
+      'For production, set ATTESTATION_PRIVATE_KEY env var.'
+  );
   return key;
 }
 
@@ -107,9 +127,43 @@ async function loadKeyFromFirestore(): Promise<AttestationKey | null> {
   if (!firebaseAvailable) return null;
   const doc = await db.collection('serverKeys').doc('attestation').get();
   if (!doc.exists) return null;
-  const data = doc.data() as { privKeyB58?: string; pubKeyB58?: string };
-  if (!data.privKeyB58 || !data.pubKeyB58) return null;
-  return { privKeyB58: data.privKeyB58, pubKeyB58: data.pubKeyB58 };
+  const data = doc.data() as {
+    privKeyB58?: string;
+    privKeyEncrypted?: string;
+    pubKeyB58?: string;
+  };
+  if (!data.pubKeyB58) return null;
+
+  // Preferred: sealed private key.
+  if (data.privKeyEncrypted) {
+    try {
+      const privKeyB58 = await unseal(data.privKeyEncrypted);
+      return { privKeyB58, pubKeyB58: data.pubKeyB58 };
+    } catch (err) {
+      console.warn(
+        '[attestation] failed to unseal persisted key:',
+        err instanceof Error ? err.message : err
+      );
+      return null;
+    }
+  }
+
+  // Legacy plaintext private key (pre-R2-2). Never trust it in production — a
+  // Firestore read would hand an attacker the signing key. In dev, use it once
+  // and re-persist sealed so the plaintext copy ages out.
+  if (data.privKeyB58) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error(
+        '[attestation] serverKeys/attestation holds a PLAINTEXT private key — refusing ' +
+          'to use it in production. Set ATTESTATION_PRIVATE_KEY and delete the Firestore doc.'
+      );
+      return null;
+    }
+    const key = { privKeyB58: data.privKeyB58, pubKeyB58: data.pubKeyB58 };
+    void persistKey(key).catch(() => {});
+    return key;
+  }
+  return null;
 }
 
 async function getKey(): Promise<AttestationKey> {
@@ -119,12 +173,23 @@ async function getKey(): Promise<AttestationKey> {
     _key = envKey;
     return envKey;
   }
+
+  // R2-2: production must supply the signing key via env. Auto-generating one,
+  // or loading an unsealed persisted one, would put a forgeable attestation
+  // signing authority one Firestore read away.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'ATTESTATION_PRIVATE_KEY is required in production. Generate one with ' +
+        '`openssl rand 32 | base58` and set it in the environment.'
+    );
+  }
+
   const stored = await loadKeyFromFirestore();
   if (stored) {
     _key = stored;
     return stored;
   }
-  _key = generateAndPersist();
+  _key = await generateAndPersist();
   return _key;
 }
 
