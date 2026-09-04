@@ -25,6 +25,7 @@ import {
 } from './universes.handlers';
 import { isUniverseAdmin, isUniverseAdminStrict, getSafeInfo } from '../../lib/safe-admin';
 import { isEvmAddress, normalizeUniverseId } from '../../lib/universe-id';
+import { getUserSolanaWallet } from '../../lib/circle-solana';
 import { db } from '../../lib/firebase';
 import { generateNonce, consumeNonce } from '../../lib/siwe';
 import { getPlatformConfig } from '../../services/platformConfig';
@@ -62,7 +63,9 @@ const getUniverseSchema = z.object({
 });
 
 const getByCreatorSchema = z.object({
-  creator: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid creator address'),
+  creator: z
+    .string()
+    .regex(/^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/, 'Invalid creator address'),
 });
 
 export const universesRouter = router({
@@ -241,11 +244,55 @@ export const universesRouter = router({
       };
     }),
 
-  /** Get universes by creator address. Owner sees their private universes; others do not. */
+  /**
+   * Get universes by creator address. Owner sees their private universes;
+   * others do not.
+   *
+   * When the caller is asking about their own connected EVM address, also
+   * merges in universes created by their Circle-managed Solana wallet.
+   * Solana universes are minted server-side under a per-user Circle wallet
+   * (see initializeSolanaUniverse) that the connected EVM wallet never
+   * signs for — without this, they'd be invisible in Studio even though the
+   * same account owns them.
+   */
   getByCreator: publicProcedure.input(getByCreatorSchema).query(async ({ input, ctx }) => {
-    return await getUniversesByCreator(input.creator, {
+    const result = await getUniversesByCreator(input.creator, {
       viewerAddress: ctx.user?.address,
     });
+
+    const askingAboutSelf =
+      !!ctx.user?.uid &&
+      !!ctx.user.address &&
+      isEvmAddress(input.creator) &&
+      input.creator.toLowerCase() === ctx.user.address.toLowerCase();
+
+    if (askingAboutSelf && result.success) {
+      try {
+        const solanaWallet = await getUserSolanaWallet(ctx.user!.uid);
+        if (solanaWallet?.address) {
+          // viewerAddress = the Solana wallet itself: we derived it
+          // server-side from the caller's own session uid, so it's
+          // established as theirs without trusting any client input.
+          const solanaResult = await getUniversesByCreator(solanaWallet.address, {
+            viewerAddress: solanaWallet.address,
+          });
+          if (solanaResult.success) {
+            const seen = new Set(result.data.map((u: any) => u.id));
+            for (const u of solanaResult.data) {
+              if (!seen.has(u.id)) {
+                result.data.push(u);
+                seen.add(u.id);
+              }
+            }
+            result.total = result.data.length;
+          }
+        }
+      } catch (err) {
+        console.warn('[getByCreator] Solana wallet lookup failed:', err);
+      }
+    }
+
+    return result;
   }),
 
   /**
