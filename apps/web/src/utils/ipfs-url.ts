@@ -190,6 +190,44 @@ const acquireResolveSlot = createSemaphore(6);
 // gateways), independently of the resolve gate above.
 const acquireGatewayRaceSlot = createSemaphore(6);
 
+// ── Per-host circuit breaker ────────────────────────────────────────────
+//
+// The semaphore above caps concurrent race *sessions*, but a media-heavy
+// page still mounts one SmartImage/ModelViewer/etc. per asset — each with
+// its own distinct CID, so the per-CID dedup above doesn't collapse them.
+// A gallery of dozens of items therefore queues dozens of raceIpfsGateways()
+// sessions in quick succession, and every single one blindly re-probes all
+// ~4 public gateways regardless of whether one of them just answered 429
+// seconds ago. That turns "one gateway is rate-limited" into "every
+// subsequent asset on the page adds another request to the gateway that's
+// already rate-limited" — worsening the exact condition that caused the
+// 429 in the first place, and starving every other pending race of a slot
+// while they wait out a host that's already known to be throttled.
+//
+// A 429 is a capacity signal from the gateway itself (unlike a 404/504,
+// which is usually per-CID/per-content rather than a statement about the
+// whole host), so once one lands, skip that host from new probes for a
+// short cooldown — self-healing, not a permanent block.
+const GATEWAY_COOLDOWN_MS = 20_000;
+const gatewayCooldownUntil = new Map<string, number>();
+
+function isGatewayCoolingDown(candidateUrl: string): boolean {
+  try {
+    const until = gatewayCooldownUntil.get(new URL(candidateUrl).host);
+    return typeof until === 'number' && until > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+function markGatewayRateLimited(candidateUrl: string): void {
+  try {
+    gatewayCooldownUntil.set(new URL(candidateUrl).host, Date.now() + GATEWAY_COOLDOWN_MS);
+  } catch {
+    /* unparseable URL — nothing to key the cooldown on */
+  }
+}
+
 // Extract the "<cid>[/sub/path][?query]" portion of a known IPFS URL.
 // Returns null if the URL isn't an IPFS gateway URL we recognize.
 function extractIpfsPath(url: string): { cidPath: string } | null {
@@ -327,12 +365,19 @@ export async function raceIpfsGateways(
 
     let pending = candidates.length;
     for (const candidate of candidates) {
+      if (isGatewayCoolingDown(candidate)) {
+        if (--pending === 0) finish(dedicatedUrl || candidates[0]);
+        continue;
+      }
       const controller = new AbortController();
       controllers.push(controller);
       fetch(candidate, { method: 'HEAD', signal: controller.signal, mode: 'cors' })
         .then((res) => {
           if (res.ok) finish(candidate);
-          else if (--pending === 0) finish(dedicatedUrl || candidates[0]);
+          else {
+            if (res.status === 429) markGatewayRateLimited(candidate);
+            if (--pending === 0) finish(dedicatedUrl || candidates[0]);
+          }
         })
         .catch(() => {
           if (--pending === 0) finish(dedicatedUrl || candidates[0]);
