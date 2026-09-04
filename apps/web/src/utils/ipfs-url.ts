@@ -364,9 +364,22 @@ export async function raceIpfsGateways(
     }
 
     let pending = candidates.length;
+    // Every public probe failing/cooling-down is not, by itself, a reason to
+    // lock in `candidates[0]` — that's the unverified public primary, and if
+    // every public gateway just failed then it's the LEAST likely of all of
+    // them to actually work. `resolveIpfsUrlAsync` (our dedicated gateway) is
+    // still in flight at this point far more often than not: public probes
+    // can fail near-instantly (a CORS/NotSameOrigin rejection resolves before
+    // any bytes move), while the dedicated lookup is a real round trip to our
+    // own server. Only fall back to the unverified primary here if the
+    // dedicated URL is already known — otherwise let that in-flight lookup's
+    // own `.then` (or, failing that, the timeout below) make the call.
+    const onProbeExhausted = () => {
+      if (--pending === 0 && dedicatedUrl) finish(dedicatedUrl);
+    };
     for (const candidate of candidates) {
       if (isGatewayCoolingDown(candidate)) {
-        if (--pending === 0) finish(dedicatedUrl || candidates[0]);
+        onProbeExhausted();
         continue;
       }
       const controller = new AbortController();
@@ -376,11 +389,11 @@ export async function raceIpfsGateways(
           if (res.ok) finish(candidate);
           else {
             if (res.status === 429) markGatewayRateLimited(candidate);
-            if (--pending === 0) finish(dedicatedUrl || candidates[0]);
+            onProbeExhausted();
           }
         })
         .catch(() => {
-          if (--pending === 0) finish(dedicatedUrl || candidates[0]);
+          onProbeExhausted();
         });
     }
 

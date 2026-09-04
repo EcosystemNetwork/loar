@@ -21,7 +21,7 @@
  * `<source src>` on the failing elements was exactly
  * `peach-impressive-moth-978.mypinata.cloud./ipfs/<cid>/<file>` — no scheme.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveActiveGateway } from '../ipfs-url';
 
 const PUBLIC_GATEWAY = 'https://ipfs.io';
@@ -107,5 +107,90 @@ describe('resolveActiveGateway', () => {
     for (const input of weirdInputs) {
       expect(() => resolveActiveGateway(input, false, PUBLIC_GATEWAY)).not.toThrow();
     }
+  });
+});
+
+/**
+ * Regression coverage for a live-traffic bug (2026-09-04): every public
+ * gateway HEAD probe failing (or cooling down) *faster* than our own
+ * dedicated-gateway lookup (`resolveIpfsUrlAsync` → `/api/ipfs/resolve`)
+ * used to fall back to the unverified public primary (`candidates[0]`)
+ * immediately — even though the dedicated lookup was still in flight and,
+ * in production, resolves reliably in well under a second. A near-instant
+ * rejection (e.g. a CORS/`NotSameOrigin` block) on every public candidate
+ * would win that race by default and lock in the one gateway just proven
+ * dead, so ModelViewer/SmartImage/etc. loaded the doomed public URL instead
+ * of waiting the extra beat for the dedicated one. Console symptom:
+ * `ipfs.io` 504s + `gateway.pinata.cloud` 429s alongside
+ * `net::ERR_BLOCKED_BY_RESPONSE.NotSameOrigin` on the public candidates,
+ * then `TypeError: Failed to fetch` from the GLTF/model loader.
+ */
+describe('raceIpfsGateways', () => {
+  const DEDICATED_URL = 'https://peach-impressive-moth-978.mypinata.cloud/ipfs/QmTest123/file.glb';
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubEnv('VITE_SERVER_URL', 'https://api.loar.test');
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('waits for an in-flight dedicated-gateway resolve instead of locking in the public primary when every public probe fails fast', async () => {
+    global.fetch = vi.fn((input: unknown, init?: RequestInit) => {
+      const href = typeof input === 'string' ? input : (input as Request).url;
+      if (init?.method === 'HEAD') {
+        // Every public gateway probe rejects near-instantly — e.g. exactly
+        // what a CORS/NotSameOrigin block looks like from the caller's side.
+        return Promise.reject(new Error('blocked'));
+      }
+      if (href.includes('/api/ipfs/resolve')) {
+        // Real round trip to our own server — genuinely takes a beat, but
+        // reliably succeeds (this is the case verified live in prod).
+        return new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                ok: true,
+                json: async () => ({ url: DEDICATED_URL, expiresAt: Date.now() + 60_000 }),
+              } as Response),
+            15
+          )
+        );
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${href}`));
+    }) as unknown as typeof fetch;
+
+    const { raceIpfsGateways, getIpfsUrlCandidates } = await import('../ipfs-url');
+    const src = 'ipfs://QmTest123/file.glb';
+    const candidates = getIpfsUrlCandidates(src);
+    expect(candidates.length).toBeGreaterThan(1);
+    const publicPrimary = candidates[0];
+
+    const result = await raceIpfsGateways(src, { timeoutMs: 500 });
+
+    expect(result).toBe(DEDICATED_URL);
+    expect(result).not.toBe(publicPrimary);
+  });
+
+  it('still falls back to the public primary if the dedicated resolve never lands before the timeout', async () => {
+    global.fetch = vi.fn((_input: unknown, init?: RequestInit) => {
+      if (init?.method === 'HEAD') return Promise.reject(new Error('blocked'));
+      // Dedicated resolve hangs past the race timeout — the overall
+      // setTimeout ceiling must still produce a usable result.
+      return new Promise(() => {});
+    }) as unknown as typeof fetch;
+
+    const { raceIpfsGateways, getIpfsUrlCandidates } = await import('../ipfs-url');
+    const src = 'ipfs://QmTest456/file.glb';
+    const publicPrimary = getIpfsUrlCandidates(src)[0];
+
+    const result = await raceIpfsGateways(src, { timeoutMs: 50 });
+
+    expect(result).toBe(publicPrimary);
   });
 });
