@@ -266,8 +266,13 @@ export class StorageManager {
     return manifest;
   }
 
-  async uploadFromUrl(url: string, filename?: string, userId?: string): Promise<StorageManifest> {
-    const { buffer, contentType } = await fetchToBuffer(url);
+  async uploadFromUrl(
+    url: string,
+    filename?: string,
+    userId?: string,
+    opts?: { googleApiKey?: string }
+  ): Promise<StorageManifest> {
+    const { buffer, contentType } = await fetchToBuffer(url, undefined, undefined, opts);
     const resolvedFilename =
       filename || url.split('/').pop()?.split('?')[0] || `file-${Date.now()}`;
     return this.upload(buffer, resolvedFilename, contentType, userId);

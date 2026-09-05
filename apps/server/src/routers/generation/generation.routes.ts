@@ -2395,8 +2395,11 @@ export const generationRouter = router({
       let result;
       // Dispatch: Google-direct Veo → Google API; Seedance → ByteDance; everything else → FAL.
       // Declared outside the try block — the post-generation storage mirror
-      // below needs to know isGoogle too.
+      // below needs to know isGoogle too, and needs the same resolved key
+      // (BYOK or platform) that created the file so it can re-authenticate
+      // against Google's key-scoped Files API when downloading it.
       const isGoogle = input.model?.endsWith('-google');
+      let resolvedGoogleKey: string | undefined;
       try {
         const isByteDance = input.model?.startsWith('bytedance/');
 
@@ -2434,6 +2437,7 @@ export const generationRouter = router({
         if (isGoogle) {
           // resolveProviderKey falls back to process.env.GOOGLE_API_KEY when no BYOK key is set.
           const googleKey = await resolveProviderKey(ctx.user.uid, 'google');
+          resolvedGoogleKey = googleKey;
           if (!googleKey) {
             await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);
             throw new Error('GOOGLE_API_KEY is not configured — set one in /settings/api-keys');
@@ -2513,7 +2517,12 @@ export const generationRouter = router({
           const manifest = await getStorageManager().uploadFromUrl(
             result.videoUrl,
             `legacy-video-${result.id || Date.now()}.mp4`,
-            ctx.user.uid
+            ctx.user.uid,
+            // BYOK Google keys create files scoped to that key — the Files
+            // API 401s a download authenticated with any other key,
+            // including the platform's env fallback. Pass the exact key
+            // that generated this video so the mirror can re-authenticate.
+            { googleApiKey: resolvedGoogleKey }
           );
           const permanentUrl = manifest.uploads[0]?.url;
           if (!permanentUrl) throw new Error('Storage upload returned no URL');
