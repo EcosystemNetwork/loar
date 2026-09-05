@@ -36,12 +36,14 @@ const ALLOWED_WIDTHS = [160, 240, 320, 480, 640, 960, 1280, 1600, 1920];
 const MAX_SOURCE_BYTES = 30 * 1024 * 1024; // 30MB upper bound on the input
 const FETCH_TIMEOUT_MS = 10_000;
 
+// cloudflare-ipfs.com removed 2026-08-24 — Cloudflare shut down its public
+// IPFS gateway (NXDOMAIN now); see apps/web/src/utils/ipfs-url.ts. (That fix,
+// af79f79d, missed this file — fixed here to match.)
 const KNOWN_GATEWAY_HOSTS = new Set<string>([
   'gateway.pinata.cloud',
   'w3s.link',
   'ipfs.io',
   'dweb.link',
-  'cloudflare-ipfs.com',
   '4everland.io',
   'nftstorage.link',
 ]);

@@ -22,6 +22,14 @@ const TRUSTED_CONNECT = [
   'https://sepolia.base.org',
   'https://*.meshy.ai',
   'https://api.coingecko.com',
+  // IPFS gateways — raceIpfsGateways() HEAD-probes these directly from the
+  // client (apps/web/src/utils/ipfs-url.ts). Mirrors netlify.toml/index.html,
+  // which already allowlist these for connect-src.
+  'https://w3s.link',
+  'https://*.w3s.link',
+  'https://ipfs.io',
+  'https://dweb.link',
+  'https://*.dweb.link',
 ].join(' ');
 
 /** Trusted domains for media-src (audio/video). */
@@ -50,6 +58,13 @@ const TRUSTED_MEDIA = [
   'https://ipfs.io',
   'https://dweb.link',
   'https://*.dweb.link',
+  // Recognized as IPFS gateway hosts by ipfs-url.ts/ipfs.ts/img-resize.ts's
+  // KNOWN_GATEWAY_HOSTS — kept in sync here so a legacy/imported media URL on
+  // either host isn't silently CSP-blocked.
+  'https://4everland.io',
+  'https://*.4everland.io',
+  'https://nftstorage.link',
+  'https://*.nftstorage.link',
 ].join(' ');
 
 /** Trusted domains for img-src. */
@@ -67,6 +82,10 @@ const TRUSTED_IMG = [
   'https://ipfs.io',
   'https://dweb.link',
   'https://*.dweb.link',
+  'https://4everland.io',
+  'https://*.4everland.io',
+  'https://nftstorage.link',
+  'https://*.nftstorage.link',
 ].join(' ');
 
 export async function securityHeaders(c: Context, next: Next) {
