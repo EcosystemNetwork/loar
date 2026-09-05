@@ -10,6 +10,7 @@ import { ponderGql, ponderQueryDefaults } from '@/utils/ponder-api';
 import { universeManagerAbi } from '@loar/abis/generated';
 import { UniverseManager } from '@loar/abis/addresses';
 import { trpcClient } from '@/utils/trpc';
+import { isEvmAddress } from '@/lib/utils';
 
 interface UniverseAddresses {
   universeAddress: `0x${string}` | undefined;
@@ -135,10 +136,19 @@ export function useUniverseAddresses(
       tokenAddress?: string;
       governanceAddress?: string;
     };
+    // A Solana universe's Firestore doc stores its SPL mint / governance
+    // addresses as base58, not hex — passing one straight into a
+    // `0x${string}`-typed field feeds it to wagmi's `useReadContract`
+    // (e.g. TokenGateGuard), and viem's address checksum throws
+    // `InvalidAddressError` synchronously during render, crashing the page.
+    // Only surface fields that are actually EVM addresses; everything else
+    // resolves to `undefined` so those reads stay disabled.
+    const evmOrUndefined = (v: string | undefined) =>
+      v && isEvmAddress(v) ? (v as `0x${string}`) : undefined;
     return {
-      universeAddress: (d.address as `0x${string}`) || undefined,
-      tokenAddress: (d.tokenAddress as `0x${string}`) || undefined,
-      governorAddress: (d.governanceAddress as `0x${string}`) || undefined,
+      universeAddress: evmOrUndefined(d.address),
+      tokenAddress: evmOrUndefined(d.tokenAddress),
+      governorAddress: evmOrUndefined(d.governanceAddress),
       hookAddress: undefined,
       lockerAddress: undefined,
       bondingCurveAddress: undefined,

@@ -14,6 +14,7 @@ import { useQuery } from '@tanstack/react-query';
 import { governanceErc20Abi } from '@loar/abis/generated';
 import { trpc } from '../utils/trpc';
 import { useUniverseAddresses } from './useUniverseAddresses';
+import { isEvmAddress } from '@/lib/utils';
 
 export type GateTarget = 'view' | 'create' | 'canon' | 'wiki' | 'governance' | 'play';
 
@@ -80,7 +81,13 @@ export function useTokenGate(
 
   // Find the matching enabled rule
   const rule = rules.find((r) => r.target === target && r.enabled);
-  const gateTokenAddress = (rule?.tokenAddress || fallbackToken) as `0x${string}` | undefined;
+  // `rule.tokenAddress` comes straight from Firestore — guard against a
+  // non-EVM value (e.g. a Solana universe misconfigured with an SPL mint
+  // address) reaching `useReadContract` below and throwing a viem
+  // `InvalidAddressError` synchronously during render.
+  const rawGateToken = rule?.tokenAddress || fallbackToken;
+  const gateTokenAddress =
+    rawGateToken && isEvmAddress(rawGateToken) ? (rawGateToken as `0x${string}`) : undefined;
 
   // Read user balance
   const { data: balance, isLoading: balanceLoading } = useReadContract({
