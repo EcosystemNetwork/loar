@@ -56,7 +56,7 @@ import {
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
-import { resolveIpfsUrl as resolveMediaUrl } from '@/utils/ipfs-url';
+import { resolveIpfsUrl as resolveMediaUrl, resolveIpfsUrlAsync } from '@/utils/ipfs-url';
 import {
   Dialog,
   DialogContent,
@@ -382,6 +382,13 @@ function UniverseTimelineEditorInner() {
   const [editVideoUrl, setEditVideoUrl] = useState('');
   const [editVideoFile, setEditVideoFile] = useState<File | null>(null);
   const [editVideoPreview, setEditVideoPreview] = useState<string | null>(null);
+  // The dialog's <video> used the *sync* resolver, which rewrites a dead
+  // dedicated `.mypinata.cloud` gateway to a public one that can 429/stall
+  // for minutes — so the preview stayed blank even though the node's own
+  // thumbnail (which uses resolveIpfsUrlAsync → our /api/ipfs/resolve, a
+  // warm server-signed 206) played fine. Resolve the preview through the
+  // same async path here; fall back to the sync pick until it lands.
+  const [editVideoPreviewResolved, setEditVideoPreviewResolved] = useState<string | null>(null);
   const [isUploadingEditVideo, setIsUploadingEditVideo] = useState(false);
   const editFileInputRef = useRef<HTMLInputElement>(null);
   const [showTrimPanel, setShowTrimPanel] = useState(false);
@@ -1453,6 +1460,29 @@ function UniverseTimelineEditorInner() {
     },
     [getStoredEvents]
   );
+
+  // Resolve the edit-dialog preview through the async gateway path (matches
+  // the timeline node's own thumbnail) so a rotted dedicated-gateway URL
+  // doesn't leave the "Change Video" preview blank. Blob/File previews and
+  // non-IPFS URLs pass straight through resolveIpfsUrlAsync untouched.
+  useEffect(() => {
+    if (!editVideoPreview) {
+      setEditVideoPreviewResolved(null);
+      return;
+    }
+    let cancelled = false;
+    setEditVideoPreviewResolved(resolveMediaUrl(editVideoPreview) || editVideoPreview);
+    resolveIpfsUrlAsync(editVideoPreview)
+      .then((best) => {
+        if (!cancelled && best) setEditVideoPreviewResolved(best);
+      })
+      .catch(() => {
+        /* keep the sync pick already set above */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editVideoPreview]);
 
   // Persist trim in/out points for the video currently attached to an
   // event — instant and non-destructive, same convention as the per-scene
@@ -4243,8 +4273,8 @@ function UniverseTimelineEditorInner() {
             {editVideoPreview && (
               <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
                 <video
-                  key={editVideoPreview}
-                  src={resolveMediaUrl(editVideoPreview)}
+                  key={editVideoPreviewResolved || editVideoPreview}
+                  src={editVideoPreviewResolved || resolveMediaUrl(editVideoPreview)}
                   className="w-full h-full object-contain"
                   controls
                   muted
