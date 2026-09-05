@@ -914,6 +914,23 @@ export const threedRouter = router({
       }
 
       const provider: 'meshy' | 'tripo' = input.rigType === 'biped' ? 'meshy' : 'tripo';
+
+      // BYOK is mandatory for Tripo3D (non-biped rigs) — there is no server
+      // key pool (dispatcher.ts resolves BYOK only). Resolve the caller's own
+      // key up front so a missing key fails as a clean FORBIDDEN *before* any
+      // credit reservation, the same way every other BYOK-gated route behaves.
+      let tripoApiKey: string | undefined;
+      if (provider === 'tripo') {
+        const { resolveProviderKey } = await import('../../lib/byok');
+        tripoApiKey = await resolveProviderKey(ctx.user.uid, 'tripo');
+        if (!tripoApiKey) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Add your Tripo3D API key at /settings/api-keys to rig non-humanoid models.',
+          });
+        }
+      }
+
       const { fiatMargin } = await getMargins();
       const credits = toCredits(RIG_COST, fiatMargin);
       const genId = randomUUID();
@@ -967,8 +984,9 @@ export const threedRouter = router({
             return { result: { jobId: genId, providerTaskId: taskId }, actualCredits: credits };
           }
 
-          // Tripo3D path — import, then rig (animate is a separate request)
-          const apiKey = await resolveProviderKey(ctx.user.uid, 'tripo').catch(() => undefined);
+          // Tripo3D path — import, then rig (animate is a separate request).
+          // Key was resolved and non-null-checked before the reservation above.
+          const apiKey = tripoApiKey;
           const fileToken = await tripo3dService.uploadRemoteGlb(sourceUrl, apiKey);
           const importTask = await tripo3dService.importModel(fileToken, apiKey);
           // Wait for import to land — it's fast (~10s) so we wait inline.
@@ -1053,6 +1071,21 @@ export const threedRouter = router({
         });
       }
 
+      // BYOK is mandatory for Tripo3D animation retarget — there is no server
+      // key pool. Resolve the caller's own key up front so a missing key is a
+      // clean FORBIDDEN before the credit reservation.
+      let tripoApiKey: string | undefined;
+      if (parsed.provider === 'tripo') {
+        const { resolveProviderKey } = await import('../../lib/byok');
+        tripoApiKey = await resolveProviderKey(ctx.user.uid, 'tripo');
+        if (!tripoApiKey) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Add your Tripo3D API key at /settings/api-keys to animate this model.',
+          });
+        }
+      }
+
       const { fiatMargin } = await getMargins();
       const credits = toCredits(ANIMATION_COST, fiatMargin);
       const genId = randomUUID();
@@ -1112,8 +1145,9 @@ export const threedRouter = router({
             return { result: { jobId: genId, providerTaskId: taskId }, actualCredits: credits };
           }
 
-          // Tripo3D animation retarget
-          const apiKey = await resolveProviderKey(ctx.user.uid, 'tripo').catch(() => undefined);
+          // Tripo3D animation retarget — key resolved + checked before the
+          // reservation above.
+          const apiKey = tripoApiKey;
           const tripoAnimation = input.actionRef.slice('tripo:'.length) as TripoAnimation;
           const { taskId } = await tripo3dService.retargetAnimation({
             rigTaskId: parsed.taskId,
