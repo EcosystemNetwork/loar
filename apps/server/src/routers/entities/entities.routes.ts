@@ -52,13 +52,9 @@ import { geminiService } from '../../services/gemini';
 import { triggerCoverImageGenerationAsync } from '../../services/entity-cover-image';
 import { db } from '../../lib/firebase';
 import { getExcludedUniverseIds } from '../universes/universes.handlers';
+import { universeAddressSchema as universeAddress } from '../../lib/universe-address-schema';
 
 const entityKindSchema = z.enum(ENTITY_KINDS);
-
-// A universe address is either a lowercased EVM `0x…` address or a
-// case-sensitive Solana base58 PDA — don't constrain the format here.
-// See lib/universe-id.ts and physics.routes.ts for the same fix.
-const universeAddress = z.string().min(1, 'Universe address is required');
 
 export const entitiesRouter = router({
   /** Create a new entity. universeAddress is optional for creator kinds. */

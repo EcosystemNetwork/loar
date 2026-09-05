@@ -4,6 +4,7 @@
  * Collection: `notebookEntries/{entryId}` (top-level, indexed by creator).
  */
 import { db } from '../../lib/firebase';
+import { normalizeUniverseId } from '../../lib/universe-id';
 import type {
   NotebookEntry,
   CreateNotebookEntryInput,
@@ -28,7 +29,7 @@ export async function createNotebookEntry(
     title: input.title,
     body: input.body,
     tags: input.tags ?? [],
-    universeAddress: input.universeAddress ? input.universeAddress.toLowerCase() : null,
+    universeAddress: input.universeAddress ? normalizeUniverseId(input.universeAddress) : null,
     promotedTo: null,
     createdAt: now,
     updatedAt: now,
@@ -54,7 +55,7 @@ export async function listNotebookEntriesByCreator(
     query = query.where(
       'universeAddress',
       '==',
-      universeAddress ? universeAddress.toLowerCase() : null
+      universeAddress ? normalizeUniverseId(universeAddress) : null
     );
   }
 
@@ -83,7 +84,9 @@ export async function updateNotebookEntry(
   if (input.body !== undefined) updates.body = input.body;
   if (input.tags !== undefined) updates.tags = input.tags;
   if (input.universeAddress !== undefined) {
-    updates.universeAddress = input.universeAddress ? input.universeAddress.toLowerCase() : null;
+    updates.universeAddress = input.universeAddress
+      ? normalizeUniverseId(input.universeAddress)
+      : null;
   }
 
   await ref.update(updates);

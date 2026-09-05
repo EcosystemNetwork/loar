@@ -59,7 +59,11 @@ export interface PhysicsViolation {
 
 export function emptyLaws(universeAddress: string): UniverseLaws {
   return {
-    universeAddress: universeAddress.toLowerCase(),
+    // Callers already pass a normalizeUniverseId()'d id (see
+    // physics.handlers.ts getUniverseLaws) — re-lowercasing here mangled the
+    // case-sensitive Solana base58 form back into a value that never matches
+    // the real PDA. Use it verbatim.
+    universeAddress,
     invariants: [],
     conservationRules: [],
     forbiddenEvents: [],

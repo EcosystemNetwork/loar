@@ -10,11 +10,7 @@ import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { getUniverseLaws, setUniverseLaws, validateAgainstLaws } from './physics.handlers';
 import { getUniverse } from '../universes/universes.handlers';
 import { isEvmAddress } from '../../lib/universe-id';
-
-// A universe address is either a lowercased EVM `0x…` address or a
-// case-sensitive Solana base58 PDA — don't constrain the format here.
-// See lib/universe-id.ts.
-const universeAddress = z.string().min(1, 'Universe address is required');
+import { universeAddressSchema as universeAddress } from '../../lib/universe-address-schema';
 
 const invariantSchema = z.object({
   id: z.string().min(1).max(64),

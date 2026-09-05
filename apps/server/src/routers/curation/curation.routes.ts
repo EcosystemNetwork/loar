@@ -17,11 +17,7 @@ import {
   getMyEndorsementFor,
   getLeaderboard,
 } from './curation.handlers';
-
-// A universe address is either a lowercased EVM `0x…` address or a
-// case-sensitive Solana base58 PDA — don't constrain the format here.
-// See lib/universe-id.ts and physics.routes.ts for the same fix.
-const universeAddress = z.string().min(1, 'Universe address is required');
+import { universeAddressSchema as universeAddress } from '../../lib/universe-address-schema';
 const targetTypeSchema = z.enum(CURATION_TARGET_TYPES as [string, ...string[]]);
 
 export const curationRouter = router({

@@ -6,6 +6,7 @@
  * target" constraint without needing a compound index.
  */
 import { db } from '../../lib/firebase';
+import { normalizeUniverseId } from '../../lib/universe-id';
 import type { Endorsement, CurationTargetType, LeaderboardEntry } from './curation.types';
 
 function endorsementsCol() {
@@ -36,7 +37,7 @@ export async function upsertEndorsement(input: {
         universeAddress:
           input.universeAddress !== undefined
             ? input.universeAddress
-              ? input.universeAddress.toLowerCase()
+              ? normalizeUniverseId(input.universeAddress)
               : null
             : (existing.data() as Endorsement).universeAddress,
         updatedAt: now,
@@ -48,7 +49,7 @@ export async function upsertEndorsement(input: {
         targetId: input.targetId,
         weight: input.weight,
         note: input.note ?? '',
-        universeAddress: input.universeAddress ? input.universeAddress.toLowerCase() : null,
+        universeAddress: input.universeAddress ? normalizeUniverseId(input.universeAddress) : null,
         createdAt: now,
         updatedAt: now,
       };
@@ -140,7 +141,7 @@ export async function getLeaderboard(opts: {
     query = query.where(
       'universeAddress',
       '==',
-      universeAddress ? universeAddress.toLowerCase() : null
+      universeAddress ? normalizeUniverseId(universeAddress) : null
     );
   }
   // Bound: enough endorsements to build a meaningful top-N leaderboard.

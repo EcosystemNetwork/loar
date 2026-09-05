@@ -11,6 +11,7 @@
  */
 import { db } from '../../lib/firebase';
 import { rehostEphemeralUrl } from '../../lib/rehost-ephemeral';
+import { normalizeUniverseId } from '../../lib/universe-id';
 import {
   type Entity,
   type CreateEntityInput,
@@ -122,7 +123,7 @@ export async function createEntity(
     name: input.name,
     description: input.description,
     kind: input.kind,
-    universeAddress: input.universeAddress ? input.universeAddress.toLowerCase() : null,
+    universeAddress: input.universeAddress ? normalizeUniverseId(input.universeAddress) : null,
     parentId,
     nodeIds: input.nodeIds ?? [],
     imageUrl: pinnedImageUrl,
@@ -174,7 +175,7 @@ export async function getEntitiesByUniverse(
   let query: FirebaseFirestore.Query = col.where(
     'universeAddress',
     '==',
-    universeAddress.toLowerCase()
+    normalizeUniverseId(universeAddress)
   );
 
   if (kind) {
@@ -306,7 +307,9 @@ export async function updateEntity(
   if (input.name !== undefined) updates.name = input.name;
   if (input.description !== undefined) updates.description = input.description;
   if (input.universeAddress !== undefined)
-    updates.universeAddress = input.universeAddress ? input.universeAddress.toLowerCase() : null;
+    updates.universeAddress = input.universeAddress
+      ? normalizeUniverseId(input.universeAddress)
+      : null;
   if (input.parentId !== undefined) updates.parentId = input.parentId;
   if (input.nodeIds !== undefined) updates.nodeIds = input.nodeIds;
   if (input.imageUrl !== undefined) {
@@ -447,7 +450,11 @@ export async function searchEntities(opts: {
   let firestoreQuery: FirebaseFirestore.Query = entitiesCol();
 
   if (universeAddress) {
-    firestoreQuery = firestoreQuery.where('universeAddress', '==', universeAddress.toLowerCase());
+    firestoreQuery = firestoreQuery.where(
+      'universeAddress',
+      '==',
+      normalizeUniverseId(universeAddress)
+    );
   }
   if (kind) {
     firestoreQuery = firestoreQuery.where('kind', '==', kind);
@@ -648,7 +655,7 @@ export async function getEntityRelations(
 /** Get all relationships within a universe. */
 export async function getUniverseRelations(universeAddress: string): Promise<EntityRelation[]> {
   const snapshot = await relationsCol()
-    .where('universeAddress', '==', universeAddress.toLowerCase())
+    .where('universeAddress', '==', normalizeUniverseId(universeAddress))
     .limit(200)
     .get();
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as EntityRelation);
