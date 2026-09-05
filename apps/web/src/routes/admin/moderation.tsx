@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   Sparkles,
   Search,
+  Box,
 } from 'lucide-react';
 import { RiskBadge } from '@/components/vlm/RiskBadge';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
@@ -54,8 +55,8 @@ function ContentPreviewCard({ preview }: { preview: ContentPreview | null }) {
   }
 
   const isVideo = preview.mediaType === 'video' || preview.mediaType === 'ai-video';
-  const isImage =
-    preview.mediaType === 'image' || preview.mediaType === 'ai-image' || preview.mediaType === '3d';
+  const isImage = preview.mediaType === 'image' || preview.mediaType === 'ai-image';
+  const is3D = preview.mediaType === '3d';
   const mediaSrc = resolveIpfsUrlPreferred(preview.mediaUrl);
   const posterSrc = resolveIpfsUrlPreferred(preview.thumbnailUrl);
 
@@ -84,6 +85,10 @@ function ContentPreviewCard({ preview }: { preview: ContentPreview | null }) {
             alt={preview.title || 'flagged content'}
             className="w-full h-full object-cover"
           />
+        ) : is3D ? (
+          // 3D with no rendered thumbnail: `mediaUrl` is a .glb/.fbx binary,
+          // not a decodable image — a cube glyph beats a failed SmartImage.
+          <Box className="h-6 w-6 text-amber-200/70" />
         ) : (
           <span className="text-xs text-muted-foreground px-2 text-center">no preview</span>
         )}
@@ -576,7 +581,19 @@ function AllContentTab() {
               <Card key={c.id} className={off ? 'opacity-60' : undefined}>
                 <CardContent className="p-3 flex items-center gap-3">
                   <div className="w-16 h-16 flex-shrink-0 rounded overflow-hidden bg-black/40 flex items-center justify-center">
-                    {c.thumbnailUrl || c.mediaUrl ? (
+                    {c.mediaType === '3d' ? (
+                      // 3D: `mediaUrl` is a .glb/.fbx binary, not a
+                      // decodable image — only ever render `thumbnailUrl`.
+                      c.thumbnailUrl ? (
+                        <SmartImage
+                          src={c.thumbnailUrl}
+                          alt={c.title || 'content'}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Box className="h-6 w-6 text-amber-200/70" />
+                      )
+                    ) : c.thumbnailUrl || c.mediaUrl ? (
                       <SmartImage
                         src={c.thumbnailUrl || c.mediaUrl}
                         alt={c.title || 'content'}

@@ -2,7 +2,7 @@
  * Featured Card — A single featured item with queued video loading.
  */
 import { useState } from 'react';
-import { Film } from 'lucide-react';
+import { Film, Box } from 'lucide-react';
 import { useVideoLoad } from '@/hooks/useVideoLoad';
 import { proxiedImage, proxiedSrcSet } from '@/utils/img-proxy';
 
@@ -18,6 +18,10 @@ interface FeaturedCardProps {
 
 export function FeaturedCard({ item }: FeaturedCardProps) {
   const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
+  // 3D items' `mediaUrl` is a .glb/.fbx binary, not a decodable image —
+  // only ever fall back to it for non-3D media (see components/gallery/
+  // ContentCard.tsx's `is3D` branch for the pattern this mirrors).
+  const is3D = item.mediaType === '3d';
   const {
     videoRef,
     ready,
@@ -25,6 +29,9 @@ export function FeaturedCard({ item }: FeaturedCardProps) {
     onLoaded,
   } = useVideoLoad(isVideo ? item.mediaUrl : undefined);
   const [loaded, setLoaded] = useState(false);
+  const rawThumbnail = is3D
+    ? item.thumbnailUrl
+    : item.thumbnailUrl || item.mediaUrl || '/placeholder.jpg';
 
   return (
     <div className="relative aspect-video rounded-lg overflow-hidden group cursor-pointer bg-gradient-to-br from-zinc-900 via-zinc-900/95 to-zinc-800">
@@ -63,10 +70,19 @@ export function FeaturedCard({ item }: FeaturedCardProps) {
             </div>
           )}
         </>
+      ) : is3D && !rawThumbnail ? (
+        // 3D with no Meshy-rendered thumbnail: no image-decodable source
+        // exists (mediaUrl is a .glb/.fbx binary) — show a cube glyph
+        // instead of proxying the model URL through the image resize proxy,
+        // which can only ever fail.
+        <div className="w-full h-full flex items-center justify-center relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/15 to-rose-500/15" />
+          <Box className="relative h-8 w-8 text-amber-200/70" />
+        </div>
       ) : (
         <img
-          src={proxiedImage(item.thumbnailUrl || item.mediaUrl || '/placeholder.jpg')}
-          srcSet={proxiedSrcSet(item.thumbnailUrl || item.mediaUrl)}
+          src={proxiedImage(rawThumbnail)}
+          srcSet={proxiedSrcSet(rawThumbnail)}
           sizes="(max-width: 768px) 100vw, 640px"
           alt={item.title || 'Featured'}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

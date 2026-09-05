@@ -3,7 +3,7 @@
  * Click a gallery card to pop it out into this immersive viewer.
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { X, Download, Heart, Eye, GitBranch, ArrowUpRight } from 'lucide-react';
+import { X, Download, Heart, Eye, GitBranch, ArrowUpRight, Box } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useGalleryLineage } from '@/hooks/useGallery';
@@ -278,13 +278,25 @@ export function MediaLightbox({ content, onClose, onNavigate }: MediaLightboxPro
                     onClick={() => onNavigate?.(lineage.parent!)}
                     className="flex items-center gap-3 bg-white/5 hover:bg-white/10 rounded-lg p-2 w-full text-left transition-colors"
                   >
-                    <SmartImage
-                      src={
-                        lineage.parent.thumbnailUrl || lineage.parent.mediaUrl || '/placeholder.jpg'
-                      }
-                      alt={lineage.parent.title}
-                      className="w-16 h-10 object-cover rounded"
-                    />
+                    {lineage.parent.mediaType === '3d' && !lineage.parent.thumbnailUrl ? (
+                      // 3D with no rendered thumbnail: `mediaUrl` is a
+                      // .glb/.fbx binary, not a decodable image.
+                      <div className="w-16 h-10 rounded bg-white/5 flex items-center justify-center flex-shrink-0">
+                        <Box className="h-4 w-4 text-amber-200/70" />
+                      </div>
+                    ) : (
+                      <SmartImage
+                        src={
+                          lineage.parent.mediaType === '3d'
+                            ? lineage.parent.thumbnailUrl
+                            : lineage.parent.thumbnailUrl ||
+                              lineage.parent.mediaUrl ||
+                              '/placeholder.jpg'
+                        }
+                        alt={lineage.parent.title}
+                        className="w-16 h-10 object-cover rounded"
+                      />
+                    )}
                     <div className="min-w-0 flex-1">
                       <div className="text-sm truncate">{lineage.parent.title}</div>
                       <div className="text-xs text-white/50 truncate">
@@ -330,11 +342,21 @@ export function MediaLightbox({ content, onClose, onNavigate }: MediaLightboxPro
                       className="relative aspect-square overflow-hidden rounded bg-white/5 hover:ring-2 hover:ring-white/40 transition-all"
                       title={d.title}
                     >
-                      <SmartImage
-                        src={d.thumbnailUrl || d.mediaUrl || '/placeholder.jpg'}
-                        alt={d.title}
-                        className="w-full h-full object-cover"
-                      />
+                      {d.mediaType === '3d' && !d.thumbnailUrl ? (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Box className="h-4 w-4 text-amber-200/70" />
+                        </div>
+                      ) : (
+                        <SmartImage
+                          src={
+                            d.mediaType === '3d'
+                              ? d.thumbnailUrl
+                              : d.thumbnailUrl || d.mediaUrl || '/placeholder.jpg'
+                          }
+                          alt={d.title}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
                     </button>
                   ))}
                 </div>

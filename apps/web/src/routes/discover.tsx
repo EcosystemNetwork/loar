@@ -43,6 +43,7 @@ import {
   Eye,
   Lock,
   Crown,
+  Box,
 } from 'lucide-react';
 
 export const Route = createFileRoute('/discover')({
@@ -135,7 +136,26 @@ function DiscoverPage() {
                   search={item.universeId ? { universe: item.universeId } : {}}
                   className="group relative rounded-xl overflow-hidden bg-muted aspect-[3/4] hover:ring-2 hover:ring-primary/50 transition-all"
                 >
-                  {item.thumbnailUrl || item.mediaUrl ? (
+                  {item.mediaType === '3d' ? (
+                    // 3D: `mediaUrl` is a .glb/.fbx binary, not a decodable
+                    // image — only ever render `thumbnailUrl` (Meshy's
+                    // rendered preview); fall back to a cube glyph instead of
+                    // feeding the model URL to SmartImage (always fails, see
+                    // components/gallery/ContentCard.tsx's `is3D` branch and
+                    // components/home/HomeSections.tsx's `ContentCard`).
+                    item.thumbnailUrl ? (
+                      <SmartImage
+                        src={item.thumbnailUrl}
+                        alt={item.title || 'Trending'}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center relative">
+                        <div className="absolute inset-0 bg-gradient-to-br from-amber-500/15 to-rose-500/15" />
+                        <Box className="relative h-8 w-8 text-amber-200/70" />
+                      </div>
+                    )
+                  ) : item.thumbnailUrl || item.mediaUrl ? (
                     <SmartImage
                       src={item.thumbnailUrl || item.mediaUrl}
                       alt={item.title || 'Trending'}

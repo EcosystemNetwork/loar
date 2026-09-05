@@ -821,9 +821,14 @@ function ThreeDModelsTab({ universeAddress }: { universeAddress?: string }) {
                 <div className="absolute inset-0 flex items-center justify-center">
                   <Rotate3d className="h-6 w-6 text-muted-foreground/30" />
                 </div>
-                {(item.thumbnailUrl || item.mediaUrl) && (
+                {/* `mediaUrl` is the raw .glb/.fbx binary for 3D items — not a
+                    decodable image. Only ever render `thumbnailUrl`; when
+                    absent, the Rotate3d glyph above stays visible instead of
+                    a failed SmartImage covering it with "Couldn't load
+                    image". */}
+                {item.thumbnailUrl && (
                   <SmartImage
-                    src={item.thumbnailUrl || item.mediaUrl}
+                    src={item.thumbnailUrl}
                     alt={item.title}
                     decoding="async"
                     className="absolute inset-0 w-full h-full object-cover"
