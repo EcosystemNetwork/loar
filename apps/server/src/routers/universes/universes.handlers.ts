@@ -9,6 +9,7 @@ import { db } from '../../lib/firebase';
 import { randomUUID } from 'crypto';
 import { getSafeInfo } from '../../lib/safe-admin';
 import { TRPCError } from '@trpc/server';
+import { normalizeUniverseId } from '../../lib/universe-id';
 
 // ── Mint fee credit conversion (~$10 worth of generation credits) ─────────
 const UNIVERSE_MINT_CREDITS = parseInt(process.env.UNIVERSE_MINT_CREDITS ?? '333', 10);
@@ -315,7 +316,8 @@ export async function setUniverseHidden(
   isHidden: boolean,
   actor?: { uid?: string; address?: string }
 ) {
-  const id = universeId.toLowerCase();
+  // EVM ids are stored lowercased; Solana base58 PDAs are case-sensitive.
+  const id = normalizeUniverseId(universeId);
   const doc = await collection().doc(id).get();
   if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Universe not found' });
 
@@ -353,7 +355,8 @@ export async function setUniversePrivate(
   isPrivate: boolean,
   actor?: { uid?: string; address?: string }
 ) {
-  const id = universeId.toLowerCase();
+  // EVM ids are stored lowercased; Solana base58 PDAs are case-sensitive.
+  const id = normalizeUniverseId(universeId);
   const doc = await collection().doc(id).get();
   if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Universe not found' });
 
@@ -391,7 +394,8 @@ export async function deleteUniverse(
   actor?: { uid?: string; address?: string },
   reason?: string
 ) {
-  const id = universeId.toLowerCase();
+  // EVM ids are stored lowercased; Solana base58 PDAs are case-sensitive.
+  const id = normalizeUniverseId(universeId);
   const ref = collection().doc(id);
   const doc = await ref.get();
   if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'Universe not found' });

@@ -328,7 +328,8 @@ export const universesRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const universeId = input.universeId.toLowerCase();
+      // EVM ids are stored lowercased; Solana base58 PDAs are case-sensitive.
+      const universeId = normalizeUniverseId(input.universeId);
       if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
         throw new Error('Only the universe admin can finalize token deployment');
       }
@@ -361,7 +362,8 @@ export const universesRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const universeId = input.universeId.toLowerCase();
+      // EVM ids are stored lowercased; Solana base58 PDAs are case-sensitive.
+      const universeId = normalizeUniverseId(input.universeId);
       const callerUid = ctx.user.uid.toLowerCase();
 
       // Only the current creator can convert to multi-sig
@@ -417,7 +419,8 @@ export const universesRouter = router({
   disableMultiSig: protectedProcedure
     .input(z.object({ universeId: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const universeId = input.universeId.toLowerCase();
+      // EVM ids are stored lowercased; Solana base58 PDAs are case-sensitive.
+      const universeId = normalizeUniverseId(input.universeId);
       const callerUid = ctx.user.uid.toLowerCase();
 
       const doc = await db.collection('cinematicUniverses').doc(universeId).get();
@@ -548,7 +551,7 @@ export const universesRouter = router({
     .query(async ({ input }) => {
       const doc = await db
         .collection('cinematicUniverses')
-        .doc(input.universeId.toLowerCase())
+        .doc(normalizeUniverseId(input.universeId))
         .get();
       if (!doc.exists) throw new Error('Universe not found');
 
@@ -575,7 +578,8 @@ export const universesRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const universeId = input.universeId.toLowerCase();
+      // EVM ids are stored lowercased; Solana base58 PDAs are case-sensitive.
+      const universeId = normalizeUniverseId(input.universeId);
       if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
         throw new Error('Only the universe admin can set the domain');
       }
@@ -597,7 +601,8 @@ export const universesRouter = router({
     .mutation(async ({ input, ctx }) => {
       // INF-5: access model switches control token-gate / subscription
       // revenue paths — strict on-chain owner check required.
-      const universeId = input.universeId.toLowerCase();
+      // EVM ids are stored lowercased; Solana base58 PDAs are case-sensitive.
+      const universeId = normalizeUniverseId(input.universeId);
       if (!(await isUniverseAdminStrict(universeId, ctx.user.uid))) {
         throw new Error('Only the universe admin can update access settings');
       }
@@ -690,7 +695,8 @@ export const universesRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       // INF-5: privacy flips can hide monetized content from buyers. Strict check.
-      const universeId = input.universeId.toLowerCase();
+      // EVM ids are stored lowercased; Solana base58 PDAs are case-sensitive.
+      const universeId = normalizeUniverseId(input.universeId);
       if (!(await isUniverseAdminStrict(universeId, ctx.user.uid))) {
         throw new Error('Only the universe creator can change privacy');
       }
@@ -737,7 +743,7 @@ export const universesRouter = router({
     .query(async ({ input }) => {
       const doc = await db
         .collection('cinematicUniverses')
-        .doc(input.universeId.toLowerCase())
+        .doc(normalizeUniverseId(input.universeId))
         .get();
       if (!doc.exists) return { accessModel: 'open' };
       return { accessModel: doc.data()?.accessModel || 'open' };
@@ -758,7 +764,8 @@ export const universesRouter = router({
     .mutation(async ({ input, ctx }) => {
       // INF-5: universeType flip (fun → monetized) unlocks the revenue
       // mode — treat it like a treasury action and require strict admin.
-      const universeId = input.universeId.toLowerCase();
+      // EVM ids are stored lowercased; Solana base58 PDAs are case-sensitive.
+      const universeId = normalizeUniverseId(input.universeId);
       if (!(await isUniverseAdminStrict(universeId, ctx.user.uid))) {
         throw new Error('Only the universe admin can update the universe type');
       }
@@ -777,7 +784,7 @@ export const universesRouter = router({
     .query(async ({ input }) => {
       const doc = await db
         .collection('cinematicUniverses')
-        .doc(input.universeId.toLowerCase())
+        .doc(normalizeUniverseId(input.universeId))
         .get();
       if (!doc.exists) return { universeType: 'monetized' as const };
       return {
@@ -799,7 +806,8 @@ export const universesRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const universeId = input.universeId.toLowerCase();
+      // EVM ids are stored lowercased; Solana base58 PDAs are case-sensitive.
+      const universeId = normalizeUniverseId(input.universeId);
       if (!(await isUniverseAdmin(universeId, ctx.user.uid))) {
         throw new Error('Only the universe admin can set the canon style pack');
       }
@@ -830,7 +838,7 @@ export const universesRouter = router({
     .query(async ({ input }) => {
       const doc = await db
         .collection('cinematicUniverses')
-        .doc(input.universeId.toLowerCase())
+        .doc(normalizeUniverseId(input.universeId))
         .get();
       if (!doc.exists) return { canonStylePackEntityId: null };
       return {
