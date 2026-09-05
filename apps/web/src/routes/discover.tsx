@@ -21,6 +21,14 @@ import { QueryState } from '@/components/QueryState';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import { SmartImage } from '@/components/SmartImage';
 import { useResolvedIpfsUrl } from '@/hooks/useResolvedIpfsUrl';
+import { ModelViewer } from '@/components/ModelViewer';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Search,
@@ -44,6 +52,7 @@ import {
   Lock,
   Crown,
   Box,
+  Rotate3d,
 } from 'lucide-react';
 
 export const Route = createFileRoute('/discover')({
@@ -130,56 +139,7 @@ function DiscoverPage() {
           {trendingItems.length > 0 && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {trendingItems.map((item: any, i: number) => (
-                <Link
-                  key={item.id || item.contentId || i}
-                  to="/gallery"
-                  search={item.universeId ? { universe: item.universeId } : {}}
-                  className="group relative rounded-xl overflow-hidden bg-muted aspect-[3/4] hover:ring-2 hover:ring-primary/50 transition-all"
-                >
-                  {item.mediaType === '3d' ? (
-                    // 3D: `mediaUrl` is a .glb/.fbx binary, not a decodable
-                    // image — only ever render `thumbnailUrl` (Meshy's
-                    // rendered preview); fall back to a cube glyph instead of
-                    // feeding the model URL to SmartImage (always fails, see
-                    // components/gallery/ContentCard.tsx's `is3D` branch and
-                    // components/home/HomeSections.tsx's `ContentCard`).
-                    item.thumbnailUrl ? (
-                      <SmartImage
-                        src={item.thumbnailUrl}
-                        alt={item.title || 'Trending'}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center relative">
-                        <div className="absolute inset-0 bg-gradient-to-br from-amber-500/15 to-rose-500/15" />
-                        <Box className="relative h-8 w-8 text-amber-200/70" />
-                      </div>
-                    )
-                  ) : item.thumbnailUrl || item.mediaUrl ? (
-                    <SmartImage
-                      src={item.thumbnailUrl || item.mediaUrl}
-                      alt={item.title || 'Trending'}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <TrendingUp className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                  <div className="absolute bottom-0 inset-x-0 p-2.5">
-                    <div className="flex items-center gap-1 mb-1">
-                      <span className="text-[10px] font-bold text-orange-400">#{i + 1}</span>
-                      <Flame className="h-3 w-3 text-orange-400" />
-                    </div>
-                    <p className="text-white text-xs font-medium line-clamp-2 leading-tight">
-                      {item.title || 'Untitled'}
-                    </p>
-                    <p className="text-white/50 text-[10px] mt-0.5">
-                      {item.totalViews ?? item.views ?? 0} views
-                    </p>
-                  </div>
-                </Link>
+                <TrendingCard key={item.id || item.contentId || i} item={item} rank={i} />
               ))}
             </div>
           )}
@@ -210,6 +170,9 @@ function DiscoverPage() {
                 </TabsTrigger>
                 <TabsTrigger value="videos" className="gap-1">
                   <Film className="h-4 w-4" /> Videos
+                </TabsTrigger>
+                <TabsTrigger value="3d" className="gap-1">
+                  <Rotate3d className="h-4 w-4" /> 3D Models
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -324,6 +287,11 @@ function DiscoverPage() {
           {/* Videos Tab */}
           <TabsContent value="videos">
             <VideosTabContent search={search} />
+          </TabsContent>
+
+          {/* 3D Models Tab */}
+          <TabsContent value="3d">
+            <ThreeDModelsTabContent search={search} />
           </TabsContent>
         </Tabs>
       </div>
@@ -1217,84 +1185,356 @@ function CreatorCard({ profile }: { profile: any }) {
 
 function ContentFeedCard({ item }: { item: any }) {
   const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
+  // 3D: `mediaUrl` is a .glb/.fbx binary, never a decodable image. Route the
+  // card to the wiki's 3D-models tab (its `ModelViewer` dialog is the only
+  // place the model is actually viewable) and only ever render `thumbnailUrl`.
+  const is3D = item.mediaType === '3d';
+
+  const media = is3D ? (
+    item.thumbnailUrl ? (
+      <SmartImage src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
+    ) : (
+      <div className="w-full h-full flex items-center justify-center relative">
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-500/15 to-rose-500/15" />
+        <Box className="relative h-10 w-10 text-amber-200/70" />
+      </div>
+    )
+  ) : item.thumbnailUrl ? (
+    <SmartImage src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
+  ) : isVideo ? (
+    <video
+      src={resolveIpfsUrlPreferred(item.mediaUrl)}
+      className="w-full h-full object-cover"
+      muted
+      preload="metadata"
+    />
+  ) : (
+    <SmartImage src={item.mediaUrl} alt={item.title} className="w-full h-full object-cover" />
+  );
+
+  const inner = (
+    <Card className="overflow-hidden group cursor-pointer hover:shadow-lg transition-all duration-300">
+      <CardContent className="p-0">
+        <div className="relative aspect-video bg-muted">
+          {media}
+          {isVideo && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Play className="h-10 w-10 text-white" />
+            </div>
+          )}
+          {is3D && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Rotate3d className="h-9 w-9 text-white" />
+            </div>
+          )}
+          <div className="absolute top-2 right-2">
+            <ContentLaneBadge
+              classification={
+                item.classification === 'fan' || item.classification === 'licensed'
+                  ? item.classification
+                  : 'original'
+              }
+              reviewStatus={item.reviewStatus}
+              size="sm"
+            />
+          </div>
+          <div className="absolute bottom-2 left-2">
+            <Badge variant="outline" className="text-xs bg-black/40 text-white border-0">
+              {item.mediaType === 'ai-video'
+                ? 'AI Video'
+                : item.mediaType === 'ai-image'
+                  ? 'AI Image'
+                  : is3D
+                    ? '3D'
+                    : item.mediaType}
+            </Badge>
+          </div>
+        </div>
+
+        <div className="p-3">
+          {item.universeId && (
+            <p className="text-[10px] text-muted-foreground mb-1 truncate">
+              <Globe className="h-2.5 w-2.5 inline mr-0.5" />
+              {item.universeName || item.universeId.slice(0, 10) + '...'}
+            </p>
+          )}
+          <h3 className="font-medium truncate">{item.title}</h3>
+          {item.description && (
+            <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{item.description}</p>
+          )}
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex gap-1">
+              {Array.isArray(item.tags) &&
+                item.tags.slice(0, 2).map((tag: string) => (
+                  <Badge key={tag} variant="outline" className="text-xs">
+                    {tag}
+                  </Badge>
+                ))}
+            </div>
+            <span className="text-xs text-muted-foreground">{item.views ?? 0} views</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  return is3D ? (
+    <Link
+      to="/wiki"
+      search={{
+        ...(item.universeId ? { universe: item.universeId } : {}),
+        tab: '3d-models',
+      }}
+    >
+      {inner}
+    </Link>
+  ) : (
+    <Link to="/gallery">{inner}</Link>
+  );
+}
+
+/* ─── Trending hero card ───────────────────────────────────────── */
+
+function TrendingCard({ item, rank }: { item: any; rank: number }) {
+  // 3D `mediaUrl` is a .glb/.fbx binary — never an <img> source. Route 3D
+  // trending cards straight to the wiki's 3D-models tab (the only surface
+  // that can actually render the model) instead of the generic gallery.
+  const is3D = item.mediaType === '3d';
+
+  const inner = (
+    <>
+      {is3D ? (
+        item.thumbnailUrl ? (
+          <SmartImage
+            src={item.thumbnailUrl}
+            alt={item.title || 'Trending'}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/15 to-rose-500/15" />
+            <Box className="relative h-8 w-8 text-amber-200/70" />
+          </div>
+        )
+      ) : item.thumbnailUrl || item.mediaUrl ? (
+        <SmartImage
+          src={item.thumbnailUrl || item.mediaUrl}
+          alt={item.title || 'Trending'}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <TrendingUp className="h-8 w-8 text-muted-foreground" />
+        </div>
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+      <div className="absolute bottom-0 inset-x-0 p-2.5">
+        <div className="flex items-center gap-1 mb-1">
+          <span className="text-[10px] font-bold text-orange-400">#{rank + 1}</span>
+          <Flame className="h-3 w-3 text-orange-400" />
+        </div>
+        <p className="text-white text-xs font-medium line-clamp-2 leading-tight">
+          {item.title || 'Untitled'}
+        </p>
+        <p className="text-white/50 text-[10px] mt-0.5">
+          {item.totalViews ?? item.views ?? 0} views
+        </p>
+      </div>
+    </>
+  );
+
+  const className =
+    'group relative rounded-xl overflow-hidden bg-muted aspect-[3/4] hover:ring-2 hover:ring-primary/50 transition-all';
+
+  return is3D ? (
+    <Link
+      to="/wiki"
+      search={{ ...(item.universeId ? { universe: item.universeId } : {}), tab: '3d-models' }}
+      className={className}
+    >
+      {inner}
+    </Link>
+  ) : (
+    <Link
+      to="/gallery"
+      search={item.universeId ? { universe: item.universeId } : {}}
+      className={className}
+    >
+      {inner}
+    </Link>
+  );
+}
+
+/* ─── 3D Models Tab ───────────────────────────────────────────── */
+
+function ThreeDModelsTabContent({ search }: { search: string }) {
+  const [selected, setSelected] = useState<any | null>(null);
+
+  const query = useInfiniteQuery({
+    queryKey: ['discover-3d'],
+    queryFn: ({ pageParam }: { pageParam?: string }) =>
+      trpcClient.gallery.browse.query({
+        mediaType: '3d',
+        sortBy: 'newest',
+        limit: 24,
+        cursor: pageParam,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last: any) => last.nextCursor ?? undefined,
+  });
+
+  const allItems = query.data?.pages.flatMap((p: any) => p.items) ?? [];
+  // Hide legacy untextured intermediates — mirrors wiki/index.tsx's ThreeDModelsTab.
+  const textured = allItems.filter(
+    (item: any) => !(Array.isArray(item.tags) && item.tags.includes('untextured'))
+  );
+  const s = search.trim().toLowerCase();
+  const items = s
+    ? textured.filter(
+        (item: any) =>
+          item.title?.toLowerCase().includes(s) || item.description?.toLowerCase().includes(s)
+      )
+    : textured;
 
   return (
-    <Link to="/gallery">
-      <Card className="overflow-hidden group cursor-pointer hover:shadow-lg transition-all duration-300">
+    <>
+      <QueryState
+        isLoading={query.isLoading}
+        isError={query.isError}
+        isEmpty={items.length === 0}
+        onRetry={() => query.refetch()}
+        errorMessage="Failed to load 3D models. Please try again."
+        skeletonCount={8}
+        skeletonAspect="aspect-square"
+        skeletonGrid="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
+        emptyState={
+          <div className="text-center py-16">
+            <Rotate3d className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">No 3D models yet</h3>
+            <p className="text-muted-foreground">
+              {search ? `No results for "${search}"` : 'Generate one from a universe editor.'}
+            </p>
+          </div>
+        }
+      >
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {items.map((item: any) => (
+            <ThreeDModelCard key={item.id} item={item} onSelect={() => setSelected(item)} />
+          ))}
+        </div>
+        {query.hasNextPage && (
+          <div className="flex justify-center mt-6">
+            <Button
+              variant="outline"
+              onClick={() => query.fetchNextPage()}
+              disabled={query.isFetchingNextPage}
+              className="gap-2"
+            >
+              {query.isFetchingNextPage && <Loader2 className="h-4 w-4 animate-spin" />}
+              Load more
+            </Button>
+          </div>
+        )}
+      </QueryState>
+
+      <Discover3DViewerDialog item={selected} onOpenChange={(open) => !open && setSelected(null)} />
+    </>
+  );
+}
+
+function ThreeDModelCard({ item, onSelect }: { item: any; onSelect: () => void }) {
+  return (
+    <button type="button" onClick={onSelect} className="text-left w-full">
+      <Card className="overflow-hidden group cursor-pointer hover:shadow-lg hover:ring-2 hover:ring-primary/40 transition-all">
         <CardContent className="p-0">
-          <div className="relative aspect-video bg-muted">
-            {item.thumbnailUrl ? (
+          <div className="relative aspect-square bg-muted">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Rotate3d className="h-8 w-8 text-muted-foreground/25" />
+            </div>
+            {/* `mediaUrl` is the raw .glb binary — only ever render `thumbnailUrl`. */}
+            {item.thumbnailUrl && (
               <SmartImage
                 src={item.thumbnailUrl}
                 alt={item.title}
-                className="w-full h-full object-cover"
-              />
-            ) : isVideo ? (
-              <video
-                src={resolveIpfsUrlPreferred(item.mediaUrl)}
-                className="w-full h-full object-cover"
-                muted
-                preload="metadata"
-              />
-            ) : (
-              <SmartImage
-                src={item.mediaUrl}
-                alt={item.title}
-                className="w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
             )}
-            {isVideo && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Play className="h-10 w-10 text-white" />
-              </div>
-            )}
-            <div className="absolute top-2 right-2">
-              <ContentLaneBadge
-                classification={
-                  item.classification === 'fan' || item.classification === 'licensed'
-                    ? item.classification
-                    : 'original'
-                }
-                reviewStatus={item.reviewStatus}
-                size="sm"
-              />
-            </div>
-            <div className="absolute bottom-2 left-2">
-              <Badge variant="outline" className="text-xs bg-black/40 text-white border-0">
-                {item.mediaType === 'ai-video'
-                  ? 'AI Video'
-                  : item.mediaType === 'ai-image'
-                    ? 'AI Image'
-                    : item.mediaType}
-              </Badge>
+            <Badge className="absolute top-2 left-2 bg-black/60 text-white border-0 text-[10px] gap-1">
+              <Rotate3d className="h-2.5 w-2.5" /> 3D
+            </Badge>
+            <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Eye className="h-8 w-8 text-white" />
             </div>
           </div>
-
           <div className="p-3">
             {item.universeId && (
               <p className="text-[10px] text-muted-foreground mb-1 truncate">
                 <Globe className="h-2.5 w-2.5 inline mr-0.5" />
-                {item.universeName || item.universeId.slice(0, 10) + '...'}
+                {item.universeId.slice(0, 10)}...
               </p>
             )}
-            <h3 className="font-medium truncate">{item.title}</h3>
+            <h3 className="font-medium truncate">{item.title || 'Untitled'}</h3>
             {item.description && (
-              <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{item.description}</p>
+              <p className="text-sm text-muted-foreground line-clamp-2 mt-1 break-words">
+                <UserText>{item.description}</UserText>
+              </p>
             )}
-            <div className="flex items-center justify-between mt-2">
-              <div className="flex gap-1">
-                {Array.isArray(item.tags) &&
-                  item.tags.slice(0, 2).map((tag: string) => (
-                    <Badge key={tag} variant="outline" className="text-xs">
-                      {tag}
-                    </Badge>
-                  ))}
-              </div>
-              <span className="text-xs text-muted-foreground">{item.views ?? 0} views</span>
-            </div>
           </div>
         </CardContent>
       </Card>
-    </Link>
+    </button>
+  );
+}
+
+/**
+ * Lightweight in-place 3D viewer for the Discover 3D lane. Wraps <ModelViewer>
+ * (Google <model-viewer>, orbit + auto-rotate) so a model is viewable without
+ * leaving Discover; the wiki's testbench dialog stays the place to rig/animate.
+ */
+function Discover3DViewerDialog({
+  item,
+  onOpenChange,
+}: {
+  item: any | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const posterUrl = useResolvedIpfsUrl(item?.thumbnailUrl);
+
+  return (
+    <Dialog open={!!item} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>{item?.title || '3D Model'}</DialogTitle>
+          {item?.description && (
+            <DialogDescription className="line-clamp-3">{item.description}</DialogDescription>
+          )}
+        </DialogHeader>
+        {item?.mediaUrl ? (
+          <div className="space-y-3">
+            <div className="h-[60vh] w-full">
+              <ModelViewer
+                src={item.mediaUrl}
+                poster={posterUrl}
+                alt={item.title || '3D Model'}
+                className="h-full"
+                testbench
+              />
+            </div>
+            {item.universeId && (
+              <Link
+                to="/wiki"
+                search={{ universe: item.universeId, tab: '3d-models' }}
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <Globe className="h-3 w-3" />
+                Open in Wiki → 3D Models
+              </Link>
+            )}
+          </div>
+        ) : (
+          <div className="py-16 text-center text-muted-foreground">Model unavailable.</div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
