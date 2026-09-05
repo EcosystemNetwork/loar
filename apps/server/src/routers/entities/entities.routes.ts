@@ -55,7 +55,10 @@ import { getExcludedUniverseIds } from '../universes/universes.handlers';
 
 const entityKindSchema = z.enum(ENTITY_KINDS);
 
-const ethereumAddress = z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address');
+// A universe address is either a lowercased EVM `0x…` address or a
+// case-sensitive Solana base58 PDA — don't constrain the format here.
+// See lib/universe-id.ts and physics.routes.ts for the same fix.
+const universeAddress = z.string().min(1, 'Universe address is required');
 
 export const entitiesRouter = router({
   /** Create a new entity. universeAddress is optional for creator kinds. */
@@ -66,7 +69,7 @@ export const entitiesRouter = router({
         name: z.string().min(1).max(200),
         description: z.string().max(5000).default(''),
         kind: entityKindSchema,
-        universeAddress: ethereumAddress.nullish(),
+        universeAddress: universeAddress.nullish(),
         parentId: z.string().nullish(),
         nodeIds: z.array(z.number().int().nonnegative()).optional(),
         imageUrl: z.string().url().nullish(),
@@ -126,7 +129,7 @@ export const entitiesRouter = router({
       z.object({
         entityId: z.string().min(1),
         /** @deprecated No longer needed — kept for backwards compatibility. */
-        universeAddress: ethereumAddress.optional(),
+        universeAddress: universeAddress.optional(),
       })
     )
     .query(async ({ input, ctx }) => {
@@ -150,7 +153,7 @@ export const entitiesRouter = router({
   list: publicProcedure
     .input(
       z.object({
-        universeAddress: ethereumAddress,
+        universeAddress: universeAddress,
         kind: entityKindSchema.optional(),
         limit: z.number().int().positive().max(200).optional(),
         cursor: z.string().optional(),
@@ -231,7 +234,7 @@ export const entitiesRouter = router({
       z.object({
         parentId: z.string().min(1),
         /** @deprecated No longer needed — kept for backwards compatibility. */
-        universeAddress: ethereumAddress.optional(),
+        universeAddress: universeAddress.optional(),
         limit: z.number().int().positive().max(200).default(100),
       })
     )
@@ -251,7 +254,7 @@ export const entitiesRouter = router({
       z.object({
         entityId: z.string().min(1),
         /** @deprecated Kept for backwards compatibility — no longer used for routing. */
-        universeAddress: ethereumAddress.optional(),
+        universeAddress: universeAddress.optional(),
         name: z.string().min(1).max(200).optional(),
         description: z.string().max(5000).optional(),
         parentId: z.string().nullish(),
@@ -285,7 +288,7 @@ export const entitiesRouter = router({
       z.object({
         entityId: z.string().min(1),
         /** @deprecated Kept for backwards compatibility. */
-        universeAddress: ethereumAddress.optional(),
+        universeAddress: universeAddress.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -306,7 +309,7 @@ export const entitiesRouter = router({
         entityId: z.string().min(1),
         nodeId: z.number().int().nonnegative(),
         /** @deprecated Kept for backwards compatibility. */
-        universeAddress: ethereumAddress.optional(),
+        universeAddress: universeAddress.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -327,7 +330,7 @@ export const entitiesRouter = router({
         entityId: z.string().min(1),
         nodeId: z.number().int().nonnegative(),
         /** @deprecated Kept for backwards compatibility. */
-        universeAddress: ethereumAddress.optional(),
+        universeAddress: universeAddress.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -396,7 +399,7 @@ export const entitiesRouter = router({
     .input(
       z.object({
         query: z.string().min(1).max(200),
-        universeAddress: ethereumAddress.optional(),
+        universeAddress: universeAddress.optional(),
         kind: entityKindSchema.optional(),
         limit: z.number().int().positive().max(100).default(50),
       })
@@ -471,7 +474,7 @@ export const entitiesRouter = router({
 
   /** Get all relationships within a universe. */
   universeRelations: publicProcedure
-    .input(z.object({ universeAddress: ethereumAddress }))
+    .input(z.object({ universeAddress: universeAddress }))
     .query(async ({ input, ctx }) => {
       const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
       if (excluded.has(input.universeAddress.toLowerCase())) {

@@ -18,7 +18,10 @@ import {
   getLeaderboard,
 } from './curation.handlers';
 
-const ethereumAddress = z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address');
+// A universe address is either a lowercased EVM `0x…` address or a
+// case-sensitive Solana base58 PDA — don't constrain the format here.
+// See lib/universe-id.ts and physics.routes.ts for the same fix.
+const universeAddress = z.string().min(1, 'Universe address is required');
 const targetTypeSchema = z.enum(CURATION_TARGET_TYPES as [string, ...string[]]);
 
 export const curationRouter = router({
@@ -30,7 +33,7 @@ export const curationRouter = router({
         targetId: z.string().min(1).max(200),
         weight: z.number().int().min(1).max(5),
         note: z.string().max(500).optional(),
-        universeAddress: ethereumAddress.nullish(),
+        universeAddress: universeAddress.nullish(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -120,7 +123,7 @@ export const curationRouter = router({
       z
         .object({
           targetType: targetTypeSchema.optional(),
-          universeAddress: ethereumAddress.nullish(),
+          universeAddress: universeAddress.nullish(),
           limit: z.number().int().positive().max(100).default(25),
         })
         .default({ limit: 25 })

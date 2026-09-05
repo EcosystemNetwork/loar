@@ -16,7 +16,10 @@ import {
   promoteNotebookEntry,
 } from './notebook.handlers';
 
-const ethereumAddress = z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address');
+// A universe address is either a lowercased EVM `0x…` address or a
+// case-sensitive Solana base58 PDA — don't constrain the format here.
+// See lib/universe-id.ts and physics.routes.ts for the same fix.
+const universeAddress = z.string().min(1, 'Universe address is required');
 const entityKindSchema = z.enum(ENTITY_KINDS);
 
 async function assertOwner(entryId: string, caller?: string) {
@@ -35,7 +38,7 @@ export const notebookRouter = router({
         title: z.string().min(1).max(200),
         body: z.string().max(20_000).default(''),
         tags: z.array(z.string().min(1).max(40)).max(20).optional(),
-        universeAddress: ethereumAddress.nullish(),
+        universeAddress: universeAddress.nullish(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -56,7 +59,7 @@ export const notebookRouter = router({
     .input(
       z
         .object({
-          universeAddress: ethereumAddress.nullish(),
+          universeAddress: universeAddress.nullish(),
           onlyPromoted: z.boolean().optional(),
           limit: z.number().int().positive().max(200).default(100),
         })
@@ -89,7 +92,7 @@ export const notebookRouter = router({
         title: z.string().min(1).max(200).optional(),
         body: z.string().max(20_000).optional(),
         tags: z.array(z.string().min(1).max(40)).max(20).optional(),
-        universeAddress: ethereumAddress.nullish(),
+        universeAddress: universeAddress.nullish(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -113,7 +116,7 @@ export const notebookRouter = router({
       z.object({
         entryId: z.string().min(1),
         kind: entityKindSchema,
-        universeAddress: ethereumAddress.nullish(),
+        universeAddress: universeAddress.nullish(),
         imageUrl: z.string().url().nullish(),
       })
     )
