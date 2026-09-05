@@ -12,9 +12,9 @@
  *    `isAddressLikeUniverseId` is the fixed classifier: true for either an
  *    EVM address or a Solana PDA.
  *
- * 2. "Blank page / InvalidAddressError" — once (1) was fixed and the page
- *    rendered further, `useUniverseAddresses`'s Firestore fallback cast
- *    whatever was in the doc's address/tokenAddress/governanceAddress
+ * 2. "Blank page / InvalidAddressError" (round 1) — once (1) was fixed and
+ *    the page rendered further, `useUniverseAddresses`'s Firestore fallback
+ *    cast whatever was in the doc's address/tokenAddress/governanceAddress
  *    fields straight to `0x${string}`. A Solana universe's doc holds base58
  *    (SPL mint / PDA) values there, not hex — that garbage value reached
  *    wagmi's `useReadContract` (TokenGateGuard, useTokenGate), and viem's
@@ -22,16 +22,30 @@
  *    render, crashing the whole page. `asEvmAddressOrUndefined` is the
  *    guard: it only lets actual EVM addresses through.
  *
+ * 3. "Blank page / InvalidAddressError" (round 2) — fixing (2) still wasn't
+ *    enough: `GovernanceSidebar` read those same three Firestore fields
+ *    *directly* off `finalUniverse` (bypassing useUniverseAddresses
+ *    entirely) and called viem's `getAddress()` on them unconditionally —
+ *    the sidebar is mounted by the parent route regardless of whether it's
+ *    open, so this ran, and threw, on every page load for a Solana
+ *    universe. `toChecksummedAddressOrUndefined` replaces the raw
+ *    `getAddress()` call: `undefined` for anything non-EVM (or the zero
+ *    address, or a hex-shaped value with a bad checksum) instead of a
+ *    thrown exception.
+ *
  * These are deliberately framework-free (no wagmi/react-query/DOM) per this
  * project's vitest.config.ts, which scopes unit tests to "pure logic, hooks
  * helpers" — the actual hook wiring is exercised by the e2e suite.
  */
 import { describe, expect, it } from 'vitest';
+import { getAddress } from 'viem';
 import {
   asEvmAddressOrUndefined,
   isAddressLikeUniverseId,
   isEvmAddress,
   isSolanaAddress,
+  toChecksummedAddressOrUndefined,
+  ZERO_ADDRESS,
 } from '../utils';
 
 // The exact id from the reported incident.
@@ -146,5 +160,55 @@ describe('asEvmAddressOrUndefined — the useUniverseAddresses/useTokenGate guar
 
   it('turns null into undefined', () => {
     expect(asEvmAddressOrUndefined(null)).toBeUndefined();
+  });
+});
+
+describe('toChecksummedAddressOrUndefined — the GovernanceSidebar guard', () => {
+  it('checksums a valid lowercase EVM address (no regression for EVM universes)', () => {
+    expect(toChecksummedAddressOrUndefined(EVM_ADDRESS_LOWER)).toBe(getAddress(EVM_ADDRESS_LOWER));
+  });
+
+  it('checksums a valid already-correct mixed-case EVM address', () => {
+    expect(toChecksummedAddressOrUndefined(EVM_ADDRESS_MIXED_CASE)).toBe(
+      getAddress(EVM_ADDRESS_MIXED_CASE)
+    );
+  });
+
+  it('turns the reported Solana PDA into undefined instead of throwing (the actual crash)', () => {
+    // Before this fix, GovernanceSidebar called `getAddress()` on this value
+    // directly and it threw InvalidAddressError synchronously during render.
+    expect(() => toChecksummedAddressOrUndefined(REPORTED_SOLANA_PDA)).not.toThrow();
+    expect(toChecksummedAddressOrUndefined(REPORTED_SOLANA_PDA)).toBeUndefined();
+  });
+
+  it('turns a Solana SPL mint address into undefined instead of throwing', () => {
+    expect(() => toChecksummedAddressOrUndefined(SOLANA_SPL_MINT)).not.toThrow();
+    expect(toChecksummedAddressOrUndefined(SOLANA_SPL_MINT)).toBeUndefined();
+  });
+
+  it('treats the zero address as unset (prevents contract calls to address(0))', () => {
+    expect(toChecksummedAddressOrUndefined(ZERO_ADDRESS)).toBeUndefined();
+  });
+
+  it('re-checksums a wrong-case-but-still-hex-shaped address rather than rejecting it', () => {
+    // getAddress() does NOT throw for a mere EIP-55 checksum mismatch on an
+    // otherwise-valid hex address — it silently re-checksums it. (Confirmed
+    // against viem directly: only genuinely non-hex-shaped input throws.)
+    // This just pins down that this helper doesn't fight that behavior.
+    const wrongCase = '0x89669812F850f34f907ee9e9009f501d1b008420';
+    expect(getAddress(wrongCase)).toBe(getAddress(EVM_ADDRESS_LOWER));
+    expect(toChecksummedAddressOrUndefined(wrongCase)).toBe(getAddress(EVM_ADDRESS_LOWER));
+  });
+
+  it('never throws for arbitrary non-address strings (defense in depth)', () => {
+    for (const bad of ['not-an-address', '0x123', REPORTED_SOLANA_PDA, SOLANA_SPL_MINT, '0x']) {
+      expect(() => toChecksummedAddressOrUndefined(bad)).not.toThrow();
+      expect(toChecksummedAddressOrUndefined(bad)).toBeUndefined();
+    }
+  });
+
+  it('passes through undefined and empty string as undefined', () => {
+    expect(toChecksummedAddressOrUndefined(undefined)).toBeUndefined();
+    expect(toChecksummedAddressOrUndefined('')).toBeUndefined();
   });
 });

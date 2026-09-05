@@ -30,7 +30,8 @@ import { useWriteContract } from '@/hooks/useCircleWrite';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { universeGovernorAbi, governanceErc20Abi, universeAbi } from '@loar/abis/generated';
 import { type Address, formatUnits } from 'viem';
-import { encodeFunctionData, keccak256, getAddress } from 'viem';
+import { encodeFunctionData, keccak256 } from 'viem';
+import { toChecksummedAddressOrUndefined } from '@/lib/utils';
 import type { Node } from 'reactflow';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import {
@@ -136,22 +137,19 @@ export function GovernanceSidebar({
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
 
-  // Get governance addresses from universe data
-  const ZERO = '0x0000000000000000000000000000000000000000';
-  const rawGovernanceAddress = finalUniverse?.governanceAddress ?? undefined;
-  const rawTokenAddress = finalUniverse?.tokenAddress ?? undefined;
-  // Treat zero-address as undefined to prevent contract calls to address(0)
-  const governanceAddress = (
-    rawGovernanceAddress && rawGovernanceAddress !== ZERO
-      ? getAddress(rawGovernanceAddress)
-      : undefined
-  ) as Address | undefined;
-  const tokenAddress = (
-    rawTokenAddress && rawTokenAddress !== ZERO ? getAddress(rawTokenAddress) : undefined
-  ) as Address | undefined;
-  const timelineAddress = finalUniverse?.address
-    ? (getAddress(finalUniverse.address) as Address)
-    : (undefined as unknown as Address);
+  // Get governance addresses from universe data.
+  // This sidebar is always mounted by the parent route (see the on-chain-read
+  // comment below) — so these run unconditionally on every universe page
+  // load, including Solana universes, whose Firestore doc holds base58 (SPL
+  // mint/PDA) values in these same fields. `toChecksummedAddressOrUndefined`
+  // (unlike a raw `getAddress()` call) resolves those — and the zero
+  // address — to `undefined` instead of throwing `InvalidAddressError`
+  // synchronously and crashing the whole editor on mount.
+  const governanceAddress = toChecksummedAddressOrUndefined(finalUniverse?.governanceAddress);
+  const tokenAddress = toChecksummedAddressOrUndefined(finalUniverse?.tokenAddress);
+  const timelineAddress = toChecksummedAddressOrUndefined(finalUniverse?.address) as unknown as
+    | Address
+    | undefined;
 
   // Multi-sig admin detection
   const { isSafe, safeAddress, owners, threshold } = useIsUniverseAdmin(

@@ -6,6 +6,7 @@
 
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { getAddress } from 'viem';
 
 /**
  * Merges Tailwind CSS class names, resolving conflicts via tailwind-merge.
@@ -67,4 +68,36 @@ export function asEvmAddressOrUndefined(
   value: string | null | undefined
 ): `0x${string}` | undefined {
   return value && isEvmAddress(value) ? (value as `0x${string}`) : undefined;
+}
+
+/** The all-zero EVM address, as commonly stored to mean "not set". */
+export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
+
+/**
+ * Checksums an address-shaped string via viem's `getAddress`, or returns
+ * `undefined` for anything that isn't hex-shaped (including the zero
+ * address and a Solana base58 value) instead of throwing.
+ *
+ * This is exactly what used to crash the universe editor on mount for
+ * Solana universes: GovernanceSidebar read `finalUniverse.tokenAddress`/
+ * `governanceAddress`/`address` — base58 SPL mint/PDA values on a Solana
+ * universe's Firestore doc — straight into `getAddress()` with only a "not
+ * the zero address" guard, and the sidebar is mounted unconditionally by
+ * the parent route regardless of whether it's open. `getAddress()` throws
+ * `InvalidAddressError` for anything that isn't 20 valid hex bytes; note it
+ * does *not* throw for a mere EIP-55 checksum mismatch on an
+ * otherwise-valid hex address — it just re-checksums it. `isEvmAddress`
+ * pre-filters the shape; the try/catch is defense-in-depth in case that
+ * ever changes, not a currently-reachable path. Route every such field
+ * through this instead of calling `getAddress()` directly.
+ */
+export function toChecksummedAddressOrUndefined(
+  value: string | null | undefined
+): `0x${string}` | undefined {
+  if (!value || value === ZERO_ADDRESS || !isEvmAddress(value)) return undefined;
+  try {
+    return getAddress(value);
+  } catch {
+    return undefined;
+  }
 }
