@@ -14,6 +14,7 @@ describe('isEphemeralUrl — 3D provider CDNs', () => {
 
   it('does not flag Tripo/Meshy API endpoints or permanent hosts', () => {
     expect(isEphemeralUrl('https://api.tripo3d.ai/v2/openapi/task/123')).toBe(false);
+    expect(isEphemeralUrl('https://openapi.tripo3d.ai/v3/animations/rig')).toBe(false);
     expect(isEphemeralUrl('https://api.meshy.ai/openapi/v1/image-to-3d')).toBe(false);
     expect(isEphemeralUrl('https://gateway.pinata.cloud/ipfs/Qm123')).toBe(false);
   });

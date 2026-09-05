@@ -984,15 +984,14 @@ export const threedRouter = router({
             return { result: { jobId: genId, providerTaskId: taskId }, actualCredits: credits };
           }
 
-          // Tripo3D path — import, then rig (animate is a separate request).
+          // Tripo3D path — upload the GLB, then rig (animate is a separate
+          // request). v3's rig endpoint takes the file_token directly, so the
+          // old import_model task + inline poll are gone.
           // Key was resolved and non-null-checked before the reservation above.
           const apiKey = tripoApiKey;
           const fileToken = await tripo3dService.uploadRemoteGlb(sourceUrl, apiKey);
-          const importTask = await tripo3dService.importModel(fileToken, apiKey);
-          // Wait for import to land — it's fast (~10s) so we wait inline.
-          await tripo3dService.waitForTask(importTask.taskId, 5 * 60 * 1000, 3000, apiKey);
           const { taskId } = await tripo3dService.rigModel({
-            originalModelTaskId: importTask.taskId,
+            input: fileToken,
             rigType: input.rigType as TripoRigType,
             apiKey,
           });
@@ -1001,7 +1000,6 @@ export const threedRouter = router({
             userId: ctx.user.uid,
             type: 'tripo_rigging',
             status: 'running',
-            tripoImportTaskId: importTask.taskId,
             tripoRigTaskId: taskId,
             sourceContentId: input.contentId,
             sourceMediaUrl: sourceUrl,
@@ -1150,7 +1148,7 @@ export const threedRouter = router({
           const apiKey = tripoApiKey;
           const tripoAnimation = input.actionRef.slice('tripo:'.length) as TripoAnimation;
           const { taskId } = await tripo3dService.retargetAnimation({
-            rigTaskId: parsed.taskId,
+            input: parsed.taskId,
             animation: tripoAnimation,
             apiKey,
           });
@@ -1558,7 +1556,7 @@ async function completeTripoRiggingTask(opts: {
       5000,
       apiKey
     );
-    const rawGlbUrl = task.output?.model || task.output?.pbr_model;
+    const rawGlbUrl = task.output?.model_url || task.output?.model_urls?.[0];
     if (!rawGlbUrl) {
       throw new Error('Tripo rigging completed without a GLB output');
     }
@@ -1625,7 +1623,7 @@ async function completeTripoAnimationTask(opts: {
       5000,
       apiKey
     );
-    const rawGlbUrl = task.output?.model || task.output?.pbr_model;
+    const rawGlbUrl = task.output?.model_url || task.output?.model_urls?.[0];
     if (!rawGlbUrl) {
       throw new Error('Tripo animation completed without a GLB output');
     }

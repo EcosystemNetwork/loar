@@ -130,9 +130,10 @@ async function testMiniMaxKey(key: string): Promise<boolean> {
 }
 
 async function testTripoKey(key: string): Promise<boolean> {
-  // Tripo's lightest reachable endpoint — account balance. 200 == valid,
-  // 401/403 == bad key, anything else we treat as transient (don't reject).
-  const res = await fetch('https://api.tripo3d.ai/v2/openapi/user/balance', {
+  // Tripo's lightest reachable endpoint — account balance (OpenAPI v3).
+  // 200 == valid, 401/403 == bad key, anything else we treat as transient
+  // (don't reject).
+  const res = await fetch('https://openapi.tripo3d.ai/v3/account/balance', {
     method: 'GET',
     headers: { Authorization: `Bearer ${key}` },
     signal: AbortSignal.timeout(8_000),

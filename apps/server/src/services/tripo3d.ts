@@ -1,21 +1,30 @@
 /**
- * Tripo3D Service — non-humanoid rigging + animation library.
+ * Tripo3D Service — non-humanoid rigging + animation library (OpenAPI v3).
  *
  * Covers what Meshy can't: quadrupeds, birds, snakes, fish, insects, spiders,
  * mechanical creatures, vehicles. Tripo's rig types are
- *   biped, quadruped, hexapod, octopod, avian, serpentine, aquatic, others.
+ *   biped, quadruped, hexapod, octopod, avian, serpentine, aquatic.
  *
  * Workflow for an externally-generated GLB (e.g. a Meshy textured mesh):
- *   1. Download the GLB and POST it to /upload          → image_token
- *   2. POST /task type=import_model                      → originalModelTaskId
- *   3. POST /task type=animate_rig (rig_type + spec)     → rigTaskId
- *   4. POST /task type=animate_retarget (animation)      → animationTaskId
- *   5. GET /task/{id} polled until status=success        → output.model URL
+ *   1. POST /files (multipart)                       → file_token
+ *   2. POST /animations/rig  { input: file_token }   → rigTaskId
+ *   3. POST /animations/retarget { input: rigTaskId }→ animationTaskId
+ *   4. GET /tasks/{id} polled until status=success   → output.model_url
+ *
+ * v3 note: /animations/rig accepts a `file_token` (or a prior task_id)
+ * directly as `input`, so the separate v2 `import_model` task is gone — one
+ * fewer round-trip and one fewer poll. v2 (`api.tripo3d.ai/v2/openapi`) is
+ * being retired by Tripo (maintenance ends 2026-10-01, endpoints disabled
+ * 2026-11-01); this service targets v3.
  *
  * Required env var: TRIPO_API_KEY (or BYOK via provider-keys store).
  */
 
-const BASE_URL = 'https://api.tripo3d.ai/v2/openapi';
+const BASE_URL = 'https://openapi.tripo3d.ai/v3';
+
+/** Rig model versions. v2.5 covers every non-humanoid rig type; v1.0 is biped-only. */
+const RIG_MODEL_NONHUMANOID = 'v2.5-20260210';
+const RIG_MODEL_BIPED = 'v1.0-20240301';
 
 export type TripoRigType =
   | 'biped'
@@ -25,6 +34,9 @@ export type TripoRigType =
   | 'avian'
   | 'serpentine'
   | 'aquatic'
+  // Kept for backwards compatibility with our rig-type enum. v3 does not
+  // document `others`; a vehicle/mech rig may fail — the task error surfaces
+  // through `waitForTask`.
   | 'others';
 
 export type TripoRigSpec = 'mixamo' | 'tripo';
@@ -47,14 +59,11 @@ export type TripoAnimation =
   | 'preset:serpentine:march'
   | 'preset:aquatic:march';
 
-export type TripoTaskStatus =
-  | 'queued'
-  | 'running'
-  | 'success'
-  | 'failed'
-  | 'cancelled'
-  | 'banned'
-  | 'expired';
+/**
+ * v3 collapses `banned`/`expired` into `failed` (reported with an
+ * `error_code` — 2008 moderation, 2018 queue expiry).
+ */
+export type TripoTaskStatus = 'queued' | 'running' | 'success' | 'failed' | 'cancelled';
 
 export interface TripoTask {
   task_id: string;
@@ -62,13 +71,16 @@ export interface TripoTask {
   status: TripoTaskStatus;
   progress?: number;
   output?: {
-    model?: string;
-    pbr_model?: string;
-    rendered_video?: string;
-    rendered_image?: string;
-    base_model?: string;
+    /** Signed 3D model download URL — expires, rehost before persisting. */
+    model_url?: string;
+    model_urls?: string[];
+    rendered_video_url?: string;
+    rendered_image_url?: string;
   };
-  error?: { code?: string; message?: string };
+  /** Present when status is `failed`. */
+  error_code?: number;
+  /** Present when status is `failed`. */
+  error_message?: string;
 }
 
 interface CreateTaskResponse {
@@ -83,7 +95,7 @@ interface GetTaskResponse {
 
 interface UploadResponse {
   code: number;
-  data: { image_token: string };
+  data: { file_token: string };
 }
 
 class Tripo3dService {
@@ -112,29 +124,35 @@ class Tripo3dService {
       },
       body: JSON.stringify(body),
     });
-    if (!res.ok) {
-      const text = await res.text().catch(() => res.statusText);
-      throw new Error(`Tripo3D API error ${res.status}: ${text}`);
-    }
-    return res.json() as Promise<T>;
+    return this.parse<T>(res);
   }
 
   private async get<T>(path: string, apiKey: string): Promise<T> {
     const res = await fetch(`${BASE_URL}${path}`, {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
+    return this.parse<T>(res);
+  }
+
+  /** Shared response handler — surfaces both HTTP errors and `code != 0` bodies. */
+  private async parse<T>(res: Response): Promise<T> {
     if (!res.ok) {
       const text = await res.text().catch(() => res.statusText);
       throw new Error(`Tripo3D API error ${res.status}: ${text}`);
     }
-    return res.json() as Promise<T>;
+    const json = (await res.json()) as T & { code?: number; message?: string; suggestion?: string };
+    if (typeof json.code === 'number' && json.code !== 0) {
+      const hint = json.suggestion ? ` — ${json.suggestion}` : '';
+      throw new Error(`Tripo3D API error (code ${json.code}): ${json.message ?? 'unknown'}${hint}`);
+    }
+    return json;
   }
 
   /**
-   * Stream a remote GLB through Tripo's /upload endpoint. Returns the
-   * file token used as the `file` reference on the subsequent import_model
-   * task. Direct (non-STS) upload — works for files up to Tripo's per-file
-   * cap (~100 MB at time of writing; well above any single Meshy mesh).
+   * Stream a remote GLB through Tripo's /files endpoint. Returns the
+   * `file_token` used as the `input` on the subsequent rig task. Direct
+   * multipart upload — models are accepted up to 150 MB, well above any
+   * single Meshy mesh.
    */
   async uploadRemoteGlb(modelUrl: string, apiKey?: string): Promise<string> {
     const key = this.resolveKey(apiKey);
@@ -150,38 +168,21 @@ class Tripo3dService {
       new File([blob], inferFilename(modelUrl), { type: blob.type || 'model/gltf-binary' })
     );
 
-    const res = await fetch(`${BASE_URL}/upload`, {
+    const res = await fetch(`${BASE_URL}/files`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}` },
       body: form,
     });
-    if (!res.ok) {
-      const text = await res.text().catch(() => res.statusText);
-      throw new Error(`Tripo3D upload error ${res.status}: ${text}`);
-    }
-    const json = (await res.json()) as UploadResponse;
-    if (!json.data?.image_token) {
+    const json = await this.parse<UploadResponse>(res);
+    if (!json.data?.file_token) {
       throw new Error('Tripo3D upload returned no file token');
     }
-    return json.data.image_token;
-  }
-
-  /**
-   * Register an uploaded file as a Tripo task that downstream rig/animate
-   * calls can reference via `original_model_task_id`.
-   */
-  async importModel(fileToken: string, apiKey?: string): Promise<{ taskId: string }> {
-    const key = this.resolveKey(apiKey);
-    const json = await this.post<CreateTaskResponse>(
-      '/task',
-      { type: 'import_model', file: { file_token: fileToken } },
-      key
-    );
-    return { taskId: json.data.task_id };
+    return json.data.file_token;
   }
 
   async rigModel(args: {
-    originalModelTaskId: string;
+    /** A `file_token` from `uploadRemoteGlb`, or a prior model task_id. */
+    input: string;
     rigType: TripoRigType;
     spec?: TripoRigSpec;
     outFormat?: 'glb' | 'fbx';
@@ -189,10 +190,10 @@ class Tripo3dService {
   }): Promise<{ taskId: string }> {
     const key = this.resolveKey(args.apiKey);
     const json = await this.post<CreateTaskResponse>(
-      '/task',
+      '/animations/rig',
       {
-        type: 'animate_rig',
-        original_model_task_id: args.originalModelTaskId,
+        input: args.input,
+        model: args.rigType === 'biped' ? RIG_MODEL_BIPED : RIG_MODEL_NONHUMANOID,
         rig_type: args.rigType,
         spec: args.spec ?? 'tripo',
         out_format: args.outFormat ?? 'glb',
@@ -203,7 +204,8 @@ class Tripo3dService {
   }
 
   async retargetAnimation(args: {
-    rigTaskId: string;
+    /** The rigged model's task_id (from `rigModel`). */
+    input: string;
     animation: TripoAnimation;
     outFormat?: 'glb' | 'fbx';
     bakeAnimation?: boolean;
@@ -211,10 +213,9 @@ class Tripo3dService {
   }): Promise<{ taskId: string }> {
     const key = this.resolveKey(args.apiKey);
     const json = await this.post<CreateTaskResponse>(
-      '/task',
+      '/animations/retarget',
       {
-        type: 'animate_retarget',
-        original_model_task_id: args.rigTaskId,
+        input: args.input,
         animation: args.animation,
         out_format: args.outFormat ?? 'glb',
         bake_animation: args.bakeAnimation ?? true,
@@ -226,7 +227,7 @@ class Tripo3dService {
 
   async getTask(taskId: string, apiKey?: string): Promise<TripoTask> {
     const key = this.resolveKey(apiKey);
-    const json = await this.get<GetTaskResponse>(`/task/${taskId}`, key);
+    const json = await this.get<GetTaskResponse>(`/tasks/${taskId}`, key);
     return json.data;
   }
 
@@ -240,13 +241,12 @@ class Tripo3dService {
     while (Date.now() < deadline) {
       const task = await this.getTask(taskId, apiKey);
       if (task.status === 'success') return task;
-      if (task.status === 'failed' || task.status === 'banned') {
+      if (task.status !== 'queued' && task.status !== 'running') {
         throw new Error(
-          `Tripo3D task ${taskId} ${task.status}: ${task.error?.message || 'unknown'}`
+          `Tripo3D task ${taskId} ${task.status}: ${
+            task.error_message || task.error_code || 'unknown'
+          }`
         );
-      }
-      if (task.status === 'cancelled' || task.status === 'expired') {
-        throw new Error(`Tripo3D task ${taskId} ${task.status}`);
       }
       await new Promise((r) => setTimeout(r, pollIntervalMs));
     }
