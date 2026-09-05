@@ -10,7 +10,7 @@ import { ponderGql, ponderQueryDefaults } from '@/utils/ponder-api';
 import { universeManagerAbi } from '@loar/abis/generated';
 import { UniverseManager } from '@loar/abis/addresses';
 import { trpcClient } from '@/utils/trpc';
-import { isEvmAddress } from '@/lib/utils';
+import { asEvmAddressOrUndefined } from '@/lib/utils';
 
 interface UniverseAddresses {
   universeAddress: `0x${string}` | undefined;
@@ -143,12 +143,10 @@ export function useUniverseAddresses(
     // `InvalidAddressError` synchronously during render, crashing the page.
     // Only surface fields that are actually EVM addresses; everything else
     // resolves to `undefined` so those reads stay disabled.
-    const evmOrUndefined = (v: string | undefined) =>
-      v && isEvmAddress(v) ? (v as `0x${string}`) : undefined;
     return {
-      universeAddress: evmOrUndefined(d.address),
-      tokenAddress: evmOrUndefined(d.tokenAddress),
-      governorAddress: evmOrUndefined(d.governanceAddress),
+      universeAddress: asEvmAddressOrUndefined(d.address),
+      tokenAddress: asEvmAddressOrUndefined(d.tokenAddress),
+      governorAddress: asEvmAddressOrUndefined(d.governanceAddress),
       hookAddress: undefined,
       lockerAddress: undefined,
       bondingCurveAddress: undefined,

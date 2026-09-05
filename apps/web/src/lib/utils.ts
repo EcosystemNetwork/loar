@@ -49,3 +49,22 @@ export function isAddressLikeUniverseId(id: string): boolean {
 export function normalizeUniverseId(id: string): string {
   return isEvmAddress(id) ? id.toLowerCase() : id;
 }
+
+/**
+ * Narrows an arbitrary address-shaped string (as stored on a universe's
+ * Firestore doc) to a `0x${string}` usable with wagmi/viem, or `undefined`
+ * if it isn't actually EVM-shaped.
+ *
+ * A Solana universe's `tokenAddress`/`address`/`governanceAddress` fields
+ * hold base58 (SPL mint / PDA) values, not hex. Passing one of those
+ * straight into `useReadContract({ address })` reaches viem's checksum
+ * validation — which throws `InvalidAddressError` synchronously during
+ * render even when the query itself is `enabled: false` — and crashes the
+ * whole page with a blank screen (see useUniverseAddresses/useTokenGate).
+ * Route every such field through this guard instead of casting.
+ */
+export function asEvmAddressOrUndefined(
+  value: string | null | undefined
+): `0x${string}` | undefined {
+  return value && isEvmAddress(value) ? (value as `0x${string}`) : undefined;
+}
