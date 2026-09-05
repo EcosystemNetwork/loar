@@ -53,6 +53,7 @@ import {
   DollarSign,
   Palette,
   GitBranch,
+  Box,
 } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
@@ -74,6 +75,7 @@ import { toast } from 'sonner';
 import type { UniverseData } from '@/types/universe';
 import { isBlockchainUniverse as checkBlockchain } from '@/types/universe';
 import { SmartImage } from '@/components/SmartImage';
+import { Universe3DModelDialog } from '@/components/universe/Universe3DModelDialog';
 
 interface UniverseSidebarProps {
   finalUniverse: UniverseData | null;
@@ -121,6 +123,7 @@ export function UniverseSidebar({
   const [showAccessSettings, setShowAccessSettings] = useState(false);
   const [showPublishPanel, setShowPublishPanel] = useState(false);
   const [showEditMetadata, setShowEditMetadata] = useState(false);
+  const [show3DDialog, setShow3DDialog] = useState(false);
   const [editName, setEditName] = useState('');
   const [editImageUrl, setEditImageUrl] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -514,6 +517,20 @@ export function UniverseSidebar({
                 </Link>
               </div>
 
+              {/* Create 3D model button */}
+              <div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShow3DDialog(true)}
+                  disabled={!universeIdOrAddress}
+                  className="w-full bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30 hover:from-violet-100 hover:to-purple-100 dark:hover:from-violet-950/50 dark:hover:to-purple-950/50 border-violet-200 dark:border-violet-800 transition-all duration-300 group/btn h-10"
+                >
+                  <Box className="h-4 w-4 mr-2 group-hover/btn:scale-110 transition-transform duration-300 text-violet-600 dark:text-violet-400" />
+                  Create 3D Model
+                </Button>
+              </div>
+
               {/* Wiki Entities */}
               <WikiEntitiesSection universeAddress={universeIdOrAddress} />
 
@@ -624,6 +641,15 @@ export function UniverseSidebar({
           </div>
         </div>
       </div>
+
+      {/* Create 3D Model Dialog */}
+      {universeIdOrAddress && (
+        <Universe3DModelDialog
+          open={show3DDialog}
+          onOpenChange={setShow3DDialog}
+          universeId={universeIdOrAddress}
+        />
+      )}
 
       {/* Subscribe Dialog */}
       {showSubscribe && (
