@@ -93,6 +93,33 @@ function extractCidPath(input: string): string | null {
   return null;
 }
 
+/**
+ * GET /api/ipfs/gateway-config
+ *   Returns: { base, host, token, isDedicated }
+ *
+ * The client primes this once per session (see apps/web/src/utils/ipfs-url.ts
+ * `primeIpfsGatewayConfig`) so it can compose dedicated-gateway URLs
+ * synchronously for first paint, instead of starting every asset on a slow
+ * public gateway (ipfs.io) and waiting for `/api/ipfs/resolve` per CID.
+ *
+ * `token` is only returned for a dedicated `.mypinata.cloud` gateway that
+ * actually needs it — and it is no more exposed here than it already is by
+ * `/resolve`, which bakes it into every returned media URL. Not returned for
+ * a public gateway config.
+ */
+router.get('/gateway-config', (c) => {
+  const base = gatewayBase();
+  const host = gatewayHost();
+  const isDedicated = host.endsWith('.mypinata.cloud');
+  c.header('Cache-Control', 'public, max-age=300, s-maxage=300');
+  return c.json({
+    base,
+    host,
+    token: isDedicated ? gatewayToken() : '',
+    isDedicated,
+  });
+});
+
 router.get('/resolve', (c) => {
   const raw = c.req.query('url') ?? c.req.query('cid') ?? '';
   if (raw.length > 2048) {

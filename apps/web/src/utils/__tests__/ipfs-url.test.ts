@@ -194,3 +194,93 @@ describe('raceIpfsGateways', () => {
     expect(result).toBe(publicPrimary);
   });
 });
+
+/**
+ * Coverage for the boot-time dedicated-gateway config (2026-09-05): first
+ * paint used to start every asset on `ipfs.io` (the sync default) and only
+ * upgrade to the fast dedicated Pinata gateway after a per-CID
+ * `/api/ipfs/resolve` round trip or a 2.5s race timeout — which itself falls
+ * back to `ipfs.io`. `primeIpfsGatewayConfig` fetches the gateway base +
+ * token once per session so `resolveIpfsUrl` / `getIpfsUrlCandidates` can
+ * compose the dedicated URL synchronously as the primary.
+ */
+describe('primeIpfsGatewayConfig / dedicated-gateway primary', () => {
+  const originalFetch = global.fetch;
+  const CFG = {
+    base: 'https://peach-impressive-moth-978.mypinata.cloud',
+    host: 'peach-impressive-moth-978.mypinata.cloud',
+    token: 'tok_abc123',
+    isDedicated: true,
+  };
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubEnv('VITE_SERVER_URL', 'https://api.loar.test');
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('leaves resolution on the public gateway until the config is primed', async () => {
+    const { resolveIpfsUrl, getIpfsUrlCandidates } = await import('../ipfs-url');
+    expect(resolveIpfsUrl('ipfs://QmCold/file.png')).toBe('https://ipfs.io/ipfs/QmCold/file.png');
+    expect(getIpfsUrlCandidates('ipfs://QmCold/file.png')[0]).toBe(
+      'https://ipfs.io/ipfs/QmCold/file.png'
+    );
+  });
+
+  it('makes the dedicated gateway the sync primary once primed', async () => {
+    global.fetch = vi.fn((input: unknown) => {
+      const href = typeof input === 'string' ? input : (input as Request).url;
+      if (href.includes('/api/ipfs/gateway-config')) {
+        return Promise.resolve({ ok: true, json: async () => CFG } as Response);
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${href}`));
+    }) as unknown as typeof fetch;
+
+    const { primeIpfsGatewayConfig, resolveIpfsUrl, getIpfsUrlCandidates } =
+      await import('../ipfs-url');
+    await primeIpfsGatewayConfig();
+
+    const dedicated =
+      'https://peach-impressive-moth-978.mypinata.cloud/ipfs/QmWarm/file.png?pinataGatewayToken=tok_abc123';
+    expect(resolveIpfsUrl('ipfs://QmWarm/file.png')).toBe(dedicated);
+    expect(resolveIpfsUrl('https://ipfs.io/ipfs/QmWarm/file.png')).toBe(dedicated);
+
+    const candidates = getIpfsUrlCandidates('ipfs://QmWarm/file.png');
+    expect(candidates[0]).toBe(dedicated);
+    // Public gateways still trail as fallbacks for the onError chain.
+    expect(candidates).toContain('https://ipfs.io/ipfs/QmWarm/file.png');
+  });
+
+  it('ignores a schemeless / corrupted base from the endpoint (no unparseable URL)', async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => ({
+          base: 'peach-impressive-moth-978.mypinata.cloud.',
+          host: 'peach-impressive-moth-978.mypinata.cloud',
+          token: 't',
+          isDedicated: true,
+        }),
+      } as Response)
+    ) as unknown as typeof fetch;
+
+    const { primeIpfsGatewayConfig, resolveIpfsUrl } = await import('../ipfs-url');
+    await primeIpfsGatewayConfig();
+
+    const out = resolveIpfsUrl('ipfs://QmBad/file.png');
+    expect(out).toBe('https://ipfs.io/ipfs/QmBad/file.png');
+    expect(() => new URL(out)).not.toThrow();
+  });
+
+  it('does not throw or wedge when the config endpoint is unreachable', async () => {
+    global.fetch = vi.fn(() => Promise.reject(new Error('offline'))) as unknown as typeof fetch;
+    const { primeIpfsGatewayConfig, resolveIpfsUrl } = await import('../ipfs-url');
+    await expect(primeIpfsGatewayConfig()).resolves.toBeUndefined();
+    expect(resolveIpfsUrl('ipfs://QmX/f.png')).toBe('https://ipfs.io/ipfs/QmX/f.png');
+  });
+});

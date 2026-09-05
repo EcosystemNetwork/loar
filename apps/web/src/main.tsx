@@ -33,6 +33,13 @@ window.addEventListener('vite:preloadError', (e) => {
 import { installGlobalIpfsFallback } from './utils/install-ipfs-fallback';
 installGlobalIpfsFallback();
 
+// Prime the dedicated Pinata gateway config once per session so first paint
+// composes fast-gateway URLs synchronously instead of starting every asset on
+// ipfs.io. Fire-and-forget: a warm localStorage cache serves repeat visits
+// instantly, and public gateways cover the cold first-visit window.
+import { primeIpfsGatewayConfig } from './utils/ipfs-url';
+void primeIpfsGatewayConfig();
+
 // Offline-video service worker. Fire-and-forget — caches episodes the user
 // explicitly flags via the "Save offline" button. No app-shell caching.
 import { registerOfflineWorker } from './lib/offline-cache';

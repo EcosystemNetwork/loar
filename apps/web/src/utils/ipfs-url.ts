@@ -118,8 +118,14 @@ export function resolveIpfsUrl(url?: string | null): string {
   if (!url || typeof url !== 'string') return '';
   if (url.startsWith('ipfs://')) {
     const path = url.slice('ipfs://'.length).replace(/^ipfs\//, '');
-    return appendToken(`${ACTIVE_GATEWAY}/ipfs/${path}`);
+    return composeDedicatedUrl(path) ?? appendToken(`${ACTIVE_GATEWAY}/ipfs/${path}`);
   }
+  // Once the dedicated gateway config is primed, route known IPFS URLs
+  // straight to it — it's the fast, reliable path. Cold cache (first visit,
+  // pre-prime) falls through to the public-gateway rewrite below unchanged.
+  const parts = extractIpfsPath(url);
+  const dedicated = parts ? composeDedicatedUrl(parts.cidPath) : null;
+  if (dedicated) return dedicated;
   return appendToken(rewriteBrokenDedicatedGatewayUrl(url));
 }
 
@@ -149,6 +155,100 @@ const KNOWN_GATEWAY_HOSTS = new Set<string>([
   '4everland.io',
   'nftstorage.link',
 ]);
+
+// ── Dedicated gateway config (primed once per session) ──────────────────
+//
+// The server's dedicated Pinata gateway (`<name>.mypinata.cloud`) is
+// CDN-backed with our content pinned hot — dramatically faster and steadier
+// than any public gateway. The catch is it needs a token the static JS
+// bundle must not carry (WEB-1), so historically the client could only reach
+// it via a per-CID round trip to `/api/ipfs/resolve`, and *first paint* for
+// every asset started on `ipfs.io` — which, per this file's own notes, can
+// hang 20s+ before failing. `raceIpfsGateways` only upgrades away from that
+// after a 2.5s timeout, and on timeout falls right back to `ipfs.io`.
+//
+// Instead: fetch the gateway base + token once per session from
+// `/api/ipfs/gateway-config` (primeIpfsGatewayConfig, called at app boot),
+// cache it in localStorage for an instant warm start on repeat visits, and
+// use it as the *primary* synchronous candidate. The token is no more
+// exposed than `/api/ipfs/resolve` already makes it (that endpoint bakes it
+// into every media URL it returns).
+type DedicatedGatewayConfig = { base: string; host: string; token: string };
+const DEDICATED_CFG_LS_KEY = 'loar:ipfs-gateway-config:v1';
+
+function normalizeDedicatedConfig(input: unknown): DedicatedGatewayConfig | null {
+  if (!input || typeof input !== 'object') return null;
+  const { base, host, token } = input as Record<string, unknown>;
+  if (typeof base !== 'string' || typeof host !== 'string') return null;
+  if (!host.endsWith('.mypinata.cloud')) return null;
+  const trimmedBase = base.trim().replace(/\/$/, '');
+  try {
+    // A corrupted/schemeless base must never reach URL composition — that was
+    // the exact 2026-08-25 incident behind resolveActiveGateway's test suite.
+    if (new URL(trimmedBase).host !== host) return null;
+  } catch {
+    return null;
+  }
+  return { base: trimmedBase, host, token: typeof token === 'string' ? token : '' };
+}
+
+function readCachedDedicatedConfig(): DedicatedGatewayConfig | null {
+  try {
+    const raw = localStorage.getItem(DEDICATED_CFG_LS_KEY);
+    return raw ? normalizeDedicatedConfig(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
+}
+
+let dedicatedConfig: DedicatedGatewayConfig | null = readCachedDedicatedConfig();
+let dedicatedConfigPrimed: Promise<void> | null = null;
+
+/**
+ * Fetch the dedicated gateway config once and cache it (memory + localStorage).
+ * Idempotent — repeat calls return the same in-flight/settled promise. Safe to
+ * call before the server is reachable: on failure the public gateways still
+ * work, and the next call retries.
+ */
+export function primeIpfsGatewayConfig(): Promise<void> {
+  if (dedicatedConfigPrimed) return dedicatedConfigPrimed;
+  const run = (async () => {
+    if (!SERVER_URL) return;
+    try {
+      const res = await fetch(`${SERVER_URL}/api/ipfs/gateway-config`, { credentials: 'omit' });
+      if (!res.ok) return;
+      const cfg = normalizeDedicatedConfig(await res.json());
+      if (!cfg) return;
+      dedicatedConfig = cfg;
+      try {
+        localStorage.setItem(DEDICATED_CFG_LS_KEY, JSON.stringify(cfg));
+      } catch {
+        /* private mode / quota — in-memory config is enough for this session */
+      }
+    } catch {
+      // Offline or server down — retry on the next call.
+      dedicatedConfigPrimed = null;
+    }
+  })();
+  dedicatedConfigPrimed = run;
+  return run;
+}
+
+/**
+ * Compose a dedicated-gateway URL for a `<cid>[/path][?query]` string, or null
+ * when the config hasn't been primed yet (cold first visit) — callers then
+ * fall back to the public primary and the background race upgrades later.
+ */
+function composeDedicatedUrl(cidPath: string): string | null {
+  const cfg = dedicatedConfig;
+  if (!cfg || !cidPath) return null;
+  const [path, query] = cidPath.split('?');
+  const params = new URLSearchParams(query || '');
+  params.delete('pinataGatewayToken');
+  if (cfg.token) params.set('pinataGatewayToken', cfg.token);
+  const qs = params.toString();
+  return `${cfg.base}/ipfs/${path}${qs ? `?${qs}` : ''}`;
+}
 
 // ── Concurrency gate ────────────────────────────────────────────────────
 //
@@ -275,10 +375,16 @@ export function getIpfsUrlCandidates(url?: string | null): string[] {
   const parts = extractIpfsPath(url || primary);
   if (!parts) return [primary];
 
+  // `primary` is already the dedicated URL when the config is primed; when it
+  // isn't, prepend it anyway once available so the onError chain and the
+  // global rotator can still reach it. Public gateways trail as fallbacks.
+  const dedicated = composeDedicatedUrl(parts.cidPath);
   const fallbacks = PUBLIC_FALLBACK_GATEWAYS.map((gw) => `${gw}/ipfs/${parts.cidPath}`);
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const candidate of [primary, ...fallbacks]) {
+  for (const candidate of [dedicated, primary, ...fallbacks].filter((c): c is string =>
+    Boolean(c)
+  )) {
     if (!seen.has(candidate)) {
       seen.add(candidate);
       out.push(candidate);

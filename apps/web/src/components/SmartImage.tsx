@@ -85,41 +85,43 @@ export function SmartImage({
   // and gets reordered once the race settles.
   const [orderedCandidates, setOrderedCandidates] = useState<string[]>(candidates);
   const [candidateIdx, setCandidateIdx] = useState(0);
-  // True while we're probing gateways in parallel before committing a src.
-  // Skipped entirely when there's nothing to race (single candidate, e.g. a
-  // plain non-IPFS URL) so non-IPFS images never pay the probe round trip.
-  const [racing, setRacing] = useState(candidates.length > 1);
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
+  // Flipped once the visible <img> has fired load or error. The background
+  // gateway race below stops reordering `src` out from under a settled image
+  // — an upgrade only helps while the primary is still stalled.
+  const settledRef = useRef(false);
 
-  const activeSrc = racing ? '' : orderedCandidates[candidateIdx] || '';
+  const activeSrc = orderedCandidates[candidateIdx] || '';
 
   useEffect(() => {
     setOrderedCandidates(candidates);
     setCandidateIdx(0);
     setLoaded(false);
     setErrored(false);
+    settledRef.current = false;
 
-    if (candidates.length <= 1) {
-      setRacing(false);
-      return;
-    }
+    if (candidates.length <= 1) return;
 
-    // Race the candidate gateways (HEAD, in parallel) so we commit `src` to
-    // whichever one is verified live and fastest, instead of starting on the
-    // primary and waiting for a native `onerror` — which never fires on a
-    // hang, only a hard failure, and a stalled public gateway can hang for
-    // 20s+ before that happens.
-    setRacing(true);
+    // Render `candidates[0]` immediately (the dedicated CDN gateway once
+    // primeIpfsGatewayConfig has landed — fast and reliable) and race the
+    // rest in the background. If the primary stalls — a native `onerror`
+    // never fires on a hang, only a hard failure, and a degraded public
+    // gateway can hang for 20s+ — the race swaps in a verified-live gateway
+    // before that timeout.
     let cancelled = false;
     const controller = new AbortController();
     raceIpfsGateways(src, { signal: controller.signal, timeoutMs: 2500 })
       .then((best) => {
-        if (cancelled || !best) return;
-        setOrderedCandidates((prev) => [best, ...prev.filter((c) => c !== best)]);
+        if (cancelled || !best || settledRef.current) return;
+        setOrderedCandidates((prev) => {
+          if (prev[0] === best) return prev;
+          return [best, ...prev.filter((c) => c !== best)];
+        });
+        setCandidateIdx(0);
       })
-      .finally(() => {
-        if (!cancelled) setRacing(false);
+      .catch(() => {
+        /* race falls through to the sync pick already rendering */
       });
 
     return () => {
@@ -132,15 +134,19 @@ export function SmartImage({
   }, [src]);
 
   const handleError: React.ReactEventHandler<HTMLImageElement> = (e) => {
+    // A failure that advances to the next candidate keeps the race relevant
+    // (the new src might stall too); exhausting the chain settles it.
     if (candidateIdx + 1 < orderedCandidates.length) {
       setCandidateIdx(candidateIdx + 1);
     } else {
+      settledRef.current = true;
       setErrored(true);
     }
     onError?.(e);
   };
 
   const handleLoad: React.ReactEventHandler<HTMLImageElement> = (e) => {
+    settledRef.current = true;
     setLoaded(true);
     onLoad?.(e);
   };
