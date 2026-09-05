@@ -22,6 +22,7 @@ import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import { SmartImage } from '@/components/SmartImage';
 import { useResolvedIpfsUrl } from '@/hooks/useResolvedIpfsUrl';
 import { ModelViewer } from '@/components/ModelViewer';
+import { Model3DThumbnail } from '@/components/Model3DThumbnail';
 import {
   Dialog,
   DialogContent,
@@ -1190,14 +1191,25 @@ function ContentFeedCard({ item }: { item: any }) {
   // place the model is actually viewable) and only ever render `thumbnailUrl`.
   const is3D = item.mediaType === '3d';
 
+  const cubeFallback = (
+    <div className="w-full h-full flex items-center justify-center relative">
+      <div className="absolute inset-0 bg-gradient-to-br from-amber-500/15 to-rose-500/15" />
+      <Box className="relative h-10 w-10 text-amber-200/70" />
+    </div>
+  );
+
   const media = is3D ? (
     item.thumbnailUrl ? (
       <SmartImage src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
+    ) : item.mediaUrl ? (
+      <Model3DThumbnail
+        src={item.mediaUrl}
+        alt={item.title}
+        className="w-full h-full object-cover"
+        fallback={cubeFallback}
+      />
     ) : (
-      <div className="w-full h-full flex items-center justify-center relative">
-        <div className="absolute inset-0 bg-gradient-to-br from-amber-500/15 to-rose-500/15" />
-        <Box className="relative h-10 w-10 text-amber-200/70" />
-      </div>
+      cubeFallback
     )
   ) : item.thumbnailUrl ? (
     <SmartImage src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
@@ -1309,6 +1321,18 @@ function TrendingCard({ item, rank }: { item: any; rank: number }) {
             src={item.thumbnailUrl}
             alt={item.title || 'Trending'}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : item.mediaUrl ? (
+          <Model3DThumbnail
+            src={item.mediaUrl}
+            alt={item.title || 'Trending'}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            fallback={
+              <div className="w-full h-full flex items-center justify-center relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-500/15 to-rose-500/15" />
+                <Box className="relative h-8 w-8 text-amber-200/70" />
+              </div>
+            }
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center relative">
@@ -1451,14 +1475,22 @@ function ThreeDModelCard({ item, onSelect }: { item: any; onSelect: () => void }
             <div className="absolute inset-0 flex items-center justify-center">
               <Rotate3d className="h-8 w-8 text-muted-foreground/25" />
             </div>
-            {/* `mediaUrl` is the raw .glb binary — only ever render `thumbnailUrl`. */}
-            {item.thumbnailUrl && (
+            {/* `mediaUrl` is the raw .glb binary — never an <img> src. Prefer a
+                real `thumbnailUrl`; otherwise screenshot the model client-side. */}
+            {item.thumbnailUrl ? (
               <SmartImage
                 src={item.thumbnailUrl}
                 alt={item.title}
                 className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
-            )}
+            ) : item.mediaUrl ? (
+              <Model3DThumbnail
+                src={item.mediaUrl}
+                alt={item.title}
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                fallback={<></>}
+              />
+            ) : null}
             <Badge className="absolute top-2 left-2 bg-black/60 text-white border-0 text-[10px] gap-1">
               <Rotate3d className="h-2.5 w-2.5" /> 3D
             </Badge>
