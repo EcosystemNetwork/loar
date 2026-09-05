@@ -121,6 +121,7 @@ import { useCharacterGeneration } from '@/hooks/useCharacterGeneration';
 import { useContractSave } from '@/hooks/useContractSave';
 import { useUniverseBlockchain } from '@/hooks/useUniverseBlockchain';
 import { useSwapNodes } from '@/hooks/useTimeline';
+import { isAddressLikeUniverseId } from '@/lib/utils';
 import { toast } from 'sonner';
 import { TokenGateGuard } from '@/components/governance/TokenGateGuard';
 import { PrivateSection } from '@/components/private/PrivateSection';
@@ -487,8 +488,14 @@ function UniverseTimelineEditorInner() {
   const { writeContractAsync } = useWriteContract();
   const { writeAsync: swapNodesOnChain } = useSwapNodes();
 
-  // For blockchain universes (addresses starting with 0x), fetch from indexer
-  const isBlockchainUniverse = id?.startsWith('0x');
+  // For blockchain universes (an EVM `0x…` address or a Solana base58 PDA),
+  // fetch from Firestore-by-address / the indexer. A bare `id?.startsWith('0x')`
+  // check here misclassified every Solana universe as "off-chain" — the
+  // Firestore lookup below and the indexer fallback are both gated on this
+  // flag, so for a Solana PDA neither ever ran, `universe` resolved to null,
+  // and the "Not Found" branch further down (also gated on this flag) fired
+  // instead of opening the editor.
+  const isBlockchainUniverse = !!id && isAddressLikeUniverseId(id);
 
   // Unified query that checks Firestore, localStorage, and indexer
   const { data: universe, isLoading: isLoadingUniverse } = useQuery({
