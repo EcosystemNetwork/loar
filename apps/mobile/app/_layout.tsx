@@ -15,6 +15,7 @@ import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import '../src/global.css';
 import { AuthProvider } from '../src/contexts/AuthContext';
+import { primeIpfsGatewayConfig } from '../src/lib/ipfs-url';
 import { queryClient } from '../src/lib/trpc';
 
 SplashScreen.preventAutoHideAsync();
@@ -22,6 +23,9 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   useEffect(() => {
     SplashScreen.hideAsync();
+    // Prime the dedicated Pinata gateway config so images resolve to the fast
+    // gateway synchronously instead of gateway.pinata.cloud. Fire-and-forget.
+    void primeIpfsGatewayConfig();
   }, []);
 
   return (
