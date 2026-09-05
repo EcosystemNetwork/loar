@@ -9,8 +9,12 @@ import { z } from 'zod';
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { getUniverseLaws, setUniverseLaws, validateAgainstLaws } from './physics.handlers';
 import { getUniverse } from '../universes/universes.handlers';
+import { isEvmAddress } from '../../lib/universe-id';
 
-const ethereumAddress = z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address');
+// A universe address is either a lowercased EVM `0x…` address or a
+// case-sensitive Solana base58 PDA — don't constrain the format here.
+// See lib/universe-id.ts.
+const universeAddress = z.string().min(1, 'Universe address is required');
 
 const invariantSchema = z.object({
   id: z.string().min(1).max(64),
@@ -31,25 +35,28 @@ async function assertUniverseCreator(universeAddress: string, caller: string | u
     | { creator?: string; address?: string }
     | undefined;
   if (!universe) throw new Error('Universe not found');
-  if ((universe.creator ?? '').toLowerCase() !== caller.toLowerCase()) {
+  // EVM addresses are case-insensitive; Solana base58 creators are not —
+  // only fold case when the caller is presenting an EVM address.
+  const evmCaller = isEvmAddress(caller);
+  const creator = universe.creator ?? '';
+  const matches = evmCaller ? creator.toLowerCase() === caller.toLowerCase() : creator === caller;
+  if (!matches) {
     throw new Error('Forbidden: only the universe creator can edit physics');
   }
 }
 
 export const physicsRouter = router({
   /** Read the declared physics of a universe. */
-  get: publicProcedure
-    .input(z.object({ universeAddress: ethereumAddress }))
-    .query(async ({ input }) => {
-      const laws = await getUniverseLaws(input.universeAddress);
-      return { laws };
-    }),
+  get: publicProcedure.input(z.object({ universeAddress })).query(async ({ input }) => {
+    const laws = await getUniverseLaws(input.universeAddress);
+    return { laws };
+  }),
 
   /** Replace the stored physics. Creator-only. */
   set: protectedProcedure
     .input(
       z.object({
-        universeAddress: ethereumAddress,
+        universeAddress,
         invariants: z.array(invariantSchema).max(50).optional(),
         conservationRules: z.array(conservationRuleSchema).max(50).optional(),
         forbiddenEvents: z.array(z.string().min(1).max(200)).max(100).optional(),
@@ -76,7 +83,7 @@ export const physicsRouter = router({
   validate: publicProcedure
     .input(
       z.object({
-        universeAddress: ethereumAddress,
+        universeAddress,
         content: z.string().min(1).max(20_000),
       })
     )

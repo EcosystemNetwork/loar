@@ -2,9 +2,12 @@
  * Firestore handlers for universe physics (laws / invariants).
  *
  * Collection: `universeLaws/{universeAddress}` — one doc per universe.
- * Doc id is the lowercase universe address so we can fetch without querying.
+ * Doc id is the normalized universe address so we can fetch without
+ * querying: lowercased for an EVM `0x…` address, verbatim for a
+ * case-sensitive Solana base58 PDA. See lib/universe-id.ts.
  */
 import { db } from '../../lib/firebase';
+import { normalizeUniverseId } from '../../lib/universe-id';
 import {
   type UniverseLaws,
   type Invariant,
@@ -18,7 +21,7 @@ function lawsCol() {
 }
 
 export async function getUniverseLaws(universeAddress: string): Promise<UniverseLaws> {
-  const id = universeAddress.toLowerCase();
+  const id = normalizeUniverseId(universeAddress);
   const doc = await lawsCol().doc(id).get();
   if (!doc.exists) return emptyLaws(id);
   return doc.data() as UniverseLaws;
@@ -33,7 +36,7 @@ export async function setUniverseLaws(
   },
   updatedBy: string
 ): Promise<UniverseLaws> {
-  const id = universeAddress.toLowerCase();
+  const id = normalizeUniverseId(universeAddress);
   const ref = lawsCol().doc(id);
   const existing = (await ref.get()).data() as UniverseLaws | undefined;
   const now = new Date();
@@ -45,7 +48,7 @@ export async function setUniverseLaws(
       .map((e) => e.trim())
       .filter(Boolean),
     updatedAt: now,
-    updatedBy: updatedBy.toLowerCase(),
+    updatedBy: normalizeUniverseId(updatedBy),
   };
   await ref.set(laws);
   return laws;
