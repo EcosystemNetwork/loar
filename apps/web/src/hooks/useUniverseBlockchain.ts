@@ -21,18 +21,12 @@ import {
   planGraphPages,
   shouldPaginateGraph,
 } from './universeGraphPaging';
+import { type GraphData, type IndexerNodeContent, buildGraphData } from './universeGraphData';
 
-export interface GraphData {
-  nodeIds: readonly (string | number | bigint)[];
-  contentHashes: readonly string[]; // bytes32 content hashes from chain
-  plotHashes: readonly string[]; // bytes32 plot hashes from chain
-  urls: readonly string[]; // Resolved URLs (from indexer/storage)
-  descriptions: readonly string[]; // Resolved descriptions (from indexer/storage)
-  previousNodes: readonly (string | number | bigint)[];
-  children: readonly (string | number | bigint)[][];
-  flags: readonly boolean[];
-  canonChain: readonly (string | number | bigint)[];
-}
+// Re-exported for back-compat: callers still `import { type GraphData } from
+// '@/hooks/useUniverseBlockchain'`. The merge logic itself lives in
+// universeGraphData.ts (pure, unit-tested).
+export type { GraphData, IndexerNodeContent };
 
 export interface UseUniverseBlockchainProps {
   universeId: string;
@@ -79,15 +73,6 @@ export interface UseUniverseBlockchainReturn {
   refetchFullGraph: () => Promise<any>;
   refetchCanonChain: () => Promise<any>;
   refetchLatestNodeId: () => Promise<any>;
-}
-
-/** Ponder nodeContent shape returned by the GraphQL query. */
-interface IndexerNodeContent {
-  id: string; // "{universeAddress}:{nodeId}"
-  contentHash: string;
-  plotHash: string;
-  videoLink: string;
-  plot: string;
 }
 
 function useUniverseLeaves(contractAddress?: string) {
@@ -356,159 +341,32 @@ export function useUniverseBlockchain({
   const isLoadingOffChain =
     rqIsLoadingOffChain || (useOffChain && !!universeId && offChainStatus === 'pending');
 
-  const graphData = useMemo(() => {
-    // ── On-chain branch ──
-    // Strict: ONLY runs for actual on-chain universes. Off-chain nodes are
-    // never merged in here; an on-chain universe with zero nodes shows zero.
-    if (useOnChain) {
-      if (onChainContractAddress && fullGraphData) {
-        const [nodeIds, contentHashes, plotHashes, previousIds, nextIds, flags] = fullGraphData;
-
-        const rawNodeIds = (nodeIds || []) as readonly (string | number | bigint)[];
-        const hashStrings = (contentHashes || []) as readonly string[];
-        const plotHashStrings = (plotHashes || []) as readonly string[];
-        const rawPrevious = (previousIds || []) as readonly (string | number | bigint)[];
-        const rawChildren = (nextIds || []) as readonly (string | number | bigint)[][];
-        const rawFlags = (flags || []) as readonly boolean[];
-
-        // Nodes with an override marked `hidden: true` are dropped from the
-        // rendered graph (used when content is unrecoverable). We re-index the
-        // parallel arrays and strip references to hidden nodeIds from every
-        // `children` list and from `previousNodes` — so surviving nodes whose
-        // parent was hidden render as roots rather than pointing into the void.
-        const hiddenIdSet = new Set<string>();
-        for (let i = 0; i < rawNodeIds.length; i++) {
-          const nid = String(rawNodeIds[i]);
-          if (mediaOverrides?.[Number(nid)]?.hidden) hiddenIdSet.add(nid);
-        }
-
-        // Never hide the entire graph. If a bad/bulk `nodeMedia` override run
-        // has `hidden: true` on every node, dropping them all leaves the
-        // timeline editor and player with a blank canvas and no error —
-        // indistinguishable from data loss. Fall back to showing everything
-        // and let the caller sort it out. (Mirrors the local-archive-list
-        // guard in universe/$id.tsx's graph rebuild.)
-        if (rawNodeIds.length > 0 && hiddenIdSet.size >= rawNodeIds.length) {
-          console.warn(
-            `[useUniverseBlockchain] every node has a hidden media override (${hiddenIdSet.size}/${rawNodeIds.length}); ignoring so the graph isn't blank.`
-          );
-          hiddenIdSet.clear();
-        }
-
-        const keptIndices: number[] = [];
-        for (let i = 0; i < rawNodeIds.length; i++) {
-          if (!hiddenIdSet.has(String(rawNodeIds[i]))) keptIndices.push(i);
-        }
-
-        const resolvedUrls: string[] = [];
-        const resolvedDescriptions: string[] = [];
-        const keptNodeIds: (string | number | bigint)[] = [];
-        const keptContentHashes: string[] = [];
-        const keptPlotHashes: string[] = [];
-        const keptPrevious: (string | number | bigint)[] = [];
-        const keptChildren: (string | number | bigint)[][] = [];
-        const keptFlags: boolean[] = [];
-
-        for (const i of keptIndices) {
-          const nid = String(rawNodeIds[i]);
-          const content = contentMap?.get(nid);
-          const override = mediaOverrides?.[Number(nid)];
-
-          // Prefer off-chain override → indexer → on-chain hash fallback
-          resolvedUrls.push(
-            override?.videoLink || content?.videoLink || String(hashStrings[i] || '')
-          );
-          resolvedDescriptions.push(content?.plot || String(plotHashStrings[i] || ''));
-          keptNodeIds.push(rawNodeIds[i]);
-          keptContentHashes.push(String(hashStrings[i] || ''));
-          keptPlotHashes.push(String(plotHashStrings[i] || ''));
-          // Drop the parent pointer if it refers to a hidden node so the
-          // survivor renders as a root instead of pointing at a ghost.
-          const prev = rawPrevious[i];
-          keptPrevious.push(hiddenIdSet.has(String(prev)) ? '' : prev);
-          keptChildren.push((rawChildren[i] || []).filter((c) => !hiddenIdSet.has(String(c))));
-          keptFlags.push(Boolean(rawFlags[i]));
-        }
-
-        return {
-          nodeIds: keptNodeIds as readonly (string | number | bigint)[],
-          contentHashes: keptContentHashes as readonly string[],
-          plotHashes: keptPlotHashes as readonly string[],
-          urls: resolvedUrls,
-          descriptions: resolvedDescriptions,
-          previousNodes: keptPrevious as readonly (string | number | bigint)[],
-          children: keptChildren as readonly (string | number | bigint)[][],
-          flags: keptFlags as readonly boolean[],
-          canonChain: ((canonChainData || []) as readonly (string | number | bigint)[]).filter(
-            (c) => !hiddenIdSet.has(String(c))
-          ),
-        };
-      }
-
-      // On-chain universe but graph not loaded yet (or genuinely empty)
-      return {
-        nodeIds: [],
-        contentHashes: [],
-        plotHashes: [],
-        urls: [],
-        descriptions: [],
-        previousNodes: [],
-        children: [],
-        flags: [],
-        canonChain: [],
-      };
-    }
-
-    // ── Off-chain branch ──
-    // Strict: ONLY runs for fun-mode universes. Never reads on-chain data.
-    if (offChainData?.nodes && offChainData.nodes.length > 0) {
-      const nodes = offChainData.nodes as any[];
-      const nodeIds = nodes.map((n) => String(n.nodeId));
-      const contentHashes = nodes.map((n) => String(n.contentHash || ''));
-      const plotHashes = nodes.map((n) => String(n.plotHash || ''));
-      const urls = nodes.map((n) => String(n.videoUrl || ''));
-      const descriptions = nodes.map((n) => String(n.title || n.plot || ''));
-      const previousNodes = nodes.map((n) => String(n.previousNodeId || 0));
-      const children = nodes.map((n) =>
-        Array.isArray(n.children) ? (n.children as number[]).map((c) => String(c)) : []
-      );
-      const flags = nodes.map((n) => Boolean(n.canon));
-      const canonChain = nodes.filter((n) => n.canon).map((n) => String(n.nodeId));
-
-      return {
-        nodeIds: nodeIds as readonly (string | number | bigint)[],
-        contentHashes: contentHashes as readonly string[],
-        plotHashes: plotHashes as readonly string[],
-        urls: urls as readonly string[],
-        descriptions: descriptions as readonly string[],
-        previousNodes: previousNodes as readonly (string | number | bigint)[],
-        children: children as readonly (string | number | bigint)[][],
-        flags: flags as readonly boolean[],
-        canonChain: canonChain as readonly (string | number | bigint)[],
-      };
-    }
-
-    return {
-      nodeIds: [],
-      contentHashes: [],
-      plotHashes: [],
-      urls: [],
-      descriptions: [],
-      previousNodes: [],
-      children: [],
-      flags: [],
-      canonChain: [],
-    };
-  }, [
-    universeId,
-    useOnChain,
-    onChainContractAddress,
-    fullGraphData,
-    canonChainData,
-    contentMap,
-    mediaOverrides,
-    offChainData,
-  ]);
+  // Strict on-chain vs off-chain merge — pure logic in universeGraphData.ts
+  // (unit-tested there). `universeId` stays in the dep list purely so a
+  // universe switch re-derives even if every other input is momentarily
+  // referentially stale.
+  const graphData = useMemo(
+    () =>
+      buildGraphData({
+        useOnChain,
+        onChainContractAddress,
+        fullGraphData: fullGraphData as Parameters<typeof buildGraphData>[0]['fullGraphData'],
+        canonChainData: canonChainData as readonly (string | number | bigint)[] | undefined,
+        contentMap,
+        mediaOverrides,
+        offChainNodes: offChainData?.nodes as readonly any[] | undefined,
+      }),
+    [
+      universeId,
+      useOnChain,
+      onChainContractAddress,
+      fullGraphData,
+      canonChainData,
+      contentMap,
+      mediaOverrides,
+      offChainData,
+    ]
+  );
 
   // Include off-chain loading so callers waiting on `isLoadingAny` don't
   // release their loading UI before the off-chain fetch (offChainNodes.list)
