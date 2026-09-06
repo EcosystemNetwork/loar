@@ -116,7 +116,8 @@ import { FlowCreationPanel } from '@/components/FlowCreationPanel';
 import { GovernanceSidebar } from '@/components/GovernanceSidebar';
 import { GenerationsPanel } from '@/components/GenerationsPanel';
 import { AudioToolbar, type SelectedClip } from '@/components/AudioToolbar';
-import { calculateTreeLayout, normalizeNodeId, getEventLabel } from '@/utils/treeLayout';
+import { calculateTreeLayout, normalizeNodeId } from '@/utils/treeLayout';
+import { buildSceneFlowGraph, TIMELINE_LAYOUT_CONFIG } from '@/lib/timelineFlowGraph';
 import { useVideoGeneration, type StatusMessage } from '@/hooks/useVideoGeneration';
 import { useCharacterGeneration } from '@/hooks/useCharacterGeneration';
 import { useContractSave } from '@/hooks/useContractSave';
@@ -2718,172 +2719,45 @@ function UniverseTimelineEditorInner() {
     }
     const archivedNodeIds = wouldHideEveryNode ? new Set<string>() : storedArchivedNodeIds;
 
-    // Colors for different types
-    const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
-
     // Calculate tree layout using utility
-    const layout = calculateTreeLayout(graphData.nodeIds, graphData.previousNodes, {
-      horizontalSpacing: 420,
-      verticalSpacing: 320,
-      startX: 100,
-      startY: 100,
-    });
+    const layout = calculateTreeLayout(
+      graphData.nodeIds,
+      graphData.previousNodes,
+      TIMELINE_LAYOUT_CONFIG
+    );
 
     // Load locally-saved event data (has resolved URLs and descriptions)
     const localEvents: Record<string, any> = getStoredEvents();
 
-    // Create nodes from blockchain data using calculated layout
-    graphData.nodeIds.forEach((nodeIdStr, index) => {
-      const nodeId = normalizeNodeId(nodeIdStr);
-
-      // Skip archived (soft-deleted) nodes
-      if (archivedNodeIds.has(nodeId.toString()) || archivedNodeIds.has(String(nodeId))) return;
-
-      // Try to resolve actual URL and description from localStorage first
-      const localEvent = localEvents[nodeId.toString()] || localEvents[String(nodeId)];
-
-      const rawUrl = graphData.urls[index] || '';
-      const url =
-        localEvent?.videoUrl ||
-        (typeof rawUrl === 'string' && !isBytes32Hash(rawUrl) ? rawUrl : '');
-
-      // Handle description which might be an object {timestamp, description} or a string
-      const rawDesc = graphData.descriptions[index];
-      const rawDescStr =
-        rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
-          ? String((rawDesc as any).description)
-          : String(rawDesc || '');
-      // Use localStorage description if the on-chain value is a hash
-      const description = localEvent?.description || (isBytes32Hash(rawDescStr) ? '' : rawDescStr);
-
-      const previousNode = graphData.previousNodes[index] || '';
-      const isCanon = graphData.flags[index] || false;
-      const parentId =
-        previousNode && String(previousNode) !== '0' ? normalizeNodeId(previousNode) : 0;
-
-      // Check if this node is in the canon chain
-      const isInCanonChain =
-        graphData.canonChain &&
-        graphData.canonChain.some((canonId: any) => {
-          const canonNodeId = normalizeNodeId(canonId);
-          return canonNodeId === nodeId;
-        });
-
-      // Get position from layout calculation
-      const position = layout.nodePositions.get(nodeId) || { x: 100, y: 100 };
-
-      // Generate proper event label
-      const eventLabel = getEventLabel(nodeId, parentId, layout.nodesByParent);
-
-      const color = isCanon ? colors[0] : colors[(index + 1) % colors.length];
-
-      const displayLabel =
-        localEvent?.title ||
-        (description && description.length > 0 && description !== `Timeline event ${nodeId}`
-          ? description.substring(0, 50) + (description.length > 50 ? '...' : '')
-          : `Event ${nodeId}`);
-
-      // Count children (branches) for this node
-      const childNodes = graphData.children[index];
-      const childCount = Array.isArray(childNodes) ? childNodes.length : 0;
-
-      // Count segments from localStorage
-      let segmentCount = 0;
-      try {
-        const segKey = `event_segments_${finalUniverse?.id || id}_${nodeId}`;
-        const segData = localStorage.getItem(segKey);
-        if (segData) {
-          segmentCount = JSON.parse(segData).length;
+    // Scene node + edge construction (pure — see lib/timelineFlowGraph.ts).
+    const scene = buildSceneFlowGraph({
+      graphData,
+      layout,
+      archivedNodeIds,
+      localEvents,
+      universeId: finalUniverse?.id || id,
+      getSegmentCount: (nodeId) => {
+        try {
+          const segData = localStorage.getItem(
+            `event_segments_${finalUniverse?.id || id}_${nodeId}`
+          );
+          return segData ? JSON.parse(segData).length : 0;
+        } catch {
+          return 0;
         }
-      } catch {
-        /* ignore */
-      }
-
-      // Load version history from localStorage
-      let videoVersions: any[] | undefined;
-      let currentVersionIndex: number | undefined;
-      if (localEvent?.videoVersions && localEvent.videoVersions.length > 0) {
-        videoVersions = localEvent.videoVersions.map((v: any) => ({
-          videoUrl: v.videoUrl,
-          versionNumber: v.versionNumber,
-          generatedAt: v.generatedAt,
-          model: v.model,
-        }));
-        currentVersionIndex = localEvent.currentVersionIndex ?? -1;
-      }
-
-      blockchainNodes.push({
-        id: `blockchain-node-${nodeId}`,
-        type: 'timelineEvent',
-        position,
-        data: {
-          label: displayLabel,
-          description: description || `Event ${nodeId}`,
-          videoUrl: url,
-          timelineColor: color,
-          nodeType: 'scene',
-          eventId: nodeId.toString(),
-          blockchainNodeId: nodeId,
-          displayName: nodeId.toString(),
-          timelineId: `timeline-1`,
-          universeId: finalUniverse?.id || id,
-          isRoot: String(previousNode) === '0' || !previousNode,
-          isInCanonChain: isInCanonChain,
-          segmentCount: segmentCount > 1 ? segmentCount : undefined,
-          childCount: childCount > 1 ? childCount : undefined,
-          onAddScene: handleAddEvent,
-          onEditScene: handleEditScene,
-          onRegenerateScene: handleRegenerateScene,
-          onSwitchVersion: handleSwitchVersion,
-          onDeleteNode: handleDeleteNode,
-          isSelected: false,
-          videoVersions,
-          currentVersionIndex,
-          trimStart: localEvent?.trimStart,
-          trimEnd: localEvent?.trimEnd,
-        },
-      });
+      },
     });
 
-    // Create edges based on previous node relationships
-    graphData.nodeIds.forEach((nodeIdStr, index) => {
-      const nodeId = normalizeNodeId(nodeIdStr);
-      const previousNodeStr = graphData.previousNodes[index];
-
-      if (previousNodeStr && String(previousNodeStr) !== '0') {
-        const previousNodeId = normalizeNodeId(previousNodeStr);
-        const isCanonEdge = graphData.flags[index];
-        const color = isCanonEdge ? colors[0] : colors[(index + 1) % colors.length];
-
-        // Check if this is a branch (parent has multiple children)
-        const parentChildren = layout.nodesByParent.get(previousNodeId) || [];
-        const isBranch = parentChildren.length > 1 && parentChildren.indexOf(nodeId) > 0;
-
-        blockchainEdges.push({
-          id: `edge-${previousNodeId}-${nodeId}`,
-          source: `blockchain-node-${previousNodeId}`,
-          target: `blockchain-node-${nodeId}`,
-          animated: true,
-          label: isCanonEdge ? 'Canon' : isBranch ? 'Branch' : undefined,
-          labelStyle: {
-            fill: isCanonEdge ? '#eab308' : '#94a3b8',
-            fontSize: 10,
-            fontWeight: 600,
-          },
-          labelBgStyle: {
-            fill: '#09090b',
-            fillOpacity: 0.85,
-          },
-          labelBgPadding: [4, 2] as [number, number],
-          labelBgBorderRadius: 4,
-          style: { stroke: color, strokeWidth: isCanonEdge ? 3 : 2 },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: color,
-          },
-        });
-      }
-    });
+    // Attach the live per-node action callbacks the pure builder leaves off.
+    for (const n of scene.nodes) {
+      n.data.onAddScene = handleAddEvent;
+      n.data.onEditScene = handleEditScene;
+      n.data.onRegenerateScene = handleRegenerateScene;
+      n.data.onSwitchVersion = handleSwitchVersion;
+      n.data.onDeleteNode = handleDeleteNode;
+    }
+    blockchainNodes.push(...scene.nodes);
+    blockchainEdges.push(...scene.edges);
 
     // ── Merge in unsaved local drafts ──────────────────────────────────────
     // handleCreateEvent() fires automatically the moment a generation completes
