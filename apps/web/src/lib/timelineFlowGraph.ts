@@ -192,3 +192,123 @@ export function buildSceneFlowGraph({
 
   return { nodes, edges };
 }
+
+export interface MergeDraftNodesArgs extends SceneFlowGraph {
+  /** localStorage event store — a draft is an entry with a videoUrl and no on-chain id. */
+  localEvents: Record<string, any>;
+  /** Decimal-string ids of the nodes that DO exist on-chain. */
+  onChainNodeIds: Set<string>;
+  universeId: string;
+  /** `data.timelineId` for draft nodes — the editor passes `timeline-${id}`. */
+  timelineId: string;
+}
+
+/**
+ * Re-inject unsaved local drafts (a clip generated this session, placed on the
+ * canvas by handleCreateEvent but not yet written on-chain). Without this the
+ * draft vanishes on the next graphData refetch — the original "clip
+ * disappeared" bug. Drafts are appended in `timestamp` order, each chained off
+ * its explicit `sourceNodeId` (mapped to `blockchain-node-<id>` when that
+ * source is on-chain) or, failing that, the current tail of the graph.
+ *
+ * Pure: returns new arrays, never mutates the inputs. The caller attaches the
+ * per-node action callbacks afterwards.
+ */
+export function mergeDraftNodes({
+  nodes,
+  edges,
+  localEvents,
+  onChainNodeIds,
+  universeId,
+  timelineId,
+}: MergeDraftNodesArgs): SceneFlowGraph {
+  const outNodes = [...nodes];
+  const outEdges = [...edges];
+
+  const draftEntries = Object.entries(localEvents)
+    .filter(([eventId, ev]: [string, any]) => !onChainNodeIds.has(eventId) && ev?.videoUrl)
+    .sort((a, b) => ((a[1] as any).timestamp || 0) - ((b[1] as any).timestamp || 0));
+
+  let chainTailId: string | null = outNodes.length > 0 ? outNodes[outNodes.length - 1].id : null;
+  let chainTailPosition =
+    outNodes.length > 0 ? outNodes[outNodes.length - 1].position : { x: 100, y: 100 };
+
+  for (const [eventId, ev] of draftEntries as [string, any][]) {
+    const position = ev.position || { x: chainTailPosition.x + 420, y: chainTailPosition.y };
+
+    outNodes.push({
+      id: eventId,
+      type: 'timelineEvent',
+      position,
+      data: {
+        label: ev.title || 'Untitled scene',
+        description: ev.description || '',
+        videoUrl: ev.videoUrl,
+        timelineColor: '#a855f7',
+        nodeType: 'scene',
+        eventId,
+        displayName: eventId,
+        timelineId,
+        universeId,
+        isDraft: true,
+        isSelected: false,
+      } as TimelineNodeData,
+    });
+
+    const explicitSourceId = ev.sourceNodeId
+      ? onChainNodeIds.has(String(ev.sourceNodeId))
+        ? `blockchain-node-${normalizeNodeId(ev.sourceNodeId)}`
+        : String(ev.sourceNodeId)
+      : null;
+    const edgeSource = explicitSourceId || chainTailId;
+
+    if (edgeSource) {
+      outEdges.push({
+        id: `edge-${edgeSource}-${eventId}`,
+        source: edgeSource,
+        target: eventId,
+        animated: true,
+        style: { stroke: '#a855f7', strokeWidth: 2, strokeDasharray: '4,4' },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#a855f7' },
+      });
+    }
+
+    chainTailId = eventId;
+    chainTailPosition = position;
+  }
+
+  return { nodes: outNodes, edges: outEdges };
+}
+
+/**
+ * Append the trailing dashed "add a scene" node (+ its connector) after the
+ * last node in the graph. No-op on an empty graph. Pure.
+ */
+export function appendAddFinalNode({ nodes, edges }: SceneFlowGraph): SceneFlowGraph {
+  if (nodes.length === 0) return { nodes: [...nodes], edges: [...edges] };
+
+  const lastNode = nodes[nodes.length - 1];
+  const addNodeId = 'add-final';
+
+  return {
+    nodes: [
+      ...nodes,
+      {
+        id: addNodeId,
+        type: 'timelineEvent',
+        position: { x: lastNode.position.x + 420, y: lastNode.position.y },
+        data: { label: '', description: '', nodeType: 'add' } as TimelineNodeData,
+      },
+    ],
+    edges: [
+      ...edges,
+      {
+        id: `edge-${lastNode.id}-${addNodeId}`,
+        source: lastNode.id,
+        target: addNodeId,
+        animated: true,
+        style: { stroke: '#cbd5e1', strokeDasharray: '8,8' },
+      },
+    ],
+  };
+}

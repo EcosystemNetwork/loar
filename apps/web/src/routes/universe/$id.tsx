@@ -117,7 +117,12 @@ import { GovernanceSidebar } from '@/components/GovernanceSidebar';
 import { GenerationsPanel } from '@/components/GenerationsPanel';
 import { AudioToolbar, type SelectedClip } from '@/components/AudioToolbar';
 import { calculateTreeLayout, normalizeNodeId } from '@/utils/treeLayout';
-import { buildSceneFlowGraph, TIMELINE_LAYOUT_CONFIG } from '@/lib/timelineFlowGraph';
+import {
+  buildSceneFlowGraph,
+  mergeDraftNodes,
+  appendAddFinalNode,
+  TIMELINE_LAYOUT_CONFIG,
+} from '@/lib/timelineFlowGraph';
 import { useVideoGeneration, type StatusMessage } from '@/hooks/useVideoGeneration';
 import { useCharacterGeneration } from '@/hooks/useCharacterGeneration';
 import { useContractSave } from '@/hooks/useContractSave';
@@ -2748,115 +2753,38 @@ function UniverseTimelineEditorInner() {
       },
     });
 
-    // Attach the live per-node action callbacks the pure builder leaves off.
-    for (const n of scene.nodes) {
-      n.data.onAddScene = handleAddEvent;
-      n.data.onEditScene = handleEditScene;
-      n.data.onRegenerateScene = handleRegenerateScene;
-      n.data.onSwitchVersion = handleSwitchVersion;
-      n.data.onDeleteNode = handleDeleteNode;
-    }
-    blockchainNodes.push(...scene.nodes);
-    blockchainEdges.push(...scene.edges);
-
-    // ── Merge in unsaved local drafts ──────────────────────────────────────
-    // handleCreateEvent() fires automatically the moment a generation completes
-    // (see handleVideoGenerated below) so a freshly generated clip is placed on
-    // the canvas immediately rather than only living in transient dialog state.
-    // That node has no on-chain id yet, so without this step it would vanish
-    // the next time this effect reruns (e.g. graphData refetching on window
-    // refocus) — reproducing the exact "clip disappeared" bug this exists to
-    // fix. Re-inject any localEvents entry not yet backed by an on-chain node.
-    const onChainIds = new Set(
+    // Merge unsaved local drafts, then append the trailing "add scene" node —
+    // both pure (see lib/timelineFlowGraph.ts). handleCreateEvent() drops a
+    // freshly generated clip onto the canvas before it has an on-chain id;
+    // without the draft merge it would vanish on the next graphData refetch
+    // (the original "clip disappeared" bug).
+    const onChainNodeIds = new Set(
       graphData.nodeIds.map((nodeIdStr) => normalizeNodeId(nodeIdStr).toString())
     );
-    const draftEntries = Object.entries(localEvents)
-      .filter(([eventId, ev]: [string, any]) => !onChainIds.has(eventId) && ev?.videoUrl)
-      .sort((a: any, b: any) => (a[1].timestamp || 0) - (b[1].timestamp || 0));
-
-    let chainTailId: string | null =
-      blockchainNodes.length > 0 ? blockchainNodes[blockchainNodes.length - 1].id : null;
-    let chainTailPosition =
-      blockchainNodes.length > 0
-        ? blockchainNodes[blockchainNodes.length - 1].position
-        : { x: 100, y: 100 };
-
-    draftEntries.forEach(([eventId, ev]: [string, any]) => {
-      const position = ev.position || { x: chainTailPosition.x + 420, y: chainTailPosition.y };
-
-      blockchainNodes.push({
-        id: eventId,
-        type: 'timelineEvent',
-        position,
-        data: {
-          label: ev.title || 'Untitled scene',
-          description: ev.description || '',
-          videoUrl: ev.videoUrl,
-          timelineColor: '#a855f7',
-          nodeType: 'scene',
-          eventId,
-          displayName: eventId,
-          timelineId: `timeline-${id}`,
-          universeId: finalUniverse?.id || id,
-          isDraft: true,
-          onAddScene: handleAddEvent,
-          onEditScene: handleEditScene,
-          onRegenerateScene: handleRegenerateScene,
-          onSwitchVersion: handleSwitchVersion,
-          onDeleteNode: handleDeleteNode,
-          isSelected: false,
-        },
-      });
-
-      // An explicit branch source (on-chain or an earlier draft) if the user
-      // picked one when generating, otherwise chain off the current tail.
-      const explicitSourceId = ev.sourceNodeId
-        ? onChainIds.has(String(ev.sourceNodeId))
-          ? `blockchain-node-${normalizeNodeId(ev.sourceNodeId)}`
-          : String(ev.sourceNodeId)
-        : null;
-      const edgeSource = explicitSourceId || chainTailId;
-
-      if (edgeSource) {
-        blockchainEdges.push({
-          id: `edge-${edgeSource}-${eventId}`,
-          source: edgeSource,
-          target: eventId,
-          animated: true,
-          style: { stroke: '#a855f7', strokeWidth: 2, strokeDasharray: '4,4' },
-          markerEnd: { type: MarkerType.ArrowClosed, color: '#a855f7' },
-        });
-      }
-
-      chainTailId = eventId;
-      chainTailPosition = position;
+    const withDrafts = mergeDraftNodes({
+      nodes: scene.nodes,
+      edges: scene.edges,
+      localEvents,
+      onChainNodeIds,
+      universeId: finalUniverse?.id || id,
+      timelineId: `timeline-${id}`,
     });
+    const withAddNode = appendAddFinalNode(withDrafts);
 
-    // Add final + node to continue the timeline
-    if (blockchainNodes.length > 0) {
-      const lastNode = blockchainNodes[blockchainNodes.length - 1];
-      const addNodeId = `add-final`;
-
-      blockchainNodes.push({
-        id: addNodeId,
-        type: 'timelineEvent',
-        position: { x: lastNode.position.x + 420, y: lastNode.position.y },
-        data: {
-          label: '',
-          description: '',
-          nodeType: 'add',
-          onAddScene: handleAddEvent,
-        },
-      });
-
-      blockchainEdges.push({
-        id: `edge-${lastNode.id}-${addNodeId}`,
-        source: lastNode.id,
-        target: addNodeId,
-        animated: true,
-        style: { stroke: '#cbd5e1', strokeDasharray: '8,8' },
-      });
+    // Attach the live per-node action callbacks the pure builders leave off.
+    // Scene/draft nodes get the full set; the trailing "add" node only adds.
+    for (const n of withAddNode.nodes) {
+      n.data.onAddScene = handleAddEvent;
+      if (n.data.nodeType !== 'add') {
+        n.data.onEditScene = handleEditScene;
+        n.data.onRegenerateScene = handleRegenerateScene;
+        n.data.onSwitchVersion = handleSwitchVersion;
+        n.data.onDeleteNode = handleDeleteNode;
+      }
     }
+
+    blockchainNodes.push(...withAddNode.nodes);
+    blockchainEdges.push(...withAddNode.edges);
 
     // Re-inject the in-flight "Generating…" placeholder, if any — this effect
     // rebuilds `nodes` wholesale from graphData/localStorage and would

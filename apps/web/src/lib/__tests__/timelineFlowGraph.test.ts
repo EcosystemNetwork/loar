@@ -8,11 +8,15 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_GRAPH_DATA, type GraphData } from '@/hooks/universeGraphData';
 import { calculateTreeLayout } from '@/utils/treeLayout';
+import type { Edge, Node } from 'reactflow';
+import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import {
   TIMELINE_LAYOUT_CONFIG,
   TIMELINE_NODE_COLORS,
+  appendAddFinalNode,
   buildSceneFlowGraph,
   buildTimelineFlowGraph,
+  mergeDraftNodes,
 } from '../timelineFlowGraph';
 
 const HASH = '0x' + 'a'.repeat(64);
@@ -256,5 +260,228 @@ describe('buildTimelineFlowGraph — colours + edge styling', () => {
 describe('buildTimelineFlowGraph — empty', () => {
   it('returns empty nodes/edges for an empty graph', () => {
     expect(build(EMPTY_GRAPH_DATA)).toEqual({ nodes: [], edges: [] });
+  });
+});
+
+// ── mergeDraftNodes ──────────────────────────────────────────────────────
+
+const sceneNode = (id: string, x = 100, y = 100): Node<TimelineNodeData> => ({
+  id,
+  type: 'timelineEvent',
+  position: { x, y },
+  data: { nodeType: 'scene', label: id, description: '' } as TimelineNodeData,
+});
+
+const mergeDrafts = (
+  localEvents: Record<string, any>,
+  over: Partial<Parameters<typeof mergeDraftNodes>[0]> = {}
+) =>
+  mergeDraftNodes({
+    nodes: [sceneNode('blockchain-node-1', 100, 100)],
+    edges: [] as Edge[],
+    localEvents,
+    onChainNodeIds: new Set(['1']),
+    universeId: '0xuni',
+    timelineId: 'timeline-0xuni',
+    ...over,
+  });
+
+describe('mergeDraftNodes', () => {
+  it('no drafts → returns copies of the inputs, unchanged', () => {
+    const nodes = [sceneNode('blockchain-node-1')];
+    const edges: Edge[] = [];
+    const out = mergeDraftNodes({
+      nodes,
+      edges,
+      localEvents: {},
+      onChainNodeIds: new Set(['1']),
+      universeId: '0xuni',
+      timelineId: 't',
+    });
+    expect(out.nodes).toEqual(nodes);
+    expect(out.nodes).not.toBe(nodes); // fresh array
+    expect(out.edges).toEqual([]);
+  });
+
+  it('appends a draft as a purple isDraft scene node keyed by its localEvents id', () => {
+    const { nodes } = mergeDrafts({
+      'draft-a': { videoUrl: 'https://v/a.mp4', title: 'Fresh Clip', timestamp: 1 },
+    });
+    const draft = nodes.find((n) => n.id === 'draft-a')!;
+    expect(draft).toBeDefined();
+    expect(draft.data).toMatchObject({
+      nodeType: 'scene',
+      isDraft: true,
+      label: 'Fresh Clip',
+      videoUrl: 'https://v/a.mp4',
+      timelineColor: '#a855f7',
+      timelineId: 'timeline-0xuni',
+      universeId: '0xuni',
+    });
+  });
+
+  it('labels a title-less draft "Untitled scene" and blanks a missing description', () => {
+    const { nodes } = mergeDrafts({ d: { videoUrl: 'https://v.mp4', timestamp: 1 } });
+    const d = nodes.find((n) => n.id === 'd')!;
+    expect(d.data.label).toBe('Untitled scene');
+    expect(d.data.description).toBe('');
+  });
+
+  it('skips a localEvents entry with no videoUrl', () => {
+    const { nodes } = mergeDrafts({ d: { title: 'no video', timestamp: 1 } });
+    expect(nodes.some((n) => n.id === 'd')).toBe(false);
+  });
+
+  it('skips an entry whose id is already on-chain', () => {
+    const { nodes } = mergeDrafts(
+      { '1': { videoUrl: 'https://v.mp4', timestamp: 1 } },
+      { onChainNodeIds: new Set(['1']) }
+    );
+    expect(nodes).toHaveLength(1); // just the original scene node
+  });
+
+  it('orders multiple drafts by timestamp', () => {
+    const { nodes } = mergeDrafts({
+      late: { videoUrl: 'https://l.mp4', timestamp: 200 },
+      early: { videoUrl: 'https://e.mp4', timestamp: 100 },
+    });
+    const ids = nodes.map((n) => n.id);
+    expect(ids.indexOf('early')).toBeLessThan(ids.indexOf('late'));
+  });
+
+  it('chains the first draft off the current tail with a dashed purple edge', () => {
+    const { edges } = mergeDrafts({ d: { videoUrl: 'https://v.mp4', timestamp: 1 } });
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toMatchObject({
+      id: 'edge-blockchain-node-1-d',
+      source: 'blockchain-node-1',
+      target: 'd',
+    });
+    expect((edges[0].style as any).strokeDasharray).toBe('4,4');
+  });
+
+  it('chains consecutive drafts off each other', () => {
+    const { edges } = mergeDrafts({
+      a: { videoUrl: 'https://a.mp4', timestamp: 1 },
+      b: { videoUrl: 'https://b.mp4', timestamp: 2 },
+    });
+    expect(edges.map((e) => e.id)).toEqual(['edge-blockchain-node-1-a', 'edge-a-b']);
+  });
+
+  it('routes a draft to an explicit on-chain sourceNodeId as blockchain-node-<n>', () => {
+    const { edges } = mergeDrafts({
+      d: { videoUrl: 'https://v.mp4', timestamp: 1, sourceNodeId: '1' },
+    });
+    expect(edges[0].source).toBe('blockchain-node-1');
+  });
+
+  it('routes a draft to an explicit off-chain (draft) sourceNodeId verbatim', () => {
+    const { edges } = mergeDrafts({
+      d: { videoUrl: 'https://v.mp4', timestamp: 1, sourceNodeId: 'some-other-draft' },
+    });
+    expect(edges[0].source).toBe('some-other-draft');
+  });
+
+  it('places a draft at ev.position when given, else 420px right of the tail', () => {
+    const withPos = mergeDrafts({
+      d: { videoUrl: 'https://v.mp4', timestamp: 1, position: { x: 5, y: 6 } },
+    });
+    expect(withPos.nodes.find((n) => n.id === 'd')!.position).toEqual({ x: 5, y: 6 });
+
+    const noPos = mergeDrafts({ d: { videoUrl: 'https://v.mp4', timestamp: 1 } });
+    expect(noPos.nodes.find((n) => n.id === 'd')!.position).toEqual({ x: 520, y: 100 });
+  });
+
+  it('with an empty starting graph, the sole draft gets no edge (no tail to attach to)', () => {
+    const out = mergeDraftNodes({
+      nodes: [],
+      edges: [],
+      localEvents: { d: { videoUrl: 'https://v.mp4', timestamp: 1 } },
+      onChainNodeIds: new Set(),
+      universeId: '0xuni',
+      timelineId: 't',
+    });
+    expect(out.nodes).toHaveLength(1);
+    expect(out.edges).toEqual([]);
+    expect(out.nodes[0].position).toEqual({ x: 520, y: 100 });
+  });
+
+  it('does not mutate the input arrays', () => {
+    const nodes = [sceneNode('blockchain-node-1')];
+    const edges: Edge[] = [];
+    mergeDraftNodes({
+      nodes,
+      edges,
+      localEvents: { d: { videoUrl: 'https://v.mp4', timestamp: 1 } },
+      onChainNodeIds: new Set(),
+      universeId: '0xuni',
+      timelineId: 't',
+    });
+    expect(nodes).toHaveLength(1);
+    expect(edges).toHaveLength(0);
+  });
+});
+
+// ── appendAddFinalNode ───────────────────────────────────────────────────
+
+describe('appendAddFinalNode', () => {
+  it('is a no-op on an empty graph (returns fresh empty arrays)', () => {
+    const out = appendAddFinalNode({ nodes: [], edges: [] });
+    expect(out).toEqual({ nodes: [], edges: [] });
+  });
+
+  it('adds an "add-final" node 420px right of the last node, plus a dashed connector', () => {
+    const { nodes, edges } = appendAddFinalNode({
+      nodes: [sceneNode('blockchain-node-3', 900, 200)],
+      edges: [],
+    });
+    const add = nodes.find((n) => n.id === 'add-final')!;
+    expect(add.data.nodeType).toBe('add');
+    expect(add.position).toEqual({ x: 1320, y: 200 });
+    expect(edges).toEqual([
+      expect.objectContaining({
+        id: 'edge-blockchain-node-3-add-final',
+        source: 'blockchain-node-3',
+        target: 'add-final',
+      }),
+    ]);
+    expect((edges[0].style as any).strokeDasharray).toBe('8,8');
+  });
+
+  it('anchors to whatever node is last (e.g. a draft)', () => {
+    const { nodes } = appendAddFinalNode({
+      nodes: [sceneNode('blockchain-node-1', 100, 100), sceneNode('draft-x', 520, 100)],
+      edges: [],
+    });
+    expect(nodes.find((n) => n.id === 'add-final')!.position).toEqual({ x: 940, y: 100 });
+  });
+
+  it('does not mutate the input', () => {
+    const input = { nodes: [sceneNode('n1')], edges: [] as Edge[] };
+    appendAddFinalNode(input);
+    expect(input.nodes).toHaveLength(1);
+    expect(input.edges).toHaveLength(0);
+  });
+});
+
+describe('draft merge + add node — full pipeline parity', () => {
+  it('scene nodes, then timestamp-ordered drafts, then the add node', () => {
+    const scene = build(chain(2));
+    const withDrafts = mergeDraftNodes({
+      nodes: scene.nodes,
+      edges: scene.edges,
+      localEvents: { d1: { videoUrl: 'https://d1.mp4', timestamp: 10 } },
+      onChainNodeIds: new Set(['1', '2']),
+      universeId: '0xuni',
+      timelineId: 'timeline-0xuni',
+    });
+    const final = appendAddFinalNode(withDrafts);
+    expect(final.nodes.map((n) => n.id)).toEqual([
+      'blockchain-node-1',
+      'blockchain-node-2',
+      'd1',
+      'add-final',
+    ]);
+    expect(final.nodes.at(-1)!.data.nodeType).toBe('add');
   });
 });
