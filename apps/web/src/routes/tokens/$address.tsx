@@ -3,7 +3,7 @@
  * candlestick chart, watchlist, share, creator link, maturity progress.
  */
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   useTokenDetail,
   useSwapHistory,
@@ -13,14 +13,27 @@ import {
   ethPricePerToken,
   ethPriceFromTick,
   formatTokenAmount,
-  formatEth,
   formatCompactEth,
   timeAgo,
   computeAmountOut,
   weiToNumber,
 } from '@/hooks/useTokens';
 import { useSwapExecution } from '@/hooks/useSwapExecution';
+import {
+  usePriceSeries,
+  useBondingCurveTradesForCurve,
+  useTokenTransfers,
+  computePriceStats,
+  computeTraderLeaderboard,
+} from '@/hooks/useTokenAnalytics';
 import { CandlestickChart } from '@/components/tokens/CandlestickChart';
+import {
+  BuySellPressure,
+  HolderInsights,
+  TraderLeaderboardCard,
+  TokenStatStrip,
+} from '@/components/tokens/TokenAnalytics';
+import { TokenTransactionsTable } from '@/components/tokens/TokenTransactionsTable';
 import { TokenComments } from '@/components/tokens/TokenComments';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,7 +49,6 @@ import {
   ExternalLink,
   Loader2,
   PieChart,
-  TrendingUp,
   Users,
   Zap,
   ArrowUpRight,
@@ -47,7 +59,6 @@ import {
   StarOff,
   AlertTriangle,
   Clock,
-  MessageCircle,
   Bookmark,
   User,
 } from 'lucide-react';
@@ -55,13 +66,11 @@ import { useChainId, useBalance, useBytecode } from 'wagmi';
 import { parseUnits, formatEther } from 'viem';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { getExplorerAddressUrl } from '@/configs/chains';
-import { openExternal } from '@/utils/open-external';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 import { UniverseStakePanel } from '@/components/UniverseStakePanel';
 import { LPYieldManager } from '@/components/LPYieldManager';
-import { useUnstoppableDomain, formatDisplayName } from '@/hooks/useUnstoppableDomain';
 import { pushRecentToken } from '@/hooks/useRecentTokens';
 
 export const Route = createFileRoute('/tokens/$address')({
@@ -188,6 +197,70 @@ function TokenDetailPage() {
         };
       });
   }, [swaps, tokenIsCurrency0]);
+
+  // Unified price series — merges pre-graduation bonding-curve snapshots with
+  // post-graduation swaps so bonding tokens get real chart history. Falls back
+  // to swap-only `chartData` when the series is empty (older indexer schema).
+  const { data: priceSeries } = usePriceSeries({
+    bondingCurveId: bondingCurve?.id,
+    swaps,
+    tokenIsCurrency0,
+  });
+  const seriesForChart = priceSeries.length >= 2 ? priceSeries : chartData;
+
+  // Per-token bonding-curve trade feed + ERC-20 transfers for the analytics
+  // widgets (transactions table, trader leaderboard, holder insights).
+  const curveTradesQuery = useBondingCurveTradesForCurve(bondingCurve?.id, 500);
+  const curveTrades = useMemo(() => curveTradesQuery.data ?? [], [curveTradesQuery.data]);
+  const transfersQuery = useTokenTransfers(token?.id, 1000);
+  const transfers = useMemo(() => transfersQuery.data ?? [], [transfersQuery.data]);
+
+  const priceStats = useMemo(() => computePriceStats(seriesForChart), [seriesForChart]);
+
+  const traderRows = useMemo(
+    () =>
+      computeTraderLeaderboard({
+        bondingTrades: curveTrades,
+        swaps: swaps ?? [],
+        tokenIsCurrency0,
+      }),
+    [curveTrades, swaps, tokenIsCurrency0]
+  );
+
+  const uniqueTraders = traderRows.length;
+
+  // 24h buy/sell pressure across both trade sources.
+  const pressure24h = useMemo(() => {
+    const dayAgo = Math.floor(Date.now() / 1000) - 86400;
+    let buys = 0,
+      sells = 0,
+      buyVol = 0,
+      sellVol = 0;
+    for (const s of swaps ?? []) {
+      if (s.timestamp < dayAgo) continue;
+      const ethSigned = tokenIsCurrency0 ? BigInt(s.amount1) : BigInt(s.amount0);
+      const ethAbs = weiToNumber(ethSigned < 0n ? -ethSigned : ethSigned, 18);
+      if (ethSigned > 0n) {
+        buys++;
+        buyVol += ethAbs;
+      } else if (ethSigned < 0n) {
+        sells++;
+        sellVol += ethAbs;
+      }
+    }
+    for (const t of curveTrades) {
+      if (t.timestamp < dayAgo) continue;
+      const ethAbs = weiToNumber(t.ethAmount, 18);
+      if (t.isBuy) {
+        buys++;
+        buyVol += ethAbs;
+      } else {
+        sells++;
+        sellVol += ethAbs;
+      }
+    }
+    return { buys, sells, buyVol, sellVol };
+  }, [swaps, curveTrades, tokenIsCurrency0]);
 
   // 24h price change
   const priceChange = useMemo(() => {
@@ -527,74 +600,41 @@ function TokenDetailPage() {
                     </span>
                   )}
                 </div>
-                <CandlestickChart data={chartData} />
+                <CandlestickChart data={seriesForChart} />
               </CardContent>
             </Card>
 
-            {/* Recent Trades */}
+            {/* All-time price stats */}
+            <TokenStatStrip stats={priceStats} uniqueTraders={uniqueTraders} />
+
+            {/* Buy / sell pressure */}
+            <BuySellPressure
+              buys={pressure24h.buys}
+              sells={pressure24h.sells}
+              buyVol={pressure24h.buyVol}
+              sellVol={pressure24h.sellVol}
+            />
+
+            {/* Transactions */}
             <Card>
               <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <TrendingUp className="h-4 w-4 text-primary" />
-                  <h3 className="font-semibold">Recent Trades</h3>
-                  <div className="ml-auto h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                </div>
-
-                {swapsLoading ? (
+                {swapsLoading && curveTrades.length === 0 ? (
                   <div className="flex justify-center py-8">
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   </div>
-                ) : !swaps?.length ? (
-                  <p className="text-center py-8 text-sm text-muted-foreground">No trades yet</p>
                 ) : (
-                  <div className="space-y-1 max-h-[400px] overflow-y-auto">
-                    <div className="grid grid-cols-5 gap-2 text-[10px] text-muted-foreground font-semibold uppercase px-2 pb-1 border-b">
-                      <span>Type</span>
-                      <span>Amount</span>
-                      <span>Price</span>
-                      <span>Trader</span>
-                      <span className="text-right">Time</span>
-                    </div>
-                    {swaps.slice(0, 50).map((swap) => {
-                      // ETH side sign drives BUY/SELL — ETH flowing INTO the
-                      // pool (positive) means the user is buying our token.
-                      const ethAmountSigned = tokenIsCurrency0
-                        ? BigInt(swap.amount1)
-                        : BigInt(swap.amount0);
-                      const isBuy = ethAmountSigned > 0n;
-                      const ethAmountAbs =
-                        ethAmountSigned < 0n ? -ethAmountSigned : ethAmountSigned;
-                      return (
-                        <div
-                          key={swap.id}
-                          className="grid grid-cols-5 gap-2 items-center text-xs px-2 py-1.5 rounded hover:bg-muted/50"
-                        >
-                          <Badge
-                            variant={isBuy ? 'default' : 'destructive'}
-                            className="text-[10px] w-fit px-1.5 py-0"
-                          >
-                            {isBuy ? 'BUY' : 'SELL'}
-                          </Badge>
-                          <span className="font-mono text-[10px] truncate">
-                            {formatEth(ethAmountAbs.toString())}
-                          </span>
-                          <span className="font-mono text-[10px]">
-                            {ethPriceFromTick(swap.tick, tokenIsCurrency0).toExponential(2)}
-                          </span>
-                          <AddressDisplay
-                            address={swap.sender}
-                            className="text-[10px] text-muted-foreground"
-                          />
-                          <span className="text-[10px] text-muted-foreground text-right">
-                            {timeAgo(swap.timestamp)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <TokenTransactionsTable
+                    swaps={swaps ?? []}
+                    bondingTrades={curveTrades}
+                    tokenIsCurrency0={tokenIsCurrency0}
+                    chainId={chainId}
+                  />
                 )}
               </CardContent>
             </Card>
+
+            {/* Trader leaderboard */}
+            <TraderLeaderboardCard rows={traderRows} />
 
             {/* Comments */}
             <Card>
@@ -882,6 +922,13 @@ function TokenDetailPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Holder analytics — concentration donut, holder history, whale flow */}
+            <HolderInsights
+              holders={visibleHolders}
+              transfers={transfers}
+              circulatingSupplyWei={circulatingSupplyWei}
+            />
 
             {/* Holder Distribution */}
             <Card>

@@ -1,12 +1,9 @@
 /**
- * CandlestickChart — Interactive price chart with candles, volume bars,
- * and timeframe selection for token detail pages.
- *
- * Renders a pure SVG chart with hover tooltips, price/time axes,
- * and volume overlay — no external charting library needed.
+ * CandlestickChart — interactive price chart with candles / line modes, moving
+ * averages, a log-scale toggle, a buy/sell-split volume pane, timeframe
+ * selection and hover crosshair. Pure SVG — no charting library.
  */
 import { useState, useMemo, useCallback, useRef } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 interface TradePoint {
@@ -22,6 +19,8 @@ interface Candle {
   low: number;
   close: number;
   volume: number;
+  buyVolume: number;
+  sellVolume: number;
   timestamp: number; // bucket start
   trades: number;
 }
@@ -52,6 +51,8 @@ function buildCandles(data: TradePoint[], tf: Timeframe): Candle[] {
         low: d.price,
         close: d.price,
         volume: d.ethAmount,
+        buyVolume: d.isBuy ? d.ethAmount : 0,
+        sellVolume: d.isBuy ? 0 : d.ethAmount,
         timestamp: key,
         trades: 1,
       });
@@ -60,11 +61,12 @@ function buildCandles(data: TradePoint[], tf: Timeframe): Candle[] {
       existing.low = Math.min(existing.low, d.price);
       existing.close = d.price;
       existing.volume += d.ethAmount;
+      if (d.isBuy) existing.buyVolume += d.ethAmount;
+      else existing.sellVolume += d.ethAmount;
       existing.trades += 1;
     }
   }
 
-  // Fill gaps with flat candles
   const sorted = Array.from(candleMap.values()).sort((a, b) => a.timestamp - b.timestamp);
   if (sorted.length < 2) return sorted;
 
@@ -80,36 +82,62 @@ function buildCandles(data: TradePoint[], tf: Timeframe): Candle[] {
           low: sorted[i].close,
           close: sorted[i].close,
           volume: 0,
+          buyVolume: 0,
+          sellVolume: 0,
           timestamp: t,
           trades: 0,
         });
         t += bucket;
-        if (filled.length > 500) break; // safety
+        if (filled.length > 500) break;
       }
     }
   }
 
-  return filled.slice(-120); // max 120 candles
+  return filled.slice(-120);
+}
+
+// Static SVG geometry — hoisted so hook deps stay stable.
+const W = 700;
+const H_CANDLE = 200;
+const H_VOLUME = 50;
+const H = H_CANDLE + H_VOLUME + 40;
+const PAD = { top: 12, right: 64, bottom: 28, left: 4 };
+const CHART_W = W - PAD.left - PAD.right;
+
+/** Simple moving average of candle closes; null for the warm-up window. */
+function sma(candles: Candle[], period: number): (number | null)[] {
+  const out: (number | null)[] = [];
+  let sum = 0;
+  for (let i = 0; i < candles.length; i++) {
+    sum += candles[i].close;
+    if (i >= period) sum -= candles[i - period].close;
+    out.push(i >= period - 1 ? sum / period : null);
+  }
+  return out;
 }
 
 export function CandlestickChart({ data }: { data: TradePoint[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [timeframe, setTimeframe] = useState<Timeframe>('5m');
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [chartType, setChartType] = useState<'candles' | 'line'>('candles');
+  const [logScale, setLogScale] = useState(false);
+  const [showMA, setShowMA] = useState(true);
 
   const candles = useMemo(() => buildCandles(data, timeframe), [data, timeframe]);
+  const ma7 = useMemo(() => sma(candles, 7), [candles]);
+  const ma25 = useMemo(() => sma(candles, 25), [candles]);
 
-  const W = 700;
-  const H_CANDLE = 200;
-  const H_VOLUME = 50;
-  const H = H_CANDLE + H_VOLUME + 40; // + x-axis
-  const PAD = { top: 12, right: 64, bottom: 28, left: 4 };
-  const chartW = W - PAD.left - PAD.right;
+  const chartW = CHART_W;
 
-  const prices = candles.length > 0 ? candles.flatMap((c) => [c.high, c.low]) : [0];
+  const rawPrices = candles.length > 0 ? candles.flatMap((c) => [c.high, c.low]) : [1];
+  // Log scale needs strictly positive values; fall back to linear if any <= 0.
+  const canLog = logScale && rawPrices.every((p) => p > 0);
+  const tf = (p: number) => (canLog ? Math.log10(p) : p);
+  const prices = rawPrices.map(tf);
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
-  const priceRange = maxPrice - minPrice || minPrice * 0.01 || 1;
+  const priceRange = maxPrice - minPrice || Math.abs(minPrice) * 0.01 || 1;
   const pricePad = priceRange * 0.05;
 
   const maxVol = Math.max(...candles.map((c) => c.volume), 0.001);
@@ -119,16 +147,17 @@ export function CandlestickChart({ data }: { data: TradePoint[] }) {
 
   const toX = (i: number) => PAD.left + (i + 0.5) * candleW;
   const toY = (p: number) =>
-    PAD.top + (1 - (p - (minPrice - pricePad)) / (priceRange + pricePad * 2)) * H_CANDLE;
-  const volY = (v: number) => PAD.top + H_CANDLE + H_VOLUME - (v / maxVol) * (H_VOLUME - 4);
+    PAD.top + (1 - (tf(p) - (minPrice - pricePad)) / (priceRange + pricePad * 2)) * H_CANDLE;
+  const volTop = PAD.top + H_CANDLE;
+  const buyVolY = (v: number) => volTop + H_VOLUME - (v / maxVol) * (H_VOLUME - 4);
 
-  // Y-axis ticks
   const yTicks = Array.from({ length: 5 }, (_, i) => {
-    const p = minPrice + (priceRange * i) / 4;
-    return { price: p, y: toY(p) };
+    const frac = i / 4;
+    const tfVal = minPrice + priceRange * frac;
+    const price = canLog ? Math.pow(10, tfVal) : tfVal;
+    return { price, y: PAD.top + (1 - frac) * H_CANDLE };
   });
 
-  // X-axis ticks (every ~20 candles)
   const step = Math.max(Math.floor(candles.length / 6), 1);
   const xTicks = candles
     .filter((_, i) => i % step === 0)
@@ -139,79 +168,133 @@ export function CandlestickChart({ data }: { data: TradePoint[] }) {
     if (timeframe === '1d') return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
-
   const formatPrice = (p: number) => (p < 0.001 ? p.toExponential(2) : p.toFixed(6));
+
+  const linePath = useMemo(() => {
+    if (!candles.length) return '';
+    return candles.map((c, i) => `${i === 0 ? 'M' : 'L'} ${toX(i)} ${toY(c.close)}`).join(' ');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candles, minPrice, priceRange, canLog]);
+
+  const maPath = (series: (number | null)[]) => {
+    let d = '';
+    let started = false;
+    series.forEach((v, i) => {
+      if (v == null) return;
+      d += `${started ? 'L' : 'M'} ${toX(i)} ${toY(v)} `;
+      started = true;
+    });
+    return d;
+  };
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
       const mouseX = ((e.clientX - rect.left) / rect.width) * W - PAD.left;
       const idx = Math.floor(mouseX / candleW);
-      if (idx >= 0 && idx < candles.length) {
-        setHoverIndex(idx);
-      }
+      if (idx >= 0 && idx < candles.length) setHoverIndex(idx);
     },
     [candles.length, candleW]
   );
 
   if (candles.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground text-sm">
+      <div className="flex flex-col items-center justify-center py-16 text-sm text-muted-foreground">
         No trading data available
       </div>
     );
   }
 
   const hoverCandle = hoverIndex !== null ? candles[hoverIndex] : null;
-  const lastCandle = candles[candles.length - 1];
 
   return (
     <div ref={containerRef} className="space-y-2">
-      {/* Timeframe selector */}
-      <div className="flex items-center justify-between">
+      {/* Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-1">
-          {(['1m', '5m', '15m', '1h', '4h', '1d'] as Timeframe[]).map((tf) => (
+          {(['1m', '5m', '15m', '1h', '4h', '1d'] as Timeframe[]).map((t) => (
             <Button
-              key={tf}
-              variant={timeframe === tf ? 'default' : 'ghost'}
+              key={t}
+              variant={timeframe === t ? 'default' : 'ghost'}
               size="sm"
-              className="h-6 px-2 text-[10px] font-mono"
-              onClick={() => setTimeframe(tf)}
+              className="h-6 px-2 font-mono text-[10px]"
+              onClick={() => setTimeframe(t)}
             >
-              {tf}
+              {t}
             </Button>
           ))}
         </div>
-        {/* OHLCV display for hovered candle */}
-        {hoverCandle && (
-          <div className="flex gap-3 text-[10px] font-mono tabular-nums">
-            <span className="text-muted-foreground">
-              O <span className="text-foreground">{formatPrice(hoverCandle.open)}</span>
-            </span>
-            <span className="text-muted-foreground">
-              H <span className="text-green-500">{formatPrice(hoverCandle.high)}</span>
-            </span>
-            <span className="text-muted-foreground">
-              L <span className="text-red-500">{formatPrice(hoverCandle.low)}</span>
-            </span>
-            <span className="text-muted-foreground">
-              C <span className="text-foreground">{formatPrice(hoverCandle.close)}</span>
-            </span>
-            <span className="text-muted-foreground">
-              V <span className="text-foreground">{hoverCandle.volume.toFixed(4)}</span>
-            </span>
-          </div>
-        )}
+        <div className="flex items-center gap-1">
+          <Button
+            variant={chartType === 'candles' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-6 px-2 text-[10px]"
+            onClick={() => setChartType('candles')}
+          >
+            Candles
+          </Button>
+          <Button
+            variant={chartType === 'line' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-6 px-2 text-[10px]"
+            onClick={() => setChartType('line')}
+          >
+            Line
+          </Button>
+          <Button
+            variant={showMA ? 'default' : 'ghost'}
+            size="sm"
+            className="h-6 px-2 text-[10px]"
+            onClick={() => setShowMA((v) => !v)}
+            title="Moving averages (7 / 25)"
+          >
+            MA
+          </Button>
+          <Button
+            variant={logScale ? 'default' : 'ghost'}
+            size="sm"
+            className="h-6 px-2 text-[10px]"
+            onClick={() => setLogScale((v) => !v)}
+            title="Logarithmic price axis"
+          >
+            Log
+          </Button>
+        </div>
       </div>
 
-      {/* Chart SVG */}
+      {/* OHLCV for hovered candle */}
+      {hoverCandle && (
+        <div className="flex flex-wrap gap-3 font-mono text-[10px] tabular-nums">
+          <span className="text-muted-foreground">
+            O <span className="text-foreground">{formatPrice(hoverCandle.open)}</span>
+          </span>
+          <span className="text-muted-foreground">
+            H <span className="text-green-500">{formatPrice(hoverCandle.high)}</span>
+          </span>
+          <span className="text-muted-foreground">
+            L <span className="text-red-500">{formatPrice(hoverCandle.low)}</span>
+          </span>
+          <span className="text-muted-foreground">
+            C <span className="text-foreground">{formatPrice(hoverCandle.close)}</span>
+          </span>
+          <span className="text-muted-foreground">
+            V <span className="text-foreground">{hoverCandle.volume.toFixed(4)}</span>
+          </span>
+          {hoverCandle.trades > 0 && (
+            <span className="text-muted-foreground">
+              <span className="text-green-500">{hoverCandle.buyVolume.toFixed(3)}</span> /{' '}
+              <span className="text-red-500">{hoverCandle.sellVolume.toFixed(3)}</span>
+            </span>
+          )}
+        </div>
+      )}
+
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full h-auto"
+        className="h-auto w-full"
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setHoverIndex(null)}
       >
-        {/* Grid */}
         {yTicks.map((tick, i) => (
           <line
             key={`gy-${i}`}
@@ -225,65 +308,92 @@ export function CandlestickChart({ data }: { data: TradePoint[] }) {
           />
         ))}
 
-        {/* Volume separator */}
         <line
           x1={PAD.left}
-          y1={PAD.top + H_CANDLE}
+          y1={volTop}
           x2={W - PAD.right}
-          y2={PAD.top + H_CANDLE}
+          y2={volTop}
           stroke="currentColor"
           strokeOpacity="0.1"
         />
 
-        {/* Volume bars */}
-        {candles.map((c, i) => (
-          <rect
-            key={`vol-${i}`}
-            x={toX(i) - bodyW / 2}
-            y={volY(c.volume)}
-            width={bodyW}
-            height={PAD.top + H_CANDLE + H_VOLUME - volY(c.volume)}
-            fill={c.close >= c.open ? '#22c55e' : '#ef4444'}
-            fillOpacity={hoverIndex === i ? 0.6 : 0.2}
-            rx="0.5"
-          />
-        ))}
-
-        {/* Candles */}
+        {/* Volume bars — split buy (green, from baseline) over sell (red, stacked) */}
         {candles.map((c, i) => {
-          const isGreen = c.close >= c.open;
-          const color = isGreen ? '#22c55e' : '#ef4444';
-          const bodyTop = toY(Math.max(c.open, c.close));
-          const bodyBot = toY(Math.min(c.open, c.close));
-          const bodyHeight = Math.max(bodyBot - bodyTop, 1);
-
+          const total = c.buyVolume + c.sellVolume || c.volume;
+          if (total <= 0) return null;
+          const fullH = volTop + H_VOLUME - buyVolY(total);
+          const buyFrac = total > 0 ? c.buyVolume / total : 0;
+          const buyH = fullH * buyFrac;
+          const sellH = fullH - buyH;
+          const x = toX(i) - bodyW / 2;
           return (
-            <g key={`candle-${i}`}>
-              {/* Wick */}
-              <line
-                x1={toX(i)}
-                y1={toY(c.high)}
-                x2={toX(i)}
-                y2={toY(c.low)}
-                stroke={color}
-                strokeWidth="1"
-              />
-              {/* Body */}
+            <g key={`vol-${i}`} opacity={hoverIndex === i ? 0.85 : 0.5}>
               <rect
-                x={toX(i) - bodyW / 2}
-                y={bodyTop}
+                x={x}
+                y={volTop + H_VOLUME - sellH}
                 width={bodyW}
-                height={bodyHeight}
-                fill={isGreen ? color : color}
-                stroke={color}
-                strokeWidth="0.5"
-                rx="0.5"
+                height={sellH}
+                fill="#ef4444"
+              />
+              <rect
+                x={x}
+                y={volTop + H_VOLUME - sellH - buyH}
+                width={bodyW}
+                height={buyH}
+                fill="#22c55e"
               />
             </g>
           );
         })}
 
-        {/* Y-axis labels */}
+        {/* Price: candles or line */}
+        {chartType === 'candles' ? (
+          candles.map((c, i) => {
+            const isGreen = c.close >= c.open;
+            const color = isGreen ? '#22c55e' : '#ef4444';
+            const bodyTop = toY(Math.max(c.open, c.close));
+            const bodyBot = toY(Math.min(c.open, c.close));
+            const bodyHeight = Math.max(bodyBot - bodyTop, 1);
+            return (
+              <g key={`candle-${i}`}>
+                <line
+                  x1={toX(i)}
+                  y1={toY(c.high)}
+                  x2={toX(i)}
+                  y2={toY(c.low)}
+                  stroke={color}
+                  strokeWidth="1"
+                />
+                <rect
+                  x={toX(i) - bodyW / 2}
+                  y={bodyTop}
+                  width={bodyW}
+                  height={bodyHeight}
+                  fill={color}
+                  stroke={color}
+                  strokeWidth="0.5"
+                />
+              </g>
+            );
+          })
+        ) : (
+          <path
+            d={linePath}
+            fill="none"
+            stroke="#6366f1"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
+        )}
+
+        {/* Moving averages */}
+        {showMA && (
+          <>
+            <path d={maPath(ma7)} fill="none" stroke="#f59e0b" strokeWidth="1" opacity="0.9" />
+            <path d={maPath(ma25)} fill="none" stroke="#38bdf8" strokeWidth="1" opacity="0.9" />
+          </>
+        )}
+
         {yTicks.map((tick, i) => (
           <text
             key={`yl-${i}`}
@@ -298,7 +408,6 @@ export function CandlestickChart({ data }: { data: TradePoint[] }) {
           </text>
         ))}
 
-        {/* X-axis labels */}
         {xTicks.map((tick, i) => (
           <text
             key={`xl-${i}`}
@@ -313,14 +422,13 @@ export function CandlestickChart({ data }: { data: TradePoint[] }) {
           </text>
         ))}
 
-        {/* Hover crosshair */}
         {hoverIndex !== null && hoverCandle && (
           <>
             <line
               x1={toX(hoverIndex)}
               y1={PAD.top}
               x2={toX(hoverIndex)}
-              y2={PAD.top + H_CANDLE + H_VOLUME}
+              y2={volTop + H_VOLUME}
               stroke="currentColor"
               strokeOpacity="0.3"
               strokeDasharray="3 3"
@@ -334,7 +442,6 @@ export function CandlestickChart({ data }: { data: TradePoint[] }) {
               strokeOpacity="0.3"
               strokeDasharray="3 3"
             />
-            {/* Price label on Y axis */}
             <rect
               x={W - PAD.right}
               y={toY(hoverCandle.close) - 7}
@@ -355,6 +462,17 @@ export function CandlestickChart({ data }: { data: TradePoint[] }) {
           </>
         )}
       </svg>
+
+      {showMA && (
+        <div className="flex gap-3 text-[9px] text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-0.5 w-3 bg-amber-500" /> MA 7
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-0.5 w-3 bg-sky-400" /> MA 25
+          </span>
+        </div>
+      )}
     </div>
   );
 }
