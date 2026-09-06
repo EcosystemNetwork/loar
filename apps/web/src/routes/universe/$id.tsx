@@ -154,6 +154,11 @@ import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { useNodeFilter } from '@/hooks/useNodeFilter';
 import type { ContextMenuState } from '@/components/flow/types';
 import { getSceneNodes } from '@/components/flow/types';
+import {
+  canSwapOnChain,
+  nodeDisplayTitle,
+  selectedVideoScenesInFlowOrder,
+} from '@/components/flow/selection';
 import { VideoTrimmer } from '@/components/segments/VideoTrimmer';
 import type { VideoSegment } from '@/types/segments';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
@@ -1205,19 +1210,10 @@ function UniverseTimelineEditorInner() {
   );
 
   // Derive whether the two currently-selected nodes can be swapped on-chain.
-  const canSwapSelected = useMemo(() => {
-    if (selectedNodeIds.size !== 2) return false;
-    const [a, b] = [...selectedNodeIds];
-    const nodeA = nodes.find((n) => n.id === a);
-    const nodeB = nodes.find((n) => n.id === b);
-    return (
-      !!nodeA &&
-      !!nodeB &&
-      nodeA.data.blockchainNodeId !== undefined &&
-      nodeB.data.blockchainNodeId !== undefined &&
-      nodeA.data.blockchainNodeId !== nodeB.data.blockchainNodeId
-    );
-  }, [selectedNodeIds, nodes]);
+  const canSwapSelected = useMemo(
+    () => canSwapOnChain(nodes, selectedNodeIds),
+    [selectedNodeIds, nodes]
+  );
 
   const handleSwapSelected = useCallback(() => {
     if (selectedNodeIds.size !== 2) return;
@@ -1270,57 +1266,31 @@ function UniverseTimelineEditorInner() {
 
   // Build playlist from selected nodes and open the selection player
   const handlePlaySelected = useCallback(() => {
-    if (selectedNodeIds.size === 0) return;
-    // Collect selected nodes that have video URLs, preserving canvas order (top-to-bottom, left-to-right)
-    const selectedWithVideo = nodes
-      .filter(
-        (n: any) => selectedNodeIds.has(n.id) && n.data?.videoUrl && n.data.nodeType === 'scene'
-      )
-      .sort((a: any, b: any) => {
-        // Sort by vertical position first, then horizontal
-        if (Math.abs(a.position.y - b.position.y) > 50) return a.position.y - b.position.y;
-        return a.position.x - b.position.x;
-      });
-    if (selectedWithVideo.length === 0) return;
+    if (selectedVideoScenesInFlowOrder(nodes, selectedNodeIds).length === 0) return;
     setShowSelectionPlayer(true);
   }, [selectedNodeIds, nodes]);
 
   // Get the selection playlist videos (memoized to avoid recalc on every render)
   const selectionVideos: SelectionVideo[] = useMemo(() => {
-    if (!showSelectionPlayer || selectedNodeIds.size === 0) return [];
-    return nodes
-      .filter(
-        (n: any) => selectedNodeIds.has(n.id) && n.data?.videoUrl && n.data.nodeType === 'scene'
-      )
-      .sort((a: any, b: any) => {
-        if (Math.abs(a.position.y - b.position.y) > 50) return a.position.y - b.position.y;
-        return a.position.x - b.position.x;
-      })
-      .map((n: any) => ({
-        nodeId: n.id,
-        label: n.data.label || n.data.displayName || `Event ${n.data.eventId || n.id}`,
-        videoUrl: n.data.videoUrl,
-      }));
+    if (!showSelectionPlayer) return [];
+    return selectedVideoScenesInFlowOrder(nodes, selectedNodeIds).map((n: any) => ({
+      nodeId: n.id,
+      label: nodeDisplayTitle(n),
+      videoUrl: n.data.videoUrl,
+    }));
   }, [showSelectionPlayer, selectedNodeIds, nodes]);
 
   // Build selected clips for AudioToolbar
-  const selectedClips: SelectedClip[] = useMemo(() => {
-    if (selectedNodeIds.size === 0) return [];
-    return nodes
-      .filter(
-        (n: any) => selectedNodeIds.has(n.id) && n.data?.videoUrl && n.data.nodeType === 'scene'
-      )
-      .sort((a: any, b: any) => {
-        if (Math.abs(a.position.y - b.position.y) > 50) return a.position.y - b.position.y;
-        return a.position.x - b.position.x;
-      })
-      .map((n: any) => ({
+  const selectedClips: SelectedClip[] = useMemo(
+    () =>
+      selectedVideoScenesInFlowOrder(nodes, selectedNodeIds).map((n: any) => ({
         videoUrl: n.data.videoUrl,
-        title: n.data.label || n.data.displayName || `Event ${n.data.eventId || n.id}`,
+        title: nodeDisplayTitle(n),
         generationId: n.data.generationId || n.data.eventId || n.id,
         nodeId: n.data.eventId ? parseInt(n.data.eventId, 10) : undefined,
-      }));
-  }, [selectedNodeIds, nodes]);
+      })),
+    [selectedNodeIds, nodes]
+  );
 
   // ── Undo / Redo ────────────────────────────────────────────────────
   const { pushUndoState, handleUndo, handleRedo, canUndo, canRedo, isUndoRedoAction } =
