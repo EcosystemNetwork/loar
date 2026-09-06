@@ -57,6 +57,7 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
 import { resolveIpfsUrl as resolveMediaUrl, resolveIpfsUrlAsync } from '@/utils/ipfs-url';
+import { isBytes32Hash } from '@/utils/bytes32';
 import {
   Dialog,
   DialogContent,
@@ -2731,9 +2732,6 @@ function UniverseTimelineEditorInner() {
     // Load locally-saved event data (has resolved URLs and descriptions)
     const localEvents: Record<string, any> = getStoredEvents();
 
-    // Helper: detect bytes32 hashes (0x + 64 hex chars) which aren't useful for display
-    const isHash = (val: string) => /^0x[0-9a-fA-F]{64}$/.test(val);
-
     // Create nodes from blockchain data using calculated layout
     graphData.nodeIds.forEach((nodeIdStr, index) => {
       const nodeId = normalizeNodeId(nodeIdStr);
@@ -2746,7 +2744,8 @@ function UniverseTimelineEditorInner() {
 
       const rawUrl = graphData.urls[index] || '';
       const url =
-        localEvent?.videoUrl || (typeof rawUrl === 'string' && !isHash(rawUrl) ? rawUrl : '');
+        localEvent?.videoUrl ||
+        (typeof rawUrl === 'string' && !isBytes32Hash(rawUrl) ? rawUrl : '');
 
       // Handle description which might be an object {timestamp, description} or a string
       const rawDesc = graphData.descriptions[index];
@@ -2755,7 +2754,7 @@ function UniverseTimelineEditorInner() {
           ? String((rawDesc as any).description)
           : String(rawDesc || '');
       // Use localStorage description if the on-chain value is a hash
-      const description = localEvent?.description || (isHash(rawDescStr) ? '' : rawDescStr);
+      const description = localEvent?.description || (isBytes32Hash(rawDescStr) ? '' : rawDescStr);
 
       const previousNode = graphData.previousNodes[index] || '';
       const isCanon = graphData.flags[index] || false;

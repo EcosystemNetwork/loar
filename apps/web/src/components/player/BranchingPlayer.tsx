@@ -8,6 +8,7 @@ import { BranchStats } from './BranchStats';
 import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { getIpfsUrlCandidatesPreferred, raceIpfsGateways, resolveIpfsUrl } from '@/utils/ipfs-url';
+import { isBytes32Hash } from '@/utils/bytes32';
 import { useHlsVideo, isHlsUrl } from '@/hooks/useHlsVideo';
 
 interface NodeData {
@@ -65,8 +66,7 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
         // Resolve media URL: prefer resolved URLs from indexer, fall back to contentHash
         const resolvedUrl = data.urls?.[i] || '';
         const contentHash = data.contentHashes?.[i] || '';
-        const isHash = (val: string) => /^0x[0-9a-fA-F]{64}$/.test(val);
-        const mediaUrl = resolvedUrl && !isHash(resolvedUrl) ? resolvedUrl : '';
+        const mediaUrl = resolvedUrl && !isBytes32Hash(resolvedUrl) ? resolvedUrl : '';
 
         // Also check localStorage for locally-saved events
         let localUrl = '';

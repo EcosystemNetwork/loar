@@ -20,6 +20,7 @@ import { trpcClient } from '@/utils/trpc';
 import { universeAbi } from '@loar/abis/generated';
 import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test';
 import { type GraphData } from '@/hooks/useUniverseBlockchain';
+import { isBytes32Hash } from '@/utils/bytes32';
 import { confirmTx } from '@/components/tx-confirm';
 
 export interface UseContractSaveProps {
@@ -327,8 +328,8 @@ export function useContractSave({
               entry.nodeId < newNodeId &&
               !usedIds.has(entry.nodeId) &&
               entry.description.length > 0 &&
-              // Skip bytes32 hash placeholders (0x + 64 hex chars = 66 chars)
-              !(entry.description.startsWith('0x') && entry.description.length === 66)
+              // Skip bytes32 hash placeholders (0x + 64 hex chars)
+              !isBytes32Hash(entry.description)
           )
           .reverse()
           .slice(0, remaining);
