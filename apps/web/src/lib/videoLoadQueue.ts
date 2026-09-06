@@ -11,7 +11,7 @@ type QueueEntry = {
   id: string;
 };
 
-class VideoLoadQueue {
+export class VideoLoadQueue {
   private queue: QueueEntry[] = [];
   private active = 0;
   private concurrency: number;
