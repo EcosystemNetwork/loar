@@ -26,7 +26,8 @@ function isEnabled(): boolean {
   return typeof window.gtag === 'function';
 }
 
-function templateToPath(template: string): string {
+/** "/analytics/$universeId" → "/analytics/:universeId" so GA never sees a real param value. */
+export function templateToPath(template: string): string {
   return template.replace(/\$(\w+)/g, ':$1');
 }
 

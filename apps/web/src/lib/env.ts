@@ -25,7 +25,7 @@ const optionalAddress = z.preprocess((v) => {
   return v;
 }, z.string().regex(ADDRESS_RE).optional());
 
-const envSchema = z.object({
+export const envSchema = z.object({
   // ── Server URL (falls back to relative path if unset) ─────────────────────
   VITE_SERVER_URL: optionalString,
 
