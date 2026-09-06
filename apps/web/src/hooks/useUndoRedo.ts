@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import type { Node, Edge } from 'reactflow';
+import { GraphHistory } from './historyStack';
 
 interface GraphSnapshot<TNodeData> {
   nodes: Node<TNodeData>[];
@@ -33,8 +34,11 @@ export function useUndoRedo<TNodeData = unknown>(
   const edgesRef = useRef(edges);
   edgesRef.current = edges;
 
-  const undoStack = useRef<GraphSnapshot<TNodeData>[]>([]);
-  const redoStack = useRef<GraphSnapshot<TNodeData>[]>([]);
+  // Stack bookkeeping (redo-clear-on-push, cap eviction, push-current-on-step)
+  // lives in GraphHistory — pure and unit-tested in historyStack.test.ts.
+  const historyRef = useRef<GraphHistory<GraphSnapshot<TNodeData>>>(
+    new GraphHistory<GraphSnapshot<TNodeData>>(maxHistory)
+  );
   const isUndoRedoAction = useRef(false);
 
   const [canUndo, setCanUndo] = useState(false);
@@ -49,21 +53,18 @@ export function useUndoRedo<TNodeData = unknown>(
   );
 
   const pushUndoState = useCallback(() => {
-    undoStack.current.push(snapshot());
-    if (undoStack.current.length > maxHistory) undoStack.current.shift();
-    redoStack.current = [];
+    historyRef.current.push(snapshot());
     setCanUndo(true);
     setCanRedo(false);
-  }, [snapshot, maxHistory]);
+  }, [snapshot]);
 
   const handleUndo = useCallback(() => {
-    const prev = undoStack.current.pop();
+    const prev = historyRef.current.undo(snapshot());
     if (!prev) return;
     isUndoRedoAction.current = true;
-    redoStack.current.push(snapshot());
     setNodes(prev.nodes);
     setEdges(prev.edges);
-    setCanUndo(undoStack.current.length > 0);
+    setCanUndo(historyRef.current.canUndo);
     setCanRedo(true);
     requestAnimationFrame(() => {
       isUndoRedoAction.current = false;
@@ -71,13 +72,12 @@ export function useUndoRedo<TNodeData = unknown>(
   }, [snapshot, setNodes, setEdges]);
 
   const handleRedo = useCallback(() => {
-    const next = redoStack.current.pop();
+    const next = historyRef.current.redo(snapshot());
     if (!next) return;
     isUndoRedoAction.current = true;
-    undoStack.current.push(snapshot());
     setNodes(next.nodes);
     setEdges(next.edges);
-    setCanRedo(redoStack.current.length > 0);
+    setCanRedo(historyRef.current.canRedo);
     setCanUndo(true);
     requestAnimationFrame(() => {
       isUndoRedoAction.current = false;

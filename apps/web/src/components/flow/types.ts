@@ -111,3 +111,59 @@ export function findRootNodes(
 
   return sceneNodes.filter((n) => !hasParent.has(n.id));
 }
+
+// ── Node filter predicate (pure — see useNodeFilter for the stateful hook) ──
+
+/** True when the filter would actually narrow the node set. */
+export function isFilterActive(filter: NodeFilter): boolean {
+  return (
+    filter.searchText.trim() !== '' ||
+    filter.canonStatus !== 'all' ||
+    filter.arcId !== null ||
+    filter.hasVideo !== 'all'
+  );
+}
+
+/**
+ * Whether a single node passes the filter. Non-scene nodes (`add`, `branch`)
+ * always pass — the filter only ever dims scene nodes. Text search matches a
+ * space-joined haystack of label/description/eventId/displayName,
+ * case-insensitively. An `arcId` that doesn't resolve to a known arc is
+ * ignored (treated as "no arc constraint").
+ */
+export function nodeMatchesFilter(
+  node: Node<TimelineNodeData>,
+  filter: NodeFilter,
+  arcs: ArcDefinition[]
+): boolean {
+  if (node.data.nodeType !== 'scene') return true;
+
+  if (filter.searchText.trim()) {
+    // trim before matching too — otherwise a stray trailing space in the
+    // search box silently zeroes the results (the old useNodeFilter bug).
+    const q = filter.searchText.trim().toLowerCase();
+    const haystack = [
+      node.data.label,
+      node.data.description,
+      node.data.eventId,
+      node.data.displayName,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    if (!haystack.includes(q)) return false;
+  }
+
+  if (filter.canonStatus === 'canon' && !node.data.isInCanonChain) return false;
+  if (filter.canonStatus === 'non-canon' && node.data.isInCanonChain) return false;
+
+  if (filter.hasVideo === 'yes' && !node.data.videoUrl) return false;
+  if (filter.hasVideo === 'no' && node.data.videoUrl) return false;
+
+  if (filter.arcId) {
+    const arc = arcs.find((a) => a.id === filter.arcId);
+    if (arc && !arc.nodeIds.includes(node.id)) return false;
+  }
+
+  return true;
+}

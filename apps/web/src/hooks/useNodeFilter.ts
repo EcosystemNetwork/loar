@@ -8,55 +8,21 @@
 import { useState, useMemo, useCallback } from 'react';
 import type { Node } from 'reactflow';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
-import { type NodeFilter, type ArcDefinition, DEFAULT_FILTER } from '@/components/flow/types';
+import {
+  type NodeFilter,
+  type ArcDefinition,
+  DEFAULT_FILTER,
+  isFilterActive,
+  nodeMatchesFilter,
+} from '@/components/flow/types';
 
 export function useNodeFilter(nodes: Node<TimelineNodeData>[], arcs: ArcDefinition[]) {
   const [filter, setFilter] = useState<NodeFilter>(DEFAULT_FILTER);
 
-  const isActive = useMemo(() => {
-    return (
-      filter.searchText.trim() !== '' ||
-      filter.canonStatus !== 'all' ||
-      filter.arcId !== null ||
-      filter.hasVideo !== 'all'
-    );
-  }, [filter]);
+  const isActive = useMemo(() => isFilterActive(filter), [filter]);
 
   const matchesFilter = useCallback(
-    (node: Node<TimelineNodeData>): boolean => {
-      if (node.data.nodeType !== 'scene') return true; // Don't filter non-scene nodes
-
-      // Text search
-      if (filter.searchText.trim()) {
-        const q = filter.searchText.toLowerCase();
-        const haystack = [
-          node.data.label,
-          node.data.description,
-          node.data.eventId,
-          node.data.displayName,
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
-
-      // Canon status
-      if (filter.canonStatus === 'canon' && !node.data.isInCanonChain) return false;
-      if (filter.canonStatus === 'non-canon' && node.data.isInCanonChain) return false;
-
-      // Has video
-      if (filter.hasVideo === 'yes' && !node.data.videoUrl) return false;
-      if (filter.hasVideo === 'no' && node.data.videoUrl) return false;
-
-      // Arc filter
-      if (filter.arcId) {
-        const arc = arcs.find((a) => a.id === filter.arcId);
-        if (arc && !arc.nodeIds.includes(node.id)) return false;
-      }
-
-      return true;
-    },
+    (node: Node<TimelineNodeData>): boolean => nodeMatchesFilter(node, filter, arcs),
     [filter, arcs]
   );
 
