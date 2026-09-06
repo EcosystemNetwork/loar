@@ -1,73 +1,68 @@
 /**
- * Entity Creation Flow Tests — Create hub, entity forms, and universe creation.
+ * Create Console Flow Tests — the consolidated `/create` generation console,
+ * the `/create/$kind` entity forms, and on-chain universe creation.
  *
- * Verifies:
- * - Create hub page loads with entity type cards
- * - All entity kinds are listed (Universe, Person, Place, etc.)
- * - Clicking an entity kind navigates to the form
- * - Entity form has required fields (name, summary, image)
- * - Monetization toggle works
- * - Rights declaration appears when monetized
- * - Upload media card is present
- * - Universe creation route loads (authenticated)
+ * `/create` is now a single Higgsfield-style prompt window (the GenerateConsole
+ * component, shared with the redirected `/sandbox`). It can also roll world
+ * entities into a chosen wiki. The old grid-of-cards hub is gone.
  */
 
 import { test, expect, injectMockSession } from './fixtures';
 
-test.describe('Create Hub — Page Load', () => {
-  test('create hub loads with heading', async ({ page }) => {
+test.describe('Create Console — Page Load', () => {
+  test('create loads with heading', async ({ page }) => {
     await page.goto('/create');
     await expect(page).toHaveURL(/\/create/);
     await expect(page.locator('body')).toContainText(/create/i);
   });
 
-  test('create hub has header', async ({ page }) => {
+  test('create has header', async ({ page }) => {
     await page.goto('/create');
     await expect(page.locator('header')).toBeVisible();
   });
-});
 
-test.describe('Create Hub — Entity Type Cards', () => {
-  const entityKinds = ['Universe', 'Person', 'Place', 'Faction', 'Lore', 'Species', 'Organization'];
-
-  for (const kind of entityKinds) {
-    test(`shows ${kind} entity card`, async ({ page }) => {
-      await page.goto('/create');
-      await expect(page.getByText(kind, { exact: false }).first()).toBeVisible();
-    });
-  }
-
-  test('shows Upload Media card', async ({ page }) => {
-    await page.goto('/create');
-    await expect(page.getByText(/upload media/i).first()).toBeVisible();
-  });
-
-  test('Universe card mentions on-chain deployment', async ({ page }) => {
-    await page.goto('/create');
-    await expect(page.getByText(/on-chain|governance token|deploy/i).first()).toBeVisible();
-  });
-
-  test('Person card mentions characters', async ({ page }) => {
-    await page.goto('/create');
-    await expect(page.getByText(/character|hero|villain|NPC/i).first()).toBeVisible();
+  test('/sandbox redirects into /create', async ({ page }) => {
+    await page.goto('/sandbox');
+    await expect(page).toHaveURL(/\/create/);
   });
 });
 
-test.describe('Create Hub — Navigation to Forms', () => {
-  test('Person card link exists and points to /create/person', async ({ page }) => {
+test.describe('Create Console — Generation UI', () => {
+  test('shows the prompt window and mode tabs', async ({ page }) => {
+    await injectMockSession(page);
     await page.goto('/create');
-    const personLink = page.locator('a[href*="/create/person"]').first();
-    await expect(personLink).toBeVisible();
-    const href = await personLink.getAttribute('href');
-    expect(href).toMatch(/\/create\/person/);
+    await page.waitForTimeout(1500);
+    // Prompt textarea
+    await expect(page.locator('textarea').first()).toBeVisible();
+    // Media mode tabs
+    await expect(page.getByRole('button', { name: 'Image', exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Video', exact: true }).first()).toBeVisible();
   });
 
-  test('Place card link exists and points to /create/place', async ({ page }) => {
+  test('exposes the "Generate into" wiki picker', async ({ page }) => {
+    await injectMockSession(page);
     await page.goto('/create');
-    const placeLink = page.locator('a[href*="/create/place"]').first();
-    await expect(placeLink).toBeVisible();
-    const href = await placeLink.getAttribute('href');
-    expect(href).toMatch(/\/create\/place/);
+    await page.waitForTimeout(1500);
+    await expect(page.getByText(/generate into/i).first()).toBeVisible();
+  });
+
+  test('offers world-entity kinds (Person, Place, Faction)', async ({ page }) => {
+    await injectMockSession(page);
+    await page.goto('/create');
+    await page.waitForTimeout(1500);
+    for (const kind of ['Person', 'Place', 'Faction']) {
+      await expect(page.getByRole('button', { name: kind, exact: true }).first()).toBeVisible();
+    }
+  });
+
+  test('picking a world kind reveals the entity form + wiki requirement hint', async ({ page }) => {
+    await injectMockSession(page);
+    await page.goto('/create');
+    await page.waitForTimeout(1500);
+    await page.getByRole('button', { name: 'Person', exact: true }).first().click();
+    await page.waitForTimeout(300);
+    await expect(page.getByRole('button', { name: /generate person/i }).first()).toBeVisible();
+    await expect(page.getByText(/world entities must belong to one/i).first()).toBeVisible();
   });
 });
 

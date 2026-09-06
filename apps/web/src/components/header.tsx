@@ -68,6 +68,7 @@ const moreGroupsBase: MoreGroup[] = [
     label: 'Studio',
     links: [
       { to: '/canvas', label: 'Canvas' },
+      { to: '/notebook', label: 'Notebook' },
       { to: '/editor', label: 'Clip Editor' },
       { to: '/lab/voice-studio', label: 'Voice Studio' },
       { to: '/lab/zai', label: 'Model Lab' },

@@ -22,7 +22,19 @@ import {
   type Token as PonderToken,
 } from '@/utils/ponder-api';
 import type { FirestoreUniverse } from '@/types/firestore';
-import { Plus, Settings, BarChart3, Eye, Film, Loader2, Wand2, Coins, Layers } from 'lucide-react';
+import {
+  Plus,
+  Settings,
+  BarChart3,
+  Eye,
+  Film,
+  Loader2,
+  Wand2,
+  Coins,
+  Layers,
+  GitBranch,
+  Sparkles,
+} from 'lucide-react';
 
 export const Route = createFileRoute('/studio')({
   // WEB-6: await /auth/me before studio mutations become reachable.
@@ -149,6 +161,7 @@ function StudioPage() {
 
       {/* ── Body ──────────────────────────────────────── */}
       <div className="max-w-[1440px] mx-auto px-4 md:px-8 py-8">
+        <BuildableUniverses />
         {enriched.length === 0 ? (
           <EmptyState onCreate={() => navigate({ to: '/cinematicUniverseCreate' })} />
         ) : (
@@ -158,6 +171,134 @@ function StudioPage() {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Universes the caller can author into — creator, Safe multi-sig signer, or
+ * team member. Relocated here from the old `/create` hub. Each tile jumps
+ * into the generation console scoped to that wiki.
+ */
+function BuildableUniverses() {
+  const { address, isAuthenticated } = useWalletAuth();
+
+  const { data: mine } = useQuery({
+    queryKey: ['studio', 'buildable-universes', address],
+    queryFn: async () => {
+      try {
+        return await trpcClient.universes.getEditableByMe.query();
+      } catch {
+        return await trpcClient.universes.getByCreator.query({ creator: address! });
+      }
+    },
+    enabled: !!address && isAuthenticated,
+    staleTime: 30_000,
+  });
+
+  const list = ((mine as any)?.data ?? mine ?? []) as Array<{
+    id: string;
+    name?: string;
+    description?: string;
+    image_url?: string;
+    imageURL?: string;
+    portrait_image_url?: string;
+    isPrivate?: boolean;
+    roles?: Array<'creator' | 'safe_signer' | 'team_member'>;
+  }>;
+
+  if (list.length === 0) return null;
+
+  const roleLabel = (roles: string[] | undefined): string | null => {
+    if (!roles || roles.length === 0) return null;
+    if (roles.includes('creator')) return null;
+    if (roles.includes('safe_signer')) return 'Multi-sig';
+    if (roles.includes('team_member')) return 'Team';
+    return null;
+  };
+
+  return (
+    <div className="mb-10">
+      <div className="mb-4 flex items-end justify-between">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">Your Universes</h2>
+          <p className="text-sm text-muted-foreground">
+            Pick one to generate into, or launch a new one below.
+          </p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {list.map((u) => {
+          const img = u.image_url || u.imageURL || u.portrait_image_url || '';
+          const role = roleLabel(u.roles);
+          return (
+            <div
+              key={u.id}
+              className="group flex flex-col rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-primary/40 transition-all overflow-hidden"
+            >
+              <Link
+                to="/create"
+                search={{ universe: u.id }}
+                className="flex items-center gap-3 p-3"
+              >
+                {img ? (
+                  <SmartImage
+                    src={img}
+                    alt=""
+                    sizes="48px"
+                    className="h-12 w-12 rounded-lg flex-shrink-0"
+                  />
+                ) : (
+                  <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-primary/40 to-purple-500/40 flex-shrink-0" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold truncate">{u.name || 'Untitled universe'}</p>
+                    {u.isPrivate && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        Private
+                      </span>
+                    )}
+                    {role && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">
+                        {role}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {u.description || `${u.id.slice(0, 6)}…${u.id.slice(-4)}`}
+                  </p>
+                </div>
+              </Link>
+              <div className="flex items-stretch gap-px bg-white/5 border-t border-white/5 text-xs">
+                <Link
+                  to="/create"
+                  search={{ universe: u.id }}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-2 bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  Generate
+                </Link>
+                <Link
+                  to="/universe/$id"
+                  params={{ id: u.id }}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-2 hover:bg-white/10 transition-colors"
+                >
+                  <GitBranch className="h-3 w-3" />
+                  Editor
+                </Link>
+                <Link
+                  to="/universe/$id/gallery"
+                  params={{ id: u.id }}
+                  className="flex-1 inline-flex items-center justify-center px-2 py-2 hover:bg-white/10 transition-colors"
+                >
+                  Gallery
+                </Link>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
