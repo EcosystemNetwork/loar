@@ -1,9 +1,10 @@
 /**
  * Token Launchpad — Discover & browse all launched universe tokens.
  *
- * pump.fun-style listing with enriched token cards (price, 24h change,
- * sparkline, holder count), trending sort, live activity feed, and
- * token maturity progress indicators.
+ * pump.fun-style discovery with two views (card grid + dense screener table),
+ * URL-persisted sort/stage/search/preset/tab state, an advanced filter panel,
+ * one-click screener presets, a watchlist tab, a "new pairs" stream, a
+ * recently-viewed rail, and a live cross-token activity feed.
  */
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState, useMemo, memo } from 'react';
@@ -16,10 +17,26 @@ import {
   timeAgo,
   weiToNumber,
 } from '@/hooks/useTokens';
+import { useTokenWatchlist } from '@/hooks/useTokenWatchlist';
+import { useRecentTokens } from '@/hooks/useRecentTokens';
+import {
+  type AdvancedFilters,
+  type SortMode,
+  type StageFilter,
+  type ScreenerTab,
+  type ScreenerView,
+  EMPTY_FILTERS,
+  SCREENER_PRESETS,
+  runScreener,
+} from '@/lib/token-screener';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Sparkline } from '@/components/tokens/Sparkline';
+import { TokenTable } from '@/components/tokens/TokenTable';
+import { TokenScreenerControls } from '@/components/tokens/TokenScreenerControls';
+import { QuickBuyButton } from '@/components/tokens/QuickBuyButton';
 import {
   Rocket,
   Search,
@@ -28,31 +45,76 @@ import {
   Flame,
   Clock,
   Users,
-  ExternalLink,
-  Loader2,
   Zap,
-  BarChart3,
   Plus,
   ArrowUpRight,
   ArrowDownRight,
   Activity,
   DollarSign,
   Target,
-  Bookmark,
+  Star,
   Share2,
+  LayoutGrid,
+  Table2,
+  Sparkles,
 } from 'lucide-react';
-import { useChainId } from 'wagmi';
-import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
-import { getExplorerAddressUrl } from '@/configs/chains';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 import { QueryState } from '@/components/QueryState';
 
+const SORT_MODES: SortMode[] = [
+  'trending',
+  'newest',
+  'holders',
+  'volume',
+  'liquidity',
+  'mcap',
+  'gainers',
+  'name',
+];
+const STAGE_FILTERS: StageFilter[] = ['all', 'bonding', 'graduating', 'graduated', 'halted'];
+
+/**
+ * All keys optional so `<Link to="/tokens">` elsewhere doesn't have to supply a
+ * search object. `validateSearch` still normalises every value, so at runtime
+ * the fields are always populated — `useNormalizedSearch` re-applies the same
+ * defaults for a non-optional read.
+ */
+interface TokenSearch {
+  view?: ScreenerView;
+  sort?: SortMode;
+  stage?: StageFilter;
+  q?: string;
+  preset?: string;
+  tab?: ScreenerTab;
+}
+
+type NormalizedSearch = {
+  view: ScreenerView;
+  sort: SortMode;
+  stage: StageFilter;
+  q: string;
+  preset?: string;
+  tab: ScreenerTab;
+};
+
+function normalizeSearch(search: Record<string, unknown>): NormalizedSearch {
+  const sort = search.sort as SortMode;
+  const stage = search.stage as StageFilter;
+  const preset = typeof search.preset === 'string' ? search.preset : undefined;
+  return {
+    view: search.view === 'table' ? 'table' : 'grid',
+    sort: SORT_MODES.includes(sort) ? sort : 'trending',
+    stage: STAGE_FILTERS.includes(stage) ? stage : 'all',
+    q: typeof search.q === 'string' ? search.q : '',
+    preset: preset && SCREENER_PRESETS.some((p) => p.id === preset) ? preset : undefined,
+    tab: search.tab === 'watchlist' || search.tab === 'new' ? (search.tab as ScreenerTab) : 'all',
+  };
+}
+
 export const Route = createFileRoute('/tokens/')({
+  validateSearch: (search: Record<string, unknown>): TokenSearch => normalizeSearch(search),
   component: TokenLaunchpad,
 });
-
-type SortMode = 'trending' | 'newest' | 'holders' | 'volume' | 'name';
-type StageFilter = 'all' | TokenStage;
 
 interface LiveActivityItem {
   kind: 'swap' | 'bondingTrade';
@@ -64,11 +126,28 @@ interface LiveActivityItem {
   ethAmountWei: string;
 }
 
+const SORT_META: { mode: SortMode; icon: typeof Flame; label: string }[] = [
+  { mode: 'trending', icon: Flame, label: 'Trending' },
+  { mode: 'newest', icon: Clock, label: 'New' },
+  { mode: 'gainers', icon: TrendingUp, label: 'Gainers' },
+  { mode: 'volume', icon: Activity, label: 'Volume' },
+  { mode: 'liquidity', icon: DollarSign, label: 'Liquidity' },
+  { mode: 'mcap', icon: Target, label: 'MCap' },
+  { mode: 'holders', icon: Users, label: 'Holders' },
+  { mode: 'name', icon: ArrowUpDown, label: 'A-Z' },
+];
+
 function TokenLaunchpad() {
-  const chainId = useChainId();
-  const [search, setSearch] = useState('');
-  const [sortMode, setSortMode] = useState<SortMode>('trending');
-  const [stageFilter, setStageFilter] = useState<StageFilter>('all');
+  const rawSearch = Route.useSearch();
+  const search = normalizeSearch(rawSearch as Record<string, unknown>);
+  const navigate = Route.useNavigate();
+  const setSearch = (patch: Partial<TokenSearch>) =>
+    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+
+  const [filters, setFilters] = useState<AdvancedFilters>(EMPTY_FILTERS);
+  const { watched, isWatched, toggle: toggleWatch, count: watchCount } = useTokenWatchlist();
+  const recentAddrs = useRecentTokens();
+
   const {
     data: tokens,
     isLoading,
@@ -79,67 +158,60 @@ function TokenLaunchpad() {
     totalMarketCap,
   } = useTokenListData();
 
-  // Search filter applied independently of stage so the stage-filter tab counts
-  // can reflect the search input without double-filtering themselves.
-  const searchFilteredTokens = useMemo(() => {
+  const applyPreset = (id: string | null) => {
+    if (!id) {
+      setSearch({ preset: undefined });
+      setFilters(EMPTY_FILTERS);
+      return;
+    }
+    const preset = SCREENER_PRESETS.find((p) => p.id === id);
+    if (!preset) return;
+    setSearch({ preset: id, stage: preset.stage, sort: preset.sort });
+    setFilters({ ...EMPTY_FILTERS, ...preset.filters });
+  };
+
+  // ── Screener pipeline ──────────────────────────────────────────────
+  const tabFiltered = useMemo(() => {
     if (!tokens.length) return [];
-    if (!search) return tokens;
-    const q = search.toLowerCase();
-    return tokens.filter(
-      (t) =>
-        t.name.toLowerCase().includes(q) ||
-        t.symbol.toLowerCase().includes(q) ||
-        t.id.toLowerCase().includes(q)
-    );
-  }, [tokens, search]);
-
-  const filteredTokens = useMemo(() => {
-    let result = searchFilteredTokens;
-    if (stageFilter !== 'all') {
-      result = result.filter((t) => t.stage === stageFilter);
+    if (search.tab === 'watchlist') return tokens.filter((t) => watched.has(t.id.toLowerCase()));
+    if (search.tab === 'new') {
+      const dayAgo = Math.floor(Date.now() / 1000) - 86400;
+      return tokens.filter((t) => t.createdAt >= dayAgo);
     }
-    result = [...result];
+    return tokens;
+  }, [tokens, search.tab, watched]);
 
-    switch (sortMode) {
-      case 'trending':
-        result.sort((a, b) => b.swapCount24h - a.swapCount24h || b.volume24h - a.volume24h);
-        break;
-      case 'newest':
-        result.sort((a, b) => b.createdAt - a.createdAt);
-        break;
-      case 'holders':
-        result.sort((a, b) => b.holderCount - a.holderCount);
-        break;
-      case 'volume':
-        result.sort((a, b) => b.volume24h - a.volume24h);
-        break;
-      case 'name':
-        result.sort((a, b) => a.name.localeCompare(b.name));
-        break;
-    }
-
-    return result;
-  }, [searchFilteredTokens, sortMode, stageFilter]);
+  const screened = useMemo(
+    () =>
+      runScreener(tabFiltered, {
+        search: search.q,
+        stage: search.stage,
+        filters,
+        sort: search.tab === 'new' ? 'newest' : search.sort,
+      }),
+    [tabFiltered, search.q, search.stage, search.sort, search.tab, filters]
+  );
 
   const stageCounts = useMemo(() => {
-    const counts = {
-      all: searchFilteredTokens.length,
-      bonding: 0,
-      graduating: 0,
-      graduated: 0,
-      halted: 0,
-    };
-    for (const t of searchFilteredTokens) {
-      counts[t.stage]++;
-    }
+    const base = tabFiltered.filter(
+      (t) =>
+        !search.q ||
+        t.name.toLowerCase().includes(search.q.toLowerCase()) ||
+        t.symbol.toLowerCase().includes(search.q.toLowerCase()) ||
+        t.id.toLowerCase().includes(search.q.toLowerCase())
+    );
+    const counts = { all: base.length, bonding: 0, graduating: 0, graduated: 0, halted: 0 };
+    for (const t of base) counts[t.stage]++;
     return counts;
-  }, [searchFilteredTokens]);
+  }, [tabFiltered, search.q]);
 
-  // Live activity: merge Uniswap pool swaps and bonding-curve trades for known
-  // launchpad tokens only. Anything we can't map to a launchpad token is
-  // dropped — without that filter the indexer's PoolManager Swap stream leaks
-  // unrelated pools into the feed (showing "0.00e+0 ETH" rows from random
-  // senders because the fallback reads the wrong pool side).
+  const recentTokens = useMemo(() => {
+    if (!tokens.length || !recentAddrs.length) return [];
+    const byId = new Map(tokens.map((t) => [t.id.toLowerCase(), t]));
+    return recentAddrs.map((a) => byId.get(a.toLowerCase())).filter(Boolean) as EnrichedToken[];
+  }, [tokens, recentAddrs]);
+
+  // ── Live activity feed ────────────────────────────────────────────
   const liveActivity = useMemo((): LiveActivityItem[] => {
     if (!tokens.length) return [];
     const poolToToken = new Map<string, EnrichedToken>();
@@ -154,7 +226,6 @@ function TokenLaunchpad() {
       const token = poolToToken.get(swap.poolId);
       if (!token) continue;
       const ethAmountSigned = BigInt(token.tokenIsCurrency0 ? swap.amount1 : swap.amount0);
-      // Pool-perspective convention: positive ETH delta = pool received ETH = BUY.
       const isBuy = ethAmountSigned > 0n;
       const ethAbs = ethAmountSigned < 0n ? -ethAmountSigned : ethAmountSigned;
       items.push({
@@ -185,11 +256,16 @@ function TokenLaunchpad() {
     return items.slice(0, 25);
   }, [recentSwaps, recentBondingTrades, tokens]);
 
+  const gainers24h = useMemo(
+    () => tokens.filter((t) => (t.priceChange24h ?? 0) > 0).length,
+    [tokens]
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
           <div>
             <div className="flex items-center gap-3 mb-2">
               <Rocket className="h-8 w-8 text-primary" />
@@ -208,7 +284,7 @@ function TokenLaunchpad() {
             </Link>
             <Link to="/tokens/portfolio">
               <Button variant="outline" size="lg" className="gap-2">
-                <Bookmark className="h-5 w-5" />
+                <Star className="h-5 w-5" />
                 Portfolio
               </Button>
             </Link>
@@ -223,70 +299,130 @@ function TokenLaunchpad() {
 
         {/* Stats Bar */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-6">
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Rocket className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{tokens.length}</p>
-                <p className="text-xs text-muted-foreground">Tokens Launched</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-500/10">
-                <DollarSign className="h-5 w-5 text-green-500" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold tabular-nums">
-                  {totalMarketCap > 0 ? formatCompactEth(totalMarketCap) : '--'}
-                </p>
-                <p className="text-xs text-muted-foreground">Total MCap (ETH)</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-500/10">
-                <TrendingUp className="h-5 w-5 text-purple-500" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{liveActivity.length}</p>
-                <p className="text-xs text-muted-foreground">Recent Trades</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-amber-500/10">
-                <Flame className="h-5 w-5 text-amber-500" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">1B</p>
-                <p className="text-xs text-muted-foreground">Supply / Token</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-500/10">
-                <Zap className="h-5 w-5 text-blue-500" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">LP Locked</p>
-                <p className="text-xs text-muted-foreground">Forever. No Rugs.</p>
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard
+            icon={Rocket}
+            tint="primary"
+            value={String(tokens.length)}
+            label="Tokens Launched"
+          />
+          <StatCard
+            icon={DollarSign}
+            tint="green"
+            value={totalMarketCap > 0 ? formatCompactEth(totalMarketCap) : '--'}
+            label="Total MCap (ETH)"
+          />
+          <StatCard
+            icon={TrendingUp}
+            tint="purple"
+            value={String(gainers24h)}
+            label="Gainers (24h)"
+          />
+          <StatCard
+            icon={Activity}
+            tint="amber"
+            value={String(liveActivity.length)}
+            label="Recent Trades"
+          />
+          <StatCard icon={Zap} tint="blue" value="LP Locked" label="Forever. No Rugs." />
         </div>
+
+        {/* Recently viewed */}
+        {recentTokens.length > 0 && search.tab === 'all' && (
+          <div className="mb-5">
+            <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              Recently viewed
+            </p>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {recentTokens.map((t) => (
+                <Link
+                  key={t.id}
+                  to="/tokens/$address"
+                  params={{ address: t.id }}
+                  className="flex flex-shrink-0 items-center gap-2 rounded-lg border bg-card px-2.5 py-1.5 hover:border-primary/50"
+                >
+                  {t.imageURL ? (
+                    <img
+                      src={t.imageURL}
+                      alt={t.symbol}
+                      className="h-6 w-6 rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-[9px] font-bold text-primary">
+                      {t.symbol.slice(0, 3)}
+                    </span>
+                  )}
+                  <span className="text-xs font-semibold">${t.symbol}</span>
+                  {t.priceChange24h != null && (
+                    <span
+                      className={`text-[10px] font-mono ${
+                        t.priceChange24h >= 0 ? 'text-green-500' : 'text-red-500'
+                      }`}
+                    >
+                      {t.priceChange24h >= 0 ? '+' : ''}
+                      {t.priceChange24h.toFixed(1)}%
+                    </span>
+                  )}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Main Token Grid */}
           <div className="lg:col-span-3">
+            {/* Tabs + view toggle */}
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="flex gap-1.5">
+                {(
+                  [
+                    { tab: 'all' as ScreenerTab, label: 'All', icon: Rocket },
+                    { tab: 'new' as ScreenerTab, label: 'New pairs', icon: Sparkles },
+                    { tab: 'watchlist' as ScreenerTab, label: `Watchlist`, icon: Star },
+                  ] as const
+                ).map(({ tab, label, icon: Icon }) => (
+                  <Button
+                    key={tab}
+                    variant={search.tab === tab ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSearch({ tab })}
+                    className="h-8 gap-1.5 px-3 text-xs"
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                    {tab === 'watchlist' && watchCount > 0 && (
+                      <span className="ml-0.5 text-[10px] opacity-70 tabular-nums">
+                        {watchCount}
+                      </span>
+                    )}
+                  </Button>
+                ))}
+              </div>
+              <div className="flex gap-1 rounded-lg border p-0.5">
+                <button
+                  onClick={() => setSearch({ view: 'grid' })}
+                  className={`rounded-md p-1.5 ${
+                    search.view === 'grid' ? 'bg-muted text-foreground' : 'text-muted-foreground'
+                  }`}
+                  title="Card grid"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setSearch({ view: 'table' })}
+                  className={`rounded-md p-1.5 ${
+                    search.view === 'table' ? 'bg-muted text-foreground' : 'text-muted-foreground'
+                  }`}
+                  title="Screener table"
+                >
+                  <Table2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
             {/* Stage filter tabs */}
-            <div className="flex gap-1.5 flex-wrap mb-3">
+            <div className="mb-3 flex flex-wrap gap-1.5">
               {(
                 [
                   { stage: 'all' as StageFilter, label: 'All' },
@@ -298,10 +434,10 @@ function TokenLaunchpad() {
               ).map(({ stage, label }) => (
                 <Button
                   key={stage}
-                  variant={stageFilter === stage ? 'default' : 'outline'}
+                  variant={search.stage === stage ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setStageFilter(stage)}
-                  className="text-xs h-8 px-3"
+                  onClick={() => setSearch({ stage })}
+                  className="h-8 px-3 text-xs"
                 >
                   {label}
                   <span className="ml-1.5 text-[10px] opacity-60 tabular-nums">
@@ -312,45 +448,48 @@ function TokenLaunchpad() {
             </div>
 
             {/* Search & Sort */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <div className="mb-3 flex flex-col gap-3 sm:flex-row">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by name, symbol, or address..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9 h-10"
+                  value={search.q}
+                  onChange={(e) => setSearch({ q: e.target.value })}
+                  className="h-10 pl-9"
                 />
               </div>
-              <div className="flex gap-1.5 flex-wrap">
-                {(
-                  [
-                    { mode: 'trending' as SortMode, icon: Flame, label: 'Trending' },
-                    { mode: 'newest' as SortMode, icon: Clock, label: 'New' },
-                    { mode: 'holders' as SortMode, icon: Users, label: 'Holders' },
-                    { mode: 'volume' as SortMode, icon: TrendingUp, label: 'Volume' },
-                    { mode: 'name' as SortMode, icon: ArrowUpDown, label: 'A-Z' },
-                  ] as const
-                ).map(({ mode, icon: Icon, label }) => (
+              <div className="flex flex-wrap gap-1.5">
+                {SORT_META.map(({ mode, icon: Icon, label }) => (
                   <Button
                     key={mode}
-                    variant={sortMode === mode ? 'default' : 'outline'}
+                    variant={search.sort === mode ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setSortMode(mode)}
-                    className="text-xs h-8 px-2.5"
+                    onClick={() => setSearch({ sort: mode })}
+                    className="h-8 px-2.5 text-xs"
+                    disabled={search.tab === 'new'}
                   >
-                    <Icon className="h-3 w-3 mr-1" />
+                    <Icon className="mr-1 h-3 w-3" />
                     {label}
                   </Button>
                 ))}
               </div>
             </div>
 
-            {/* Token Cards */}
+            {/* Presets + advanced filters */}
+            <div className="mb-4">
+              <TokenScreenerControls
+                filters={filters}
+                onFiltersChange={setFilters}
+                activePreset={search.preset ?? null}
+                onPreset={applyPreset}
+              />
+            </div>
+
+            {/* Results */}
             <QueryState
               isLoading={isLoading}
               isError={isError}
-              isEmpty={filteredTokens.length === 0}
+              isEmpty={screened.length === 0}
               onRetry={() => refetch()}
               errorMessage="Failed to load tokens. The indexer may be temporarily unavailable."
               skeletonCount={6}
@@ -358,33 +497,50 @@ function TokenLaunchpad() {
               skeletonGrid="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"
               emptyState={
                 <Card>
-                  <CardContent className="text-center py-16">
-                    <Rocket className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">
-                      {search ? 'No tokens match your search' : 'No tokens launched yet'}
+                  <CardContent className="py-16 text-center">
+                    <Rocket className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+                    <h3 className="mb-2 text-lg font-semibold">
+                      {search.tab === 'watchlist'
+                        ? 'Your watchlist is empty'
+                        : search.q
+                          ? 'No tokens match your search'
+                          : 'No tokens match these filters'}
                     </h3>
-                    <p className="text-muted-foreground mb-4">
-                      {search
-                        ? 'Try a different search term'
-                        : 'Be the first to launch a universe token!'}
+                    <p className="mb-4 text-muted-foreground">
+                      {search.tab === 'watchlist'
+                        ? 'Tap the star on any token to add it here.'
+                        : 'Try loosening the filters or clearing the preset.'}
                     </p>
-                    {!search && (
-                      <Link to="/tokens/launch">
-                        <Button>
-                          <Rocket className="h-4 w-4 mr-2" />
-                          Launch First Token
-                        </Button>
-                      </Link>
-                    )}
+                    <Link to="/tokens/launch">
+                      <Button>
+                        <Rocket className="mr-2 h-4 w-4" />
+                        Launch a Token
+                      </Button>
+                    </Link>
                   </CardContent>
                 </Card>
               }
             >
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                {filteredTokens.map((token) => (
-                  <TokenCard key={token.id} token={token} chainId={chainId} />
-                ))}
-              </div>
+              {search.view === 'table' ? (
+                <TokenTable
+                  tokens={screened}
+                  sortMode={search.tab === 'new' ? 'newest' : search.sort}
+                  onSort={(mode) => setSearch({ sort: mode })}
+                  isWatched={isWatched}
+                  onToggleWatch={toggleWatch}
+                />
+              ) : (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {screened.map((token) => (
+                    <TokenCard
+                      key={token.id}
+                      token={token}
+                      isWatched={isWatched(token.id)}
+                      onToggleWatch={() => toggleWatch(token.id, token.symbol)}
+                    />
+                  ))}
+                </div>
+              )}
             </QueryState>
           </div>
 
@@ -392,47 +548,49 @@ function TokenLaunchpad() {
           <div className="lg:col-span-1">
             <Card className="sticky top-20">
               <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-4">
+                <div className="mb-4 flex items-center gap-2">
                   <Activity className="h-4 w-4 text-primary" />
-                  <h3 className="font-semibold text-sm">Live Activity</h3>
-                  <div className="ml-auto h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  <h3 className="text-sm font-semibold">Live Activity</h3>
+                  <div className="ml-auto h-2 w-2 animate-pulse rounded-full bg-green-500" />
                 </div>
 
                 {liveActivity.length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-8">No trades yet</p>
+                  <p className="py-8 text-center text-xs text-muted-foreground">No trades yet</p>
                 ) : (
-                  <div className="space-y-1.5 max-h-[600px] overflow-y-auto">
+                  <div className="max-h-[600px] space-y-1.5 overflow-y-auto">
                     {liveActivity.map((item) => (
                       <Link
                         key={item.id}
                         to="/tokens/$address"
                         params={{ address: item.token.id }}
-                        className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 text-xs hover:bg-muted/80 transition-colors"
+                        className="flex items-center gap-2 rounded-lg bg-muted/50 p-2 text-xs transition-colors hover:bg-muted/80"
                       >
                         <div
-                          className={`w-1.5 h-8 rounded-full flex-shrink-0 ${item.isBuy ? 'bg-green-500' : 'bg-red-500'}`}
+                          className={`h-8 w-1.5 flex-shrink-0 rounded-full ${
+                            item.isBuy ? 'bg-green-500' : 'bg-red-500'
+                          }`}
                         />
-                        <div className="flex-1 min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
                             <Badge
                               variant={item.isBuy ? 'default' : 'destructive'}
-                              className="text-[9px] px-1 py-0 h-4"
+                              className="h-4 px-1 py-0 text-[9px]"
                             >
                               {item.isBuy ? 'BUY' : 'SELL'}
                             </Badge>
-                            <span className="font-semibold truncate text-[11px]">
+                            <span className="truncate text-[11px] font-semibold">
                               ${item.token.symbol}
                             </span>
                             {item.kind === 'bondingTrade' && (
                               <Badge
                                 variant="outline"
-                                className="text-[8px] px-1 py-0 h-3.5 border-amber-500/40 text-amber-500"
+                                className="h-3.5 border-amber-500/40 px-1 py-0 text-[8px] text-amber-500"
                               >
                                 curve
                               </Badge>
                             )}
                           </div>
-                          <div className="flex items-center justify-between mt-0.5">
+                          <div className="mt-0.5 flex items-center justify-between">
                             <AddressDisplay
                               address={item.sender}
                               className="text-[10px] text-muted-foreground"
@@ -442,7 +600,7 @@ function TokenLaunchpad() {
                             </span>
                           </div>
                         </div>
-                        <div className="text-right flex-shrink-0">
+                        <div className="flex-shrink-0 text-right">
                           <p className="font-mono text-[11px] font-semibold">
                             {formatEth(item.ethAmountWei)}
                           </p>
@@ -460,85 +618,59 @@ function TokenLaunchpad() {
   );
 }
 
-// ─── Sparkline SVG ────────────────────────────────────────────────────
+// ─── Stat card ───────────────────────────────────────────────────────
 
-let sparklineIdCounter = 0;
+const TINTS: Record<string, string> = {
+  primary: 'bg-primary/10 text-primary',
+  green: 'bg-green-500/10 text-green-500',
+  purple: 'bg-purple-500/10 text-purple-500',
+  amber: 'bg-amber-500/10 text-amber-500',
+  blue: 'bg-blue-500/10 text-blue-500',
+};
 
-const Sparkline = memo(function Sparkline({
-  data,
-  width = 80,
-  height = 32,
+function StatCard({
+  icon: Icon,
+  tint,
+  value,
+  label,
 }: {
-  data: number[];
-  width?: number;
-  height?: number;
+  icon: typeof Rocket;
+  tint: keyof typeof TINTS | string;
+  value: string;
+  label: string;
 }) {
-  const [gradientId] = useState(() => `spark-${++sparklineIdCounter}`);
-
-  if (data.length < 2) return <div style={{ width, height }} />;
-
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  const isPositive = data[data.length - 1] >= data[0];
-  const color = isPositive ? '#22c55e' : '#ef4444';
-
-  const points = data
-    .map((v, i) => {
-      const x = (i / (data.length - 1)) * width;
-      const y = height - ((v - min) / range) * (height - 4) - 2;
-      return `${x},${y}`;
-    })
-    .join(' ');
-
-  // Gradient fill area
-  const firstX = 0;
-  const lastX = width;
-  const areaPoints = `${firstX},${height} ${points} ${lastX},${height}`;
-
   return (
-    <svg width={width} height={height} className="flex-shrink-0">
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <polygon fill={`url(#${gradientId})`} points={areaPoints} />
-      <polyline fill="none" stroke={color} strokeWidth="1.5" points={points} />
-    </svg>
+    <Card>
+      <CardContent className="flex items-center gap-3 p-4">
+        <div className={`rounded-lg p-2 ${TINTS[tint] ?? TINTS.primary}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <div>
+          <p className="text-2xl font-bold tabular-nums">{value}</p>
+          <p className="text-xs text-muted-foreground">{label}</p>
+        </div>
+      </CardContent>
+    </Card>
   );
-});
+}
 
-// ─── Stage Badge ──────────────────────────────────────────────────────
+// ─── Stage Badge ─────────────────────────────────────────────────────
 
 function StageBadge({ stage }: { stage: TokenStage }) {
   const config = {
-    bonding: {
-      label: 'Bonding',
-      className: 'bg-primary/80 text-white',
-    },
-    graduating: {
-      label: 'Graduating',
-      className: 'bg-amber-500/80 text-white',
-    },
-    graduated: {
-      label: 'Graduated',
-      className: 'bg-green-500/80 text-white',
-    },
-    halted: {
-      label: 'Halted',
-      className: 'bg-red-500/80 text-white',
-    },
+    bonding: { label: 'Bonding', className: 'bg-primary/80 text-white' },
+    graduating: { label: 'Graduating', className: 'bg-amber-500/80 text-white' },
+    graduated: { label: 'Graduated', className: 'bg-green-500/80 text-white' },
+    halted: { label: 'Halted', className: 'bg-red-500/80 text-white' },
   }[stage];
   return (
-    <Badge className={`text-[10px] px-1.5 py-0 border-0 backdrop-blur-sm ${config.className}`}>
+    <Badge className={`border-0 px-1.5 py-0 text-[10px] backdrop-blur-sm ${config.className}`}>
       {config.label}
     </Badge>
   );
 }
 
-// ─── Graduation Progress ──────────────────────────────────────────────
+// ─── Graduation / Maturity progress ─────────────────────────────────
 
 function GraduationProgress({ token }: { token: EnrichedToken }) {
   const curve = token.bondingCurve;
@@ -550,15 +682,15 @@ function GraduationProgress({ token }: { token: EnrichedToken }) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-[10px]">
-        <span className="text-muted-foreground flex items-center gap-1">
+        <span className="flex items-center gap-1 text-muted-foreground">
           <Zap className="h-2.5 w-2.5" />
           {token.stage === 'halted' ? 'Halted' : 'Graduation'}
         </span>
-        <span className="font-mono tabular-nums font-medium">
+        <span className="font-mono font-medium tabular-nums">
           {raised.toFixed(3)} / {target.toFixed(1)} ETH
         </span>
       </div>
-      <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+      <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
         <div
           className={`h-full rounded-full transition-all ${
             token.stage === 'halted'
@@ -574,10 +706,7 @@ function GraduationProgress({ token }: { token: EnrichedToken }) {
   );
 }
 
-// ─── Token Maturity Progress ──────────────────────────────────────────
-
 function MaturityProgress({ token }: { token: EnrichedToken }) {
-  // Milestones: first trade, 10 holders, 50 swaps, 100 holders, 500 swaps
   const milestones = [
     { label: 'First trade', met: token.totalSwaps >= 1 },
     { label: '10 holders', met: token.holderCount >= 10 },
@@ -585,17 +714,13 @@ function MaturityProgress({ token }: { token: EnrichedToken }) {
     { label: '100 holders', met: token.holderCount >= 100 },
     { label: '500 swaps', met: token.totalSwaps >= 500 },
   ];
-
   const completed = milestones.filter((m) => m.met).length;
   const pct = (completed / milestones.length) * 100;
-
-  // Find next milestone
   const next = milestones.find((m) => !m.met);
-
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-[10px]">
-        <span className="text-muted-foreground flex items-center gap-1">
+        <span className="flex items-center gap-1 text-muted-foreground">
           <Target className="h-2.5 w-2.5" />
           Maturity
         </span>
@@ -603,9 +728,9 @@ function MaturityProgress({ token }: { token: EnrichedToken }) {
           {completed}/{milestones.length}
         </span>
       </div>
-      <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+      <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
         <div
-          className="h-full rounded-full transition-all bg-gradient-to-r from-amber-500 via-green-500 to-emerald-500"
+          className="h-full rounded-full bg-gradient-to-r from-amber-500 via-green-500 to-emerald-500 transition-all"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -614,26 +739,29 @@ function MaturityProgress({ token }: { token: EnrichedToken }) {
   );
 }
 
-// ─── Token Card Component ─────────────────────────────────────────────
+// ─── Token Card ──────────────────────────────────────────────────────
 
 const TokenCard = memo(function TokenCard({
   token,
-  chainId,
+  isWatched,
+  onToggleWatch,
 }: {
   token: EnrichedToken;
-  chainId: number;
+  isWatched: boolean;
+  onToggleWatch: () => void;
 }) {
+  const isBrandNew = Math.floor(Date.now() / 1000) - token.createdAt < 1800;
   return (
     <Link to="/tokens/$address" params={{ address: token.id }}>
-      <Card className="group hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/5 cursor-pointer overflow-hidden">
+      <Card className="group cursor-pointer overflow-hidden transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5">
         <CardContent className="p-0">
           {/* Token Image */}
-          <div className="relative h-28 bg-gradient-to-br from-primary/20 via-purple-500/20 to-pink-500/20 overflow-hidden">
+          <div className="relative h-28 overflow-hidden bg-gradient-to-br from-primary/20 via-purple-500/20 to-pink-500/20">
             {token.imageURL ? (
               <img
                 src={token.imageURL}
                 alt={token.name}
-                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all"
+                className="h-full w-full object-cover opacity-80 transition-all group-hover:scale-105 group-hover:opacity-100"
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center">
@@ -642,42 +770,55 @@ const TokenCard = memo(function TokenCard({
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
-            {/* Stage badge - top left */}
-            <div className="absolute top-2 left-2">
+            <div className="absolute left-2 top-2 flex items-center gap-1">
               <StageBadge stage={token.stage} />
+              {isBrandNew && (
+                <Badge className="border-0 bg-sky-500/90 px-1.5 py-0 text-[9px] text-white">
+                  NEW
+                </Badge>
+              )}
             </div>
 
-            {/* Price change badge - top right */}
-            {token.priceChange24h !== null && (
-              <div className="absolute top-2 right-2">
+            <div className="absolute right-2 top-2 flex items-center gap-1">
+              {token.priceChange24h !== null && (
                 <Badge
-                  className={`text-[10px] px-1.5 py-0 border-0 backdrop-blur-sm ${
+                  className={`border-0 px-1.5 py-0 text-[10px] backdrop-blur-sm ${
                     token.priceChange24h >= 0
                       ? 'bg-green-500/80 text-white'
                       : 'bg-red-500/80 text-white'
                   }`}
                 >
                   {token.priceChange24h >= 0 ? (
-                    <ArrowUpRight className="h-2.5 w-2.5 mr-0.5" />
+                    <ArrowUpRight className="mr-0.5 h-2.5 w-2.5" />
                   ) : (
-                    <ArrowDownRight className="h-2.5 w-2.5 mr-0.5" />
+                    <ArrowDownRight className="mr-0.5 h-2.5 w-2.5" />
                   )}
                   {Math.abs(token.priceChange24h).toFixed(1)}%
                 </Badge>
-              </div>
-            )}
+              )}
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onToggleWatch();
+                }}
+                className="rounded-full bg-black/40 p-1 text-white/80 backdrop-blur-sm hover:text-yellow-400"
+                title={isWatched ? 'Unwatch' : 'Watch'}
+              >
+                <Star className={`h-3 w-3 ${isWatched ? 'fill-yellow-400 text-yellow-400' : ''}`} />
+              </button>
+            </div>
 
-            {/* Name + symbol overlay */}
             <div className="absolute bottom-2 left-3 right-3 flex items-end justify-between">
               <div>
-                <p className="text-white font-bold text-sm drop-shadow">{token.name}</p>
-                <Badge className="bg-white/20 backdrop-blur-sm text-white border-0 text-[10px]">
+                <p className="text-sm font-bold text-white drop-shadow">{token.name}</p>
+                <Badge className="border-0 bg-white/20 text-[10px] text-white backdrop-blur-sm">
                   ${token.symbol}
                 </Badge>
               </div>
               <Badge
                 variant="outline"
-                className="bg-black/40 backdrop-blur-sm text-white border-white/20 text-[10px]"
+                className="border-white/20 bg-black/40 text-[10px] text-white backdrop-blur-sm"
               >
                 {timeAgo(token.createdAt)}
               </Badge>
@@ -685,43 +826,45 @@ const TokenCard = memo(function TokenCard({
           </div>
 
           {/* Token Info */}
-          <div className="p-3 space-y-2.5">
-            {/* Price + Sparkline row */}
+          <div className="space-y-2.5 p-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[10px] text-muted-foreground">Price</p>
-                <p className="text-sm font-bold font-mono tabular-nums">
+                <p className="font-mono text-sm font-bold tabular-nums">
                   {token.price != null
                     ? token.price < 0.001
                       ? token.price.toExponential(2)
                       : token.price.toFixed(6)
                     : '--'}
-                  <span className="text-[10px] text-muted-foreground ml-1">ETH</span>
+                  <span className="ml-1 text-[10px] text-muted-foreground">ETH</span>
                 </p>
+                {token.priceChange1h != null && (
+                  <p
+                    className={`text-[10px] font-mono ${
+                      token.priceChange1h >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}
+                  >
+                    {token.priceChange1h >= 0 ? '+' : ''}
+                    {token.priceChange1h.toFixed(1)}% · 1h
+                  </p>
+                )}
               </div>
               <Sparkline data={token.sparkline} width={72} height={28} />
             </div>
 
-            {/* Stats row */}
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="bg-muted/50 rounded-md py-1.5 px-1">
-                <p className="text-xs font-bold tabular-nums">{token.holderCount}</p>
-                <p className="text-[9px] text-muted-foreground">Holders</p>
-              </div>
-              <div className="bg-muted/50 rounded-md py-1.5 px-1">
-                <p className="text-xs font-bold tabular-nums">{token.totalSwaps}</p>
-                <p className="text-[9px] text-muted-foreground">Swaps</p>
-              </div>
-              <div className="bg-muted/50 rounded-md py-1.5 px-1">
-                <p className="text-xs font-bold tabular-nums">
-                  {token.volume24h >= 0.001 ? token.volume24h.toFixed(3) : '--'}
-                </p>
-                <p className="text-[9px] text-muted-foreground">Vol 24h</p>
-              </div>
+            <div className="grid grid-cols-4 gap-1.5 text-center">
+              <MiniStat value={String(token.holderCount)} label="Holders" />
+              <MiniStat value={String(token.totalSwaps)} label="Swaps" />
+              <MiniStat
+                value={token.volume24h >= 0.001 ? formatCompactEth(token.volume24h) : '--'}
+                label="Vol 24h"
+              />
+              <MiniStat
+                value={token.liquidityEth >= 0.001 ? formatCompactEth(token.liquidityEth) : '--'}
+                label="Liq"
+              />
             </div>
 
-            {/* Market Cap (circulating). FDV shown alongside while bonding so
-                users see both the live trading cap and the fully-diluted figure. */}
             {token.marketCap != null && token.marketCap > 0 && (
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">MCap</span>
@@ -739,37 +882,31 @@ const TokenCard = memo(function TokenCard({
               </div>
             )}
 
-            {/* Graduation progress (bonding/graduating/halted) or maturity milestones (graduated) */}
             {token.stage === 'graduated' ? (
               <MaturityProgress token={token} />
             ) : (
               <GraduationProgress token={token} />
             )}
 
-            {/* Badges + Share */}
             <div className="flex items-center justify-between pt-0.5">
+              <QuickBuyButton tokenId={token.id} />
               <div className="flex items-center gap-1.5">
-                <Badge variant="secondary" className="text-[10px] gap-1">
-                  <Zap className="h-2.5 w-2.5" />
-                  LP Locked
-                </Badge>
-                <Badge variant="secondary" className="text-[10px] gap-1">
+                <Badge variant="secondary" className="gap-1 text-[10px]">
                   <Users className="h-2.5 w-2.5" />
                   Governance
                 </Badge>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(`${window.location.origin}/tokens/${token.id}`);
+                  }}
+                  className="p-1 text-muted-foreground transition-colors hover:text-foreground"
+                  title="Copy link"
+                >
+                  <Share2 className="h-3 w-3" />
+                </button>
               </div>
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const url = `${window.location.origin}/tokens/${token.id}`;
-                  navigator.clipboard.writeText(url);
-                }}
-                className="text-muted-foreground hover:text-foreground transition-colors p-1"
-                title="Copy link"
-              >
-                <Share2 className="h-3 w-3" />
-              </button>
             </div>
           </div>
         </CardContent>
@@ -777,3 +914,12 @@ const TokenCard = memo(function TokenCard({
     </Link>
   );
 });
+
+function MiniStat({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="rounded-md bg-muted/50 px-1 py-1.5">
+      <p className="text-xs font-bold tabular-nums">{value}</p>
+      <p className="text-[9px] text-muted-foreground">{label}</p>
+    </div>
+  );
+}

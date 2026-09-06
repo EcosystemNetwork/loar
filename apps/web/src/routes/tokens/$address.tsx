@@ -62,18 +62,28 @@ import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 import { UniverseStakePanel } from '@/components/UniverseStakePanel';
 import { LPYieldManager } from '@/components/LPYieldManager';
 import { useUnstoppableDomain, formatDisplayName } from '@/hooks/useUnstoppableDomain';
+import { pushRecentToken } from '@/hooks/useRecentTokens';
 
 export const Route = createFileRoute('/tokens/$address')({
+  validateSearch: (search: Record<string, unknown>): { buy?: string } => ({
+    buy: typeof search.buy === 'string' && /^\d*\.?\d+$/.test(search.buy) ? search.buy : undefined,
+  }),
   component: TokenDetailPage,
 });
 
 function TokenDetailPage() {
   const { address: tokenAddress } = Route.useParams();
+  const { buy: initialBuyAmount } = Route.useSearch();
   const chainId = useChainId();
   const { address: userAddress } = useAccount();
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
   const [shareToast, setShareToast] = useState(false);
   const queryClient = useQueryClient();
+
+  // Record this visit for the launchpad's "recently viewed" rail.
+  useEffect(() => {
+    if (tokenAddress) pushRecentToken(tokenAddress);
+  }, [tokenAddress]);
 
   const {
     data: tokenData,
@@ -704,6 +714,7 @@ function TokenDetailPage() {
                   tokenIsCurrency0={tokenIsCurrency0}
                   latestSqrtPriceX96={swaps?.[0]?.sqrtPriceX96 ?? pool?.sqrtPriceX96 ?? null}
                   latestLiquidity={swaps?.[0]?.liquidity ?? null}
+                  initialAmount={initialBuyAmount}
                 />
               </CardContent>
             </Card>
@@ -965,6 +976,7 @@ function SwapInterface({
   tokenIsCurrency0,
   latestSqrtPriceX96,
   latestLiquidity,
+  initialAmount,
 }: {
   tokenAddress: string;
   tokenSymbol: string;
@@ -980,9 +992,10 @@ function SwapInterface({
   tokenIsCurrency0: boolean;
   latestSqrtPriceX96: string | null;
   latestLiquidity: string | null;
+  initialAmount?: string;
 }) {
   const [mode, setMode] = useState<'buy' | 'sell'>('buy');
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState(initialAmount ?? '');
   const { address } = useAccount();
   const { data: ethBalance } = useBalance({ address });
   const { executeSwap, status, txHash, error, isNativeSwapAvailable, reset } = useSwapExecution();

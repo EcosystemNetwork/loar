@@ -907,10 +907,23 @@ export function timeAgo(timestamp: number): string {
 export interface EnrichedToken extends Token {
   price: number | null;
   priceChange24h: number | null;
+  // Shorter-window price move, same sign convention as priceChange24h. Null
+  // until there are at least two trades inside the 1h window.
+  priceChange1h: number | null;
   volume24h: number;
+  // Absolute ETH moved in the trailing hour (swaps + bonding-curve trades).
+  volume1h: number;
   swapCount24h: number;
+  // Trade-direction split for the trailing 24h — powers the buy/sell pressure
+  // gauge and the screener's "buy pressure" column.
+  buyCount24h: number;
+  sellCount24h: number;
   totalSwaps: number;
   holderCount: number;
+  // Rough ETH-side liquidity depth. Post-graduation this is the ETH virtual
+  // reserve derived from the pool's `liquidity` + `sqrtPriceX96`; while on the
+  // bonding curve it's the ETH raised so far (the curve's redeemable float).
+  liquidityEth: number;
   sparkline: number[];
   // Circulating-supply market cap: tokensSold during bonding, full supply
   // post-graduation. This matches the standard crypto convention; for the
@@ -1047,7 +1060,9 @@ export function useTokenListData() {
     }
 
     const allSwaps = swapsQuery.data ?? [];
-    const oneDayAgo = Math.floor(Date.now() / 1000) - 86400;
+    const nowSec = Math.floor(Date.now() / 1000);
+    const oneDayAgo = nowSec - 86400;
+    const oneHourAgo = nowSec - 3600;
 
     // Group swaps by poolId
     const swapsByPool = new Map<string, Swap[]>();
@@ -1055,6 +1070,17 @@ export function useTokenListData() {
       const list = swapsByPool.get(swap.poolId) ?? [];
       list.push(swap);
       swapsByPool.set(swap.poolId, list);
+    }
+
+    // Group recent bonding-curve trades by curve address so pre-graduation
+    // tokens (which emit no PoolManager Swap events) still get volume and
+    // buy/sell counts. Keyed lowercase to match `bondingCurve.id`.
+    const bondingTradesByCurve = new Map<string, BondingCurveTrade[]>();
+    for (const t of bondingTradesQuery.data ?? []) {
+      const key = t.bondingCurve.toLowerCase();
+      const list = bondingTradesByCurve.get(key) ?? [];
+      list.push(t);
+      bondingTradesByCurve.set(key, list);
     }
 
     // Count holders per token address (lowercased)
@@ -1100,12 +1126,54 @@ export function useTokenListData() {
         }
       }
 
-      // 24h volume: sum absolute ETH moved. ETH sits on the side opposite
-      // our token — amount1 when the token is currency0, else amount0.
+      // 24h volume + trade-direction split. ETH sits on the side opposite our
+      // token — amount1 when the token is currency0, else amount0. Positive ETH
+      // delta into the pool = BUY (same convention as the live-activity feed).
       let volume24h = 0;
+      let volume1h = 0;
+      let buyCount24h = 0;
+      let sellCount24h = 0;
       for (const s of recentSwaps) {
-        const ethAmount = BigInt(tokenIsCurrency0 ? s.amount1 : s.amount0);
-        volume24h += weiToNumber(ethAmount < 0n ? -ethAmount : ethAmount, 18);
+        const ethSigned = BigInt(tokenIsCurrency0 ? s.amount1 : s.amount0);
+        const ethAbs = weiToNumber(ethSigned < 0n ? -ethSigned : ethSigned, 18);
+        volume24h += ethAbs;
+        if (s.timestamp >= oneHourAgo) volume1h += ethAbs;
+        if (ethSigned > 0n) buyCount24h++;
+        else if (ethSigned < 0n) sellCount24h++;
+      }
+
+      // Fold in pre-graduation bonding-curve trades so bonding-phase tokens
+      // report real volume/counts (they emit no Swap events).
+      const curveTrades = bondingCurve
+        ? (bondingTradesByCurve.get(bondingCurve.id.toLowerCase()) ?? [])
+        : [];
+      for (const t of curveTrades) {
+        if (t.timestamp < oneDayAgo) continue;
+        const ethAbs = weiToNumber(t.ethAmount, 18);
+        volume24h += ethAbs;
+        if (t.timestamp >= oneHourAgo) volume1h += ethAbs;
+        if (t.isBuy) buyCount24h++;
+        else sellCount24h++;
+      }
+
+      // 1h price change — oldest trade inside the 1h window vs current price.
+      let priceChange1h: number | null = null;
+      const recentHourSwaps = recentSwaps.filter((s) => s.timestamp >= oneHourAgo);
+      if (recentHourSwaps.length >= 2 && price != null) {
+        const oldestPrice = ethPriceFromTick(
+          recentHourSwaps[recentHourSwaps.length - 1].tick,
+          tokenIsCurrency0
+        );
+        if (oldestPrice > 0) priceChange1h = ((price - oldestPrice) / oldestPrice) * 100;
+      } else if (price == null || recentHourSwaps.length < 2) {
+        const hourCurveTrades = curveTrades
+          .filter((t) => t.timestamp >= oneHourAgo)
+          .sort((a, b) => a.timestamp - b.timestamp);
+        if (hourCurveTrades.length >= 2) {
+          const first = weiToNumber(hourCurveTrades[0].price, 18);
+          const last = weiToNumber(hourCurveTrades[hourCurveTrades.length - 1].price, 18);
+          if (first > 0) priceChange1h = ((last - first) / first) * 100;
+        }
       }
 
       // Sparkline: last 20 swap prices, oldest→newest, inverted to match the
@@ -1148,14 +1216,40 @@ export function useTokenListData() {
       const latestSqrtPriceX96 = latestSwap?.sqrtPriceX96 ?? pool?.sqrtPriceX96 ?? null;
       const latestLiquidity = latestSwap?.liquidity ?? null;
 
+      // ETH-side liquidity depth. While bonding, the curve's ETH float ≈ raised.
+      // Post-graduation, derive the ETH virtual reserve from Uniswap v4's
+      // constant-L math: reserve(currency0) = L·2^96 / sqrtP, reserve(currency1)
+      // = L·sqrtP / 2^96 (both wei). ETH is the side our token is NOT on.
+      let liquidityEth = 0;
+      if (bondingCurve && !bondingCurve.graduated) {
+        liquidityEth = weiToNumber(bondingCurve.ethRaised, 18);
+      } else if (latestLiquidity && latestSqrtPriceX96) {
+        try {
+          const L = BigInt(latestLiquidity);
+          const sqrtP = BigInt(latestSqrtPriceX96);
+          const Q96 = 1n << 96n;
+          if (L > 0n && sqrtP > 0n) {
+            const ethReserveWei = tokenIsCurrency0 ? (L * sqrtP) / Q96 : (L * Q96) / sqrtP;
+            liquidityEth = weiToNumber(ethReserveWei, 18);
+          }
+        } catch {
+          liquidityEth = 0;
+        }
+      }
+
       return {
         ...token,
         price,
         priceChange24h,
+        priceChange1h,
         volume24h,
+        volume1h,
         swapCount24h: recentSwaps.length,
+        buyCount24h,
+        sellCount24h,
         totalSwaps: tokenSwaps.length,
         holderCount: holderCounts.get(token.id.toLowerCase()) ?? 0,
+        liquidityEth,
         sparkline,
         marketCap,
         fdv,
@@ -1168,7 +1262,14 @@ export function useTokenListData() {
         tokenIsCurrency0,
       };
     });
-  }, [tokensQuery.data, poolsQuery.data, swapsQuery.data, holdersQuery.data, curvesQuery.data]);
+  }, [
+    tokensQuery.data,
+    poolsQuery.data,
+    swapsQuery.data,
+    holdersQuery.data,
+    curvesQuery.data,
+    bondingTradesQuery.data,
+  ]);
 
   // Total market cap across all tokens
   const totalMarketCap = useMemo(() => {
