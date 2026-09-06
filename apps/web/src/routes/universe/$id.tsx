@@ -976,14 +976,26 @@ function UniverseTimelineEditorInner() {
 
   // ── Multi-select & Node Management ────────────────────────────────
 
-  // Track ReactFlow selection changes
+  // Track ReactFlow selection changes.
+  //
+  // ReactFlow fires this on essentially every node-store update, not only when
+  // the selected set actually changes. Allocating a fresh `new Set(...)` each
+  // time gave `selectedNodeIds` a new identity on every render, which re-ran
+  // the isSelected/dimmed sync effect below → `setNodes` → another store
+  // update → this callback again: a render loop that made the bulk-actions
+  // toolbar flicker on/off continuously while the select tool was in use.
+  // Bail out to the *same* Set reference when the ids are unchanged.
   useOnSelectionChange({
     onChange: useCallback(({ nodes: selectedNodes }: OnSelectionChangeParams) => {
-      setSelectedNodeIds(
-        new Set(
-          selectedNodes.filter((n: any) => n.data?.nodeType === 'scene').map((n: any) => n.id)
-        )
-      );
+      const nextIds = selectedNodes
+        .filter((n: any) => n.data?.nodeType === 'scene')
+        .map((n: any) => n.id);
+      setSelectedNodeIds((prev) => {
+        if (prev.size === nextIds.length && nextIds.every((idv) => prev.has(idv))) {
+          return prev;
+        }
+        return new Set(nextIds);
+      });
     }, []),
   });
 
@@ -3051,24 +3063,30 @@ function UniverseTimelineEditorInner() {
     [setEdges]
   );
 
-  // Sync isSelected + dimmed flags on node data when selection/filter changes
+  // Sync isSelected + dimmed flags on node data when selection/filter changes.
+  // Return the *same* array reference when nothing actually changed so this
+  // doesn't push a no-op node-store update on every selection tick (which
+  // ReactFlow would report back through useOnSelectionChange).
   useEffect(() => {
-    setNodes((nds: any) =>
-      nds.map((n: any) => {
+    setNodes((nds: any) => {
+      let changed = false;
+      const next = nds.map((n: any) => {
         const shouldBeSelected = selectedNodeIds.has(n.id);
         const shouldBeDimmed =
           nodeFilter.matchingNodeIds !== null &&
           !nodeFilter.matchingNodeIds.has(n.id) &&
           n.data.nodeType === 'scene';
         if (n.data.isSelected !== shouldBeSelected || n.data.dimmed !== shouldBeDimmed) {
+          changed = true;
           return {
             ...n,
             data: { ...n.data, isSelected: shouldBeSelected, dimmed: shouldBeDimmed },
           };
         }
         return n;
-      })
-    );
+      });
+      return changed ? next : nds;
+    });
   }, [selectedNodeIds, nodeFilter.matchingNodeIds, setNodes]);
 
   // Handle node selection — shift+click toggles multi-select without navigating
