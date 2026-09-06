@@ -18,29 +18,26 @@ interface Props {
 
 interface State {
   hasError: boolean;
+  error: Error | null;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false };
+  state: State = { hasError: false, error: null };
 
-  static getDerivedStateFromError(): State {
-    return { hasError: true };
+  // Keep the error in state (not an instance field) so the fallback's
+  // "Show error details" block actually renders on the first error — a plain
+  // field set in componentDidCatch never triggers a re-render.
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, info: any) {
     console.error('Uncaught error:', error);
     console.error('Component stack:', info?.componentStack);
-    this._error = error;
-    this._info = info;
   }
 
-  _error: Error | null = null;
-  _info: any = null;
-
   handleRetry = () => {
-    this._error = null;
-    this._info = null;
-    this.setState({ hasError: false });
+    this.setState({ hasError: false, error: null });
   };
 
   render() {
@@ -74,13 +71,13 @@ export class ErrorBoundary extends Component<Props, State> {
                   Go Home
                 </a>
               </div>
-              {this._error && (
+              {this.state.error && (
                 <details className="text-left mt-4">
                   <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors">
                     Show error details
                   </summary>
                   <pre className="mt-2 whitespace-pre-wrap text-[11px] text-muted-foreground bg-muted/50 p-3 rounded-lg overflow-auto max-h-[200px] border border-border">
-                    {this._error.message}
+                    {this.state.error.message}
                   </pre>
                 </details>
               )}
