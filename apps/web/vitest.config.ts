@@ -1,19 +1,39 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
 
-// Unit tests only (pure logic, hooks helpers) — separate from the Playwright
-// suite in e2e/, which drives the actual running app. Keep this config
-// scoped to src/ so it never picks up e2e/*.spec.ts.
+// Two test projects, split by extension:
+//   *.test.ts   → node env, pure logic (the original suite, unchanged)
+//   *.test.tsx  → jsdom env + @testing-library/react (component tests)
+// Kept scoped to src/ so it never picks up the Playwright suite in e2e/.
 export default defineConfig({
-  test: {
-    globals: true,
-    environment: 'node',
-    include: ['src/**/*.test.ts'],
-    testTimeout: 10_000,
-  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+  },
+  test: {
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'node',
+          globals: true,
+          environment: 'node',
+          include: ['src/**/*.test.ts'],
+          testTimeout: 10_000,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'dom',
+          globals: true,
+          environment: 'jsdom',
+          include: ['src/**/*.test.tsx'],
+          setupFiles: ['src/test/setup.ts'],
+          testTimeout: 10_000,
+        },
+      },
+    ],
   },
 });
