@@ -1490,6 +1490,12 @@ import('./jobs/reconcile-users')
   .then(({ startUserReconcileJob }) => startUserReconcileJob())
   .catch((err) => console.warn('[reconcile-users] failed to start:', err));
 
+// Token price-alert sweep (opt-in via TOKEN_ALERT_ENABLED=true, one replica).
+// Pushes FCM notifications when a user's price threshold is crossed.
+import('./jobs/token-alerts')
+  .then(({ startTokenAlertJob }) => startTokenAlertJob())
+  .catch((err) => console.warn('[token-alerts] failed to start:', err));
+
 const port = env.PORT;
 
 console.log(`Starting server on port ${port}`);

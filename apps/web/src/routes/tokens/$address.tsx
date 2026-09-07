@@ -35,6 +35,7 @@ import {
 } from '@/components/tokens/TokenAnalytics';
 import { TokenTransactionsTable } from '@/components/tokens/TokenTransactionsTable';
 import { TokenGovernanceCard } from '@/components/tokens/TokenGovernanceCard';
+import { TokenAlertButton } from '@/components/tokens/TokenAlertButton';
 import { TokenComments } from '@/components/tokens/TokenComments';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -477,6 +478,13 @@ function TokenDetailPage() {
                 {isWatching ? 'Watching' : 'Watch'}
               </Button>
             )}
+
+            {/* Price alert */}
+            <TokenAlertButton
+              tokenAddress={token.id}
+              tokenSymbol={token.symbol}
+              currentPrice={currentPrice}
+            />
 
             {/* Share */}
             <Button variant="outline" size="sm" className="gap-1.5" onClick={shareToken}>

@@ -70,6 +70,7 @@ import { Route as TokensSwapRouteImport } from './routes/tokens/swap'
 import { Route as TokensPortfolioRouteImport } from './routes/tokens/portfolio'
 import { Route as TokensLaunchRouteImport } from './routes/tokens/launch'
 import { Route as TokensHoldersRouteImport } from './routes/tokens/holders'
+import { Route as TokensAlertsRouteImport } from './routes/tokens/alerts'
 import { Route as TokensAddressRouteImport } from './routes/tokens/$address'
 import { Route as ShopUniverseIdRouteImport } from './routes/shop/$universeId'
 import { Route as SettingsWalletsRouteImport } from './routes/settings.wallets'
@@ -451,6 +452,11 @@ const TokensLaunchRoute = TokensLaunchRouteImport.update({
 const TokensHoldersRoute = TokensHoldersRouteImport.update({
   id: '/tokens/holders',
   path: '/tokens/holders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TokensAlertsRoute = TokensAlertsRouteImport.update({
+  id: '/tokens/alerts',
+  path: '/tokens/alerts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TokensAddressRoute = TokensAddressRouteImport.update({
@@ -943,6 +949,7 @@ export interface FileRoutesByFullPath {
   '/settings/wallets': typeof SettingsWalletsRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
+  '/tokens/alerts': typeof TokensAlertsRoute
   '/tokens/holders': typeof TokensHoldersRoute
   '/tokens/launch': typeof TokensLaunchRoute
   '/tokens/portfolio': typeof TokensPortfolioRoute
@@ -1083,6 +1090,7 @@ export interface FileRoutesByTo {
   '/settings/wallets': typeof SettingsWalletsRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
+  '/tokens/alerts': typeof TokensAlertsRoute
   '/tokens/holders': typeof TokensHoldersRoute
   '/tokens/launch': typeof TokensLaunchRoute
   '/tokens/portfolio': typeof TokensPortfolioRoute
@@ -1224,6 +1232,7 @@ export interface FileRoutesById {
   '/settings/wallets': typeof SettingsWalletsRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
+  '/tokens/alerts': typeof TokensAlertsRoute
   '/tokens/holders': typeof TokensHoldersRoute
   '/tokens/launch': typeof TokensLaunchRoute
   '/tokens/portfolio': typeof TokensPortfolioRoute
@@ -1366,6 +1375,7 @@ export interface FileRouteTypes {
     | '/settings/wallets'
     | '/shop/$universeId'
     | '/tokens/$address'
+    | '/tokens/alerts'
     | '/tokens/holders'
     | '/tokens/launch'
     | '/tokens/portfolio'
@@ -1506,6 +1516,7 @@ export interface FileRouteTypes {
     | '/settings/wallets'
     | '/shop/$universeId'
     | '/tokens/$address'
+    | '/tokens/alerts'
     | '/tokens/holders'
     | '/tokens/launch'
     | '/tokens/portfolio'
@@ -1646,6 +1657,7 @@ export interface FileRouteTypes {
     | '/settings/wallets'
     | '/shop/$universeId'
     | '/tokens/$address'
+    | '/tokens/alerts'
     | '/tokens/holders'
     | '/tokens/launch'
     | '/tokens/portfolio'
@@ -1783,6 +1795,7 @@ export interface RootRouteChildren {
   SettingsWalletsRoute: typeof SettingsWalletsRoute
   ShopUniverseIdRoute: typeof ShopUniverseIdRoute
   TokensAddressRoute: typeof TokensAddressRoute
+  TokensAlertsRoute: typeof TokensAlertsRoute
   TokensHoldersRoute: typeof TokensHoldersRoute
   TokensLaunchRoute: typeof TokensLaunchRoute
   TokensPortfolioRoute: typeof TokensPortfolioRoute
@@ -2238,6 +2251,13 @@ declare module '@tanstack/react-router' {
       path: '/tokens/holders'
       fullPath: '/tokens/holders'
       preLoaderRoute: typeof TokensHoldersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tokens/alerts': {
+      id: '/tokens/alerts'
+      path: '/tokens/alerts'
+      fullPath: '/tokens/alerts'
+      preLoaderRoute: typeof TokensAlertsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/tokens/$address': {
@@ -2987,6 +3007,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsWalletsRoute: SettingsWalletsRoute,
   ShopUniverseIdRoute: ShopUniverseIdRoute,
   TokensAddressRoute: TokensAddressRoute,
+  TokensAlertsRoute: TokensAlertsRoute,
   TokensHoldersRoute: TokensHoldersRoute,
   TokensLaunchRoute: TokensLaunchRoute,
   TokensPortfolioRoute: TokensPortfolioRoute,
