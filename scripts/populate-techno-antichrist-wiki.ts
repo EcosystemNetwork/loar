@@ -44,9 +44,10 @@
  *
  * Usage:
  *   pnpm tsx scripts/populate-techno-antichrist-wiki.ts --dry-run
- *   pnpm tsx scripts/populate-techno-antichrist-wiki.ts --covers --only="Rex"
- *   SERVER_URL=https://api.loar.fun WEB_ORIGIN=https://loar.fun \
- *     pnpm tsx scripts/populate-techno-antichrist-wiki.ts
+ *   PRIVATE_KEY=<owner key> pnpm tsx scripts/populate-techno-antichrist-wiki.ts --prod --covers --only="Rex Duce"
+ *   PRIVATE_KEY=<owner key> pnpm tsx scripts/populate-techno-antichrist-wiki.ts --prod
+ *
+ *   --prod  = shorthand for SERVER_URL=https://api.loar.fun WEB_ORIGIN=https://loar.fun
  */
 import dotenv from 'dotenv';
 import path from 'path';
@@ -70,12 +71,17 @@ if (!rawKey) {
   process.exit(1);
 }
 
+// --prod bakes in the loar.fun endpoints so the only env var you must pass is PRIVATE_KEY.
+const PROD = has('--prod');
 const SERVER_URL = (
   process.env.SERVER_URL ??
+  (PROD ? 'https://api.loar.fun' : undefined) ??
   process.env.VITE_SERVER_URL ??
   'http://localhost:3000'
 ).replace(/\/$/, '');
-const WEB_ORIGIN = (process.env.WEB_ORIGIN ?? 'http://localhost:5173').replace(/\/$/, '');
+const WEB_ORIGIN = (
+  process.env.WEB_ORIGIN ?? (PROD ? 'https://loar.fun' : 'http://localhost:5173')
+).replace(/\/$/, '');
 const CHAIN_ID = Number(process.env.CHAIN_ID ?? '11155111');
 const NANO_BANANA_MODEL = process.env.NANO_BANANA_MODEL ?? 'nano-banana-pro-google';
 

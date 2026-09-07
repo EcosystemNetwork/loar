@@ -424,6 +424,17 @@ async function main() {
     /* field name may differ on live; non-fatal */
   }
   console.log(`  episodes docs for this universe: ${epCount} (NOT modified by this script)`);
+
+  // ── Credits (image.generate bills universeCredits/<id>) ───────────────────
+  const CREDIT_FLOOR = 3000;
+  const cref = db.collection('universeCredits').doc(UNIVERSE_ID);
+  const csnap = await cref.get();
+  const curBal = csnap.exists ? Number((csnap.data() as any).balance ?? 0) : null;
+  console.log(
+    `  universeCredits: ${
+      curBal === null ? 'MISSING' : curBal
+    }  ->  ${curBal === null || curBal < CREDIT_FLOOR ? `${CREDIT_FLOOR} (funded)` : 'unchanged'}`
+  );
   console.log('');
 
   // ── New entities (the new) ───────────────────────────────────────────────
@@ -454,6 +465,28 @@ async function main() {
   // 2. rewrite the universe description
   await uref.update({ description: NEW_DESCRIPTION, updated_at: now });
   console.log(`  rewrote universe description`);
+
+  // 2b. ensure the universe has credits for the Nano Banana wiki run
+  if (curBal === null || curBal < CREDIT_FLOOR) {
+    await cref.set(
+      {
+        universeId: UNIVERSE_ID,
+        balance: CREDIT_FLOOR,
+        totalPurchased: Math.max(
+          CREDIT_FLOOR,
+          csnap.exists ? Number((csnap.data() as any).totalPurchased ?? 0) : 0
+        ),
+        totalSpent: csnap.exists ? Number((csnap.data() as any).totalSpent ?? 0) : 0,
+        seedTxHash: null,
+        seedSource: 'genesis',
+        lastFundedAt: now,
+        updatedAt: now,
+        ...(csnap.exists ? {} : { createdAt: now }),
+      },
+      { merge: true }
+    );
+    console.log(`  funded universeCredits to ${CREDIT_FLOOR}`);
+  }
 
   // 3. insert new entities (batched)
   let created = 0;
