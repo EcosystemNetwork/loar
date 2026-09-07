@@ -69,6 +69,7 @@ import { Route as TreasuryUniverseIdRouteImport } from './routes/treasury/$unive
 import { Route as TokensSwapRouteImport } from './routes/tokens/swap'
 import { Route as TokensPortfolioRouteImport } from './routes/tokens/portfolio'
 import { Route as TokensLaunchRouteImport } from './routes/tokens/launch'
+import { Route as TokensHoldersRouteImport } from './routes/tokens/holders'
 import { Route as TokensAddressRouteImport } from './routes/tokens/$address'
 import { Route as ShopUniverseIdRouteImport } from './routes/shop/$universeId'
 import { Route as SettingsWalletsRouteImport } from './routes/settings.wallets'
@@ -445,6 +446,11 @@ const TokensPortfolioRoute = TokensPortfolioRouteImport.update({
 const TokensLaunchRoute = TokensLaunchRouteImport.update({
   id: '/tokens/launch',
   path: '/tokens/launch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TokensHoldersRoute = TokensHoldersRouteImport.update({
+  id: '/tokens/holders',
+  path: '/tokens/holders',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TokensAddressRoute = TokensAddressRouteImport.update({
@@ -937,6 +943,7 @@ export interface FileRoutesByFullPath {
   '/settings/wallets': typeof SettingsWalletsRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
+  '/tokens/holders': typeof TokensHoldersRoute
   '/tokens/launch': typeof TokensLaunchRoute
   '/tokens/portfolio': typeof TokensPortfolioRoute
   '/tokens/swap': typeof TokensSwapRoute
@@ -1076,6 +1083,7 @@ export interface FileRoutesByTo {
   '/settings/wallets': typeof SettingsWalletsRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
+  '/tokens/holders': typeof TokensHoldersRoute
   '/tokens/launch': typeof TokensLaunchRoute
   '/tokens/portfolio': typeof TokensPortfolioRoute
   '/tokens/swap': typeof TokensSwapRoute
@@ -1216,6 +1224,7 @@ export interface FileRoutesById {
   '/settings/wallets': typeof SettingsWalletsRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
   '/tokens/$address': typeof TokensAddressRoute
+  '/tokens/holders': typeof TokensHoldersRoute
   '/tokens/launch': typeof TokensLaunchRoute
   '/tokens/portfolio': typeof TokensPortfolioRoute
   '/tokens/swap': typeof TokensSwapRoute
@@ -1357,6 +1366,7 @@ export interface FileRouteTypes {
     | '/settings/wallets'
     | '/shop/$universeId'
     | '/tokens/$address'
+    | '/tokens/holders'
     | '/tokens/launch'
     | '/tokens/portfolio'
     | '/tokens/swap'
@@ -1496,6 +1506,7 @@ export interface FileRouteTypes {
     | '/settings/wallets'
     | '/shop/$universeId'
     | '/tokens/$address'
+    | '/tokens/holders'
     | '/tokens/launch'
     | '/tokens/portfolio'
     | '/tokens/swap'
@@ -1635,6 +1646,7 @@ export interface FileRouteTypes {
     | '/settings/wallets'
     | '/shop/$universeId'
     | '/tokens/$address'
+    | '/tokens/holders'
     | '/tokens/launch'
     | '/tokens/portfolio'
     | '/tokens/swap'
@@ -1771,6 +1783,7 @@ export interface RootRouteChildren {
   SettingsWalletsRoute: typeof SettingsWalletsRoute
   ShopUniverseIdRoute: typeof ShopUniverseIdRoute
   TokensAddressRoute: typeof TokensAddressRoute
+  TokensHoldersRoute: typeof TokensHoldersRoute
   TokensLaunchRoute: typeof TokensLaunchRoute
   TokensPortfolioRoute: typeof TokensPortfolioRoute
   TokensSwapRoute: typeof TokensSwapRoute
@@ -2218,6 +2231,13 @@ declare module '@tanstack/react-router' {
       path: '/tokens/launch'
       fullPath: '/tokens/launch'
       preLoaderRoute: typeof TokensLaunchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tokens/holders': {
+      id: '/tokens/holders'
+      path: '/tokens/holders'
+      fullPath: '/tokens/holders'
+      preLoaderRoute: typeof TokensHoldersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/tokens/$address': {
@@ -2967,6 +2987,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsWalletsRoute: SettingsWalletsRoute,
   ShopUniverseIdRoute: ShopUniverseIdRoute,
   TokensAddressRoute: TokensAddressRoute,
+  TokensHoldersRoute: TokensHoldersRoute,
   TokensLaunchRoute: TokensLaunchRoute,
   TokensPortfolioRoute: TokensPortfolioRoute,
   TokensSwapRoute: TokensSwapRoute,

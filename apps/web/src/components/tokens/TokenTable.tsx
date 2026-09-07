@@ -7,7 +7,7 @@ import { memo } from 'react';
 import { Sparkline } from './Sparkline';
 import { QuickBuyButton } from './QuickBuyButton';
 import { formatCompactEth, type EnrichedToken, type TokenStage } from '@/hooks/useTokens';
-import { ArrowDown, Star } from 'lucide-react';
+import { ArrowDown, MessageCircle, Star } from 'lucide-react';
 import type { SortMode } from '@/lib/token-screener';
 
 function compactAge(createdAt: number): string {
@@ -63,12 +63,14 @@ export const TokenTable = memo(function TokenTable({
   onSort,
   isWatched,
   onToggleWatch,
+  commentCountFor,
 }: {
   tokens: EnrichedToken[];
   sortMode: SortMode;
   onSort: (mode: SortMode) => void;
   isWatched: (addr: string) => boolean;
   onToggleWatch: (addr: string, symbol: string) => void;
+  commentCountFor?: (addr: string) => number;
 }) {
   return (
     <div className="overflow-x-auto rounded-lg border">
@@ -185,6 +187,12 @@ export const TokenTable = memo(function TokenTable({
                 {/* Actions */}
                 <td className="px-2.5 py-2">
                   <div className="flex items-center justify-end gap-1">
+                    {commentCountFor && commentCountFor(t.id) > 0 && (
+                      <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                        <MessageCircle className="h-3 w-3" />
+                        {commentCountFor(t.id)}
+                      </span>
+                    )}
                     <QuickBuyButton tokenId={t.id} compact />
                     <button
                       onClick={(e) => {

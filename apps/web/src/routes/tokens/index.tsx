@@ -8,6 +8,8 @@
  */
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState, useMemo, memo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { trpc } from '@/utils/trpc';
 import {
   useTokenListData,
   type EnrichedToken,
@@ -57,6 +59,9 @@ import {
   LayoutGrid,
   Table2,
   Sparkles,
+  MessageCircle,
+  Trophy,
+  Bookmark,
 } from 'lucide-react';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 import { QueryState } from '@/components/QueryState';
@@ -211,6 +216,25 @@ function TokenLaunchpad() {
     return recentAddrs.map((a) => byId.get(a.toLowerCase())).filter(Boolean) as EnrichedToken[];
   }, [tokens, recentAddrs]);
 
+  // Community-activity badge — one batch call for every token in view.
+  const commentTargetAddrs = useMemo(
+    () =>
+      screened
+        .slice(0, 60)
+        .map((t) => t.id)
+        .sort()
+        .join(','),
+    [screened]
+  );
+  const { data: commentCounts } = useQuery({
+    ...trpc.tokenSocial.getCommentCounts.queryOptions({
+      tokenAddresses: commentTargetAddrs ? commentTargetAddrs.split(',') : [],
+    }),
+    enabled: commentTargetAddrs.length > 0,
+    staleTime: 60_000,
+  });
+  const commentCountFor = (addr: string) => commentCounts?.[addr.toLowerCase()] ?? 0;
+
   // ── Live activity feed ────────────────────────────────────────────
   const liveActivity = useMemo((): LiveActivityItem[] => {
     if (!tokens.length) return [];
@@ -275,7 +299,13 @@ function TokenLaunchpad() {
               Discover universe tokens. Every token = governance over a narrative universe.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link to="/tokens/holders">
+              <Button variant="outline" size="lg" className="gap-2">
+                <Trophy className="h-5 w-5" />
+                Top Holders
+              </Button>
+            </Link>
             <Link to="/tokens/swap">
               <Button variant="outline" size="lg" className="gap-2">
                 <ArrowUpDown className="h-5 w-5" />
@@ -284,7 +314,7 @@ function TokenLaunchpad() {
             </Link>
             <Link to="/tokens/portfolio">
               <Button variant="outline" size="lg" className="gap-2">
-                <Star className="h-5 w-5" />
+                <Bookmark className="h-5 w-5" />
                 Portfolio
               </Button>
             </Link>
@@ -528,6 +558,7 @@ function TokenLaunchpad() {
                   onSort={(mode) => setSearch({ sort: mode })}
                   isWatched={isWatched}
                   onToggleWatch={toggleWatch}
+                  commentCountFor={commentCountFor}
                 />
               ) : (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -537,6 +568,7 @@ function TokenLaunchpad() {
                       token={token}
                       isWatched={isWatched(token.id)}
                       onToggleWatch={() => toggleWatch(token.id, token.symbol)}
+                      commentCount={commentCountFor(token.id)}
                     />
                   ))}
                 </div>
@@ -745,10 +777,12 @@ const TokenCard = memo(function TokenCard({
   token,
   isWatched,
   onToggleWatch,
+  commentCount = 0,
 }: {
   token: EnrichedToken;
   isWatched: boolean;
   onToggleWatch: () => void;
+  commentCount?: number;
 }) {
   const isBrandNew = Math.floor(Date.now() / 1000) - token.createdAt < 1800;
   return (
@@ -891,6 +925,12 @@ const TokenCard = memo(function TokenCard({
             <div className="flex items-center justify-between pt-0.5">
               <QuickBuyButton tokenId={token.id} />
               <div className="flex items-center gap-1.5">
+                {commentCount > 0 && (
+                  <Badge variant="secondary" className="gap-1 text-[10px]">
+                    <MessageCircle className="h-2.5 w-2.5" />
+                    {commentCount}
+                  </Badge>
+                )}
                 <Badge variant="secondary" className="gap-1 text-[10px]">
                   <Users className="h-2.5 w-2.5" />
                   Governance

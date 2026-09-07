@@ -4,7 +4,7 @@
  */
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useMemo } from 'react';
-import { useTokenListData, type EnrichedToken, timeAgo } from '@/hooks/useTokens';
+import { useTokenListData, timeAgo } from '@/hooks/useTokens';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,10 +14,6 @@ import {
   CheckCircle2,
   ExternalLink,
   Rocket,
-  Users,
-  TrendingUp,
-  Zap,
-  BarChart3,
   ArrowUpRight,
   ArrowDownRight,
 } from 'lucide-react';
@@ -37,11 +33,13 @@ function CreatorProfilePage() {
   const [copied, setCopied] = useState(false);
 
   const creatorTokens = useMemo(() => {
-    return allTokens.filter(
-      (t) =>
-        t.deployer.toLowerCase() === creatorAddress.toLowerCase() ||
-        t.tokenAdmin.toLowerCase() === creatorAddress.toLowerCase()
-    );
+    return allTokens
+      .filter(
+        (t) =>
+          t.deployer.toLowerCase() === creatorAddress.toLowerCase() ||
+          t.tokenAdmin.toLowerCase() === creatorAddress.toLowerCase()
+      )
+      .sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0));
   }, [allTokens, creatorAddress]);
 
   const stats = useMemo(() => {
@@ -49,7 +47,28 @@ function CreatorProfilePage() {
     const totalSwaps = creatorTokens.reduce((sum, t) => sum + t.totalSwaps, 0);
     const totalVolume = creatorTokens.reduce((sum, t) => sum + t.volume24h, 0);
     const totalMarketCap = creatorTokens.reduce((sum, t) => sum + (t.marketCap ?? 0), 0);
-    return { totalHolders, totalSwaps, totalVolume, totalMarketCap };
+    const totalLiquidity = creatorTokens.reduce((sum, t) => sum + t.liquidityEth, 0);
+    // Graduation success rate — of the tokens that left the bonding curve.
+    const withCurve = creatorTokens.filter((t) => t.bondingCurve);
+    const graduated = creatorTokens.filter(
+      (t) => t.stage === 'graduated' || t.bondingCurve?.graduated
+    ).length;
+    const successRate = creatorTokens.length ? (graduated / creatorTokens.length) * 100 : 0;
+    const avgHolders = creatorTokens.length ? Math.round(totalHolders / creatorTokens.length) : 0;
+    const best = creatorTokens[0] ?? null;
+    return {
+      totalHolders,
+      totalSwaps,
+      totalVolume,
+      totalMarketCap,
+      totalLiquidity,
+      graduated,
+      haltedCount: creatorTokens.filter((t) => t.stage === 'halted').length,
+      onCurve: withCurve.length - graduated,
+      successRate,
+      avgHolders,
+      best,
+    };
   }, [creatorTokens]);
 
   const copyAddress = () => {
@@ -100,32 +119,32 @@ function CreatorProfilePage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <Card>
             <CardContent className="p-3 text-center">
-              <p className="text-xs text-muted-foreground">Tokens</p>
+              <p className="text-xs text-muted-foreground">Tokens Launched</p>
               <p className="text-xl font-bold">{creatorTokens.length}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-3 text-center">
-              <p className="text-xs text-muted-foreground">Total Holders</p>
-              <p className="text-xl font-bold">{stats.totalHolders}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-3 text-center">
-              <p className="text-xs text-muted-foreground">Total Swaps</p>
-              <p className="text-xl font-bold">{stats.totalSwaps}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-3 text-center">
-              <p className="text-xs text-muted-foreground">24h Volume</p>
-              <p className="text-xl font-bold">
-                {stats.totalVolume >= 0.001 ? `${stats.totalVolume.toFixed(3)}` : '--'}
+              <p className="text-[10px] text-muted-foreground">
+                {stats.graduated} graduated
+                {stats.haltedCount > 0 && ` · ${stats.haltedCount} halted`}
               </p>
-              <p className="text-[10px] text-muted-foreground">ETH</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3 text-center">
+              <p className="text-xs text-muted-foreground">Graduation Rate</p>
+              <p
+                className={`text-xl font-bold ${
+                  stats.successRate >= 50
+                    ? 'text-green-500'
+                    : stats.successRate > 0
+                      ? 'text-amber-500'
+                      : ''
+                }`}
+              >
+                {creatorTokens.length ? `${stats.successRate.toFixed(0)}%` : '--'}
+              </p>
+              <p className="text-[10px] text-muted-foreground">of launches</p>
             </CardContent>
           </Card>
           <Card>
@@ -141,7 +160,79 @@ function CreatorProfilePage() {
               <p className="text-[10px] text-muted-foreground">ETH</p>
             </CardContent>
           </Card>
+          <Card>
+            <CardContent className="p-3 text-center">
+              <p className="text-xs text-muted-foreground">Total Liquidity</p>
+              <p className="text-xl font-bold">
+                {stats.totalLiquidity >= 0.001 ? stats.totalLiquidity.toFixed(2) : '--'}
+              </p>
+              <p className="text-[10px] text-muted-foreground">ETH</p>
+            </CardContent>
+          </Card>
         </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+          <Card>
+            <CardContent className="p-3 text-center">
+              <p className="text-xs text-muted-foreground">Total Holders</p>
+              <p className="text-lg font-bold">{stats.totalHolders}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3 text-center">
+              <p className="text-xs text-muted-foreground">Avg Holders / Token</p>
+              <p className="text-lg font-bold">{stats.avgHolders}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3 text-center">
+              <p className="text-xs text-muted-foreground">Total Swaps</p>
+              <p className="text-lg font-bold">{stats.totalSwaps}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3 text-center">
+              <p className="text-xs text-muted-foreground">24h Volume</p>
+              <p className="text-lg font-bold">
+                {stats.totalVolume >= 0.001 ? `${stats.totalVolume.toFixed(3)}` : '--'}
+              </p>
+              <p className="text-[10px] text-muted-foreground">ETH</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Best performer */}
+        {stats.best && (stats.best.marketCap ?? 0) > 0 && (
+          <Link to="/tokens/$address" params={{ address: stats.best.id }} className="mb-8 block">
+            <Card className="border-primary/30 bg-primary/5 transition-colors hover:border-primary/60">
+              <CardContent className="flex items-center gap-3 p-4">
+                <Badge className="bg-primary/80 text-[10px] text-white">Top token</Badge>
+                {stats.best.imageURL && (
+                  <img
+                    src={stats.best.imageURL}
+                    alt={stats.best.symbol}
+                    className="h-9 w-9 rounded-full object-cover"
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="truncate text-sm font-semibold">
+                    {stats.best.name}{' '}
+                    <span className="text-muted-foreground">${stats.best.symbol}</span>
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {stats.best.holderCount} holders · {stats.best.totalSwaps} swaps
+                  </p>
+                </div>
+                <p className="font-mono text-sm font-bold tabular-nums">
+                  {(stats.best.marketCap ?? 0) >= 1000
+                    ? `${((stats.best.marketCap ?? 0) / 1000).toFixed(1)}K`
+                    : (stats.best.marketCap ?? 0).toFixed(2)}{' '}
+                  ETH
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
 
         {/* Token List */}
         <h2 className="text-lg font-semibold mb-4">Launched Tokens</h2>
@@ -179,6 +270,19 @@ function CreatorProfilePage() {
                           <h3 className="font-semibold truncate">{token.name}</h3>
                           <Badge variant="outline" className="text-[10px]">
                             ${token.symbol}
+                          </Badge>
+                          <Badge
+                            className={`text-[9px] px-1.5 py-0 border-0 ${
+                              token.stage === 'graduated'
+                                ? 'bg-green-500/80 text-white'
+                                : token.stage === 'graduating'
+                                  ? 'bg-amber-500/80 text-white'
+                                  : token.stage === 'halted'
+                                    ? 'bg-red-500/80 text-white'
+                                    : 'bg-primary/80 text-white'
+                            }`}
+                          >
+                            {token.stage}
                           </Badge>
                           {token.priceChange24h !== null && (
                             <Badge

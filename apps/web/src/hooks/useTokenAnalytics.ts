@@ -221,6 +221,41 @@ export interface TokenPriceStats {
   tradeCount: number;
 }
 
+// ─── All token holders (cross-token leaderboard) ──────────────────
+
+export interface AllHolderRow {
+  tokenAddress: string;
+  holderAddress: string;
+  balance: string;
+}
+
+/**
+ * Every indexed holder balance across every token. Capped at the indexer's
+ * page size — good enough to rank the biggest holders, not an exhaustive
+ * census. Used by the cross-token holder leaderboard.
+ */
+export function useAllTokenHolders(limit = 1000) {
+  return useQuery({
+    queryKey: ['all-token-holders', limit],
+    queryFn: async (): Promise<AllHolderRow[]> => {
+      try {
+        const data = await ponderGql<{ tokenHolders: { items: AllHolderRow[] } }>(
+          `query ($limit: Int!) {
+            tokenHolders(limit: $limit, orderBy: "balance", orderDirection: "desc") {
+              items { tokenAddress holderAddress balance }
+            }
+          }`,
+          { limit }
+        );
+        return data.tokenHolders?.items ?? [];
+      } catch {
+        return [];
+      }
+    },
+    ...ponderQueryDefaults,
+  });
+}
+
 export function computePriceStats(series: SeriesPoint[]): TokenPriceStats {
   if (!series.length) {
     return {

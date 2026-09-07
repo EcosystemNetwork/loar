@@ -186,6 +186,24 @@ export const tokenSocialRouter = router({
       return snap.data().count;
     }),
 
+  /**
+   * Batch comment counts for a set of tokens — one call powers the "N comments"
+   * badge across a whole launchpad grid. Runs the per-token count() aggregations
+   * in parallel (cheap on Firestore) and returns an address → count map.
+   */
+  getCommentCounts: publicProcedure
+    .input(z.object({ tokenAddresses: z.array(z.string().min(1)).max(120) }))
+    .query(async ({ input }) => {
+      const addrs = Array.from(new Set(input.tokenAddresses.map((a) => a.toLowerCase())));
+      const counts = await Promise.all(
+        addrs.map(async (addr) => {
+          const snap = await tokenCommentsCol().where('tokenAddress', '==', addr).count().get();
+          return [addr, snap.data().count] as const;
+        })
+      );
+      return Object.fromEntries(counts) as Record<string, number>;
+    }),
+
   // ─── Watchlist ───────────────────────────────────────────────────────
 
   /** Get user's watchlist */
