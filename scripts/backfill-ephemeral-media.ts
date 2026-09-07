@@ -29,6 +29,7 @@ const APPLY = process.argv.includes('--apply');
 const limitArgIdx = process.argv.indexOf('--limit');
 const LIMIT = limitArgIdx !== -1 ? Number(process.argv[limitArgIdx + 1]) : Infinity;
 
+// Keep in sync with apps/server/src/lib/rehost-ephemeral.ts
 const EPHEMERAL_HOSTS = [
   'volces.com',
   'fal.media',
@@ -37,6 +38,9 @@ const EPHEMERAL_HOSTS = [
   'oaidalleapiprodscus.blob.core.windows.net',
   'ark-acg',
   'generativelanguage.googleapis.com', // Google-direct Veo/Gemini Files API — key-scoped, expires
+  'assets.meshy.ai', // Meshy 3D — GLB/FBX/USDZ/thumbnail URLs, CloudFront-signed, expire
+  'tripo-data', // Tripo3D — tripo-data.rg1.data.tripo3d.ai + legacy tripo-data.cdn.bcebos.com
+  'data.tripo3d.ai', // Tripo3D data domain (any region subdomain), signed, expire
 ];
 
 function isEphemeralUrl(url: string | null | undefined): boolean {

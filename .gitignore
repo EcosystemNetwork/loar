@@ -4,6 +4,9 @@ node_modules
 coverage/
 .nyc_output
 
+# One-off data-repair script backups (JSON dumps of deleted/patched Firestore docs)
+scripts/.backups/
+
 # Built TypeScript output for server-side packages — never commit; CI builds these.
 # packages/abis/dist is intentionally committed (consumed as a published-style
 # package by other apps). apps/mobile/dist is Expo bundle output kept for now.

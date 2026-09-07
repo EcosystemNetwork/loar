@@ -43,6 +43,12 @@ const EPHEMERAL_PATTERNS = [
   // creating API key and the file itself expires — same "never mirrored"
   // failure mode as the other ephemeral hosts.
   'generativelanguage.googleapis.com',
+  // Meshy 3D + Tripo3D — CloudFront/OSS-signed model + thumbnail URLs that
+  // expire (or get their signing key revoked). Mirrors
+  // apps/server/src/lib/rehost-ephemeral.ts.
+  'assets.meshy.ai',
+  'tripo-data',
+  'data.tripo3d.ai',
 ];
 const MEDIA_URL_FIELDS = ['mediaUrl', 'videoUrl', 'audioUrl', 'imageUrl', 'thumbnailUrl'];
 

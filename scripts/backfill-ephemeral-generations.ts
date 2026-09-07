@@ -53,6 +53,9 @@ const EPHEMERAL_HOSTS = [
   'pbxt.replicate.delivery',
   'oaidalleapiprodscus.blob.core.windows.net',
   'generativelanguage.googleapis.com', // Google-direct Veo/Gemini Files API — key-scoped, expires
+  'assets.meshy.ai', // Meshy 3D — GLB/FBX/USDZ/thumbnail URLs, CloudFront-signed, expire
+  'tripo-data', // Tripo3D — tripo-data.rg1.data.tripo3d.ai + legacy tripo-data.cdn.bcebos.com
+  'data.tripo3d.ai', // Tripo3D data domain (any region subdomain), signed, expire
 ];
 
 function isEphemeralUrl(url: unknown): url is string {
