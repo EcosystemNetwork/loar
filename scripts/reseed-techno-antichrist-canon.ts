@@ -17,8 +17,9 @@
  * Commit (destructive — deletes old entities, rewrites description, inserts new):
  *   pnpm tsx scripts/reseed-techno-antichrist-canon.ts --commit
  *
- * Against live prod:
- *   railway run --service loar -- pnpm tsx scripts/reseed-techno-antichrist-canon.ts --commit
+ * Against live prod (--live ignores a local .env FIRESTORE_EMULATOR_HOST):
+ *   railway run --service loar -- pnpm tsx scripts/reseed-techno-antichrist-canon.ts --live
+ *   railway run --service loar -- pnpm tsx scripts/reseed-techno-antichrist-canon.ts --live --commit
  *
  * `episodes` docs are reported but NOT touched — timeline / video work stays in
  * the universe editor.
@@ -31,6 +32,12 @@ import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
+// `railway run` merges the prod service env with the local .env, and a local
+// .env that sets FIRESTORE_EMULATOR_HOST would silently redirect firebase-admin
+// to a (usually dead) local emulator. `--live` is the deliberate opt-in to
+// ignore it and talk to the real Firestore for this project's credentials.
+if (process.argv.includes('--live')) delete process.env.FIRESTORE_EMULATOR_HOST;
 
 // Case-sensitive Solana PDA — do NOT lowercase.
 const UNIVERSE_ID = 'H9E6T6KyaL4xZMhttKAprcayQGonswqUnvXmtcb8a9kL';
