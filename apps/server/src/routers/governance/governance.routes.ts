@@ -273,6 +273,39 @@ export const governanceRouter = router({
       };
     }),
 
+  /** List proposals across ALL universes (global governance feed), newest first. */
+  listAllProposals: publicProcedure
+    .input(
+      z.object({
+        state: proposalStateEnum.optional(),
+        limit: z.number().min(1).max(50).default(30),
+        cursor: z.string().optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      let query = input.state
+        ? proposalsCol()
+            .where('state', '==', input.state)
+            .orderBy('startBlock', 'desc')
+            .limit(input.limit)
+        : proposalsCol().orderBy('startBlock', 'desc').limit(input.limit);
+
+      if (input.cursor) {
+        const cursorDoc = await proposalsCol().doc(input.cursor).get();
+        if (cursorDoc.exists) query = query.startAfter(cursorDoc);
+      }
+
+      const snapshot = await query.get();
+      const proposals = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      return {
+        proposals,
+        nextCursor:
+          snapshot.docs.length === input.limit
+            ? snapshot.docs[snapshot.docs.length - 1]?.id
+            : undefined,
+      };
+    }),
+
   /** Get a single proposal by ID */
   getProposal: publicProcedure
     .input(z.object({ proposalId: z.string() }))

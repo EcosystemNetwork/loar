@@ -61,6 +61,7 @@ const moreGroupsBase: MoreGroup[] = [
     links: [
       { to: '/market', label: 'Marketplace' },
       { to: '/marketplace/likeness', label: 'Likeness Marketplace' },
+      { to: '/governance', label: 'Governance' },
       { to: '/activity', label: 'Activity' },
     ],
   },

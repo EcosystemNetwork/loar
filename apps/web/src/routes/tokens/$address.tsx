@@ -34,6 +34,7 @@ import {
   TokenStatStrip,
 } from '@/components/tokens/TokenAnalytics';
 import { TokenTransactionsTable } from '@/components/tokens/TokenTransactionsTable';
+import { TokenGovernanceCard } from '@/components/tokens/TokenGovernanceCard';
 import { TokenComments } from '@/components/tokens/TokenComments';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -779,6 +780,11 @@ function TokenDetailPage() {
                   }
                 />
               )}
+
+            {/* Governance — voting power + inline proposal voting */}
+            {token.universeAddress && (
+              <TokenGovernanceCard universeId={token.universeAddress} tokenSymbol={token.symbol} />
+            )}
 
             {/* Token Maturity */}
             <Card>

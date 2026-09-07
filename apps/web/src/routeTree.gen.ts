@@ -57,6 +57,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as WikiIndexRouteImport } from './routes/wiki/index'
 import { Route as TokensIndexRouteImport } from './routes/tokens/index'
 import { Route as SellIndexRouteImport } from './routes/sell/index'
+import { Route as GovernanceIndexRouteImport } from './routes/governance/index'
 import { Route as CreateIndexRouteImport } from './routes/create/index'
 import { Route as BountiesIndexRouteImport } from './routes/bounties/index'
 import { Route as AgentsIndexRouteImport } from './routes/agents/index'
@@ -384,6 +385,11 @@ const TokensIndexRoute = TokensIndexRouteImport.update({
 const SellIndexRoute = SellIndexRouteImport.update({
   id: '/sell/',
   path: '/sell/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GovernanceIndexRoute = GovernanceIndexRouteImport.update({
+  id: '/governance/',
+  path: '/governance/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CreateIndexRoute = CreateIndexRouteImport.update({
@@ -942,6 +948,7 @@ export interface FileRoutesByFullPath {
   '/agents/': typeof AgentsIndexRoute
   '/bounties/': typeof BountiesIndexRoute
   '/create/': typeof CreateIndexRoute
+  '/governance/': typeof GovernanceIndexRoute
   '/sell/': typeof SellIndexRoute
   '/tokens/': typeof TokensIndexRoute
   '/wiki/': typeof WikiIndexRoute
@@ -1080,6 +1087,7 @@ export interface FileRoutesByTo {
   '/agents': typeof AgentsIndexRoute
   '/bounties': typeof BountiesIndexRoute
   '/create': typeof CreateIndexRoute
+  '/governance': typeof GovernanceIndexRoute
   '/sell': typeof SellIndexRoute
   '/tokens': typeof TokensIndexRoute
   '/wiki': typeof WikiIndexRoute
@@ -1219,6 +1227,7 @@ export interface FileRoutesById {
   '/agents/': typeof AgentsIndexRoute
   '/bounties/': typeof BountiesIndexRoute
   '/create/': typeof CreateIndexRoute
+  '/governance/': typeof GovernanceIndexRoute
   '/sell/': typeof SellIndexRoute
   '/tokens/': typeof TokensIndexRoute
   '/wiki/': typeof WikiIndexRoute
@@ -1359,6 +1368,7 @@ export interface FileRouteTypes {
     | '/agents/'
     | '/bounties/'
     | '/create/'
+    | '/governance/'
     | '/sell/'
     | '/tokens/'
     | '/wiki/'
@@ -1497,6 +1507,7 @@ export interface FileRouteTypes {
     | '/agents'
     | '/bounties'
     | '/create'
+    | '/governance'
     | '/sell'
     | '/tokens'
     | '/wiki'
@@ -1635,6 +1646,7 @@ export interface FileRouteTypes {
     | '/agents/'
     | '/bounties/'
     | '/create/'
+    | '/governance/'
     | '/sell/'
     | '/tokens/'
     | '/wiki/'
@@ -1770,6 +1782,7 @@ export interface RootRouteChildren {
   AgentsIndexRoute: typeof AgentsIndexRoute
   BountiesIndexRoute: typeof BountiesIndexRoute
   CreateIndexRoute: typeof CreateIndexRoute
+  GovernanceIndexRoute: typeof GovernanceIndexRoute
   SellIndexRoute: typeof SellIndexRoute
   TokensIndexRoute: typeof TokensIndexRoute
   WikiIndexRoute: typeof WikiIndexRoute
@@ -2121,6 +2134,13 @@ declare module '@tanstack/react-router' {
       path: '/sell'
       fullPath: '/sell/'
       preLoaderRoute: typeof SellIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/governance/': {
+      id: '/governance/'
+      path: '/governance'
+      fullPath: '/governance/'
+      preLoaderRoute: typeof GovernanceIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/create/': {
@@ -2958,6 +2978,7 @@ const rootRouteChildren: RootRouteChildren = {
   AgentsIndexRoute: AgentsIndexRoute,
   BountiesIndexRoute: BountiesIndexRoute,
   CreateIndexRoute: CreateIndexRoute,
+  GovernanceIndexRoute: GovernanceIndexRoute,
   SellIndexRoute: SellIndexRoute,
   TokensIndexRoute: TokensIndexRoute,
   WikiIndexRoute: WikiIndexRoute,
