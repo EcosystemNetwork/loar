@@ -162,13 +162,13 @@ function RouteComponent() {
               <p className="text-sm text-muted-foreground">Your creator command center</p>
             </div>
             <div className="flex items-center gap-2">
-              <RouterLink to="/sandbox">
+              <RouterLink to="/create">
                 <Button variant="outline" size="sm" className="gap-1.5">
                   <Sparkles className="h-3.5 w-3.5" />
                   Lab
                 </Button>
               </RouterLink>
-              <RouterLink to="/create">
+              <RouterLink to="/cinematicUniverseCreate">
                 <Button size="sm" className="gap-1.5">
                   <Plus className="h-3.5 w-3.5" />
                   Create Universe
@@ -200,13 +200,13 @@ function RouteComponent() {
                   </p>
                 </div>
                 <div className="flex gap-3">
-                  <RouterLink to="/sandbox">
+                  <RouterLink to="/create">
                     <Button variant="outline" className="gap-2">
                       <Sparkles className="h-4 w-4" />
                       Open Lab
                     </Button>
                   </RouterLink>
-                  <RouterLink to="/create">
+                  <RouterLink to="/cinematicUniverseCreate">
                     <Button className="gap-2">
                       <Plus className="h-4 w-4" />
                       Create Universe
@@ -268,13 +268,13 @@ function RouteComponent() {
               Quick Actions
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-              <RouterLink to="/sandbox">
+              <RouterLink to="/create">
                 <QuickAction icon={<Sparkles className="h-4 w-4" />} label="Lab" />
               </RouterLink>
               <RouterLink to="/lab/zai">
                 <QuickAction icon={<Wand2 className="h-4 w-4" />} label="Model Lab" />
               </RouterLink>
-              <RouterLink to="/create">
+              <RouterLink to="/cinematicUniverseCreate">
                 <QuickAction icon={<Plus className="h-4 w-4" />} label="New Universe" />
               </RouterLink>
               <RouterLink to="/create/$kind" params={{ kind: 'person' }}>

@@ -2759,6 +2759,57 @@ export function GenerateConsole({
             </div>
           </div>
         )}
+
+        {isConsole && (
+          <div className="mt-10 border-t border-border pt-5">
+            <p className="text-xs font-semibold text-muted-foreground mb-2">Need more control?</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm">
+              <Link
+                to="/create/$kind"
+                params={{ kind: worldKind ?? 'person' }}
+                search={
+                  autoSendTarget && !['__off__', '__gallery__'].includes(autoSendTarget)
+                    ? { universe: autoSendTarget }
+                    : {}
+                }
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Detailed entity form
+              </Link>
+              <Link
+                to="/cinematicUniverseCreate"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                New universe (on-chain)
+              </Link>
+              <Link to="/create/likeness" className="text-muted-foreground hover:text-foreground">
+                Your Likeness
+              </Link>
+              <Link to="/create/persona" className="text-muted-foreground hover:text-foreground">
+                Persona package
+              </Link>
+              <Link to="/lab/voice-studio" className="text-muted-foreground hover:text-foreground">
+                Voice Studio
+              </Link>
+              <Link to="/lab/zai" className="text-muted-foreground hover:text-foreground">
+                Model Lab
+              </Link>
+              <Link to="/notebook" className="text-muted-foreground hover:text-foreground">
+                Notebook
+              </Link>
+              <Link to="/canvas" className="text-muted-foreground hover:text-foreground">
+                Canvas
+              </Link>
+              <Link
+                to="/upload"
+                search={{}}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Upload media
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

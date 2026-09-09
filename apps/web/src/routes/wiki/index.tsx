@@ -445,9 +445,9 @@ function GalleryTab({ universeAddress }: { universeAddress?: string }) {
 
       <div className="flex justify-end">
         <Button asChild size="sm" variant="outline">
-          <Link to="/sandbox">
+          <Link to="/create" search={{ universe: universeAddress }}>
             <Plus className="h-4 w-4 mr-1" />
-            Create in Lab
+            Create
           </Link>
         </Button>
       </div>

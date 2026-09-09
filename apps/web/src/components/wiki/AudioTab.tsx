@@ -78,7 +78,7 @@ export function AudioTab({ universeAddress }: AudioTabProps) {
             className="pl-9"
           />
         </div>
-        <Link to="/sandbox">
+        <Link to="/create" search={{ universe: universeAddress }}>
           <Button size="sm" variant="outline">
             <Plus className="h-4 w-4 mr-1" />
             Generate Audio
@@ -95,7 +95,7 @@ export function AudioTab({ universeAddress }: AudioTabProps) {
           <p className="text-xs mb-4">
             Generate music, dialogue, or SFX in the Lab — they'll appear here.
           </p>
-          <Link to="/sandbox">
+          <Link to="/create" search={{ universe: universeAddress }}>
             <Button variant="outline">Open Lab</Button>
           </Link>
         </div>
