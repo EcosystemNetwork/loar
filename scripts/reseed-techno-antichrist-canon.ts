@@ -370,6 +370,32 @@ const EPISODES: Seed[] = [
 
 const ALL: Seed[] = [...CHARACTERS, ...FACTIONS, ...LORE, ...PLACES, ...EPISODES];
 
+// `--env-check`: print WHICH image-generation credential env vars are present
+// (name + present/empty only — never a value). Run via `railway run` to see
+// what the prod loar service actually has.
+if (process.argv.includes('--env-check')) {
+  const names = [
+    'GOOGLE_API_KEY',
+    'GEMINI_API_KEY',
+    'GOOGLE_GENAI_API_KEY',
+    'GOOGLE_AI_API_KEY',
+    'GOOGLE_GENERATIVE_AI_API_KEY',
+    'GOOGLE_CLOUD_API_KEY',
+    'FAL_KEY',
+    'FAL_API_KEY',
+    'BYTEDANCE_API_KEY',
+    'ZAI_API_KEY',
+    'OPENAI_API_KEY',
+    'PINATA_JWT',
+  ];
+  console.log('image-gen credential env presence on this process:');
+  for (const n of names) {
+    const v = process.env[n];
+    console.log(`  ${n.padEnd(30)} ${v && v.trim() ? `present (len ${v.trim().length})` : '—'}`);
+  }
+  process.exit(0);
+}
+
 async function main() {
   const saPath = path.resolve(
     process.cwd(),
