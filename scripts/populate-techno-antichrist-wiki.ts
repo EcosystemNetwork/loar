@@ -447,6 +447,25 @@ async function main() {
   log('AUTH', `authenticating (${AUTH_CHAIN === 'solana' ? 'SIWS' : 'SIWE'})...`);
   const token = await getAuthToken();
 
+  // Optional: stash a BYOK provider key on the signing account first.
+  //   SET_GOOGLE_KEY=<key>  or  SET_FAL_KEY=<key>
+  // The server validates the key against the provider before persisting;
+  // a bad key returns a message and nothing is stored.
+  for (const [env, provider] of [
+    ['SET_GOOGLE_KEY', 'google'],
+    ['SET_FAL_KEY', 'fal'],
+  ] as const) {
+    const k = process.env[env]?.trim();
+    if (!k) continue;
+    log('key', `providers.upsertKey provider=${provider} len=${k.length} prefix=${k.slice(0, 4)}…`);
+    try {
+      const out = await tRPCMutate('providers.upsertKey', { provider, apiKey: k }, token);
+      log('key', `stored: ${JSON.stringify(out).slice(0, 300)}`);
+    } catch (err: any) {
+      log('key', `REJECTED: ${err?.message?.slice(0, 300) ?? err}`);
+    }
+  }
+
   if (phases.covers) await runCovers(token);
   if (phases.hero) await runHero(token);
 
