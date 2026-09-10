@@ -68,6 +68,39 @@ export function buildTimelineFlowGraph(
   return buildSceneFlowGraph({ ...args, layout });
 }
 
+/**
+ * The localStorage "archive everything" guard, lifted verbatim from the
+ * "Convert blockchain data to timeline nodes" effect in universe/$id.tsx.
+ *
+ * `universe_archived_nodes_<id>` is a per-browser soft-delete list with no
+ * restore UI. `buildSceneFlowGraph` silently skips every id in it. If that
+ * list happens to cover *every* node the universe currently has (Select-All →
+ * Delete, then reload — or a set left over from an earlier, larger timeline),
+ * the canvas goes blank with no error and reads as data loss. When that
+ * happens, ignore the list for this render so the real nodes come back.
+ *
+ * A *partial* archive list is honoured as-is — that is the intended
+ * soft-delete behaviour, and also the mechanism behind "some nodes render
+ * then disappear" while a timeline is still being built out.
+ *
+ * @returns the set to actually pass to `buildSceneFlowGraph`, plus whether
+ *          the guard fired (the effect logs a console warning when it does).
+ */
+export function resolveArchivedNodeIds(args: {
+  storedArchivedNodeIds: ReadonlySet<string>;
+  allNodeIds: readonly (string | number | bigint)[];
+}): { archivedNodeIds: Set<string>; wouldHideEveryNode: boolean } {
+  const { storedArchivedNodeIds, allNodeIds } = args;
+  const wouldHideEveryNode =
+    storedArchivedNodeIds.size > 0 &&
+    allNodeIds.length > 0 &&
+    allNodeIds.every((n) => storedArchivedNodeIds.has(normalizeNodeId(n).toString()));
+  return {
+    archivedNodeIds: wouldHideEveryNode ? new Set<string>() : new Set(storedArchivedNodeIds),
+    wouldHideEveryNode,
+  };
+}
+
 export function buildSceneFlowGraph({
   graphData,
   layout,

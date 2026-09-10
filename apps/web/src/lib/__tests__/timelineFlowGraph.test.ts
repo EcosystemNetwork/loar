@@ -17,7 +17,9 @@ import {
   buildSceneFlowGraph,
   buildTimelineFlowGraph,
   mergeDraftNodes,
+  resolveArchivedNodeIds,
 } from '../timelineFlowGraph';
+import { buildOffChainGraphData } from '@/hooks/universeGraphData';
 
 const HASH = '0x' + 'a'.repeat(64);
 
@@ -483,5 +485,212 @@ describe('draft merge + add node — full pipeline parity', () => {
       'add-final',
     ]);
     expect(final.nodes.at(-1)!.data.nodeType).toBe('add');
+  });
+});
+
+describe('resolveArchivedNodeIds — the localStorage "archive everything" guard', () => {
+  it('empty archive set → passthrough, guard does not fire', () => {
+    const r = resolveArchivedNodeIds({ storedArchivedNodeIds: new Set(), allNodeIds: [1, 2, 3] });
+    expect(r.wouldHideEveryNode).toBe(false);
+    expect([...r.archivedNodeIds]).toEqual([]);
+  });
+
+  it('partial cover is honoured as-is (the intended soft-delete)', () => {
+    const r = resolveArchivedNodeIds({
+      storedArchivedNodeIds: new Set(['1', '2']),
+      allNodeIds: [1, 2, 3, 4, 5],
+    });
+    expect(r.wouldHideEveryNode).toBe(false);
+    expect([...r.archivedNodeIds].sort()).toEqual(['1', '2']);
+  });
+
+  it('exact full cover → guard fires, archive is cleared for this render', () => {
+    const r = resolveArchivedNodeIds({
+      storedArchivedNodeIds: new Set(['1', '2', '3']),
+      allNodeIds: [1, 2, 3],
+    });
+    expect(r.wouldHideEveryNode).toBe(true);
+    expect([...r.archivedNodeIds]).toEqual([]);
+  });
+
+  it('a stale superset (archive lists more ids than exist now) still fires the guard', () => {
+    // e.g. an earlier 40-node timeline was Select-All→Deleted, now only 7 nodes exist.
+    const r = resolveArchivedNodeIds({
+      storedArchivedNodeIds: new Set(Array.from({ length: 40 }, (_, i) => String(i + 1))),
+      allNodeIds: [1, 2, 3, 4, 5, 6, 7],
+    });
+    expect(r.wouldHideEveryNode).toBe(true);
+    expect([...r.archivedNodeIds]).toEqual([]);
+  });
+
+  it('one un-archived node is enough to keep the guard silent (partial hide happens)', () => {
+    const r = resolveArchivedNodeIds({
+      storedArchivedNodeIds: new Set(['1', '2', '3', '4', '5', '6']),
+      allNodeIds: [1, 2, 3, 4, 5, 6, 7],
+    });
+    expect(r.wouldHideEveryNode).toBe(false);
+    expect(r.archivedNodeIds.has('1')).toBe(true);
+    expect(r.archivedNodeIds.has('7')).toBe(false);
+  });
+
+  it('normalizes numeric, string and bigint node ids the same way when matching', () => {
+    const r = resolveArchivedNodeIds({
+      storedArchivedNodeIds: new Set(['1', '2', '3']),
+      allNodeIds: ['1', 2, 3n],
+    });
+    expect(r.wouldHideEveryNode).toBe(true);
+  });
+
+  it('no nodes at all → guard cannot fire (nothing to un-blank)', () => {
+    const r = resolveArchivedNodeIds({
+      storedArchivedNodeIds: new Set(['1', '2']),
+      allNodeIds: [],
+    });
+    expect(r.wouldHideEveryNode).toBe(false);
+  });
+
+  it('returns a fresh Set (mutating the result does not touch the stored set)', () => {
+    const stored = new Set(['1']);
+    const r = resolveArchivedNodeIds({ storedArchivedNodeIds: stored, allNodeIds: [1, 2] });
+    r.archivedNodeIds.add('99');
+    expect(stored.has('99')).toBe(false);
+  });
+});
+
+describe('buildSceneFlowGraph — archived nodes are exactly why nodes "disappear"', () => {
+  it('a partial archive set drops precisely the listed scene nodes', () => {
+    const { nodes } = build(chain(5), { archivedNodeIds: new Set(['2', '4']) });
+    expect(nodes.map((n) => n.id)).toEqual([
+      'blockchain-node-1',
+      'blockchain-node-3',
+      'blockchain-node-5',
+    ]);
+  });
+
+  it('edges that referenced an archived node are left dangling (documents current behaviour)', () => {
+    const { nodes, edges } = build(chain(4), { archivedNodeIds: new Set(['2']) });
+    // The node is gone from the canvas...
+    expect(nodes.map((n) => n.id)).not.toContain('blockchain-node-2');
+    // ...but the edges that pointed at it are NOT pruned — they render as edges
+    // to nothing. Not the cause of the "disappearing nodes" report, but the
+    // reason a partially-archived timeline looks broken rather than just shorter.
+    expect(edges.map((e) => e.id)).toEqual(['edge-1-2', 'edge-2-3', 'edge-3-4']);
+  });
+
+  it('clearing the archive (guard fired) renders every node again', () => {
+    const g = chain(5);
+    const stored = new Set(['1', '2', '3', '4', '5']);
+    const { archivedNodeIds } = resolveArchivedNodeIds({
+      storedArchivedNodeIds: stored,
+      allNodeIds: g.nodeIds,
+    });
+    const { nodes } = build(g, { archivedNodeIds });
+    expect(nodes).toHaveLength(5);
+  });
+
+  it('honours the archive skip whether ids are stored as "1" or 1', () => {
+    const numericIds = build(chain(3), { archivedNodeIds: new Set(['2']) });
+    expect(numericIds.nodes.map((n) => n.id)).toEqual(['blockchain-node-1', 'blockchain-node-3']);
+  });
+
+  it('an archive set that covers everything but is passed raw DOES blank the canvas (why the guard exists)', () => {
+    // Passing the stored set straight through, without resolveArchivedNodeIds.
+    const { nodes } = build(chain(4), { archivedNodeIds: new Set(['1', '2', '3', '4']) });
+    expect(nodes).toHaveLength(0);
+  });
+});
+
+describe('end-to-end: an offChainNodes chain renders as a full canvas', () => {
+  // The exact doc shape gen-techno-antichrist-video.ts --nodes writes.
+  const offChainDocs = Array.from({ length: 7 }, (_, i) => ({
+    id: `uuid-${i + 1}`,
+    universeId: 'H9E6',
+    nodeId: i + 1,
+    creator: '0xf39f',
+    contentHash: `0xc${i + 1}`,
+    plotHash: `0xp${i + 1}`,
+    videoUrl: `https://fb/${i + 1}.mp4`,
+    plot: `shot ${i + 1}`,
+    title: `Ep — shot ${i + 1}`,
+    sceneId: i + 1,
+    previousNodeId: i, // 0,1,2,3,4,5,6
+    children: i === 6 ? [] : [i + 2],
+    canon: i === 0,
+  }));
+
+  it('7 offChainNodes → 7 timeline scene nodes + 6 chain edges + a trailing add node', () => {
+    const graphData = buildOffChainGraphData(offChainDocs);
+    const { nodes, edges } = buildTimelineFlowGraph({
+      graphData,
+      archivedNodeIds: new Set<string>(),
+      localEvents: {},
+      universeId: 'H9E6',
+    });
+    const withAdd = appendAddFinalNode({ nodes, edges });
+
+    expect(nodes.filter((n) => n.data.nodeType === 'scene')).toHaveLength(7);
+    expect(nodes.map((n) => n.id)).toEqual([
+      'blockchain-node-1',
+      'blockchain-node-2',
+      'blockchain-node-3',
+      'blockchain-node-4',
+      'blockchain-node-5',
+      'blockchain-node-6',
+      'blockchain-node-7',
+    ]);
+    expect(edges.map((e) => e.id)).toEqual([
+      'edge-1-2',
+      'edge-2-3',
+      'edge-3-4',
+      'edge-4-5',
+      'edge-5-6',
+      'edge-6-7',
+    ]);
+    expect(withAdd.nodes.at(-1)!.data.nodeType).toBe('add');
+  });
+
+  it('the root node is flagged isRoot and the canon node is styled with the canon colour', () => {
+    const graphData = buildOffChainGraphData(offChainDocs);
+    const { nodes } = buildTimelineFlowGraph({
+      graphData,
+      archivedNodeIds: new Set<string>(),
+      localEvents: {},
+      universeId: 'H9E6',
+    });
+    expect(nodes[0].data.isRoot).toBe(true);
+    expect(nodes[1].data.isRoot).toBe(false);
+    expect(nodes[0].data.timelineColor).toBe(TIMELINE_NODE_COLORS[0]); // canon accent
+  });
+
+  it('every scene node carries its video url and a human label from the title', () => {
+    const graphData = buildOffChainGraphData(offChainDocs);
+    const { nodes } = buildTimelineFlowGraph({
+      graphData,
+      archivedNodeIds: new Set<string>(),
+      localEvents: {},
+      universeId: 'H9E6',
+    });
+    expect(nodes.map((n) => n.data.videoUrl)).toEqual(offChainDocs.map((d) => d.videoUrl));
+    expect(nodes[0].data.label).toContain('Ep — shot 1');
+  });
+
+  it('archiving the middle of the chain leaves the ends on the canvas (the reported symptom)', () => {
+    const graphData = buildOffChainGraphData(offChainDocs);
+    const { archivedNodeIds } = resolveArchivedNodeIds({
+      storedArchivedNodeIds: new Set(['3', '4', '5']),
+      allNodeIds: graphData.nodeIds,
+    });
+    const { nodes } = buildTimelineFlowGraph({
+      graphData,
+      archivedNodeIds,
+      localEvents: {},
+      universeId: 'H9E6',
+    });
+    expect(nodes.map((n) => n.id)).toEqual([
+      'blockchain-node-1',
+      'blockchain-node-2',
+      'blockchain-node-6',
+      'blockchain-node-7',
+    ]);
   });
 });

@@ -12,6 +12,7 @@ import {
   buildGraphData,
   buildOffChainGraphData,
   buildOnChainGraphData,
+  deriveTimelineMode,
   type IndexerNodeContent,
   type NodeMediaOverride,
   type RawFullGraph,
@@ -299,6 +300,267 @@ describe('buildGraphData — strict on-chain vs off-chain routing', () => {
   it('off-chain mode with no nodes → EMPTY', () => {
     const g = buildGraphData({ useOnChain: false, offChainNodes: undefined });
     expect(g).toBe(EMPTY_GRAPH_DATA);
+  });
+});
+
+describe('deriveTimelineMode — which timeline source the editor reads', () => {
+  // ── isOnChain resolved to true (confirmed minted) ──────────────────────
+  it('isOnChain=true → on-chain only, regardless of address shape', () => {
+    expect(deriveTimelineMode({ isBlockchainUniverse: true, isOnChain: true })).toEqual({
+      useOnChain: true,
+      useOffChain: false,
+    });
+    expect(deriveTimelineMode({ isBlockchainUniverse: false, isOnChain: true })).toEqual({
+      useOnChain: true,
+      useOffChain: false,
+    });
+  });
+
+  // ── isOnChain resolved to false (confirmed fun-mode) ───────────────────
+  it('isOnChain=false → off-chain only, even for an address-like id', () => {
+    expect(deriveTimelineMode({ isBlockchainUniverse: true, isOnChain: false })).toEqual({
+      useOnChain: false,
+      useOffChain: true,
+    });
+    expect(deriveTimelineMode({ isBlockchainUniverse: false, isOnChain: false })).toEqual({
+      useOnChain: false,
+      useOffChain: true,
+    });
+  });
+
+  it('exactly one of useOnChain / useOffChain is true once isOnChain has resolved', () => {
+    for (const isBlockchainUniverse of [true, false]) {
+      for (const isOnChain of [true, false]) {
+        const m = deriveTimelineMode({ isBlockchainUniverse, isOnChain });
+        expect(m.useOnChain).toBe(!m.useOffChain);
+      }
+    }
+  });
+
+  // ── isOnChain still undefined (universe doc loading) ───────────────────
+  it('isOnChain=undefined + address-like id → on-chain guess (the pre-resolve window)', () => {
+    expect(deriveTimelineMode({ isBlockchainUniverse: true, isOnChain: undefined })).toEqual({
+      useOnChain: true,
+      useOffChain: false,
+    });
+  });
+
+  it('isOnChain=undefined + non-address id → off-chain guess', () => {
+    expect(deriveTimelineMode({ isBlockchainUniverse: false, isOnChain: undefined })).toEqual({
+      useOnChain: false,
+      useOffChain: true,
+    });
+  });
+
+  it('during the undefined window an address-like id has BOTH flags false for off-chain (query disabled)', () => {
+    const m = deriveTimelineMode({ isBlockchainUniverse: true, isOnChain: undefined });
+    expect(m.useOffChain).toBe(false); // offChainNodes query is `enabled: useOffChain` → stays idle
+  });
+
+  // ── the "nodes flash then vanish" scenario for a Solana-PDA universe ───
+  it('Solana-PDA fun-mode universe: undefined→false transition flips on-chain guess to off-chain', () => {
+    // isAddressLikeUniverseId() is true for a base58 PDA, so isBlockchainUniverse=true.
+    const loading = deriveTimelineMode({ isBlockchainUniverse: true, isOnChain: undefined });
+    const resolved = deriveTimelineMode({ isBlockchainUniverse: true, isOnChain: false });
+
+    expect(loading.useOnChain).toBe(true); // brief on-chain render (no contract → EMPTY graph)
+    expect(resolved.useOffChain).toBe(true); // then off-chain nodes load and stay
+    expect(loading.useOffChain).toBe(false);
+    expect(resolved.useOnChain).toBe(false);
+  });
+
+  it('a minted EVM universe keeps on-chain mode across the undefined→true transition', () => {
+    expect(
+      deriveTimelineMode({ isBlockchainUniverse: true, isOnChain: undefined }).useOnChain
+    ).toBe(true);
+    expect(deriveTimelineMode({ isBlockchainUniverse: true, isOnChain: true }).useOnChain).toBe(
+      true
+    );
+  });
+
+  it('a legacy 0x fun-mode universe: undefined window guesses on-chain, then corrects to off-chain', () => {
+    // Old fun-mode universes have 0x-looking ids too (isBlockchainUniverse=true).
+    expect(
+      deriveTimelineMode({ isBlockchainUniverse: true, isOnChain: undefined }).useOffChain
+    ).toBe(false);
+    expect(deriveTimelineMode({ isBlockchainUniverse: true, isOnChain: false }).useOffChain).toBe(
+      true
+    );
+  });
+});
+
+describe('buildOffChainGraphData — offChainNodes Firestore doc mapping', () => {
+  // A realistic chained timeline: the exact doc shape gen-techno-antichrist-video.ts
+  // writes (mirrors apps/server/src/routers/offChainNodes.routes.ts).
+  const chain = [
+    {
+      id: 'uuid-1',
+      universeId: 'H9E6',
+      nodeId: 1,
+      creator: '0xf39f',
+      contentHash: '0xc1',
+      plotHash: '0xp1',
+      videoUrl: 'https://fb/1.mp4',
+      plot: 'shot one plot',
+      title: 'Ep 1 — shot 1',
+      sceneId: 1,
+      previousNodeId: 0,
+      children: [2],
+      canon: true,
+    },
+    {
+      id: 'uuid-2',
+      universeId: 'H9E6',
+      nodeId: 2,
+      creator: '0xf39f',
+      contentHash: '0xc2',
+      plotHash: '0xp2',
+      videoUrl: 'https://fb/2.mp4',
+      plot: 'shot two plot',
+      title: 'Ep 1 — shot 2',
+      sceneId: 2,
+      previousNodeId: 1,
+      children: [3],
+      canon: false,
+    },
+    {
+      id: 'uuid-3',
+      universeId: 'H9E6',
+      nodeId: 3,
+      creator: '0xf39f',
+      contentHash: '0xc3',
+      plotHash: '0xp3',
+      videoUrl: 'https://fb/3.mp4',
+      plot: 'shot three plot',
+      title: 'Ep 1 — shot 3',
+      sceneId: 3,
+      previousNodeId: 2,
+      children: [],
+      canon: false,
+    },
+  ];
+
+  it('maps a chained timeline to string node ids in order', () => {
+    const g = buildOffChainGraphData(chain);
+    expect(g.nodeIds).toEqual(['1', '2', '3']);
+    expect(g.previousNodes).toEqual(['0', '1', '2']);
+  });
+
+  it('carries videoUrl → urls and title → descriptions', () => {
+    const g = buildOffChainGraphData(chain);
+    expect(g.urls).toEqual(['https://fb/1.mp4', 'https://fb/2.mp4', 'https://fb/3.mp4']);
+    expect(g.descriptions).toEqual(['Ep 1 — shot 1', 'Ep 1 — shot 2', 'Ep 1 — shot 3']);
+  });
+
+  it('flags each node canon and extracts the canonChain from canon:true docs only', () => {
+    const g = buildOffChainGraphData(chain);
+    expect(g.flags).toEqual([true, false, false]);
+    expect(g.canonChain).toEqual(['1']);
+  });
+
+  it('stringifies children arrays', () => {
+    const g = buildOffChainGraphData(chain);
+    expect(g.children).toEqual([['2'], ['3'], []]);
+  });
+
+  it('passes contentHash / plotHash straight through', () => {
+    const g = buildOffChainGraphData(chain);
+    expect(g.contentHashes).toEqual(['0xc1', '0xc2', '0xc3']);
+    expect(g.plotHashes).toEqual(['0xp1', '0xp2', '0xp3']);
+  });
+
+  it('falls back to plot when a node has no title', () => {
+    const g = buildOffChainGraphData([
+      { nodeId: 1, videoUrl: 'x', previousNodeId: 0, plot: 'plot only', canon: true },
+    ]);
+    expect(g.descriptions).toEqual(['plot only']);
+  });
+
+  it('tolerates missing optional fields (contentHash, plotHash, children, videoUrl)', () => {
+    const g = buildOffChainGraphData([{ nodeId: 7, previousNodeId: 0 }]);
+    expect(g.nodeIds).toEqual(['7']);
+    expect(g.contentHashes).toEqual(['']);
+    expect(g.plotHashes).toEqual(['']);
+    expect(g.urls).toEqual(['']);
+    expect(g.children).toEqual([[]]);
+    expect(g.flags).toEqual([false]);
+  });
+
+  it('treats a non-array children value as []', () => {
+    const g = buildOffChainGraphData([
+      { nodeId: 1, previousNodeId: 0, children: null },
+      { nodeId: 2, previousNodeId: 1, children: undefined },
+    ]);
+    expect(g.children).toEqual([[], []]);
+  });
+
+  it('undefined / empty input → the shared frozen EMPTY_GRAPH_DATA', () => {
+    expect(buildOffChainGraphData(undefined)).toBe(EMPTY_GRAPH_DATA);
+    expect(buildOffChainGraphData([])).toBe(EMPTY_GRAPH_DATA);
+  });
+
+  it('a node with previousNodeId 0 and no canon flag still maps (root need not be canon)', () => {
+    const g = buildOffChainGraphData([{ nodeId: 1, previousNodeId: 0, videoUrl: 'x' }]);
+    expect(g.previousNodes).toEqual(['0']);
+    expect(g.flags).toEqual([false]);
+    expect(g.canonChain).toEqual([]);
+  });
+
+  it('numeric-string vs number nodeId both stringify identically', () => {
+    const g = buildOffChainGraphData([
+      { nodeId: 1, previousNodeId: 0 },
+      { nodeId: '2', previousNodeId: '1' },
+    ]);
+    expect(g.nodeIds).toEqual(['1', '2']);
+    expect(g.previousNodes).toEqual(['0', '1']);
+  });
+});
+
+describe('buildGraphData — the "nodes disappear right away" path', () => {
+  const tuple = fullGraph([1, 2], { contentHashes: [HASH_A, HASH_B] });
+  const offChainNodes = [
+    { nodeId: 1, videoUrl: 'https://off/1.mp4', previousNodeId: 0, canon: true },
+    { nodeId: 2, videoUrl: 'https://off/2.mp4', previousNodeId: 1, canon: false },
+  ];
+
+  it('reproduces the flash: on-chain guess with no contract yields EMPTY even though off-chain nodes exist', () => {
+    // This is the pre-resolve render for a Solana-PDA fun-mode universe.
+    const { useOnChain } = deriveTimelineMode({ isBlockchainUniverse: true, isOnChain: undefined });
+    const g = buildGraphData({ useOnChain, onChainContractAddress: undefined, offChainNodes });
+    expect(g).toBe(EMPTY_GRAPH_DATA);
+  });
+
+  it('after isOnChain resolves to false the same inputs yield the full off-chain graph', () => {
+    const { useOnChain } = deriveTimelineMode({ isBlockchainUniverse: true, isOnChain: false });
+    const g = buildGraphData({ useOnChain, onChainContractAddress: undefined, offChainNodes });
+    expect(g.nodeIds).toEqual(['1', '2']);
+    expect(g.urls).toEqual(['https://off/1.mp4', 'https://off/2.mp4']);
+  });
+
+  it('the full flash sequence: EMPTY → nodes, driven only by the isOnChain transition', () => {
+    const args = { onChainContractAddress: undefined as string | undefined, offChainNodes };
+    const loading = buildGraphData({
+      ...args,
+      useOnChain: deriveTimelineMode({ isBlockchainUniverse: true, isOnChain: undefined })
+        .useOnChain,
+    });
+    const resolved = buildGraphData({
+      ...args,
+      useOnChain: deriveTimelineMode({ isBlockchainUniverse: true, isOnChain: false }).useOnChain,
+    });
+    expect(loading.nodeIds).toEqual([]);
+    expect(resolved.nodeIds).toEqual(['1', '2']);
+  });
+
+  it('a real minted universe never flashes empty: on-chain guess + contract + data → merged graph', () => {
+    const { useOnChain } = deriveTimelineMode({ isBlockchainUniverse: true, isOnChain: undefined });
+    const g = buildGraphData({
+      useOnChain,
+      onChainContractAddress: '0xabc',
+      fullGraphData: tuple,
+      offChainNodes,
+    });
+    expect(g.nodeIds).toEqual([1, 2]);
   });
 });
 

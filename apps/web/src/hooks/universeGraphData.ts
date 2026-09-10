@@ -171,6 +171,35 @@ export function buildOffChainGraphData(offChainNodes: readonly any[] | undefined
   };
 }
 
+/**
+ * Which timeline source the editor/player should read for a universe.
+ *
+ * Mirrors the two lines at the top of `useUniverseBlockchain` verbatim — kept
+ * here as a pure function so the "nodes flash then vanish" class of bug (a
+ * Solana-PDA universe momentarily resolving to on-chain mode with no contract
+ * → EMPTY graph) is pinned by tests rather than only reproduced in the browser.
+ *
+ * - `isOnChain === undefined` → universe doc still loading; fall back to the
+ *   legacy `isBlockchainUniverse` address-shape heuristic.
+ * - `isOnChain === false` → confirmed fun-mode; never touch the contract.
+ * - `isOnChain === true` → confirmed minted; on-chain only.
+ */
+export interface TimelineMode {
+  useOnChain: boolean;
+  useOffChain: boolean;
+}
+
+export function deriveTimelineMode(args: {
+  isBlockchainUniverse: boolean;
+  isOnChain: boolean | undefined;
+}): TimelineMode {
+  const { isBlockchainUniverse, isOnChain } = args;
+  return {
+    useOnChain: isOnChain === undefined ? isBlockchainUniverse : isOnChain,
+    useOffChain: isOnChain === undefined ? !isBlockchainUniverse : !isOnChain,
+  };
+}
+
 export interface BuildGraphDataArgs {
   /** Strict mode: true → on-chain only, false → off-chain only. */
   useOnChain: boolean;
