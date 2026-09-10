@@ -28,4 +28,4 @@ echo "==== $(date -Is) ===="
 # threads the offChainNodes chain, and refreshes the episodes docs. Then a
 # --motion pass tops up any remaining per-entity clips.
 exec railway run --service loar -- pnpm tsx scripts/gen-techno-antichrist-video.ts \
-  --live --nodes --motion --trailer --res=1080p --dur=8 --max=22
+  --live --nodes --motion --trailer --res=1080p --dur=8 --max=22 --parallel=10
