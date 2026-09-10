@@ -1695,6 +1695,12 @@ function WikiPage() {
               {universeInfo.accessModel}
             </Badge>
           )}
+          <Button asChild size="sm" variant="outline" className="flex-shrink-0 gap-1.5">
+            <Link to="/universe/$id/watch" params={{ id: universeInfo.id }}>
+              <Globe className="h-3.5 w-3.5" />
+              Open universe
+            </Link>
+          </Button>
         </div>
       )}
 

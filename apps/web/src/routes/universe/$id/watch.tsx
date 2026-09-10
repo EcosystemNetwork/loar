@@ -851,6 +851,7 @@ function QuickLinks({
     {
       to: '/characters/$universeId',
       params: { universeId } as any,
+      search: undefined as any,
       label: 'Characters',
       subtitle: 'Cast & likeness',
       Icon: Users,
@@ -859,6 +860,7 @@ function QuickLinks({
       ? {
           to: '/tokens/$address',
           params: { address: tokenAddress } as any,
+          search: undefined as any,
           label: 'Token',
           subtitle: 'Trade & hold',
           Icon: Coins,
@@ -867,6 +869,9 @@ function QuickLinks({
     {
       to: '/wiki',
       params: undefined,
+      // Scope the wiki to this universe so "Wiki" opens its lore, not the
+      // global encyclopedia.
+      search: { universe: universeId } as any,
       label: 'Wiki',
       subtitle: 'Lore, places, events',
       Icon: BookOpen,
@@ -874,6 +879,7 @@ function QuickLinks({
   ].filter(Boolean) as Array<{
     to: string;
     params: any;
+    search: any;
     label: string;
     subtitle: string;
     Icon: React.ComponentType<{ className?: string }>;
@@ -885,11 +891,12 @@ function QuickLinks({
     <section>
       <h2 className="text-xl md:text-2xl font-display italic mb-4">Explore</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {tiles.map(({ to, params, label, subtitle, Icon }) => (
+        {tiles.map(({ to, params, search, label, subtitle, Icon }) => (
           <Link
             key={label}
             to={to as any}
             params={params}
+            search={search}
             className="group flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-primary/40 hover:bg-white/[0.04] transition-all"
           >
             <div className="w-11 h-11 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center flex-shrink-0">
