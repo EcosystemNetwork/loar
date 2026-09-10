@@ -60,6 +60,17 @@ const FORCE = has('--force');
 const ONLY = val('--only')?.toLowerCase();
 const KIND = val('--kind')?.toLowerCase();
 const LIMIT = val('--limit') ? Number(val('--limit')) : Infinity;
+// Stop the process after this many successful clips this run — lets an hourly
+// cron drain the Veo quota window without spinning on 429s for the rest of the hour.
+const MAX = val('--max') ? Number(val('--max')) : Infinity;
+let made = 0;
+function recordSuccess() {
+  made++;
+  if (made >= MAX) {
+    console.log(`\n  hit --max=${MAX} — stopping this run (resume next time)`);
+    process.exit(0);
+  }
+}
 // Registry id (see apps/server/src/services/video-models/registry.ts). The fast
 // tier has real quota headroom on this key; dispatchGoogleVeo auto-falls-back
 // down the Google Veo tiers on a 429.
@@ -349,6 +360,7 @@ async function main() {
         await e.ref.update({ 'metadata.videoUrl': url, updatedAt: new Date() });
         console.log(`      ✓ ${url}`);
         ok++;
+        recordSuccess();
       } catch (err: any) {
         console.log(`      ✗ ${err?.message?.slice(0, 200) ?? err}`);
       }
@@ -393,6 +405,7 @@ async function main() {
             sortOrder: i,
           });
           console.log(`      ✓ ${i} ${url}`);
+          recordSuccess();
         } catch (err: any) {
           console.log(`      ✗ ${i} ${err?.message?.slice(0, 180) ?? err}`);
         }
@@ -430,6 +443,7 @@ async function main() {
           sortOrder: i,
         });
         console.log(`      ✓ ${i} ${url}`);
+        recordSuccess();
       } catch (err: any) {
         console.log(`      ✗ ${i} ${err?.message?.slice(0, 180) ?? err}`);
       }
