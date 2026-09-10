@@ -16,8 +16,9 @@
  *   --motion    image-to-video off every entity's cover — the wiki comes alive
  *   --episodes  a multi-shot animatic per "Ep N — …" entity (text-to-video)
  *   --trailer   a ~16-shot teaser attached to the universe
- *   --nodes     chained offChainNodes timeline of every episode shot (reuses
- *               existing animatic clips; generates only the gaps) + episodes docs
+ *   --nodes     one chained offChainNodes sequence per episode (independent of
+ *               each other, so --parallel runs multiple episodes at once; reuses
+ *               existing animatic clips, generates only the gaps) + episodes docs
  *
  * Flags:
  *   --live          ignore a local .env FIRESTORE_EMULATOR_HOST
@@ -32,9 +33,9 @@
  *                   auto-falls-back down the Google tiers on a 429.
  *   --dur=N         seconds 4|6|8 (default 8)
  *   --res=R         720p|1080p|4k (default 1080p; downgraded if the tier lacks it)
- *   --parallel=N    clips in flight at once within --motion/--episodes/--trailer
- *                   (default 1 = old sequential behaviour). --nodes always stays
- *                   sequential — each node needs the previous node's id to chain to.
+ *   --parallel=N    for --motion/--episodes/--trailer: clips in flight at once.
+ *                   For --nodes: episode sequences in flight at once (shots
+ *                   within one episode still chain in order). Default 1.
  */
 import dotenv from 'dotenv';
 import path from 'path';
