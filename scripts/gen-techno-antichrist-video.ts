@@ -32,6 +32,9 @@
  *                   auto-falls-back down the Google tiers on a 429.
  *   --dur=N         seconds 4|6|8 (default 8)
  *   --res=R         720p|1080p|4k (default 1080p; downgraded if the tier lacks it)
+ *   --parallel=N    clips in flight at once within --motion/--episodes/--trailer
+ *                   (default 1 = old sequential behaviour). --nodes always stays
+ *                   sequential — each node needs the previous node's id to chain to.
  */
 import dotenv from 'dotenv';
 import path from 'path';
@@ -66,12 +69,19 @@ const LIMIT = val('--limit') ? Number(val('--limit')) : Infinity;
 // Stop the process after this many successful clips this run — lets an hourly
 // cron drain the Veo quota window without spinning on 429s for the rest of the hour.
 const MAX = val('--max') ? Number(val('--max')) : Infinity;
+// How many clips to generate concurrently within a phase (default 1 = old
+// sequential behaviour). --nodes stays sequential regardless — its chain
+// (previousNodeId) is only known once the prior node exists.
+const CONCURRENCY = val('--parallel') ? Math.max(1, Number(val('--parallel'))) : 1;
 let made = 0;
+let maxHit = false;
 function recordSuccess() {
   made++;
-  if (made >= MAX) {
-    console.log(`\n  hit --max=${MAX} — stopping this run (resume next time)`);
-    process.exit(0);
+  if (made >= MAX && !maxHit) {
+    maxHit = true;
+    console.log(
+      `\n  hit --max=${MAX} — finishing in-flight clips, then stopping (resume next time)`
+    );
   }
 }
 // Registry id (see apps/server/src/services/video-models/registry.ts). The fast
@@ -196,6 +206,29 @@ const EPISODE_SHOTS: Record<string, string[]> = {
 // ── helpers ─────────────────────────────────────────────────────────────────
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Run `fn` over `items` with at most `limit` in flight at once. Each item keeps
+ * its own index (for sortOrder etc.) regardless of finish order. Stops handing
+ * out new work once --max is hit, but lets already-started clips finish rather
+ * than aborting them mid-write.
+ */
+async function mapLimit<T>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<void>
+): Promise<void> {
+  let cursor = 0;
+  async function worker() {
+    for (;;) {
+      if (maxHit) return;
+      const index = cursor++;
+      if (index >= items.length) return;
+      await fn(items[index], index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(Math.max(limit, 1), items.length) }, worker));
 }
 
 const TRANSIENT =
@@ -421,9 +454,9 @@ async function main() {
     if (KIND) targets = targets.filter((e) => String(e.kind).toLowerCase() === KIND);
     targets.sort((a, b) => String(a.name).localeCompare(String(b.name)));
     if (LIMIT !== Infinity) targets = targets.slice(0, LIMIT);
-    console.log(`  motion: ${targets.length} entity clips\n`);
+    console.log(`  motion: ${targets.length} entity clips (${CONCURRENCY} at a time)\n`);
     let ok = 0;
-    for (const e of targets) {
+    await mapLimit(targets, CONCURRENCY, async (e) => {
       const base =
         EPISODE_VISUAL[e.name] ??
         VISUAL[e.name] ??
@@ -432,11 +465,11 @@ async function main() {
       console.log(`  • ${e.name}`);
       if (DRY_RUN) {
         console.log(`      ${I2V ? 'i2v' : 't2v'} :: ${prompt.slice(0, 90)}…`);
-        continue;
+        return;
       }
       if (await mediaExists(e.id, 'ta-motion', 0)) {
-        console.log(`      · exists — skip`);
-        continue;
+        console.log(`      · ${e.name} exists — skip`);
+        return;
       }
       try {
         const veoUrl = await veoClip(prompt, I2V ? e.imageUrl : undefined);
@@ -451,14 +484,14 @@ async function main() {
           sortOrder: 0,
         });
         await e.ref.update({ 'metadata.videoUrl': url, updatedAt: new Date() });
-        console.log(`      ✓ ${url}`);
+        console.log(`      ✓ ${e.name} ${url}`);
         ok++;
         recordSuccess();
       } catch (err: any) {
-        console.log(`      ✗ ${err?.message?.slice(0, 200) ?? err}`);
+        console.log(`      ✗ ${e.name} ${err?.message?.slice(0, 200) ?? err}`);
       }
-      await sleep(4000);
-    }
+      if (CONCURRENCY <= 1) await sleep(4000);
+    });
     console.log(`\n  motion done — ${ok}/${targets.length}\n`);
   }
 
@@ -473,17 +506,16 @@ async function main() {
         console.log(`  ! no entity "${name}" — skipping`);
         continue;
       }
-      console.log(`  ${name}: ${EPISODE_SHOTS[name].length} shots`);
-      let i = 0;
-      for (const shot of EPISODE_SHOTS[name]) {
-        i++;
+      console.log(`  ${name}: ${EPISODE_SHOTS[name].length} shots (${CONCURRENCY} at a time)`);
+      await mapLimit(EPISODE_SHOTS[name], CONCURRENCY, async (shot, idx) => {
+        const i = idx + 1;
         if (DRY_RUN) {
           console.log(`      ${i}. ${shot.slice(0, 100)}…`);
-          continue;
+          return;
         }
         if (await mediaExists(ent.id, 'ta-animatic', i)) {
           console.log(`      · ${i} exists — skip`);
-          continue;
+          return;
         }
         try {
           const veoUrl = await veoClip(`${shot} ${STYLE}`);
@@ -502,8 +534,8 @@ async function main() {
         } catch (err: any) {
           console.log(`      ✗ ${i} ${err?.message?.slice(0, 180) ?? err}`);
         }
-        await sleep(4000);
-      }
+        if (CONCURRENCY <= 1) await sleep(4000);
+      });
     }
     console.log('');
   }
@@ -511,17 +543,16 @@ async function main() {
   // ── trailer: attached to the universe ────────────────────────────────────
   if (phases.trailer) {
     const shots = LIMIT !== Infinity ? TRAILER.slice(0, LIMIT) : TRAILER;
-    console.log(`  trailer: ${shots.length} shots`);
-    let i = 0;
-    for (const shot of shots) {
-      i++;
+    console.log(`  trailer: ${shots.length} shots (${CONCURRENCY} at a time)`);
+    await mapLimit(shots, CONCURRENCY, async (shot, idx) => {
+      const i = idx + 1;
       if (DRY_RUN) {
         console.log(`      ${i}. ${shot.slice(0, 100)}…`);
-        continue;
+        return;
       }
       if (await mediaExists(UNIVERSE_ID, 'ta-trailer', i)) {
         console.log(`      · ${i} exists — skip`);
-        continue;
+        return;
       }
       try {
         const veoUrl = await veoClip(`${shot} ${STYLE}`);
@@ -540,38 +571,43 @@ async function main() {
       } catch (err: any) {
         console.log(`      ✗ ${i} ${err?.message?.slice(0, 180) ?? err}`);
       }
-      await sleep(4000);
-    }
+      if (CONCURRENCY <= 1) await sleep(4000);
+    });
     console.log('');
   }
 
-  // ── nodes: a chained off-chain timeline of every episode shot, in order ───
+  // ── nodes: one independent node sequence per episode, episodes run in parallel ─
+  // Each episode is its own chain (root previousNodeId 0, shots link within that
+  // episode only) — episodes don't depend on each other, so up to CONCURRENCY of
+  // them build at once. Within one episode, shots still create in order (each
+  // needs the previous shot's nodeId), but the slow part — Veo generation — for
+  // *different* episodes overlaps.
   if (phases.nodes) {
-    console.log(`  nodes: building the episode timeline\n`);
-    let prev = 0;
-    const perEpisode: Record<
-      string,
-      Array<{ nodeId: number; title: string; videoUrl: string }>
-    > = {};
-    let scene = 0;
+    const episodeNames = Object.keys(EPISODE_SHOTS);
+    console.log(
+      `  nodes: ${episodeNames.length} independent episode sequences (${CONCURRENCY} at a time)\n`
+    );
 
-    for (const [epName, shots] of Object.entries(EPISODE_SHOTS)) {
+    await mapLimit(episodeNames, CONCURRENCY, async (epName, epIdx) => {
       const ent = entities.find((e) => e.name === epName);
       if (!ent) {
         console.log(`  ! no entity "${epName}" — skipping`);
-        continue;
+        return;
       }
-      console.log(`  ${epName}`);
-      perEpisode[epName] = [];
-      let i = 0;
-      for (const shot of shots) {
-        i++;
-        scene++;
+      const shots = EPISODE_SHOTS[epName];
+      console.log(`  ${epName}: ${shots.length} shots`);
+      const clips: Array<{ nodeId: number; title: string; videoUrl: string }> = [];
+      let prev = 0; // root of THIS episode's own chain — independent of every other episode
+
+      for (let idx = 0; idx < shots.length; idx++) {
+        if (maxHit) break;
+        const i = idx + 1;
+        const shot = shots[idx];
         const title = `${epName} — shot ${i}`;
 
         const existingNode = await findNodeByTitle(title);
         if (existingNode != null) {
-          console.log(`      · ${i} node #${existingNode} exists`);
+          console.log(`      · ${epName} ${i} node #${existingNode} exists`);
           const nd = await db
             .collection('offChainNodes')
             .where('universeId', '==', UNIVERSE_ID)
@@ -579,21 +615,20 @@ async function main() {
             .limit(1)
             .get();
           const v = nd.empty ? '' : (nd.docs[0].data().videoUrl as string);
-          perEpisode[epName].push({ nodeId: existingNode, title, videoUrl: v });
+          clips.push({ nodeId: existingNode, title, videoUrl: v });
           prev = existingNode;
           continue;
         }
 
         if (DRY_RUN) {
-          console.log(`      ${i} would node: ${shot.slice(0, 80)}…`);
-          prev = -scene; // placeholder for dry-run chaining log only
+          console.log(`      ${epName} ${i} would node: ${shot.slice(0, 80)}…`);
           continue;
         }
 
         // Reuse an already-generated animatic clip for this ep/shot if we have one.
         let url = await existingClipUrl(ent.id, 'ta-animatic', i);
         if (url) {
-          console.log(`      ${i} reuse clip`);
+          console.log(`      ${epName} ${i} reuse clip`);
         } else {
           try {
             const veoUrl = await veoClip(`${shot} ${STYLE}`);
@@ -607,13 +642,13 @@ async function main() {
               subCategory: 'ta-animatic',
               sortOrder: i,
             });
-            console.log(`      ${i} ✓ new clip`);
+            console.log(`      ${epName} ${i} ✓ new clip`);
             recordSuccess();
           } catch (err: any) {
-            console.log(`      ${i} ✗ ${err?.message?.slice(0, 160) ?? err}`);
+            console.log(`      ${epName} ${i} ✗ ${err?.message?.slice(0, 160) ?? err}`);
             continue; // leave a gap; a later run fills it and chains in place
           }
-          await sleep(4000);
+          if (CONCURRENCY <= 1) await sleep(4000);
         }
 
         const nodeId = await createNode({
@@ -621,21 +656,14 @@ async function main() {
           plot: shot,
           title,
           previousNodeId: prev,
-          sceneId: scene,
+          sceneId: i,
         });
-        console.log(`      ${i} → node #${nodeId}`);
-        perEpisode[epName].push({ nodeId, title, videoUrl: url });
+        console.log(`      ${epName} ${i} → node #${nodeId}`);
+        clips.push({ nodeId, title, videoUrl: url });
         prev = nodeId;
       }
-    }
 
-    // Wrap each episode's node slice into an episodes doc.
-    if (!DRY_RUN) {
-      let epNum = 0;
-      for (const [epName, clips] of Object.entries(perEpisode)) {
-        epNum++;
-        if (clips.length === 0) continue;
-        const ent = entities.find((e) => e.name === epName);
+      if (!DRY_RUN && clips.length > 0) {
         const q = await db
           .collection('episodes')
           .where('universeId', '==', UNIVERSE_ID)
@@ -650,9 +678,9 @@ async function main() {
             {
               id: epId,
               universeId: UNIVERSE_ID,
-              episodeNumber: epNum,
+              episodeNumber: epIdx + 1,
               title: epName,
-              description: String(ent?.description ?? '').slice(0, 240),
+              description: String(ent.description ?? '').slice(0, 240),
               isCanon: true,
               clipCount: clips.length,
               clips: clips.map((c, idx) => ({
@@ -668,7 +696,7 @@ async function main() {
           );
         console.log(`  episode "${epName}" — ${clips.length} clips → ${epId}`);
       }
-    }
+    });
     console.log('');
   }
 
