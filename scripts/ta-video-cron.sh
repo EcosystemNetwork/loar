@@ -14,6 +14,11 @@ set -euo pipefail
 
 export HOME="${HOME:-/home/god}"
 export PATH="$HOME/.config/nvm/versions/node/v22.19.0/bin:$HOME/.local/share/pnpm:/usr/local/bin:/usr/bin:/bin"
+# GEN_GOOGLE_KEY (a working AI Studio key, overriding the exhausted injected
+# GOOGLE_API_KEY) is sourced from outside the repo — never hardcode a key here,
+# this file is committed. Set it in ~/.config/loar/ta-video-key.env, e.g.:
+#   echo 'export GEN_GOOGLE_KEY="AQ...."' > ~/.config/loar/ta-video-key.env
+[ -f "$HOME/.config/loar/ta-video-key.env" ] && source "$HOME/.config/loar/ta-video-key.env"
 
 cd /home/god/Desktop/loar/loar
 
