@@ -457,6 +457,24 @@ function GalleryTab({ universeAddress }: { universeAddress?: string }) {
         isLoading={isLoading}
         emptyMessage={galleryEmptyMessage(mediaType, originFilter)}
       />
+
+      {/* The gallery only lists generations made through /create — a universe
+          seeded with wiki entities directly (script-built, imported, etc.)
+          reads as fully empty here even though its wiki is populated. Point
+          people at the one view that always covers every entity kind. */}
+      {!isLoading && filtered.length === 0 && universeAddress && (
+        <p className="text-center text-sm text-muted-foreground">
+          Looking for this universe's wiki instead of generations?{' '}
+          <Link
+            to="/wiki"
+            search={{ universe: universeAddress, tab: 'az-index' }}
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            Browse the full A–Z index
+          </Link>
+          .
+        </p>
+      )}
     </div>
   );
 }
