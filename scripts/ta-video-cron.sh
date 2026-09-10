@@ -18,5 +18,9 @@ export PATH="$HOME/.config/nvm/versions/node/v22.19.0/bin:$HOME/.local/share/pnp
 cd /home/god/Desktop/loar/loar
 
 echo "==== $(date -Is) ===="
+# --nodes builds the episode timeline: reuses existing clips, generates only the
+# gap shots (Veo, capped by --max so a run drains the quota window and exits),
+# threads the offChainNodes chain, and refreshes the episodes docs. Then a
+# --motion pass tops up any remaining per-entity clips.
 exec railway run --service loar -- pnpm tsx scripts/gen-techno-antichrist-video.ts \
-  --live --motion --episodes --trailer --res=1080p --dur=8 --max=25
+  --live --nodes --motion --trailer --res=1080p --dur=8 --max=22
