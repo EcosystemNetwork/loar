@@ -16,6 +16,8 @@
  *   --motion    image-to-video off every entity's cover — the wiki comes alive
  *   --episodes  a multi-shot animatic per "Ep N — …" entity (text-to-video)
  *   --trailer   a ~16-shot teaser attached to the universe
+ *   --nodes     chained offChainNodes timeline of every episode shot (reuses
+ *               existing animatic clips; generates only the gaps) + episodes docs
  *
  * Flags:
  *   --live          ignore a local .env FIRESTORE_EMULATOR_HOST
@@ -37,6 +39,7 @@ import fs from 'fs';
 import { randomUUID } from 'crypto';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { keccak256, toBytes } from 'viem';
 import { firebaseStorageService } from '../apps/server/src/services/firebase-storage';
 import { dispatchGoogleVeo } from '../apps/server/src/services/video-models/google-veo-dispatch';
 import { VIDEO_MODELS } from '../apps/server/src/services/video-models/registry';
@@ -93,8 +96,13 @@ const RES = (val('--res') ?? '1080p') as '720p' | '1080p' | '4k';
 const I2V = has('--i2v');
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 
-let phases = { motion: has('--motion'), episodes: has('--episodes'), trailer: has('--trailer') };
-if (!phases.motion && !phases.episodes && !phases.trailer) phases.motion = true;
+let phases = {
+  motion: has('--motion'),
+  episodes: has('--episodes'),
+  trailer: has('--trailer'),
+  nodes: has('--nodes'),
+};
+if (!phases.motion && !phases.episodes && !phases.trailer && !phases.nodes) phases.motion = true;
 
 const MOTION_CLAUSE =
   'Subtle live-action cinematography: a slow push-in or gentle handheld drift, practical light flicker, ' +
@@ -289,6 +297,91 @@ function slug(s: string) {
   return s.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
 }
 
+// ── off-chain timeline nodes (mirrors offChainNodes.routes.ts) ──────────────
+const NODE_CREATOR = CREATOR.toLowerCase();
+
+async function nextNodeId(): Promise<number> {
+  const ref = db.collection('offChainNodeCounters').doc(UNIVERSE_ID);
+  return db.runTransaction(async (tx) => {
+    const d = await tx.get(ref);
+    const next = ((d.exists ? (d.data()?.latest as number) : 0) || 0) + 1;
+    tx.set(ref, { latest: next, updatedAt: new Date() }, { merge: true });
+    return next;
+  });
+}
+
+/** Existing node for this title, if any (resume-safe). Returns its nodeId. */
+async function findNodeByTitle(title: string): Promise<number | null> {
+  const q = await db
+    .collection('offChainNodes')
+    .where('universeId', '==', UNIVERSE_ID)
+    .where('title', '==', title)
+    .limit(1)
+    .get();
+  return q.empty ? null : ((q.docs[0].data().nodeId as number) ?? null);
+}
+
+async function createNode(opts: {
+  videoUrl: string;
+  plot: string;
+  title: string;
+  previousNodeId: number;
+  sceneId: number;
+}): Promise<number> {
+  const nodeId = await nextNodeId();
+  const id = randomUUID();
+  await db
+    .collection('offChainNodes')
+    .doc(id)
+    .set({
+      id,
+      universeId: UNIVERSE_ID,
+      nodeId,
+      creator: NODE_CREATOR,
+      contentHash: keccak256(toBytes(opts.videoUrl)),
+      plotHash: keccak256(toBytes(opts.plot)),
+      videoUrl: opts.videoUrl,
+      plot: opts.plot,
+      title: opts.title,
+      sceneId: opts.sceneId,
+      previousNodeId: opts.previousNodeId,
+      children: [],
+      canon: opts.previousNodeId === 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  if (opts.previousNodeId > 0) {
+    const p = await db
+      .collection('offChainNodes')
+      .where('universeId', '==', UNIVERSE_ID)
+      .where('nodeId', '==', opts.previousNodeId)
+      .limit(1)
+      .get();
+    if (!p.empty) {
+      const kids = (p.docs[0].data().children || []) as number[];
+      if (!kids.includes(nodeId))
+        await p.docs[0].ref.update({ children: [...kids, nodeId], updatedAt: new Date() });
+    }
+  }
+  return nodeId;
+}
+
+/** URL of an already-generated clip for this ep/shot, if one exists. */
+async function existingClipUrl(
+  targetId: string,
+  subCategory: string,
+  sortOrder: number
+): Promise<string | null> {
+  const q = await db
+    .collection('mediaAttachments')
+    .where('targetId', '==', targetId)
+    .where('subCategory', '==', subCategory)
+    .where('sortOrder', '==', sortOrder)
+    .limit(1)
+    .get();
+  return q.empty ? null : ((q.docs[0].data().url as string) ?? null);
+}
+
 // ── main ────────────────────────────────────────────────────────────────────
 async function main() {
   if (!GOOGLE_API_KEY)
@@ -448,6 +541,133 @@ async function main() {
         console.log(`      ✗ ${i} ${err?.message?.slice(0, 180) ?? err}`);
       }
       await sleep(4000);
+    }
+    console.log('');
+  }
+
+  // ── nodes: a chained off-chain timeline of every episode shot, in order ───
+  if (phases.nodes) {
+    console.log(`  nodes: building the episode timeline\n`);
+    let prev = 0;
+    const perEpisode: Record<
+      string,
+      Array<{ nodeId: number; title: string; videoUrl: string }>
+    > = {};
+    let scene = 0;
+
+    for (const [epName, shots] of Object.entries(EPISODE_SHOTS)) {
+      const ent = entities.find((e) => e.name === epName);
+      if (!ent) {
+        console.log(`  ! no entity "${epName}" — skipping`);
+        continue;
+      }
+      console.log(`  ${epName}`);
+      perEpisode[epName] = [];
+      let i = 0;
+      for (const shot of shots) {
+        i++;
+        scene++;
+        const title = `${epName} — shot ${i}`;
+
+        const existingNode = await findNodeByTitle(title);
+        if (existingNode != null) {
+          console.log(`      · ${i} node #${existingNode} exists`);
+          const nd = await db
+            .collection('offChainNodes')
+            .where('universeId', '==', UNIVERSE_ID)
+            .where('nodeId', '==', existingNode)
+            .limit(1)
+            .get();
+          const v = nd.empty ? '' : (nd.docs[0].data().videoUrl as string);
+          perEpisode[epName].push({ nodeId: existingNode, title, videoUrl: v });
+          prev = existingNode;
+          continue;
+        }
+
+        if (DRY_RUN) {
+          console.log(`      ${i} would node: ${shot.slice(0, 80)}…`);
+          prev = -scene; // placeholder for dry-run chaining log only
+          continue;
+        }
+
+        // Reuse an already-generated animatic clip for this ep/shot if we have one.
+        let url = await existingClipUrl(ent.id, 'ta-animatic', i);
+        if (url) {
+          console.log(`      ${i} reuse clip`);
+        } else {
+          try {
+            const veoUrl = await veoClip(`${shot} ${STYLE}`);
+            url = await rehost(veoUrl, `ta-node-${slug(epName)}-shot${i}.mp4`);
+            await attach({
+              url,
+              targetType: 'entity',
+              targetId: ent.id,
+              targetName: epName,
+              label: `${epName} — shot ${i}`,
+              subCategory: 'ta-animatic',
+              sortOrder: i,
+            });
+            console.log(`      ${i} ✓ new clip`);
+            recordSuccess();
+          } catch (err: any) {
+            console.log(`      ${i} ✗ ${err?.message?.slice(0, 160) ?? err}`);
+            continue; // leave a gap; a later run fills it and chains in place
+          }
+          await sleep(4000);
+        }
+
+        const nodeId = await createNode({
+          videoUrl: url,
+          plot: shot,
+          title,
+          previousNodeId: prev,
+          sceneId: scene,
+        });
+        console.log(`      ${i} → node #${nodeId}`);
+        perEpisode[epName].push({ nodeId, title, videoUrl: url });
+        prev = nodeId;
+      }
+    }
+
+    // Wrap each episode's node slice into an episodes doc.
+    if (!DRY_RUN) {
+      let epNum = 0;
+      for (const [epName, clips] of Object.entries(perEpisode)) {
+        epNum++;
+        if (clips.length === 0) continue;
+        const ent = entities.find((e) => e.name === epName);
+        const q = await db
+          .collection('episodes')
+          .where('universeId', '==', UNIVERSE_ID)
+          .where('title', '==', epName)
+          .limit(1)
+          .get();
+        const epId = q.empty ? randomUUID() : q.docs[0].id;
+        await db
+          .collection('episodes')
+          .doc(epId)
+          .set(
+            {
+              id: epId,
+              universeId: UNIVERSE_ID,
+              episodeNumber: epNum,
+              title: epName,
+              description: String(ent?.description ?? '').slice(0, 240),
+              isCanon: true,
+              clipCount: clips.length,
+              clips: clips.map((c, idx) => ({
+                nodeId: String(c.nodeId),
+                label: `Shot ${idx + 1}`,
+                videoUrl: c.videoUrl,
+              })),
+              sourceCreator: NODE_CREATOR,
+              updatedAt: new Date(),
+              createdAt: new Date(),
+            },
+            { merge: true }
+          );
+        console.log(`  episode "${epName}" — ${clips.length} clips → ${epId}`);
+      }
     }
     console.log('');
   }
