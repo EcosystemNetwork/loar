@@ -53,7 +53,7 @@ const MODELS = val('--model')
 let phases = { covers: has('--covers'), hero: has('--hero') };
 if (!phases.covers && !phases.hero) phases = { covers: true, hero: true };
 
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+const GOOGLE_API_KEY = process.env.GEN_GOOGLE_KEY?.trim() || process.env.GOOGLE_API_KEY; // GEN_GOOGLE_KEY = drop-in second AI Studio key for fresh Veo quota
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 function sleep(ms: number) {

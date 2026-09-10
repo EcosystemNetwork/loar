@@ -94,7 +94,7 @@ const RES = (val('--res') ?? '1080p') as '720p' | '1080p' | '4k';
 // firebasestorage URL can fail from this environment, so --motion is
 // text-to-video by default. Pass --i2v to condition on each entity's cover.
 const I2V = has('--i2v');
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+const GOOGLE_API_KEY = process.env.GEN_GOOGLE_KEY?.trim() || process.env.GOOGLE_API_KEY; // GEN_GOOGLE_KEY = drop-in second AI Studio key for fresh Veo quota
 
 let phases = {
   motion: has('--motion'),
