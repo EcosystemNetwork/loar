@@ -419,6 +419,28 @@ async function main() {
     `${auth.chain.toUpperCase()} signer: ${auth.address}${auth.evmAddress ? ` → linked EVM ${auth.evmAddress}` : ''}`
   );
 
+  // Image generation on prod is BYOK — the server has no shared provider key, so
+  // image.generate 503s with "GOOGLE_API_KEY / FAL_KEY is not configured" unless
+  // the signing account has a key stored. Push one here with SET_GOOGLE_KEY=<key>
+  // (Gemini, for nano-banana-*-google) or SET_FAL_KEY=<key> (fal, for nano-banana).
+  // The server validates against the provider before persisting; a bad key is
+  // rejected and nothing is stored. Once set it sticks to the account — you only
+  // need this on the first run.
+  for (const [env, provider] of [
+    ['SET_GOOGLE_KEY', 'google'],
+    ['SET_FAL_KEY', 'fal'],
+  ] as const) {
+    const k = process.env[env]?.trim();
+    if (!k) continue;
+    log('key', `providers.upsertKey provider=${provider} len=${k.length} prefix=${k.slice(0, 4)}…`);
+    try {
+      const out = await tRPCMutate('providers.upsertKey', { provider, apiKey: k }, auth.token);
+      log('key', `stored: ${JSON.stringify(out).slice(0, 200)}`);
+    } catch (err: any) {
+      log('key', `REJECTED: ${err?.message?.slice(0, 240) ?? err}`);
+    }
+  }
+
   const targets = await resolveTargets(auth.token, signer);
   if (targets.length === 0) {
     console.log('\nNo target universes resolved. Nothing to do.');
@@ -427,10 +449,13 @@ async function main() {
 
   console.log(`\n  ${targets.length} universe(s) in scope:`);
   for (const t of targets) {
-    const owned = !t.creator || t.creator.toLowerCase() === signer.toLowerCase();
+    // entities.update is gated per-entity on createdBy, not on the universe
+    // creator — a signer can cover entities it made in someone else's universe.
+    // universes.updateMetadata (the --hero phase) IS universe-creator gated.
+    const ownsUniverse = !t.creator || t.creator.toLowerCase() === signer.toLowerCase();
     console.log(
       `   - ${t.name.padEnd(34)} ${String(t.id).slice(0, 24).padEnd(24)} hero:${t.heroImageUrl ? 'y' : 'MISSING'}` +
-        `${owned ? '' : '  ⚠ NOT owned by signer — writes will 403'}`
+        `${!ownsUniverse && phases.hero ? '  ⚠ signer ≠ universe creator — --hero will 403' : ''}`
     );
   }
 
