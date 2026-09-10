@@ -193,6 +193,23 @@ async function rehost(veoUrl: string, filename: string): Promise<string> {
 
 let db: FirebaseFirestore.Firestore;
 
+/** True if a clip for this target + subCategory + sortOrder already exists (skip on re-run unless --force). */
+async function mediaExists(
+  targetId: string,
+  subCategory: string,
+  sortOrder: number
+): Promise<boolean> {
+  if (FORCE) return false;
+  const q = await db
+    .collection('mediaAttachments')
+    .where('targetId', '==', targetId)
+    .where('subCategory', '==', subCategory)
+    .where('sortOrder', '==', sortOrder)
+    .limit(1)
+    .get();
+  return !q.empty;
+}
+
 async function attach(opts: {
   url: string;
   targetType: 'entity' | 'universe';
@@ -285,6 +302,10 @@ async function main() {
         console.log(`      ${I2V ? 'i2v' : 't2v'} :: ${prompt.slice(0, 90)}…`);
         continue;
       }
+      if (await mediaExists(e.id, 'ta-motion', 0)) {
+        console.log(`      · exists — skip`);
+        continue;
+      }
       try {
         const veoUrl = await veoClip(prompt, I2V ? e.imageUrl : undefined);
         const url = await rehost(veoUrl, `ta-motion-${slug(e.name)}.mp4`);
@@ -327,6 +348,10 @@ async function main() {
           console.log(`      ${i}. ${shot.slice(0, 100)}…`);
           continue;
         }
+        if (await mediaExists(ent.id, 'ta-animatic', i)) {
+          console.log(`      · ${i} exists — skip`);
+          continue;
+        }
         try {
           const veoUrl = await veoClip(`${shot} ${STYLE}`);
           const url = await rehost(veoUrl, `ta-${slug(name)}-shot${i}.mp4`);
@@ -351,12 +376,17 @@ async function main() {
 
   // ── trailer: attached to the universe ────────────────────────────────────
   if (phases.trailer) {
-    console.log(`  trailer: ${TRAILER.length} shots`);
+    const shots = LIMIT !== Infinity ? TRAILER.slice(0, LIMIT) : TRAILER;
+    console.log(`  trailer: ${shots.length} shots`);
     let i = 0;
-    for (const shot of TRAILER) {
+    for (const shot of shots) {
       i++;
       if (DRY_RUN) {
         console.log(`      ${i}. ${shot.slice(0, 100)}…`);
+        continue;
+      }
+      if (await mediaExists(UNIVERSE_ID, 'ta-trailer', i)) {
+        console.log(`      · ${i} exists — skip`);
         continue;
       }
       try {
