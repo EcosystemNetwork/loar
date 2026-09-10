@@ -24,11 +24,12 @@
  *   --only=Sub      restrict --motion to entities whose name contains Sub
  *   --kind=k        restrict --motion to a kind (person|place|lore|event|faction)
  *   --limit=N       cap items
- *   --model=ID      google veo model id (default veo-3.1-fast-generate-preview;
- *                   others: veo-3.1-generate-preview, veo-3.1-lite-generate-preview,
- *                   veo-3.0-generate-001)
+ *   --model=ID      Google Veo *registry* id (default veo-31-fast-preview-google;
+ *                   others: veo-31-preview-google, veo-31-lite-preview-google,
+ *                   veo-30-google, veo-30-fast-google). dispatchGoogleVeo
+ *                   auto-falls-back down the Google tiers on a 429.
  *   --dur=N         seconds 4|6|8 (default 8)
- *   --res=R         720p|1080p|4k (default 1080p; 4k only 8s premium)
+ *   --res=R         720p|1080p|4k (default 1080p; downgraded if the tier lacks it)
  */
 import dotenv from 'dotenv';
 import path from 'path';
@@ -37,7 +38,8 @@ import { randomUUID } from 'crypto';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { firebaseStorageService } from '../apps/server/src/services/firebase-storage';
-import { veoGenerate } from '../apps/server/src/services/gemini';
+import { dispatchGoogleVeo } from '../apps/server/src/services/video-models/google-veo-dispatch';
+import { VIDEO_MODELS } from '../apps/server/src/services/video-models/registry';
 import { STYLE, VISUAL, EPISODE_VISUAL } from './lib/ta-visual';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -58,7 +60,20 @@ const FORCE = has('--force');
 const ONLY = val('--only')?.toLowerCase();
 const KIND = val('--kind')?.toLowerCase();
 const LIMIT = val('--limit') ? Number(val('--limit')) : Infinity;
-const MODEL = val('--model') ?? 'veo-3.1-fast-generate-preview';
+// Registry id (see apps/server/src/services/video-models/registry.ts). The fast
+// tier has real quota headroom on this key; dispatchGoogleVeo auto-falls-back
+// down the Google Veo tiers on a 429.
+const MODEL = val('--model') ?? 'veo-31-fast-preview-google';
+const PRIMARY = VIDEO_MODELS.find((m) => m.id === MODEL && m.provider === 'google');
+if (!PRIMARY) {
+  console.error(
+    `--model="${MODEL}" is not a Google Veo registry id. Options: ` +
+      VIDEO_MODELS.filter((m) => m.provider === 'google' && m.id.includes('veo'))
+        .map((m) => m.id)
+        .join(', ')
+  );
+  process.exit(1);
+}
 const DUR = val('--dur') ? Number(val('--dur')) : 8;
 const RES = (val('--res') ?? '1080p') as '720p' | '1080p' | '4k';
 // Veo on the AI Studio surface must inline the source image; safeFetch of a
@@ -164,20 +179,33 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+const TRANSIENT =
+  /503|internal server|no videoUrl|UNAVAILABLE|deadline|ECONNRESET|fetch failed|temporar/i;
+
 async function veoClip(prompt: string, imageUrl?: string): Promise<string> {
-  const r = await veoGenerate({
-    apiKey: GOOGLE_API_KEY,
-    model: MODEL,
-    prompt,
-    imageUrl,
-    durationSec: DUR,
-    resolution: RES,
-    aspectRatio: '16:9',
-  });
-  if (r.status !== 'completed' || !r.videoUrl) {
-    throw new Error(r.error || `veo ${r.status}, no videoUrl`);
+  let lastErr = '';
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    const r = await dispatchGoogleVeo(
+      PRIMARY!,
+      {
+        prompt,
+        imageUrl,
+        durationSec: DUR,
+        resolution: RES,
+        aspectRatio: '16:9',
+        mode: imageUrl ? 'image_to_video' : 'text_to_video',
+      },
+      GOOGLE_API_KEY as string
+    );
+    if (r.status === 'completed' && r.videoUrl) return r.videoUrl;
+    lastErr = r.error || `veo ${r.status}, no videoUrl`;
+    if (attempt < 4 && TRANSIENT.test(lastErr)) {
+      await sleep(20_000 * attempt);
+      continue;
+    }
+    break;
   }
-  return r.videoUrl;
+  throw new Error(lastErr);
 }
 
 async function rehost(veoUrl: string, filename: string): Promise<string> {
@@ -324,7 +352,7 @@ async function main() {
       } catch (err: any) {
         console.log(`      ✗ ${err?.message?.slice(0, 200) ?? err}`);
       }
-      await sleep(1500);
+      await sleep(4000);
     }
     console.log(`\n  motion done — ${ok}/${targets.length}\n`);
   }
@@ -368,7 +396,7 @@ async function main() {
         } catch (err: any) {
           console.log(`      ✗ ${i} ${err?.message?.slice(0, 180) ?? err}`);
         }
-        await sleep(1500);
+        await sleep(4000);
       }
     }
     console.log('');
@@ -405,7 +433,7 @@ async function main() {
       } catch (err: any) {
         console.log(`      ✗ ${i} ${err?.message?.slice(0, 180) ?? err}`);
       }
-      await sleep(1500);
+      await sleep(4000);
     }
     console.log('');
   }
