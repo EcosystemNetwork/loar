@@ -11,14 +11,14 @@
 [![Node 18+](https://img.shields.io/badge/Node.js-18%2B-green)](https://nodejs.org/)
 [![Ethereum Sepolia](https://img.shields.io/badge/Network-Ethereum%20Sepolia-blue)](https://sepolia.etherscan.io/)
 [![Target: Ethereum Mainnet](https://img.shields.io/badge/Target-Ethereum%20Mainnet-627EEA)](https://etherscan.io/)
-[![Coming soon: Solana + Base](https://img.shields.io/badge/Coming%20soon-Solana%20%2B%20Base-9945FF)](#-multi-chain-roadmap--solana--base-coming-soon)
+[![Solana: live on devnet](https://img.shields.io/badge/Solana-live%20on%20devnet-9945FF)](#-multi-chain-status--solana-live-base-not-yet)
 [![$LOAR on pump.fun](https://img.shields.io/badge/%24LOAR-live%20on%20pump.fun-9945FF)](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb)
 
 **[Website](https://loar.fun)** · **[$LOAR token](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb)** · **[Telegram](https://t.me/+AXD-XK8SVvw5MTIx)** · **[X / Twitter](https://x.com/LOAR_FUN)**
 
 </div>
 
-> **Last updated:** August 31, 2026 | **Status:** Testnet Alpha. LOAR is a **multi-modal AI creation suite** — video, image, audio, 3D, and language models (~70 model IDs, 9 providers) — wrapped in an on-chain ownership, governance, and revenue layer. The protocol runs on **Ethereum Sepolia** today (contracts live + verified; Mainnet wired for swaps/auth). Chain details: [Smart Contracts](#smart-contracts-sepolia) · [multi-chain roadmap](#-multi-chain-roadmap--solana--base-coming-soon).
+> **Last updated:** September 10, 2026 | **Status:** Testnet Alpha. LOAR is a **multi-modal AI creation suite** — video, image, audio, 3D, and language models (~70 model IDs, 9 providers) — wrapped in an on-chain ownership, governance, and revenue layer. The protocol's canonical rights/revenue layer runs on **Ethereum Sepolia** today (contracts live + verified; Mainnet wired for swaps/auth), with a parallel **Solana devnet** stack live for wallet provisioning, universe creation, and a custodial bridge (token launchpad still EVM-only). Chain details: [Smart Contracts](#smart-contracts-sepolia) · [multi-chain status](#-multi-chain-status--solana-live-base-not-yet).
 
 ---
 
@@ -31,7 +31,7 @@
 | **Telegram**    | [t.me/+AXD-XK8SVvw5MTIx](https://t.me/+AXD-XK8SVvw5MTIx)                                           |
 | **X / Twitter** | [@LOAR_FUN](https://x.com/LOAR_FUN)                                                                |
 
-$LOAR is live and tradable on [pump.fun](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb) (Solana, mint `2xowaGYF…dpTYb`); a native Token-2022 $LOAR + bridge are in the [multi-chain roadmap](#-multi-chain-roadmap--solana--base-coming-soon).
+$LOAR is live and tradable on [pump.fun](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb) (Solana, mint `2xowaGYF…dpTYb`) — a standalone bonding-curve launch, not wired into the protocol. A native Token-2022 $LOAR is still planned; see [multi-chain status](#-multi-chain-status--solana-live-base-not-yet) for what's live today (wallets, universe creation, bridge) versus what's next (the SVM token launchpad).
 
 ---
 
@@ -225,12 +225,12 @@ These features have working smart contracts, backend APIs, AND frontend UIs, but
 
 ### PLANNED (Not implemented)
 
-| Feature                         | Notes                                                                                                                                                                                                                                                    |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Mainnet Deployment**          | Contracts live on Ethereum Sepolia. Needs security audit before Ethereum Mainnet. Solana + Base are planned future chains (see [multi-chain roadmap](#-multi-chain-roadmap--solana--base-coming-soon)). See [launch audit](docs/pre-launch-checklist.md) |
-| **Fiat On-Ramp**                | Stripe integration exists but requires `STRIPE_SECRET_KEY`. No other fiat on-ramp                                                                                                                                                                        |
-| **Merch Fulfillment**           | Backend CRUD exists. No fulfillment partner integration, no order management dashboard                                                                                                                                                                   |
-| **Mobile App Store Publishing** | Expo 52 app exists (iOS + Android). Not yet submitted to App Store / Play Store                                                                                                                                                                          |
+| Feature                         | Notes                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Mainnet Deployment**          | Contracts live on Ethereum Sepolia. Needs security audit before Ethereum Mainnet. Solana's sister programs are live on **devnet** only — mainnet-beta needs an Anchor audit + Wormhole NTT bridge (see [multi-chain status](#-multi-chain-status--solana-live-base-not-yet)); Base is not currently active. See [launch audit](docs/pre-launch-checklist.md) |
+| **Fiat On-Ramp**                | Stripe integration exists but requires `STRIPE_SECRET_KEY`. No other fiat on-ramp                                                                                                                                                                                                                                                                            |
+| **Merch Fulfillment**           | Backend CRUD exists. No fulfillment partner integration, no order management dashboard                                                                                                                                                                                                                                                                       |
+| **Mobile App Store Publishing** | Expo 52 app exists (iOS + Android). Not yet submitted to App Store / Play Store                                                                                                                                                                                                                                                                              |
 
 ---
 
@@ -247,8 +247,8 @@ These features have working smart contracts, backend APIs, AND frontend UIs, but
               ┌─────────────────────┐  ┌──────────────────────┐
               │   API Server        │  │  Ethereum (EVM)      │
               │   Hono + tRPC       │  │  69 contracts        │
-              │   80+ routers       │  │  (proxied +          │
-              │   800+ procedures   │  │  upgradeable)        │
+              │   111+ routers      │  │  (proxied +          │
+              │   900+ procedures   │  │  upgradeable)        │
               │   Port 3000         │  └──────────┬───────────┘
               │                     │             │ events
               └──────────┬──────────┘             ▼
@@ -262,19 +262,26 @@ These features have working smart contracts, backend APIs, AND frontend UIs, but
               └──────────────────┘
 ```
 
-| App              | Stack                                                    | Description                                           |
-| ---------------- | -------------------------------------------------------- | ----------------------------------------------------- |
-| `apps/web`       | React 18, Vite, TanStack Router/Query, wagmi, Circle DCW | Frontend SPA (65 routes)                              |
-| `apps/server`    | Hono, tRPC, Firebase Admin (Firestore)                   | API server (80+ routers, 800+ procedures)             |
-| `apps/indexer`   | Ponder v0.15, GraphQL                                    | Blockchain event indexer (37 tables)                  |
-| `apps/contracts` | Foundry, Solidity ^0.8.30                                | EVM smart contracts (Ethereum Sepolia, 69 contracts)  |
-| `apps/mcp`       | MCP Server                                               | AI agent gateway (25 tools for MCP-compatible agents) |
-| `apps/mobile`    | Expo 52, React Native, NativeWind                        | iOS + Android app                                     |
-| `packages/abis`  | Auto-generated wagmi hooks                               | Shared contract bindings                              |
+_Diagram shows the Ethereum path. Solana runs a parallel devnet stack (`apps/programs` + `apps/solana-indexer`) — see [multi-chain status](#-multi-chain-status--solana-live-base-not-yet)._
+
+| App                   | Stack                                                    | Description                                                                            |
+| --------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `apps/web`            | React 18, Vite, TanStack Router/Query, wagmi, Circle DCW | Frontend SPA (139 routes)                                                              |
+| `apps/server`         | Hono, tRPC, Firebase Admin (Firestore)                   | API server (111+ routers, 900+ procedures)                                             |
+| `apps/indexer`        | Ponder v0.15, GraphQL                                    | Ethereum event indexer (37 tables)                                                     |
+| `apps/contracts`      | Foundry, Solidity ^0.8.30                                | EVM smart contracts (Ethereum Sepolia, 69 contracts)                                   |
+| `apps/programs`       | Anchor 0.31.1, Rust                                      | Solana programs — `universe` (PDA container) + `episode` (Bubblegum cNFT), devnet-live |
+| `apps/solana-indexer` | Helius webhooks, Firestore                               | Solana event indexer for the Anchor programs + cNFT mints                              |
+| `apps/mcp`            | MCP Server                                               | AI agent gateway (25 tools for MCP-compatible agents)                                  |
+| `apps/mcp-gateway`    | OAuth 2.1, SSE                                           | Hosted MCP gateway at `mcp.loar.fun` — bridges browser agents to per-user MCP sessions |
+| `apps/mobile`         | Expo 52, React Native, NativeWind                        | iOS + Android app (Circle DCW auth; Android adds Solana SIWS)                          |
+| `packages/abis`       | Auto-generated wagmi hooks + Anchor IDL types            | Shared EVM + Solana contract bindings                                                  |
+
+> `apps/event-listener` (a Firestore-based indexer meant to eventually replace Ponder/Neon, see [docs/prd-indexer-firestore-migration.md](docs/prd-indexer-firestore-migration.md)) exists in the workspace but isn't deployed — Ponder remains the live Ethereum indexer today.
 
 ### Key Flows
 
-**Auth:** Circle DCW (server-custodied EVM wallets) > SIWE Signature > Server JWT > Bearer Token > protectedProcedure. EVM writes via `useCircleWrite`. _(Solana writes via dedicated `/api/solana/*` routes signed through Circle KMS are planned for the future Solana chain — see [multi-chain roadmap](#-multi-chain-roadmap--solana--base-coming-soon).)_
+**Auth:** Circle DCW provisions both an EVM wallet and a Solana wallet at sign-up. SIWE Signature (EVM) or SIWS Signature (Solana, mobile) > Server JWT (carries `evm`/`sol` claims) > Bearer Token > protectedProcedure. EVM writes go through `useCircleWrite`; Solana writes go through dedicated `/api/solana/*` routes that build Anchor instructions server-side and sign through Circle KMS — see [multi-chain status](#-multi-chain-status--solana-live-base-not-yet).
 
 **Content Creation:** AI Generate > Decentralized Storage (SHA-256 dedup) > On-Chain Hash > Ponder Index
 
@@ -290,7 +297,7 @@ These features have working smart contracts, backend APIs, AND frontend UIs, but
 
 69 EVM contracts are deployed and verified on **Ethereum Sepolia testnet** (chain ID 11155111). **Ethereum Mainnet** (chain ID 1) is wired for swaps/auth; no LOAR contracts are deployed there yet. Revenue contracts use an upgradeable proxy pattern: **UUPS** for singletons and **Beacon Proxy** for per-universe NFTs.
 
-Contracts are **live on Ethereum Sepolia** (chain 11155111) today — the only network with LOAR contracts deployed. **Ethereum Mainnet** (chain 1) is the deployment target and is wired for swaps/auth, but no LOAR contracts are deployed there yet. **Solana and Base are planned future chains** — see the [multi-chain roadmap](#-multi-chain-roadmap--solana--base-coming-soon).
+Contracts are **live on Ethereum Sepolia** (chain 11155111) today — the only EVM network with LOAR contracts deployed. **Ethereum Mainnet** (chain 1) is the deployment target and is wired for swaps/auth, but no LOAR contracts are deployed there yet. **Solana has its own sister programs live on devnet** (Anchor, not Solidity — see below); **Base is not currently a deployable chain**. See the [multi-chain status](#-multi-chain-status--solana-live-base-not-yet).
 
 ### Core Protocol
 
@@ -355,63 +362,72 @@ Per-universe NFT instances are deployed as **Beacon Proxies**. Upgrading a beaco
 
 ---
 
-## 🛣️ Multi-chain roadmap — Solana & Base (coming soon)
+## 🛣️ Multi-chain status — Solana live, Base not yet
 
-> **Today, the LOAR protocol runs on Ethereum only:** Sepolia testnet (contracts
-> live + verified on-chain) with Ethereum Mainnet wired for swaps/auth. The one
-> thing live on Solana is the **$LOAR token itself**, launched on
+> **Ethereum stays canonical for rights and revenue.** Universe ownership,
+> governance, tokens, and every revenue contract in [Smart Contracts](#smart-contracts-sepolia)
+> live on Ethereum (Sepolia today; Mainnet is the deployment target). Solana
+> was prototyped end-to-end, **removed from `main`, and has since been restored**
+> as a parallel devnet stack — this is a live, actively-fixed integration, not a
+> future roadmap item. Base was prototyped alongside it and has **not** been
+> restored; it isn't a selectable chain today. The one thing live on Solana
+> _outside_ this stack is the **$LOAR token itself**, launched on
 > [pump.fun](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb)
 > (mint `2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb`) — a standalone
-> bonding-curve launch, not wired into the protocol yet. **The Solana protocol
-> and Base are planned future chains — not yet active.** Both were prototyped end-to-end
-> (Solana devnet programs, Base Sepolia deploys) and have since been removed from
-> the active codebase and **archived for a future restore** (branch
-> `archive/solana-base-support`, tag `solana-base-snapshot`). The tables below
-> describe the intended design for when these chains come online — they do not
-> reflect anything live in the current build.
+> bonding-curve launch, not wired into the protocol.
 
-### Solana (planned)
+### Solana — live on devnet
 
-The intended model: Circle Developer-Controlled Wallets auto-provision **one
-server-custodied identity that signs on both chains** — no Phantom/Solflare
-adapter, no second seed phrase. The same SIWE session JWT would authorize EVM
-writes via `useCircleWrite` and Solana writes via dedicated `/api/solana/*`
-routes that build instructions server-side and sign through Circle KMS. $LOAR
-would be bridged across chains; the 28-week parity plan tracks 12 Anchor program
-ports + Wormhole NTT before mainnet-beta.
+Circle Developer-Controlled Wallets provision **one server-custodied identity
+that signs on both chains** at sign-up — no Phantom/Solflare adapter, no second
+seed phrase. The chain picker in the universe-creation flow (gated behind
+`VITE_SOLANA_CLUSTER`, currently `devnet`) lets a creator deploy a universe on
+Solana instead of Ethereum; the same session then reads/writes it through the
+editor, wiki, and profile like any other universe.
 
-| Planned feature                  | What it would be                                                                                                                                                                                                                 |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Compressed-NFT episode mints** | Bubblegum cNFTs (~$0.0001/mint) via the `episode` Anchor program — atomic with the on-chain episode record                                                                                                                       |
-| **Canon promotion**              | Flips `is_canon` + mints a parallel Metaplex Core asset (marketplace-tradable, 5% royalty)                                                                                                                                       |
-| **$LOAR Token-2022**             | Native SPL replacement for the current [pump.fun $LOAR](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb): 1B supply, Pausable + Metadata extensions, mint **permanently locked** via one-way `lock_loar_mint` |
-| **Payment program**              | Solana sister of `PaymentRouter.sol` — pull-style accumulators per creator, two-step ownership, `transfer_checked` everywhere                                                                                                    |
-| **Solana Pay → cNFT auto-mint**  | One button: scan QR → pay 0.01 SOL → cNFT lands in wallet, payment tx pinned into lineage                                                                                                                                        |
-| **Cross-chain bridge**           | Custodial lock-and-mint (per-tx + per-user caps, idempotency keys, balance prechecks), Wormhole NTT for production                                                                                                               |
-| **Cross-chain attestation**      | Ed25519 receipt per mint linking Solana cNFT ↔ EVM Universe — verifiable offline                                                                                                                                                 |
-| **Squads multisig**              | Solana parity with Gnosis Safe for shared Universe ownership — `create` / `propose` / `approve` / `execute`                                                                                                                      |
-| **Unified Circle DCW auth**      | One SIWE session signs on both chains; Circle KMS provisions EVM + Solana addresses automatically (no Phantom/Solflare)                                                                                                          |
-| **MCP tools for AI agents**      | Solana tools (`mint_episode`, `canonize`, `pay_intent`, `pay_status`, `activity`, `get_attestation`) — scope-gated                                                                                                               |
+| Live today                          | Detail                                                                                                                                        |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dual-wallet sign-up**             | `provisionSolanaWalletAtSignup()` provisions a Solana wallet alongside the EVM wallet on every OTP/social login; JWT gains an `sol` claim     |
+| **Universe creation (create-only)** | The `universe` Anchor program mints a PDA-based universe on devnet via `useSolanaUniverseInit`; the base58 PDA is never lowercased end-to-end |
+| **Universe editor + wiki**          | Timeline editor, watch/profile pages, entities/curation, physics, and the governance sidebar all recognize Solana PDA universes               |
+| **Custodial bridge**                | `/bridge` — public reconciliation snapshot (ledger vs. vault per chain) + authenticated transfer history for Solana ↔ EVM $LOAR transfers     |
+| **Mobile SIWS**                     | Android Mobile Wallet Adapter Sign-In-With-Solana; iOS shows a universal-link fallback                                                        |
+| **Solana Pay**                      | QR-code payment button wired to the same custodial flow                                                                                       |
 
-The prototype reached Solana **devnet** (universe / episode / payment programs +
-Token-2022 $LOAR + Squads + custodial bridge + attestation + MCP tools). Those
-deployments are **archived, not live** — they live on the `archive/solana-base-support`
-branch and will be restored and re-deployed when Solana support is brought back online.
+| Not live yet                                      | Detail                                                                                                                                                                                                                                                           |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SVM token launchpad**                           | Solana universes are **create-only** — no on-chain token + LP deploy yet; `monetize` mode is disabled for Solana selections                                                                                                                                      |
+| **Governance**                                    | `useGovernance()` has a typed Solana branch that returns `disabled` — Realms wiring is unbuilt, no `/api/governance/*` Solana routes exist                                                                                                                       |
+| **Canon marketplace / licensing / ads / collabs** | EVM-only; no Solana equivalents yet                                                                                                                                                                                                                              |
+| **Mainnet-beta**                                  | Devnet only. Needs program-upgrade keypair rotation, an external Anchor audit, a live Wormhole NTT bridge, and Squads multisig handover                                                                                                                          |
+| **Native $LOAR (Token-2022)**                     | The only live $LOAR is the [pump.fun bonding-curve token](https://pump.fun/coin/2xowaGYFTMtBfvjqw6jnEgxyrpouzmcE9A7uarZdpTYb) — standalone, not wired into the protocol. A Token-2022 mint with a permanently-locked mint authority is designed but not deployed |
 
-**Design docs (future work):** [`docs/solana-overview.md`](docs/solana-overview.md) (umbrella),
-[`docs/solana-bridge.md`](docs/solana-bridge.md) (bridge),
-[`docs/solana-mainnet-runbook.md`](docs/solana-mainnet-runbook.md) (devnet → mainnet),
-[`docs/prd-solana-parity.md`](docs/prd-solana-parity.md) (28-week EVM parity plan),
-[`docs/prd-solana-native-sdk-glue.md`](docs/prd-solana-native-sdk-glue.md) (native SDK glue layer).
+Under the hood: `apps/programs` (Anchor 0.31.1) holds the `universe` and `episode`
+(Bubblegum cNFT, canon promotion to Metaplex Core) programs; `apps/solana-indexer`
+mirrors their events into Firestore via Helius webhooks. Both were surgically
+restored from an earlier archived snapshot (commit `4cff84fb`) in a phased
+migration — programs/indexer, server routes, shared ABIs, web UI, mobile, and
+CI all landed; the one open item is a full credential-rotated devnet redeploy,
+tracked in the restoration plan's status log.
 
-### Base (planned)
+**Design docs:** [`docs/solana-overview.md`](docs/solana-overview.md) (umbrella),
+[`docs/solana-parity-restoration-plan.md`](docs/solana-parity-restoration-plan.md) (what was restored, phase-by-phase status log),
+[`docs/solana-bridge.md`](docs/solana-bridge.md) (bridge design),
+[`docs/solana-mainnet-runbook.md`](docs/solana-mainnet-runbook.md) (devnet → mainnet-beta),
+[`docs/prd-solana-parity.md`](docs/prd-solana-parity.md) (EVM parity plan, S0–S5 phases),
+[`docs/prd-solana-native-sdk-glue.md`](docs/prd-solana-native-sdk-glue.md) (native SDK adapters).
 
-Base (Base Sepolia → Base Mainnet) was wired as a second EVM target via the same
-multi-chain contract address registry and chain-selector UI. It has been
-deprecated from the active build pending a future restore; Base contracts will be
-re-deployed and re-wired when the chain is brought back online.
+### Base — not currently active
 
----
+Base (Base Sepolia → Base Mainnet) was prototyped as a second EVM deploy target
+behind the same multi-chain contract-address registry and chain-selector UI,
+then removed along with Solana. Unlike Solana, it has **not** been restored —
+there's no Base route, no Base contract deployment, and no Base option in the
+chain picker today. The one place Base still appears in the code is as the
+**intended canonical home for $LOAR in a future production bridge**
+(`apps/server/src/lib/wormhole-bridge.ts` names Base Mainnet as where $LOAR
+would live once Wormhole NTT replaces the current custodial lock-and-mint
+backend) — a documented target, not a live integration.
 
 ## How to Run Locally
 
@@ -758,15 +774,18 @@ Required GitHub secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `WORK_DIR`.
 ```
 loar/
 ├── apps/
-│   ├── web/             # React 18 SPA (Vite + TanStack Router, 65+ routes)
-│   ├── server/          # Hono + tRPC API (80+ routers, 800+ procedures)
-│   ├── indexer/         # Ponder v0.15 blockchain indexer (37 tables)
+│   ├── web/             # React 18 SPA (Vite + TanStack Router, 139 routes)
+│   ├── server/          # Hono + tRPC API (111+ routers, 900+ procedures)
+│   ├── indexer/         # Ponder v0.15 Ethereum indexer (37 tables)
 │   ├── contracts/       # Foundry/Solidity EVM (69 contracts, upgradeable, Ethereum Sepolia)
+│   ├── programs/        # Anchor Solana programs — universe + episode (devnet)
+│   ├── solana-indexer/  # Helius-webhook Solana indexer → Firestore
 │   ├── mcp/             # MCP server — AI agent gateway (25+ tools)
-│   └── mobile/          # Expo 52 / React Native (iOS + Android, Circle DCW)
+│   ├── mcp-gateway/     # Hosted OAuth 2.1 MCP gateway (mcp.loar.fun)
+│   └── mobile/          # Expo 52 / React Native (iOS + Android, Circle DCW + Solana SIWS)
 ├── packages/
-│   └── abis/            # Generated wagmi hooks + contract ABIs + addresses
-├── docs/                # Product + technical documentation (70+ docs)
+│   └── abis/            # Generated wagmi hooks + Anchor IDL types + addresses
+├── docs/                # Product + technical documentation (80+ docs)
 ├── scripts/             # Ops scripts (smoke harness, reattribution, recovery)
 ├── .env.example         # Environment variable template
 ├── setup.sh             # First-time setup script
