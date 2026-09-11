@@ -13,6 +13,7 @@ import { universeAbi } from '@loar/abis/generated';
 import { type Address } from 'viem';
 import { ponderGql, ponderQueryDefaults } from '@/utils/ponder-api';
 import { trpcClient } from '@/utils/trpc';
+import { asEvmAddressOrUndefined } from '@/lib/utils';
 import {
   type GraphFetchFailureReason,
   type RawGraphTuple,
@@ -261,7 +262,16 @@ export function useUniverseBlockchain({
   // to the legacy isBlockchainUniverse heuristic for backwards compat.
   const useOnChain = isOnChain === undefined ? isBlockchainUniverse : isOnChain;
   const useOffChain = isOnChain === undefined ? !isBlockchainUniverse : !isOnChain;
-  const onChainContractAddress = useOnChain ? contractAddress : undefined;
+  // isBlockchainUniverse is true for Solana base58 PDAs too (see
+  // isAddressLikeUniverseId), so during the pre-resolve window above,
+  // `contractAddress` can be a Solana address here. Passed raw into
+  // useReadContract/useReadContracts below (`as Address`), that throws
+  // viem's InvalidAddressError *synchronously during render* — even though
+  // every read is `enabled: !!onChainContractAddress` — which blanks the
+  // whole page before the off-chain (Firestore) timeline ever gets a chance
+  // to render. Route it through the same guard already used for
+  // useUniverseAddresses/useTokenGate instead of casting.
+  const onChainContractAddress = useOnChain ? asEvmAddressOrUndefined(contractAddress) : undefined;
   const {
     data: leavesData,
     isLoading: isLoadingLeaves,
