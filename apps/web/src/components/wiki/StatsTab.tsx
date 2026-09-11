@@ -14,6 +14,8 @@ import {
   Layers,
   Cpu,
   Building2,
+  Images,
+  Palette,
 } from 'lucide-react';
 import type { EntityKind, WikiEntity } from './types';
 
@@ -37,6 +39,8 @@ const CREATOR_KINDS: {
   { kind: 'vehicle', label: 'Vehicles', icon: Layers, color: 'bg-orange-500' },
   { kind: 'technology', label: 'Tech', icon: Cpu, color: 'bg-lime-500' },
   { kind: 'organization', label: 'Orgs', icon: Building2, color: 'bg-pink-500' },
+  { kind: 'moodboard', label: 'Moodboards', icon: Images, color: 'bg-fuchsia-500' },
+  { kind: 'style_pack', label: 'Style Packs', icon: Palette, color: 'bg-indigo-500' },
 ];
 
 export function StatsTab({ universeAddress }: StatsTabProps) {

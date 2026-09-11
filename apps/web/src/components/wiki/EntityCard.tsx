@@ -27,6 +27,8 @@ import {
   Crown,
   Heart,
   Flag,
+  Images,
+  Palette,
 } from 'lucide-react';
 import { FlagDialog } from './FlagDialog';
 import type { WikiEntity } from './types';
@@ -43,6 +45,8 @@ const KIND_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   vehicle: Layers,
   technology: Cpu,
   organization: Building2,
+  moodboard: Images,
+  style_pack: Palette,
   timeline: GitBranch,
   reality: Eye,
   dimension: Box,

@@ -23,6 +23,8 @@ const KINDS: EntityKind[] = [
   'vehicle',
   'technology',
   'organization',
+  'moodboard',
+  'style_pack',
 ];
 
 export function RandomEntityButton({ universeAddress }: RandomEntityButtonProps) {

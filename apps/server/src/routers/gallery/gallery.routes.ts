@@ -120,7 +120,21 @@ export const galleryRouter = router({
 
       // Compute final mediaType filter by intersecting mediaType + origin filters.
       // Both affect the same Firestore field, so we combine them into one `in` clause.
-      const allTypes = ['video', 'ai-video', 'image', 'ai-image', 'audio', '3d'];
+      // `ai-3d`/`ai-audio` are written by sandbox.routes.ts's saveDraft (see the
+      // mediaType ternary there) alongside `ai-video`/`ai-image` — they must be
+      // treated the same way those two are, or drafted 3D/audio content silently
+      // vanishes from the dedicated 3D Models / Audio wiki tabs, which always
+      // pass an explicit mediaType (never 'all').
+      const allTypes = [
+        'video',
+        'ai-video',
+        'image',
+        'ai-image',
+        'audio',
+        'ai-audio',
+        '3d',
+        'ai-3d',
+      ];
       let allowedByMedia: string[];
       if (input.mediaType === 'all') {
         allowedByMedia = allTypes;
@@ -128,17 +142,21 @@ export const galleryRouter = router({
         allowedByMedia = ['video', 'ai-video'];
       } else if (input.mediaType === 'image') {
         allowedByMedia = ['image', 'ai-image'];
+      } else if (input.mediaType === 'audio') {
+        allowedByMedia = ['audio', 'ai-audio'];
+      } else if (input.mediaType === '3d') {
+        allowedByMedia = ['3d', 'ai-3d'];
       } else {
         allowedByMedia = [input.mediaType];
       }
 
-      // All 3D in the gallery is AI-generated today — content.routes.ts only
-      // accepts image/video uploads, and every `publishToGallery({mediaType:'3d'})`
+      // All 3D/audio drafts in the gallery are AI-generated today — content.routes.ts
+      // only accepts image/video uploads, and every `publishToGallery({mediaType:'3d'})`
       // call site is a Meshy-backed generator (threed.routes, character-pipeline).
-      // So '3d' lives in the `generated` bucket, not `uploaded`.
+      // So '3d'/'ai-3d' and 'ai-audio' live in the `generated` bucket, not `uploaded`.
       let allowedByOrigin: string[];
       if (input.origin === 'generated') {
-        allowedByOrigin = ['ai-video', 'ai-image', '3d'];
+        allowedByOrigin = ['ai-video', 'ai-image', 'ai-audio', '3d', 'ai-3d'];
       } else if (input.origin === 'uploaded') {
         allowedByOrigin = ['video', 'image', 'audio'];
       } else {

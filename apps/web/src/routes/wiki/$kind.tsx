@@ -23,6 +23,8 @@ import {
   Layers,
   Cpu,
   Building2,
+  Images,
+  Palette,
 } from 'lucide-react';
 import { SmartImage } from '@/components/SmartImage';
 import { UserText } from '@/components/user-text';
@@ -38,6 +40,8 @@ const VALID_KINDS = [
   'vehicle',
   'technology',
   'organization',
+  'moodboard',
+  'style_pack',
 ] as const;
 
 type CreatorKind = (typeof VALID_KINDS)[number];
@@ -53,6 +57,8 @@ const KIND_DISPLAY_NAMES: Record<CreatorKind, string> = {
   vehicle: 'Vehicles',
   technology: 'Technology',
   organization: 'Organizations',
+  moodboard: 'Moodboards',
+  style_pack: 'Style Packs',
 };
 
 const KIND_ICONS: Record<CreatorKind, React.ComponentType<{ className?: string }>> = {
@@ -66,6 +72,8 @@ const KIND_ICONS: Record<CreatorKind, React.ComponentType<{ className?: string }
   vehicle: Layers,
   technology: Cpu,
   organization: Building2,
+  moodboard: Images,
+  style_pack: Palette,
 };
 
 function isValidKind(kind: string): kind is CreatorKind {

@@ -21,6 +21,8 @@ const KINDS: EntityKind[] = [
   'vehicle',
   'technology',
   'organization',
+  'moodboard',
+  'style_pack',
 ];
 
 const ALPHABET = '#ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
