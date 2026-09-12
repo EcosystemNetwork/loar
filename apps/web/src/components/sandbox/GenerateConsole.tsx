@@ -1439,46 +1439,58 @@ export function GenerateConsole({
     return () => window.removeEventListener('keydown', onKey);
   }, [submitCurrent]);
 
+  // Gradient swatches for the style-preset strip — a stand-in for real per-style
+  // thumbnails so presets read as visual chips (Higgsfield-style) not text pills.
+  const STYLE_SWATCHES: Record<string, string> = {
+    cinematic: 'from-slate-700 via-amber-600 to-slate-900',
+    photoreal: 'from-sky-200 via-slate-300 to-slate-500',
+    anime: 'from-pink-400 via-fuchsia-400 to-indigo-500',
+    manga: 'from-neutral-200 via-neutral-500 to-neutral-900',
+    comic: 'from-yellow-400 via-red-500 to-blue-600',
+    pixar: 'from-orange-300 via-rose-400 to-sky-400',
+    watercolor: 'from-blue-200 via-purple-200 to-rose-200',
+    oil: 'from-amber-700 via-red-800 to-neutral-900',
+    pixel: 'from-lime-400 via-emerald-500 to-teal-700',
+    cyberpunk: 'from-fuchsia-500 via-purple-700 to-cyan-500',
+    noir: 'from-neutral-300 via-neutral-600 to-black',
+    fantasy: 'from-amber-300 via-orange-500 to-purple-700',
+    studio: 'from-neutral-100 via-neutral-300 to-neutral-500',
+    lowpoly: 'from-teal-400 via-cyan-500 to-blue-600',
+    isometric: 'from-violet-300 via-indigo-400 to-blue-500',
+    vaporwave: 'from-pink-400 via-purple-500 to-cyan-400',
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6 sm:py-8 max-w-6xl pb-bottom-nav md:pb-12">
-        {/* Header */}
-        <div className="mb-6 sm:mb-8 flex items-start justify-between gap-4 flex-wrap">
-          <div className="min-w-0">
-            <div className="flex items-center gap-3 mb-2 flex-wrap">
-              <Sparkles className="h-6 w-6 text-primary" />
-              <h1 className="text-2xl sm:text-3xl font-bold">{isConsole ? 'Create' : 'Lab'}</h1>
-              <Badge variant="secondary">Beta</Badge>
-              {activeCount > 0 && (
-                <Badge className="bg-primary/20 text-primary border-primary/30">
-                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                  {activeCount} running
-                </Badge>
-              )}
-            </div>
-            <p className="text-muted-foreground">
-              {isConsole
-                ? 'One prompt window for everything — images, video, voice, audio, 3D, and world entities. Pick a wiki to publish into, or keep it in drafts. Press '
-                : 'Image, video, voice, audio, 3D, and lip-synced talking scenes — all queue in parallel and auto-save to your drafts. Press '}
-              <kbd className="px-1 py-0.5 text-[10px] bg-muted rounded border border-border">
-                ⌘↵
-              </kbd>{' '}
-              in any prompt to fire.
-            </p>
+      {/* Hero band */}
+      <div className="border-b border-border/60 bg-gradient-to-b from-primary/[0.06] to-transparent">
+        <div className="container mx-auto px-4 pt-8 pb-6 sm:pt-12 sm:pb-8 max-w-3xl text-center">
+          <div className="flex items-center justify-center gap-2.5 mb-3 flex-wrap">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              {isConsole ? 'Create anything' : 'Lab'}
+            </h1>
+            {activeCount > 0 && (
+              <Badge className="bg-primary/20 text-primary border-primary/30">
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                {activeCount} running
+              </Badge>
+            )}
           </div>
-          <Button
-            variant="outline"
-            className="shrink-0"
-            onClick={() => navigate({ to: isConsole ? '/cinematicUniverseCreate' : '/create' })}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            {isConsole ? 'New universe' : 'Create Universe'}
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
+          <p className="text-muted-foreground text-sm sm:text-base max-w-xl mx-auto">
+            {isConsole
+              ? 'One prompt for images, video, voice, audio, 3D, and world entities. Pick a wiki to publish into, or keep it in drafts.'
+              : 'Image, video, voice, audio, 3D, and lip-synced talking scenes — all queue in parallel and auto-save to your drafts.'}{' '}
+            Press{' '}
+            <kbd className="px-1 py-0.5 text-[10px] bg-muted rounded border border-border">⌘↵</kbd>{' '}
+            to fire.
+          </p>
         </div>
+      </div>
 
+      <div className="container mx-auto px-4 py-6 sm:py-8 max-w-6xl pb-bottom-nav md:pb-12">
         {!isAuthenticated && !isAuthenticating ? (
-          <Card>
+          <Card className="max-w-md mx-auto">
             <CardContent className="py-10 flex flex-col items-center gap-4">
               <Wand2 className="h-10 w-10 text-muted-foreground" />
               <p className="text-muted-foreground text-center max-w-sm">
@@ -1488,664 +1500,944 @@ export function GenerateConsole({
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-            {/* Left: create + queue */}
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6 lg:gap-8">
+            {/* Left: composer + queue */}
             <div className="flex flex-col gap-4 min-w-0">
-              <h2 className="text-lg font-semibold">Create</h2>
-
-              {/* Prominent wiki target — the "generate into which wiki" control */}
-              {isConsole && (
-                <div className="flex flex-col gap-1.5 rounded-lg border border-primary/30 bg-primary/5 p-3">
-                  <label className="text-xs font-semibold flex items-center gap-1.5">
-                    <Globe className="h-3.5 w-3.5" />
-                    Generate into
-                  </label>
-                  <Select
-                    value={autoSendTarget === '__off__' ? '__gallery__' : autoSendTarget}
-                    onValueChange={setAutoSendTarget}
-                  >
-                    <SelectTrigger className="h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__gallery__">My Gallery — save to drafts only</SelectItem>
-                      {autoSendUniverses.length > 0 && (
-                        <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-                          Your wikis
-                        </div>
-                      )}
-                      {autoSendUniverses.map((u: any) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {u.name || u.id.slice(0, 12)}
-                          {u.isMultiSig ? ' (multi-sig)' : ''}
-                        </SelectItem>
+              {/* Composer card — mode pills, wiki target, prompt, and generate live here */}
+              <div className="rounded-2xl border border-border bg-card shadow-sm p-4 sm:p-5 flex flex-col gap-4">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  {/* Mode pills */}
+                  <div className="flex flex-wrap gap-1 rounded-full border border-border p-1 bg-muted/20">
+                    {SANDBOX_TABS.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          setWorldKind(null);
+                          setMode(t.id);
+                        }}
+                        className={`text-[11px] px-3 py-1.5 rounded-full transition-colors ${
+                          !worldKind && mode === t.id
+                            ? 'bg-primary text-primary-foreground'
+                            : 'text-muted-foreground hover:bg-muted/60'
+                        }`}
+                        title={t.hint}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                    {enableWorldKinds &&
+                      WORLD_KINDS.map((k) => (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={() => setWorldKind(k)}
+                          className={`text-[11px] px-3 py-1.5 rounded-full transition-colors ${
+                            worldKind === k
+                              ? 'bg-primary text-primary-foreground'
+                              : 'text-muted-foreground hover:bg-muted/60'
+                          }`}
+                        >
+                          {KIND_LABELS[k] ?? k}
+                        </button>
                       ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[10px] text-muted-foreground">
-                    Images & videos here auto-publish to the chosen wiki's gallery. World entities
-                    require a wiki.
-                  </p>
-                </div>
-              )}
+                  </div>
 
-              {/* Mode tabs */}
-              <div className="flex flex-wrap gap-1 border border-border rounded-lg p-1 bg-muted/20">
-                {SANDBOX_TABS.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => {
-                      setWorldKind(null);
-                      setMode(t.id);
-                    }}
-                    className={`flex-1 min-w-[70px] text-[11px] px-2 py-1.5 rounded transition-colors ${
-                      !worldKind && mode === t.id
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-muted-foreground hover:bg-muted/60'
-                    }`}
-                    title={t.hint}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-                {enableWorldKinds &&
-                  WORLD_KINDS.map((k) => (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setWorldKind(k)}
-                      className={`flex-1 min-w-[70px] text-[11px] px-2 py-1.5 rounded transition-colors ${
-                        worldKind === k
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground hover:bg-muted/60'
-                      }`}
+                  {/* Compact wiki picker, top-right of the composer */}
+                  {isConsole && (
+                    <Select
+                      value={autoSendTarget === '__off__' ? '__gallery__' : autoSendTarget}
+                      onValueChange={setAutoSendTarget}
                     >
-                      {KIND_LABELS[k] ?? k}
-                    </button>
-                  ))}
-              </div>
-
-              {/* World-entity form */}
-              {worldKind && (
-                <div className="flex flex-col gap-3">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">Entity type</label>
-                    <Select value={worldKind} onValueChange={(v) => setWorldKind(v as WorldKind)}>
-                      <SelectTrigger>
+                      <SelectTrigger
+                        className="h-8 w-auto max-w-[220px] rounded-full border-primary/30 bg-primary/5 text-xs gap-1.5 px-3"
+                        title="Which wiki this publishes into"
+                      >
+                        <Globe className="h-3.5 w-3.5 text-primary shrink-0" />
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {WORLD_KINDS.map((k) => (
-                          <SelectItem key={k} value={k}>
-                            {KIND_LABELS[k] ?? k}
+                        <SelectItem value="__gallery__">My Gallery — drafts only</SelectItem>
+                        {autoSendUniverses.length > 0 && (
+                          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+                            Your wikis
+                          </div>
+                        )}
+                        {autoSendUniverses.map((u: any) => (
+                          <SelectItem key={u.id} value={u.id}>
+                            {u.name || u.id.slice(0, 12)}
+                            {u.isMultiSig ? ' (multi-sig)' : ''}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                  <Input
-                    value={entityName}
-                    onChange={(e) => setEntityName(e.target.value)}
-                    placeholder="Name (optional — AI names it from your prompt)"
-                    className="h-9 text-sm"
-                  />
-                  <Textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    rows={4}
-                    className="resize-none"
-                    placeholder={`Describe this ${(
-                      KIND_LABELS[worldKind] ?? worldKind
-                    ).toLowerCase()} — its role, look, history, secrets…`}
-                  />
-                  <ModelSelector
-                    type="image"
-                    value={imageModel}
-                    onChange={setImageModel}
-                    label="Portrait model"
-                    task="text_to_image"
-                    compact
-                  />
-                  <Button
-                    disabled={!prompt.trim() || !generationEnabled}
-                    onClick={() => runEntityGen(worldKind)}
-                  >
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Generate {KIND_LABELS[worldKind] ?? worldKind}
-                  </Button>
-                  {(autoSendTarget === '__off__' || autoSendTarget === '__gallery__') && (
-                    <p className="text-[11px] text-amber-600 dark:text-amber-500">
-                      Pick a wiki in “Generate into” above — world entities must belong to one.
-                    </p>
                   )}
                 </div>
-              )}
+                {isConsole && (
+                  <p className="text-[10px] text-muted-foreground -mt-2">
+                    Images & videos auto-publish to the chosen wiki's gallery. World entities
+                    require a wiki.
+                  </p>
+                )}
 
-              {!worldKind && (mode === 'image' || mode === 'video') && (
-                <>
-                  {/* Prompt */}
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium">Prompt</label>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 px-2 text-[11px]"
-                          disabled={isEnhancing || !prompt.trim()}
-                          onClick={() => enhancePrompt('image')}
-                          title="Use Gemini to expand into a detailed image prompt"
-                        >
-                          {isEnhancing ? (
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                          ) : (
-                            <Sparkles className="h-3 w-3 mr-1" />
-                          )}
-                          Enhance for image
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 px-2 text-[11px]"
-                          disabled={isEnhancing || !prompt.trim()}
-                          onClick={() => enhancePrompt('video')}
-                          title="Use Gemini to expand into a cinematic video prompt"
-                        >
-                          <Sparkles className="h-3 w-3 mr-1" />
-                          Enhance for video
-                        </Button>
-                      </div>
-                    </div>
-                    <Textarea
-                      placeholder="Describe what you want to create… e.g. 'A lone samurai on a neon-lit rooftop in cyberpunk Tokyo'"
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      rows={3}
-                      className="resize-none"
-                    />
-                  </div>
-
-                  {/* Style preset chips */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">Style</label>
-                    <div className="flex flex-wrap gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setStylePreset(null)}
-                        className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${
-                          stylePreset === null
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
-                        }`}
-                      >
-                        None
-                      </button>
-                      {STYLE_PRESETS.map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => setStylePreset(p.id)}
-                          className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${
-                            stylePreset === p.id
-                              ? 'bg-primary text-primary-foreground border-primary'
-                              : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
-                          }`}
-                          title={p.suffix}
-                        >
-                          {p.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Settings row */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* World-entity form */}
+                {worldKind && (
+                  <div className="flex flex-col gap-3">
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">Aspect</label>
-                      <Select value={imageSize} onValueChange={(v) => setImageSize(v as ImageSize)}>
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Entity type
+                      </label>
+                      <Select value={worldKind} onValueChange={(v) => setWorldKind(v as WorldKind)}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {IMAGE_SIZES.map((s) => (
-                            <SelectItem key={s.value} value={s.value}>
-                              {s.label}
+                          {WORLD_KINDS.map((k) => (
+                            <SelectItem key={k} value={k}>
+                              {KIND_LABELS[k] ?? k}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
+                    <Input
+                      value={entityName}
+                      onChange={(e) => setEntityName(e.target.value)}
+                      placeholder="Name (optional — AI names it from your prompt)"
+                      className="h-9 text-sm"
+                    />
+                    <Textarea
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      rows={4}
+                      className="resize-none"
+                      placeholder={`Describe this ${(
+                        KIND_LABELS[worldKind] ?? worldKind
+                      ).toLowerCase()} — its role, look, history, secrets…`}
+                    />
                     <ModelSelector
                       type="image"
                       value={imageModel}
                       onChange={setImageModel}
-                      label="Image model"
+                      label="Portrait model"
                       task="text_to_image"
                       compact
                     />
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">
-                        Video model
-                      </label>
-                      <Select
-                        value={videoModel}
-                        onValueChange={(v) => setVideoModel(v as VideoModel)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {VIDEO_MODELS.map((m) => (
-                            <SelectItem key={m.value} value={m.value}>
-                              <span className="flex items-center gap-1.5">
-                                {m.label}
-                                {m.badge && (
-                                  <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-medium">
-                                    {m.badge}
-                                  </span>
-                                )}
-                              </span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label
-                        className="text-xs font-medium text-muted-foreground"
-                        title="Image only — fires N parallel generations from the same prompt"
-                      >
-                        Variations
-                      </label>
-                      <Select
-                        value={String(variations)}
-                        onValueChange={(v) => setVariations(Number(v))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {VARIATION_OPTIONS.map((n) => (
-                            <SelectItem key={n} value={String(n)}>
-                              {n}× {n === 1 ? 'image' : 'images'}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Reference image — dropzone when empty, preview when set */}
-                  {referenceImage ? (
-                    <div className="flex items-center gap-3 p-2 rounded-lg border border-primary/30 bg-primary/5">
-                      <img
-                        src={referenceImage.url}
-                        alt=""
-                        className="h-12 w-12 rounded object-cover"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-xs font-medium">Reference</p>
-                          <div className="flex gap-1">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setReferenceImage({ ...referenceImage, mode: 'style' })
-                              }
-                              className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
-                                referenceImage.mode === 'style'
-                                  ? 'bg-primary text-primary-foreground border-primary'
-                                  : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
-                              }`}
-                              title="Use as style + composition reference for image generation"
-                            >
-                              Style
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setReferenceImage({ ...referenceImage, mode: 'animate' })
-                              }
-                              className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
-                                referenceImage.mode === 'animate'
-                                  ? 'bg-primary text-primary-foreground border-primary'
-                                  : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
-                              }`}
-                              title="Animate this image into a video"
-                            >
-                              Animate
-                            </button>
-                          </div>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground truncate">
-                          {referenceImage.mode === 'style'
-                            ? 'Image-to-image: prompt drives style + content, ref guides composition'
-                            : 'Image-to-video: ref becomes the first frame'}
-                        </p>
-                      </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7"
-                        onClick={() => setReferenceImage(null)}
-                        title="Clear reference"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={onRefDrop}
-                      onClick={() => refFileInputRef.current?.click()}
-                      className="flex items-center justify-center gap-2 p-3 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors text-xs text-muted-foreground"
+                    <Button
+                      className="rounded-full self-end px-5"
+                      disabled={!prompt.trim() || !generationEnabled}
+                      onClick={() => runEntityGen(worldKind)}
                     >
-                      {isUploadingRef ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Upload className="h-3.5 w-3.5" />
-                      )}
-                      <span>
-                        {isUploadingRef
-                          ? 'Uploading…'
-                          : 'Drop or click to add an image (style/animate ref) or a video (import for restyle/extend/interpolate)'}
-                      </span>
-                      <input
-                        ref={refFileInputRef}
-                        type="file"
-                        accept="image/*,video/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) uploadAsset(f, 'style');
-                          e.target.value = '';
-                        }}
-                      />
-                    </div>
-                  )}
-
-                  {/* Advanced controls — negative prompt + seed */}
-                  <div className="border border-border rounded-lg">
-                    <button
-                      type="button"
-                      onClick={() => setShowAdvanced((v) => !v)}
-                      className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted/40 rounded-lg"
-                    >
-                      <span>Advanced (negative prompt, seed)</span>
-                      {showAdvanced ? (
-                        <ChevronUp className="h-3.5 w-3.5" />
-                      ) : (
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                    {showAdvanced && (
-                      <div className="px-3 pb-3 flex flex-col gap-2.5">
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[11px] font-medium text-muted-foreground">
-                            Negative prompt
-                          </label>
-                          <Textarea
-                            placeholder="What to avoid: e.g. 'blurry, low quality, extra fingers, watermark'"
-                            value={negativePrompt}
-                            onChange={(e) => setNegativePrompt(e.target.value)}
-                            rows={2}
-                            className="resize-none text-xs"
-                          />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <label
-                            className="text-[11px] font-medium text-muted-foreground"
-                            title="Same seed + same prompt + same model = reproducible result. Image only."
-                          >
-                            Seed (image only)
-                          </label>
-                          <div className="flex gap-1.5">
-                            <Input
-                              type="number"
-                              inputMode="numeric"
-                              placeholder="Random"
-                              value={seed ?? ''}
-                              onChange={(e) => {
-                                const v = e.target.value.trim();
-                                setSeed(v ? Number(v) : null);
-                              }}
-                              className="h-8 text-xs"
-                            />
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 px-2 text-xs"
-                              onClick={() => setSeed(randomSeed())}
-                              title="Roll a new random seed"
-                            >
-                              <Dices className="h-3 w-3 mr-1" />
-                              Random
-                            </Button>
-                            {seed !== null && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-8 px-2 text-xs"
-                                onClick={() => setSeed(null)}
-                              >
-                                Clear
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Generate {KIND_LABELS[worldKind] ?? worldKind}
+                    </Button>
+                    {(autoSendTarget === '__off__' || autoSendTarget === '__gallery__') && (
+                      <p className="text-[11px] text-amber-600 dark:text-amber-500">
+                        Pick a wiki in “Generate into” above — world entities must belong to one.
+                      </p>
                     )}
                   </div>
+                )}
 
-                  {/* Video controls — only relevant in video mode */}
-                  {mode === 'video' && (
-                    <div className="border border-border rounded-lg p-3 space-y-2.5">
-                      <p className="text-[11px] font-semibold text-muted-foreground">
-                        Video controls
-                      </p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[11px] text-muted-foreground">
-                            Duration ({videoDuration}s)
-                          </label>
-                          <div className="flex gap-1">
-                            {VIDEO_DURATIONS.map((d) => (
-                              <button
-                                key={d}
-                                type="button"
-                                onClick={() => setVideoDuration(d)}
-                                className={`flex-1 text-[10px] py-1 rounded border transition-colors ${
-                                  videoDuration === d
-                                    ? 'bg-primary text-primary-foreground border-primary'
-                                    : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
-                                }`}
-                              >
-                                {d}s
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[11px] text-muted-foreground">Resolution</label>
-                          <div className="flex gap-1">
-                            {VIDEO_RESOLUTIONS.map((r) => (
-                              <button
-                                key={r}
-                                type="button"
-                                onClick={() => setVideoResolution(r)}
-                                className={`flex-1 text-[10px] py-1 rounded border transition-colors ${
-                                  videoResolution === r
-                                    ? 'bg-primary text-primary-foreground border-primary'
-                                    : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
-                                }`}
-                              >
-                                {r}
-                              </button>
-                            ))}
-                          </div>
+                {!worldKind && (mode === 'image' || mode === 'video') && (
+                  <>
+                    {/* Prompt */}
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium">Prompt</label>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-[11px]"
+                            disabled={isEnhancing || !prompt.trim()}
+                            onClick={() => enhancePrompt('image')}
+                            title="Use Gemini to expand into a detailed image prompt"
+                          >
+                            {isEnhancing ? (
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : (
+                              <Sparkles className="h-3 w-3 mr-1" />
+                            )}
+                            Enhance for image
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-[11px]"
+                            disabled={isEnhancing || !prompt.trim()}
+                            onClick={() => enhancePrompt('video')}
+                            title="Use Gemini to expand into a cinematic video prompt"
+                          >
+                            <Sparkles className="h-3 w-3 mr-1" />
+                            Enhance for video
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[11px] text-muted-foreground">Camera motion</label>
-                        <Select
-                          value={cameraPreset || 'none'}
-                          onValueChange={(v) => setCameraPreset(v === 'none' ? '' : v)}
+                      <Textarea
+                        placeholder="Describe what you want to create… e.g. 'A lone samurai on a neon-lit rooftop in cyberpunk Tokyo'"
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        rows={3}
+                        className="resize-none"
+                      />
+                    </div>
+
+                    {/* Style preset strip — swatch chips, horizontal scroll */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-medium text-muted-foreground">Style</label>
+                      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                        <button
+                          type="button"
+                          onClick={() => setStylePreset(null)}
+                          className="flex flex-col items-center gap-1 shrink-0 group"
+                          title="No style suffix"
                         >
-                          <SelectTrigger className="h-8 text-xs">
+                          <span
+                            className={`h-11 w-11 rounded-xl border-2 flex items-center justify-center bg-muted/40 transition-colors ${
+                              stylePreset === null
+                                ? 'border-primary'
+                                : 'border-transparent group-hover:border-border'
+                            }`}
+                          >
+                            <X className="h-3.5 w-3.5 text-muted-foreground" />
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">None</span>
+                        </button>
+                        {STYLE_PRESETS.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setStylePreset(p.id)}
+                            className="flex flex-col items-center gap-1 shrink-0 group"
+                            title={p.suffix}
+                          >
+                            <span
+                              className={`h-11 w-11 rounded-xl border-2 bg-gradient-to-br ${
+                                STYLE_SWATCHES[p.id] ?? 'from-muted to-muted-foreground/30'
+                              } transition-colors ${
+                                stylePreset === p.id
+                                  ? 'border-primary'
+                                  : 'border-transparent group-hover:border-border'
+                              }`}
+                            />
+                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                              {p.label}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Settings toolbar */}
+                    <div className="flex flex-wrap gap-3">
+                      <div className="flex flex-col gap-1.5 min-w-[120px] flex-1">
+                        <label className="text-xs font-medium text-muted-foreground">Aspect</label>
+                        <Select
+                          value={imageSize}
+                          onValueChange={(v) => setImageSize(v as ImageSize)}
+                        >
+                          <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {CAMERA_PRESET_OPTIONS.map((p) => (
-                              <SelectItem key={p.id || 'none'} value={p.id || 'none'}>
-                                {p.label}
+                            {IMAGE_SIZES.map((s) => (
+                              <SelectItem key={s.value} value={s.value}>
+                                {s.label}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
-                      {cameraPreset && (
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[11px] text-muted-foreground">
-                            Camera intensity
-                          </label>
-                          <div className="flex gap-1">
-                            {(['subtle', 'standard', 'pronounced'] as const).map((i) => (
+                      <div className="min-w-[140px] flex-1">
+                        <ModelSelector
+                          type="image"
+                          value={imageModel}
+                          onChange={setImageModel}
+                          label="Image model"
+                          task="text_to_image"
+                          compact
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5 min-w-[120px] flex-1">
+                        <label className="text-xs font-medium text-muted-foreground">
+                          Video model
+                        </label>
+                        <Select
+                          value={videoModel}
+                          onValueChange={(v) => setVideoModel(v as VideoModel)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {VIDEO_MODELS.map((m) => (
+                              <SelectItem key={m.value} value={m.value}>
+                                <span className="flex items-center gap-1.5">
+                                  {m.label}
+                                  {m.badge && (
+                                    <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-medium">
+                                      {m.badge}
+                                    </span>
+                                  )}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex flex-col gap-1.5 min-w-[120px] flex-1">
+                        <label
+                          className="text-xs font-medium text-muted-foreground"
+                          title="Image only — fires N parallel generations from the same prompt"
+                        >
+                          Variations
+                        </label>
+                        <Select
+                          value={String(variations)}
+                          onValueChange={(v) => setVariations(Number(v))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {VARIATION_OPTIONS.map((n) => (
+                              <SelectItem key={n} value={String(n)}>
+                                {n}× {n === 1 ? 'image' : 'images'}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Reference image — dropzone when empty, preview when set */}
+                    {referenceImage ? (
+                      <div className="flex items-center gap-3 p-2 rounded-lg border border-primary/30 bg-primary/5">
+                        <img
+                          src={referenceImage.url}
+                          alt=""
+                          className="h-12 w-12 rounded object-cover"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-medium">Reference</p>
+                            <div className="flex gap-1">
                               <button
-                                key={i}
                                 type="button"
-                                onClick={() => setCameraIntensity(i)}
-                                className={`flex-1 text-[10px] py-1 rounded border transition-colors capitalize ${
-                                  cameraIntensity === i
+                                onClick={() =>
+                                  setReferenceImage({ ...referenceImage, mode: 'style' })
+                                }
+                                className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                                  referenceImage.mode === 'style'
                                     ? 'bg-primary text-primary-foreground border-primary'
                                     : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
                                 }`}
+                                title="Use as style + composition reference for image generation"
                               >
-                                {i}
+                                Style
                               </button>
-                            ))}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setReferenceImage({ ...referenceImage, mode: 'animate' })
+                                }
+                                className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                                  referenceImage.mode === 'animate'
+                                    ? 'bg-primary text-primary-foreground border-primary'
+                                    : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+                                }`}
+                                title="Animate this image into a video"
+                              >
+                                Animate
+                              </button>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            {referenceImage.mode === 'style'
+                              ? 'Image-to-image: prompt drives style + content, ref guides composition'
+                              : 'Image-to-video: ref becomes the first frame'}
+                          </p>
+                        </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => setReferenceImage(null)}
+                          title="Clear reference"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={onRefDrop}
+                        onClick={() => refFileInputRef.current?.click()}
+                        className="flex items-center justify-center gap-2 p-3 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors text-xs text-muted-foreground"
+                      >
+                        {isUploadingRef ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Upload className="h-3.5 w-3.5" />
+                        )}
+                        <span>
+                          {isUploadingRef
+                            ? 'Uploading…'
+                            : 'Drop or click to add an image (style/animate ref) or a video (import for restyle/extend/interpolate)'}
+                        </span>
+                        <input
+                          ref={refFileInputRef}
+                          type="file"
+                          accept="image/*,video/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) uploadAsset(f, 'style');
+                            e.target.value = '';
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Advanced controls — negative prompt + seed */}
+                    <div className="border border-border rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => setShowAdvanced((v) => !v)}
+                        className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted/40 rounded-lg"
+                      >
+                        <span>Advanced (negative prompt, seed)</span>
+                        {showAdvanced ? (
+                          <ChevronUp className="h-3.5 w-3.5" />
+                        ) : (
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                      {showAdvanced && (
+                        <div className="px-3 pb-3 flex flex-col gap-2.5">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-medium text-muted-foreground">
+                              Negative prompt
+                            </label>
+                            <Textarea
+                              placeholder="What to avoid: e.g. 'blurry, low quality, extra fingers, watermark'"
+                              value={negativePrompt}
+                              onChange={(e) => setNegativePrompt(e.target.value)}
+                              rows={2}
+                              className="resize-none text-xs"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label
+                              className="text-[11px] font-medium text-muted-foreground"
+                              title="Same seed + same prompt + same model = reproducible result. Image only."
+                            >
+                              Seed (image only)
+                            </label>
+                            <div className="flex gap-1.5">
+                              <Input
+                                type="number"
+                                inputMode="numeric"
+                                placeholder="Random"
+                                value={seed ?? ''}
+                                onChange={(e) => {
+                                  const v = e.target.value.trim();
+                                  setSeed(v ? Number(v) : null);
+                                }}
+                                className="h-8 text-xs"
+                              />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2 text-xs"
+                                onClick={() => setSeed(randomSeed())}
+                                title="Roll a new random seed"
+                              >
+                                <Dices className="h-3 w-3 mr-1" />
+                                Random
+                              </Button>
+                              {seed !== null && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 px-2 text-xs"
+                                  onClick={() => setSeed(null)}
+                                >
+                                  Clear
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       )}
-                      <label className="flex items-center gap-2 text-[11px] text-muted-foreground cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={videoAudioOn}
-                          onChange={(e) => setVideoAudioOn(e.target.checked)}
-                          className="accent-primary"
-                        />
-                        Generate audio (only used by models that support it — Seedance, Veo 3)
-                      </label>
                     </div>
-                  )}
 
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    <Button
-                      className="flex-1"
-                      disabled={!canGenerate}
-                      onClick={() => {
-                        const slots = checkConcurrency(variations);
-                        if (slots === 0) return;
-                        const finalPrompt = applyStylePreset(prompt, stylePreset);
-                        const isStyleRef = referenceImage?.mode === 'style';
-                        for (let i = 0; i < slots; i++) {
-                          runImageGen(finalPrompt, {
-                            imageSize,
-                            imageModel,
-                            negativePrompt: negativePrompt.trim() || undefined,
-                            // For variations we want each result distinct — only
-                            // fix the seed for the first one when N>1.
-                            seed: variations > 1 && i > 0 ? null : seed,
-                            styleRefImageUrl: isStyleRef ? referenceImage!.url : undefined,
-                            stylePresetId: stylePreset ?? null,
-                          });
+                    {/* Video controls — only relevant in video mode */}
+                    {mode === 'video' && (
+                      <div className="border border-border rounded-lg p-3 space-y-2.5">
+                        <p className="text-[11px] font-semibold text-muted-foreground">
+                          Video controls
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] text-muted-foreground">
+                              Duration ({videoDuration}s)
+                            </label>
+                            <div className="flex gap-1">
+                              {VIDEO_DURATIONS.map((d) => (
+                                <button
+                                  key={d}
+                                  type="button"
+                                  onClick={() => setVideoDuration(d)}
+                                  className={`flex-1 text-[10px] py-1 rounded border transition-colors ${
+                                    videoDuration === d
+                                      ? 'bg-primary text-primary-foreground border-primary'
+                                      : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+                                  }`}
+                                >
+                                  {d}s
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] text-muted-foreground">Resolution</label>
+                            <div className="flex gap-1">
+                              {VIDEO_RESOLUTIONS.map((r) => (
+                                <button
+                                  key={r}
+                                  type="button"
+                                  onClick={() => setVideoResolution(r)}
+                                  className={`flex-1 text-[10px] py-1 rounded border transition-colors ${
+                                    videoResolution === r
+                                      ? 'bg-primary text-primary-foreground border-primary'
+                                      : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+                                  }`}
+                                >
+                                  {r}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[11px] text-muted-foreground">Camera motion</label>
+                          <Select
+                            value={cameraPreset || 'none'}
+                            onValueChange={(v) => setCameraPreset(v === 'none' ? '' : v)}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CAMERA_PRESET_OPTIONS.map((p) => (
+                                <SelectItem key={p.id || 'none'} value={p.id || 'none'}>
+                                  {p.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {cameraPreset && (
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] text-muted-foreground">
+                              Camera intensity
+                            </label>
+                            <div className="flex gap-1">
+                              {(['subtle', 'standard', 'pronounced'] as const).map((i) => (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => setCameraIntensity(i)}
+                                  className={`flex-1 text-[10px] py-1 rounded border transition-colors capitalize ${
+                                    cameraIntensity === i
+                                      ? 'bg-primary text-primary-foreground border-primary'
+                                      : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+                                  }`}
+                                >
+                                  {i}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <label className="flex items-center gap-2 text-[11px] text-muted-foreground cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={videoAudioOn}
+                            onChange={(e) => setVideoAudioOn(e.target.checked)}
+                            className="accent-primary"
+                          />
+                          Generate audio (only used by models that support it — Seedance, Veo 3)
+                        </label>
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex gap-2 justify-end">
+                      <Button
+                        className="flex-1 sm:flex-none rounded-full px-5"
+                        disabled={!canGenerate}
+                        onClick={() => {
+                          const slots = checkConcurrency(variations);
+                          if (slots === 0) return;
+                          const finalPrompt = applyStylePreset(prompt, stylePreset);
+                          const isStyleRef = referenceImage?.mode === 'style';
+                          for (let i = 0; i < slots; i++) {
+                            runImageGen(finalPrompt, {
+                              imageSize,
+                              imageModel,
+                              negativePrompt: negativePrompt.trim() || undefined,
+                              // For variations we want each result distinct — only
+                              // fix the seed for the first one when N>1.
+                              seed: variations > 1 && i > 0 ? null : seed,
+                              styleRefImageUrl: isStyleRef ? referenceImage!.url : undefined,
+                              stylePresetId: stylePreset ?? null,
+                            });
+                          }
+                          if (isStyleRef) setReferenceImage(null);
+                          setPrompt('');
+                        }}
+                      >
+                        <ImageIcon className="h-4 w-4 mr-2" />
+                        {variations > 1 ? `Generate ${variations} Images` : 'Generate Image'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 sm:flex-none rounded-full px-5"
+                        disabled={!canGenerate || videoNeedsImage}
+                        title={
+                          videoNeedsImage
+                            ? 'Pick Seedance, or set a reference image first'
+                            : undefined
                         }
-                        if (isStyleRef) setReferenceImage(null);
+                        onClick={() => {
+                          if (checkConcurrency(1) === 0) return;
+                          const finalPrompt = applyStylePreset(prompt, stylePreset);
+                          const useAnimate = referenceImage?.mode === 'animate';
+                          runVideoGen(finalPrompt, {
+                            videoModel,
+                            imageSize,
+                            sourceImageUrl: useAnimate ? referenceImage!.url : undefined,
+                            negativePrompt: negativePrompt.trim() || undefined,
+                            stylePresetId: stylePreset ?? null,
+                            durationSec: videoDuration,
+                            resolution: videoResolution,
+                            cameraPreset: cameraPreset || undefined,
+                            cameraIntensity: cameraPreset ? cameraIntensity : undefined,
+                            audioOn: videoAudioOn,
+                          });
+                          if (useAnimate) setReferenceImage(null);
+                          setPrompt('');
+                        }}
+                      >
+                        <Video className="h-4 w-4 mr-2" />
+                        {referenceImage?.mode === 'animate' ? 'Animate' : 'Generate Video'}
+                      </Button>
+                    </div>
+
+                    <p className="text-[11px] text-muted-foreground -mt-1">
+                      Up to {MAX_CONCURRENT_GENS} generations run in parallel. Each run auto-saves
+                      as a draft and stays in your queue across reloads.
+                    </p>
+                  </>
+                )}
+
+                {/* Voice (TTS + SFX) */}
+                {!worldKind && mode === 'voice' && (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-wrap gap-1">
+                      {(['tts', 'sfx'] as const).map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setVoiceMode(m)}
+                          className={`text-[11px] px-2 py-1 rounded border transition-colors ${
+                            voiceMode === m
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+                          }`}
+                        >
+                          {m === 'tts' ? 'Text-to-Speech' : 'Sound Effect'}
+                        </button>
+                      ))}
+                    </div>
+                    <Textarea
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      placeholder={
+                        voiceMode === 'tts'
+                          ? 'Type the line to speak — full sentences work best'
+                          : 'Describe the sound — e.g. "thunder crack with low rumble"'
+                      }
+                      rows={3}
+                      className="resize-none"
+                    />
+                    {voiceMode === 'tts' && (
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-muted-foreground">Voice</label>
+                        {Array.isArray(voicesList) && voicesList.length === 0 ? (
+                          <p className="text-[11px] text-destructive">
+                            No voices available — ElevenLabs is not configured on the server. Set
+                            ELEVENLABS_API_KEY to enable TTS.
+                          </p>
+                        ) : (
+                          <Select value={voiceId} onValueChange={setVoiceId}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Loading voices…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(voicesList ?? []).map((v: any) => {
+                                const id = v.voice_id || v.id;
+                                const label = v.name || id;
+                                return (
+                                  <SelectItem key={id} value={id}>
+                                    {label}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+                    )}
+                    {voiceMode === 'sfx' && (
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-muted-foreground whitespace-nowrap">
+                          Duration {sfxDuration}s
+                        </label>
+                        <input
+                          type="range"
+                          min={1}
+                          max={22}
+                          step={1}
+                          value={sfxDuration}
+                          onChange={(e) => setSfxDuration(Number(e.target.value))}
+                          className="flex-1 accent-primary"
+                        />
+                      </div>
+                    )}
+                    <Button
+                      className="rounded-full self-end px-5"
+                      disabled={!prompt.trim() || (voiceMode === 'tts' && !voiceId)}
+                      onClick={() => {
+                        if (checkConcurrency(1) === 0) return;
+                        runVoiceGen(prompt, {
+                          voiceId,
+                          flavor: voiceMode,
+                          sfxDurationSec: voiceMode === 'sfx' ? sfxDuration : undefined,
+                        });
                         setPrompt('');
                       }}
                     >
-                      <ImageIcon className="h-4 w-4 mr-2" />
-                      {variations > 1 ? `Generate ${variations} Images` : 'Generate Image'}
+                      {voiceMode === 'tts' ? 'Synthesize Speech' : 'Generate Sound Effect'}
                     </Button>
+                  </div>
+                )}
+
+                {/* Audio (text→music) */}
+                {!worldKind && mode === 'audio' && (
+                  <div className="flex flex-col gap-3">
+                    <Textarea
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      placeholder="Describe the music — e.g. 'epic orchestral battle theme with choir, 120bpm'"
+                      rows={3}
+                      className="resize-none"
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-muted-foreground">
+                          Duration ({audioDuration}s)
+                        </label>
+                        <input
+                          type="range"
+                          min={5}
+                          max={60}
+                          step={1}
+                          value={audioDuration}
+                          onChange={(e) => setAudioDuration(Number(e.target.value))}
+                          className="accent-primary"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-muted-foreground">
+                          Genre (optional)
+                        </label>
+                        <Input
+                          value={audioGenre}
+                          onChange={(e) => setAudioGenre(e.target.value)}
+                          placeholder="e.g. lo-fi, orchestral, synthwave"
+                          className="h-9 text-xs"
+                        />
+                      </div>
+                    </div>
                     <Button
-                      variant="outline"
-                      className="flex-1"
-                      disabled={!canGenerate || videoNeedsImage}
-                      title={
-                        videoNeedsImage
-                          ? 'Pick Seedance, or set a reference image first'
-                          : undefined
+                      className="rounded-full self-end px-5"
+                      disabled={!prompt.trim()}
+                      onClick={() => {
+                        if (checkConcurrency(1) === 0) return;
+                        runAudioGen(prompt, {
+                          durationSec: audioDuration,
+                          genre: audioGenre.trim() || undefined,
+                        });
+                        setPrompt('');
+                      }}
+                    >
+                      Generate Music
+                    </Button>
+                  </div>
+                )}
+
+                {/* 3D */}
+                {!worldKind && mode === '3d' && (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-wrap gap-1">
+                      {(['text', 'image'] as const).map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setThreedMode(m)}
+                          className={`text-[11px] px-2 py-1 rounded border transition-colors ${
+                            threedMode === m
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+                          }`}
+                        >
+                          {m === 'text' ? 'Text → 3D' : 'Image → 3D'}
+                        </button>
+                      ))}
+                    </div>
+                    <Textarea
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      placeholder={
+                        threedMode === 'text'
+                          ? 'Describe the model — e.g. "low-poly viking longboat, weathered wood texture"'
+                          : 'Optional prompt to guide the geometry (works without one too)'
+                      }
+                      rows={3}
+                      className="resize-none"
+                    />
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-medium text-muted-foreground">Art style</label>
+                      <Select
+                        value={threedArtStyle}
+                        onValueChange={(v) => setThreedArtStyle(v as typeof threedArtStyle)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(['realistic', 'cartoon', 'low-poly', 'sculpture', 'pbr'] as const).map(
+                            (s) => (
+                              <SelectItem key={s} value={s}>
+                                {s}
+                              </SelectItem>
+                            )
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {threedMode === 'image' && (
+                      <p className="text-[10px] text-muted-foreground">
+                        Drop an image into the queue (right-side drafts panel) or via the dropzone
+                        in Image mode, then come back here. The most recent image draft is used as
+                        source.
+                      </p>
+                    )}
+                    <Button
+                      className="rounded-full self-end px-5"
+                      disabled={
+                        !prompt.trim() && threedMode === 'text'
+                          ? true
+                          : threedMode === 'image' && !drafts?.find((d: any) => d.imageUrl)
                       }
                       onClick={() => {
                         if (checkConcurrency(1) === 0) return;
-                        const finalPrompt = applyStylePreset(prompt, stylePreset);
-                        const useAnimate = referenceImage?.mode === 'animate';
-                        runVideoGen(finalPrompt, {
-                          videoModel,
-                          imageSize,
-                          sourceImageUrl: useAnimate ? referenceImage!.url : undefined,
-                          negativePrompt: negativePrompt.trim() || undefined,
-                          stylePresetId: stylePreset ?? null,
-                          durationSec: videoDuration,
-                          resolution: videoResolution,
-                          cameraPreset: cameraPreset || undefined,
-                          cameraIntensity: cameraPreset ? cameraIntensity : undefined,
-                          audioOn: videoAudioOn,
+                        const sourceImg =
+                          drafts?.find((d: any) => d.imageUrl)?.imageUrl ?? undefined;
+                        run3DGen(prompt, {
+                          threedMode,
+                          artStyle: threedArtStyle,
+                          ...(threedMode === 'image' && sourceImg ? { imageUrl: sourceImg } : {}),
                         });
-                        if (useAnimate) setReferenceImage(null);
                         setPrompt('');
                       }}
                     >
-                      <Video className="h-4 w-4 mr-2" />
-                      {referenceImage?.mode === 'animate' ? 'Animate' : 'Generate Video'}
+                      {threedMode === 'text' ? 'Generate 3D Model' : 'Convert Image → 3D'}
                     </Button>
+                    <p className="text-[10px] text-muted-foreground -mt-1">
+                      3D generation runs async — the queue card stays "generating" while Meshy works
+                      (1-3 min typical). You can keep using other tabs.
+                    </p>
                   </div>
+                )}
 
-                  <p className="text-[11px] text-muted-foreground -mt-1">
-                    Up to {MAX_CONCURRENT_GENS} generations run in parallel. Each run auto-saves as
-                    a draft and stays in your queue across reloads.
-                  </p>
-                </>
-              )}
-
-              {/* Voice (TTS + SFX) */}
-              {!worldKind && mode === 'voice' && (
-                <div className="flex flex-col gap-3">
-                  <div className="flex flex-wrap gap-1">
-                    {(['tts', 'sfx'] as const).map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => setVoiceMode(m)}
-                        className={`text-[11px] px-2 py-1 rounded border transition-colors ${
-                          voiceMode === m
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
-                        }`}
+                {/* Talking scene */}
+                {!worldKind && mode === 'talking' && (
+                  <div className="flex flex-col gap-3">
+                    <p className="text-[11px] text-muted-foreground">
+                      Combine an image + dialogue + voice into a lip-synced clip. Drop the source
+                      image in the Image dropzone or pick from your drafts.
+                    </p>
+                    {referenceImage ? (
+                      <div className="flex items-center gap-3 p-2 rounded-lg border border-primary/30 bg-primary/5">
+                        <img
+                          src={referenceImage.url}
+                          alt=""
+                          className="h-12 w-12 rounded object-cover"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium">Talking source</p>
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            {referenceImage.url}
+                          </p>
+                        </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => setReferenceImage(null)}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={onRefDrop}
+                        onClick={() => refFileInputRef.current?.click()}
+                        className="flex items-center justify-center gap-2 p-3 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors text-xs text-muted-foreground"
                       >
-                        {m === 'tts' ? 'Text-to-Speech' : 'Sound Effect'}
-                      </button>
-                    ))}
-                  </div>
-                  <Textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder={
-                      voiceMode === 'tts'
-                        ? 'Type the line to speak — full sentences work best'
-                        : 'Describe the sound — e.g. "thunder crack with low rumble"'
-                    }
-                    rows={3}
-                    className="resize-none"
-                  />
-                  {voiceMode === 'tts' && (
+                        <Upload className="h-3.5 w-3.5" />
+                        <span>Drop or click to add a portrait image</span>
+                        <input
+                          ref={refFileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) uploadAsset(f, 'animate');
+                            e.target.value = '';
+                          }}
+                        />
+                      </div>
+                    )}
+                    <Textarea
+                      value={talkingDialogue}
+                      onChange={(e) => setTalkingDialogue(e.target.value)}
+                      placeholder='What the character says — e.g. "I have been waiting for you, traveler."'
+                      rows={3}
+                      className="resize-none"
+                    />
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-medium text-muted-foreground">Voice</label>
                       {Array.isArray(voicesList) && voicesList.length === 0 ? (
                         <p className="text-[11px] text-destructive">
-                          No voices available — ElevenLabs is not configured on the server. Set
-                          ELEVENLABS_API_KEY to enable TTS.
+                          No voices available — ElevenLabs is not configured on the server.
                         </p>
                       ) : (
                         <Select value={voiceId} onValueChange={setVoiceId}>
@@ -2155,10 +2447,9 @@ export function GenerateConsole({
                           <SelectContent>
                             {(voicesList ?? []).map((v: any) => {
                               const id = v.voice_id || v.id;
-                              const label = v.name || id;
                               return (
                                 <SelectItem key={id} value={id}>
-                                  {label}
+                                  {v.name || id}
                                 </SelectItem>
                               );
                             })}
@@ -2166,309 +2457,60 @@ export function GenerateConsole({
                         </Select>
                       )}
                     </div>
-                  )}
-                  {voiceMode === 'sfx' && (
+                    <Input
+                      value={talkingMotion}
+                      onChange={(e) => setTalkingMotion(e.target.value)}
+                      placeholder="Optional motion direction (subtle nod, looking left, etc.)"
+                      className="h-9 text-xs"
+                    />
                     <div className="flex items-center gap-2">
                       <label className="text-xs text-muted-foreground whitespace-nowrap">
-                        Duration {sfxDuration}s
+                        Duration {talkingDuration}s
                       </label>
                       <input
                         type="range"
-                        min={1}
-                        max={22}
+                        min={3}
+                        max={10}
                         step={1}
-                        value={sfxDuration}
-                        onChange={(e) => setSfxDuration(Number(e.target.value))}
+                        value={talkingDuration}
+                        onChange={(e) => setTalkingDuration(Number(e.target.value))}
                         className="flex-1 accent-primary"
                       />
                     </div>
-                  )}
-                  <Button
-                    disabled={!prompt.trim() || (voiceMode === 'tts' && !voiceId)}
-                    onClick={() => {
-                      if (checkConcurrency(1) === 0) return;
-                      runVoiceGen(prompt, {
-                        voiceId,
-                        flavor: voiceMode,
-                        sfxDurationSec: voiceMode === 'sfx' ? sfxDuration : undefined,
-                      });
-                      setPrompt('');
-                    }}
-                  >
-                    {voiceMode === 'tts' ? 'Synthesize Speech' : 'Generate Sound Effect'}
-                  </Button>
-                </div>
-              )}
-
-              {/* Audio (text→music) */}
-              {!worldKind && mode === 'audio' && (
-                <div className="flex flex-col gap-3">
-                  <Textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Describe the music — e.g. 'epic orchestral battle theme with choir, 120bpm'"
-                    rows={3}
-                    className="resize-none"
-                  />
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">
-                        Duration ({audioDuration}s)
-                      </label>
-                      <input
-                        type="range"
-                        min={5}
-                        max={60}
-                        step={1}
-                        value={audioDuration}
-                        onChange={(e) => setAudioDuration(Number(e.target.value))}
-                        className="accent-primary"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">
-                        Genre (optional)
-                      </label>
-                      <Input
-                        value={audioGenre}
-                        onChange={(e) => setAudioGenre(e.target.value)}
-                        placeholder="e.g. lo-fi, orchestral, synthwave"
-                        className="h-9 text-xs"
-                      />
-                    </div>
-                  </div>
-                  <Button
-                    disabled={!prompt.trim()}
-                    onClick={() => {
-                      if (checkConcurrency(1) === 0) return;
-                      runAudioGen(prompt, {
-                        durationSec: audioDuration,
-                        genre: audioGenre.trim() || undefined,
-                      });
-                      setPrompt('');
-                    }}
-                  >
-                    Generate Music
-                  </Button>
-                </div>
-              )}
-
-              {/* 3D */}
-              {!worldKind && mode === '3d' && (
-                <div className="flex flex-col gap-3">
-                  <div className="flex flex-wrap gap-1">
-                    {(['text', 'image'] as const).map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => setThreedMode(m)}
-                        className={`text-[11px] px-2 py-1 rounded border transition-colors ${
-                          threedMode === m
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
-                        }`}
-                      >
-                        {m === 'text' ? 'Text → 3D' : 'Image → 3D'}
-                      </button>
-                    ))}
-                  </div>
-                  <Textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder={
-                      threedMode === 'text'
-                        ? 'Describe the model — e.g. "low-poly viking longboat, weathered wood texture"'
-                        : 'Optional prompt to guide the geometry (works without one too)'
-                    }
-                    rows={3}
-                    className="resize-none"
-                  />
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">Art style</label>
-                    <Select
-                      value={threedArtStyle}
-                      onValueChange={(v) => setThreedArtStyle(v as typeof threedArtStyle)}
+                    <Button
+                      className="rounded-full self-end px-5"
+                      disabled={!referenceImage?.url || !talkingDialogue.trim() || !voiceId}
+                      onClick={() => {
+                        if (!referenceImage?.url) return;
+                        if (checkConcurrency(1) === 0) return;
+                        runTalkingScene({
+                          imageUrl: referenceImage.url,
+                          dialogue: talkingDialogue,
+                          voiceId,
+                          motionPrompt: talkingMotion.trim() || undefined,
+                          durationSec: talkingDuration,
+                        });
+                        setTalkingDialogue('');
+                        setTalkingMotion('');
+                        setReferenceImage(null);
+                      }}
                     >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(['realistic', 'cartoon', 'low-poly', 'sculpture', 'pbr'] as const).map(
-                          (s) => (
-                            <SelectItem key={s} value={s}>
-                              {s}
-                            </SelectItem>
-                          )
-                        )}
-                      </SelectContent>
-                    </Select>
+                      Generate Talking Scene
+                    </Button>
                   </div>
-                  {threedMode === 'image' && (
-                    <p className="text-[10px] text-muted-foreground">
-                      Drop an image into the queue (right-side drafts panel) or via the dropzone in
-                      Image mode, then come back here. The most recent image draft is used as
-                      source.
-                    </p>
-                  )}
-                  <Button
-                    disabled={
-                      !prompt.trim() && threedMode === 'text'
-                        ? true
-                        : threedMode === 'image' && !drafts?.find((d: any) => d.imageUrl)
-                    }
-                    onClick={() => {
-                      if (checkConcurrency(1) === 0) return;
-                      const sourceImg = drafts?.find((d: any) => d.imageUrl)?.imageUrl ?? undefined;
-                      run3DGen(prompt, {
-                        threedMode,
-                        artStyle: threedArtStyle,
-                        ...(threedMode === 'image' && sourceImg ? { imageUrl: sourceImg } : {}),
-                      });
-                      setPrompt('');
-                    }}
-                  >
-                    {threedMode === 'text' ? 'Generate 3D Model' : 'Convert Image → 3D'}
-                  </Button>
-                  <p className="text-[10px] text-muted-foreground -mt-1">
-                    3D generation runs async — the queue card stays "generating" while Meshy works
-                    (1-3 min typical). You can keep using other tabs.
-                  </p>
-                </div>
-              )}
-
-              {/* Talking scene */}
-              {!worldKind && mode === 'talking' && (
-                <div className="flex flex-col gap-3">
-                  <p className="text-[11px] text-muted-foreground">
-                    Combine an image + dialogue + voice into a lip-synced clip. Drop the source
-                    image in the Image dropzone or pick from your drafts.
-                  </p>
-                  {referenceImage ? (
-                    <div className="flex items-center gap-3 p-2 rounded-lg border border-primary/30 bg-primary/5">
-                      <img
-                        src={referenceImage.url}
-                        alt=""
-                        className="h-12 w-12 rounded object-cover"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium">Talking source</p>
-                        <p className="text-[10px] text-muted-foreground truncate">
-                          {referenceImage.url}
-                        </p>
-                      </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7"
-                        onClick={() => setReferenceImage(null)}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={onRefDrop}
-                      onClick={() => refFileInputRef.current?.click()}
-                      className="flex items-center justify-center gap-2 p-3 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors text-xs text-muted-foreground"
-                    >
-                      <Upload className="h-3.5 w-3.5" />
-                      <span>Drop or click to add a portrait image</span>
-                      <input
-                        ref={refFileInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) uploadAsset(f, 'animate');
-                          e.target.value = '';
-                        }}
-                      />
-                    </div>
-                  )}
-                  <Textarea
-                    value={talkingDialogue}
-                    onChange={(e) => setTalkingDialogue(e.target.value)}
-                    placeholder='What the character says — e.g. "I have been waiting for you, traveler."'
-                    rows={3}
-                    className="resize-none"
-                  />
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">Voice</label>
-                    {Array.isArray(voicesList) && voicesList.length === 0 ? (
-                      <p className="text-[11px] text-destructive">
-                        No voices available — ElevenLabs is not configured on the server.
-                      </p>
-                    ) : (
-                      <Select value={voiceId} onValueChange={setVoiceId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Loading voices…" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(voicesList ?? []).map((v: any) => {
-                            const id = v.voice_id || v.id;
-                            return (
-                              <SelectItem key={id} value={id}>
-                                {v.name || id}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </div>
-                  <Input
-                    value={talkingMotion}
-                    onChange={(e) => setTalkingMotion(e.target.value)}
-                    placeholder="Optional motion direction (subtle nod, looking left, etc.)"
-                    className="h-9 text-xs"
-                  />
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-muted-foreground whitespace-nowrap">
-                      Duration {talkingDuration}s
-                    </label>
-                    <input
-                      type="range"
-                      min={3}
-                      max={10}
-                      step={1}
-                      value={talkingDuration}
-                      onChange={(e) => setTalkingDuration(Number(e.target.value))}
-                      className="flex-1 accent-primary"
-                    />
-                  </div>
-                  <Button
-                    disabled={!referenceImage?.url || !talkingDialogue.trim() || !voiceId}
-                    onClick={() => {
-                      if (!referenceImage?.url) return;
-                      if (checkConcurrency(1) === 0) return;
-                      runTalkingScene({
-                        imageUrl: referenceImage.url,
-                        dialogue: talkingDialogue,
-                        voiceId,
-                        motionPrompt: talkingMotion.trim() || undefined,
-                        durationSec: talkingDuration,
-                      });
-                      setTalkingDialogue('');
-                      setTalkingMotion('');
-                      setReferenceImage(null);
-                    }}
-                  >
-                    Generate Talking Scene
-                  </Button>
-                </div>
-              )}
+                )}
+              </div>
+              {/* ── /composer card ── */}
 
               {/* World-entity results */}
               {entityResults.length > 0 && (
                 <div className="flex flex-col gap-2 pt-2">
                   <h3 className="text-sm font-semibold text-muted-foreground">World entities</h3>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {entityResults.map((r) => (
                       <div
                         key={r.id}
-                        className="rounded-lg border border-border overflow-hidden bg-muted/20"
+                        className="rounded-xl border border-border overflow-hidden bg-card hover:border-primary/30 transition-colors"
                       >
                         <div className="aspect-square bg-muted relative flex items-center justify-center">
                           {r.imageUrl ? (
@@ -2531,7 +2573,7 @@ export function GenerateConsole({
 
               {/* Queue grid */}
               {generations.length > 0 && (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {generations.map((g) => (
                     <GenerationCard
                       key={g.id}
@@ -2580,37 +2622,41 @@ export function GenerateConsole({
                 </Card>
               )}
 
-              {/* Auto-send setting: fire-and-forget promotion after each generation */}
+              {/* Publish settings — rights + visibility for whatever's auto-sent.
+                  The wiki target itself lives in the composer's prominent picker
+                  for console; the full ("Lab") variant keeps its own selector. */}
               <Card>
                 <CardContent className="py-3 space-y-2">
                   <div className="flex items-center gap-1.5 text-xs font-semibold">
                     <Rocket className="h-3 w-3" />
-                    Auto-send generations
+                    {isConsole ? 'Publish settings' : 'Auto-send generations'}
                   </div>
-                  <Select value={autoSendTarget} onValueChange={setAutoSendTarget}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__off__" className="text-xs">
-                        Off — save to drafts only
-                      </SelectItem>
-                      <SelectItem value="__gallery__" className="text-xs">
-                        My Gallery (no universe)
-                      </SelectItem>
-                      {autoSendUniverses.length > 0 && (
-                        <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-                          Your universes
-                        </div>
-                      )}
-                      {autoSendUniverses.map((u: any) => (
-                        <SelectItem key={u.id} value={u.id} className="text-xs">
-                          {u.name || u.id.slice(0, 12)}
-                          {u.isMultiSig ? ' (multi-sig)' : ''}
+                  {!isConsole && (
+                    <Select value={autoSendTarget} onValueChange={setAutoSendTarget}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__off__" className="text-xs">
+                          Off — save to drafts only
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                        <SelectItem value="__gallery__" className="text-xs">
+                          My Gallery (no universe)
+                        </SelectItem>
+                        {autoSendUniverses.length > 0 && (
+                          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+                            Your universes
+                          </div>
+                        )}
+                        {autoSendUniverses.map((u: any) => (
+                          <SelectItem key={u.id} value={u.id} className="text-xs">
+                            {u.name || u.id.slice(0, 12)}
+                            {u.isMultiSig ? ' (multi-sig)' : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
 
                   {autoSendTarget !== '__off__' && (
                     <>
