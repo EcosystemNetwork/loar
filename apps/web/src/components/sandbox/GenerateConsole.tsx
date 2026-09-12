@@ -154,6 +154,16 @@ const WORLD_KINDS: WorldKind[] = [
   'organization',
 ];
 
+/** Filter chips for the unified feed (queue + world entities + drafts). */
+const FEED_FILTERS: Array<{ id: 'all' | GenKind | 'entity'; label: string }> = [
+  { id: 'all', label: 'All' },
+  { id: 'image', label: 'Image' },
+  { id: 'video', label: 'Video' },
+  { id: 'audio', label: 'Audio' },
+  { id: '3d-model', label: '3D' },
+  { id: 'entity', label: 'Entities' },
+];
+
 export function GenerateConsole({
   variant = 'full',
   initialUniverse,
@@ -193,7 +203,7 @@ export function GenerateConsole({
   const [videoAudioOn, setVideoAudioOn] = useState<boolean>(true);
 
   // Drafts panel filter
-  const [draftFilter, setDraftFilter] = useState<'all' | GenKind>('all');
+  const [draftFilter, setDraftFilter] = useState<'all' | GenKind | 'entity'>('all');
 
   // Auto-send: after each generation auto-saves to drafts, optionally promote it
   // straight into a universe (or the user's gallery). Persists across reloads.
@@ -329,6 +339,7 @@ export function GenerateConsole({
       status: 'generating' | 'done' | 'failed';
       error?: string;
       entityId?: string;
+      createdAt: number;
     }>
   >([]);
 
@@ -1067,7 +1078,15 @@ export function GenerateConsole({
         pickRandom(RANDOM_NAME_SEEDS[kind] ?? ['Untitled']);
       const localId = makeId();
       setEntityResults((prev) => [
-        { id: localId, kind, name, imageUrl: null, universeId, status: 'generating' as const },
+        {
+          id: localId,
+          kind,
+          name,
+          imageUrl: null,
+          universeId,
+          status: 'generating' as const,
+          createdAt: Date.now(),
+        },
         ...prev,
       ]);
       inFlightCountRef.current += 1;
@@ -1459,6 +1478,38 @@ export function GenerateConsole({
     isometric: 'from-violet-300 via-indigo-400 to-blue-500',
     vaporwave: 'from-pink-400 via-purple-500 to-cyan-400',
   };
+
+  // Unified feed — merge the live queue, world-entity rolls, and saved drafts
+  // into one recency-sorted list. A draft still represented by a live queue
+  // card (matching draftId) is suppressed so it doesn't render twice.
+  type FeedEntry =
+    | { kind: 'gen'; ts: number; gen: Generation }
+    | { kind: 'entity'; ts: number; entity: (typeof entityResults)[number] }
+    | { kind: 'draft'; ts: number; draft: DraftData };
+
+  const feedItems = React.useMemo<FeedEntry[]>(() => {
+    const liveDraftIds = new Set(
+      generations.map((g) => g.draftId).filter((id): id is string => Boolean(id))
+    );
+    const items: FeedEntry[] = [];
+
+    for (const g of generations) {
+      if (draftFilter !== 'all' && g.kind !== draftFilter) continue;
+      items.push({ kind: 'gen', ts: g.createdAt, gen: g });
+    }
+    if (draftFilter === 'all' || draftFilter === 'entity') {
+      for (const e of entityResults) items.push({ kind: 'entity', ts: e.createdAt, entity: e });
+    }
+    if (draftFilter !== 'entity') {
+      for (const d of (drafts as DraftData[] | undefined) ?? []) {
+        if (liveDraftIds.has(d.id)) continue;
+        if (draftFilter !== 'all' && inferDraftKind(d) !== draftFilter) continue;
+        const ts = d.createdAt ? Date.parse(d.createdAt) : NaN;
+        items.push({ kind: 'draft', ts: Number.isFinite(ts) ? ts : 0, draft: d });
+      }
+    }
+    return items.sort((a, b) => b.ts - a.ts);
+  }, [generations, entityResults, drafts, draftFilter]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -2502,60 +2553,8 @@ export function GenerateConsole({
               </div>
               {/* ── /composer card ── */}
 
-              {/* World-entity results */}
-              {entityResults.length > 0 && (
-                <div className="flex flex-col gap-2 pt-2">
-                  <h3 className="text-sm font-semibold text-muted-foreground">World entities</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {entityResults.map((r) => (
-                      <div
-                        key={r.id}
-                        className="rounded-xl border border-border overflow-hidden bg-card hover:border-primary/30 transition-colors"
-                      >
-                        <div className="aspect-square bg-muted relative flex items-center justify-center">
-                          {r.imageUrl ? (
-                            <img src={r.imageUrl} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <Loader2
-                              className={`h-5 w-5 text-muted-foreground ${
-                                r.status === 'generating' ? 'animate-spin' : ''
-                              }`}
-                            />
-                          )}
-                        </div>
-                        <div className="p-2 space-y-1">
-                          <p className="text-xs font-medium truncate">{r.name}</p>
-                          <p className="text-[10px] text-muted-foreground">
-                            {KIND_LABELS[r.kind] ?? r.kind}
-                            {r.status === 'failed' ? ` · ${r.error ?? 'failed'}` : ''}
-                          </p>
-                          {r.status === 'done' && r.entityId && (
-                            <div className="flex gap-2">
-                              <Link
-                                to="/wiki/entity/$id"
-                                params={{ id: r.entityId }}
-                                className="text-[10px] text-primary hover:underline"
-                              >
-                                Open in wiki
-                              </Link>
-                              <Link
-                                to="/create/$kind"
-                                params={{ kind: r.kind }}
-                                search={{ universe: r.universeId }}
-                                className="text-[10px] text-muted-foreground hover:underline"
-                              >
-                                Refine
-                              </Link>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Queue header */}
+              {/* Queue status line — the cards themselves render in the unified
+                  feed below (merged with world entities + drafts). */}
               {generations.length > 0 && (
                 <div className="flex items-center justify-between pt-2">
                   <h3 className="text-sm font-semibold text-muted-foreground">
@@ -2570,30 +2569,9 @@ export function GenerateConsole({
                   )}
                 </div>
               )}
-
-              {/* Queue grid */}
-              {generations.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {generations.map((g) => (
-                    <GenerationCard
-                      key={g.id}
-                      gen={g}
-                      onDismiss={() => removeGen(g.id)}
-                      onRetry={() => retryGen(g)}
-                      onAnimate={() => handleAnimate(g)}
-                      onUseAsStyleRef={() => handleUseAsStyleRef(g)}
-                      onEditOp={(op, opts) => runEditOp(g, op, opts)}
-                      onRetryDraftSave={() => retryDraftSave(g)}
-                      onVoiceModified={(newUrl, newId, label) =>
-                        handleVoiceModified(g, newUrl, newId, label)
-                      }
-                    />
-                  ))}
-                </div>
-              )}
             </div>
 
-            {/* Right: drafts */}
+            {/* Right: publish settings */}
             <div className="flex flex-col gap-4">
               {/* Target chain — where items will live once promoted/minted */}
               {SUPPORTED_CHAINS.length > 1 && (
@@ -2714,95 +2692,146 @@ export function GenerateConsole({
                   )}
                 </CardContent>
               </Card>
+            </div>
+          </div>
+        )}
 
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <h2 className="text-lg font-semibold">Your Drafts</h2>
-                {drafts && drafts.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {[
-                      { id: 'all' as const, label: 'All' },
-                      { id: 'image' as const, label: 'Image' },
-                      { id: 'video' as const, label: 'Video' },
-                      { id: 'audio' as const, label: 'Audio' },
-                      { id: '3d-model' as const, label: '3D' },
-                    ].map((f) => (
-                      <button
-                        key={f.id}
-                        type="button"
-                        onClick={() => setDraftFilter(f.id)}
-                        className={`text-[10px] px-2 py-1 rounded border transition-colors ${
-                          draftFilter === f.id
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
-                        }`}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
+        {/* Unified feed — live queue, world entities, and saved drafts merged
+            into one recency-sorted grid. A draft still represented by a live
+            queue card (same draftId) is suppressed to avoid showing it twice. */}
+        {isAuthenticated && (
+          <div className="mt-8">
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+              <h2 className="text-lg font-semibold">Your feed</h2>
+              <div className="flex flex-wrap gap-1">
+                {FEED_FILTERS.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setDraftFilter(f.id)}
+                    className={`text-[10px] px-2 py-1 rounded-full border transition-colors ${
+                      draftFilter === f.id
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
               </div>
+            </div>
 
-              {!drafts || drafts.length === 0 ? (
-                <Card>
-                  <CardContent className="py-12 flex flex-col items-center gap-3 text-center">
-                    <Wand2 className="h-8 w-8 text-muted-foreground/50" />
-                    <p className="text-muted-foreground text-sm">
-                      Nothing saved yet. Generate something and it'll show up here.
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                (() => {
-                  const filtered = (drafts as DraftData[]).filter(
-                    (d) => draftFilter === 'all' || inferDraftKind(d) === draftFilter
-                  );
-                  if (filtered.length === 0) {
+            {feedItems.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 flex flex-col items-center gap-3 text-center">
+                  <Wand2 className="h-8 w-8 text-muted-foreground/50" />
+                  <p className="text-muted-foreground text-sm">
+                    {draftFilter === 'all'
+                      ? "Nothing yet — generate something above and it'll show up here."
+                      : `No ${draftFilter} items yet.`}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {feedItems.map((item) => {
+                  if (item.kind === 'gen') {
+                    const g = item.gen;
                     return (
-                      <Card>
-                        <CardContent className="py-8 flex flex-col items-center gap-2 text-center">
-                          <Wand2 className="h-6 w-6 text-muted-foreground/40" />
-                          <p className="text-muted-foreground text-xs">
-                            No {draftFilter} drafts yet.
-                          </p>
-                        </CardContent>
-                      </Card>
+                      <GenerationCard
+                        key={`g-${g.id}`}
+                        gen={g}
+                        onDismiss={() => removeGen(g.id)}
+                        onRetry={() => retryGen(g)}
+                        onAnimate={() => handleAnimate(g)}
+                        onUseAsStyleRef={() => handleUseAsStyleRef(g)}
+                        onEditOp={(op, opts) => runEditOp(g, op, opts)}
+                        onRetryDraftSave={() => retryDraftSave(g)}
+                        onVoiceModified={(newUrl, newId, label) =>
+                          handleVoiceModified(g, newUrl, newId, label)
+                        }
+                      />
                     );
                   }
+                  if (item.kind === 'entity') {
+                    const r = item.entity;
+                    return (
+                      <div
+                        key={`e-${r.id}`}
+                        className="rounded-xl border border-border overflow-hidden bg-card hover:border-primary/30 transition-colors"
+                      >
+                        <div className="aspect-square bg-muted relative flex items-center justify-center">
+                          {r.imageUrl ? (
+                            <img src={r.imageUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <Loader2
+                              className={`h-5 w-5 text-muted-foreground ${
+                                r.status === 'generating' ? 'animate-spin' : ''
+                              }`}
+                            />
+                          )}
+                        </div>
+                        <div className="p-2 space-y-1">
+                          <p className="text-xs font-medium truncate">{r.name}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {KIND_LABELS[r.kind] ?? r.kind}
+                            {r.status === 'failed' ? ` · ${r.error ?? 'failed'}` : ''}
+                          </p>
+                          {r.status === 'done' && r.entityId && (
+                            <div className="flex gap-2">
+                              <Link
+                                to="/wiki/entity/$id"
+                                params={{ id: r.entityId }}
+                                className="text-[10px] text-primary hover:underline"
+                              >
+                                Open in wiki
+                              </Link>
+                              <Link
+                                to="/create/$kind"
+                                params={{ kind: r.kind }}
+                                search={{ universe: r.universeId }}
+                                className="text-[10px] text-muted-foreground hover:underline"
+                              >
+                                Refine
+                              </Link>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+                  const draft = item.draft;
                   return (
-                    <div className="grid grid-cols-2 gap-3">
-                      {filtered.map((draft) => (
-                        <DraftCard
-                          key={draft.id}
-                          draft={draft}
-                          onDelete={() => delDraftMutation.mutate(draft.id)}
-                          onReuse={() => {
-                            const kind = inferDraftKind(draft);
-                            // Switch to the right tab so the form matches the kind
-                            if (kind === 'audio') setMode('voice');
-                            else if (kind === '3d-model') setMode('3d');
-                            else if (kind === 'video') setMode('video');
-                            else setMode('image');
-                            setPrompt(draft.prompt);
-                            if (draft.model && VALID_VIDEO_MODELS.has(draft.model as VideoModel)) {
-                              setVideoModel(draft.model as VideoModel);
-                            }
-                            if (draft.imageUrl) {
-                              setReferenceImage({
-                                url: draft.imageUrl,
-                                prompt: draft.prompt,
-                                mode: draft.videoUrl ? 'animate' : 'style',
-                              });
-                            }
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          }}
-                        />
-                      ))}
-                    </div>
+                    <DraftCard
+                      key={`d-${draft.id}`}
+                      draft={draft}
+                      onDelete={() => delDraftMutation.mutate(draft.id)}
+                      onReuse={() => {
+                        const kind = inferDraftKind(draft);
+                        // Switch to the right tab so the form matches the kind
+                        setWorldKind(null);
+                        if (kind === 'audio') setMode('voice');
+                        else if (kind === '3d-model') setMode('3d');
+                        else if (kind === 'video') setMode('video');
+                        else setMode('image');
+                        setPrompt(draft.prompt);
+                        if (draft.model && VALID_VIDEO_MODELS.has(draft.model as VideoModel)) {
+                          setVideoModel(draft.model as VideoModel);
+                        }
+                        if (draft.imageUrl) {
+                          setReferenceImage({
+                            url: draft.imageUrl,
+                            prompt: draft.prompt,
+                            mode: draft.videoUrl ? 'animate' : 'style',
+                          });
+                        }
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                    />
                   );
-                })()
-              )}
-            </div>
+                })}
+              </div>
+            )}
           </div>
         )}
 
