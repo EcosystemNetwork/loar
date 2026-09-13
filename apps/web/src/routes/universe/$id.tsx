@@ -270,6 +270,47 @@ const nodeTypes = {
   timelineEvent: TimelineEventNode,
 };
 
+/**
+ * A `<video>` whose `src` is resolved through the async gateway path
+ * (`resolveIpfsUrlAsync`) instead of a raw/sync-resolved URL — same
+ * reasoning as the "Change Video" dialog's main preview (see the
+ * `editVideoPreviewResolved` effect below): a rotted dedicated-gateway URL
+ * must not leave the thumbnail blank. Used for the version-history
+ * thumbnails, which (unlike the main preview) render a whole list at once
+ * and so can't share one single piece of state.
+ */
+function ResolvedThumbnailVideo({
+  url,
+  className,
+}: {
+  url: string | null | undefined;
+  className?: string;
+}) {
+  const [resolved, setResolved] = useState<string>(() => (url ? resolveMediaUrl(url) : ''));
+
+  useEffect(() => {
+    if (!url) {
+      setResolved('');
+      return;
+    }
+    let cancelled = false;
+    setResolved(resolveMediaUrl(url) || url);
+    resolveIpfsUrlAsync(url)
+      .then((best) => {
+        if (!cancelled && best) setResolved(best);
+      })
+      .catch(() => {
+        /* keep the sync pick already set above */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+
+  if (!resolved) return null;
+  return <video src={resolved} className={className} muted preload="metadata" />;
+}
+
 function UniverseTimelineEditorInner() {
   const { id } = useParams({ from: '/universe/$id' });
   const navigate = useNavigate();
@@ -4202,11 +4243,9 @@ function UniverseTimelineEditorInner() {
                                 title={`v${v.versionNumber} — ${v.model || 'unknown'} — ${new Date(v.generatedAt).toLocaleDateString()}`}
                               >
                                 <div className="aspect-video bg-zinc-800 relative">
-                                  <video
-                                    src={resolveMediaUrl(v.videoUrl)}
+                                  <ResolvedThumbnailVideo
+                                    url={v.videoUrl}
                                     className="w-full h-full object-cover"
-                                    muted
-                                    preload="metadata"
                                   />
                                   <div className="absolute bottom-0 inset-x-0 bg-black/70 text-white text-[10px] text-center py-0.5">
                                     v{v.versionNumber}
@@ -4231,13 +4270,9 @@ function UniverseTimelineEditorInner() {
                             title="Latest version"
                           >
                             <div className="aspect-video bg-zinc-800 relative">
-                              <video
-                                src={resolveMediaUrl(
-                                  eventData.latestVideoUrl || eventData.videoUrl
-                                )}
+                              <ResolvedThumbnailVideo
+                                url={eventData.latestVideoUrl || eventData.videoUrl}
                                 className="w-full h-full object-cover"
-                                muted
-                                preload="metadata"
                               />
                               <div className="absolute bottom-0 inset-x-0 bg-primary/90 text-white text-[10px] text-center py-0.5">
                                 v{versions.length + 1} (latest)
