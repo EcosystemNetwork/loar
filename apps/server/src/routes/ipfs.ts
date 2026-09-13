@@ -103,15 +103,25 @@ function extractCidPath(input: string): string | null {
  * public gateway (ipfs.io) and waiting for `/api/ipfs/resolve` per CID.
  *
  * `token` is only returned for a dedicated `.mypinata.cloud` gateway that
- * actually needs it — and it is no more exposed here than it already is by
- * `/resolve`, which bakes it into every returned media URL. Not returned for
- * a public gateway config.
+ * actually needs it — and a single client obtaining it is no more exposed
+ * than `/resolve` already makes it (that endpoint bakes it into every
+ * returned media URL). Not returned for a public gateway config.
+ *
+ * Cache-Control is deliberately `private` and short: this response has no
+ * per-request key (no query params), so `public`/`s-maxage` would let any
+ * shared cache in front of this server (CDN, reverse proxy) serve one
+ * cached copy — token included — to every caller for the cache lifetime,
+ * bypassing both the origin and the rate limiter below entirely. The
+ * client already caches this in localStorage/AsyncStorage across sessions
+ * (see `primeIpfsGatewayConfig`), so the HTTP cache only needs to smooth
+ * out bursts within a single page load, and a short lifetime lets a
+ * rotated token propagate quickly instead of surviving in an edge cache.
  */
 router.get('/gateway-config', (c) => {
   const base = gatewayBase();
   const host = gatewayHost();
   const isDedicated = host.endsWith('.mypinata.cloud');
-  c.header('Cache-Control', 'public, max-age=300, s-maxage=300');
+  c.header('Cache-Control', 'private, max-age=30');
   return c.json({
     base,
     host,

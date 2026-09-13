@@ -250,6 +250,20 @@ app.route('/api/x402', x402Routes);
 // IP bucket below.
 const { ipfsRoutes } = await import('./routes/ipfs');
 app.use('/api/ipfs/*', rateLimiter({ windowMs: 60_000, max: 120, name: 'ipfs' }));
+// /gateway-config hands back the raw dedicated-gateway token in the clear
+// (by design — see the route's own doc comment) so a client can compose
+// dedicated-gateway URLs synchronously. Unlike /resolve, whose exposure is
+// capped per request (one CID per call), a single successful call here
+// yields a reusable credential good against *.mypinata.cloud directly,
+// bypassing this server (and its rate limits) entirely. Priming happens once
+// per session/app-launch and the result is cached client-side (localStorage
+// / AsyncStorage), so legitimate traffic never needs more than a handful of
+// calls per IP per window — a much tighter bucket than the shared /api/ipfs/*
+// one raises the bar on scraping the token without affecting real clients.
+app.use(
+  '/api/ipfs/gateway-config',
+  rateLimiter({ windowMs: 60_000, max: 10, name: 'ipfs-gateway-config' })
+);
 app.route('/api/ipfs', ipfsRoutes);
 
 // Image resize proxy (sharp). Powers SmartImage's srcset on the web app —
