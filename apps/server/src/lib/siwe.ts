@@ -7,6 +7,39 @@ import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
 import { recoverMessageAddress, getAddress } from 'viem';
 import { db, firebaseAvailable } from './firebase';
 
+// Firestore's client has no default deadline — if the configured Firestore
+// (or, in local dev, the emulator) is unreachable or wedged, an `await` on a
+// `.get()`/`.set()`/`runTransaction()` call hangs forever instead of
+// rejecting. On the auth hot path (nonce issuance, SIWE verify, session
+// checks) that turns a backend blip into a permanently-hung request — no
+// timeout, no error, just a held-open connection — for every endpoint below.
+// Bound every such call so a Firestore outage fails fast (503-able) instead
+// of hanging; the in-memory fallback paths alongside these are unaffected.
+const FIRESTORE_OP_TIMEOUT_MS = 8000;
+
+class FirestoreTimeoutError extends Error {
+  constructor(op: string) {
+    super(`Firestore operation "${op}" timed out after ${FIRESTORE_OP_TIMEOUT_MS}ms`);
+    this.name = 'FirestoreTimeoutError';
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, op: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new FirestoreTimeoutError(op)), FIRESTORE_OP_TIMEOUT_MS);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
 // AUTH-03: In production, Firestore is REQUIRED for nonce storage to ensure
 // multi-instance safety. In-memory fallback is only allowed in local dev.
 const getNoncesCol = () => {
@@ -41,12 +74,15 @@ setInterval(
 
     try {
       const cutoff = new Date(Date.now() - 10 * 60 * 1000); // 10 min ago
-      const expired = await col.where('expiresAt', '<', cutoff).limit(500).get();
+      const expired = await withTimeout(
+        col.where('expiresAt', '<', cutoff).limit(500).get(),
+        'nonceCleanup.query'
+      );
       if (expired.empty) return;
 
       const batch = db.batch();
       expired.docs.forEach((doc) => batch.delete(doc.ref));
-      await batch.commit();
+      await withTimeout(batch.commit(), 'nonceCleanup.commit');
     } catch (err) {
       console.error('[SIWE] Nonce cleanup failed:', err);
     }
@@ -157,7 +193,10 @@ export async function generateNonce(): Promise<string> {
 
   const col1 = getNoncesCol();
   if (col1) {
-    await col1.doc(nonce).set({ createdAt: now, expiresAt, used: false });
+    await withTimeout(
+      col1.doc(nonce).set({ createdAt: now, expiresAt, used: false }),
+      'generateNonce.set'
+    );
   } else {
     memoryNonces.set(nonce, { createdAt: now, expiresAt, used: false });
   }
@@ -179,14 +218,17 @@ export async function consumeNonce(nonce: string): Promise<void> {
   if (col) {
     // Firestore: run the read + delete inside a transaction so two concurrent
     // consumes on different replicas can't both succeed.
-    await db.runTransaction(async (tx) => {
-      const ref = col.doc(nonce);
-      const doc = await tx.get(ref);
-      if (!doc.exists) throw new Error('Invalid or expired nonce');
-      const data = doc.data()!;
-      if (new Date() > data.expiresAt.toDate()) throw new Error('Invalid or expired nonce');
-      tx.delete(ref);
-    });
+    await withTimeout(
+      db.runTransaction(async (tx) => {
+        const ref = col.doc(nonce);
+        const doc = await tx.get(ref);
+        if (!doc.exists) throw new Error('Invalid or expired nonce');
+        const data = doc.data()!;
+        if (new Date() > data.expiresAt.toDate()) throw new Error('Invalid or expired nonce');
+        tx.delete(ref);
+      }),
+      'consumeNonce.transaction'
+    );
   } else {
     // In-memory (dev only): delete IMMEDIATELY. Map.delete returns a boolean
     // but the value we actually need is whether the entry existed before we
@@ -318,18 +360,21 @@ export async function verifySiweSignature(
   const col2 = getNoncesCol();
   if (col2) {
     // Atomic nonce consumption via Firestore transaction to prevent race conditions
-    await db.runTransaction(async (transaction) => {
-      const nonceRef = col2.doc(nonce);
-      const nonceDoc = await transaction.get(nonceRef);
-      if (!nonceDoc.exists) throw new Error('Invalid or expired nonce');
+    await withTimeout(
+      db.runTransaction(async (transaction) => {
+        const nonceRef = col2.doc(nonce);
+        const nonceDoc = await transaction.get(nonceRef);
+        if (!nonceDoc.exists) throw new Error('Invalid or expired nonce');
 
-      const nonceData = nonceDoc.data()!;
-      if (nonceData.used) throw new Error('Invalid or expired nonce');
-      if (new Date() > nonceData.expiresAt.toDate()) throw new Error('Invalid or expired nonce');
+        const nonceData = nonceDoc.data()!;
+        if (nonceData.used) throw new Error('Invalid or expired nonce');
+        if (new Date() > nonceData.expiresAt.toDate()) throw new Error('Invalid or expired nonce');
 
-      // AUTH-03: Delete nonce from Firestore (one-time use) instead of marking used
-      transaction.delete(nonceRef);
-    });
+        // AUTH-03: Delete nonce from Firestore (one-time use) instead of marking used
+        transaction.delete(nonceRef);
+      }),
+      'verifySiweSignature.consumeNonce'
+    );
   } else {
     // Atomic nonce consumption: delete IMMEDIATELY before any async work
     // to prevent TOCTOU race. The nonce is consumed even if validation
@@ -400,7 +445,7 @@ setInterval(
 export async function revokeToken(jti: string): Promise<void> {
   const col = firebaseAvailable ? db.collection('revokedTokens') : null;
   if (col) {
-    await col.doc(jti).set({ revokedAt: new Date() });
+    await withTimeout(col.doc(jti).set({ revokedAt: new Date() }), 'revokeToken.set');
   } else {
     // Evict oldest entries if at capacity (LRU-style eviction)
     if (memoryBlacklist.size >= MAX_BLACKLIST_SIZE) {
@@ -418,7 +463,7 @@ export async function revokeToken(jti: string): Promise<void> {
 async function isTokenRevoked(jti: string): Promise<boolean> {
   const col = firebaseAvailable ? db.collection('revokedTokens') : null;
   if (col) {
-    const doc = await col.doc(jti).get();
+    const doc = await withTimeout(col.doc(jti).get(), 'isTokenRevoked.get');
     return doc.exists;
   }
   return memoryBlacklist.has(jti);
