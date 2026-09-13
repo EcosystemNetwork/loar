@@ -152,7 +152,9 @@ contract EpisodeNFT is
         Episode storage ep = episodes[episodeId];
         if (!ep.active) revert EpisodeNotActive();
         if (ep.maxSupply > 0 && ep.minted >= ep.maxSupply) revert MaxSupplyReached();
-        if (msg.value < ep.mintPrice) revert InsufficientPayment();
+        uint256 mintPrice = ep.mintPrice;
+        address creator = ep.creator;
+        if (msg.value < mintPrice) revert InsufficientPayment();
 
         tokenId = nextTokenId++;
         ep.minted++;
@@ -160,19 +162,19 @@ contract EpisodeNFT is
 
         _safeMint(msg.sender, tokenId);
         _setTokenURI(tokenId, tokenURI_);
-        _setTokenRoyalty(tokenId, ep.creator, defaultRoyaltyBps);
+        _setTokenRoyalty(tokenId, creator, defaultRoyaltyBps);
 
         // Route exact mint price through PaymentRouter; refund excess
-        if (ep.mintPrice > 0) {
-            paymentRouter.route{value: ep.mintPrice}(ep.creator, platformFeeBps);
+        if (mintPrice > 0) {
+            paymentRouter.route{value: mintPrice}(creator, platformFeeBps);
         }
-        uint256 excess = msg.value - ep.mintPrice;
+        uint256 excess = msg.value - mintPrice;
         if (excess > 0) {
             (bool refunded,) = msg.sender.call{value: excess}("");
             if (!refunded) revert TransferFailed();
         }
 
-        emit EpisodeMinted(tokenId, episodeId, msg.sender, ep.mintPrice);
+        emit EpisodeMinted(tokenId, episodeId, msg.sender, mintPrice);
     }
 
     /// @notice Deactivate episode listing

@@ -198,8 +198,9 @@ contract StoryBounties is
         if (b.status != BountyStatus.OPEN) revert BountyNotOpen();
         if (msg.sender != b.poster && msg.sender != platform) revert NotPoster();
 
-        uint256 platformFee = (b.reward * platformFeeBps) / 10_000;
-        uint256 winnerReward = b.reward - platformFee;
+        uint256 reward = b.reward;
+        uint256 platformFee = (reward * platformFeeBps) / 10_000;
+        uint256 winnerReward = reward - platformFee;
 
         b.status = BountyStatus.CLAIMED;
         b.claimedBy = winner;
@@ -234,8 +235,9 @@ contract StoryBounties is
         if (b.status != BountyStatus.OPEN) revert BountyNotOpen();
         if (msg.sender != b.poster) revert NotPoster();
 
-        uint256 fee = (b.reward * cancellationFeeBps) / 10_000;
-        uint256 refund = b.reward - fee;
+        uint256 reward = b.reward;
+        uint256 fee = (reward * cancellationFeeBps) / 10_000;
+        uint256 refund = reward - fee;
 
         b.status = BountyStatus.CANCELLED;
 

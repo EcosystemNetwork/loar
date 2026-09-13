@@ -192,14 +192,16 @@ contract CharacterNFT is
         tokenToCharacter[tokenId] = characterId;
         characterMinted[characterId]++;
 
+        address characterCreator = characters[characterId].creator;
+
         _safeMint(msg.sender, tokenId);
         _setTokenURI(tokenId, tokenURI_);
-        _setTokenRoyalty(tokenId, characters[characterId].creator, 500);
+        _setTokenRoyalty(tokenId, characterCreator, 500);
 
         // Route payment to creator through PaymentRouter
         if (msg.value > 0) {
             uint256 excess = msg.value - price;
-            paymentRouter.route{value: price}(characters[characterId].creator, appearanceFeeBps);
+            paymentRouter.route{value: price}(characterCreator, appearanceFeeBps);
             // Refund excess ETH
             if (excess > 0) {
                 (bool refunded,) = msg.sender.call{value: excess}("");

@@ -95,24 +95,34 @@ contract SplitRouter is ReentrancyGuard, Ownable {
         if (block.timestamp < splitsLastChangedAt[entityHash] + SPLIT_CHANGE_COOLDOWN) {
             revert SplitChangeCooldownActive();
         }
-        if (splits.length == 0 || splits.length > MAX_RECIPIENTS) revert TooManyRecipients();
+        uint256 len = splits.length;
+        if (len == 0 || len > MAX_RECIPIENTS) revert TooManyRecipients();
 
         uint256 totalBps = 0;
-        for (uint256 i = 0; i < splits.length; i++) {
+        // Loop counters below are bounded by `len` (<= MAX_RECIPIENTS) and can
+        // never realistically overflow uint256 — unchecked skips the redundant
+        // arithmetic-overflow check on each increment.
+        for (uint256 i = 0; i < len;) {
             if (splits[i].recipient == address(0)) revert ZeroAddress();
             totalBps += splits[i].bps;
+            unchecked {
+                ++i;
+            }
         }
         if (totalBps != 10000) revert InvalidSplitTotal();
 
         // Store splits
         delete _splits[entityHash];
-        for (uint256 i = 0; i < splits.length; i++) {
+        for (uint256 i = 0; i < len;) {
             _splits[entityHash].push(splits[i]);
+            unchecked {
+                ++i;
+            }
         }
         splitOwner[entityHash] = msg.sender;
         splitsLastChangedAt[entityHash] = block.timestamp;
 
-        emit SplitsConfigured(entityHash, msg.sender, splits.length);
+        emit SplitsConfigured(entityHash, msg.sender, len);
     }
 
     /// @notice Route a payment through splits. Platform fee deducted first,
@@ -126,7 +136,8 @@ contract SplitRouter is ReentrancyGuard, Ownable {
     {
         if (platformFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         Split[] storage splits = _splits[entityHash];
-        if (splits.length == 0) revert NoSplitsConfigured();
+        uint256 len = splits.length;
+        if (len == 0) revert NoSplitsConfigured();
         if (msg.value == 0) return;
 
         // Deduct platform fee to treasury
@@ -142,9 +153,9 @@ contract SplitRouter is ReentrancyGuard, Ownable {
         // The last recipient receives the remainder (distributable - distributed) to
         // collect all rounding dust, ensuring no ETH is left in the contract.
         uint256 distributed = 0;
-        for (uint256 i = 0; i < splits.length; i++) {
+        for (uint256 i = 0; i < len;) {
             uint256 share;
-            if (i == splits.length - 1) {
+            if (i == len - 1) {
                 share = distributable - distributed; // last gets remainder
             } else {
                 share = (distributable * splits[i].bps) / 10000;
@@ -153,9 +164,12 @@ contract SplitRouter is ReentrancyGuard, Ownable {
                 paymentRouter.route{value: share}(splits[i].recipient, 0);
                 distributed += share;
             }
+            unchecked {
+                ++i;
+            }
         }
 
-        emit SplitPayment(entityHash, msg.value, splits.length, platformFeeBps);
+        emit SplitPayment(entityHash, msg.value, len, platformFeeBps);
     }
 
     /// @notice Get splits for an entity

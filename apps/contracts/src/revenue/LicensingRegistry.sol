@@ -314,21 +314,22 @@ contract LicensingRegistry is
     function purchaseMerch(uint256 merchId) external payable nonReentrant whenNotPaused {
         MerchItem storage item = merchItems[merchId];
         if (!item.active) revert MerchNotActive();
-        if (msg.value < item.price) revert InsufficientPayment();
+        uint256 price = item.price;
+        if (msg.value < price) revert InsufficientPayment();
 
         item.sold++;
 
         // Route exact price through PaymentRouter; refund overpayment
-        if (item.price > 0) {
-            paymentRouter.route{value: item.price}(item.creator, platformFeeBps);
+        if (price > 0) {
+            paymentRouter.route{value: price}(item.creator, platformFeeBps);
         }
-        uint256 refund = msg.value - item.price;
+        uint256 refund = msg.value - price;
         if (refund > 0) {
             (bool ok,) = msg.sender.call{value: refund}("");
             if (!ok) revert RefundFailed();
         }
 
-        emit MerchSold(merchId, msg.sender, item.price);
+        emit MerchSold(merchId, msg.sender, price);
     }
 
     // ---- Views ----

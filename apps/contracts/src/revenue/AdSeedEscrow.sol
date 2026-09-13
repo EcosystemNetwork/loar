@@ -175,8 +175,8 @@ contract AdSeedEscrow is
         Seed storage s = seeds[seedId];
         if (s.sponsor == address(0)) revert UnknownSeed();
         if (block.timestamp >= s.expiresAt) revert SeedExpired();
-        uint256 remaining = s.totalFunded - s.totalReleased;
-        if (amount > remaining) revert InsufficientEscrow();
+        uint256 remainingAmount = s.totalFunded - s.totalReleased;
+        if (amount > remainingAmount) revert InsufficientEscrow();
 
         s.totalReleased += amount;
         IERC20(loarToken).safeTransfer(creator, amount);
@@ -193,12 +193,12 @@ contract AdSeedEscrow is
         if (s.refunded) revert AlreadyRefunded();
         if (block.timestamp < s.expiresAt) revert SeedNotExpired();
 
-        uint256 remaining = s.totalFunded - s.totalReleased;
+        uint256 remainingAmount = s.totalFunded - s.totalReleased;
         s.refunded = true;
-        if (remaining > 0) {
-            IERC20(loarToken).safeTransfer(s.sponsor, remaining);
+        if (remainingAmount > 0) {
+            IERC20(loarToken).safeTransfer(s.sponsor, remainingAmount);
         }
-        emit SeedRefunded(seedId, s.sponsor, remaining);
+        emit SeedRefunded(seedId, s.sponsor, remainingAmount);
     }
 
     // ── Views ───────────────────────────────────────────────────────────

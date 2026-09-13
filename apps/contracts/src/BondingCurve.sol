@@ -215,10 +215,14 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
         require(block.timestamp <= deadline, "Transaction expired");
         if (msg.value == 0) revert ZeroAmount();
 
-        uint256 tokensBought = _getTokensForEth(msg.value, tokensSold);
+        // Cache the storage read — reused below for the supply cap, the cost
+        // integral, and the final write. tokensSold cannot change mid-call
+        // (nonReentrant, no external calls before this point).
+        uint256 _tokensSold = tokensSold;
+        uint256 tokensBought = _getTokensForEth(msg.value, _tokensSold);
 
         // Cap to available supply
-        uint256 available = TOTAL_CURVE_SUPPLY - tokensSold;
+        uint256 available = TOTAL_CURVE_SUPPLY - _tokensSold;
         if (tokensBought > available) {
             tokensBought = available;
         }
@@ -234,9 +238,9 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
         cumulativeBought[msg.sender] = newCumulative;
 
         // Calculate actual cost for the tokens bought (may be less than msg.value if capped)
-        uint256 actualCost = _getCostForTokens(tokensBought, tokensSold);
+        uint256 actualCost = _getCostForTokens(tokensBought, _tokensSold);
 
-        tokensSold += tokensBought;
+        tokensSold = _tokensSold + tokensBought;
         ethRaised += actualCost;
 
         IERC20(token).safeTransfer(msg.sender, tokensBought);
@@ -281,11 +285,12 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
         whenActive
     {
         require(block.timestamp <= deadline, "Transaction expired");
+        uint256 _tokensSold = tokensSold;
         if (tokenAmount == 0) revert ZeroAmount();
-        if (tokenAmount > tokensSold) revert InsufficientTokens();
+        if (tokenAmount > _tokensSold) revert InsufficientTokens();
 
         // ETH value from the integral: slope * (tokensSold² - (tokensSold - tokenAmount)²) / 2
-        uint256 ethReturn = _getCostForTokens(tokenAmount, tokensSold - tokenAmount);
+        uint256 ethReturn = _getCostForTokens(tokenAmount, _tokensSold - tokenAmount);
 
         // Apply sell fee (1%)
         uint256 fee = (ethReturn * SELL_FEE_BPS) / BPS;
@@ -296,7 +301,7 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
         // Pull tokens from seller
         IERC20(token).safeTransferFrom(msg.sender, address(this), tokenAmount);
 
-        tokensSold -= tokenAmount;
+        tokensSold = _tokensSold - tokenAmount;
         // Only subtract the pre-fee amount from ethRaised; fee stays as extra reserve
         ethRaised -= ethReturn;
 

@@ -219,14 +219,16 @@ contract ContentLicensing is
     {
         ContentRegistration storage reg = registrations[contentHash];
         if (!reg.active) revert ContentNotActive();
-        if (reg.buyPrice == 0) revert NotForSale();
-        if (msg.value < reg.buyPrice) revert InsufficientPayment();
+        uint256 buyPrice = reg.buyPrice;
+        bytes32 splitEntityHash = reg.splitEntityHash;
+        if (buyPrice == 0) revert NotForSale();
+        if (msg.value < buyPrice) revert InsufficientPayment();
 
         dealId = nextDealId++;
         deals[dealId] = Deal({
             id: dealId,
             contentHash: contentHash,
-            splitEntityHash: reg.splitEntityHash,
+            splitEntityHash: splitEntityHash,
             dealType: DealType.BUY,
             status: DealStatus.ACTIVE,
             buyer: msg.sender,
@@ -242,10 +244,10 @@ contract ContentLicensing is
         contentOwner[contentHash] = msg.sender;
 
         // Route exact price through splits; refund overpayment
-        _routePayment(reg.splitEntityHash, reg.buyPrice);
-        _refundExcess(msg.value, reg.buyPrice);
+        _routePayment(splitEntityHash, buyPrice);
+        _refundExcess(msg.value, buyPrice);
 
-        emit ContentBought(dealId, contentHash, msg.sender, reg.buyPrice);
+        emit ContentBought(dealId, contentHash, msg.sender, buyPrice);
     }
 
     /// @notice Rent content for a duration. Payment through SplitRouter.
@@ -258,12 +260,14 @@ contract ContentLicensing is
     {
         ContentRegistration storage reg = registrations[contentHash];
         if (!reg.active) revert ContentNotActive();
-        if (reg.rentPricePerDay == 0) revert NotForRent();
+        uint256 rentPricePerDay = reg.rentPricePerDay;
+        bytes32 splitEntityHash = reg.splitEntityHash;
+        if (rentPricePerDay == 0) revert NotForRent();
         if (durationDays == 0) revert InvalidDuration();
         if (durationDays > MAX_DURATION_DAYS) revert DurationTooLong();
-        if (reg.rentPricePerDay > MAX_RENT_PRICE_PER_DAY) revert RentPriceTooHigh();
+        if (rentPricePerDay > MAX_RENT_PRICE_PER_DAY) revert RentPriceTooHigh();
 
-        uint256 totalCost = reg.rentPricePerDay * durationDays;
+        uint256 totalCost = rentPricePerDay * durationDays;
         if (msg.value < totalCost) revert InsufficientPayment();
 
         uint256 endTime = block.timestamp + (durationDays * 1 days);
@@ -272,7 +276,7 @@ contract ContentLicensing is
         deals[dealId] = Deal({
             id: dealId,
             contentHash: contentHash,
-            splitEntityHash: reg.splitEntityHash,
+            splitEntityHash: splitEntityHash,
             dealType: DealType.RENT,
             status: DealStatus.ACTIVE,
             buyer: msg.sender,
@@ -286,7 +290,7 @@ contract ContentLicensing is
         // hasAccessFast relies on latest deal to determine access, and a BUY is always valid.
         _updateLatestDealIfSafe(contentHash, msg.sender, dealId);
 
-        _routePayment(reg.splitEntityHash, totalCost);
+        _routePayment(splitEntityHash, totalCost);
         _refundExcess(msg.value, totalCost);
 
         emit ContentRented(dealId, contentHash, msg.sender, totalCost, endTime);
@@ -302,10 +306,12 @@ contract ContentLicensing is
     {
         ContentRegistration storage reg = registrations[contentHash];
         if (!reg.active) revert ContentNotActive();
-        if (reg.licenseFee == 0) revert NotLicensable();
+        uint256 licenseFee = reg.licenseFee;
+        bytes32 splitEntityHash = reg.splitEntityHash;
+        if (licenseFee == 0) revert NotLicensable();
         if (durationDays == 0) revert InvalidDuration();
         if (durationDays > MAX_DURATION_DAYS) revert DurationTooLong();
-        if (msg.value < reg.licenseFee) revert InsufficientPayment();
+        if (msg.value < licenseFee) revert InsufficientPayment();
 
         uint256 endTime = block.timestamp + (durationDays * 1 days);
 
@@ -313,7 +319,7 @@ contract ContentLicensing is
         deals[dealId] = Deal({
             id: dealId,
             contentHash: contentHash,
-            splitEntityHash: reg.splitEntityHash,
+            splitEntityHash: splitEntityHash,
             dealType: DealType.LICENSE,
             status: DealStatus.ACTIVE,
             buyer: msg.sender,
@@ -326,10 +332,10 @@ contract ContentLicensing is
         // Don't overwrite _buyerLatestDeal if user already has a permanent BUY deal
         _updateLatestDealIfSafe(contentHash, msg.sender, dealId);
 
-        _routePayment(reg.splitEntityHash, reg.licenseFee);
-        _refundExcess(msg.value, reg.licenseFee);
+        _routePayment(splitEntityHash, licenseFee);
+        _refundExcess(msg.value, licenseFee);
 
-        emit ContentLicensed(dealId, contentHash, msg.sender, reg.licenseFee, endTime);
+        emit ContentLicensed(dealId, contentHash, msg.sender, licenseFee, endTime);
     }
 
     /// @notice Pay ongoing royalty for a LICENSE deal.

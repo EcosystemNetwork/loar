@@ -161,9 +161,18 @@ contract EntityNFT is
         _setTokenURI(tokenId, metadataURI);
         _setTokenRoyalty(tokenId, msg.sender, royaltyBps);
 
-        // Route exact mint price; refund excess
+        // Route exact mint price to treasury; refund excess. Unlike the edition-style
+        // NFTs (EntityEditionNFT, EpisodeNFT, CharacterNFT) where a buyer pays a
+        // *different* registered creator, EntityNFT mints a unique 1-of-1 in the same
+        // call that registers it — creator == msg.sender always. Routing through
+        // `route(msg.sender, platformFeeBps)` credited (mintPrice - platform's cut)
+        // right back to the payer as a claimable PaymentRouter balance, so a nonzero
+        // mintPrice only ever cost the caller the platform fee slice — defeating its
+        // purpose as an anti-squat / registration price. Send the full price to
+        // treasury instead, matching StructuralDeed.mintDeed()'s identical
+        // self-registration pattern.
         if (mintPrice > 0) {
-            paymentRouter.route{value: mintPrice}(msg.sender, platformFeeBps);
+            paymentRouter.routeToTreasury{value: mintPrice}();
         }
         uint256 excess = msg.value - mintPrice;
         if (excess > 0) {

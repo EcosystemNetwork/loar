@@ -177,6 +177,13 @@ contract CollabManager is
             "Not universe B owner"
         );
 
+        // Bind the accepting address as the actual acceptor of record. Without
+        // this, c.acceptor stays pinned to the address proposed at
+        // proposeCollab() time — if universe B changes hands before
+        // acceptance, activateCollab()'s participant check and
+        // recordCollabRevenue()'s shareB payout would both keep targeting the
+        // stale, no-longer-owning address instead of whoever actually accepted.
+        c.acceptor = msg.sender;
         c.status = CollabStatus.ACCEPTED;
 
         emit CollabAccepted(collabId, msg.sender);

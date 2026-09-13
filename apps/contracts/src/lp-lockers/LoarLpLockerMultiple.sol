@@ -122,12 +122,17 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
             revert NoRewardRecipients();
         }
 
+        uint256 numRewards = tokenRewardInfo.rewardBps.length;
+
         // check that the reward amounts add up to 10000
         uint16 totalRewards = 0;
-        for (uint256 i = 0; i < tokenRewardInfo.rewardBps.length; i++) {
+        for (uint256 i = 0; i < numRewards;) {
             totalRewards += tokenRewardInfo.rewardBps[i];
             if (tokenRewardInfo.rewardBps[i] == 0) {
                 revert ZeroRewardAmount();
+            }
+            unchecked {
+                ++i;
             }
         }
         if (totalRewards != BASIS_POINTS) {
@@ -135,12 +140,15 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         }
 
         // check that no address is the zero address
-        for (uint256 i = 0; i < tokenRewardInfo.rewardBps.length; i++) {
+        for (uint256 i = 0; i < numRewards;) {
             if (
                 tokenRewardInfo.rewardAdmins[i] == address(0)
                     || tokenRewardInfo.rewardRecipients[i] == address(0)
             ) {
                 revert ZeroRewardAddress();
+            }
+            unchecked {
+                ++i;
             }
         }
 
@@ -201,13 +209,14 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         }
 
         // ensure that the max number of positions is not exceeded
-        if (lockerConfig.tickLower.length > MAX_LP_POSITIONS) {
+        uint256 numPositions_ = lockerConfig.tickLower.length;
+        if (numPositions_ > MAX_LP_POSITIONS) {
             revert TooManyPositions();
         }
 
         // make sure the locker position config is valid
         uint256 positionBpsTotal = 0;
-        for (uint256 i = 0; i < lockerConfig.tickLower.length; i++) {
+        for (uint256 i = 0; i < numPositions_;) {
             if (lockerConfig.tickLower[i] > lockerConfig.tickUpper[i]) {
                 revert TicksBackwards();
             }
@@ -228,6 +237,9 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
             }
 
             positionBpsTotal += lockerConfig.positionBps[i];
+            unchecked {
+                ++i;
+            }
         }
         if (positionBpsTotal != BASIS_POINTS) {
             revert InvalidPositionBps();
@@ -236,13 +248,13 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         bool token0IsLoar = token < poolConfig.pairedToken;
 
         // encode actions
-        bytes[] memory params = new bytes[](lockerConfig.tickLower.length + 1);
+        bytes[] memory params = new bytes[](numPositions_ + 1);
         bytes memory actions;
 
         int24 startingTick =
             token0IsLoar ? poolConfig.tickIfToken0IsLoar : -poolConfig.tickIfToken0IsLoar;
 
-        for (uint256 i = 0; i < lockerConfig.tickLower.length; i++) {
+        for (uint256 i = 0; i < numPositions_;) {
             // add mint action
             actions = abi.encodePacked(actions, uint8(Actions.MINT_POSITION));
 
@@ -276,11 +288,14 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
                 address(this), // recipient of position
                 abi.encode(address(this))
             );
+            unchecked {
+                ++i;
+            }
         }
 
         // add settle action
         actions = abi.encodePacked(actions, uint8(Actions.SETTLE_PAIR));
-        params[lockerConfig.tickLower.length] = abi.encode(poolKey.currency0, poolKey.currency1);
+        params[numPositions_] = abi.encode(poolKey.currency0, poolKey.currency1);
 
         // approvals for universe token
         {
@@ -339,22 +354,29 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         IERC20 rewardToken1 = IERC20(Currency.unwrap(tokenRewardInfo.poolKey.currency1));
 
         // determine reward distribution
-        uint256[] memory rewards0 = new uint256[](tokenRewardInfo.rewardBps.length);
-        uint256[] memory rewards1 = new uint256[](tokenRewardInfo.rewardBps.length);
+        uint256 numRewards = tokenRewardInfo.rewardBps.length;
+        uint256[] memory rewards0 = new uint256[](numRewards);
+        uint256[] memory rewards1 = new uint256[](numRewards);
         uint256 reward0Total = 0;
         uint256 reward1Total = 0;
 
-        for (uint256 i = 0; i < tokenRewardInfo.rewardBps.length - 1; i++) {
+        // `numRewards - 1` deliberately stays checked (outside unchecked) — an
+        // unregistered token (numRewards == 0) must still revert here rather
+        // than underflow into a huge loop bound.
+        for (uint256 i = 0; i < numRewards - 1;) {
             rewards0[i] = uint256(tokenRewardInfo.rewardBps[i]) * amount0 / BASIS_POINTS;
             rewards1[i] = uint256(tokenRewardInfo.rewardBps[i]) * amount1 / BASIS_POINTS;
             reward0Total += rewards0[i];
             reward1Total += rewards1[i];
+            unchecked {
+                ++i;
+            }
         }
-        rewards0[tokenRewardInfo.rewardBps.length - 1] = amount0 - reward0Total;
-        rewards1[tokenRewardInfo.rewardBps.length - 1] = amount1 - reward1Total;
+        rewards0[numRewards - 1] = amount0 - reward0Total;
+        rewards1[numRewards - 1] = amount1 - reward1Total;
 
         // distribute the rewards
-        for (uint256 i = 0; i < tokenRewardInfo.rewardBps.length; i++) {
+        for (uint256 i = 0; i < numRewards;) {
             if (rewards0[i] > 0) {
                 SafeERC20.forceApprove(rewardToken0, address(feeLocker), rewards0[i]);
                 feeLocker.storeFees(
@@ -366,6 +388,9 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
                 feeLocker.storeFees(
                     tokenRewardInfo.rewardRecipients[i], address(rewardToken1), rewards1[i]
                 );
+            }
+            unchecked {
+                ++i;
             }
         }
 
@@ -382,10 +407,13 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         bytes memory actions;
         bytes[] memory params = new bytes[](numPositions + 1);
 
-        for (uint256 i = 0; i < numPositions; i++) {
+        for (uint256 i = 0; i < numPositions;) {
             actions = abi.encodePacked(actions, uint8(Actions.DECREASE_LIQUIDITY));
             /// @dev collecting fees is achieved with liquidity=0, the second parameter
             params[i] = abi.encode(positionId + i, 0, 0, 0, abi.encode());
+            unchecked {
+                ++i;
+            }
         }
 
         Currency currency0 = poolKey.currency0;

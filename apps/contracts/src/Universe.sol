@@ -90,10 +90,14 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
     /// @param users Array of addresses to update
     /// @param status Whitelist status to set for all addresses
     function batchSetWhitelisted(address[] calldata users, bool status) external onlyAdmin {
-        require(users.length <= 200, "Batch too large");
-        for (uint256 i = 0; i < users.length; i++) {
+        uint256 len = users.length;
+        require(len <= 200, "Batch too large");
+        for (uint256 i = 0; i < len;) {
             isWhitelisted[users[i]] = status;
             emit WhitelistedUpdated(users[i], status);
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -108,10 +112,14 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
 
     /// @notice Batch vault whitelist multiple addresses in a single transaction.
     function batchSetVaultWhitelisted(address[] calldata users, bool status) external onlyAdmin {
-        require(users.length <= 200, "Batch too large");
-        for (uint256 i = 0; i < users.length; i++) {
+        uint256 len = users.length;
+        require(len <= 200, "Batch too large");
+        for (uint256 i = 0; i < len;) {
             vaultWhitelisted[users[i]] = status;
             emit VaultWhitelistUpdated(users[i], status);
+            unchecked {
+                ++i;
+            }
         }
     }
 

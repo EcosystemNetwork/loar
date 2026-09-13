@@ -265,7 +265,10 @@ contract LoarSwapRouter is IUnlockCallback, Ownable {
     /// @notice Approve the PoolManager to spend a token held by this contract.
     /// @dev Useful for settling ERC20 debts. Should be called once per token.
     function approveToken(address token) external onlyOwner {
-        IERC20(token).approve(address(manager), type(uint256).max);
+        // forceApprove (zero-then-set) tolerates USDT-style tokens that revert
+        // on a non-zero -> non-zero approve; plain .approve() would brick a
+        // second call for such a token.
+        IERC20(token).forceApprove(address(manager), type(uint256).max);
     }
 
     // ──────────────────────────────────────────────────────────────────────

@@ -136,7 +136,8 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
         }
 
         uint8 l = uint8(layer);
-        if (msg.value < layerMintPrices[l]) revert InsufficientPayment();
+        uint256 price = layerMintPrices[l];
+        if (msg.value < price) revert InsufficientPayment();
         if (layerMaxSupply[l] > 0 && layerMinted[l] >= layerMaxSupply[l]) revert LayerSoldOut();
 
         // Hierarchy validation: DOMAIN (layer 0) has no parent, all others require one
@@ -172,7 +173,6 @@ contract StructuralDeed is ERC721Enumerable, ERC721URIStorage, ERC2981, Reentran
         _setTokenRoyalty(tokenId, msg.sender, royaltyBps);
 
         // DEED-02: Route only the required price to treasury, refund excess
-        uint256 price = layerMintPrices[l];
         if (price > 0) {
             paymentRouter.routeToTreasury{value: price}();
         }

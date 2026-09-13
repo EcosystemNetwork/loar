@@ -218,7 +218,10 @@ contract CreditManager is
     {
         CreditPackage storage pkg = packages[packageId];
         if (!pkg.active) revert PackageNotActive();
-        if (msg.value < pkg.priceWei) revert InsufficientPayment();
+        uint256 priceWei = pkg.priceWei;
+        uint256 credits = pkg.credits;
+        uint256 bonusCredits = pkg.bonusCredits;
+        if (msg.value < priceWei) revert InsufficientPayment();
 
         uint256 bonusFromDiscount = 0;
         if (discountToken != address(0) && holderDiscountBps[discountToken] > 0) {
@@ -226,28 +229,28 @@ contract CreditManager is
             // that revert or consume excessive gas in balanceOf()
             try IERC20(discountToken).balanceOf(msg.sender) returns (uint256 bal) {
                 if (bal >= 1e18) {
-                    bonusFromDiscount = (pkg.credits * holderDiscountBps[discountToken]) / 10000;
+                    bonusFromDiscount = (credits * holderDiscountBps[discountToken]) / 10000;
                 }
             } catch {
                 // Token call failed — skip discount, proceed without bonus
             }
         }
 
-        uint256 totalCredits = pkg.credits + pkg.bonusCredits + bonusFromDiscount;
+        uint256 totalCredits = credits + bonusCredits + bonusFromDiscount;
         userCredits[msg.sender].balance += totalCredits;
-        userCredits[msg.sender].totalPurchased += pkg.credits;
-        userCredits[msg.sender].totalBonusReceived += pkg.bonusCredits + bonusFromDiscount;
+        userCredits[msg.sender].totalPurchased += credits;
+        userCredits[msg.sender].totalBonusReceived += bonusCredits + bonusFromDiscount;
 
         // Route exact price to treasury; refund overpayment
-        paymentRouter.routeToTreasury{value: pkg.priceWei}();
-        uint256 refund = msg.value - pkg.priceWei;
+        paymentRouter.routeToTreasury{value: priceWei}();
+        uint256 refund = msg.value - priceWei;
         if (refund > 0) {
             (bool sent,) = msg.sender.call{value: refund}("");
             if (!sent) revert TransferFailed();
         }
 
         emit CreditsPurchasedWithEth(
-            msg.sender, packageId, pkg.credits, pkg.bonusCredits + bonusFromDiscount, pkg.priceWei
+            msg.sender, packageId, credits, bonusCredits + bonusFromDiscount, priceWei
         );
     }
 
@@ -255,24 +258,25 @@ contract CreditManager is
     function purchaseWithEth(uint256 packageId) external payable nonReentrant whenNotPaused {
         CreditPackage storage pkg = packages[packageId];
         if (!pkg.active) revert PackageNotActive();
-        if (msg.value < pkg.priceWei) revert InsufficientPayment();
+        uint256 priceWei = pkg.priceWei;
+        uint256 credits = pkg.credits;
+        uint256 bonusCredits = pkg.bonusCredits;
+        if (msg.value < priceWei) revert InsufficientPayment();
 
-        uint256 totalCredits = pkg.credits + pkg.bonusCredits;
+        uint256 totalCredits = credits + bonusCredits;
         userCredits[msg.sender].balance += totalCredits;
-        userCredits[msg.sender].totalPurchased += pkg.credits;
-        userCredits[msg.sender].totalBonusReceived += pkg.bonusCredits;
+        userCredits[msg.sender].totalPurchased += credits;
+        userCredits[msg.sender].totalBonusReceived += bonusCredits;
 
         // Route exact price to treasury; refund overpayment
-        paymentRouter.routeToTreasury{value: pkg.priceWei}();
-        uint256 refund = msg.value - pkg.priceWei;
+        paymentRouter.routeToTreasury{value: priceWei}();
+        uint256 refund = msg.value - priceWei;
         if (refund > 0) {
             (bool sent,) = msg.sender.call{value: refund}("");
             if (!sent) revert TransferFailed();
         }
 
-        emit CreditsPurchasedWithEth(
-            msg.sender, packageId, pkg.credits, pkg.bonusCredits, pkg.priceWei
-        );
+        emit CreditsPurchasedWithEth(msg.sender, packageId, credits, bonusCredits, priceWei);
     }
 
     // ── Purchase with $LOAR (25% margin) ─────────────────────────
@@ -298,15 +302,17 @@ contract CreditManager is
         paymentRouter.routeLoarToTreasury(loarAmount);
 
         // $LOAR buyers get a bonus on top of the package bonus
-        uint256 loarBonus = pkg.credits / 10; // Extra 10% credits for $LOAR payments
-        uint256 totalCredits = pkg.credits + pkg.bonusCredits + loarBonus;
+        uint256 credits = pkg.credits;
+        uint256 bonusCredits = pkg.bonusCredits;
+        uint256 loarBonus = credits / 10; // Extra 10% credits for $LOAR payments
+        uint256 totalCredits = credits + bonusCredits + loarBonus;
 
         userCredits[msg.sender].balance += totalCredits;
-        userCredits[msg.sender].totalPurchased += pkg.credits;
-        userCredits[msg.sender].totalBonusReceived += pkg.bonusCredits + loarBonus;
+        userCredits[msg.sender].totalPurchased += credits;
+        userCredits[msg.sender].totalBonusReceived += bonusCredits + loarBonus;
 
         emit CreditsPurchasedWithLoar(
-            msg.sender, packageId, pkg.credits, pkg.bonusCredits + loarBonus, loarAmount
+            msg.sender, packageId, credits, bonusCredits + loarBonus, loarAmount
         );
     }
 

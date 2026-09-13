@@ -212,6 +212,7 @@ contract SubscriptionManager is
         if (months == 0 || months > 120) revert MonthsTooHigh(); // max 10 years
         TierConfig storage config = tierConfigs[universeId][tier];
         if (!config.active) revert TierNotActive();
+        uint256 pricePerMonth = config.pricePerMonth;
 
         // Require registration (prevents accidental routing to an unowned
         // universe), but route revenue to the CURRENT on-chain owner rather
@@ -220,7 +221,7 @@ contract SubscriptionManager is
         address creator = _currentCreator(universeId);
         if (creator == address(0)) revert ZeroAddress();
 
-        uint256 totalPrice = config.pricePerMonth * months;
+        uint256 totalPrice = pricePerMonth * months;
         if (msg.value < totalPrice) revert InsufficientPayment();
 
         Subscription storage sub = subscriptions[msg.sender][universeId];
@@ -244,9 +245,9 @@ contract SubscriptionManager is
                 // Downgrades are blocked above, so new tier price is strictly higher.
                 TierConfig storage oldCfg = tierConfigs[universeId][sub.tier];
                 uint256 remainingSecs = sub.expiresAt - block.timestamp;
-                if (config.pricePerMonth > 0) {
-                    startTime = block.timestamp + (remainingSecs * oldCfg.pricePerMonth)
-                        / config.pricePerMonth;
+                if (pricePerMonth > 0) {
+                    startTime =
+                        block.timestamp + (remainingSecs * oldCfg.pricePerMonth) / pricePerMonth;
                 }
                 // If new tier is free-priced (shouldn't happen given downgrade
                 // guard), the upgrade simply begins at block.timestamp.

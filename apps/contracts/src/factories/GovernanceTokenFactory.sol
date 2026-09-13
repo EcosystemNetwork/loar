@@ -66,14 +66,22 @@ contract GovernanceTokenFactory {
     }
 
     function addBlockedSymbols(string[] calldata symbols) external onlyOwner {
-        for (uint256 i = 0; i < symbols.length; i++) {
+        uint256 len = symbols.length;
+        for (uint256 i = 0; i < len;) {
             blockedSymbols[symbols[i]] = true;
+            unchecked {
+                ++i;
+            }
         }
     }
 
     function removeBlockedSymbols(string[] calldata symbols) external onlyOwner {
-        for (uint256 i = 0; i < symbols.length; i++) {
+        uint256 len = symbols.length;
+        for (uint256 i = 0; i < len;) {
             blockedSymbols[symbols[i]] = false;
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -107,11 +115,14 @@ contract GovernanceTokenFactory {
     function _requireCanonicalSymbol(string memory symbol) internal pure {
         bytes memory b = bytes(symbol);
         uint256 len = b.length;
-        for (uint256 i = 0; i < len; i++) {
+        for (uint256 i = 0; i < len;) {
             bytes1 c = b[i];
             bool isUpper = (c >= 0x41 && c <= 0x5A); // A-Z
             bool isDigit = (c >= 0x30 && c <= 0x39); // 0-9
             if (!isUpper && !isDigit) revert InvalidSymbolChar();
+            unchecked {
+                ++i;
+            }
         }
     }
 }

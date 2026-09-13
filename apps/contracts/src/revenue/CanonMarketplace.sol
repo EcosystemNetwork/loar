@@ -316,8 +316,11 @@ contract CanonMarketplace is
         // Enforce minimum quorum: total votes must meet threshold of total supply.
         // If quorum is not reached, the submission expires and held ETH is refunded
         // to the creator via the pull-based claimableRefunds pattern (CANON-04 fix).
+        uint256 votesFor = sub.votesFor;
+        uint256 votesAgainst = sub.votesAgainst;
+
         if (quorumBps > 0) {
-            uint256 totalVotes = sub.votesFor + sub.votesAgainst;
+            uint256 totalVotes = votesFor + votesAgainst;
             uint256 totalSupply = IVotes(sub.universeToken).getPastTotalSupply(sub.snapshotBlock);
             uint256 quorumRequired = (totalSupply * quorumBps) / 10_000;
             if (totalVotes < quorumRequired) {
@@ -335,7 +338,7 @@ contract CanonMarketplace is
         uint256 held = creatorHeldAmount[submissionId];
         creatorHeldAmount[submissionId] = 0;
 
-        if (sub.votesFor > sub.votesAgainst) {
+        if (votesFor > votesAgainst) {
             sub.status = SubmissionStatus.ACCEPTED;
             canonSubmissions[sub.universeId].push(submissionId);
 

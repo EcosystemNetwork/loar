@@ -110,11 +110,15 @@ contract LoarTokenSpoke is ERC20, ERC20Permit, ERC20Burnable, Ownable, Pausable 
 
     /// @notice Batch-set fee exemptions for multiple addresses
     function batchSetFeeExempt(address[] calldata accounts, bool exempt) external onlyOwner {
-        if (accounts.length > 200) revert BatchTooLarge();
-        for (uint256 i = 0; i < accounts.length; i++) {
+        uint256 len = accounts.length;
+        if (len > 200) revert BatchTooLarge();
+        for (uint256 i = 0; i < len;) {
             if (accounts[i] == address(0)) revert ZeroAddress();
             feeExempt[accounts[i]] = exempt;
             emit FeeExemptUpdated(accounts[i], exempt);
+            unchecked {
+                ++i;
+            }
         }
     }
 

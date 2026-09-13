@@ -170,8 +170,12 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
 
         _lpLockerFeeClaim(poolKey);
 
+        // Cache the pool id once — it's a keccak256 over the full PoolKey, and
+        // this function reads it multiple times per call on the hot swap path.
+        PoolId pid = poolKey.toId();
+
         // variables to determine how to collect protocol fee
-        bool token0IsLoar = loarIsToken0[poolKey.toId()];
+        bool token0IsLoar = loarIsToken0[pid];
         bool swappingForLoar = swapParams.zeroForOne != token0IsLoar;
         bool isExactInput = swapParams.amountSpecified < 0;
 
@@ -183,7 +187,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
             // since we're taking the protocol fee before the LP swap, we want to
             // take a slightly smaller amount to keep the taken LP/protocol fee at the 20% ratio,
             // this also helps us match the ExactOutput swappingForLoar scenario
-            uint24 pFee = poolProtocolFee[poolKey.toId()];
+            uint24 pFee = poolProtocolFee[pid];
             // forge-lint: disable-next-line(unsafe-typecast)
             uint128 scaledProtocolFee = (uint128(pFee) * 1e18) / (1_000_000 + pFee);
             // forge-lint: disable-next-line(unsafe-typecast)
@@ -208,7 +212,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         if (!isExactInput && !swappingForLoar) {
             // we increase the protocol fee here because we want to better match
             // the ExactOutput !swappingForLoar scenario
-            uint24 pFee = poolProtocolFee[poolKey.toId()];
+            uint24 pFee = poolProtocolFee[pid];
             // forge-lint: disable-next-line(unsafe-typecast)
             uint128 scaledProtocolFee = (uint128(pFee) * 1e18) / (1_000_000 - pFee);
             // forge-lint: disable-next-line(unsafe-typecast)
@@ -236,8 +240,12 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         BalanceDelta delta,
         bytes calldata
     ) internal override returns (bytes4, int128 unspecifiedDelta) {
+        // Cache the pool id once (see _beforeSwap) — avoids recomputing the
+        // PoolKey hash for each mapping lookup below.
+        PoolId pid = poolKey.toId();
+
         // variables to determine how to collect protocol fee
-        bool token0IsLoar = loarIsToken0[poolKey.toId()];
+        bool token0IsLoar = loarIsToken0[pid];
         bool swappingForLoar = swapParams.zeroForOne != token0IsLoar;
         bool isExactInput = swapParams.amountSpecified < 0;
 
@@ -246,7 +254,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         // how: the change in unspecified delta is debited to the swaps account post swap,
         // in this case the amount out given to the swapper is decreased
         if (isExactInput && !swappingForLoar) {
-            uint24 pFee = poolProtocolFee[poolKey.toId()];
+            uint24 pFee = poolProtocolFee[pid];
             // grab non-loar amount out
             int128 amountOut = token0IsLoar ? delta.amount1() : delta.amount0();
             // take fee from it
@@ -266,7 +274,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         // how: the change in unspecified delta is debited to the swapper's account post swap,
         // in this case the amount taken from the swapper's account is increased
         if (!isExactInput && swappingForLoar) {
-            uint24 pFee = poolProtocolFee[poolKey.toId()];
+            uint24 pFee = poolProtocolFee[pid];
             // grab non-loar amount in
             int128 amountIn = token0IsLoar ? delta.amount1() : delta.amount0();
             // take fee from amount int

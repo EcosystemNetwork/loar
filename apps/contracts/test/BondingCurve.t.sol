@@ -404,15 +404,28 @@ contract BondingCurveTest is Test {
     }
 
     /// @dev Fuzz: various supply/graduation combos produce valid slopeScaled
+    /// @dev Deployment goes through `_deployBondingCurve` (an external self-call)
+    ///      rather than `try new BondingCurve(...) returns (BondingCurve c)`
+    ///      directly. The direct form makes solc synthesize an implicit
+    ///      address -> payable-fallback-contract-type conversion for the
+    ///      try/new return binding (BondingCurve has a payable `receive()`),
+    ///      which trips a solc 0.8.30 + via_ir compiler bug: it reports
+    ///      "Explicit type conversion not allowed from non-payable address"
+    ///      against a phantom, unattributable helper function pinned just past
+    ///      this file's last line — blocking the whole test file (and every
+    ///      other test file, since forge compiles the test/ dir as one unit)
+    ///      from compiling at all. Routing the `new` through an ordinary
+    ///      external call sidesteps that code path; `try` on a regular
+    ///      external function call with a typed return is the common,
+    ///      well-trodden pattern and compiles cleanly.
     function testFuzz_constructor_various_params(uint256 supply, uint256 gradEth) public {
         supply = bound(supply, 1e20, 1e29); // 100 tokens to 100B tokens
         gradEth = bound(gradEth, 0.1 ether, 100 ether);
 
         MockToken t = new MockToken("T", "T", supply, address(this));
 
-        try new BondingCurve(address(t), address(manager), 99, supply, gradEth, 10000) returns (
-            BondingCurve c
-        ) {
+        try this._deployBondingCurve(address(t), address(manager), 99, supply, gradEth, 10000)
+        returns (BondingCurve c) {
             assertGt(c.slopeScaled(), 0, "slopeScaled must be > 0");
 
             // Verify full curve cost ~ gradEth (within 1% for reasonable params)
@@ -422,6 +435,20 @@ contract BondingCurveTest is Test {
         } catch {
             // SlopeIsZero is acceptable for extreme params
         }
+    }
+
+    /// @dev External so `try this._deployBondingCurve(...)` can catch its
+    ///      revert (SlopeIsZero on extreme fuzzed params) — see the doc
+    ///      comment on testFuzz_constructor_various_params above.
+    function _deployBondingCurve(
+        address token_,
+        address manager_,
+        uint256 universeId_,
+        uint256 supply_,
+        uint256 gradEth_,
+        uint16 maxBuyBps_
+    ) external returns (BondingCurve) {
+        return new BondingCurve(token_, manager_, universeId_, supply_, gradEth_, maxBuyBps_);
     }
 
     /// @dev Anti-whale: buying more than MAX_BUY_AMOUNT reverts

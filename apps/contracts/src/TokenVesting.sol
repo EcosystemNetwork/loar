@@ -212,15 +212,16 @@ contract TokenVesting is Ownable {
     function claim(uint256 vestingId) external {
         VestingSchedule storage v = vestings[vestingId];
         if (v.totalAmount == 0) revert VestingNotFound();
-        if (v.beneficiary != msg.sender) revert NotBeneficiary();
+        address beneficiary = v.beneficiary;
+        if (beneficiary != msg.sender) revert NotBeneficiary();
 
         uint128 claimable = _claimableAmount(v);
         if (claimable == 0) revert NothingToClaim();
 
         v.claimed += claimable;
-        IERC20(v.token).safeTransfer(v.beneficiary, claimable);
+        IERC20(v.token).safeTransfer(beneficiary, claimable);
 
-        emit TokensClaimed(vestingId, v.beneficiary, claimable);
+        emit TokensClaimed(vestingId, beneficiary, claimable);
     }
 
     /// @notice Claim vested tokens from all of the caller's vesting schedules.
@@ -229,13 +230,20 @@ contract TokenVesting is Ownable {
         uint256 len = ids.length;
         if (len > 50) revert TooManyVestings();
 
-        for (uint256 i; i < len; ++i) {
-            VestingSchedule storage v = vestings[ids[i]];
+        for (uint256 i; i < len;) {
+            uint256 id = ids[i];
+            VestingSchedule storage v = vestings[id];
             uint128 claimable = _claimableAmount(v);
             if (claimable > 0) {
                 v.claimed += claimable;
-                IERC20(v.token).safeTransfer(v.beneficiary, claimable);
-                emit TokensClaimed(ids[i], v.beneficiary, claimable);
+                // v.beneficiary == msg.sender by construction — every id in this
+                // array came from beneficiaryVestings[msg.sender] — so read
+                // msg.sender directly instead of an extra SLOAD per iteration.
+                IERC20(v.token).safeTransfer(msg.sender, claimable);
+                emit TokensClaimed(id, msg.sender, claimable);
+            }
+            unchecked {
+                ++i;
             }
         }
     }
