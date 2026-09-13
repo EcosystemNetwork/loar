@@ -11,6 +11,7 @@ import { createFileRoute, Link as RouterLink, useNavigate, redirect } from '@tan
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useBalance, useChainId, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi';
 import { useWalletAuth, awaitSessionValidation } from '@/lib/wallet-auth';
+import { normalizeUniverseId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -1048,7 +1049,10 @@ function CinematicUniverseCreate() {
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               {universeAddress && (
-                <RouterLink to="/create" search={{ universe: universeAddress.toLowerCase() }}>
+                <RouterLink
+                  to="/create"
+                  search={{ universe: normalizeUniverseId(universeAddress) }}
+                >
                   <Button size="lg" className="w-full">
                     <Rocket className="h-5 w-5 mr-2" />
                     Start Building
@@ -1058,7 +1062,7 @@ function CinematicUniverseCreate() {
               {!tokenAddress && universeAddress && (
                 <RouterLink
                   to="/universe/$id/deploy-token"
-                  params={{ id: universeAddress.toLowerCase() }}
+                  params={{ id: normalizeUniverseId(universeAddress) }}
                 >
                   <Button size="lg" variant="outline" className="w-full">
                     <Rocket className="h-5 w-5 mr-2" />
@@ -1066,7 +1070,10 @@ function CinematicUniverseCreate() {
                   </Button>
                 </RouterLink>
               )}
-              <RouterLink to="/universe/$id" params={{ id: universeAddress?.toLowerCase() ?? '' }}>
+              <RouterLink
+                to="/universe/$id"
+                params={{ id: universeAddress ? normalizeUniverseId(universeAddress) : '' }}
+              >
                 <Button size="lg" variant="outline" className="w-full">
                   Enter Universe
                 </Button>

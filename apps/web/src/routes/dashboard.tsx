@@ -46,6 +46,7 @@ import { useCreditBalance, useMyNFTs, useUniversesMetricsBatch } from '@/hooks/u
 import { useTokenListData, type EnrichedToken } from '@/hooks/useTokens';
 
 import { useWalletAuth } from '@/lib/wallet-auth';
+import { normalizeUniverseId } from '@/lib/utils';
 import { useMemo } from 'react';
 
 export const Route = createFileRoute('/dashboard')({
@@ -673,7 +674,7 @@ function UniverseCard({
                 universe.tokenAddress === '0x0000000000000000000000000000000000000000') && (
                 <RouterLink
                   to="/universe/$id/deploy-token"
-                  params={{ id: (universe.address || universe.id).toLowerCase() }}
+                  params={{ id: normalizeUniverseId(universe.address || universe.id) }}
                   onClick={(e: React.MouseEvent) => e.stopPropagation()}
                 >
                   <Button size="sm" variant="outline" className="text-[10px] h-6 px-2 gap-1">
