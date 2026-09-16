@@ -13,7 +13,7 @@ import { universeAbi } from '@loar/abis/generated';
 import { type Address } from 'viem';
 import { ponderGql, ponderQueryDefaults } from '@/utils/ponder-api';
 import { trpcClient } from '@/utils/trpc';
-import { asEvmAddressOrUndefined } from '@/lib/utils';
+import { asEvmAddressOrUndefined, normalizeUniverseId } from '@/lib/utils';
 import {
   type GraphFetchFailureReason,
   type RawGraphTuple,
@@ -330,13 +330,22 @@ export function useUniverseBlockchain({
   // ── Off-chain timeline nodes (Fun-Mode universes) ──
   // Only loads when this universe is explicitly off-chain. On-chain universes
   // never fall back to off-chain — keeps data sources strictly separated.
+  // Firestore's `where('universeId', '==', ...)` is an exact-match, and
+  // offChainNodesRouter always stores EVM-shaped ids lowercased — so a
+  // mixed-case route id (e.g. a checksummed address from `getAddress()` at
+  // publish time) here would query for a doc that doesn't exist and render
+  // an empty timeline. /watch and /profile already normalize before this
+  // same query; this hook (the editor) didn't, which is why non-Fogline
+  // fun-mode universes render zero nodes — Fogline's hardcoded id happens to
+  // already be all-lowercase.
+  const normalizedUniverseId = normalizeUniverseId(universeId);
   const {
     data: offChainData,
     isLoading: rqIsLoadingOffChain,
     status: offChainStatus,
   } = useQuery({
-    queryKey: ['offChainNodes', universeId],
-    queryFn: () => trpcClient.offChainNodes.list.query({ universeId }),
+    queryKey: ['offChainNodes', normalizedUniverseId],
+    queryFn: () => trpcClient.offChainNodes.list.query({ universeId: normalizedUniverseId }),
     enabled: !!universeId && useOffChain,
     staleTime: 30_000,
   });
