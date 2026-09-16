@@ -121,6 +121,7 @@ import {
   buildSceneFlowGraph,
   mergeDraftNodes,
   appendAddFinalNode,
+  resolveArchivedNodeIds,
   TIMELINE_LAYOUT_CONFIG,
 } from '@/lib/timelineFlowGraph';
 import { useVideoGeneration, type StatusMessage } from '@/hooks/useVideoGeneration';
@@ -2725,15 +2726,15 @@ function UniverseTimelineEditorInner() {
     // consults this key). When that happens, ignore the archive list for
     // this render so the real nodes come back.
     const storedArchivedNodeIds = getArchivedNodeIds();
-    const wouldHideEveryNode =
-      storedArchivedNodeIds.size > 0 &&
-      graphData.nodeIds.every((n) => storedArchivedNodeIds.has(normalizeNodeId(n).toString()));
+    const { archivedNodeIds, wouldHideEveryNode } = resolveArchivedNodeIds({
+      storedArchivedNodeIds,
+      allNodeIds: graphData.nodeIds,
+    });
     if (wouldHideEveryNode) {
       console.warn(
         `[universe ${id}] local archive list covers all ${graphData.nodeIds.length} node(s); ignoring it so the canvas isn't blank. Clear localStorage key "universe_archived_nodes_${id}" to reset.`
       );
     }
-    const archivedNodeIds = wouldHideEveryNode ? new Set<string>() : storedArchivedNodeIds;
 
     // Calculate tree layout using utility
     const layout = calculateTreeLayout(
