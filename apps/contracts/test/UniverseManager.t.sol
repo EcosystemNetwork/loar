@@ -73,30 +73,32 @@ contract UniverseManagerTest is Test {
         }
     }
 
-    // ── backupRelayer (content-backup relayer, platform-wide) ─────────────
+    // ── backupRelayer (content-backup relayer, lives on UniverseFactory —
+    //    not UniverseManager, which predates this feature and is itself
+    //    non-upgradeable, so it can never gain a backupRelayer() function) ──
 
     function test_setBackupRelayer_onlyOwner() public {
-        vm.prank(creator); // not the owner
+        vm.prank(creator); // not the factory owner
         vm.expectRevert();
-        manager.setBackupRelayer(address(0xBEEF));
+        factory.setBackupRelayer(address(0xBEEF));
     }
 
     function test_setBackupRelayer_updatesAndEmits() public {
-        assertEq(manager.backupRelayer(), address(0));
+        assertEq(factory.backupRelayer(), address(0));
 
         vm.expectEmit(true, true, true, true);
-        emit UniverseManager.BackupRelayerUpdated(address(0), address(0xBEEF));
-        manager.setBackupRelayer(address(0xBEEF));
+        emit UniverseFactory.BackupRelayerUpdated(address(0), address(0xBEEF));
+        factory.setBackupRelayer(address(0xBEEF));
 
-        assertEq(manager.backupRelayer(), address(0xBEEF));
+        assertEq(factory.backupRelayer(), address(0xBEEF));
     }
 
     /// @dev Integration test through the real factory-deployed Universe, not
     ///      a mock — confirms a minted universe's backupContent actually
-    ///      reads UniverseManager.backupRelayer() end-to-end, and that
-    ///      rotating the relayer on the manager takes effect on every
+    ///      reads UniverseFactory.backupRelayer() end-to-end, and that
+    ///      rotating the relayer on the factory takes effect on every
     ///      already-deployed universe without any per-universe call.
-    function test_mintedUniverse_backupContent_respectsManagerRelayer() public {
+    function test_mintedUniverse_backupContent_respectsFactoryRelayer() public {
         uint256 id = _mintUniverse("Universe With Backup");
         (IUniverse universe,,,,,) = manager.getUniverseData(id);
 
@@ -109,7 +111,7 @@ contract UniverseManagerTest is Test {
         vm.expectRevert(abi.encodeWithSelector(IUniverse.CallerNotBackupRelayer.selector, relayer));
         universe.backupContent(record, "ipfs://x", "{}");
 
-        manager.setBackupRelayer(relayer);
+        factory.setBackupRelayer(relayer);
 
         vm.prank(relayer);
         bool committed = universe.backupContent(record, "ipfs://x", "{}");

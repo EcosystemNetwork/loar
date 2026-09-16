@@ -39,6 +39,9 @@ export const IdentityNFT = {
 export const LaunchpadStaking = {
     '11155111': '0x8696aaC70BAcD9b5ecFe0126322FD1fE46CD62Fa',
 };
+export const LegacyContentBackupRegistry = {
+    '11155111': '0x3708C081320Eb2877Ee5c10e3665514E9682B371',
+};
 export const LicensingRegistry = {
     '11155111': '0xbF0Fed6125b1e05aA3Dc52B72B5cd7703990627C',
 };
@@ -76,7 +79,7 @@ export const Universe = {
     '11155111': '0x1427Df0998e28DB1b82C4bdBe1B503Bf9b98c76f',
 };
 export const UniverseFactory = {
-    '11155111': '0x8cbC5dD5aF03121F88646B9F56f414557B04dFA6',
+    '11155111': '0x94238B14f84f22A2d053bbC93CD7Ca54c6C79E85',
 };
 export const UniverseManager = {
     '11155111': '0x5441273a432821d20C949768d5940960dEaC6C35',

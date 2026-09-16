@@ -3,6 +3,7 @@ pragma solidity =0.8.30;
 
 import {IUniverse} from "./interfaces/IUniverse.sol";
 import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
+import {IUniverseFactory} from "./interfaces/IUniverseFactory.sol";
 import {NodeCreationOptions, NodeVisibilityOptions} from "./libraries/NodeOptions.sol";
 import {ContentKind, BackupRecord} from "./libraries/ContentBackup.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
@@ -21,9 +22,15 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
         address creator;
     }
 
-    constructor(IUniverseManager.UniverseConfig memory config) {
+    /// @param _backupRelayerSource The IUniverseFactory (or any contract
+    ///        implementing backupRelayer()) that backupContent authorization
+    ///        is read from live — see _checkBackupRelayer. Not UniverseManager:
+    ///        it predates this feature and is itself non-upgradeable, so it
+    ///        can never gain a backupRelayer() function.
+    constructor(IUniverseManager.UniverseConfig memory config, address _backupRelayerSource) {
         require(config.universeAdmin != address(0), "Zero admin address");
         require(config.universeManager != address(0), "Zero manager address");
+        require(_backupRelayerSource != address(0), "Zero backup relayer source");
         nodeCreationOption = config.nodeCreationOption;
         nodeVisibilityOption = config.nodeVisibilityOption;
         universeImageUrl = config.imageURL;
@@ -31,6 +38,7 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
         universeDescription = config.description;
         universeName = config.name;
         universeAdmin = config.universeAdmin;
+        backupRelayerSource = _backupRelayerSource;
     }
 
     string public universeImageUrl;
@@ -49,6 +57,8 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
 
     address public associatedToken;
     IUniverseManager public immutable universeManager;
+    /// @notice Source of the live backupRelayer() lookup — see constructor.
+    address public immutable backupRelayerSource;
     address public universeAdmin;
     uint256 public currentCanonId; // current canon tip node ID (not "is part of canon chain" — use getCanonChain())
 
@@ -86,7 +96,7 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
     }
 
     function _checkBackupRelayer() internal view {
-        if (msg.sender != universeManager.backupRelayer()) {
+        if (msg.sender != IUniverseFactory(backupRelayerSource).backupRelayer()) {
             revert CallerNotBackupRelayer(msg.sender);
         }
     }

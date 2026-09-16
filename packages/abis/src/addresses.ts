@@ -79,6 +79,12 @@ export const LaunchpadStaking = {
 
 export type LaunchpadStakingChainId = keyof typeof LaunchpadStaking;
 
+export const LegacyContentBackupRegistry = {
+  '11155111': '0x3708C081320Eb2877Ee5c10e3665514E9682B371',
+} as const;
+
+export type LegacyContentBackupRegistryChainId = keyof typeof LegacyContentBackupRegistry;
+
 export const LicensingRegistry = {
   '11155111': '0xbF0Fed6125b1e05aA3Dc52B72B5cd7703990627C',
 } as const;
@@ -152,7 +158,7 @@ export const Universe = {
 export type UniverseChainId = keyof typeof Universe;
 
 export const UniverseFactory = {
-  '11155111': '0x8cbC5dD5aF03121F88646B9F56f414557B04dFA6',
+  '11155111': '0x94238B14f84f22A2d053bbC93CD7Ca54c6C79E85',
 } as const;
 
 export type UniverseFactoryChainId = keyof typeof UniverseFactory;

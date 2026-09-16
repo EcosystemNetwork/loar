@@ -6,6 +6,7 @@ import { mainnet, sepolia } from 'wagmi/chains';
 
 import UniverseTokenDeployer from './apps/contracts/out/UniverseTokenDeployerV3.sol/UniverseTokenDeployerV3.json';
 import UniverseManagerAbi from './apps/contracts/out/UniverseManager.sol/UniverseManager.json';
+import UniverseFactoryAbi from './apps/contracts/out/UniverseFactory.sol/UniverseFactory.json';
 import LoarLpLockerMultiple from './apps/contracts/out/LoarLpLockerMultiple.sol/LoarLpLockerMultiple.json';
 import Universe from './apps/contracts/out/Universe.sol/Universe.json';
 import GovernanceERC20 from './apps/contracts/out/GovernanceTokenFactory.sol/GovernanceERC20.json';
@@ -53,6 +54,10 @@ export default defineConfig({
     {
       name: 'UniverseManager',
       abi: UniverseManagerAbi.abi as Abi,
+    },
+    {
+      name: 'UniverseFactory',
+      abi: UniverseFactoryAbi.abi as Abi,
     },
     {
       name: 'LoarLpLockerMultiple',

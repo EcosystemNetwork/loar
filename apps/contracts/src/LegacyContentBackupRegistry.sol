@@ -2,7 +2,7 @@
 pragma solidity =0.8.30;
 
 import {ContentKind} from "./libraries/ContentBackup.sol";
-import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
+import {IUniverseFactory} from "./interfaces/IUniverseFactory.sol";
 import {Pausable} from "@openzeppelin/utils/Pausable.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
 
@@ -38,22 +38,24 @@ contract LegacyContentBackupRegistry is Pausable, Ownable {
         string metadataJson
     );
 
-    /// @notice Same relayer as every Universe contract reads — single source
-    ///         of truth, rotated once via UniverseManager.setBackupRelayer.
-    IUniverseManager public immutable universeManager;
+    /// @notice Same relayer source every new Universe reads — single source
+    ///         of truth, rotated once via UniverseFactory.setBackupRelayer.
+    ///         Not UniverseManager: it predates this feature and is itself
+    ///         non-upgradeable, so it can never gain a backupRelayer() function.
+    IUniverseFactory public immutable backupRelayerSource;
 
     /// @notice universe => offChainId => backed up.
     mapping(address => mapping(bytes32 => bool)) public contentBackedUp;
 
     uint256 public constant MAX_BACKUP_BATCH_SIZE = 100;
 
-    constructor(address _universeManager) Ownable(msg.sender) {
-        require(_universeManager != address(0), "Zero manager address");
-        universeManager = IUniverseManager(_universeManager);
+    constructor(address _backupRelayerSource) Ownable(msg.sender) {
+        require(_backupRelayerSource != address(0), "Zero backup relayer source");
+        backupRelayerSource = IUniverseFactory(_backupRelayerSource);
     }
 
     modifier onlyBackupRelayer() {
-        if (msg.sender != universeManager.backupRelayer()) {
+        if (msg.sender != backupRelayerSource.backupRelayer()) {
             revert CallerNotBackupRelayer(msg.sender);
         }
         _;

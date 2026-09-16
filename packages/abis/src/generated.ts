@@ -8298,7 +8298,13 @@ export const launchpadStakingAbi = [
 export const legacyContentBackupRegistryAbi = [
   {
     type: 'constructor',
-    inputs: [{ name: '_universeManager', internalType: 'address', type: 'address' }],
+    inputs: [
+      {
+        name: '_backupRelayerSource',
+        internalType: 'address',
+        type: 'address',
+      },
+    ],
     stateMutability: 'nonpayable',
   },
   {
@@ -8328,6 +8334,13 @@ export const legacyContentBackupRegistryAbi = [
     name: 'backupContent',
     outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'backupRelayerSource',
+    outputs: [{ name: '', internalType: 'contract IUniverseFactory', type: 'address' }],
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -8404,13 +8417,6 @@ export const legacyContentBackupRegistryAbi = [
     name: 'transferOwnership',
     outputs: [],
     stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'universeManager',
-    outputs: [{ name: '', internalType: 'contract IUniverseManager', type: 'address' }],
-    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -15921,6 +15927,11 @@ export const universeAbi = [
           { name: 'universeManager', internalType: 'address', type: 'address' },
         ],
       },
+      {
+        name: '_backupRelayerSource',
+        internalType: 'address',
+        type: 'address',
+      },
     ],
     stateMutability: 'nonpayable',
   },
@@ -15971,6 +15982,13 @@ export const universeAbi = [
     name: 'backupContent',
     outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'backupRelayerSource',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -16678,6 +16696,139 @@ export const universeAbi = [
   { type: 'error', inputs: [], name: 'NodeDoesNotExist' },
   { type: 'error', inputs: [], name: 'Reentrancy' },
   { type: 'error', inputs: [], name: 'TokenDoesNotExist' },
+] as const;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// UniverseFactory
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const universeFactoryAbi = [
+  {
+    type: 'constructor',
+    inputs: [{ name: '_manager', internalType: 'address', type: 'address' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'backupRelayer',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      {
+        name: 'config',
+        internalType: 'struct IUniverseManager.UniverseConfig',
+        type: 'tuple',
+        components: [
+          {
+            name: 'nodeCreationOption',
+            internalType: 'enum NodeCreationOptions',
+            type: 'uint8',
+          },
+          {
+            name: 'nodeVisibilityOption',
+            internalType: 'enum NodeVisibilityOptions',
+            type: 'uint8',
+          },
+          { name: 'universeAdmin', internalType: 'address', type: 'address' },
+          { name: 'name', internalType: 'string', type: 'string' },
+          { name: 'imageURL', internalType: 'string', type: 'string' },
+          { name: 'description', internalType: 'string', type: 'string' },
+          { name: 'universeManager', internalType: 'address', type: 'address' },
+        ],
+      },
+    ],
+    name: 'createUniverse',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'manager',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'owner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '_relayer', internalType: 'address', type: 'address' }],
+    name: 'setBackupRelayer',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
+    name: 'transferOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldRelayer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'newRelayer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'BackupRelayerUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'OwnershipTransferred',
+  },
+  { type: 'error', inputs: [], name: 'OnlyManager' },
+  {
+    type: 'error',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'OwnableInvalidOwner',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'OwnableUnauthorizedAccount',
+  },
 ] as const;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -17582,13 +17733,6 @@ export const universeManagerAbi = [
   },
   {
     type: 'function',
-    inputs: [],
-    name: 'backupRelayer',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
     name: 'balanceOf',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
@@ -18108,13 +18252,6 @@ export const universeManagerAbi = [
   },
   {
     type: 'function',
-    inputs: [{ name: '_relayer', internalType: 'address', type: 'address' }],
-    name: 'setBackupRelayer',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
     inputs: [
       { name: 'token', internalType: 'address', type: 'address' },
       { name: 'allowed', internalType: 'bool', type: 'bool' },
@@ -18360,25 +18497,6 @@ export const universeManagerAbi = [
       { name: 'approved', internalType: 'bool', type: 'bool', indexed: false },
     ],
     name: 'ApprovalForAll',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'oldRelayer',
-        internalType: 'address',
-        type: 'address',
-        indexed: false,
-      },
-      {
-        name: 'newRelayer',
-        internalType: 'address',
-        type: 'address',
-        indexed: false,
-      },
-    ],
-    name: 'BackupRelayerUpdated',
   },
   {
     type: 'event',
@@ -26318,6 +26436,15 @@ export const useLegacyContentBackupRegistry_MaxBackupBatchSize_read =
   });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"backupRelayerSource"`
+ */
+export const useLegacyContentBackupRegistry_BackupRelayerSource_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: legacyContentBackupRegistryAbi,
+    functionName: 'backupRelayerSource',
+  });
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"contentBackedUp"`
  */
 export const useLegacyContentBackupRegistry_ContentBackedUp_read =
@@ -26350,15 +26477,6 @@ export const useLegacyContentBackupRegistry_Paused_read = /*#__PURE__*/ createUs
   abi: legacyContentBackupRegistryAbi,
   functionName: 'paused',
 });
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"universeManager"`
- */
-export const useLegacyContentBackupRegistry_UniverseManager_read =
-  /*#__PURE__*/ createUseReadContract({
-    abi: legacyContentBackupRegistryAbi,
-    functionName: 'universeManager',
-  });
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__
@@ -32859,6 +32977,14 @@ export const useUniverse_AssociatedToken_read = /*#__PURE__*/ createUseReadContr
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"backupRelayerSource"`
+ */
+export const useUniverse_BackupRelayerSource_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'backupRelayerSource',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"contentBackedUp"`
  */
 export const useUniverse_ContentBackedUp_read = /*#__PURE__*/ createUseReadContract({
@@ -33483,6 +33609,144 @@ export const useUniverse_WhitelistedUpdated_watch = /*#__PURE__*/ createUseWatch
   abi: universeAbi,
   eventName: 'WhitelistedUpdated',
 });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeFactoryAbi}__
+ */
+export const useUniverseFactory_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeFactoryAbi,
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeFactoryAbi}__ and `functionName` set to `"backupRelayer"`
+ */
+export const useUniverseFactory_BackupRelayer_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeFactoryAbi,
+  functionName: 'backupRelayer',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeFactoryAbi}__ and `functionName` set to `"manager"`
+ */
+export const useUniverseFactory_Manager_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeFactoryAbi,
+  functionName: 'manager',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeFactoryAbi}__ and `functionName` set to `"owner"`
+ */
+export const useUniverseFactory_Owner_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeFactoryAbi,
+  functionName: 'owner',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeFactoryAbi}__
+ */
+export const useUniverseFactory_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeFactoryAbi,
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeFactoryAbi}__ and `functionName` set to `"createUniverse"`
+ */
+export const useUniverseFactory_CreateUniverse_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeFactoryAbi,
+  functionName: 'createUniverse',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeFactoryAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useUniverseFactory_RenounceOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeFactoryAbi,
+  functionName: 'renounceOwnership',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeFactoryAbi}__ and `functionName` set to `"setBackupRelayer"`
+ */
+export const useUniverseFactory_SetBackupRelayer_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeFactoryAbi,
+  functionName: 'setBackupRelayer',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeFactoryAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useUniverseFactory_TransferOwnership_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeFactoryAbi,
+  functionName: 'transferOwnership',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeFactoryAbi}__
+ */
+export const useUniverseFactory_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeFactoryAbi,
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeFactoryAbi}__ and `functionName` set to `"createUniverse"`
+ */
+export const useUniverseFactory_CreateUniverse_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeFactoryAbi,
+  functionName: 'createUniverse',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeFactoryAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useUniverseFactory_RenounceOwnership_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: universeFactoryAbi,
+    functionName: 'renounceOwnership',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeFactoryAbi}__ and `functionName` set to `"setBackupRelayer"`
+ */
+export const useUniverseFactory_SetBackupRelayer_simulate = /*#__PURE__*/ createUseSimulateContract(
+  {
+    abi: universeFactoryAbi,
+    functionName: 'setBackupRelayer',
+  }
+);
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeFactoryAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useUniverseFactory_TransferOwnership_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: universeFactoryAbi,
+    functionName: 'transferOwnership',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeFactoryAbi}__
+ */
+export const useUniverseFactory_undefined_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeFactoryAbi,
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeFactoryAbi}__ and `eventName` set to `"BackupRelayerUpdated"`
+ */
+export const useUniverseFactory_BackupRelayerUpdated_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: universeFactoryAbi,
+    eventName: 'BackupRelayerUpdated',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeFactoryAbi}__ and `eventName` set to `"OwnershipTransferred"`
+ */
+export const useUniverseFactory_OwnershipTransferred_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: universeFactoryAbi,
+    eventName: 'OwnershipTransferred',
+  });
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeGovernorAbi}__
@@ -34201,14 +34465,6 @@ export const useUniverseManager_TokenSupply_read = /*#__PURE__*/ createUseReadCo
 });
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"backupRelayer"`
- */
-export const useUniverseManager_BackupRelayer_read = /*#__PURE__*/ createUseReadContract({
-  abi: universeManagerAbi,
-  functionName: 'backupRelayer',
-});
-
-/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"balanceOf"`
  */
 export const useUniverseManager_BalanceOf_read = /*#__PURE__*/ createUseReadContract({
@@ -34566,14 +34822,6 @@ export const useUniverseManager_SetApprovalForAll_write = /*#__PURE__*/ createUs
 });
 
 /**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setBackupRelayer"`
- */
-export const useUniverseManager_SetBackupRelayer_write = /*#__PURE__*/ createUseWriteContract({
-  abi: universeManagerAbi,
-  functionName: 'setBackupRelayer',
-});
-
-/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setClaimableToken"`
  */
 export const useUniverseManager_SetClaimableToken_write = /*#__PURE__*/ createUseWriteContract({
@@ -34841,16 +35089,6 @@ export const useUniverseManager_SetApprovalForAll_simulate =
   });
 
 /**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setBackupRelayer"`
- */
-export const useUniverseManager_SetBackupRelayer_simulate = /*#__PURE__*/ createUseSimulateContract(
-  {
-    abi: universeManagerAbi,
-    functionName: 'setBackupRelayer',
-  }
-);
-
-/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setClaimableToken"`
  */
 export const useUniverseManager_SetClaimableToken_simulate =
@@ -35008,15 +35246,6 @@ export const useUniverseManager_ApprovalForAll_watch = /*#__PURE__*/ createUseWa
   abi: universeManagerAbi,
   eventName: 'ApprovalForAll',
 });
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"BackupRelayerUpdated"`
- */
-export const useUniverseManager_BackupRelayerUpdated_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeManagerAbi,
-    eventName: 'BackupRelayerUpdated',
-  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"BondingCurveCreated"`

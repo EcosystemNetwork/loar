@@ -2,8 +2,10 @@
   "chainId": 11155111,
   "environment": "sepolia",
   "startBlock": 10638176,
-  "updatedAt": "2026-06-14T10:41:17.888Z",
+  "updatedAt": "2026-09-16T17:20:45.967Z",
   "contracts": {
+    "UniverseFactory": "0x94238B14f84f22A2d053bbC93CD7Ca54c6C79E85",
+    "LegacyContentBackupRegistry": "0x3708C081320Eb2877Ee5c10e3665514E9682B371",
     "SplitRouter": "0x08081f6b215D0c34D081BfeB8163455CDb1E0Bdc",
     "ContentLicensing": "0xC9fb591fC6a8a259fADF1242DF3ca434CF022216",
     "LoarToken": "0xAEC35cAAE68de337711E3bc06b51aaAa5551b63F",
@@ -30,7 +32,6 @@
     "LoarSwapRouter": "0x7E156f3Ddd56539aB941DeEfEd1342ae5C9C09a5",
     "TokenVesting": "0x5d74D9e42a52D04DEC9F895F2c9D2e14b1DdCD64",
     "Universe": "0x1427Df0998e28DB1b82C4bdBe1B503Bf9b98c76f",
-    "UniverseFactory": "0x8cbC5dD5aF03121F88646B9F56f414557B04dFA6",
     "UniverseMetadataRenderer": "0x016b0144721e3A3134d52a32F7D712d60829d559",
     "IdentityNFT": "0x45A5E2816696fE9AF96e2F669cafD376a84E8db7"
   }

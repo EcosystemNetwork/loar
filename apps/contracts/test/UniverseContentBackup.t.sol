@@ -8,11 +8,12 @@ import {IUniverseManager} from "../src/interfaces/IUniverseManager.sol";
 import {NodeCreationOptions, NodeVisibilityOptions} from "../src/libraries/NodeOptions.sol";
 import {ContentKind, BackupRecord} from "../src/libraries/ContentBackup.sol";
 
-/// @notice Minimal stand-in for UniverseManager that only implements the one
-///         function Universe.sol actually calls on it for backup-relayer
-///         auth (`backupRelayer()`). Deliberately not a full IUniverseManager
-///         implementation — Universe.sol never calls anything else on it in
-///         the backupContent path.
+/// @notice Doubles as both the `universeManager` config field (Universe.sol
+///         never calls anything on that address in the backupContent path)
+///         and the `backupRelayerSource` constructor arg, which only needs
+///         `backupRelayer()` — the one function Universe.sol actually calls
+///         for backup-relayer auth. Deliberately not a full IUniverseManager
+///         or IUniverseFactory implementation.
 contract MockUniverseManager {
     address public backupRelayer;
 
@@ -40,7 +41,7 @@ contract UniverseContentBackupTest is Test {
             description: "test universe",
             universeManager: address(manager)
         });
-        universe = new Universe(config);
+        universe = new Universe(config, address(manager));
     }
 
     function _record(bytes32 offChainId) internal pure returns (BackupRecord memory) {

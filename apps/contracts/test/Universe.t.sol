@@ -26,7 +26,7 @@ contract UniverseTest is Test {
             description: "test universe",
             universeManager: msg.sender
         });
-        universe = new Universe(config);
+        universe = new Universe(config, msg.sender);
     }
 
     function test_createNode() public {
@@ -307,7 +307,7 @@ contract UniverseTest is Test {
             description: "whitelisted",
             universeManager: address(this)
         });
-        Universe wlUniverse = new Universe(config);
+        Universe wlUniverse = new Universe(config, address(this));
 
         // Non-whitelisted user should revert
         vm.prank(address(0xBEEF));
@@ -325,7 +325,7 @@ contract UniverseTest is Test {
             description: "whitelisted",
             universeManager: address(this)
         });
-        Universe wlUniverse = new Universe(config);
+        Universe wlUniverse = new Universe(config, address(this));
 
         // Whitelist an address
         wlUniverse.setWhitelisted(address(0xBEEF), true);
@@ -348,7 +348,7 @@ contract UniverseTest is Test {
             universeManager: address(this)
         });
         vm.expectRevert("Zero admin address");
-        new Universe(config);
+        new Universe(config, address(this));
     }
 
     function test_constructorZeroManager() public {
@@ -362,7 +362,21 @@ contract UniverseTest is Test {
             universeManager: address(0)
         });
         vm.expectRevert("Zero manager address");
-        new Universe(config);
+        new Universe(config, address(this));
+    }
+
+    function test_constructorZeroBackupRelayerSource() public {
+        IUniverseManager.UniverseConfig memory config = IUniverseManager.UniverseConfig({
+            nodeCreationOption: NodeCreationOptions.PUBLIC,
+            nodeVisibilityOption: NodeVisibilityOptions.PUBLIC,
+            universeAdmin: address(this),
+            name: "Bad Universe",
+            imageURL: "img.com",
+            description: "bad",
+            universeManager: address(this)
+        });
+        vm.expectRevert("Zero backup relayer source");
+        new Universe(config, address(0));
     }
 
     function testFuzz_createNode(bytes32 contentHash, bytes32 plotHash) public {

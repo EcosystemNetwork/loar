@@ -39,8 +39,8 @@ contract LegacyContentBackupRegistryTest is Test {
         });
     }
 
-    function test_constructor_revertsOnZeroManager() public {
-        vm.expectRevert("Zero manager address");
+    function test_constructor_revertsOnZeroBackupRelayerSource() public {
+        vm.expectRevert("Zero backup relayer source");
         new LegacyContentBackupRegistry(address(0));
     }
 
