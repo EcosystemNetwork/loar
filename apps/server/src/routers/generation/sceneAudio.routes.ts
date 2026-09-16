@@ -31,7 +31,7 @@ import { db } from '../../lib/firebase';
 import { elevenLabsService } from '../../services/elevenlabs';
 import { falService } from '../../services/fal';
 import { lipSyncService } from '../../services/lipsync';
-import { firebaseStorageService } from '../../services/firebase-storage';
+import { getStorageManager } from '../../services/storage';
 import { trackQuests } from '../../services/quest-tracker';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
@@ -93,9 +93,8 @@ async function refundCredits(_userId: string, _credits: number, _jobId?: string)
 // ── Upload helper ───────────────────────────────────────────────────────
 
 async function uploadAudioBuffer(buffer: Buffer, filename: string): Promise<string> {
-  const key = await firebaseStorageService.upload(buffer, `scene-audio-${filename}`);
-  // upload() returns a storage key — convert to a playable public URL
-  return firebaseStorageService.getPublicUrl(key);
+  const manifest = await getStorageManager().upload(buffer, `scene-audio-${filename}`);
+  return manifest.uploads[0]?.url ?? '';
 }
 
 // ── Schemas ─────────────────────────────────────────────────────────────

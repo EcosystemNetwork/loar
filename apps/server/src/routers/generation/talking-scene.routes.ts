@@ -22,7 +22,7 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
 import { elevenLabsService, type ElevenLabsVoiceModel } from '../../services/elevenlabs';
-import { firebaseStorageService } from '../../services/firebase-storage';
+import { getStorageManager } from '../../services/storage';
 import { lipSyncService } from '../../services/lipsync';
 import { dispatchGeneration, generateInputSchema } from './generation.routes';
 import { getModelById } from '../../services/video-models';
@@ -94,8 +94,8 @@ async function runTts(opts: {
     throw new Error('TTS returned empty audio');
   }
   const filename = `tts-${ttsGenId}.mp3`;
-  const key = await firebaseStorageService.upload(result.audioBuffer, filename);
-  const audioUrl = firebaseStorageService.getPublicUrl(key);
+  const manifest = await getStorageManager().upload(result.audioBuffer, filename);
+  const audioUrl = manifest.uploads[0]?.url ?? '';
 
   // Persist a minimal voiceGenerations record so the audio shows up in user history.
   await voiceGenerationsCol().doc(ttsGenId).set({
@@ -338,8 +338,8 @@ export const talkingSceneRouter = router({
             if (!videoRes.ok) throw new Error('Failed to fetch synced video');
             const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
             const filename = `talking-scene-${sceneId}.mp4`;
-            const finalKey = await firebaseStorageService.upload(videoBuffer, filename);
-            const finalUrl = firebaseStorageService.getPublicUrl(finalKey);
+            const finalManifest = await getStorageManager().upload(videoBuffer, filename);
+            const finalUrl = finalManifest.uploads[0]?.url ?? '';
 
             // 4. Publish to gallery with full source-ref lineage
             const thumbnailUrl = await extractVideoThumbnail(finalUrl, sceneId).catch(

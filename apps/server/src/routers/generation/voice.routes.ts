@@ -33,7 +33,7 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
 import { elevenLabsService, type ElevenLabsVoiceModel } from '../../services/elevenlabs';
-import { firebaseStorageService } from '../../services/firebase-storage';
+import { getStorageManager } from '../../services/storage';
 import { trackQuests } from '../../services/quest-tracker';
 import { validateUploadUrl, safeFetch } from '../../lib/url-validator';
 import { createAttachment } from '../media/media.handlers';
@@ -98,13 +98,9 @@ const HISTORY_READ_CAP = 500;
 
 // ── Storage upload helper ─────────────────────────────────────────────
 
-async function uploadAudio(
-  buffer: Buffer,
-  _contentType: string,
-  filename: string
-): Promise<string> {
-  const key = await firebaseStorageService.upload(buffer, filename);
-  return firebaseStorageService.getPublicUrl(key);
+async function uploadAudio(buffer: Buffer, contentType: string, filename: string): Promise<string> {
+  const manifest = await getStorageManager().upload(buffer, filename, contentType);
+  return manifest.uploads[0]?.url ?? '';
 }
 
 // ── Fetch with timeout ───────────────────────────────────────────────

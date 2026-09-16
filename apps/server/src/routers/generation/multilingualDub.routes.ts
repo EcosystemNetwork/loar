@@ -24,7 +24,7 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
 import { elevenLabsService } from '../../services/elevenlabs';
-import { firebaseStorageService } from '../../services/firebase-storage';
+import { getStorageManager } from '../../services/storage';
 import { logFailedRefund } from '../../lib/refund-audit';
 import { FieldValue } from 'firebase-admin/firestore';
 import { TRPCError } from '@trpc/server';
@@ -314,18 +314,18 @@ export const multilingualDubRouter = router({
         let outputAudioUrl: string | null = null;
 
         if (video) {
-          const key = await firebaseStorageService.upload(
+          const manifest = await getStorageManager().upload(
             video.buffer,
             `dubs/${ctx.user.uid}/${input.id}.mp4`
           );
-          outputVideoUrl = firebaseStorageService.getPublicUrl(key);
+          outputVideoUrl = manifest.uploads[0]?.url ?? null;
         } else {
           const audio = await elevenLabsService.getDubbingAudio(dubbingId, targetLang, apiKey);
-          const key = await firebaseStorageService.upload(
+          const manifest = await getStorageManager().upload(
             audio.buffer,
             `dubs/${ctx.user.uid}/${input.id}.mp3`
           );
-          outputAudioUrl = firebaseStorageService.getPublicUrl(key);
+          outputAudioUrl = manifest.uploads[0]?.url ?? null;
         }
 
         await ref.update({

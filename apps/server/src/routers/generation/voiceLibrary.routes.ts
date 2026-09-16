@@ -23,7 +23,7 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
 import { elevenLabsService } from '../../services/elevenlabs';
-import { firebaseStorageService } from '../../services/firebase-storage';
+import { getStorageManager } from '../../services/storage';
 import { TRPCError } from '@trpc/server';
 
 // ── Collections ──────────────────────────────────────────────────────
@@ -127,8 +127,8 @@ function tickPreviewQuota(uid: string): { free: boolean; remaining: number } {
 // ── Helpers ──────────────────────────────────────────────────────────
 
 async function uploadAudio(buffer: Buffer, filename: string): Promise<string> {
-  const key = await firebaseStorageService.upload(buffer, filename);
-  return firebaseStorageService.getPublicUrl(key);
+  const manifest = await getStorageManager().upload(buffer, filename);
+  return manifest.uploads[0]?.url ?? '';
 }
 
 // ── Router ───────────────────────────────────────────────────────────

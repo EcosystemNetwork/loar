@@ -26,7 +26,7 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
 import { falService } from '../../services/fal';
-import { firebaseStorageService } from '../../services/firebase-storage';
+import { getStorageManager } from '../../services/storage';
 import { trackQuests } from '../../services/quest-tracker';
 import { createAttachment } from '../media/media.handlers';
 import { publishToGallery } from '../../lib/gallery-publish';
@@ -75,8 +75,8 @@ const HISTORY_READ_CAP = 500;
 // ── Storage upload helper ────────────────────────────────────────────
 
 async function uploadAudio(buffer: Buffer, filename: string): Promise<string> {
-  const key = await firebaseStorageService.upload(buffer, filename);
-  return firebaseStorageService.getPublicUrl(key);
+  const manifest = await getStorageManager().upload(buffer, filename);
+  return manifest.uploads[0]?.url ?? '';
 }
 
 // ── Auto-attach helper ───────────────────────────────────────────────
