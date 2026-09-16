@@ -108,6 +108,7 @@ function CreateLikenessPage() {
   const [consent, setConsent] = useState<ConsentState>(() => emptyConsentState());
   const [pricing, setPricing] = useState<PricingState>(() => emptyPricingState());
   const [newListingId, setNewListingId] = useState<string | null>(null);
+  const [newListingPendingVerification, setNewListingPendingVerification] = useState(false);
 
   // Sync detected modalities into consent state when they first appear, but
   // don't clobber explicit user choices later — only seed on the empty case.
@@ -212,6 +213,7 @@ function CreateLikenessPage() {
     },
     onSuccess: (listing) => {
       setNewListingId(listing.id);
+      setNewListingPendingVerification(listing.pendingVerification);
       setStage('success');
       queryClient.invalidateQueries({ queryKey: ['likenessMarketplace'] });
     },
@@ -246,15 +248,33 @@ function CreateLikenessPage() {
     return (
       <div className="container mx-auto max-w-2xl px-4 py-16 text-center">
         <CheckCircle2 className="size-12 mx-auto mb-4 text-green-500" />
-        <h1 className="text-2xl font-bold mb-2">Likeness listed</h1>
+        <h1 className="text-2xl font-bold mb-2">
+          {newListingPendingVerification ? 'Almost live' : 'Likeness listed'}
+        </h1>
         <p className="text-sm text-muted-foreground mb-6">
-          Your likeness is live on the marketplace under the terms you set. You can update pricing
-          or revoke consent at any time from your listings dashboard.
+          {newListingPendingVerification ? (
+            <>
+              Your listing is created but hidden from the marketplace until you complete identity
+              verification — this confirms the uploaded photos are actually you. Verify from My
+              Listings to go live.
+            </>
+          ) : (
+            <>
+              Your likeness is live on the marketplace under the terms you set. You can update
+              pricing or pause the listing at any time from My Listings.
+            </>
+          )}
         </p>
         <div className="flex gap-2 justify-center">
-          <Button onClick={() => navigate({ to: '/marketplace/likeness' })}>
-            Browse marketplace
-          </Button>
+          {newListingPendingVerification ? (
+            <Button onClick={() => navigate({ to: '/marketplace/likeness/my-listings' })}>
+              Verify identity
+            </Button>
+          ) : (
+            <Button onClick={() => navigate({ to: '/marketplace/likeness' })}>
+              Browse marketplace
+            </Button>
+          )}
           <Button variant="outline" asChild>
             <a href={`/marketplace/likeness/${newListingId}`}>View listing</a>
           </Button>

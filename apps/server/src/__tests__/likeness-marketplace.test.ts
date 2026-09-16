@@ -263,7 +263,7 @@ describe('createListing (real Firestore validation)', () => {
 
   it('persists the listing + splits when inputs are valid (real round-trip)', async () => {
     await writeVoiceEntity();
-    await writeConsent();
+    await writeConsent({ verified: true }); // already-verified seller — not testing the Phase 4 gate here
     const caller = await createTestCaller();
     const listing = await caller.likenessMarketplace.createListing({
       entityId,
@@ -295,12 +295,49 @@ describe('createListing (real Firestore validation)', () => {
     expect(snap.data()?.title).toBe('My voice');
     expect(snap.data()?.splitRecipients).toHaveLength(2);
   });
+
+  it('withholds a real-person listing from `active` until Phase 4 verification, and stamps pendingVerification', async () => {
+    await writeVoiceEntity();
+    await writeConsent(); // realPerson: true, verified: false (the default)
+    const caller = await createTestCaller();
+    const listing = await caller.likenessMarketplace.createListing({
+      entityId,
+      title: 'Unverified seller',
+      description: '',
+      buyPriceWei: '1000',
+      leasePricePerDayWei: '0',
+      licenseFeeWei: '0',
+      licenseRoyaltyBps: 0,
+      maxDurationDays: 30,
+    });
+    expect(listing.active).toBe(false);
+    expect(listing.pendingVerification).toBe(true);
+    expect(listing.verified).toBe(false);
+  });
+
+  it('publishes an AI persona (realPerson: false) live immediately — no verification required', async () => {
+    await writeVoiceEntity();
+    await writeConsent({ realPerson: false });
+    const caller = await createTestCaller();
+    const listing = await caller.likenessMarketplace.createListing({
+      entityId,
+      title: 'AI persona',
+      description: '',
+      buyPriceWei: '1000',
+      leasePricePerDayWei: '0',
+      licenseFeeWei: '0',
+      licenseRoyaltyBps: 0,
+      maxDurationDays: 30,
+    });
+    expect(listing.active).toBe(true);
+    expect(listing.pendingVerification).toBe(false);
+  });
 });
 
 describe('recordDeal (real validation gates)', () => {
   async function makeListing(): Promise<string> {
     await writeVoiceEntity({ creator: SELLER });
-    await writeConsent();
+    await writeConsent({ verified: true }); // already-verified seller — not testing the Phase 4 gate here
     const seller = await createTestCaller();
     const listing = await seller.likenessMarketplace.createListing({
       entityId,
@@ -331,7 +368,7 @@ describe('recordDeal (real validation gates)', () => {
 
   it('blocks BUY when the declared use case is not in consent.allowedUseCases', async () => {
     await writeVoiceEntity({ creator: SELLER });
-    await writeConsent({ allowedUseCases: ['narrative_film'] }); // not 'advertising'
+    await writeConsent({ verified: true, allowedUseCases: ['narrative_film'] }); // not 'advertising'
     const seller = await createTestCaller();
     const listing = await seller.likenessMarketplace.createListing({
       entityId,
@@ -377,7 +414,7 @@ describe('recordDeal (real validation gates)', () => {
 
   it('rejects LEASE without durationDays', async () => {
     await writeVoiceEntity({ creator: SELLER });
-    await writeConsent();
+    await writeConsent({ verified: true }); // already-verified seller — not testing the Phase 4 gate here
     const seller = await createTestCaller();
     const listing = await seller.likenessMarketplace.createListing({
       entityId,
@@ -468,5 +505,135 @@ describe('submitConsent (real Zod + Firestore writes)', () => {
     expect(got).not.toBeNull();
     expect(got?.id).toBe(consent.id);
     expect(got?.allowedUseCases).toContain('documentary');
+  });
+});
+
+describe('updateListing (re-validates consent + on-chain immutability)', () => {
+  async function makeVerifiedListing(): Promise<string> {
+    await writeVoiceEntity();
+    await writeConsent({ verified: true, permitLease: false });
+    const caller = await createTestCaller();
+    const listing = await caller.likenessMarketplace.createListing({
+      entityId,
+      title: 'X',
+      description: '',
+      buyPriceWei: '1000',
+      leasePricePerDayWei: '0',
+      licenseFeeWei: '0',
+      licenseRoyaltyBps: 0,
+      maxDurationDays: 30,
+    });
+    return listing.id;
+  }
+
+  it('rejects enabling a lease price the consent does not permit (the gap createListing already closed)', async () => {
+    const listingId = await makeVerifiedListing();
+    const caller = await createTestCaller();
+    await expect(
+      caller.likenessMarketplace.updateListing({
+        listingId,
+        leasePricePerDayWei: '10000000000000000',
+      })
+    ).rejects.toThrow(/does not authorize leasing/i);
+  });
+
+  it('rejects a lease price above the 1000 ETH/day on-chain cap', async () => {
+    await writeVoiceEntity();
+    await writeConsent({ verified: true });
+    const caller = await createTestCaller();
+    const listing = await caller.likenessMarketplace.createListing({
+      entityId,
+      title: 'X',
+      description: '',
+      buyPriceWei: '1000',
+      leasePricePerDayWei: '0',
+      licenseFeeWei: '0',
+      licenseRoyaltyBps: 0,
+      maxDurationDays: 30,
+    });
+    await expect(
+      caller.likenessMarketplace.updateListing({
+        listingId: listing.id,
+        leasePricePerDayWei: (1001n * 10n ** 18n).toString(),
+      })
+    ).rejects.toThrow(/exceeds the on-chain cap/i);
+  });
+
+  it('rejects price edits once the listing is published on-chain', async () => {
+    const listingId = await makeVerifiedListing();
+    const { db } = await import('../lib/firebase');
+    await db
+      .collection('likenessListings')
+      .doc(listingId)
+      .update({ onChainContentHash: '0x' + 'a'.repeat(64) });
+    const caller = await createTestCaller();
+    await expect(
+      caller.likenessMarketplace.updateListing({ listingId, buyPriceWei: '2000' })
+    ).rejects.toThrow(/published on-chain/i);
+  });
+
+  it('allows a non-price edit (title) after on-chain publish, and does not silently zero out the untouched price', async () => {
+    const listingId = await makeVerifiedListing();
+    const { db } = await import('../lib/firebase');
+    await db
+      .collection('likenessListings')
+      .doc(listingId)
+      .update({ onChainContentHash: '0x' + 'a'.repeat(64) });
+    const caller = await createTestCaller();
+    await expect(
+      caller.likenessMarketplace.updateListing({ listingId, title: 'New title' })
+    ).resolves.toEqual({ ok: true });
+
+    // Regression check: `weiString.optional()` used to resolve an omitted
+    // field to '0' (Zod still runs the inner `.default('0')`), so a
+    // title-only edit would silently zero out buyPriceWei. `optionalWeiString`
+    // must leave it untouched.
+    const snap = await db.collection('likenessListings').doc(listingId).get();
+    expect(snap.data()?.title).toBe('New title');
+    expect(snap.data()?.buyPriceWei).toBe('1000');
+  });
+});
+
+describe('checkAccess (requires auth, scoped to the caller)', () => {
+  it('never returns access for a deal that belongs to a different uid', async () => {
+    await writeVoiceEntity();
+    const { db } = await import('../lib/firebase');
+    const dealId = `deal-mkt-${Math.random().toString(36).slice(2, 10)}`;
+    await db
+      .collection('likenessDeals')
+      .doc(dealId)
+      .set({
+        id: dealId,
+        listingId: 'irrelevant',
+        entityId,
+        dealType: 'BUY',
+        sellerUid: 'seller-uid',
+        sellerAddress: SELLER.toLowerCase(),
+        buyerUid: 'the-actual-buyer',
+        buyerAddress: '0xbbb1111111111111111111111111111111111111',
+        pricePaidWei: '1000',
+        durationDays: null,
+        endTime: null,
+        txHash: '0x' + 'e'.repeat(64),
+        status: 'ACTIVE',
+        declaredUseCase: 'narrative_film',
+        startTime: new Date(),
+        onChain: false,
+        onChainDealId: null,
+        personaVersionAtSale: null,
+        personaVersionIdAtSale: null,
+      });
+
+    // A caller impersonating a different uid than the deal's buyerUid must
+    // never see this deal — closes the enumeration leak where `buyerUid`
+    // used to be an arbitrary, unauthenticated input.
+    const snooper = await createTestCaller({ uid: 'not-the-buyer' });
+    const result = await snooper.likenessMarketplace.checkAccess({ entityId });
+    expect(result.hasAccess).toBe(false);
+
+    // The real buyer, checking their own access, does see it.
+    const buyer = await createTestCaller({ uid: 'the-actual-buyer' });
+    const ownResult = await buyer.likenessMarketplace.checkAccess({ entityId });
+    expect(ownResult.hasAccess).toBe(true);
   });
 });

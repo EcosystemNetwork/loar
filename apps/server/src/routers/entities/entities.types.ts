@@ -539,6 +539,10 @@ export interface LikenessConsent {
   realPerson: boolean;
   /** True only after KYC + liveness + biometric match (Phase 4). */
   verified: boolean;
+  /** Stripe Identity verification session id, when one has been started. */
+  verificationSessionId?: string;
+  /** Lifecycle of the Phase 4 identity check. Absent = never started. */
+  verificationStatus?: 'unverified' | 'pending' | 'verified' | 'failed';
   /** Literal acknowledgement text the user clicked through. */
   attestationText: string;
   /** Optional EIP-191 signature of `attestationText` for stronger non-repudiation. */
@@ -590,6 +594,16 @@ export interface LikenessListing {
   maxDurationDays: number;
   /** Listing is hidden from browse when false. */
   active: boolean;
+  /**
+   * True while a real-person listing is created but withheld from `active`
+   * pending Phase 4 identity verification (Stripe Identity). The consent
+   * webhook flips `active: true, pendingVerification: false` together once
+   * verification completes. Distinct from a seller-initiated pause via
+   * `deactivateListing`, which never sets this.
+   */
+  pendingVerification: boolean;
+  /** Denormalized from the consent's `verified` at listing-create/verify time, so browse cards can show a trust badge without joining consent per-card. */
+  verified: boolean;
   totalSales: number;
   totalRevenueWei: string;
   // ── Phase 1.5: on-chain ContentLicensing.sol mirror ────────────────────

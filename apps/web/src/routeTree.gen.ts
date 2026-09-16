@@ -140,6 +140,7 @@ import { Route as UniverseAddressPhysicsRouteImport } from './routes/universe.$a
 import { Route as TokensCreatorAddressRouteImport } from './routes/tokens/creator.$address'
 import { Route as StudioEditAssetIdRouteImport } from './routes/studio.edit.$assetId'
 import { Route as MarketplacePersonaPersonaIdRouteImport } from './routes/marketplace.persona.$personaId'
+import { Route as MarketplaceLikenessMyListingsRouteImport } from './routes/marketplace.likeness.my-listings'
 import { Route as MarketplaceLikenessListingIdRouteImport } from './routes/marketplace.likeness.$listingId'
 import { Route as LabZaiDiagnosticRouteImport } from './routes/lab.zai.diagnostic'
 import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
@@ -805,6 +806,12 @@ const MarketplacePersonaPersonaIdRoute =
     path: '/marketplace/persona/$personaId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const MarketplaceLikenessMyListingsRoute =
+  MarketplaceLikenessMyListingsRouteImport.update({
+    id: '/my-listings',
+    path: '/my-listings',
+    getParentRoute: () => MarketplaceLikenessRoute,
+  } as any)
 const MarketplaceLikenessListingIdRoute =
   MarketplaceLikenessListingIdRouteImport.update({
     id: '/$listingId',
@@ -971,6 +978,7 @@ export interface FileRoutesByFullPath {
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/lab/zai/diagnostic': typeof LabZaiDiagnosticRoute
   '/marketplace/likeness/$listingId': typeof MarketplaceLikenessListingIdRoute
+  '/marketplace/likeness/my-listings': typeof MarketplaceLikenessMyListingsRoute
   '/marketplace/persona/$personaId': typeof MarketplacePersonaPersonaIdRoute
   '/studio/edit/$assetId': typeof StudioEditAssetIdRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
@@ -1112,6 +1120,7 @@ export interface FileRoutesByTo {
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/lab/zai/diagnostic': typeof LabZaiDiagnosticRoute
   '/marketplace/likeness/$listingId': typeof MarketplaceLikenessListingIdRoute
+  '/marketplace/likeness/my-listings': typeof MarketplaceLikenessMyListingsRoute
   '/marketplace/persona/$personaId': typeof MarketplacePersonaPersonaIdRoute
   '/studio/edit/$assetId': typeof StudioEditAssetIdRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
@@ -1254,6 +1263,7 @@ export interface FileRoutesById {
   '/event/$universe/$event': typeof EventUniverseEventRoute
   '/lab/zai/diagnostic': typeof LabZaiDiagnosticRoute
   '/marketplace/likeness/$listingId': typeof MarketplaceLikenessListingIdRoute
+  '/marketplace/likeness/my-listings': typeof MarketplaceLikenessMyListingsRoute
   '/marketplace/persona/$personaId': typeof MarketplacePersonaPersonaIdRoute
   '/studio/edit/$assetId': typeof StudioEditAssetIdRoute
   '/tokens/creator/$address': typeof TokensCreatorAddressRoute
@@ -1397,6 +1407,7 @@ export interface FileRouteTypes {
     | '/event/$universe/$event'
     | '/lab/zai/diagnostic'
     | '/marketplace/likeness/$listingId'
+    | '/marketplace/likeness/my-listings'
     | '/marketplace/persona/$personaId'
     | '/studio/edit/$assetId'
     | '/tokens/creator/$address'
@@ -1538,6 +1549,7 @@ export interface FileRouteTypes {
     | '/event/$universe/$event'
     | '/lab/zai/diagnostic'
     | '/marketplace/likeness/$listingId'
+    | '/marketplace/likeness/my-listings'
     | '/marketplace/persona/$personaId'
     | '/studio/edit/$assetId'
     | '/tokens/creator/$address'
@@ -1679,6 +1691,7 @@ export interface FileRouteTypes {
     | '/event/$universe/$event'
     | '/lab/zai/diagnostic'
     | '/marketplace/likeness/$listingId'
+    | '/marketplace/likeness/my-listings'
     | '/marketplace/persona/$personaId'
     | '/studio/edit/$assetId'
     | '/tokens/creator/$address'
@@ -2743,6 +2756,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MarketplacePersonaPersonaIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/marketplace/likeness/my-listings': {
+      id: '/marketplace/likeness/my-listings'
+      path: '/my-listings'
+      fullPath: '/marketplace/likeness/my-listings'
+      preLoaderRoute: typeof MarketplaceLikenessMyListingsRouteImport
+      parentRoute: typeof MarketplaceLikenessRoute
+    }
     '/marketplace/likeness/$listingId': {
       id: '/marketplace/likeness/$listingId'
       path: '/$listingId'
@@ -2876,10 +2896,12 @@ const LabZaiRouteWithChildren =
 
 interface MarketplaceLikenessRouteChildren {
   MarketplaceLikenessListingIdRoute: typeof MarketplaceLikenessListingIdRoute
+  MarketplaceLikenessMyListingsRoute: typeof MarketplaceLikenessMyListingsRoute
 }
 
 const MarketplaceLikenessRouteChildren: MarketplaceLikenessRouteChildren = {
   MarketplaceLikenessListingIdRoute: MarketplaceLikenessListingIdRoute,
+  MarketplaceLikenessMyListingsRoute: MarketplaceLikenessMyListingsRoute,
 }
 
 const MarketplaceLikenessRouteWithChildren =

@@ -9,15 +9,24 @@
 import { useState } from 'react';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Mic, Sparkles, Search, ShieldCheck, BadgeCheck, UserCircle2 } from 'lucide-react';
+import {
+  Mic,
+  Sparkles,
+  Search,
+  ShieldCheck,
+  BadgeCheck,
+  UserCircle2,
+  AlertTriangle,
+  RotateCw,
+} from 'lucide-react';
 import { formatEther } from 'viem';
 import { trpcClient } from '@/utils/trpc';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
-  LIKENESS_DEAL_TYPES,
   LIKENESS_MODALITIES,
   type LikenessDealType,
   type LikenessModality,
@@ -40,6 +49,7 @@ interface BrowseListing {
   leasePricePerDayWei: string;
   licenseFeeWei: string;
   totalSales: number;
+  verified: boolean;
 }
 
 function formatEthDisplay(wei: string): string {
@@ -61,7 +71,7 @@ function LikenessMarketplacePage() {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'price_asc' | 'price_desc' | 'popular'>('newest');
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['likenessMarketplace', 'browse', kind, modality, dealType, search, sortBy],
     queryFn: () =>
       trpcClient.likenessMarketplace.browse.query({
@@ -75,6 +85,8 @@ function LikenessMarketplacePage() {
   });
 
   const listings = (data?.listings ?? []) as BrowseListing[];
+
+  const kindLabel = kind === 'voice' ? 'voice' : kind === 'persona' ? 'persona' : 'likeness';
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
@@ -190,17 +202,54 @@ function LikenessMarketplacePage() {
 
       {/* Results */}
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading listings…</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Card key={i} className="overflow-hidden">
+              <Skeleton className="aspect-square w-full rounded-none" />
+              <CardContent className="p-3 space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-5 w-1/2" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : isError ? (
+        <Card>
+          <CardContent className="py-16 text-center">
+            <AlertTriangle className="size-8 mx-auto mb-3 text-destructive" />
+            <p className="text-sm text-muted-foreground mb-4">
+              Couldn't load listings — {error instanceof Error ? error.message : 'unknown error'}.
+            </p>
+            <Button size="sm" variant="outline" onClick={() => refetch()}>
+              <RotateCw className="size-3.5 mr-1.5" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
       ) : listings.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center">
             <ShieldCheck className="size-8 mx-auto mb-3 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              No listings match these filters yet. Be the first — clone your voice in the{' '}
-              <Link to="/lab/voice-studio" className="underline">
-                Voice Studio
-              </Link>{' '}
-              and list it for sale.
+              No {kindLabel} listings match these filters yet.{' '}
+              {kind === 'voice' ? (
+                <>
+                  Be the first — clone your voice in the{' '}
+                  <Link to="/lab/voice-studio" className="underline">
+                    Voice Studio
+                  </Link>{' '}
+                  and list it for sale.
+                </>
+              ) : (
+                <>
+                  Be the first —{' '}
+                  <Link to="/create/likeness" className="underline">
+                    list your own likeness
+                  </Link>{' '}
+                  for sale.
+                </>
+              )}
             </p>
           </CardContent>
         </Card>
@@ -265,7 +314,12 @@ function LikenessMarketplacePage() {
                       <h3 className="font-semibold text-sm leading-tight truncate flex-1">
                         {l.title}
                       </h3>
-                      <BadgeCheck className="size-3.5 text-primary shrink-0 mt-0.5" />
+                      {l.verified && (
+                        <BadgeCheck
+                          className="size-3.5 text-primary shrink-0 mt-0.5"
+                          aria-label="Identity verified"
+                        />
+                      )}
                     </div>
                     {l.description && (
                       <p className="text-xs text-muted-foreground line-clamp-2">{l.description}</p>

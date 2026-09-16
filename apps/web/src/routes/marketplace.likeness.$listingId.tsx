@@ -62,7 +62,7 @@ function ListingDetailPage() {
   const navigate = useNavigate();
   const { address, isConnected } = useAccount();
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['likenessMarketplace', 'getListing', listingId],
     queryFn: () => trpcClient.likenessMarketplace.getListing.query({ listingId }),
   });
@@ -290,6 +290,25 @@ function ListingDetailPage() {
     return (
       <div className="container mx-auto max-w-5xl px-4 py-8">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="container mx-auto max-w-5xl px-4 py-8">
+        <Card>
+          <CardContent className="py-16 text-center">
+            <AlertTriangle className="size-8 mx-auto mb-3 text-destructive" />
+            <p className="text-sm text-muted-foreground mb-4">
+              Couldn't load this listing —{' '}
+              {error instanceof Error ? error.message : 'unknown error'}.
+            </p>
+            <Button size="sm" variant="outline" onClick={() => refetch()}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

@@ -26,6 +26,7 @@ import { TRPCError } from '@trpc/server';
 import { randomUUID } from 'crypto';
 import { verifyAndClaimTx } from '../../services/tx-verify';
 import { recordRevenueEvent } from '../../services/revenue-recorder';
+import { createVerificationSession } from '../../services/stripe-identity';
 import {
   RightsType,
   computeEntityContentHash,
@@ -109,6 +110,18 @@ const weiString = z
   .regex(/^\d+$/, 'Must be a non-negative integer string (wei)')
   .default('0');
 
+/**
+ * Same shape as `weiString` but genuinely optional — for `updateListing`'s
+ * partial updates. `weiString.optional()` does NOT work for this: Zod still
+ * applies the inner `.default('0')` when the field is omitted, so an omitted
+ * field resolves to `'0'` instead of `undefined`. That silently zeroed out
+ * live prices on any update that only touched e.g. `title`.
+ */
+const optionalWeiString = z
+  .string()
+  .regex(/^\d+$/, 'Must be a non-negative integer string (wei)')
+  .optional();
+
 const modalitySchema = z.enum(LIKENESS_MODALITIES);
 const useCaseSchema = z.enum(LIKENESS_USE_CASES);
 const prohibitionSchema = z.enum(LIKENESS_PROHIBITIONS);
@@ -168,6 +181,51 @@ async function readOwnedEntity(entityId: string, callerAddress: string): Promise
     }
   }
   return entity;
+}
+
+/**
+ * Enforce consent's permit flags + the on-chain lease-price cap against a set
+ * of listing prices. Shared by `createListing` and `updateListing` so a
+ * seller can't use an edit to enable a deal type or lease price their
+ * consent doesn't authorize (the gap `updateListing` used to skip).
+ */
+function validateListingPrices(
+  consent: LikenessConsent,
+  prices: { buyPriceWei: string; leasePricePerDayWei: string; licenseFeeWei: string }
+): void {
+  const wantsSale = prices.buyPriceWei !== '0';
+  const wantsLease = prices.leasePricePerDayWei !== '0';
+  const wantsLicense = prices.licenseFeeWei !== '0';
+  if (wantsSale && !consent.permitSale) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Consent does not authorize sale of this likeness',
+    });
+  }
+  if (wantsLease && !consent.permitLease) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Consent does not authorize leasing of this likeness',
+    });
+  }
+  if (wantsLicense && !consent.permitLicense) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Consent does not authorize licensing of this likeness',
+    });
+  }
+  if (!wantsSale && !wantsLease && !wantsLicense) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Set at least one of buyPrice / leasePricePerDay / licenseFee above zero',
+    });
+  }
+  if (wantsLease && BigInt(prices.leasePricePerDayWei) > MAX_RENT_PRICE_PER_DAY_WEI) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Lease price per day exceeds the on-chain cap of 1000 ETH/day',
+    });
+  }
 }
 
 // ── Router ───────────────────────────────────────────────────────────────
@@ -426,6 +484,53 @@ export const likenessMarketplaceRouter = router({
     }),
 
   /**
+   * Phase 4 — start a Stripe Identity verification session for a real-person
+   * entity's active consent. On completion, `stripe-webhook.ts` flips
+   * `consent.verified` and activates any listings that were withheld pending
+   * verification (see `createListing`). No-op target for AI personas —
+   * those never require verification.
+   */
+  startVerification: protectedProcedure
+    .input(z.object({ entityId: z.string(), returnUrl: z.string().url() }))
+    .mutation(async ({ input, ctx }) => {
+      if (!ctx.user.address) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Connected wallet required' });
+      }
+      await readOwnedEntity(input.entityId, ctx.user.address);
+      const consent = await getActiveConsent(input.entityId);
+      if (!consent) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Submit consent before starting verification',
+        });
+      }
+      if (!consent.realPerson) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'AI personas do not require identity verification',
+        });
+      }
+      if (consent.verified) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'This consent is already verified' });
+      }
+
+      const session = await createVerificationSession({
+        uid: ctx.user.uid,
+        entityId: input.entityId,
+        consentId: consent.id,
+        returnUrl: input.returnUrl,
+      });
+
+      await consentsCol().doc(input.entityId).collection('revisions').doc(consent.id).update({
+        verificationSessionId: session.sessionId,
+        verificationStatus: 'pending',
+        updatedAt: new Date(),
+      });
+
+      return { url: session.url };
+    }),
+
+  /**
    * Create a marketplace listing for a voice or likeness entity. Requires an
    * active consent revision; the consent's `permit*` flags gate which deal
    * prices may be non-zero.
@@ -484,40 +589,12 @@ export const likenessMarketplaceRouter = router({
         });
       }
 
-      // Enforce consent's permit flags against price intent.
-      const wantsSale = input.buyPriceWei !== '0';
-      const wantsLease = input.leasePricePerDayWei !== '0';
-      const wantsLicense = input.licenseFeeWei !== '0';
-      if (wantsSale && !consent.permitSale) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'Consent does not authorize sale of this likeness',
-        });
-      }
-      if (wantsLease && !consent.permitLease) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'Consent does not authorize leasing of this likeness',
-        });
-      }
-      if (wantsLicense && !consent.permitLicense) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'Consent does not authorize licensing of this likeness',
-        });
-      }
-      if (!wantsSale && !wantsLease && !wantsLicense) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Set at least one of buyPrice / leasePricePerDay / licenseFee above zero',
-        });
-      }
-      if (wantsLease && BigInt(input.leasePricePerDayWei) > MAX_RENT_PRICE_PER_DAY_WEI) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Lease price per day exceeds the on-chain cap of 1000 ETH/day',
-        });
-      }
+      // Enforce consent's permit flags + lease cap against price intent.
+      validateListingPrices(consent, {
+        buyPriceWei: input.buyPriceWei,
+        leasePricePerDayWei: input.leasePricePerDayWei,
+        licenseFeeWei: input.licenseFeeWei,
+      });
 
       // Stamp `monetized=true` + rights declaration on the entity so it shows
       // up in the creator's revenue surfaces and is gated by minting checks.
@@ -527,6 +604,13 @@ export const likenessMarketplaceRouter = router({
           rightsDeclaration: 'original',
         });
       }
+
+      // Phase 4 gate — a real-person likeness/voice must pass Stripe Identity
+      // verification before it's purchasable. The listing is still created so
+      // the seller can finish the flow and start verification from My
+      // Listings; it just stays hidden from `browse` until the consent
+      // webhook flips it live (see stripe-webhook.ts).
+      const requiresVerification = consent.realPerson && !consent.verified;
 
       const now = new Date();
       const id = randomUUID();
@@ -548,7 +632,9 @@ export const likenessMarketplaceRouter = router({
         licenseFeeWei: input.licenseFeeWei,
         licenseRoyaltyBps: input.licenseRoyaltyBps,
         maxDurationDays: input.maxDurationDays,
-        active: true,
+        active: !requiresVerification,
+        pendingVerification: requiresVerification,
+        verified: consent.verified,
         totalSales: 0,
         totalRevenueWei: '0',
         onChainContentHash: null,
@@ -580,9 +666,9 @@ export const likenessMarketplaceRouter = router({
         listingId: z.string(),
         title: z.string().min(1).max(160).optional(),
         description: z.string().max(2000).optional(),
-        buyPriceWei: weiString.optional(),
-        leasePricePerDayWei: weiString.optional(),
-        licenseFeeWei: weiString.optional(),
+        buyPriceWei: optionalWeiString,
+        leasePricePerDayWei: optionalWeiString,
+        licenseFeeWei: optionalWeiString,
         licenseRoyaltyBps: z.number().int().min(0).max(MAX_ROYALTY_BPS).optional(),
         maxDurationDays: z.number().int().min(1).max(MAX_DURATION_DAYS).optional(),
       })
@@ -597,6 +683,37 @@ export const likenessMarketplaceRouter = router({
       if (listing.sellerUid !== ctx.user.uid) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not the listing owner' });
       }
+
+      const priceFieldsTouched =
+        input.buyPriceWei !== undefined ||
+        input.leasePricePerDayWei !== undefined ||
+        input.licenseFeeWei !== undefined;
+      if (priceFieldsTouched && listing.onChainContentHash) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message:
+            'This listing is published on-chain — its prices are fixed in ContentLicensing.sol ' +
+            'and cannot be edited off-chain. Delist and republish to change pricing.',
+        });
+      }
+
+      // Re-run the same consent/cap validation createListing enforces,
+      // against the *merged* result of this update — closes the gap where a
+      // seller could previously flip a price to non-zero (or over the lease
+      // cap) without consent authorizing it.
+      const mergedPrices = {
+        buyPriceWei: input.buyPriceWei ?? listing.buyPriceWei,
+        leasePricePerDayWei: input.leasePricePerDayWei ?? listing.leasePricePerDayWei,
+        licenseFeeWei: input.licenseFeeWei ?? listing.licenseFeeWei,
+      };
+      const consent = await getActiveConsent(listing.entityId);
+      if (!consent) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Consent is no longer active — re-submit consent before editing this listing',
+        });
+      }
+      validateListingPrices(consent, mergedPrices);
 
       const { listingId: _ignored, ...rest } = input;
       const updates: Record<string, unknown> = { updatedAt: new Date() };
@@ -643,7 +760,20 @@ export const likenessMarketplaceRouter = router({
           message: 'Consent is no longer active — re-submit consent before reactivating',
         });
       }
-      await ref.update({ active: true, consentId: consent.id, updatedAt: new Date() });
+      // Same Phase 4 gate as createListing — closes a pause/unpause bypass.
+      if (consent.realPerson && !consent.verified) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Identity verification is still pending — verify before reactivating',
+        });
+      }
+      await ref.update({
+        active: true,
+        pendingVerification: false,
+        verified: consent.verified,
+        consentId: consent.id,
+        updatedAt: new Date(),
+      });
       return { ok: true };
     }),
 
@@ -1124,13 +1254,18 @@ export const likenessMarketplaceRouter = router({
       };
       await dealsCol().doc(dealId).set(deal);
 
-      await listingsCol()
-        .doc(input.listingId)
-        .update({
-          totalSales: listing.totalSales + 1,
-          totalRevenueWei: (BigInt(listing.totalRevenueWei) + onChainDeal.pricePaid).toString(),
+      // Transactional read-modify-write so concurrent buyers can't clobber
+      // each other's totalSales/totalRevenueWei via a stale snapshot read.
+      const listingRef = listingsCol().doc(input.listingId);
+      await db.runTransaction(async (tx) => {
+        const freshSnap = await tx.get(listingRef);
+        const fresh = freshSnap.data() as LikenessListing;
+        tx.update(listingRef, {
+          totalSales: fresh.totalSales + 1,
+          totalRevenueWei: (BigInt(fresh.totalRevenueWei) + onChainDeal.pricePaid).toString(),
           updatedAt: now,
         });
+      });
 
       recordRevenueEvent({
         creatorUid: listing.sellerUid,
@@ -1456,10 +1591,17 @@ export const likenessMarketplaceRouter = router({
       };
 
       await dealsCol().doc(dealId).set(deal);
-      await listingRef.update({
-        totalSales: listing.totalSales + 1,
-        totalRevenueWei: (BigInt(listing.totalRevenueWei) + BigInt(input.pricePaidWei)).toString(),
-        updatedAt: now,
+
+      // Transactional read-modify-write so concurrent buyers can't clobber
+      // each other's totalSales/totalRevenueWei via a stale snapshot read.
+      await db.runTransaction(async (tx) => {
+        const freshSnap = await tx.get(listingRef);
+        const fresh = freshSnap.data() as LikenessListing;
+        tx.update(listingRef, {
+          totalSales: fresh.totalSales + 1,
+          totalRevenueWei: (BigInt(fresh.totalRevenueWei) + BigInt(input.pricePaidWei)).toString(),
+          updatedAt: now,
+        });
       });
 
       // Revenue accounting — seller gets the headline credit.
@@ -1505,22 +1647,25 @@ export const likenessMarketplaceRouter = router({
     }),
 
   /**
-   * Check if a buyer has active access to an entity for a given use case.
-   * Auto-expires deals past their endTime. Call this before allowing a
+   * Check if the calling user has active access to an entity for a given use
+   * case. Auto-expires deals past their endTime. Call this before allowing a
    * downstream generation against the licensed voice/likeness.
+   *
+   * Protected (not `publicProcedure`) and always scoped to `ctx.user.uid` —
+   * it used to accept an arbitrary `buyerUid` with no auth check, letting
+   * anyone enumerate any uid's access to any entity.
    */
-  checkAccess: publicProcedure
+  checkAccess: protectedProcedure
     .input(
       z.object({
         entityId: z.string(),
-        buyerUid: z.string(),
         useCase: useCaseSchema.optional(),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const snap = await dealsCol()
         .where('entityId', '==', input.entityId)
-        .where('buyerUid', '==', input.buyerUid)
+        .where('buyerUid', '==', ctx.user.uid)
         .where('status', '==', 'ACTIVE')
         .orderBy('startTime', 'desc')
         .limit(10)

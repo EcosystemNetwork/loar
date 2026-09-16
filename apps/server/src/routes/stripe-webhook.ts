@@ -3,7 +3,9 @@
  *
  * Handles `payment_intent.succeeded` events to issue credits even when
  * the user closes their browser mid-checkout, and `charge.refunded` /
- * `charge.dispute.created` events to claw those credits back.
+ * `charge.dispute.created` events to claw those credits back. Also handles
+ * `identity.verification_session.*` events for Phase 4 likeness-marketplace
+ * KYC + liveness verification (see `services/stripe-identity.ts`).
  *
  * Flow:
  *   1. Stripe sends POST /api/stripe/webhook with signed payload
@@ -15,13 +17,21 @@
  *      the credits that were granted for it (SEC-1 — closes the "pay, claim
  *      credits, then refund/chargeback" gap now that `verifyStripePayment`
  *      only rejects payments *already* refunded/disputed at claim time).
+ *   5. On identity.verification_session.verified: mark the matching
+ *      likeness/voice consent revision `verified: true` and activate any
+ *      listings that were withheld pending verification. On
+ *      requires_input / canceled: mark it `failed` so the seller can retry.
  *
- * Requires: STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET env vars.
+ * Requires: STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET env vars. The
+ * `identity.verification_session.*` events must be added to this endpoint's
+ * event subscription in the Stripe Dashboard — same endpoint, same secret,
+ * no new env var.
  */
 import { Hono } from 'hono';
 import { db } from '../lib/firebase';
 import { getStripe } from '../routers/credits/stripe.routes';
 import { DEFAULT_PACKAGES } from '../routers/credits/credits.routes';
+import { readVerificationSessionMetadata } from '../services/stripe-identity';
 
 export const stripeWebhookRoutes = new Hono();
 
@@ -251,6 +261,76 @@ stripeWebhookRoutes.post('/webhook', async (c) => {
       );
     } catch (err) {
       console.error(`[Stripe Webhook] Failed to process ${event.type} clawback:`, err);
+      // Return 500 so Stripe retries
+      return c.json({ error: 'Failed to process' }, 500);
+    }
+  }
+
+  if (
+    event.type === 'identity.verification_session.verified' ||
+    event.type === 'identity.verification_session.requires_input' ||
+    event.type === 'identity.verification_session.canceled'
+  ) {
+    const session = event.data.object;
+    const meta = readVerificationSessionMetadata(session);
+    if (!meta) {
+      console.error(`[Stripe Webhook] ${event.type} missing entityId/consentId/uid metadata`);
+      return c.json({ received: true });
+    }
+    const { entityId, consentId } = meta;
+
+    try {
+      const consentRef = db
+        .collection('likenessConsents')
+        .doc(entityId)
+        .collection('revisions')
+        .doc(consentId);
+      const consentSnap = await consentRef.get();
+      if (!consentSnap.exists) {
+        console.error(`[Stripe Webhook] ${event.type}: consent ${entityId}/${consentId} not found`);
+        return c.json({ received: true });
+      }
+
+      if (event.type === 'identity.verification_session.verified') {
+        await consentRef.update({
+          verified: true,
+          verificationStatus: 'verified',
+          updatedAt: new Date(),
+        });
+
+        // Activate any listings that were created but withheld pending
+        // verification — mirrors revokeConsent's batch-deactivate.
+        const pending = await db
+          .collection('likenessListings')
+          .where('entityId', '==', entityId)
+          .where('pendingVerification', '==', true)
+          .get();
+        const batch = db.batch();
+        for (const doc of pending.docs) {
+          batch.update(doc.ref, {
+            active: true,
+            pendingVerification: false,
+            verified: true,
+            updatedAt: new Date(),
+          });
+        }
+        await batch.commit();
+
+        console.log(
+          `[Stripe Webhook] Verified consent ${entityId}/${consentId}, activated ${pending.size} listing(s)`
+        );
+      } else {
+        const lastError = (session as { last_error?: { reason?: string } | null }).last_error;
+        await consentRef.update({
+          verificationStatus: 'failed',
+          updatedAt: new Date(),
+        });
+        console.log(
+          `[Stripe Webhook] ${event.type} for ${entityId}/${consentId}: ${lastError?.reason ?? 'no reason given'}`
+        );
+      }
+    } catch (err) {
+      console.error(`[Stripe Webhook] Failed to process ${event.type}:`, err);
       // Return 500 so Stripe retries
       return c.json({ error: 'Failed to process' }, 500);
     }

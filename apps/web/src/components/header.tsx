@@ -82,6 +82,7 @@ const moreGroupsBase: MoreGroup[] = [
     label: 'My Stuff',
     links: [
       { to: '/my-works', label: 'My Works' },
+      { to: '/marketplace/likeness/my-listings', label: 'My Likeness Listings' },
       { to: '/notifications', label: 'Notifications' },
       { to: '/series', label: 'Series Mode', beta: true },
       { to: '/virality', label: 'Virality Predictor', beta: true },
