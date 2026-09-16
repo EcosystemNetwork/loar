@@ -66,6 +66,11 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
     /// @notice External renderer for on-chain tokenURI (Strings+Base64 extracted for EIP-170).
     address public metadataRenderer;
 
+    /// @notice Platform-operated relayer authorized to call backupContent/
+    ///         batchBackupContent on every deployed Universe. Centralized here
+    ///         (rather than a per-universe whitelist) so it can be rotated once.
+    address public backupRelayer;
+
     /// @notice Once locked, metadataRenderer cannot be changed (protects existing tokenURIs).
     bool public metadataRendererLocked;
 
@@ -91,6 +96,7 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
     event EthClaimed(address indexed recipient, uint256 amount);
     event AdminSyncFailed(uint256 indexed tokenId, address to);
     event MetadataRendererLocked(address renderer);
+    event BackupRelayerUpdated(address oldRelayer, address newRelayer);
     /// @notice Emitted when multi-sig owner count exceeds 200 and signer minting is truncated (UNIVERSE-06).
     event SignersTruncated(uint256 indexed universeId, uint256 actualCount, uint16 mintedCount);
 
@@ -132,6 +138,14 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
     function setUniverseFactory(address _factory) external onlyOwner {
         require(_factory != address(0), "Zero address");
         universeFactory = _factory;
+    }
+
+    /// @notice Update the platform backup relayer. Settable to address(0) to
+    ///         disable backupContent platform-wide as an emergency stop.
+    function setBackupRelayer(address _relayer) external onlyOwner {
+        address old = backupRelayer;
+        backupRelayer = _relayer;
+        emit BackupRelayerUpdated(old, _relayer);
     }
 
     function setMetadataRenderer(address _renderer) external onlyOwner {

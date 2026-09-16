@@ -39,6 +39,7 @@ import ContentLicensing from './apps/contracts/out/ContentLicensing.sol/ContentL
 import LoarToken from './apps/contracts/out/LoarToken.sol/LoarToken.json';
 import LoarFaucet from './apps/contracts/out/LoarFaucet.sol/LoarFaucet.json';
 import IdentityNFT from './apps/contracts/out/IdentityNFT.sol/IdentityNFT.json';
+import LegacyContentBackupRegistry from './apps/contracts/out/LegacyContentBackupRegistry.sol/LegacyContentBackupRegistry.json';
 // Timelock governor (mainnet-ready replacement for UniverseGovernor)
 // import UniverseTimelockGovernor from './apps/contracts/out/UniverseTimelockGovernor.sol/UniverseTimelockGovernor.json';
 
@@ -103,6 +104,7 @@ export default defineConfig({
     { name: 'LoarToken', abi: LoarToken.abi as Abi },
     { name: 'LoarFaucet', abi: LoarFaucet.abi as Abi },
     { name: 'IdentityNFT', abi: IdentityNFT.abi as Abi },
+    { name: 'LegacyContentBackupRegistry', abi: LegacyContentBackupRegistry.abi as Abi },
   ],
   plugins: [
     react({

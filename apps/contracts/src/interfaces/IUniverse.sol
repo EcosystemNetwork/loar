@@ -2,6 +2,7 @@
 pragma solidity =0.8.30;
 
 import {NodeCreationOptions, NodeVisibilityOptions} from "../libraries/NodeOptions.sol";
+import {ContentKind, BackupRecord} from "../libraries/ContentBackup.sol";
 
 interface IUniverse {
     error NodeDoesNotExist();
@@ -9,6 +10,7 @@ interface IUniverse {
     error CanonNotSet();
     error CallerNotManager();
     error CallerNotAdmin(address caller);
+    error CallerNotBackupRelayer(address caller);
 
     event NodeCanonized(uint256 id, address canonizer); // deprecated — use CanonChanged
     event CanonChanged(
@@ -43,6 +45,17 @@ interface IUniverse {
     event VaultWhitelistUpdated(address indexed user, bool status);
     event TokenUpdated(address indexed token);
     event AdminUpdated(address indexed newAdmin);
+    /// @notice Off-chain content backup commitment. `relayer` is the platform
+    ///         backup relayer that submitted it, not the content's original
+    ///         author — see Universe.backupContent.
+    event ContentBackedUp(
+        ContentKind indexed kind,
+        bytes32 indexed offChainId,
+        address indexed relayer,
+        bytes32 contentHash,
+        string cid,
+        string metadataJson
+    );
 
     function setAdmin(address newAdmin) external;
     function setToken(address) external;
@@ -54,6 +67,22 @@ interface IUniverse {
     function batchSetVaultWhitelisted(address[] calldata users, bool status) external;
     function pause() external;
     function unpause() external;
+
+    /// @notice Commit an off-chain-content backup record. Callable only by the
+    ///         platform backup relayer (see UniverseManager.backupRelayer).
+    ///         Idempotent: re-submitting an already-backed-up offChainId is a
+    ///         no-op that returns false, so callers can retry safely.
+    function backupContent(BackupRecord calldata record, string calldata cid, string calldata metadataJson)
+        external
+        returns (bool);
+    /// @notice Batch version of backupContent. Skips (does not revert on)
+    ///         records already backed up.
+    function batchBackupContent(
+        BackupRecord[] calldata records,
+        string[] calldata cids,
+        string[] calldata metadataJsons
+    ) external;
+    function isContentBackedUp(bytes32 offChainId) external view returns (bool);
 
     // Metadata accessors (used by UniverseManager for on-chain tokenURI)
     function universeName() external view returns (string memory);

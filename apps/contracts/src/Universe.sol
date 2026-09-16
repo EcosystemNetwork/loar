@@ -4,6 +4,7 @@ pragma solidity =0.8.30;
 import {IUniverse} from "./interfaces/IUniverse.sol";
 import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
 import {NodeCreationOptions, NodeVisibilityOptions} from "./libraries/NodeOptions.sol";
+import {ContentKind, BackupRecord} from "./libraries/ContentBackup.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {ReentrancyGuard} from "solady/src/utils/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/utils/Pausable.sol";
@@ -39,6 +40,9 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
     uint256 public latestNodeId;
     mapping(address user => bool) isWhitelisted;
     mapping(address user => bool) public vaultWhitelisted;
+    /// @notice offChainId => backed up. Idempotency guard for backupContent;
+    ///         the CID/metadata themselves live only in the ContentBackedUp event.
+    mapping(bytes32 => bool) public contentBackedUp;
 
     NodeCreationOptions private nodeCreationOption;
     NodeVisibilityOptions private nodeVisibilityOption;
@@ -50,6 +54,9 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
 
     /// @notice Maximum children per node (prevents unbounded array growth)
     uint256 public constant MAX_CHILDREN_PER_NODE = 100;
+
+    /// @notice Maximum records per batchBackupContent call.
+    uint256 public constant MAX_BACKUP_BATCH_SIZE = 100;
 
     modifier onlyAdmin() {
         _checkAdmin();
@@ -70,6 +77,17 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
     function _checkManager() internal view {
         if (address(universeManager) != msg.sender) {
             revert CallerNotManager();
+        }
+    }
+
+    modifier onlyBackupRelayer() {
+        _checkBackupRelayer();
+        _;
+    }
+
+    function _checkBackupRelayer() internal view {
+        if (msg.sender != universeManager.backupRelayer()) {
+            revert CallerNotBackupRelayer(msg.sender);
         }
     }
 
@@ -467,6 +485,61 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
 
     function getAdmin() external view returns (address) {
         return universeAdmin;
+    }
+
+    // ---- Content backup (off-chain redundancy for entities & media) ----
+
+    /// @notice Commit an off-chain-content backup record: entity or media
+    ///         attachment metadata, backing up the pinned CID + a descriptive
+    ///         JSON blob on-chain. Only the platform backup relayer may call
+    ///         this — it's a platform durability guarantee, not user-authored
+    ///         content, so it's exempt from the WHITELISTED creation gate that
+    ///         createNode has.
+    /// @dev    Hash-in-storage/data-in-event, same pattern as createNode.
+    ///         Idempotent: re-submitting an already-backed-up offChainId is a
+    ///         no-op that returns false, so the backfill script can retry
+    ///         freely without pre-checking state.
+    function backupContent(BackupRecord calldata record, string calldata cid, string calldata metadataJson)
+        external
+        whenNotPaused
+        onlyBackupRelayer
+        returns (bool)
+    {
+        return _backupContent(record, cid, metadataJson);
+    }
+
+    /// @notice Batch version of backupContent. Skips (does not revert on)
+    ///         records already backed up, so a batch can be retried safely.
+    function batchBackupContent(
+        BackupRecord[] calldata records,
+        string[] calldata cids,
+        string[] calldata metadataJsons
+    ) external whenNotPaused onlyBackupRelayer {
+        uint256 len = records.length;
+        require(len == cids.length && len == metadataJsons.length, "Array length mismatch");
+        require(len <= MAX_BACKUP_BATCH_SIZE, "Batch too large");
+        for (uint256 i = 0; i < len;) {
+            _backupContent(records[i], cids[i], metadataJsons[i]);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    function _backupContent(BackupRecord calldata record, string calldata cid, string calldata metadataJson)
+        internal
+        returns (bool)
+    {
+        if (contentBackedUp[record.offChainId]) {
+            return false;
+        }
+        contentBackedUp[record.offChainId] = true;
+        emit ContentBackedUp(record.kind, record.offChainId, msg.sender, record.contentHash, cid, metadataJson);
+        return true;
+    }
+
+    function isContentBackedUp(bytes32 offChainId) external view returns (bool) {
+        return contentBackedUp[offChainId];
     }
 
     // ---- Pausable (emergency stop) ----

@@ -151,6 +151,12 @@ interface IUniverseManager {
 
     function enabledLockers(address locker, address hook) external view returns (bool);
 
+    /// @notice The single platform-operated relayer address authorized to call
+    ///         Universe.backupContent/batchBackupContent across every universe.
+    ///         Centralized here (rather than per-universe) so the relayer can be
+    ///         rotated once instead of on every deployed Universe individually.
+    function backupRelayer() external view returns (address);
+
     function getUniverseData(uint256 id)
         external
         view

@@ -8292,6 +8292,242 @@ export const launchpadStakingAbi = [
 ] as const;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// LegacyContentBackupRegistry
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const legacyContentBackupRegistryAbi = [
+  {
+    type: 'constructor',
+    inputs: [{ name: '_universeManager', internalType: 'address', type: 'address' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_BACKUP_BATCH_SIZE',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      {
+        name: 'record',
+        internalType: 'struct LegacyContentBackupRegistry.LegacyBackupRecord',
+        type: 'tuple',
+        components: [
+          { name: 'kind', internalType: 'enum ContentKind', type: 'uint8' },
+          { name: 'universe', internalType: 'address', type: 'address' },
+          { name: 'offChainId', internalType: 'bytes32', type: 'bytes32' },
+          { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+        ],
+      },
+      { name: 'cid', internalType: 'string', type: 'string' },
+      { name: 'metadataJson', internalType: 'string', type: 'string' },
+    ],
+    name: 'backupContent',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      {
+        name: 'records',
+        internalType: 'struct LegacyContentBackupRegistry.LegacyBackupRecord[]',
+        type: 'tuple[]',
+        components: [
+          { name: 'kind', internalType: 'enum ContentKind', type: 'uint8' },
+          { name: 'universe', internalType: 'address', type: 'address' },
+          { name: 'offChainId', internalType: 'bytes32', type: 'bytes32' },
+          { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+        ],
+      },
+      { name: 'cids', internalType: 'string[]', type: 'string[]' },
+      { name: 'metadataJsons', internalType: 'string[]', type: 'string[]' },
+    ],
+    name: 'batchBackupContent',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'bytes32', type: 'bytes32' },
+    ],
+    name: 'contentBackedUp',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'universe', internalType: 'address', type: 'address' },
+      { name: 'offChainId', internalType: 'bytes32', type: 'bytes32' },
+    ],
+    name: 'isContentBackedUp',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'owner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'paused',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
+    name: 'transferOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'universeManager',
+    outputs: [{ name: '', internalType: 'contract IUniverseManager', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'unpause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'kind',
+        internalType: 'enum ContentKind',
+        type: 'uint8',
+        indexed: true,
+      },
+      {
+        name: 'universe',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'offChainId',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+      {
+        name: 'relayer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+      { name: 'cid', internalType: 'string', type: 'string', indexed: false },
+      {
+        name: 'metadataJson',
+        internalType: 'string',
+        type: 'string',
+        indexed: false,
+      },
+    ],
+    name: 'ContentBackedUp',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'OwnershipTransferred',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Paused',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Unpaused',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'caller', internalType: 'address', type: 'address' }],
+    name: 'CallerNotBackupRelayer',
+  },
+  { type: 'error', inputs: [], name: 'EnforcedPause' },
+  { type: 'error', inputs: [], name: 'ExpectedPause' },
+  {
+    type: 'error',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'OwnableInvalidOwner',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'OwnableUnauthorizedAccount',
+  },
+] as const;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // LicensingRegistry
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -12072,6 +12308,12 @@ export const premiumActionsAbi = [
         indexed: false,
       },
       {
+        name: 'received',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
         name: 'toLp',
         internalType: 'uint256',
         type: 'uint256',
@@ -12119,6 +12361,12 @@ export const premiumActionsAbi = [
       },
       {
         name: 'cost',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'received',
         internalType: 'uint256',
         type: 'uint256',
         indexed: false,
@@ -15679,6 +15927,13 @@ export const universeAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'MAX_BACKUP_BATCH_SIZE',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'MAX_CHILDREN_PER_NODE',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
@@ -15700,6 +15955,46 @@ export const universeAbi = [
   {
     type: 'function',
     inputs: [
+      {
+        name: 'record',
+        internalType: 'struct BackupRecord',
+        type: 'tuple',
+        components: [
+          { name: 'kind', internalType: 'enum ContentKind', type: 'uint8' },
+          { name: 'offChainId', internalType: 'bytes32', type: 'bytes32' },
+          { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+        ],
+      },
+      { name: 'cid', internalType: 'string', type: 'string' },
+      { name: 'metadataJson', internalType: 'string', type: 'string' },
+    ],
+    name: 'backupContent',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      {
+        name: 'records',
+        internalType: 'struct BackupRecord[]',
+        type: 'tuple[]',
+        components: [
+          { name: 'kind', internalType: 'enum ContentKind', type: 'uint8' },
+          { name: 'offChainId', internalType: 'bytes32', type: 'bytes32' },
+          { name: 'contentHash', internalType: 'bytes32', type: 'bytes32' },
+        ],
+      },
+      { name: 'cids', internalType: 'string[]', type: 'string[]' },
+      { name: 'metadataJsons', internalType: 'string[]', type: 'string[]' },
+    ],
+    name: 'batchBackupContent',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
       { name: 'users', internalType: 'address[]', type: 'address[]' },
       { name: 'status', internalType: 'bool', type: 'bool' },
     ],
@@ -15716,6 +16011,13 @@ export const universeAbi = [
     name: 'batchSetWhitelisted',
     outputs: [],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'contentBackedUp',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -15846,6 +16148,13 @@ export const universeAbi = [
     type: 'function',
     inputs: [{ name: 'user', internalType: 'address', type: 'address' }],
     name: 'getWhitelisted',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'offChainId', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'isContentBackedUp',
     outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
     stateMutability: 'view',
   },
@@ -16075,6 +16384,44 @@ export const universeAbi = [
       },
     ],
     name: 'CanonChanged',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'kind',
+        internalType: 'enum ContentKind',
+        type: 'uint8',
+        indexed: true,
+      },
+      {
+        name: 'offChainId',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+      {
+        name: 'relayer',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'contentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+      { name: 'cid', internalType: 'string', type: 'string', indexed: false },
+      {
+        name: 'metadataJson',
+        internalType: 'string',
+        type: 'string',
+        indexed: false,
+      },
+    ],
+    name: 'ContentBackedUp',
   },
   {
     type: 'event',
@@ -16318,6 +16665,11 @@ export const universeAbi = [
     type: 'error',
     inputs: [{ name: 'caller', internalType: 'address', type: 'address' }],
     name: 'CallerNotAdmin',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'caller', internalType: 'address', type: 'address' }],
+    name: 'CallerNotBackupRelayer',
   },
   { type: 'error', inputs: [], name: 'CallerNotManager' },
   { type: 'error', inputs: [], name: 'CanonNotSet' },
@@ -17230,6 +17582,13 @@ export const universeManagerAbi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'backupRelayer',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
     name: 'balanceOf',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
@@ -17749,6 +18108,13 @@ export const universeManagerAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: '_relayer', internalType: 'address', type: 'address' }],
+    name: 'setBackupRelayer',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     inputs: [
       { name: 'token', internalType: 'address', type: 'address' },
       { name: 'allowed', internalType: 'bool', type: 'bool' },
@@ -17994,6 +18360,25 @@ export const universeManagerAbi = [
       { name: 'approved', internalType: 'bool', type: 'bool', indexed: false },
     ],
     name: 'ApprovalForAll',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldRelayer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'newRelayer',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'BackupRelayerUpdated',
   },
   {
     type: 'event',
@@ -25917,6 +26302,230 @@ export const useLaunchpadStaking_Upgraded_watch = /*#__PURE__*/ createUseWatchCo
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__
+ */
+export const useLegacyContentBackupRegistry_undefined_read = /*#__PURE__*/ createUseReadContract({
+  abi: legacyContentBackupRegistryAbi,
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"MAX_BACKUP_BATCH_SIZE"`
+ */
+export const useLegacyContentBackupRegistry_MaxBackupBatchSize_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: legacyContentBackupRegistryAbi,
+    functionName: 'MAX_BACKUP_BATCH_SIZE',
+  });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"contentBackedUp"`
+ */
+export const useLegacyContentBackupRegistry_ContentBackedUp_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: legacyContentBackupRegistryAbi,
+    functionName: 'contentBackedUp',
+  });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"isContentBackedUp"`
+ */
+export const useLegacyContentBackupRegistry_IsContentBackedUp_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: legacyContentBackupRegistryAbi,
+    functionName: 'isContentBackedUp',
+  });
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"owner"`
+ */
+export const useLegacyContentBackupRegistry_Owner_read = /*#__PURE__*/ createUseReadContract({
+  abi: legacyContentBackupRegistryAbi,
+  functionName: 'owner',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"paused"`
+ */
+export const useLegacyContentBackupRegistry_Paused_read = /*#__PURE__*/ createUseReadContract({
+  abi: legacyContentBackupRegistryAbi,
+  functionName: 'paused',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"universeManager"`
+ */
+export const useLegacyContentBackupRegistry_UniverseManager_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: legacyContentBackupRegistryAbi,
+    functionName: 'universeManager',
+  });
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__
+ */
+export const useLegacyContentBackupRegistry_undefined_write = /*#__PURE__*/ createUseWriteContract({
+  abi: legacyContentBackupRegistryAbi,
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"backupContent"`
+ */
+export const useLegacyContentBackupRegistry_BackupContent_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: legacyContentBackupRegistryAbi,
+    functionName: 'backupContent',
+  });
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"batchBackupContent"`
+ */
+export const useLegacyContentBackupRegistry_BatchBackupContent_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: legacyContentBackupRegistryAbi,
+    functionName: 'batchBackupContent',
+  });
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"pause"`
+ */
+export const useLegacyContentBackupRegistry_Pause_write = /*#__PURE__*/ createUseWriteContract({
+  abi: legacyContentBackupRegistryAbi,
+  functionName: 'pause',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useLegacyContentBackupRegistry_RenounceOwnership_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: legacyContentBackupRegistryAbi,
+    functionName: 'renounceOwnership',
+  });
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useLegacyContentBackupRegistry_TransferOwnership_write =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: legacyContentBackupRegistryAbi,
+    functionName: 'transferOwnership',
+  });
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"unpause"`
+ */
+export const useLegacyContentBackupRegistry_Unpause_write = /*#__PURE__*/ createUseWriteContract({
+  abi: legacyContentBackupRegistryAbi,
+  functionName: 'unpause',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__
+ */
+export const useLegacyContentBackupRegistry_undefined_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: legacyContentBackupRegistryAbi,
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"backupContent"`
+ */
+export const useLegacyContentBackupRegistry_BackupContent_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: legacyContentBackupRegistryAbi,
+    functionName: 'backupContent',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"batchBackupContent"`
+ */
+export const useLegacyContentBackupRegistry_BatchBackupContent_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: legacyContentBackupRegistryAbi,
+    functionName: 'batchBackupContent',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"pause"`
+ */
+export const useLegacyContentBackupRegistry_Pause_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: legacyContentBackupRegistryAbi,
+    functionName: 'pause',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"renounceOwnership"`
+ */
+export const useLegacyContentBackupRegistry_RenounceOwnership_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: legacyContentBackupRegistryAbi,
+    functionName: 'renounceOwnership',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useLegacyContentBackupRegistry_TransferOwnership_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: legacyContentBackupRegistryAbi,
+    functionName: 'transferOwnership',
+  });
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `functionName` set to `"unpause"`
+ */
+export const useLegacyContentBackupRegistry_Unpause_simulate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: legacyContentBackupRegistryAbi,
+    functionName: 'unpause',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__
+ */
+export const useLegacyContentBackupRegistry_undefined_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: legacyContentBackupRegistryAbi,
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `eventName` set to `"ContentBackedUp"`
+ */
+export const useLegacyContentBackupRegistry_ContentBackedUp_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: legacyContentBackupRegistryAbi,
+    eventName: 'ContentBackedUp',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `eventName` set to `"OwnershipTransferred"`
+ */
+export const useLegacyContentBackupRegistry_OwnershipTransferred_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: legacyContentBackupRegistryAbi,
+    eventName: 'OwnershipTransferred',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `eventName` set to `"Paused"`
+ */
+export const useLegacyContentBackupRegistry_Paused_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: legacyContentBackupRegistryAbi,
+    eventName: 'Paused',
+  });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link legacyContentBackupRegistryAbi}__ and `eventName` set to `"Unpaused"`
+ */
+export const useLegacyContentBackupRegistry_Unpaused_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: legacyContentBackupRegistryAbi,
+    eventName: 'Unpaused',
+  });
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link licensingRegistryAbi}__
  */
 export const useLicensingRegistry_undefined_read = /*#__PURE__*/ createUseReadContract({
@@ -32218,6 +32827,14 @@ export const useUniverse_undefined_read = /*#__PURE__*/ createUseReadContract({
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"MAX_BACKUP_BATCH_SIZE"`
+ */
+export const useUniverse_MaxBackupBatchSize_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'MAX_BACKUP_BATCH_SIZE',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"MAX_CHILDREN_PER_NODE"`
  */
 export const useUniverse_MaxChildrenPerNode_read = /*#__PURE__*/ createUseReadContract({
@@ -32239,6 +32856,14 @@ export const useUniverse_MaxTimelineDepth_read = /*#__PURE__*/ createUseReadCont
 export const useUniverse_AssociatedToken_read = /*#__PURE__*/ createUseReadContract({
   abi: universeAbi,
   functionName: 'associatedToken',
+});
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"contentBackedUp"`
+ */
+export const useUniverse_ContentBackedUp_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'contentBackedUp',
 });
 
 /**
@@ -32346,6 +32971,14 @@ export const useUniverse_GetWhitelisted_read = /*#__PURE__*/ createUseReadContra
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"isContentBackedUp"`
+ */
+export const useUniverse_IsContentBackedUp_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'isContentBackedUp',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"latestNodeId"`
  */
 export const useUniverse_LatestNodeId_read = /*#__PURE__*/ createUseReadContract({
@@ -32430,6 +33063,22 @@ export const useUniverse_VaultWhitelisted_read = /*#__PURE__*/ createUseReadCont
  */
 export const useUniverse_undefined_write = /*#__PURE__*/ createUseWriteContract({
   abi: universeAbi,
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"backupContent"`
+ */
+export const useUniverse_BackupContent_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeAbi,
+  functionName: 'backupContent',
+});
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"batchBackupContent"`
+ */
+export const useUniverse_BatchBackupContent_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeAbi,
+  functionName: 'batchBackupContent',
 });
 
 /**
@@ -32557,6 +33206,22 @@ export const useUniverse_Unpause_write = /*#__PURE__*/ createUseWriteContract({
  */
 export const useUniverse_undefined_simulate = /*#__PURE__*/ createUseSimulateContract({
   abi: universeAbi,
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"backupContent"`
+ */
+export const useUniverse_BackupContent_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeAbi,
+  functionName: 'backupContent',
+});
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"batchBackupContent"`
+ */
+export const useUniverse_BatchBackupContent_simulate = /*#__PURE__*/ createUseSimulateContract({
+  abi: universeAbi,
+  functionName: 'batchBackupContent',
 });
 
 /**
@@ -32703,6 +33368,14 @@ export const useUniverse_AdminUpdated_watch = /*#__PURE__*/ createUseWatchContra
 export const useUniverse_CanonChanged_watch = /*#__PURE__*/ createUseWatchContractEvent({
   abi: universeAbi,
   eventName: 'CanonChanged',
+});
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeAbi}__ and `eventName` set to `"ContentBackedUp"`
+ */
+export const useUniverse_ContentBackedUp_watch = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: universeAbi,
+  eventName: 'ContentBackedUp',
 });
 
 /**
@@ -33528,6 +34201,14 @@ export const useUniverseManager_TokenSupply_read = /*#__PURE__*/ createUseReadCo
 });
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"backupRelayer"`
+ */
+export const useUniverseManager_BackupRelayer_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeManagerAbi,
+  functionName: 'backupRelayer',
+});
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"balanceOf"`
  */
 export const useUniverseManager_BalanceOf_read = /*#__PURE__*/ createUseReadContract({
@@ -33885,6 +34566,14 @@ export const useUniverseManager_SetApprovalForAll_write = /*#__PURE__*/ createUs
 });
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setBackupRelayer"`
+ */
+export const useUniverseManager_SetBackupRelayer_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeManagerAbi,
+  functionName: 'setBackupRelayer',
+});
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setClaimableToken"`
  */
 export const useUniverseManager_SetClaimableToken_write = /*#__PURE__*/ createUseWriteContract({
@@ -34152,6 +34841,16 @@ export const useUniverseManager_SetApprovalForAll_simulate =
   });
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setBackupRelayer"`
+ */
+export const useUniverseManager_SetBackupRelayer_simulate = /*#__PURE__*/ createUseSimulateContract(
+  {
+    abi: universeManagerAbi,
+    functionName: 'setBackupRelayer',
+  }
+);
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeManagerAbi}__ and `functionName` set to `"setClaimableToken"`
  */
 export const useUniverseManager_SetClaimableToken_simulate =
@@ -34309,6 +35008,15 @@ export const useUniverseManager_ApprovalForAll_watch = /*#__PURE__*/ createUseWa
   abi: universeManagerAbi,
   eventName: 'ApprovalForAll',
 });
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"BackupRelayerUpdated"`
+ */
+export const useUniverseManager_BackupRelayerUpdated_watch =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: universeManagerAbi,
+    eventName: 'BackupRelayerUpdated',
+  });
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeManagerAbi}__ and `eventName` set to `"BondingCurveCreated"`
