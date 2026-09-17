@@ -1,3 +1,5 @@
+import { isAddressLikeUniverseId } from '@/lib/utils';
+
 /**
  * Shared Universe type used across sidebar and editor components.
  *
@@ -33,7 +35,15 @@ export interface UniverseData {
   universeType?: 'fun' | 'monetized';
 }
 
-/** Check whether a universe has an on-chain contract address */
+/**
+ * Check whether a universe's address looks like a blockchain address —
+ * an EVM `0x…` contract address or a Solana base58 PDA — as opposed to a
+ * human-readable slug. A bare `startsWith('0x')` check here misclassified
+ * every Solana universe as non-blockchain, hiding UniverseSidebar's
+ * blockchain-only controls (explorer link, admin panel, publish button) for
+ * them. See `isAddressLikeUniverseId` for the EVM/Solana shape check this
+ * mirrors.
+ */
 export function isBlockchainUniverse(u: UniverseData | null | undefined): boolean {
-  return !!u?.address?.startsWith('0x');
+  return !!u?.address && isAddressLikeUniverseId(u.address);
 }

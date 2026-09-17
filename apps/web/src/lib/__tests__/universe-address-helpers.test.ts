@@ -212,3 +212,97 @@ describe('toChecksummedAddressOrUndefined — the GovernanceSidebar guard', () =
     expect(toChecksummedAddressOrUndefined('')).toBeUndefined();
   });
 });
+
+/**
+ * Fuzz-style sweep: every address-classification helper on this page has,
+ * historically, been the thing that crashed the editor when it met a value
+ * shape it didn't expect (see the incident log above, plus the
+ * `isBlockchainUniverse` and `useIsUniverseAdmin` gaps found in the same
+ * investigation — types/__tests__/universe.test.ts). Run every helper
+ * against a wide input matrix so a *future* unguarded assumption shows up
+ * here as a thrown exception instead of a blank production page.
+ */
+describe('address helpers never throw, across a wide input matrix', () => {
+  const INPUTS: Array<string | null | undefined> = [
+    EVM_ADDRESS_LOWER,
+    EVM_ADDRESS_MIXED_CASE,
+    ZERO_ADDRESS,
+    REPORTED_SOLANA_PDA,
+    SOLANA_SPL_MINT,
+    '1'.repeat(32), // shortest valid Solana shape
+    '1'.repeat(44), // longest valid Solana shape
+    'sample-universe', // human-readable slug
+    '12345', // numeric-only id
+    '0x', // bare prefix
+    '0xNotAnAddress',
+    '0x' + '1'.repeat(39), // one hex char short
+    '0x' + '1'.repeat(41), // one hex char long
+    '0' + REPORTED_SOLANA_PDA.slice(1), // base58-excluded leading char
+    '', // empty string
+    ' ', // whitespace
+    '   0x89669812f850f34f907ee9e9009f501d1b008420   ', // untrimmed
+    'H9E6T6KyaL4xZMhttKAprcayQGonswqUnvXmtcb8a9kL\0', // embedded null byte
+    "0x89669812f850f34f907ee9e9009f501d1b008420'; DROP TABLE universes;--",
+    'a'.repeat(1000), // pathological length
+    null,
+    undefined,
+  ];
+
+  it('isEvmAddress never throws', () => {
+    for (const input of INPUTS) {
+      expect(() => isEvmAddress(input as string)).not.toThrow();
+    }
+  });
+
+  it('isSolanaAddress never throws', () => {
+    for (const input of INPUTS) {
+      expect(() => isSolanaAddress(input as string)).not.toThrow();
+    }
+  });
+
+  it('isAddressLikeUniverseId never throws', () => {
+    for (const input of INPUTS) {
+      expect(() => isAddressLikeUniverseId(input as string)).not.toThrow();
+    }
+  });
+
+  it('asEvmAddressOrUndefined never throws and only ever returns undefined or a valid EVM address', () => {
+    for (const input of INPUTS) {
+      let result: string | undefined;
+      expect(() => {
+        result = asEvmAddressOrUndefined(input);
+      }).not.toThrow();
+      if (result !== undefined) {
+        expect(isEvmAddress(result)).toBe(true);
+      }
+    }
+  });
+
+  it('toChecksummedAddressOrUndefined never throws and only ever returns undefined or a checksummed EVM address', () => {
+    for (const input of INPUTS) {
+      let result: `0x${string}` | undefined;
+      expect(() => {
+        result = toChecksummedAddressOrUndefined(input);
+      }).not.toThrow();
+      if (result !== undefined) {
+        expect(result).toBe(getAddress(result));
+      }
+    }
+  });
+
+  it('every non-EVM-shaped input in the matrix is rejected by both EVM guards', () => {
+    for (const input of INPUTS) {
+      const validEvmShape = typeof input === 'string' && isEvmAddress(input);
+      // asEvmAddressOrUndefined only checks shape — the zero address is
+      // valid EVM shape and passes through unchanged.
+      if (!validEvmShape) {
+        expect(asEvmAddressOrUndefined(input)).toBeUndefined();
+      }
+      // toChecksummedAddressOrUndefined additionally treats the zero
+      // address as "unset", so it rejects it even though the shape is valid.
+      if (!validEvmShape || input === ZERO_ADDRESS) {
+        expect(toChecksummedAddressOrUndefined(input)).toBeUndefined();
+      }
+    }
+  });
+});

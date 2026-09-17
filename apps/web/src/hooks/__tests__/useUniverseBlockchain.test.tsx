@@ -90,7 +90,9 @@ function mockFirestoreExactMatch(storedId: string) {
 }
 
 function renderUniverseBlockchain(props: Parameters<typeof useUniverseBlockchain>[0]) {
-  const queryClient = new QueryClient();
+  // retry: false — otherwise react-query's default 3-attempt exponential
+  // backoff makes the error-path test slow and flaky.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
@@ -158,5 +160,79 @@ describe('useUniverseBlockchain — off-chain node population', () => {
     });
 
     await waitFor(() => expect(result.current.graphData.nodeIds.length).toBe(1));
+  });
+
+  it('reproduces the reported "nodes won\'t populate" incident end-to-end with real Techno Antichrist data', async () => {
+    // Techno Antichrist: a Solana (non-EVM) fun-mode universe reported as
+    // "nodes won't populate" on loar.fun. universes.get and offChainNodes.list
+    // were both confirmed healthy directly against production during that
+    // investigation (real shape reproduced below) — this pins that the hook
+    // itself correctly turns that real response into a populated graph, so
+    // any future regression in the fetch/merge path (not the UI layer) shows
+    // up here instead of only in a user's browser.
+    const universeId = 'H9E6T6KyaL4xZMhttKAprcayQGonswqUnvXmtcb8a9kL';
+    const REAL_NODES = [
+      {
+        id: '7e014953-c85b-4386-8297-079bcfae901d',
+        universeId,
+        nodeId: 1,
+        contentHash: '0x7e31467ff562d3e464439d9bf7d41a4fc5f9b36b9d485956d09ba9043d8a85bd',
+        plotHash: '0x9f2f88bc129b156aeeb397a0de058173f949a56abb803e68783277d69826ebc6',
+        videoUrl:
+          'https://firebasestorage.googleapis.com/v0/b/loar-db.firebasestorage.app/o/objects%2F57%2F5729654e330bb49493a803136a1aa3d914772a2528419a3b3f626b4ed9c271fb.mp4?alt=media',
+        plot: 'A flawless "Briefing" at full tilt.',
+        title: 'Ep 1 — The Commission — shot 1',
+        previousNodeId: 0,
+        canon: true,
+        children: [2],
+      },
+      {
+        id: '7a79637b-7864-4455-818f-3eb78c78b3bf',
+        universeId,
+        nodeId: 2,
+        contentHash: '0x6879da702c64574e30cf200842476a8469b9c122a877bf86020b7a4fa94422db',
+        plotHash: '0xeb66851f498f94f570bd0cee15a46ffc1f696d1924e0fc95d4e59894fa436a7f',
+        videoUrl:
+          'https://firebasestorage.googleapis.com/v0/b/loar-db.firebasestorage.app/o/objects%2F9b%2F9b23bac7e292bc13d591cdfd8ea18a8e67725dad3c6a51aa5f243086eb35128a.mp4?alt=media',
+        plot: 'Backstage load-out at 1 a.m.',
+        title: 'Ep 1 — The Commission — shot 2',
+        previousNodeId: 1,
+        canon: false,
+        children: [3],
+      },
+    ];
+    mockOffChainList.mockResolvedValue({ nodes: REAL_NODES, total: REAL_NODES.length });
+
+    const { result } = renderUniverseBlockchain({
+      universeId,
+      contractAddress: undefined,
+      // isAddressLikeUniverseId(universeId) is true (Solana base58 PDA).
+      isBlockchainUniverse: true,
+      // onChainUniverseId is null on the real universe doc — confirmed
+      // fun-mode, never touch the (nonexistent) contract.
+      isOnChain: false,
+    });
+
+    await waitFor(() => expect(result.current.graphData.nodeIds.length).toBe(2));
+    expect(result.current.graphData.nodeIds).toEqual(['1', '2']);
+    expect(result.current.graphData.urls[0]).toContain('firebasestorage.googleapis.com');
+    expect(result.current.graphData.children[0]).toEqual(['2']);
+    expect(result.current.isLoadingOffChain).toBe(false);
+    expect(result.current.isLoadingAny).toBe(false);
+  });
+
+  it('does not crash and yields an empty graph when offChainNodes.list itself errors (e.g. a 500)', async () => {
+    const universeId = 'H9E6T6KyaL4xZMhttKAprcayQGonswqUnvXmtcb8a9kL';
+    mockOffChainList.mockRejectedValue(new Error('INTERNAL_SERVER_ERROR'));
+
+    const { result } = renderUniverseBlockchain({
+      universeId,
+      contractAddress: undefined,
+      isBlockchainUniverse: true,
+      isOnChain: false,
+    });
+
+    await waitFor(() => expect(result.current.isLoadingOffChain).toBe(false));
+    expect(result.current.graphData.nodeIds).toEqual([]);
   });
 });

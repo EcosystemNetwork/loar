@@ -129,9 +129,11 @@ export function UniverseSidebar({
   const [editDescription, setEditDescription] = useState('');
   const [isSavingMetadata, setIsSavingMetadata] = useState(false);
   const queryClient = useQueryClient();
-  const { isAdmin } = useIsUniverseAdmin(
-    finalUniverse?.address?.startsWith('0x') ? (finalUniverse.address as `0x${string}`) : undefined
-  );
+  // useIsUniverseAdmin accepts either an EVM `0x…` address or a Solana
+  // base58 PDA and resolves admin status server-side — the old
+  // `startsWith('0x')` gate here meant every Solana universe was queried
+  // with `undefined`, so its actual owner never saw admin controls.
+  const { isAdmin } = useIsUniverseAdmin(finalUniverse?.address);
 
   const isBlockchain = checkBlockchain(finalUniverse);
   const universeIdOrAddress = finalUniverse?.address || finalUniverse?.id;
