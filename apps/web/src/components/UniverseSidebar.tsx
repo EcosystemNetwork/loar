@@ -136,7 +136,15 @@ export function UniverseSidebar({
   const { isAdmin } = useIsUniverseAdmin(finalUniverse?.address);
 
   const isBlockchain = checkBlockchain(finalUniverse);
-  const universeIdOrAddress = finalUniverse?.address || finalUniverse?.id;
+  // Used only for navigation/lookup (Link params, search params, child
+  // component universeId props) — never for display. `.id` is the
+  // canonical, lowercase-for-EVM Firestore doc id that offChainNodes and
+  // every other lookup are keyed by; `.address` can be a checksummed
+  // (mixed-case) value (e.g. from viem's getAddress() at publish time).
+  // Preferring `.address` sent every Gallery/Gen-Config/Lineage/Play link
+  // for such a universe to a mixed-case URL that off-chain lookups
+  // (exact-match Firestore queries) wouldn't match.
+  const universeIdOrAddress = finalUniverse?.id || finalUniverse?.address;
   const explorerName = getExplorerName(chainId);
 
   // Close mobile sidebar on escape key
