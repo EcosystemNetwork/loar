@@ -14,6 +14,7 @@ const TRUSTED_CONNECT = [
   'https://*.fal.ai',
   'https://*.pinata.cloud',
   'https://gateway.pinata.cloud',
+  'https://*.mypinata.cloud',
   'https://*.lighthouse.storage',
   'https://*.firebaseio.com',
   'https://firestore.googleapis.com',
