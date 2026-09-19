@@ -433,9 +433,23 @@ export function getNextIpfsFallback(currentUrl?: string | null): string | null {
   const currentParts = extractIpfsPath(currentUrl);
   if (!currentParts) return null;
   const currentCid = currentParts.cidPath.split('?')[0];
+  const originOf = (u: string): string | null => {
+    try {
+      return new URL(u).origin;
+    } catch {
+      return null;
+    }
+  };
+  // Match on gateway origin AND CID. A stored URL on a gateway that isn't in
+  // the chain (e.g. a raw `*.mypinata.cloud` URL Pinata now refuses) shares
+  // only the CID with candidates[0] (our dedicated gateway) — matching on CID
+  // alone made that look like "already tried candidates[0]" and skipped
+  // straight to ipfs.io/dweb.link, rate-limiting (429) every image on the page
+  // without our own gateway ever being tried.
+  const currentOrigin = originOf(currentUrl);
   const matchIdx = candidates.findIndex((c) => {
     const p = extractIpfsPath(c);
-    return p?.cidPath.split('?')[0] === currentCid;
+    return p?.cidPath.split('?')[0] === currentCid && originOf(c) === currentOrigin;
   });
   if (matchIdx === -1) return candidates[0] ?? null;
   return candidates[matchIdx + 1] ?? null;

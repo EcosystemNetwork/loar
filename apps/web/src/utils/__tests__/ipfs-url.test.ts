@@ -317,6 +317,39 @@ describe('primeIpfsGatewayConfig / dedicated-gateway primary', () => {
     expect(() => new URL(out)).not.toThrow();
   });
 
+  it('tries the dedicated gateway before public ones when a stored bare *.mypinata.cloud URL fails', async () => {
+    // Regression, 2026-09-19 (Cyber War editor): stored image URLs are raw
+    // `<name>.mypinata.cloud/ipfs/<cid>` (no token; Pinata refuses them). The
+    // failing URL shares only its CID with candidates[0] (our custom-domain
+    // dedicated gateway), and CID-only matching made the rotator think
+    // candidates[0] was already tried — hopping straight to ipfs.io/dweb.link
+    // (429 storm) without ever requesting media.loar.fun.
+    global.fetch = vi.fn((input: unknown) => {
+      const href = typeof input === 'string' ? input : (input as Request).url;
+      if (href.includes('/api/ipfs/gateway-config')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            base: 'https://media.loar.fun',
+            host: 'media.loar.fun',
+            token: 'tok_xyz789',
+            isDedicated: true,
+          }),
+        } as Response);
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${href}`));
+    }) as unknown as typeof fetch;
+    const { primeIpfsGatewayConfig, getNextIpfsFallback } = await import('../ipfs-url');
+    await primeIpfsGatewayConfig();
+
+    const dedicated = 'https://media.loar.fun/ipfs/QmStored?pinataGatewayToken=tok_xyz789';
+    expect(
+      getNextIpfsFallback('https://peach-impressive-moth-978.mypinata.cloud/ipfs/QmStored')
+    ).toBe(dedicated);
+    // Once the dedicated URL itself fails, the chain moves on to public gateways.
+    expect(getNextIpfsFallback(dedicated)).toBe('https://ipfs.io/ipfs/QmStored');
+  });
+
   it('does not throw or wedge when the config endpoint is unreachable', async () => {
     global.fetch = vi.fn(() => Promise.reject(new Error('offline'))) as unknown as typeof fetch;
     const { primeIpfsGatewayConfig, resolveIpfsUrl } = await import('../ipfs-url');
