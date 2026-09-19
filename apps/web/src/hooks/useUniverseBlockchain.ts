@@ -132,7 +132,15 @@ function useUniverseFullGraph(contractAddress?: string, latestNodeId?: number) {
     [needsPagination, latestNodeId]
   );
 
-  const paged = useReadContracts({
+  // Narrowed on purpose: the inferred useReadContracts result over the full ABI
+  // trips TS2589 (excessively deep instantiation) on any property access.
+  const paged: {
+    data: unknown;
+    isLoading: boolean;
+    isError: boolean;
+    error: Error | null;
+    refetch: () => Promise<unknown>;
+  } = useReadContracts({
     contracts: pageRequests.map(({ startId, count }) => ({
       abi: universeAbi,
       address: (contractAddress || '0x') as Address,

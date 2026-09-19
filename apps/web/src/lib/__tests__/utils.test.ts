@@ -28,7 +28,9 @@ describe('cn', () => {
     expect(cn('p-2', 'p-4')).toBe('p-4');
   });
   it('applies clsx conditionals and drops falsy values', () => {
-    expect(cn('a', false && 'b', null, undefined, ['c', { d: true, e: false }])).toBe('a c d');
+    expect(cn('a', (0 as number) > 1 && 'b', null, undefined, ['c', { d: true, e: false }])).toBe(
+      'a c d'
+    );
   });
   it('returns "" for no meaningful input', () => {
     expect(cn()).toBe('');

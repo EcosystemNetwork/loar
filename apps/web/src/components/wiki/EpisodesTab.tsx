@@ -65,7 +65,7 @@ function tsOfScoped(e: ScopedEpisode): number {
 }
 
 /** Story-episode markers are `event` entities named "Ep 3 — Title" / "Episode 3: Title". */
-const EPISODE_NAME_RE = /^\s*(?:ep(?:isode)?\.?)\s*(\d+)\s*[—–:\-]/i;
+const EPISODE_NAME_RE = /^\s*(?:ep(?:isode)?\.?)\s*(\d+)\s*[—–:-]/i;
 
 function episodeNumber(e: WikiEntity): number {
   return Number(EPISODE_NAME_RE.exec(e.name)?.[1] ?? Number.MAX_SAFE_INTEGER);

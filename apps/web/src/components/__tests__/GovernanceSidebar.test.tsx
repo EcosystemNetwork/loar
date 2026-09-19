@@ -40,7 +40,7 @@ const mockUseIsUniverseAdmin = vi.fn(() => ({
   isError: false,
 }));
 vi.mock('@/hooks/useIsUniverseAdmin', () => ({
-  useIsUniverseAdmin: (...args: unknown[]) => mockUseIsUniverseAdmin(...args),
+  useIsUniverseAdmin: () => mockUseIsUniverseAdmin(),
 }));
 
 import { GovernanceSidebar } from '../GovernanceSidebar';
