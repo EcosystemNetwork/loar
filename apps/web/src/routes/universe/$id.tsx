@@ -2938,17 +2938,15 @@ function UniverseTimelineEditorInner() {
     // opens the scene panel with nothing real to show/save.
     if (node.data.isPending) return;
 
-    // Shift+click = toggle selection, don't navigate
+    // Shift+click = toggle selection, don't navigate. ReactFlow already
+    // toggles the node's native `selected` flag for us here (multiSelectionKeyCode
+    // ="Shift" on the <ReactFlow> below), and that flows into `selectedNodeIds`
+    // via useOnSelectionChange above. Manually toggling `selectedNodeIds` again
+    // in this handler raced that: ReactFlow's own selection-change update and
+    // this handler's setState both fire off the same click, and since this one
+    // runs second it read the already-updated `prev` and flipped the node right
+    // back — so shift-click looked like it never selected anything.
     if (event.shiftKey && node.data.nodeType === 'scene') {
-      setSelectedNodeIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(node.id)) {
-          next.delete(node.id);
-        } else {
-          next.add(node.id);
-        }
-        return next;
-      });
       return;
     }
 
