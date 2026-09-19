@@ -6,6 +6,7 @@ import { Search, UserCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { allEntitiesKey, fetchAllEntities } from './fetchAll';
 import type { WikiEntity, EntityKind } from './types';
 import { SmartImage } from '@/components/SmartImage';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
@@ -48,8 +49,8 @@ export function CreatorsTab() {
   // Pull global entity lists once and aggregate counts per creator.
   const entityQueries = useQueries({
     queries: KINDS.map((kind) => ({
-      queryKey: ['entities', 'listByKind', kind],
-      queryFn: () => trpcClient.entities.listByKind.query({ kind }),
+      queryKey: allEntitiesKey(kind),
+      queryFn: () => fetchAllEntities(kind),
       staleTime: 60_000,
     })),
   });

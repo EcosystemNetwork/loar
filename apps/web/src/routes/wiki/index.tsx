@@ -220,11 +220,27 @@ function EntityTab({ kind, universeAddress }: { kind: EntityKind; universeAddres
   const isFetchingNextPage = query.isFetchingNextPage;
 
   const deferredSearch = useDeferredValue(search);
+  const searchTerm = deferredSearch.trim();
+  // Client filtering only sees pages already loaded; hit the server search so
+  // matches beyond the first page are found too.
+  const searchQuery = useQuery({
+    queryKey: ['wiki', 'entity-search', universeAddress ?? 'global', kind, searchTerm],
+    queryFn: () =>
+      trpcClient.entities.search.query({
+        query: searchTerm,
+        kind,
+        universeAddress,
+        limit: 100,
+      }),
+    enabled: searchTerm.length >= 2,
+    staleTime: 30_000,
+  });
   const filtered = useMemo(() => {
-    const q = deferredSearch.trim().toLowerCase();
+    const q = searchTerm.toLowerCase();
     if (!q) return entities;
+    if (q.length >= 2 && searchQuery.data) return searchQuery.data.entities as WikiEntity[];
     return entities.filter((e) => e.name.toLowerCase().includes(q));
-  }, [entities, deferredSearch]);
+  }, [entities, searchTerm, searchQuery.data]);
   const sorted = useMemo(() => sortEntities(filtered, sort), [filtered, sort]);
 
   useEffect(() => {

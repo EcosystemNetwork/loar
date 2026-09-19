@@ -4,6 +4,7 @@ import { useQueries } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { allEntitiesKey, fetchAllEntities } from './fetchAll';
 import type { EntityKind, WikiEntity } from './types';
 
 interface AZIndexTabProps {
@@ -38,13 +39,8 @@ export function AZIndexTab({ universeAddress }: AZIndexTabProps) {
 
   const queries = useQueries({
     queries: KINDS.map((kind) => ({
-      queryKey: universeAddress
-        ? ['entities', 'list', universeAddress, kind]
-        : ['entities', 'listByKind', kind],
-      queryFn: () =>
-        universeAddress
-          ? trpcClient.entities.list.query({ universeAddress, kind })
-          : trpcClient.entities.listByKind.query({ kind }),
+      queryKey: allEntitiesKey(kind, universeAddress),
+      queryFn: () => fetchAllEntities(kind, universeAddress),
       staleTime: 60_000,
     })),
   });

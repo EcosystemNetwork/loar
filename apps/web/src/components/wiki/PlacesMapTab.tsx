@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { trpcClient } from '@/utils/trpc';
 import { MapPin, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { allEntitiesKey, fetchAllEntities } from './fetchAll';
 import type { WikiEntity } from './types';
 
 interface PlacesMapTabProps {
@@ -30,13 +31,8 @@ function getXY(meta: PlaceEntity['metadata']): { x: number; y: number } | null {
 
 export function PlacesMapTab({ universeAddress }: PlacesMapTabProps) {
   const { data, isLoading } = useQuery({
-    queryKey: universeAddress
-      ? ['entities', 'list', universeAddress, 'place']
-      : ['entities', 'listByKind', 'place'],
-    queryFn: () =>
-      universeAddress
-        ? trpcClient.entities.list.query({ universeAddress, kind: 'place' })
-        : trpcClient.entities.listByKind.query({ kind: 'place' }),
+    queryKey: allEntitiesKey('place', universeAddress),
+    queryFn: () => fetchAllEntities('place', universeAddress),
   });
 
   const places = (data?.entities ?? []) as PlaceEntity[];

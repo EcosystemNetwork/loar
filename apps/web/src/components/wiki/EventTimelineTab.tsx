@@ -4,6 +4,7 @@ import { trpcClient } from '@/utils/trpc';
 import { Zap, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { allEntitiesKey, fetchAllEntities } from './fetchAll';
 import type { WikiEntity } from './types';
 import { SmartImage } from '@/components/SmartImage';
 
@@ -41,19 +42,31 @@ function sortKey(meta: EventEntity['metadata']): number {
   return -Infinity;
 }
 
+function entityTs(e: WikiEntity): number {
+  const v = e.createdAt as unknown;
+  if (v && typeof v === 'object' && '_seconds' in v)
+    return ((v as { _seconds?: number })._seconds ?? 0) * 1000;
+  const t = new Date(v as string).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
 export function EventTimelineTab({ universeAddress }: EventTimelineTabProps) {
   const { data, isLoading } = useQuery({
-    queryKey: universeAddress
-      ? ['entities', 'list', universeAddress, 'event']
-      : ['entities', 'listByKind', 'event'],
-    queryFn: () =>
-      universeAddress
-        ? trpcClient.entities.list.query({ universeAddress, kind: 'event' })
-        : trpcClient.entities.listByKind.query({ kind: 'event' }),
+    queryKey: allEntitiesKey('event', universeAddress),
+    queryFn: () => fetchAllEntities('event', universeAddress),
   });
 
   const events = ((data?.entities ?? []) as EventEntity[]).slice();
-  events.sort((a, b) => sortKey(b.metadata) - sortKey(a.metadata));
+  // Undated events sink to the bottom, ordered by creation time. (Subtracting
+  // two -Infinity keys yields NaN, which made the comparator inconsistent.)
+  events.sort((a, b) => {
+    const ka = sortKey(a.metadata);
+    const kb = sortKey(b.metadata);
+    if (ka === kb) return entityTs(b) - entityTs(a);
+    if (ka === -Infinity) return 1;
+    if (kb === -Infinity) return -1;
+    return kb - ka;
+  });
 
   return (
     <div className="space-y-4">

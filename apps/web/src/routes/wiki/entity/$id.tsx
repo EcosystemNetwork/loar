@@ -834,7 +834,10 @@ function EntityPage() {
         // Browse gallery for matching content
         const gallery = await trpcClient.gallery.browse.query({
           origin: 'generated',
-          limit: 50,
+          // Scope to the entity's own universe so its content isn't buried under
+          // the global newest-50 feed.
+          ...(entity.universeAddress ? { universeId: entity.universeAddress } : {}),
+          limit: 200,
           sortBy: 'newest',
         });
         const items = (gallery as any)?.items || [];
@@ -857,7 +860,8 @@ function EntityPage() {
       // Fallback: search by entity name in gallery titles
       const gallery = await trpcClient.gallery.browse.query({
         origin: 'generated',
-        limit: 50,
+        ...(entity.universeAddress ? { universeId: entity.universeAddress } : {}),
+        limit: 200,
         sortBy: 'newest',
       });
       const items = (gallery as any)?.items || [];

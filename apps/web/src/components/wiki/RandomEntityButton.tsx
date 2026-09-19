@@ -5,6 +5,7 @@ import { trpcClient } from '@/utils/trpc';
 import { Button } from '@/components/ui/button';
 import { Shuffle, Loader2 } from 'lucide-react';
 import { pickRandom } from './sort';
+import { allEntitiesKey, fetchAllEntities } from './fetchAll';
 import type { EntityKind, WikiEntity } from './types';
 import { toast } from 'sonner';
 
@@ -33,15 +34,9 @@ export function RandomEntityButton({ universeAddress }: RandomEntityButtonProps)
   const [loading, setLoading] = useState(false);
 
   async function fetchKind(kind: EntityKind): Promise<WikiEntity[]> {
-    const queryKey = universeAddress
-      ? ['entities', 'list', universeAddress, kind]
-      : ['entities', 'listByKind', kind];
     const data = await queryClient.fetchQuery({
-      queryKey,
-      queryFn: () =>
-        universeAddress
-          ? trpcClient.entities.list.query({ universeAddress, kind })
-          : trpcClient.entities.listByKind.query({ kind }),
+      queryKey: allEntitiesKey(kind, universeAddress),
+      queryFn: () => fetchAllEntities(kind, universeAddress),
       staleTime: 60_000,
     });
     return ((data as { entities?: WikiEntity[] } | undefined)?.entities ?? []) as WikiEntity[];

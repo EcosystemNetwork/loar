@@ -4,6 +4,7 @@ import { trpcClient } from '@/utils/trpc';
 import ReactFlow, { Background, Controls, type Edge, type Node, MarkerType } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { GitBranch } from 'lucide-react';
+import { allEntitiesKey, fetchAllEntities } from './fetchAll';
 import type { EntityKind, WikiEntity } from './types';
 
 interface RelationshipGraphTabProps {
@@ -54,8 +55,8 @@ export function RelationshipGraphTab({ universeAddress }: RelationshipGraphTabPr
 
   const entityQueries = useQueries({
     queries: KINDS.map((kind) => ({
-      queryKey: ['entities', 'list', universeAddress ?? '', kind],
-      queryFn: () => trpcClient.entities.list.query({ universeAddress: universeAddress!, kind }),
+      queryKey: allEntitiesKey(kind, universeAddress),
+      queryFn: () => fetchAllEntities(kind, universeAddress),
       enabled: !!universeAddress,
       staleTime: 30_000,
     })),

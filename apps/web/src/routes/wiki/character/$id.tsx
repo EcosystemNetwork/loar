@@ -107,7 +107,7 @@ function CharacterPage() {
                 <div>
                   <span className="font-semibold">Token ID:</span> #{character.token_id}
                 </div>
-                {character.rarity_percentage && (
+                {!!character.rarity_percentage && (
                   <div>
                     <span className="font-semibold">Rarity:</span> {character.rarity_percentage}%
                   </div>
@@ -141,7 +141,7 @@ function CharacterPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {Object.entries(character.traits).map(([trait, value]: [string, string]) => (
+                {Object.entries(character.traits ?? {}).map(([trait, value]: [string, string]) => (
                   <div
                     key={trait}
                     className="flex justify-between items-center p-3 bg-secondary rounded-lg"

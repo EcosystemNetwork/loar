@@ -5,6 +5,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Film, Play, Plus } from 'lucide-react';
+import { EntityCard } from './EntityCard';
+import { allEntitiesKey, fetchAllEntities } from './fetchAll';
+import type { WikiEntity } from './types';
 import { safeHttpUrl } from '@/lib/safe-url';
 import { SmartImage } from '@/components/SmartImage';
 
@@ -61,6 +64,13 @@ function tsOfScoped(e: ScopedEpisode): number {
   return 0;
 }
 
+/** Story-episode markers are `event` entities named "Ep 3 — Title" / "Episode 3: Title". */
+const EPISODE_NAME_RE = /^\s*(?:ep(?:isode)?\.?)\s*(\d+)\s*[—–:\-]/i;
+
+function episodeNumber(e: WikiEntity): number {
+  return Number(EPISODE_NAME_RE.exec(e.name)?.[1] ?? Number.MAX_SAFE_INTEGER);
+}
+
 export function EpisodesTab({ universeAddress }: EpisodesTabProps) {
   // Per-universe view: single tRPC call, server-paginated.
   const scopedQuery = useQuery({
@@ -81,6 +91,17 @@ export function EpisodesTab({ universeAddress }: EpisodesTabProps) {
     queryFn: () => trpcClient.episodes.feed.query({ limit: 50 }) as Promise<FeedEpisode[]>,
     enabled: !universeAddress,
   });
+
+  // Written-canon episodes: `event` entities with an "Ep N —" name. These live
+  // in the entities collection, not `episodes`, so they need their own fetch.
+  const storyQuery = useQuery({
+    queryKey: allEntitiesKey('event', universeAddress),
+    queryFn: () => fetchAllEntities('event', universeAddress),
+    staleTime: 60_000,
+  });
+  const storyEpisodes = (storyQuery.data?.entities ?? [])
+    .filter((e) => EPISODE_NAME_RE.test(e.name))
+    .sort((a, b) => episodeNumber(a) - episodeNumber(b));
 
   const isLoading = universeAddress ? scopedQuery.isLoading : feedQuery.isLoading;
 
@@ -113,7 +134,8 @@ export function EpisodesTab({ universeAddress }: EpisodesTabProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          {sorted.length} episode{sorted.length !== 1 ? 's' : ''}
+          {sorted.length + storyEpisodes.length} episode
+          {sorted.length + storyEpisodes.length !== 1 ? 's' : ''}
           {!universeAddress && ' across all universes'}
         </p>
         <Link
@@ -129,7 +151,20 @@ export function EpisodesTab({ universeAddress }: EpisodesTabProps) {
 
       {isLoading && <div className="text-center py-12 text-muted-foreground">Loading…</div>}
 
-      {!isLoading && sorted.length === 0 && (
+      {storyEpisodes.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Story episodes ({storyEpisodes.length})
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {storyEpisodes.map((e) => (
+              <EntityCard key={e.id} entity={e} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!isLoading && sorted.length === 0 && storyEpisodes.length === 0 && (
         <div className="text-center py-16 text-muted-foreground">
           <Film className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
           <p className="mb-2">No episodes yet.</p>
