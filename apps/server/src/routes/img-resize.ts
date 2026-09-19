@@ -62,12 +62,30 @@ function gatewayToken(): string {
   return (process.env.PINATA_GATEWAY_TOKEN || '').trim();
 }
 
+function gatewayHost(): string {
+  try {
+    return new URL(gatewayBase()).host;
+  } catch {
+    return '';
+  }
+}
+
+// True whenever PINATA_GATEWAY_URL points somewhere other than the default
+// public fallback — covers both the literal `.mypinata.cloud` subdomain and
+// any custom domain fronting it (e.g. `media.loar.fun`). Mirrors ipfs.ts's
+// isDedicatedGateway — kept local here since these two routes don't share a
+// module.
+function isDedicatedGateway(): boolean {
+  return gatewayBase() !== PUBLIC_GATEWAY;
+}
+
 function isAcceptableSourceUrl(raw: string): boolean {
   try {
     const u = new URL(raw);
     if (u.protocol !== 'https:') return false;
     if (KNOWN_GATEWAY_HOSTS.has(u.host)) return true;
     if (u.host.endsWith('.mypinata.cloud')) return true;
+    if (u.host === gatewayHost()) return true;
     if (u.host.endsWith('.ipfs.dweb.link')) return true;
     if (u.host.endsWith('.ipfs.w3s.link')) return true;
     return false;
@@ -110,7 +128,7 @@ function upstreamFetchUrl(raw: string): string {
     return raw;
   }
   const token = gatewayToken();
-  if (token && url.host.endsWith('.mypinata.cloud')) {
+  if (token && isDedicatedGateway()) {
     url.searchParams.set('pinataGatewayToken', token);
   }
   return url.toString();
@@ -129,7 +147,7 @@ function pinataOptimizedUrl(upstream: string, width: number, format: OutputForma
   } catch {
     return null;
   }
-  if (!url.host.endsWith('.mypinata.cloud')) return null;
+  if (!url.host.endsWith('.mypinata.cloud') && url.host !== gatewayHost()) return null;
   url.searchParams.set('img-width', String(width));
   url.searchParams.set('img-fit', 'scale-down');
   if (format === 'avif' || format === 'webp') url.searchParams.set('img-format', format);

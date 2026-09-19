@@ -66,6 +66,19 @@ describe('resolveActiveGateway', () => {
     expect(result.activeGateway).toBe(PUBLIC_GATEWAY);
   });
 
+  it('treats a custom domain fronting the dedicated gateway (e.g. media.loar.fun) as dedicated too', () => {
+    // Regression: Pinata started refusing to serve content through the bare
+    // *.mypinata.cloud subdomain ("add a custom domain to this gateway"),
+    // fixed 2026-09-19 by pointing PINATA_GATEWAY_URL at a custom domain.
+    // isDedicatedGateway must not be hardcoded to the *.mypinata.cloud shape
+    // — any host that isn't a known public gateway needs the same
+    // server-signed async treatment, or first-paint sync composition would
+    // bake an unauthenticated URL into every video/image app-wide again.
+    const result = resolveActiveGateway('https://media.loar.fun', false, PUBLIC_GATEWAY);
+    expect(result.isDedicatedGateway).toBe(true);
+    expect(result.activeGateway).toBe(PUBLIC_GATEWAY);
+  });
+
   it('uses a well-formed non-dedicated gateway config as-is', () => {
     const result = resolveActiveGateway('https://gateway.pinata.cloud', false, PUBLIC_GATEWAY);
     expect(result.isDedicatedGateway).toBe(false);
@@ -254,6 +267,33 @@ describe('primeIpfsGatewayConfig / dedicated-gateway primary', () => {
     expect(candidates[0]).toBe(dedicated);
     // Public gateways still trail as fallbacks for the onError chain.
     expect(candidates).toContain('https://ipfs.io/ipfs/QmWarm/file.png');
+  });
+
+  it('makes a custom-domain gateway config (e.g. media.loar.fun) the sync primary too', async () => {
+    // Regression, 2026-09-19: normalizeDedicatedConfig used to reject any
+    // gateway-config host that didn't literally end in `.mypinata.cloud`,
+    // which would have silently dropped this custom domain back to the
+    // public ipfs.io default — exactly the bug this file's fix addresses.
+    const CUSTOM_DOMAIN_CFG = {
+      base: 'https://media.loar.fun',
+      host: 'media.loar.fun',
+      token: 'tok_xyz789',
+      isDedicated: true,
+    };
+    global.fetch = vi.fn((input: unknown) => {
+      const href = typeof input === 'string' ? input : (input as Request).url;
+      if (href.includes('/api/ipfs/gateway-config')) {
+        return Promise.resolve({ ok: true, json: async () => CUSTOM_DOMAIN_CFG } as Response);
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${href}`));
+    }) as unknown as typeof fetch;
+
+    const { primeIpfsGatewayConfig, resolveIpfsUrl } = await import('../ipfs-url');
+    await primeIpfsGatewayConfig();
+
+    expect(resolveIpfsUrl('ipfs://QmWarm/file.png')).toBe(
+      'https://media.loar.fun/ipfs/QmWarm/file.png?pinataGatewayToken=tok_xyz789'
+    );
   });
 
   it('ignores a schemeless / corrupted base from the endpoint (no unparseable URL)', async () => {

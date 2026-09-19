@@ -36,6 +36,16 @@ function gatewayToken(): string {
   return (process.env.PINATA_GATEWAY_TOKEN || '').trim();
 }
 
+// True whenever PINATA_GATEWAY_URL points somewhere other than the default
+// public fallback — covers both the literal `.mypinata.cloud` subdomain and
+// any custom domain fronting it (e.g. `media.loar.fun`). Checking the
+// configured value directly, rather than pattern-matching a specific
+// hostname suffix, means switching to a custom domain (or any future
+// gateway) doesn't silently break token issuance again.
+function isDedicatedGateway(): boolean {
+  return gatewayBase() !== PUBLIC_GATEWAY;
+}
+
 // cloudflare-ipfs.com removed 2026-08-24 — Cloudflare shut down its public
 // IPFS gateway (NXDOMAIN now); see apps/web/src/utils/ipfs-url.ts.
 const KNOWN_GATEWAY_HOSTS = new Set<string>([
@@ -102,8 +112,10 @@ function extractCidPath(input: string): string | null {
  * synchronously for first paint, instead of starting every asset on a slow
  * public gateway (ipfs.io) and waiting for `/api/ipfs/resolve` per CID.
  *
- * `token` is only returned for a dedicated `.mypinata.cloud` gateway that
- * actually needs it — and a single client obtaining it is no more exposed
+ * `token` is only returned for a dedicated gateway that actually needs it
+ * (PINATA_GATEWAY_URL pointed somewhere other than the default public
+ * fallback — see isDedicatedGateway) — and a single client obtaining it is
+ * no more exposed
  * than `/resolve` already makes it (that endpoint bakes it into every
  * returned media URL). Not returned for a public gateway config.
  *
@@ -120,7 +132,7 @@ function extractCidPath(input: string): string | null {
 router.get('/gateway-config', (c) => {
   const base = gatewayBase();
   const host = gatewayHost();
-  const isDedicated = host.endsWith('.mypinata.cloud');
+  const isDedicated = isDedicatedGateway();
   c.header('Cache-Control', 'private, max-age=30');
   return c.json({
     base,
@@ -143,7 +155,7 @@ router.get('/resolve', (c) => {
   const base = gatewayBase();
   const token = gatewayToken();
   const url = new URL(`${base}/ipfs/${cidPath}`);
-  if (token && url.host.endsWith('.mypinata.cloud')) {
+  if (token && isDedicatedGateway()) {
     url.searchParams.set('pinataGatewayToken', token);
   }
 

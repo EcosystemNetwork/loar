@@ -11,6 +11,22 @@ const PUBLIC_GATEWAY = 'https://ipfs.io';
 // Pinata's public gateway is kept in the fallback chain — it sometimes
 // recovers — but is not used as the sync default.
 const PINATA_PUBLIC_GATEWAY = 'https://gateway.pinata.cloud';
+
+// Gateway hosts known to serve public, unauthenticated IPFS traffic directly
+// — safe to use for synchronous URL composition. Anything NOT in this set
+// (a `.mypinata.cloud` dedicated gateway, or a custom domain fronting one —
+// e.g. `media.loar.fun`, see ipfs.ts's PINATA_GATEWAY_URL) is assumed to
+// need the server-signed async path instead of being hardcoded by name, so a
+// future gateway/domain change doesn't silently reopen this exact bug class.
+const KNOWN_PUBLIC_GATEWAY_HOSTS = new Set<string>([
+  'gateway.pinata.cloud',
+  'w3s.link',
+  'ipfs.io',
+  'dweb.link',
+  '4everland.io',
+  'nftstorage.link',
+]);
+
 const PREFER_PUBLIC =
   String(import.meta.env.VITE_PINATA_PREFER_PUBLIC || '')
     .trim()
@@ -56,19 +72,26 @@ export function resolveActiveGateway(
     configuredGatewayValid = false;
   }
 
-  const isDedicatedGateway = configuredHost.endsWith('.mypinata.cloud');
-  // Dedicated `.mypinata.cloud` gateways require a server-signed URL (see
-  // resolveIpfsUrlAsync) — bypass to the public gateway for synchronous URL
-  // composition. An unparseable configured value is bypassed unconditionally:
-  // an invalid URL is never safe to use as a prefix, dedicated or not.
-  const bypassDedicated = preferPublic || isDedicatedGateway || !configuredGatewayValid;
-
   let publicGatewayHost = '';
   try {
     publicGatewayHost = new URL(publicGateway).host;
   } catch {
     publicGatewayHost = '';
   }
+
+  // "Dedicated" = configured to something other than a known-public,
+  // unauthenticated gateway (see KNOWN_PUBLIC_GATEWAY_HOSTS) — covers both
+  // the literal `.mypinata.cloud` subdomain and any custom domain fronting
+  // a dedicated gateway (e.g. `media.loar.fun`).
+  const isDedicatedGateway =
+    configuredGatewayValid &&
+    configuredHost !== publicGatewayHost &&
+    !KNOWN_PUBLIC_GATEWAY_HOSTS.has(configuredHost);
+  // Dedicated gateways require a server-signed URL (see resolveIpfsUrlAsync)
+  // — bypass to the public gateway for synchronous URL composition. An
+  // unparseable configured value is bypassed unconditionally: an invalid URL
+  // is never safe to use as a prefix, dedicated or not.
+  const bypassDedicated = preferPublic || isDedicatedGateway || !configuredGatewayValid;
 
   return {
     activeGateway: bypassDedicated ? publicGateway : configuredGateway,
@@ -83,12 +106,20 @@ const { activeGateway: ACTIVE_GATEWAY, activeHost: ACTIVE_HOST } = resolveActive
   PUBLIC_GATEWAY
 );
 
+// True for the literal `.mypinata.cloud` subdomain shape, OR the host the
+// live-primed gateway config (`/api/ipfs/gateway-config`) reports right now
+// — covers a custom domain fronting a dedicated gateway (e.g. `media.loar.fun`)
+// without hardcoding that domain name here.
+function isKnownDedicatedHost(host: string): boolean {
+  return host.endsWith('.mypinata.cloud') || (!!dedicatedConfig && host === dedicatedConfig.host);
+}
+
 function appendToken(url: string): string {
   // The Pinata gateway token is server-side only, so strip any stale
   // `pinataGatewayToken` query param off URLs reaching the client.
   try {
     const parsed = new URL(url);
-    if (!parsed.host.endsWith('.mypinata.cloud') && parsed.host !== ACTIVE_HOST) return url;
+    if (!isKnownDedicatedHost(parsed.host) && parsed.host !== ACTIVE_HOST) return url;
     parsed.searchParams.delete('pinataGatewayToken');
     return parsed.toString();
   } catch {
@@ -97,12 +128,12 @@ function appendToken(url: string): string {
 }
 
 function rewriteBrokenDedicatedGatewayUrl(url: string): string {
-  // Dedicated `.mypinata.cloud` gateways require a server-side token that
-  // the client never has — always rewrite to the active public gateway in
-  // sync resolution. Async/signed flows go through resolveIpfsUrlAsync.
+  // Dedicated gateways require a server-side token that the client never
+  // has — always rewrite to the active public gateway in sync resolution.
+  // Async/signed flows go through resolveIpfsUrlAsync.
   try {
     const parsed = new URL(url);
-    if (!parsed.host.endsWith('.mypinata.cloud')) return url;
+    if (!isKnownDedicatedHost(parsed.host)) return url;
     parsed.searchParams.delete('pinataGatewayToken');
     return `${ACTIVE_GATEWAY}${parsed.pathname}${parsed.search ? parsed.search : ''}`;
   } catch {
@@ -147,15 +178,6 @@ const PUBLIC_FALLBACK_GATEWAYS = [
   'https://w3s.link',
 ];
 
-const KNOWN_GATEWAY_HOSTS = new Set<string>([
-  'gateway.pinata.cloud',
-  'w3s.link',
-  'ipfs.io',
-  'dweb.link',
-  '4everland.io',
-  'nftstorage.link',
-]);
-
 // ── Dedicated gateway config (primed once per session) ──────────────────
 //
 // The server's dedicated Pinata gateway (`<name>.mypinata.cloud`) is
@@ -179,8 +201,13 @@ const DEDICATED_CFG_LS_KEY = 'loar:ipfs-gateway-config:v1';
 function normalizeDedicatedConfig(input: unknown): DedicatedGatewayConfig | null {
   if (!input || typeof input !== 'object') return null;
   const { base, host, token } = input as Record<string, unknown>;
-  if (typeof base !== 'string' || typeof host !== 'string') return null;
-  if (!host.endsWith('.mypinata.cloud')) return null;
+  if (typeof base !== 'string' || typeof host !== 'string' || !host) return null;
+  // Accept the literal `.mypinata.cloud` subdomain OR any other host the
+  // server reports (a custom domain fronting the dedicated gateway, e.g.
+  // `media.loar.fun` — see ipfs.ts's PINATA_GATEWAY_URL). The server only
+  // ever returns a non-empty `host` here for a gateway it considers
+  // dedicated (see /api/ipfs/gateway-config's `isDedicated` gate), so no
+  // further name-shape check is needed on the client.
   const trimmedBase = base.trim().replace(/\/$/, '');
   try {
     // A corrupted/schemeless base must never reach URL composition — that was
@@ -339,8 +366,8 @@ function extractIpfsPath(url: string): { cidPath: string } | null {
   try {
     const parsed = new URL(url);
     const isKnown =
-      parsed.host.endsWith('.mypinata.cloud') ||
-      KNOWN_GATEWAY_HOSTS.has(parsed.host) ||
+      isKnownDedicatedHost(parsed.host) ||
+      KNOWN_PUBLIC_GATEWAY_HOSTS.has(parsed.host) ||
       parsed.host.endsWith('.ipfs.dweb.link') ||
       parsed.host.endsWith('.ipfs.w3s.link');
     if (!isKnown) return null;
