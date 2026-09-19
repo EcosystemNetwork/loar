@@ -47,10 +47,14 @@ jobs:
           echo "summary=$(jq -c '.results | map({direction, drift: .driftBaseUnits})' response.json)" >> "$GITHUB_OUTPUT"
 
       - name: Notify Slack (negative drift only — possible compromise)
-        if: steps.probe.outputs.neg_drift_count != '' && steps.probe.outputs.neg_drift_count != '0' && secrets.SLACK_WEBHOOK_URL != ''
+        if: steps.probe.outputs.neg_drift_count != '' && steps.probe.outputs.neg_drift_count != '0'
         env:
           WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
+          if [ -z "$WEBHOOK" ]; then
+            echo "::warning::SLACK_WEBHOOK_URL not set — skipping Slack alert"
+            exit 0
+          fi
           curl -X POST -H 'Content-type: application/json' \
             --data "{\"text\":\":rotating_light: LOAR bridge negative drift detected — ${{ steps.probe.outputs.summary }}\"}" \
             "$WEBHOOK"
