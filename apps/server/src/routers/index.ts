@@ -85,6 +85,7 @@ import { privateSectionRouter } from './privateSection/privateSection.routes';
 import { talentAgentsRouter } from './talentAgents/talentAgents.routes';
 import { aiAgentsRouter } from './aiAgents/aiAgents.routes';
 import { aiPipelinesRouter } from './aiPipelines/aiPipelines.routes';
+import { directorRouter } from './director/director.routes';
 import { apiKeysRouter } from './apiKeys/apiKeys.routes';
 import { bountiesRouter } from './bounties/bounties.routes';
 import { splitsRouter } from './splits/splits.routes';
@@ -285,6 +286,8 @@ export const appRouter = router({
   talentAgents: talentAgentsRouter,
   aiAgents: aiAgentsRouter,
   aiPipelines: aiPipelinesRouter,
+  // LOAR Director — voice/text intent routing (canon query vs story action)
+  director: directorRouter,
   apiKeys: apiKeysRouter,
 
   // ── Pricing ────────────────────────────────────────────────────────
