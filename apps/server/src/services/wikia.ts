@@ -9,6 +9,7 @@
  */
 import { dispatchLlm, type LlmMessage } from './llm-models';
 import { routeLlmModel } from './llm-models/router';
+import { sanitizeForPrompt as sp } from './gemini';
 
 interface WikiaCallOpts {
   uid?: string | null;
@@ -72,9 +73,9 @@ Be creative and expansive - turn brief descriptions into rich, cinematic narrati
 
   const userPrompt = `Create a detailed storyline wikia entry for the following event:
 
-Title: ${title}
-Description: ${description}
-Video URL: ${videoUrl}
+Title: ${sp(title, 300)}
+Description: ${sp(description)}
+Video URL: ${sp(videoUrl, 2048)}
 Event ID: ${nodeId}
 
 ${context}
@@ -149,14 +150,14 @@ function buildContextFromConnectedNodes(
   if (previousNodes && previousNodes.length > 0) {
     context += '\n\nPREVIOUS EVENTS:\n';
     previousNodes.forEach((node, idx) => {
-      context += `${idx + 1}. ${node.title}: ${node.plot}\n`;
+      context += `${idx + 1}. ${sp(node.title, 300)}: ${sp(node.plot)}\n`;
     });
   }
 
   if (nextNodes && nextNodes.length > 0) {
     context += '\n\nSUBSEQUENT EVENTS:\n';
     nextNodes.forEach((node, idx) => {
-      context += `${idx + 1}. ${node.title}: ${node.plot}\n`;
+      context += `${idx + 1}. ${sp(node.title, 300)}: ${sp(node.plot)}\n`;
     });
   }
 
@@ -178,14 +179,14 @@ export async function generateStorylineFromPrompt(
   if (previousEvents && previousEvents.length > 0) {
     context = '\n\nPREVIOUS EVENTS IN THIS UNIVERSE:\n';
     previousEvents.forEach((event, idx) => {
-      context += `${idx + 1}. ${event.title}: ${event.description}\n`;
+      context += `${idx + 1}. ${sp(event.title, 300)}: ${sp(event.description)}\n`;
     });
   }
 
   // Build character context
   let characterContext = '';
   if (characters && characters.length > 0) {
-    characterContext = `\n\nCHARACTERS IN THIS SCENE: ${characters.join(', ')}`;
+    characterContext = `\n\nCHARACTERS IN THIS SCENE: ${characters.map((c) => sp(c, 200)).join(', ')}`;
   }
 
   const systemPrompt = `You are a creative storyteller for a cinematic universe.
@@ -195,7 +196,7 @@ Focus on visual details, atmosphere, action, and emotion.`;
 
   const fullPrompt = `The user wants to create a new event in their cinematic universe with this idea:
 
-"${userPrompt}"
+"${sp(userPrompt)}"
 ${characterContext}
 ${context}
 
@@ -248,8 +249,8 @@ export async function generateEventSummary(
 
   const userPrompt = `Create a single engaging sentence (max 20 words) that summarizes this event:
 
-Title: ${title}
-Description: ${description}
+Title: ${sp(title, 300)}
+Description: ${sp(description)}
 
 Return only the summary sentence, no additional text.`;
 

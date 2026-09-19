@@ -4,6 +4,7 @@
  * Aggregates content, profiles, and licensing data into a browsable
  * gallery experience. Supports universe-scoped and global views.
  */
+import { isUniverseExcluded, normalizeUniverseId } from '../../lib/universe-id';
 import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { z } from 'zod';
@@ -101,7 +102,7 @@ export const galleryRouter = router({
 
       // Scoped browse into a single universe that's private/hidden (and the
       // viewer isn't the owner) returns nothing — never leak universe content.
-      if (input.universeId && excluded.has(input.universeId.toLowerCase())) {
+      if (input.universeId && isUniverseExcluded(excluded, input.universeId)) {
         return { items: [], nextCursor: null };
       }
 
@@ -203,7 +204,9 @@ export const galleryRouter = router({
       const matchedDocs = snapshot.docs.filter((d) => {
         const data = d.data();
         if (!isVisible(data.contentStatus)) return false;
-        const uniId = (data.universeId as string | undefined)?.toLowerCase();
+        const uniId = (data.universeId as string | undefined)
+          ? normalizeUniverseId(data.universeId as string)
+          : undefined;
         if (uniId && excluded.has(uniId)) return false;
         if (applyMediaFilter && !finalTypes.includes(data.mediaType as string)) return false;
         if (filterCreatorInMemory && data.creatorUid !== input.creatorUid) return false;
@@ -271,7 +274,7 @@ export const galleryRouter = router({
     .query(async ({ input, ctx }) => {
       const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
 
-      if (input.universeId && excluded.has(input.universeId.toLowerCase())) {
+      if (input.universeId && isUniverseExcluded(excluded, input.universeId)) {
         return [];
       }
 
@@ -287,7 +290,9 @@ export const galleryRouter = router({
         .filter((d) => {
           const data = d.data();
           if (!isVisible(data.contentStatus)) return false;
-          const uniId = (data.universeId as string | undefined)?.toLowerCase();
+          const uniId = (data.universeId as string | undefined)
+            ? normalizeUniverseId(data.universeId as string)
+            : undefined;
           if (uniId && excluded.has(uniId)) return false;
           return true;
         })
@@ -319,7 +324,9 @@ export const galleryRouter = router({
       const root = rootDoc.data()!;
 
       const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
-      const rootUniverseId = (root.universeId as string | undefined)?.toLowerCase();
+      const rootUniverseId = (root.universeId as string | undefined)
+        ? normalizeUniverseId(root.universeId as string)
+        : undefined;
       // Don't resolve lineage rooted in a private/hidden universe for non-owners.
       if (rootUniverseId && excluded.has(rootUniverseId)) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Content not found' });
@@ -327,7 +334,9 @@ export const galleryRouter = router({
 
       const isContentVisible = (data: FirebaseFirestore.DocumentData): boolean => {
         if (!isVisible(data.contentStatus)) return false;
-        const uniId = (data.universeId as string | undefined)?.toLowerCase();
+        const uniId = (data.universeId as string | undefined)
+          ? normalizeUniverseId(data.universeId as string)
+          : undefined;
         if (uniId && excluded.has(uniId)) return false;
         return true;
       };
@@ -368,7 +377,7 @@ export const galleryRouter = router({
     .input(z.object({ universeId: z.string() }))
     .query(async ({ input, ctx }) => {
       const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
-      if (excluded.has(input.universeId.toLowerCase())) return [];
+      if (isUniverseExcluded(excluded, input.universeId)) return [];
 
       const now = new Date();
       const snapshot = await featuredCol()
@@ -462,7 +471,9 @@ export const galleryRouter = router({
         .filter((d) => {
           const data = d.data();
           if (!isVisible(data.contentStatus)) return false;
-          const uniId = (data.universeId as string | undefined)?.toLowerCase();
+          const uniId = (data.universeId as string | undefined)
+            ? normalizeUniverseId(data.universeId as string)
+            : undefined;
           if (uniId && excluded.has(uniId)) return false;
           return true;
         })

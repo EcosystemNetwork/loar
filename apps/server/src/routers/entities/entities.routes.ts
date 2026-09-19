@@ -52,9 +52,25 @@ import { geminiService } from '../../services/gemini';
 import { triggerCoverImageGenerationAsync } from '../../services/entity-cover-image';
 import { db } from '../../lib/firebase';
 import { getExcludedUniverseIds } from '../universes/universes.handlers';
+import { isUniverseExcluded } from '../../lib/universe-id';
 import { universeAddressSchema as universeAddress } from '../../lib/universe-address-schema';
 
 const entityKindSchema = z.enum(ENTITY_KINDS);
+
+/**
+ * Throws when the entity is missing or lives in a hidden/private universe the
+ * viewer can't see. Used by every public read keyed off an entityId so they
+ * can't be used to peek into private universes.
+ */
+async function assertEntityVisible(entityId: string, viewerAddress?: string) {
+  const entity = await getEntity(entityId);
+  if (!entity) throw new Error('Entity not found');
+  if (entity.universeAddress) {
+    const excluded = await getExcludedUniverseIds({ viewerAddress });
+    if (isUniverseExcluded(excluded, entity.universeAddress)) throw new Error('Entity not found');
+  }
+  return entity;
+}
 
 export const entitiesRouter = router({
   /** Create a new entity. universeAddress is optional for creator kinds. */
@@ -133,7 +149,7 @@ export const entitiesRouter = router({
       if (!entity) throw new Error('Entity not found');
       if (entity.universeAddress) {
         const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
-        if (excluded.has(entity.universeAddress.toLowerCase())) {
+        if (isUniverseExcluded(excluded, entity.universeAddress)) {
           throw new Error('Entity not found');
         }
       }
@@ -152,12 +168,16 @@ export const entitiesRouter = router({
         universeAddress: universeAddress,
         kind: entityKindSchema.optional(),
         limit: z.number().int().positive().max(200).optional(),
-        cursor: z.string().optional(),
+        cursor: z
+          .string()
+          .max(200)
+          .regex(/^[^/]+$/)
+          .optional(),
       })
     )
     .query(async ({ input, ctx }) => {
       const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
-      if (excluded.has(input.universeAddress.toLowerCase())) {
+      if (isUniverseExcluded(excluded, input.universeAddress)) {
         return { entities: [], total: 0, nextCursor: null };
       }
       const { entities, nextCursorId } = await getEntitiesByUniverse(
@@ -184,7 +204,11 @@ export const entitiesRouter = router({
       z.object({
         kind: entityKindSchema,
         limit: z.number().int().positive().max(200).default(100),
-        cursor: z.string().optional(),
+        cursor: z
+          .string()
+          .max(200)
+          .regex(/^[^/]+$/)
+          .optional(),
       })
     )
     .query(async ({ input, ctx }) => {
@@ -195,7 +219,7 @@ export const entitiesRouter = router({
         input.cursor
       );
       const entities = raw.filter(
-        (e) => !e.universeAddress || !excluded.has(e.universeAddress.toLowerCase())
+        (e) => !e.universeAddress || !isUniverseExcluded(excluded, e.universeAddress)
       );
       return { entities, total: entities.length, nextCursor: nextCursorId };
     }),
@@ -219,7 +243,7 @@ export const entitiesRouter = router({
       const fetchLimit = excluded.size > 0 ? Math.min(input.limit * 2, 200) : input.limit;
       const raw = await getEntitiesByCreator(input.creator, input.kind, fetchLimit);
       const entities = raw
-        .filter((e) => !e.universeAddress || !excluded.has(e.universeAddress.toLowerCase()))
+        .filter((e) => !e.universeAddress || !isUniverseExcluded(excluded, e.universeAddress))
         .slice(0, input.limit);
       return { entities, total: entities.length };
     }),
@@ -238,7 +262,7 @@ export const entitiesRouter = router({
       const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
       const raw = await getChildEntities(input.parentId, input.limit);
       const children = raw.filter(
-        (e) => !e.universeAddress || !excluded.has(e.universeAddress.toLowerCase())
+        (e) => !e.universeAddress || !isUniverseExcluded(excluded, e.universeAddress)
       );
       return { children, total: children.length };
     }),
@@ -404,13 +428,13 @@ export const entitiesRouter = router({
       const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
 
       // Scoped search into a private/hidden universe — never surface results.
-      if (input.universeAddress && excluded.has(input.universeAddress.toLowerCase())) {
+      if (input.universeAddress && isUniverseExcluded(excluded, input.universeAddress)) {
         return { entities: [], total: 0 };
       }
 
       const raw = await searchEntities(input);
       const entities = raw.filter(
-        (e) => !e.universeAddress || !excluded.has(e.universeAddress.toLowerCase())
+        (e) => !e.universeAddress || !isUniverseExcluded(excluded, e.universeAddress)
       );
       return { entities, total: entities.length };
     }),
@@ -438,8 +462,10 @@ export const entitiesRouter = router({
         .get();
       const ids = likesSnap.docs.map((d) => d.data().targetId as string);
       if (ids.length === 0) return { entities: [], total: 0 };
+      const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user.address });
       const entities = (await Promise.all(ids.map((id) => getEntity(id).catch(() => null)))).filter(
-        (e): e is NonNullable<typeof e> => !!e
+        (e): e is NonNullable<typeof e> =>
+          !!e && (!e.universeAddress || !isUniverseExcluded(excluded, e.universeAddress))
       );
       return { entities, total: entities.length };
     }),
@@ -457,15 +483,26 @@ export const entitiesRouter = router({
       z.object({
         entityId: z.string().min(1),
         limit: z.number().int().positive().max(200).default(100),
-        cursor: z.string().optional(),
+        cursor: z
+          .string()
+          .max(200)
+          .regex(/^[^/]+$/)
+          .optional(),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
+      await assertEntityVisible(input.entityId, ctx.user?.address);
+      const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
       const { relations, nextCursorId } = await getEntityRelations(input.entityId, {
         limit: input.limit,
         cursorId: input.cursor,
       });
-      return { relations, nextCursor: nextCursorId };
+      return {
+        relations: relations.filter(
+          (r) => !r.universeAddress || !isUniverseExcluded(excluded, r.universeAddress)
+        ),
+        nextCursor: nextCursorId,
+      };
     }),
 
   /** Get all relationships within a universe. */
@@ -473,7 +510,7 @@ export const entitiesRouter = router({
     .input(z.object({ universeAddress: universeAddress }))
     .query(async ({ input, ctx }) => {
       const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user?.address });
-      if (excluded.has(input.universeAddress.toLowerCase())) {
+      if (isUniverseExcluded(excluded, input.universeAddress)) {
         return { relations: [] };
       }
       const relations = await getUniverseRelations(input.universeAddress);
@@ -498,6 +535,9 @@ export const entitiesRouter = router({
       if (source.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
         throw new Error('Forbidden: you must own the source entity to create relationships');
       }
+      // Target must be visible to the caller — otherwise this doubles as an
+      // existence oracle for entity ids in private universes.
+      await assertEntityVisible(input.targetId, ctx.user.address);
       const relation = await createRelation(
         input.sourceId,
         input.targetId,
@@ -571,7 +611,8 @@ export const entitiesRouter = router({
         includeInherited: z.boolean().default(true),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
+      await assertEntityVisible(input.entityId, ctx.user?.address);
       const resolved = await resolveReferenceBundle(input.entityId, {
         includeInherited: input.includeInherited,
       });
@@ -628,7 +669,8 @@ export const entitiesRouter = router({
     /** Read the current descriptor for an entity. Public. */
     get: publicProcedure
       .input(z.object({ entityId: z.string().min(1) }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
+        await assertEntityVisible(input.entityId, ctx.user?.address);
         const descriptor = await getVisualDescriptor(input.entityId);
         return { descriptor };
       }),
@@ -641,7 +683,8 @@ export const entitiesRouter = router({
           limit: z.number().int().positive().max(100).default(20),
         })
       )
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
+        await assertEntityVisible(input.entityId, ctx.user?.address);
         const history = await getDescriptorHistory(input.entityId, input.limit);
         return { history };
       }),

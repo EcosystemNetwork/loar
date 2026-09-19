@@ -21,3 +21,12 @@ export function isEvmAddress(s: string): boolean {
 export function normalizeUniverseId(id: string): string {
   return isEvmAddress(id) ? id.toLowerCase() : id;
 }
+
+/**
+ * Membership test against an excluded-universe set (whose members are raw doc
+ * ids: lowercased EVM, verbatim Solana base58). Lowercasing a Solana PDA before
+ * `.has()` never matches, so hidden/private Solana universes leaked.
+ */
+export function isUniverseExcluded(excluded: Set<string>, id: string): boolean {
+  return excluded.has(normalizeUniverseId(id));
+}

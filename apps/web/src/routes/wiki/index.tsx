@@ -92,6 +92,7 @@ import { AudioTab } from '@/components/wiki/AudioTab';
 import { RelationshipGraphTab } from '@/components/wiki/RelationshipGraphTab';
 import { EventTimelineTab } from '@/components/wiki/EventTimelineTab';
 import { PlacesMapTab } from '@/components/wiki/PlacesMapTab';
+import { safeHttpUrl } from '@/lib/safe-url';
 import { AZIndexTab } from '@/components/wiki/AZIndexTab';
 import { ActivityTab } from '@/components/wiki/ActivityTab';
 import { StatsTab } from '@/components/wiki/StatsTab';
@@ -1300,7 +1301,13 @@ function Model3DTestbenchDialog({
               )}
               <div className="space-y-1.5">
                 <p className="text-xs font-medium text-muted-foreground">Assets</p>
-                <a href={activeUrl} target="_blank" rel="noreferrer" download className="block">
+                <a
+                  href={safeHttpUrl(activeUrl)}
+                  target="_blank"
+                  rel="noreferrer"
+                  download
+                  className="block"
+                >
                   <Button variant="outline" size="sm" className="w-full justify-start">
                     Download active GLB
                   </Button>

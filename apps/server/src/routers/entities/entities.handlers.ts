@@ -475,19 +475,34 @@ export async function searchEntities(opts: {
     firestoreQuery = firestoreQuery.where('kind', '==', kind);
   }
 
-  // Firestore doesn't support LIKE, so we fetch more and filter in memory.
+  // Firestore doesn't support LIKE, so scan newest-first in bounded batches and
+  // filter in memory until we have `limit` hits or hit the scan cap. (The old
+  // single `limit*5` read silently missed every entity outside the newest 250.)
   // For a production system, use Algolia/Typesense/Meilisearch.
-  const fetchLimit = Math.min(limit * 5, 500);
-  const snapshot = await firestoreQuery.orderBy('createdAt', 'desc').limit(fetchLimit).get();
-
-  return snapshot.docs
-    .map((doc) => ({ id: doc.id, ...doc.data() }) as Entity)
-    .filter(
-      (e) =>
-        e.name.toLowerCase().includes(q) ||
+  const BATCH = 500;
+  const MAX_SCANNED = 5000;
+  const matches: Entity[] = [];
+  let scanned = 0;
+  let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
+  while (matches.length < limit && scanned < MAX_SCANNED) {
+    let page = firestoreQuery.orderBy('createdAt', 'desc').orderBy('__name__', 'desc').limit(BATCH);
+    if (cursor) page = page.startAfter(cursor);
+    const snapshot = await page.get();
+    for (const doc of snapshot.docs) {
+      const e = { id: doc.id, ...doc.data() } as Entity;
+      if (
+        e.name?.toLowerCase().includes(q) ||
         (e.description && e.description.toLowerCase().includes(q))
-    )
-    .slice(0, limit);
+      ) {
+        matches.push(e);
+        if (matches.length >= limit) break;
+      }
+    }
+    scanned += snapshot.docs.length;
+    if (snapshot.docs.length < BATCH) break;
+    cursor = snapshot.docs[snapshot.docs.length - 1];
+  }
+  return matches;
 }
 
 // ── Relationships ────────────────────────────────────────────────────

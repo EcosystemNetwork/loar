@@ -10,6 +10,16 @@ import { db } from '../../lib/firebase';
 import { throwApiError, wrapError } from '../../lib/errors';
 import { wikiaService } from '../../services/wikia';
 import { geminiService } from '../../services/gemini';
+import { isUniverseAdmin } from '../../lib/safe-admin';
+import { normalizeUniverseId } from '../../lib/universe-id';
+
+/** Doc ids can't contain '/', and the `${universeId}-${eventId}` key must be unambiguous. */
+const wikiKeyPart = z
+  .string()
+  .min(1)
+  .max(200)
+  .refine((v) => !v.includes('/'), 'Must not contain "/"');
+const MAX_WIKI_GENERATIONS_PER_HOUR = 20;
 
 const charactersCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -36,7 +46,11 @@ export const wikiRouter = router({
         .object({
           universeId: z.string().optional(),
           limit: z.number().int().positive().max(200).default(50),
-          cursor: z.string().optional(),
+          cursor: z
+            .string()
+            .max(200)
+            .regex(/^[^/]+$/)
+            .optional(),
         })
         .optional()
     )
@@ -73,7 +87,7 @@ export const wikiRouter = router({
             character_name: char.character_name,
             collection: char.collection,
             token_id: char.token_id,
-            traits: char.traits as Record<string, string>,
+            traits: (char.traits ?? {}) as Record<string, string>,
             rarity_rank: char.rarity_rank,
             rarity_percentage: char.rarity_percentage ? parseFloat(char.rarity_percentage) : 0,
             image_url: char.image_url,
@@ -83,6 +97,11 @@ export const wikiRouter = router({
         };
       } catch (error) {
         console.error('Failed to load characters from database:', error);
+        // The static fallback file has no universe scoping — serving it for a
+        // universe-filtered request would return unrelated characters.
+        if (input?.universeId) {
+          throw wrapError(error, 'Could not load character data');
+        }
         try {
           const wikiPath = join(process.cwd(), '../character-wiki/simple_character_wiki.json');
           const wikiData = readFileSync(wikiPath, 'utf-8');
@@ -111,7 +130,7 @@ export const wikiRouter = router({
       character_name: char.character_name,
       collection: char.collection,
       token_id: char.token_id,
-      traits: char.traits as Record<string, string>,
+      traits: (char.traits ?? {}) as Record<string, string>,
       rarity_rank: char.rarity_rank,
       rarity_percentage: char.rarity_percentage ? parseFloat(char.rarity_percentage) : 0,
       image_url: char.image_url,
@@ -125,11 +144,17 @@ export const wikiRouter = router({
     .input(
       z.object({
         nodeId: z.number(),
-        title: z.string(),
-        description: z.string(),
-        videoUrl: z.string(),
-        previousNodes: z.array(z.object({ title: z.string(), plot: z.string() })).optional(),
-        nextNodes: z.array(z.object({ title: z.string(), plot: z.string() })).optional(),
+        title: z.string().max(300),
+        description: z.string().max(5000),
+        videoUrl: z.string().url().max(2048),
+        previousNodes: z
+          .array(z.object({ title: z.string().max(300), plot: z.string().max(5000) }))
+          .max(20)
+          .optional(),
+        nextNodes: z
+          .array(z.object({ title: z.string().max(300), plot: z.string().max(5000) }))
+          .max(20)
+          .optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -152,10 +177,11 @@ export const wikiRouter = router({
   generateStoryline: protectedProcedure
     .input(
       z.object({
-        prompt: z.string().min(1, 'Prompt is required'),
-        characters: z.array(z.string()).optional(),
+        prompt: z.string().min(1, 'Prompt is required').max(5000),
+        characters: z.array(z.string().max(200)).max(50).optional(),
         previousEvents: z
-          .array(z.object({ title: z.string(), description: z.string() }))
+          .array(z.object({ title: z.string().max(300), description: z.string().max(5000) }))
+          .max(20)
           .optional(),
       })
     )
@@ -176,27 +202,66 @@ export const wikiRouter = router({
   generateFromVideo: protectedProcedure
     .input(
       z.object({
-        universeId: z.string(),
-        eventId: z.string(),
-        videoUrl: z.string(),
-        title: z.string(),
-        description: z.string(),
-        characterIds: z.array(z.string()).optional(),
+        universeId: wikiKeyPart,
+        eventId: wikiKeyPart,
+        videoUrl: z.string().url().max(2048),
+        title: z.string().max(300),
+        description: z.string().max(5000),
+        characterIds: z.array(wikiKeyPart).max(50).optional(),
         characters: z
           .array(
             z.object({
-              name: z.string(),
-              userDescription: z.string(),
-              visualDescription: z.string().optional(),
+              name: z.string().min(1).max(200),
+              userDescription: z.string().max(5000),
+              visualDescription: z.string().max(5000).optional(),
             })
           )
+          .max(50)
           .optional(),
         previousEvents: z
-          .array(z.object({ title: z.string(), description: z.string() }))
+          .array(z.object({ title: z.string().max(300), description: z.string().max(5000) }))
+          .max(20)
           .optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const wikiId = `${normalizeUniverseId(input.universeId)}-${input.eventId}`;
+      const caller = ctx.user.address;
+      const callerIsAdmin = !!caller && (await isUniverseAdmin(input.universeId, caller));
+
+      // Overwrite guard: an existing event wiki may only be regenerated by a
+      // universe admin or the user who originally generated it.
+      const existingDoc = await eventWikisCol().doc(wikiId).get();
+      if (existingDoc.exists && !callerIsAdmin) {
+        const owner = existingDoc.data()?.generatedByUid as string | undefined;
+        if (owner !== ctx.user.uid) {
+          throwApiError(
+            'FORBIDDEN',
+            'Only the universe owner or the original author can regenerate this wiki'
+          );
+        }
+      }
+
+      // Cost guard: Gemini 2.5 Pro on the server key. Fixed 1h window per user,
+      // kept in a single doc so it needs no composite index.
+      const rateRef = db.collection('wikiGenerationRate').doc(ctx.user.uid);
+      const allowed = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(rateRef);
+        const now = Date.now();
+        const d = snap.data() as { windowStart?: number; count?: number } | undefined;
+        const fresh = !d?.windowStart || now - d.windowStart > 60 * 60 * 1000;
+        const count = fresh ? 0 : (d?.count ?? 0);
+        if (count >= MAX_WIKI_GENERATIONS_PER_HOUR) return false;
+        tx.set(rateRef, { windowStart: fresh ? now : d!.windowStart, count: count + 1 });
+        return true;
+      });
+      if (!allowed) {
+        throwApiError(
+          'TOO_MANY_REQUESTS',
+          `Rate limit exceeded: max ${MAX_WIKI_GENERATIONS_PER_HOUR} wiki generations per hour`
+        );
+      }
+
       try {
         let characterData = input.characters;
         if (!characterData && input.characterIds && input.characterIds.length > 0) {
@@ -224,9 +289,9 @@ export const wikiRouter = router({
           previousEvents: input.previousEvents,
         });
 
-        const wikiId = `${input.universeId}-${input.eventId}`;
         const wikiEntry = {
-          universeId: input.universeId,
+          universeId: normalizeUniverseId(input.universeId),
+          generatedByUid: ctx.user.uid,
           eventId: input.eventId,
           wikiData: result.wikiData,
           videoUrl: input.videoUrl,
@@ -257,14 +322,17 @@ export const wikiRouter = router({
 
   /** Get a wiki entry for a specific event. */
   getWiki: publicProcedure
-    .input(z.object({ universeId: z.string(), eventId: z.string() }))
-    .query(async ({ input }) => {
-      const wikiId = `${input.universeId}-${input.eventId}`;
+    .input(z.object({ universeId: wikiKeyPart, eventId: wikiKeyPart }))
+    .query(async ({ input, ctx }) => {
+      const wikiId = `${normalizeUniverseId(input.universeId)}-${input.eventId}`;
       const doc = await eventWikisCol().doc(wikiId).get();
 
       if (!doc.exists) return null;
 
       const data = doc.data()!;
+      // Generation cost/token telemetry is only for the universe's admins.
+      const showCost =
+        !!ctx.user?.address && (await isUniverseAdmin(input.universeId, ctx.user.address));
       return {
         id: doc.id,
         universeId: data.universeId as string,
@@ -275,10 +343,10 @@ export const wikiRouter = router({
         eventDescription: data.eventDescription as string | undefined,
         characterIds: data.characterIds as string[] | null,
         generatedBy: data.generatedBy as string | undefined,
-        tokensUsed: data.tokensUsed as number | undefined,
-        inputTokens: data.inputTokens as number | undefined,
-        outputTokens: data.outputTokens as number | undefined,
-        costUsd: data.costUsd as string | undefined,
+        tokensUsed: showCost ? (data.tokensUsed as number | undefined) : undefined,
+        inputTokens: showCost ? (data.inputTokens as number | undefined) : undefined,
+        outputTokens: showCost ? (data.outputTokens as number | undefined) : undefined,
+        costUsd: showCost ? (data.costUsd as string | undefined) : undefined,
         generatedAt: data.generatedAt?.toDate?.()?.toISOString?.() ?? null,
         updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() ?? null,
       };
@@ -293,15 +361,19 @@ export const wikiRouter = router({
   getUniverseWikis: publicProcedure
     .input(
       z.object({
-        universeId: z.string(),
+        universeId: z.string().min(1).max(200),
         limit: z.number().int().positive().max(200).default(50),
-        cursor: z.string().optional(),
+        cursor: z
+          .string()
+          .max(200)
+          .regex(/^[^/]+$/)
+          .optional(),
       })
     )
     .query(async ({ input }) => {
       const col = eventWikisCol();
       let query: FirebaseFirestore.Query = col
-        .where('universeId', '==', input.universeId)
+        .where('universeId', '==', normalizeUniverseId(input.universeId))
         .orderBy('generatedAt', 'asc')
         .orderBy('__name__', 'asc');
 

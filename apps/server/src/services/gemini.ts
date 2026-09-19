@@ -9,7 +9,7 @@ import { routeLlmModel, dispatchLlmWithFallback } from './llm-models';
  * Sanitize user-supplied text before interpolating into AI prompts.
  * Strips common prompt injection patterns while preserving legitimate content.
  */
-function sanitizeForPrompt(text: string, maxLen = 5000): string {
+export function sanitizeForPrompt(text: string, maxLen = 5000): string {
   return (
     text
       .replace(/\n{3,}/g, '\n\n')

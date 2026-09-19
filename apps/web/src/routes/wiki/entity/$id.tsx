@@ -958,9 +958,9 @@ function EntityPage() {
                           {v.type ?? '2d'}
                         </span>
                       </div>
-                      {v.modelUrl && (
+                      {safeUrl(v.modelUrl) && (
                         <a
-                          href={v.modelUrl}
+                          href={safeUrl(v.modelUrl)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="absolute top-1 left-1 rounded bg-violet-500/90 text-white text-[9px] px-1.5 py-0.5 font-medium hover:bg-violet-600"

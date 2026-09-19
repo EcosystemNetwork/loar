@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Film, Play, Plus } from 'lucide-react';
+import { safeHttpUrl } from '@/lib/safe-url';
 import { SmartImage } from '@/components/SmartImage';
 
 interface EpisodesTabProps {
@@ -161,7 +162,7 @@ export function EpisodesTab({ universeAddress }: EpisodesTabProps) {
               )}
               {ep.exportUrl && (
                 <a
-                  href={ep.exportUrl}
+                  href={safeHttpUrl(ep.exportUrl)}
                   target="_blank"
                   rel="noreferrer"
                   className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity"
