@@ -52,6 +52,32 @@ describe('GET /api/ipfs/gateway-config', () => {
     expect(json.token).toBe('');
   });
 
+  it('treats a custom domain fronting the dedicated gateway (e.g. media.loar.fun) as dedicated too', async () => {
+    // Regression, 2026-09-19: Pinata started refusing to serve content
+    // through the bare *.mypinata.cloud subdomain, fixed by pointing
+    // PINATA_GATEWAY_URL at a custom domain. isDedicatedGateway() must not
+    // be hardcoded to the `.mypinata.cloud` shape, or switching domains
+    // silently stops the token from being issued/appended again.
+    process.env.PINATA_GATEWAY_URL = 'https://media.loar.fun';
+    process.env.PINATA_GATEWAY_TOKEN = 'tok_custom_domain';
+
+    const res = await app().request('/api/ipfs/gateway-config');
+    const json = await res.json();
+    expect(json).toMatchObject({
+      base: 'https://media.loar.fun',
+      host: 'media.loar.fun',
+      token: 'tok_custom_domain',
+      isDedicated: true,
+    });
+
+    const resolveJson = await (
+      await app().request('/api/ipfs/resolve?url=QmQkCrfsjiPk5vkZPU4XcESetNLDrmLeqjV3SLANYUooyC')
+    ).json();
+    expect(resolveJson.url).toBe(
+      'https://media.loar.fun/ipfs/QmQkCrfsjiPk5vkZPU4XcESetNLDrmLeqjV3SLANYUooyC?pinataGatewayToken=tok_custom_domain'
+    );
+  });
+
   it('falls back to the public path-style gateway when nothing is configured', async () => {
     delete process.env.PINATA_GATEWAY_URL;
     delete process.env.PINATA_GATEWAY_TOKEN;

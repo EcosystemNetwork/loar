@@ -37,6 +37,11 @@ const TRUSTED_CONNECT = [
 const TRUSTED_MEDIA = [
   "'self'",
   'blob:',
+  // Our own subdomains — covers a custom domain fronting the dedicated IPFS
+  // gateway (e.g. media.loar.fun; see apps/server/src/routes/ipfs.ts's
+  // PINATA_GATEWAY_URL) without needing a CSP change every time that
+  // gateway domain changes. Mirrors connect-src's existing *.loar.fun entry.
+  'https://*.loar.fun',
   'https://storage.googleapis.com',
   // Google-direct Veo's ephemeral Files API URL — only reached when the
   // mirror-to-permanent-storage step falls back (it requires an API key
@@ -73,6 +78,8 @@ const TRUSTED_IMG = [
   "'self'",
   'data:',
   'blob:',
+  // See TRUSTED_MEDIA above — same custom-domain-gateway rationale.
+  'https://*.loar.fun',
   'https://*.pinata.cloud',
   'https://*.mypinata.cloud',
   'https://gateway.pinata.cloud',

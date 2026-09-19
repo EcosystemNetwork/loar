@@ -53,6 +53,12 @@ function connectSrcSources(csp: string): string[] {
   return match[1].trim().split(/\s+/);
 }
 
+function mediaSrcSources(csp: string): string[] {
+  const match = csp.match(/media-src\s+([^;]+)/);
+  if (!match) throw new Error('media-src directive not found in CSP string');
+  return match[1].trim().split(/\s+/);
+}
+
 async function getMiddlewareCsp(): Promise<string> {
   const app = new Hono();
   app.use('*', securityHeaders);
@@ -105,6 +111,37 @@ describe('CSP gateway allowlist stays in sync across all three declaration sites
       .sort();
     const indexHtmlGateways = connectSrcSources(getIndexHtmlCsp()).filter(isGatewayDomain).sort();
     const netlifyGateways = connectSrcSources(getNetlifyTomlCsp()).filter(isGatewayDomain).sort();
+
+    expect(indexHtmlGateways).toEqual(middlewareGateways);
+    expect(netlifyGateways).toEqual(middlewareGateways);
+  });
+});
+
+/**
+ * Regression test, 2026-09-19: the same three-surface drift bug above, but
+ * for media-src instead of connect-src. A custom domain fronting the
+ * dedicated IPFS gateway (media.loar.fun — see the Pinata
+ * *.mypinata.cloud-subdomain-blocked incident, apps/server/src/routes/ipfs.ts)
+ * was allowed in `security-headers.ts` via a `https://*.loar.fun` entry, but
+ * CSP-blocked every video load in production because netlify.toml and
+ * index.html's media-src lists didn't have it — the exact "updated one
+ * surface, not the other two" failure mode the connect-src test above exists
+ * to catch, just on a different directive. Covering media-src here closes
+ * that gap for `*.loar.fun` and any future gateway-domain addition.
+ */
+describe('CSP media-src stays in sync across all three declaration sites', () => {
+  it('every surface allows https://*.loar.fun in media-src', async () => {
+    expect(mediaSrcSources(await getMiddlewareCsp())).toContain('https://*.loar.fun');
+    expect(mediaSrcSources(getIndexHtmlCsp())).toContain('https://*.loar.fun');
+    expect(mediaSrcSources(getNetlifyTomlCsp())).toContain('https://*.loar.fun');
+  });
+
+  it('all three surfaces declare exactly the same gateway-domain media-src set', async () => {
+    const middlewareGateways = mediaSrcSources(await getMiddlewareCsp())
+      .filter(isGatewayDomain)
+      .sort();
+    const indexHtmlGateways = mediaSrcSources(getIndexHtmlCsp()).filter(isGatewayDomain).sort();
+    const netlifyGateways = mediaSrcSources(getNetlifyTomlCsp()).filter(isGatewayDomain).sort();
 
     expect(indexHtmlGateways).toEqual(middlewareGateways);
     expect(netlifyGateways).toEqual(middlewareGateways);

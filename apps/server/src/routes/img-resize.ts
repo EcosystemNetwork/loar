@@ -70,13 +70,15 @@ function gatewayHost(): string {
   }
 }
 
-// True whenever PINATA_GATEWAY_URL points somewhere other than the default
-// public fallback — covers both the literal `.mypinata.cloud` subdomain and
-// any custom domain fronting it (e.g. `media.loar.fun`). Mirrors ipfs.ts's
-// isDedicatedGateway — kept local here since these two routes don't share a
-// module.
+// True whenever PINATA_GATEWAY_URL points somewhere other than a known
+// public, unauthenticated gateway — covers both the literal
+// `.mypinata.cloud` subdomain and any custom domain fronting it (e.g.
+// `media.loar.fun`), while an operator deliberately pointing
+// PINATA_GATEWAY_URL at a plain public gateway never leaks a token for it.
+// Mirrors ipfs.ts's isDedicatedGateway — kept local here since these two
+// routes don't share a module.
 function isDedicatedGateway(): boolean {
-  return gatewayBase() !== PUBLIC_GATEWAY;
+  return !KNOWN_GATEWAY_HOSTS.has(gatewayHost());
 }
 
 function isAcceptableSourceUrl(raw: string): boolean {

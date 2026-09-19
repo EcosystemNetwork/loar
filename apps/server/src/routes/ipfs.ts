@@ -36,16 +36,6 @@ function gatewayToken(): string {
   return (process.env.PINATA_GATEWAY_TOKEN || '').trim();
 }
 
-// True whenever PINATA_GATEWAY_URL points somewhere other than the default
-// public fallback — covers both the literal `.mypinata.cloud` subdomain and
-// any custom domain fronting it (e.g. `media.loar.fun`). Checking the
-// configured value directly, rather than pattern-matching a specific
-// hostname suffix, means switching to a custom domain (or any future
-// gateway) doesn't silently break token issuance again.
-function isDedicatedGateway(): boolean {
-  return gatewayBase() !== PUBLIC_GATEWAY;
-}
-
 // cloudflare-ipfs.com removed 2026-08-24 — Cloudflare shut down its public
 // IPFS gateway (NXDOMAIN now); see apps/web/src/utils/ipfs-url.ts.
 const KNOWN_GATEWAY_HOSTS = new Set<string>([
@@ -56,6 +46,19 @@ const KNOWN_GATEWAY_HOSTS = new Set<string>([
   '4everland.io',
   'nftstorage.link',
 ]);
+
+// True whenever PINATA_GATEWAY_URL points somewhere other than a known
+// public, unauthenticated gateway — covers both the literal
+// `.mypinata.cloud` subdomain and any custom domain fronting it (e.g.
+// `media.loar.fun`). Checking against the known-public set, rather than
+// pattern-matching one specific hostname shape, means switching to a custom
+// domain (or any future gateway) doesn't silently break token issuance
+// again, while an operator deliberately pointing PINATA_GATEWAY_URL at a
+// plain public gateway (e.g. gateway.pinata.cloud) still never leaks a
+// token for it.
+function isDedicatedGateway(): boolean {
+  return !KNOWN_GATEWAY_HOSTS.has(gatewayHost());
+}
 
 function isAcceptableSourceHost(host: string): boolean {
   if (!host) return false;
