@@ -114,6 +114,17 @@ describe('offChainNodes.create', () => {
     expect(ids).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
 
+  it('never reuses a nodeId when the counter lags existing nodes', async () => {
+    const a = await alice();
+    await a.create({ universeId });
+    await a.create({ universeId, previousNodeId: 1 });
+    // Simulate a direct-writing script / stale counter: reset it to 0.
+    const { db } = await import('../lib/firebase');
+    await db!.collection('offChainNodeCounters').doc(universeId).set({ latest: 0 });
+    const n = await a.create({ universeId, previousNodeId: 2 });
+    expect(n.nodeId).toBe(3);
+  });
+
   it('links a child to its parent and marks it non-canon', async () => {
     const a = await alice();
     await a.create({ universeId });

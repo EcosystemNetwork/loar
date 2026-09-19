@@ -286,6 +286,27 @@ describe('buildGraphData — strict on-chain vs off-chain routing', () => {
     expect(g).toBe(EMPTY_GRAPH_DATA);
   });
 
+  it('on-chain mode with a loaded but EMPTY contract graph → falls back to off-chain nodes', () => {
+    const g = buildGraphData({
+      useOnChain: true,
+      onChainContractAddress: '0xabc',
+      fullGraphData: fullGraph([]),
+      offChainNodes: offNodes,
+    });
+    expect(g.nodeIds).toEqual(['9']);
+    expect(g.urls).toEqual(['https://off/9.mp4']);
+  });
+
+  it('on-chain mode with an empty contract graph and no off-chain nodes → stays empty', () => {
+    const g = buildGraphData({
+      useOnChain: true,
+      onChainContractAddress: '0xabc',
+      fullGraphData: fullGraph([]),
+      offChainNodes: [],
+    });
+    expect(g.nodeIds).toEqual([]);
+  });
+
   it('off-chain mode → off-chain result, ignoring any on-chain inputs', () => {
     const g = buildGraphData({
       useOnChain: false,

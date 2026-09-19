@@ -209,6 +209,7 @@ export interface BuildGraphDataArgs {
   canonChainData?: readonly (string | number | bigint)[];
   contentMap?: Map<string, IndexerNodeContent>;
   mediaOverrides?: Record<number, NodeMediaOverride>;
+  /** Firestore nodes; used as the only source when off-chain, and as a fallback when on-chain is empty. */
   offChainNodes?: readonly any[];
 }
 
@@ -223,10 +224,23 @@ export function buildGraphData({
   offChainNodes,
 }: BuildGraphDataArgs): GraphData {
   if (useOnChain) {
-    if (onChainContractAddress && fullGraphData) {
-      return buildOnChainGraphData(fullGraphData, canonChainData, contentMap, mediaOverrides);
+    if (!onChainContractAddress || !fullGraphData) return EMPTY_GRAPH_DATA;
+    const onChain = buildOnChainGraphData(
+      fullGraphData,
+      canonChainData,
+      contentMap,
+      mediaOverrides
+    );
+    // A universe can be minted (has an `onChainUniverseId`) yet have all of its
+    // story nodes in Firestore's `offChainNodes` — e.g. episodes generated
+    // through the router after minting, with nothing ever indexed from the
+    // contract. Strict on-chain mode used to render those as an empty canvas.
+    // Only when the contract graph has loaded and has *no* nodes do we show the off-chain ones,
+    // so a genuinely on-chain timeline never gets Firestore nodes mixed in.
+    if (onChain.nodeIds.length === 0 && offChainNodes && offChainNodes.length > 0) {
+      return buildOffChainGraphData(offChainNodes);
     }
-    return EMPTY_GRAPH_DATA;
+    return onChain;
   }
   return buildOffChainGraphData(offChainNodes);
 }

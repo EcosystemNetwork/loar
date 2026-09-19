@@ -66,10 +66,22 @@ const createNodeInput = z.object({
 
 async function nextSequentialId(universeId: string): Promise<number> {
   const ref = counterCol().doc(universeId);
+  // The counter can lag the real maximum (scripts that write nodes directly,
+  // or a counter keyed by a pre-normalisation id) — trusting it alone hands
+  // out a duplicate nodeId, which collapses two nodes into one on the canvas.
+  // Read the highest existing id *outside* the transaction: a range query
+  // inside it makes concurrent creates contend and time out, and the counter
+  // itself already serialises concurrent writers.
+  const top = await nodesCol()
+    .where('universeId', '==', universeId)
+    .orderBy('nodeId', 'desc')
+    .limit(1)
+    .get();
+  const highest = top.empty ? 0 : (top.docs[0].data().nodeId as number) || 0;
   return db!.runTransaction(async (tx) => {
     const doc = await tx.get(ref);
-    const current = doc.exists ? (doc.data()?.latest as number) || 0 : 0;
-    const next = current + 1;
+    const counter = doc.exists ? (doc.data()?.latest as number) || 0 : 0;
+    const next = Math.max(counter, highest) + 1;
     tx.set(ref, { latest: next, updatedAt: new Date() }, { merge: true });
     return next;
   });

@@ -346,7 +346,9 @@ export function useUniverseBlockchain({
   } = useQuery({
     queryKey: ['offChainNodes', normalizedUniverseId],
     queryFn: () => trpcClient.offChainNodes.list.query({ universeId: normalizedUniverseId }),
-    enabled: !!universeId && useOffChain,
+    // Also fetched in on-chain mode: buildGraphData falls back to these when the
+    // contract/indexer side has no nodes for a minted universe.
+    enabled: !!universeId,
     staleTime: 30_000,
   });
   // react-query's `isLoading` is `isPending && isFetching`, so on the single
