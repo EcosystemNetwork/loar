@@ -201,6 +201,16 @@ export const directorRouter = router({
    * credits via `generation.generate`) both go through an explicit,
    * user-confirmed call rather than a voice misparse silently mutating
    * the universe or spending credits.
+   *
+   * create_node/branch_story/update_node write to `offChainNodes` — the
+   * collection the timeline graph (ReactFlow canvas) actually renders from
+   * for off-chain ("fun-mode") universes; `universeEvents` is a companion
+   * metadata store, not the node source, so writing only there would mutate
+   * canon data the UI never shows. `videoUrl` is intentionally omitted — a
+   * voice-created beat can exist before a shot is generated for it
+   * (`buildOffChainGraphData` renders nodes with an empty url fine). This
+   * only affects off-chain universes; a minted on-chain universe's timeline
+   * comes from the contract and isn't reachable from here.
    */
   executeStoryAction: protectedProcedure
     .input(
@@ -209,10 +219,10 @@ export const directorRouter = router({
         kind: z.enum(['create_node', 'branch_story', 'update_node', 'generate_scene']),
         title: z.string().max(200).optional(),
         description: z.string().min(1).max(2000),
-        /** branch_story only: the event this branches off of. */
-        previousEventId: z.string().optional(),
-        /** update_node only: the event to revise. */
-        eventId: z.string().optional(),
+        /** create_node/branch_story: node to continue/branch from (0 = root). */
+        previousNodeId: z.number().int().min(0).optional(),
+        /** update_node only: the node to revise. */
+        nodeId: z.number().int().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -236,54 +246,32 @@ export const directorRouter = router({
         return { kind: 'generate_scene' as const, generation };
       }
 
-      if (input.kind === 'branch_story' && !input.previousEventId) {
+      if (input.kind === 'branch_story' && input.previousNodeId == null) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'branch_story requires previousEventId',
+          message: 'branch_story requires previousNodeId',
         });
       }
 
       if (input.kind === 'update_node') {
-        if (!input.eventId) {
-          throw new TRPCError({ code: 'BAD_REQUEST', message: 'update_node requires eventId' });
+        if (input.nodeId == null) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'update_node requires nodeId' });
         }
-        // Merge onto the existing event rather than replacing it outright —
-        // universeEvents.upsert dot-path-sets the whole value at
-        // `events.${eventId}`, so a bare {title, description} would wipe any
-        // other fields (videoUrl, prompts, etc.) already saved on that node.
-        const existing = await caller.universeEvents.get({ universeId: input.universeId });
-        const existingEvent = (existing?.events?.[input.eventId] ?? {}) as Record<string, unknown>;
-        await caller.universeEvents.upsert({
+        const updated = await caller.offChainNodes.update({
           universeId: input.universeId,
-          events: {
-            [input.eventId]: {
-              ...existingEvent,
-              title: input.title || (existingEvent.title as string | undefined) || '',
-              description: input.description,
-              sourceType: 'voice_director',
-              updatedAt: new Date().toISOString(),
-              updatedBy: ctx.user.uid,
-            },
-          },
+          nodeId: input.nodeId,
+          title: input.title,
+          plot: input.description,
         });
-        return { kind: 'update_node' as const, eventId: input.eventId };
+        return { kind: 'update_node' as const, nodeId: updated.nodeId as number };
       }
 
-      const { randomUUID } = await import('crypto');
-      const eventId = randomUUID();
-      await caller.universeEvents.upsert({
+      const created = await caller.offChainNodes.create({
         universeId: input.universeId,
-        events: {
-          [eventId]: {
-            title: input.title || '',
-            description: input.description,
-            sourceType: 'voice_director',
-            branchOf: input.kind === 'branch_story' ? input.previousEventId : null,
-            createdAt: new Date().toISOString(),
-            createdBy: ctx.user.uid,
-          },
-        },
+        plot: input.description,
+        title: input.title,
+        previousNodeId: input.previousNodeId ?? 0,
       });
-      return { kind: input.kind, eventId };
+      return { kind: input.kind, nodeId: created.nodeId as number };
     }),
 });

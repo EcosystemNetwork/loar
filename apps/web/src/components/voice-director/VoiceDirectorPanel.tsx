@@ -206,7 +206,7 @@ function DirectorTab({ universeId }: { universeId: string }) {
   const [log, setLog] = useState<LogEntry[]>([]);
   const [steps, setSteps] = useState<StatusStep[]>([]);
   const [pendingAction, setPendingAction] = useState<StoryActionPlan | null>(null);
-  const lastEventIdRef = useRef<string | null>(null);
+  const lastNodeIdRef = useRef<number | null>(null);
   const audioElRef = useRef<HTMLAudioElement>(null);
 
   const addLog = (role: LogEntry['role'], text: string) =>
@@ -241,7 +241,7 @@ function DirectorTab({ universeId }: { universeId: string }) {
         const result = await trpcClient.director.dispatch.mutate({
           universeId,
           audioUrl,
-          hasActiveNode: !!lastEventIdRef.current,
+          hasActiveNode: lastNodeIdRef.current != null,
           voice: {},
         });
 
@@ -285,11 +285,11 @@ function DirectorTab({ universeId }: { universeId: string }) {
       const description = pendingAction.params.description || pendingAction.summary;
       const title = pendingAction.params.title;
 
-      if (kind === 'branch_story' && !lastEventIdRef.current) {
+      if (kind === 'branch_story' && lastNodeIdRef.current == null) {
         toast.error('Nothing to branch from yet — create a node first.');
         return;
       }
-      if (kind === 'update_node' && !lastEventIdRef.current) {
+      if (kind === 'update_node' && lastNodeIdRef.current == null) {
         toast.error('Nothing to update yet — create a node first.');
         return;
       }
@@ -299,12 +299,17 @@ function DirectorTab({ universeId }: { universeId: string }) {
         kind,
         title,
         description,
-        previousEventId: kind === 'branch_story' ? lastEventIdRef.current! : undefined,
-        eventId: kind === 'update_node' ? lastEventIdRef.current! : undefined,
+        // create_node continues from the last node if there is one;
+        // branch_story requires it explicitly.
+        previousNodeId:
+          kind === 'branch_story' || kind === 'create_node'
+            ? (lastNodeIdRef.current ?? undefined)
+            : undefined,
+        nodeId: kind === 'update_node' ? lastNodeIdRef.current! : undefined,
       });
 
-      if ('eventId' in result && result.eventId) {
-        lastEventIdRef.current = result.eventId;
+      if ('nodeId' in result && typeof result.nodeId === 'number') {
+        lastNodeIdRef.current = result.nodeId;
       }
       setStep('execute', ACTION_VERB[kind], true);
       toast.success(ACTION_VERB[kind]);

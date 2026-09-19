@@ -44,7 +44,10 @@ const counterCol = () => {
 
 const createNodeInput = z.object({
   universeId: z.string().min(1),
-  videoUrl: z.string().url(),
+  // Optional so a story beat can exist before media is generated for it
+  // (e.g. the voice director creating a plot point ahead of `generate_scene`).
+  // buildOffChainGraphData already falls back to '' safely for rendering.
+  videoUrl: z.string().url().optional().default(''),
   plot: z.string().max(20000).default(''),
   previousNodeId: z.number().int().min(0).default(0),
   /** Optional content hash override; defaults to keccak256(videoUrl) */
