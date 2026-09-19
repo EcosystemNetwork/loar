@@ -59,7 +59,7 @@ export interface UseContractSaveReturn {
 /**
  * Parse the NodeCreated event from a transaction receipt to extract the real on-chain node ID.
  */
-function parseNodeCreatedEvent(logs: Log[]): {
+export function parseNodeCreatedEvent(logs: Log[]): {
   nodeId: bigint;
   previous: bigint;
 } | null {

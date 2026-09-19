@@ -29,6 +29,8 @@ import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { randomUUID } from 'crypto';
 import { keccak256, toBytes } from 'viem';
+import { FieldValue } from 'firebase-admin/firestore';
+import { normalizeUniverseId } from '../../lib/universe-id';
 
 const nodesCol = () => {
   if (!db) throw new Error('Firebase not configured');
@@ -73,18 +75,35 @@ async function nextSequentialId(universeId: string): Promise<number> {
   });
 }
 
-async function appendChild(universeId: string, parentId: number, childId: number) {
+/** Look up a node doc by (universeId, nodeId); `null` when it doesn't exist. */
+async function findNode(universeId: string, nodeId: number) {
   const snap = await nodesCol()
     .where('universeId', '==', universeId)
-    .where('nodeId', '==', parentId)
+    .where('nodeId', '==', nodeId)
     .limit(1)
     .get();
-  if (snap.empty) return;
-  const doc = snap.docs[0];
-  const children = (doc.data().children || []) as number[];
-  if (!children.includes(childId)) {
-    await doc.ref.update({ children: [...children, childId], updatedAt: new Date() });
-  }
+  return snap.empty ? null : snap.docs[0];
+}
+
+// arrayUnion / arrayRemove are applied server-side, so concurrent sibling
+// creates or deletes can't lose each other's writes the way a
+// read-modify-write of the whole `children` array would.
+async function appendChild(universeId: string, parentId: number, childId: number) {
+  const parent = await findNode(universeId, parentId);
+  if (!parent) return;
+  await parent.ref.update({
+    children: FieldValue.arrayUnion(childId),
+    updatedAt: new Date(),
+  });
+}
+
+async function removeChild(universeId: string, parentId: number, childId: number) {
+  const parent = await findNode(universeId, parentId);
+  if (!parent) return;
+  await parent.ref.update({
+    children: FieldValue.arrayRemove(childId),
+    updatedAt: new Date(),
+  });
 }
 
 // ── Router ──────────────────────────────────────────────────────────────
@@ -100,13 +119,22 @@ export const offChainNodesRouter = router({
         message: 'Wallet address or uid required to create node',
       });
     }
+    // EVM ids are stored lowercased (readers query that form); Solana PDAs verbatim.
+    const universeId = normalizeUniverseId(input.universeId);
+    // Reject a dangling parent *before* the counter burns an id.
+    if (input.previousNodeId > 0 && !(await findNode(universeId, input.previousNodeId))) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: `Parent node ${input.previousNodeId} not found`,
+      });
+    }
     const contentHash = input.contentHash || keccak256(toBytes(input.videoUrl));
     const plotHash = input.plotHash || keccak256(toBytes(input.plot));
-    const nodeId = await nextSequentialId(input.universeId);
+    const nodeId = await nextSequentialId(universeId);
 
     const doc = {
       id: randomUUID(),
-      universeId: input.universeId,
+      universeId,
       nodeId,
       creator,
       contentHash,
@@ -125,7 +153,7 @@ export const offChainNodesRouter = router({
     await nodesCol().doc(doc.id).set(doc);
 
     if (input.previousNodeId > 0) {
-      await appendChild(input.universeId, input.previousNodeId, nodeId);
+      await appendChild(universeId, input.previousNodeId, nodeId);
     }
 
     return doc;
@@ -134,7 +162,7 @@ export const offChainNodesRouter = router({
   /** List all off-chain nodes for a universe. */
   list: publicProcedure.input(z.object({ universeId: z.string() })).query(async ({ input }) => {
     const snap = await nodesCol()
-      .where('universeId', '==', input.universeId)
+      .where('universeId', '==', normalizeUniverseId(input.universeId))
       .orderBy('nodeId', 'asc')
       .get();
     const nodes = snap.docs.map((d) => d.data());
@@ -145,13 +173,8 @@ export const offChainNodesRouter = router({
   get: publicProcedure
     .input(z.object({ universeId: z.string(), nodeId: z.number().int() }))
     .query(async ({ input }) => {
-      const snap = await nodesCol()
-        .where('universeId', '==', input.universeId)
-        .where('nodeId', '==', input.nodeId)
-        .limit(1)
-        .get();
-      if (snap.empty) return null;
-      return snap.docs[0].data();
+      const doc = await findNode(normalizeUniverseId(input.universeId), input.nodeId);
+      return doc ? doc.data() : null;
     }),
 
   /** Update an existing node (canon flag, plot text, etc.). */
@@ -166,14 +189,11 @@ export const offChainNodesRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const snap = await nodesCol()
-        .where('universeId', '==', input.universeId)
-        .where('nodeId', '==', input.nodeId)
-        .limit(1)
-        .get();
-      if (snap.empty) throw new Error(`Node ${input.nodeId} not found`);
+      const doc = await findNode(normalizeUniverseId(input.universeId), input.nodeId);
+      if (!doc)
+        throw new TRPCError({ code: 'NOT_FOUND', message: `Node ${input.nodeId} not found` });
 
-      const data = snap.docs[0].data();
+      const data = doc.data();
       const caller = (ctx.user?.address || ctx.user?.uid || '').toLowerCase();
       if (!caller || (data.creator || '').toLowerCase() !== caller) {
         throw new TRPCError({
@@ -190,7 +210,7 @@ export const offChainNodesRouter = router({
       }
       if (input.canon !== undefined) updates.canon = input.canon;
 
-      await snap.docs[0].ref.update(updates);
+      await doc.ref.update(updates);
       return { ...data, ...updates };
     }),
 
@@ -198,14 +218,11 @@ export const offChainNodesRouter = router({
   delete: protectedProcedure
     .input(z.object({ universeId: z.string(), nodeId: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
-      const snap = await nodesCol()
-        .where('universeId', '==', input.universeId)
-        .where('nodeId', '==', input.nodeId)
-        .limit(1)
-        .get();
-      if (snap.empty) return { deleted: false };
+      const universeId = normalizeUniverseId(input.universeId);
+      const doc = await findNode(universeId, input.nodeId);
+      if (!doc) return { deleted: false };
 
-      const data = snap.docs[0].data();
+      const data = doc.data();
       const caller = (ctx.user?.address || ctx.user?.uid || '').toLowerCase();
       if (!caller || (data.creator || '').toLowerCase() !== caller) {
         throw new TRPCError({
@@ -215,23 +232,10 @@ export const offChainNodesRouter = router({
       }
       const previousId = data.previousNodeId as number;
 
-      await snap.docs[0].ref.delete();
+      await doc.ref.delete();
 
       // Unlink from parent
-      if (previousId > 0) {
-        const parentSnap = await nodesCol()
-          .where('universeId', '==', input.universeId)
-          .where('nodeId', '==', previousId)
-          .limit(1)
-          .get();
-        if (!parentSnap.empty) {
-          const parentChildren = (parentSnap.docs[0].data().children || []) as number[];
-          await parentSnap.docs[0].ref.update({
-            children: parentChildren.filter((id) => id !== input.nodeId),
-            updatedAt: new Date(),
-          });
-        }
-      }
+      if (previousId > 0) await removeChild(universeId, previousId, input.nodeId);
 
       return { deleted: true };
     }),
