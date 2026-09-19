@@ -564,7 +564,7 @@ export const entitiesRouter = router({
   generateProfile: protectedProcedure
     .input(
       z.object({
-        name: z.string().min(1),
+        name: z.string().min(1).max(200),
         kind: entityKindSchema,
         hint: z.string().max(1000).default(''),
       })

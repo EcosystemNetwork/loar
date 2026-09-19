@@ -361,7 +361,11 @@ export function GenerateConsole({
         .filter(Boolean)
         .map((r) =>
           r.status === 'generating'
-            ? { ...r, status: 'failed' as const, error: 'Interrupted by navigation' }
+            ? {
+                ...r,
+                status: 'failed' as const,
+                error: 'Interrupted — it may already exist in the wiki; check before retrying',
+              }
             : r
         )
         .slice(0, ENTITY_RESULTS_MAX_PERSISTED);
@@ -477,7 +481,7 @@ export function GenerateConsole({
           gen.kind === '3d-model' ? '3d' : gen.kind;
         const result = await trpcClient.sandbox.saveDraft.mutate({
           title: gen.prompt.slice(0, 80) || 'Untitled',
-          prompt: gen.prompt,
+          prompt: gen.prompt.slice(0, 2000),
           imageUrl: gen.imageUrl,
           videoUrl: gen.videoUrl,
           audioUrl: gen.audioUrl,
@@ -1130,6 +1134,7 @@ export function GenerateConsole({
         toast.error("You don't have access to that wiki — pick one you own in “Generate into”.");
         return;
       }
+      if (checkConcurrency(1) === 0) return;
       const universeId = target;
       const p = prompt.trim();
       const submittedEntityName = entityName.trim();
@@ -1168,6 +1173,9 @@ export function GenerateConsole({
             })
             .catch(() => null),
         ]);
+        if (!img) {
+          toast.warning('Portrait generation failed — the entity was created without an image.');
+        }
         const imageUrl =
           img && (img as any).imageUrls?.[0] ? ((img as any).imageUrls[0] as string) : null;
         const stringMeta: Record<string, string> = {};
@@ -1217,6 +1225,7 @@ export function GenerateConsole({
     },
     [
       generationEnabled,
+      checkConcurrency,
       prompt,
       entityName,
       imageModel,
@@ -1450,7 +1459,7 @@ export function GenerateConsole({
       });
       setPrompt('');
     } else if (mode === '3d') {
-      const sourceImg = drafts?.find((d: any) => d.imageUrl)?.imageUrl ?? undefined;
+      const sourceImg = referenceImage?.url;
       if (threedMode === 'text' && !prompt.trim()) return;
       if (threedMode === 'image' && !sourceImg) return;
       if (checkConcurrency(1) === 0) return;
@@ -1459,6 +1468,7 @@ export function GenerateConsole({
         artStyle: threedArtStyle,
         ...(threedMode === 'image' && sourceImg ? { imageUrl: sourceImg } : {}),
       });
+      if (threedMode === 'image') setReferenceImage(null);
       setPrompt('');
     } else if (mode === 'talking') {
       if (!referenceImage?.url || !talkingDialogue.trim() || !voiceId) return;
@@ -1506,7 +1516,6 @@ export function GenerateConsole({
     runAudioGen,
     threedMode,
     threedArtStyle,
-    drafts,
     run3DGen,
     talkingDialogue,
     talkingMotion,
@@ -1671,7 +1680,9 @@ export function GenerateConsole({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__off__">Off — save to drafts only</SelectItem>
-                        <SelectItem value="__gallery__">My Gallery — publish publicly</SelectItem>
+                        <SelectItem value="__gallery__">
+                          My Gallery — {autoSendVisibility}
+                        </SelectItem>
                         {autoSendUniverses.length > 0 && (
                           <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
                             Your wikis
@@ -1691,7 +1702,7 @@ export function GenerateConsole({
                   <p className="text-[10px] text-muted-foreground -mt-2">
                     {autoSendTarget === '__off__'
                       ? 'Saved to drafts only — nothing publishes until you pick a wiki above. World entities require a wiki.'
-                      : "Images & videos auto-publish to the chosen wiki's gallery. World entities require a wiki."}
+                      : "Generations auto-publish to the chosen wiki's gallery. World entities require a wiki."}
                   </p>
                 )}
 
@@ -2455,29 +2466,71 @@ export function GenerateConsole({
                         </SelectContent>
                       </Select>
                     </div>
-                    {threedMode === 'image' && (
-                      <p className="text-[10px] text-muted-foreground">
-                        Drop an image into the queue (right-side drafts panel) or via the dropzone
-                        in Image mode, then come back here. The most recent image draft is used as
-                        source.
-                      </p>
-                    )}
+                    {threedMode === 'image' &&
+                      (referenceImage ? (
+                        <div className="flex items-center gap-3 p-2 rounded-lg border border-primary/30 bg-primary/5">
+                          <img
+                            src={referenceImage.url}
+                            alt=""
+                            className="h-12 w-12 rounded object-cover"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium">3D source image</p>
+                            <p className="text-[10px] text-muted-foreground truncate">
+                              {referenceImage.url}
+                            </p>
+                          </div>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            onClick={() => setReferenceImage(null)}
+                            title="Clear source image"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={onRefDrop}
+                          onClick={() => refFileInputRef.current?.click()}
+                          className="flex items-center justify-center gap-2 p-3 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors text-xs text-muted-foreground"
+                        >
+                          <Upload className="h-3.5 w-3.5" />
+                          <span>
+                            Drop or click to add the source image — or use “Animate” / “Use as style
+                            ref” on any image card
+                          </span>
+                          <input
+                            ref={refFileInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) uploadAsset(f, 'style');
+                              e.target.value = '';
+                            }}
+                          />
+                        </div>
+                      ))}
                     <Button
                       className="rounded-full self-end px-5"
                       disabled={
                         !prompt.trim() && threedMode === 'text'
                           ? true
-                          : threedMode === 'image' && !drafts?.find((d: any) => d.imageUrl)
+                          : threedMode === 'image' && !referenceImage?.url
                       }
                       onClick={() => {
                         if (checkConcurrency(1) === 0) return;
-                        const sourceImg =
-                          drafts?.find((d: any) => d.imageUrl)?.imageUrl ?? undefined;
+                        const sourceImg = referenceImage?.url;
                         run3DGen(prompt, {
                           threedMode,
                           artStyle: threedArtStyle,
                           ...(threedMode === 'image' && sourceImg ? { imageUrl: sourceImg } : {}),
                         });
+                        if (threedMode === 'image') setReferenceImage(null);
                         setPrompt('');
                       }}
                     >
@@ -2836,12 +2889,12 @@ export function GenerateConsole({
                         <div className="aspect-square bg-muted relative flex items-center justify-center">
                           {r.imageUrl ? (
                             <img src={r.imageUrl} alt="" className="w-full h-full object-cover" />
+                          ) : r.status === 'generating' ? (
+                            <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
+                          ) : r.status === 'failed' ? (
+                            <AlertCircle className="h-5 w-5 text-destructive" />
                           ) : (
-                            <Loader2
-                              className={`h-5 w-5 text-muted-foreground ${
-                                r.status === 'generating' ? 'animate-spin' : ''
-                              }`}
-                            />
+                            <ImageIcon className="h-5 w-5 text-muted-foreground/50" />
                           )}
                         </div>
                         <div className="p-2 space-y-1">
@@ -2858,14 +2911,6 @@ export function GenerateConsole({
                                 className="text-[10px] text-primary hover:underline"
                               >
                                 Open in wiki
-                              </Link>
-                              <Link
-                                to="/create/$kind"
-                                params={{ kind: r.kind }}
-                                search={{ universe: r.universeId }}
-                                className="text-[10px] text-muted-foreground hover:underline"
-                              >
-                                Refine
                               </Link>
                             </div>
                           )}

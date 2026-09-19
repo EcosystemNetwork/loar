@@ -1,3 +1,12 @@
+import { z } from 'zod';
+
+/** Draft media URLs must be plain http(s) — rejects javascript:, data:, file: etc. */
+export const mediaUrlSchema = z
+  .string()
+  .max(2048)
+  .url()
+  .refine((u) => /^https?:\/\//i.test(u), { message: 'Media URL must be http(s)' });
+
 /**
  * Picks the canonical media for a sandbox draft. Shared by saveDraft (which
  * mirrors a draft into a gallery content record) and promoteToUniverse so the

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveDraftMedia } from './draft-media';
+import { resolveDraftMedia, mediaUrlSchema } from './draft-media';
 
 describe('resolveDraftMedia', () => {
   it('prefers the 3D model over a turntable video and thumbnail', () => {
@@ -30,5 +30,18 @@ describe('resolveDraftMedia', () => {
   });
   it('prefers an explicit thumbnail', () => {
     expect(resolveDraftMedia({ imageUrl: 'i', thumbnailUrl: 't' }).thumbnailUrl).toBe('t');
+  });
+});
+
+describe('mediaUrlSchema', () => {
+  it('accepts http(s) urls', () => {
+    expect(mediaUrlSchema.safeParse('https://media.loar.fun/x.png').success).toBe(true);
+    expect(mediaUrlSchema.safeParse('http://localhost:3000/x.png').success).toBe(true);
+  });
+  it('rejects non-http schemes and oversized urls', () => {
+    expect(mediaUrlSchema.safeParse('javascript:alert(1)').success).toBe(false);
+    expect(mediaUrlSchema.safeParse('data:image/png;base64,AAAA').success).toBe(false);
+    expect(mediaUrlSchema.safeParse('file:///etc/passwd').success).toBe(false);
+    expect(mediaUrlSchema.safeParse('https://x.com/' + 'a'.repeat(3000)).success).toBe(false);
   });
 });

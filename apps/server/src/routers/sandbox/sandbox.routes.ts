@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { db } from '../../lib/firebase';
 import { FieldValue } from 'firebase-admin/firestore';
-import { resolveDraftMedia } from './draft-media';
+import { resolveDraftMedia, mediaUrlSchema } from './draft-media';
 
 const sandboxCol = () => {
   if (!db)
@@ -50,14 +50,14 @@ export const sandboxRouter = router({
       z.object({
         title: z.string().min(1).max(200),
         prompt: z.string().min(1).max(2000),
-        imageUrl: z.string().url().optional(),
-        videoUrl: z.string().url().optional(),
-        audioUrl: z.string().url().optional(),
+        imageUrl: mediaUrlSchema.optional(),
+        videoUrl: mediaUrlSchema.optional(),
+        audioUrl: mediaUrlSchema.optional(),
         // Distinguishes music from TTS/SFX within kind: 'audio' — the client
         // uses this on "reuse" to pick the matching composer tab.
         audioFlavor: z.enum(['tts', 'sfx', 'music']).optional(),
-        modelUrl: z.string().url().optional(),
-        thumbnailUrl: z.string().url().optional(),
+        modelUrl: mediaUrlSchema.optional(),
+        thumbnailUrl: mediaUrlSchema.optional(),
         kind: z.enum(['image', 'video', 'audio', '3d']).optional(),
         model: z.string().optional(),
         tags: z.array(z.string()).max(10).default([]),
@@ -183,8 +183,8 @@ export const sandboxRouter = router({
         title: z.string().min(1).max(200).optional(),
         prompt: z.string().min(1).max(2000).optional(),
         model: z.string().optional(),
-        videoUrl: z.string().url().optional(),
-        imageUrl: z.string().url().optional(),
+        videoUrl: mediaUrlSchema.optional(),
+        imageUrl: mediaUrlSchema.optional(),
         tags: z.array(z.string()).max(10).optional(),
       })
     )
