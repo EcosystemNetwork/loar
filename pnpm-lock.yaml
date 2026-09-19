@@ -50,7 +50,7 @@ overrides:
 
 patchedDependencies:
   '@tanstack/router-core@1.171.6':
-    hash: tzf4qar76xrn4zpturolvimoii
+    hash: z55kteu2roovehydpixvoacljq
     path: patches/@tanstack__router-core@1.171.6.patch
 
 importers:
@@ -736,7 +736,7 @@ importers:
         version: 5.100.14(@tanstack/react-query@5.100.14(react@18.3.1))(react@18.3.1)
       '@tanstack/react-router-devtools':
         specifier: ^1.114.27
-        version: 1.167.0(@tanstack/react-router@1.170.8(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@tanstack/router-core@1.171.6(patch_hash=tzf4qar76xrn4zpturolvimoii))(csstype@3.2.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        version: 1.167.0(@tanstack/react-router@1.170.8(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@tanstack/router-core@1.171.6(patch_hash=z55kteu2roovehydpixvoacljq))(csstype@3.2.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@tanstack/router-plugin':
         specifier: ^1.114.27
         version: 1.168.11(@tanstack/react-router@1.170.8(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(vite@6.4.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.3)(yaml@2.9.0))
@@ -19996,14 +19996,14 @@ snapshots:
       '@tanstack/query-core': 5.100.14
       react: 18.3.1
 
-  '@tanstack/react-router-devtools@1.167.0(@tanstack/react-router@1.170.8(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@tanstack/router-core@1.171.6(patch_hash=tzf4qar76xrn4zpturolvimoii))(csstype@3.2.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@tanstack/react-router-devtools@1.167.0(@tanstack/react-router@1.170.8(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@tanstack/router-core@1.171.6(patch_hash=z55kteu2roovehydpixvoacljq))(csstype@3.2.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@tanstack/react-router': 1.170.8(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@tanstack/router-devtools-core': 1.168.0(@tanstack/router-core@1.171.6(patch_hash=tzf4qar76xrn4zpturolvimoii))(csstype@3.2.3)
+      '@tanstack/router-devtools-core': 1.168.0(@tanstack/router-core@1.171.6(patch_hash=z55kteu2roovehydpixvoacljq))(csstype@3.2.3)
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
     optionalDependencies:
-      '@tanstack/router-core': 1.171.6(patch_hash=tzf4qar76xrn4zpturolvimoii)
+      '@tanstack/router-core': 1.171.6(patch_hash=z55kteu2roovehydpixvoacljq)
     transitivePeerDependencies:
       - csstype
 
@@ -20011,7 +20011,7 @@ snapshots:
     dependencies:
       '@tanstack/history': 1.162.0
       '@tanstack/react-store': 0.9.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@tanstack/router-core': 1.171.6(patch_hash=tzf4qar76xrn4zpturolvimoii)
+      '@tanstack/router-core': 1.171.6(patch_hash=z55kteu2roovehydpixvoacljq)
       isbot: 5.1.40
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
@@ -20023,16 +20023,16 @@ snapshots:
       react-dom: 18.3.1(react@18.3.1)
       use-sync-external-store: 1.6.0(react@18.3.1)
 
-  '@tanstack/router-core@1.171.6(patch_hash=tzf4qar76xrn4zpturolvimoii)':
+  '@tanstack/router-core@1.171.6(patch_hash=z55kteu2roovehydpixvoacljq)':
     dependencies:
       '@tanstack/history': 1.162.0
       cookie-es: 3.1.1
       seroval: 1.5.4
       seroval-plugins: 1.5.4(seroval@1.5.4)
 
-  '@tanstack/router-devtools-core@1.168.0(@tanstack/router-core@1.171.6(patch_hash=tzf4qar76xrn4zpturolvimoii))(csstype@3.2.3)':
+  '@tanstack/router-devtools-core@1.168.0(@tanstack/router-core@1.171.6(patch_hash=z55kteu2roovehydpixvoacljq))(csstype@3.2.3)':
     dependencies:
-      '@tanstack/router-core': 1.171.6(patch_hash=tzf4qar76xrn4zpturolvimoii)
+      '@tanstack/router-core': 1.171.6(patch_hash=z55kteu2roovehydpixvoacljq)
       clsx: 2.1.1
       goober: 2.1.19(csstype@3.2.3)
     optionalDependencies:
@@ -20041,7 +20041,7 @@ snapshots:
   '@tanstack/router-generator@1.167.10':
     dependencies:
       '@babel/types': 7.29.7
-      '@tanstack/router-core': 1.171.6(patch_hash=tzf4qar76xrn4zpturolvimoii)
+      '@tanstack/router-core': 1.171.6(patch_hash=z55kteu2roovehydpixvoacljq)
       '@tanstack/router-utils': 1.162.1
       '@tanstack/virtual-file-routes': 1.162.0
       jiti: 2.7.0
@@ -20059,7 +20059,7 @@ snapshots:
       '@babel/template': 7.29.7
       '@babel/traverse': 7.29.7
       '@babel/types': 7.29.7
-      '@tanstack/router-core': 1.171.6(patch_hash=tzf4qar76xrn4zpturolvimoii)
+      '@tanstack/router-core': 1.171.6(patch_hash=z55kteu2roovehydpixvoacljq)
       '@tanstack/router-generator': 1.167.10
       '@tanstack/router-utils': 1.162.1
       '@tanstack/virtual-file-routes': 1.162.0

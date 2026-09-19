@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { LiveConversation } from './LiveConversation';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 
@@ -200,7 +201,7 @@ export function VoiceDirectorPanel({
 
 // ── Director tab ─────────────────────────────────────────────────────
 
-function DirectorTab({ universeId }: { universeId: string }) {
+function DirectorPushToTalk({ universeId }: { universeId: string }) {
   const { isRecording, start, stop, cancel } = useMicRecorder();
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<LogEntry[]>([]);
@@ -409,25 +410,17 @@ function DirectorTab({ universeId }: { universeId: string }) {
 
 // ── Character tab ────────────────────────────────────────────────────
 
-function CharacterTab({ universeId }: { universeId: string }) {
+function CharacterPushToTalk({
+  universeId,
+  characterId,
+}: {
+  universeId: string;
+  characterId: string;
+}) {
   const { isRecording, start, stop, cancel } = useMicRecorder();
   const [busy, setBusy] = useState(false);
-  const [characterId, setCharacterId] = useState<string>('');
   const [log, setLog] = useState<LogEntry[]>([]);
   const audioElRef = useRef<HTMLAudioElement>(null);
-
-  const { data: characters } = useQuery({
-    queryKey: ['voice-director-characters', universeId],
-    queryFn: () =>
-      trpcClient.entities.list.query({ universeAddress: universeId, kind: 'person', limit: 40 }),
-    enabled: !!universeId,
-  });
-
-  useEffect(() => {
-    if (!characterId && characters?.entities?.length) {
-      setCharacterId(characters.entities[0].id);
-    }
-  }, [characters, characterId]);
 
   const addLog = (role: LogEntry['role'], text: string) =>
     setLog((l) => [...l, { id: `${Date.now()}-${role}`, role, text }]);
@@ -478,19 +471,6 @@ function CharacterTab({ universeId }: { universeId: string }) {
     <div className="flex flex-col gap-3 pt-2">
       <audio ref={audioElRef} className="hidden" />
 
-      <Select value={characterId} onValueChange={setCharacterId}>
-        <SelectTrigger className="border-zinc-800 bg-zinc-900">
-          <SelectValue placeholder="Pick a character" />
-        </SelectTrigger>
-        <SelectContent>
-          {(characters?.entities ?? []).map((c: any) => (
-            <SelectItem key={c.id} value={c.id}>
-              {c.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
       <div className="flex max-h-56 flex-col gap-2 overflow-y-auto rounded border border-zinc-800 bg-zinc-900/50 p-3 text-sm">
         {log.length === 0 ? (
           <p className="text-zinc-500">Ask this character something.</p>
@@ -520,6 +500,95 @@ function CharacterTab({ universeId }: { universeId: string }) {
           <Square className="mr-1.5 size-3.5" /> Stop
         </Button>
       </div>
+    </div>
+  );
+}
+
+// ── Live vs push-to-talk wrappers ────────────────────────────────────
+
+function ModeSwitch({ live, onChange }: { live: boolean; onChange: (live: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      className="mx-auto mt-1 block text-xs text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
+      onClick={() => onChange(!live)}
+    >
+      {live ? 'Prefer to record one message at a time?' : 'Switch to live conversation'}
+    </button>
+  );
+}
+
+function DirectorTab({ universeId }: { universeId: string }) {
+  const [live, setLive] = useState(true);
+  return (
+    <>
+      {live ? (
+        <LiveConversation
+          universeId={universeId}
+          mode="director"
+          speakerLabel="Director"
+          onUnavailable={() => setLive(false)}
+        />
+      ) : (
+        <DirectorPushToTalk universeId={universeId} />
+      )}
+      <ModeSwitch live={live} onChange={setLive} />
+    </>
+  );
+}
+
+function CharacterTab({ universeId }: { universeId: string }) {
+  const [live, setLive] = useState(true);
+  const [characterId, setCharacterId] = useState('');
+
+  const { data: characters } = useQuery({
+    queryKey: ['voice-director-characters', universeId],
+    queryFn: () =>
+      trpcClient.entities.list.query({ universeAddress: universeId, kind: 'person', limit: 40 }),
+    enabled: !!universeId,
+  });
+
+  useEffect(() => {
+    if (!characterId && characters?.entities?.length) setCharacterId(characters.entities[0].id);
+  }, [characters, characterId]);
+
+  const selected = (characters?.entities ?? []).find((c: any) => c.id === characterId) as
+    | { name: string }
+    | undefined;
+
+  return (
+    <div className="flex flex-col gap-3 pt-2">
+      <Select value={characterId} onValueChange={setCharacterId}>
+        <SelectTrigger className="border-zinc-800 bg-zinc-900">
+          <SelectValue placeholder="Pick a character" />
+        </SelectTrigger>
+        <SelectContent>
+          {(characters?.entities ?? []).map((c: any) => (
+            <SelectItem key={c.id} value={c.id}>
+              {c.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {!characterId ? (
+        <p className="py-6 text-center text-sm text-zinc-500">
+          No characters in this universe yet.
+        </p>
+      ) : live ? (
+        // key: switching characters remounts, which ends the old conversation.
+        <LiveConversation
+          key={characterId}
+          universeId={universeId}
+          mode="character"
+          entityId={characterId}
+          speakerLabel={selected?.name ?? 'Character'}
+          onUnavailable={() => setLive(false)}
+        />
+      ) : (
+        <CharacterPushToTalk universeId={universeId} characterId={characterId} />
+      )}
+      <ModeSwitch live={live} onChange={setLive} />
     </div>
   );
 }

@@ -27,6 +27,8 @@ class Settings:
     sambanova_model: str
     director_voice_id: str | None
     allowed_origins: tuple[str, ...]
+    # Override for the SambaNova endpoint (a proxy, or a local stand-in in tests).
+    sambanova_base_url: str | None = None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Settings":
@@ -45,6 +47,7 @@ class Settings:
             sambanova_model=env.get("SAMBANOVA_MODEL") or "Meta-Llama-3.3-70B-Instruct",
             director_voice_id=env.get("GRADIUM_DIRECTOR_VOICE_ID") or None,
             allowed_origins=origins,
+            sambanova_base_url=env.get("SAMBANOVA_BASE_URL") or None,
         )
 
 

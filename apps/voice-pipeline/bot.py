@@ -115,11 +115,15 @@ async def run_bot(websocket, claims: dict[str, Any], settings: Settings) -> None
             ),
         )
         stt = GradiumSTTService(api_key=settings.gradium_api_key)
+        llm_kwargs: dict[str, Any] = {}
+        if settings.sambanova_base_url:
+            llm_kwargs["base_url"] = settings.sambanova_base_url
         llm = SambaNovaLLMService(
             api_key=settings.sambanova_api_key,
             settings=SambaNovaLLMService.Settings(
                 model=settings.sambanova_model, temperature=temperature, max_tokens=500
             ),
+            **llm_kwargs,
         )
         if session is not None:
             register_tools(llm, session)
