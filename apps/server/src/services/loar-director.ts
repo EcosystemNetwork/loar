@@ -21,7 +21,7 @@ import { getStorageManager } from './storage';
 import { assertProviderAllowed, recordProviderCost } from './cost-tracker';
 
 export type DirectorIntent = 'canon_query' | 'story_action';
-export type StoryActionKind = 'create_node' | 'branch_story' | 'generate_scene';
+export type StoryActionKind = 'create_node' | 'branch_story' | 'update_node' | 'generate_scene';
 
 export interface DirectorClassification {
   intent: DirectorIntent;
@@ -166,6 +166,57 @@ Question: """${opts.utterance}"""`;
   return { answer: toSpokenLength(result.text), hasContext: true };
 }
 
+/**
+ * Answer as a character, in first person, grounded in what that character
+ * could plausibly know from the recorded canon — not a narrator summary.
+ * When the entity's own context doesn't cover the question, the character
+ * says so in-character rather than inventing knowledge it shouldn't have
+ * (e.g. who's responsible for something it hasn't discovered yet).
+ */
+export async function answerAsCharacter(opts: {
+  utterance: string;
+  universeId: string;
+  entityId: string;
+  userId?: string | null;
+}): Promise<CanonQueryResult> {
+  const context = await buildGenerationContext({
+    universeId: opts.universeId,
+    entityId: opts.entityId,
+  }).catch(() => null);
+
+  if (!context) {
+    return { answer: "I don't have anything to say about that.", hasContext: false };
+  }
+
+  let modelId: string;
+  try {
+    modelId = pickModel(false);
+  } catch {
+    return { answer: "I can't find the words right now.", hasContext: true };
+  }
+
+  const prompt = `You are voicing a character inside a LOAR story universe, speaking in first person AS them — not as a narrator describing them. Stay strictly within what this character would plausibly know from the context below. If asked about something they have no way of knowing yet (a secret not yet discovered, another character's private motive, an event that hasn't happened to them), say so in character — deflect, express uncertainty, or say they don't know — rather than revealing it. Keep it to 2-4 spoken sentences in their voice.
+
+${context}
+
+They are asked: """${opts.utterance}"""
+
+Respond with only what the character says — no quotation marks, no stage directions, no "As [name],".`;
+
+  const result = await dispatchLlm({
+    modelId,
+    userId: opts.userId ?? undefined,
+    maxTokens: 300,
+    messages: [{ role: 'user', content: prompt }],
+  }).catch(() => null);
+
+  if (!result) {
+    return { answer: "I can't find the words right now.", hasContext: true };
+  }
+
+  return { answer: toSpokenLength(result.text), hasContext: true };
+}
+
 export interface CharacterVoiceResult {
   audioUrl: string | null;
 }
@@ -292,20 +343,27 @@ export async function resolveAndSynthesizeCharacterVoice(opts: {
 const STORY_ACTION_LABELS: Record<StoryActionKind, string> = {
   create_node: 'creating a new story node',
   branch_story: 'branching the story here',
+  update_node: 'updating that scene',
   generate_scene: 'generating a new scene',
 };
 
 /**
- * Turn a story-action utterance into a structured plan: which of the three
- * action kinds it is, the extracted parameters, and a short spoken
- * acknowledgement. This does not execute anything — the client (or a
- * follow-up call) hands the plan to the real mutation (offChainNodes.create,
- * universeEvents.create, generation.*) which enforces ownership + credits.
+ * Turn a story-action utterance into a structured plan: which action kind
+ * it is, the extracted parameters, and a short spoken acknowledgement. This
+ * does not execute anything — the client (or a follow-up call) hands the
+ * plan to `executeStoryAction`, which enforces ownership + credits.
+ *
+ * `hasActiveNode` tells the classifier whether there's a node from earlier
+ * in this conversation that "change that" / "actually, ..." could refer to
+ * — pass true once the client has a `lastEventId` from a prior create/branch
+ * in the same session. Without it, revision language falls back to
+ * `create_node` rather than guessing at a target to update.
  */
 export async function planStoryAction(opts: {
   utterance: string;
   universeId: string;
   userId?: string | null;
+  hasActiveNode?: boolean;
 }): Promise<StoryActionPlan> {
   const fallback: StoryActionPlan = {
     kind: 'create_node',
@@ -321,17 +379,21 @@ export async function planStoryAction(opts: {
     return fallback;
   }
 
+  const updateOption = opts.hasActiveNode
+    ? `\n- "update_node": revise the scene/node created or discussed earlier in this conversation (e.g. "actually, she shouldn't know that yet", "change the ending").`
+    : '';
+
   const prompt = `You are LOAR's story director. The user asked for a story action. Classify it into exactly one kind:
 
 - "create_node": continue the timeline with a new scene/node.
-- "branch_story": start an alternate branch from an existing point in the story.
+- "branch_story": start an alternate branch from an existing point in the story.${updateOption}
 - "generate_scene": generate a specific shot/clip (a visual, not a plot beat).
 
-Also extract a short "title" (<=80 chars) and a "description" (<=400 chars) capturing what they asked for, in your own words.
+Also extract a short "title" (<=80 chars) and a "description" (<=400 chars) capturing what they asked for, in your own words. For "update_node", the description should be the revised scene content, not just the delta.
 
 Line: """${opts.utterance}"""
 
-Respond with strict JSON only: {"kind": "create_node" | "branch_story" | "generate_scene", "title": string, "description": string}`;
+Respond with strict JSON only: {"kind": "create_node" | "branch_story"${opts.hasActiveNode ? ' | "update_node"' : ''} | "generate_scene", "title": string, "description": string}`;
 
   const result = await dispatchLlm({
     modelId,
@@ -344,8 +406,11 @@ Respond with strict JSON only: {"kind": "create_node" | "branch_story" | "genera
   if (!result) return fallback;
 
   const parsed = parseJsonObject(result.text);
+  const allowUpdate = !!opts.hasActiveNode;
   const kind: StoryActionKind =
-    parsed?.kind === 'branch_story' || parsed?.kind === 'generate_scene'
+    parsed?.kind === 'branch_story' ||
+    parsed?.kind === 'generate_scene' ||
+    (allowUpdate && parsed?.kind === 'update_node')
       ? parsed.kind
       : 'create_node';
   const title = typeof parsed?.title === 'string' && parsed.title.trim() ? parsed.title : '';
