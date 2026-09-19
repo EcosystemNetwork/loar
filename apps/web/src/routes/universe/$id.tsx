@@ -53,6 +53,7 @@ import {
   Scissors,
   Pencil,
   ExternalLink,
+  Mic,
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
@@ -139,6 +140,7 @@ import { MotionBrush } from '@/components/flow/MotionBrush';
 import type { SceneControls } from '@/components/flow/TimelineNodes';
 import { SelectionPlayer, type SelectionVideo } from '@/components/player/SelectionPlayer';
 import { NodeOutlinePanel } from '@/components/flow/NodeOutlinePanel';
+import { VoiceDirectorPanel } from '@/components/voice-director/VoiceDirectorPanel';
 import { NodeFilterBar } from '@/components/flow/NodeFilterBar';
 import { BulkOperationsToolbar } from '@/components/flow/BulkOperationsToolbar';
 import { NodeContextMenu } from '@/components/flow/NodeContextMenu';
@@ -507,6 +509,7 @@ function UniverseTimelineEditorInner() {
 
   // Node Management state
   const [showOutlinePanel, setShowOutlinePanel] = useState(false);
+  const [showVoiceDirector, setShowVoiceDirector] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false,
     x: 0,
@@ -3609,6 +3612,13 @@ function UniverseTimelineEditorInner() {
                       <List className="h-4 w-4" />
                     </button>
                     <button
+                      onClick={() => setShowVoiceDirector(true)}
+                      className={`p-1.5 hover:bg-zinc-700 transition-colors ${showVoiceDirector ? 'text-amber-400' : 'text-zinc-400 hover:text-white'}`}
+                      title="Voice Director"
+                    >
+                      <Mic className="h-4 w-4" />
+                    </button>
+                    <button
                       onClick={() => {
                         setShowSearch(true);
                       }}
@@ -3829,6 +3839,12 @@ function UniverseTimelineEditorInner() {
           selectedNodeIds={selectedNodeIds}
           onNavigateToNode={handleNavigateToNode}
           onToggleSelect={handleToggleSelect}
+        />
+
+        <VoiceDirectorPanel
+          universeId={id}
+          open={showVoiceDirector}
+          onOpenChange={setShowVoiceDirector}
         />
 
         {/* Bottom Panel - Event Creation (Google Veo Flow Style) */}
