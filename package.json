@@ -111,6 +111,8 @@
         "GHSA-5p2g-fcmc-qvqq"
       ]
     },
-    "patchedDependencies": {}
+    "patchedDependencies": {
+      "@tanstack/router-core@1.171.6": "patches/@tanstack__router-core@1.171.6.patch"
+    }
   }
 }

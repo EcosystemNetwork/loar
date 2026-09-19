@@ -1,0 +1,24 @@
+diff --git a/dist/cjs/load-matches.cjs b/dist/cjs/load-matches.cjs
+index ab816e129d85a7a54c88371c5ba90c1dbec4cdd0..6171a29a989e263a9e3e57f238495152c50dd5f0 100644
+--- a/dist/cjs/load-matches.cjs
++++ b/dist/cjs/load-matches.cjs
+@@ -463,6 +463,7 @@ const loadRouteMatch = async (inner, matchPromises, index) => {
+ 		if (_tanstack_router_core_isServer.isServer ?? inner.router.isServer) return inner.router.getMatch(matchId);
+ 	} else {
+ 		const prevMatch = inner.router.getMatch(matchId);
++		if (!prevMatch) return inner.matches[index];
+ 		const activeIdAtIndex = inner.router.stores.matchesId.get()[index];
+ 		const previousRouteMatchId = (activeIdAtIndex && inner.router.stores.matchStores.get(activeIdAtIndex) || null)?.routeId === routeId ? activeIdAtIndex : inner.router.stores.matches.get().find((d) => d.routeId === routeId)?.id;
+ 		const preload = resolvePreload(inner, matchId);
+diff --git a/dist/esm/load-matches.js b/dist/esm/load-matches.js
+index 3ad245aef7776899cdda3b6d6a84025cc759f9ad..d9b6ebcd51ca2370e3302c15a25310187ded64cc 100644
+--- a/dist/esm/load-matches.js
++++ b/dist/esm/load-matches.js
+@@ -463,6 +463,7 @@ const loadRouteMatch = async (inner, matchPromises, index) => {
+ 		if (isServer ?? inner.router.isServer) return inner.router.getMatch(matchId);
+ 	} else {
+ 		const prevMatch = inner.router.getMatch(matchId);
++		if (!prevMatch) return inner.matches[index];
+ 		const activeIdAtIndex = inner.router.stores.matchesId.get()[index];
+ 		const previousRouteMatchId = (activeIdAtIndex && inner.router.stores.matchStores.get(activeIdAtIndex) || null)?.routeId === routeId ? activeIdAtIndex : inner.router.stores.matches.get().find((d) => d.routeId === routeId)?.id;
+ 		const preload = resolvePreload(inner, matchId);
