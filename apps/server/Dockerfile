@@ -8,6 +8,8 @@ WORKDIR /app
 # (Previous stubbed package.json files drifted from the lockfile whenever
 # devDependencies were added to any non-server workspace.)
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# pnpm patchedDependencies (root package.json) — install fails without the patch files.
+COPY patches ./patches
 COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/
 COPY apps/indexer/package.json ./apps/indexer/
@@ -57,6 +59,8 @@ WORKDIR /app
 # Copy workspace root + every workspace member's package.json so pnpm's
 # --frozen-lockfile check matches specifiers in pnpm-lock.yaml exactly.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# pnpm patchedDependencies (root package.json) — install fails without the patch files.
+COPY patches ./patches
 COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/
 COPY apps/indexer/package.json ./apps/indexer/
