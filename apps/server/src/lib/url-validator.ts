@@ -113,9 +113,17 @@ export async function safeFetch(
   const dispatcher = new Agent({
     connect: {
       // Force the outgoing TCP connection to use the IP we just validated.
-      // Node passes a lookup shaped like dns.lookup's callback form.
-      lookup: (_hostname, _options, cb) =>
-        cb(null, pinnedIp as unknown as string, family as unknown as number),
+      // Node 20+/undici call lookup with `all: true` (autoSelectFamily) and
+      // expect an address array; the legacy form expects (address, family).
+      // Answering the wrong shape yields "Invalid IP address: undefined".
+      lookup: (_hostname, options, cb) => {
+        const cbAny = cb as unknown as (...args: unknown[]) => void;
+        if (options && (options as { all?: boolean }).all) {
+          cbAny(null, [{ address: pinnedIp, family }]);
+        } else {
+          cbAny(null, pinnedIp, family);
+        }
+      },
     },
   });
   // `dispatcher` is an undici-specific fetch option recognised by Node 20+.
