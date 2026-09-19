@@ -10,6 +10,10 @@ interface SliderProps {
   max?: number;
   step?: number;
   disabled?: boolean;
+  id?: string;
+  name?: string;
+  'aria-label'?: string;
+  'aria-labelledby'?: string;
 }
 
 const Slider = React.forwardRef<HTMLInputElement, SliderProps>(

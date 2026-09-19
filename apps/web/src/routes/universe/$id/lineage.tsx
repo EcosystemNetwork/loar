@@ -362,6 +362,9 @@ function UniverseLineagePage() {
             ))}
           </div>
           <input
+            id="lineage-creator-uid"
+            name="creator-uid"
+            aria-label="Filter by creator uid"
             placeholder="Filter by creator uid…"
             value={creatorUid}
             onChange={(e) => setCreatorUid(e.target.value.trim())}

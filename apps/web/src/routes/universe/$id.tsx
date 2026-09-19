@@ -3500,10 +3500,12 @@ function UniverseTimelineEditorInner() {
 
                             {/* Size */}
                             <div className="space-y-1">
-                              <label className="text-[11px] text-zinc-400">
+                              <label htmlFor="minimap-size" className="text-[11px] text-zinc-400">
                                 Size — {miniMapSize}px
                               </label>
                               <Slider
+                                id="minimap-size"
+                                name="minimap-size"
                                 value={[miniMapSize]}
                                 onValueChange={([v]) => setMiniMapSize(v)}
                                 min={100}
@@ -3519,10 +3521,15 @@ function UniverseTimelineEditorInner() {
 
                             {/* Opacity */}
                             <div className="space-y-1">
-                              <label className="text-[11px] text-zinc-400">
+                              <label
+                                htmlFor="minimap-opacity"
+                                className="text-[11px] text-zinc-400"
+                              >
                                 Opacity — {miniMapOpacity}%
                               </label>
                               <Slider
+                                id="minimap-opacity"
+                                name="minimap-opacity"
                                 value={[miniMapOpacity]}
                                 onValueChange={([v]) => setMiniMapOpacity(v)}
                                 min={20}
@@ -3538,10 +3545,15 @@ function UniverseTimelineEditorInner() {
 
                             {/* Zoom Sensitivity */}
                             <div className="space-y-1">
-                              <label className="text-[11px] text-zinc-400">
+                              <label
+                                htmlFor="minimap-zoom-step"
+                                className="text-[11px] text-zinc-400"
+                              >
                                 Zoom Sensitivity — {miniMapZoomStep}
                               </label>
                               <Slider
+                                id="minimap-zoom-step"
+                                name="minimap-zoom-step"
                                 value={[miniMapZoomStep]}
                                 onValueChange={([v]) => setMiniMapZoomStep(v)}
                                 min={1}
@@ -3557,10 +3569,12 @@ function UniverseTimelineEditorInner() {
 
                             {/* Toggles */}
                             <div className="space-y-1.5">
-                              <label className="text-[11px] text-zinc-400">Options</label>
+                              <span className="block text-[11px] text-zinc-400">Options</span>
                               <div className="space-y-1">
                                 <label className="flex items-center gap-2 cursor-pointer">
                                   <input
+                                    id="minimap-auto-collapse"
+                                    name="minimap-auto-collapse"
                                     type="checkbox"
                                     checked={miniMapAutoCollapse}
                                     onChange={(e) => setMiniMapAutoCollapse(e.target.checked)}
@@ -3572,6 +3586,8 @@ function UniverseTimelineEditorInner() {
                                 </label>
                                 <label className="flex items-center gap-2 cursor-pointer">
                                   <input
+                                    id="minimap-show-legend"
+                                    name="minimap-show-legend"
                                     type="checkbox"
                                     checked={miniMapShowLegend}
                                     onChange={(e) => setMiniMapShowLegend(e.target.checked)}
@@ -3581,6 +3597,8 @@ function UniverseTimelineEditorInner() {
                                 </label>
                                 <label className="flex items-center gap-2 cursor-pointer">
                                   <input
+                                    id="minimap-show-edges"
+                                    name="minimap-show-edges"
                                     type="checkbox"
                                     checked={miniMapShowEdges}
                                     onChange={(e) => setMiniMapShowEdges(e.target.checked)}
@@ -3595,7 +3613,7 @@ function UniverseTimelineEditorInner() {
 
                             {/* Position */}
                             <div className="space-y-1">
-                              <label className="text-[11px] text-zinc-400">Position</label>
+                              <span className="block text-[11px] text-zinc-400">Position</span>
                               <div className="grid grid-cols-2 gap-1">
                                 {(
                                   [
@@ -4394,7 +4412,7 @@ function UniverseTimelineEditorInner() {
                       <div>
                         <div className="flex items-center gap-1.5 mb-2">
                           <History className="h-3.5 w-3.5 text-muted-foreground" />
-                          <Label className="text-sm font-medium">Version History</Label>
+                          <span className="text-sm font-medium">Version History</span>
                           <span className="text-xs text-muted-foreground">
                             ({versions.length + 1} versions)
                           </span>
@@ -4475,8 +4493,12 @@ function UniverseTimelineEditorInner() {
 
             {/* Upload File */}
             <div>
-              <Label className="text-sm font-medium mb-1.5 block">Upload Video File</Label>
+              <Label htmlFor="edit-video-file" className="text-sm font-medium mb-1.5 block">
+                Upload Video File
+              </Label>
               <input
+                id="edit-video-file"
+                name="edit-video-file"
                 ref={editFileInputRef}
                 type="file"
                 accept="video/*"
@@ -4507,9 +4529,13 @@ function UniverseTimelineEditorInner() {
 
             {/* Paste URL */}
             <div>
-              <Label className="text-sm font-medium mb-1.5 block">Paste Video URL</Label>
+              <Label htmlFor="edit-video-url" className="text-sm font-medium mb-1.5 block">
+                Paste Video URL
+              </Label>
               <div className="flex gap-2">
                 <Input
+                  id="edit-video-url"
+                  name="edit-video-url"
                   placeholder="https://..."
                   value={editVideoUrl}
                   onChange={(e) => {
