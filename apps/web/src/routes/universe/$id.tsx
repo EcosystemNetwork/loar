@@ -2155,13 +2155,13 @@ function UniverseTimelineEditorInner() {
       }
 
       // H — hand (pan) tool
-      if (e.key === 'h') {
+      if (e.key === 'h' && !e.metaKey && !e.ctrlKey) {
         setCanvasTool('hand');
         return;
       }
 
       // V — select tool
-      if (e.key === 'v') {
+      if (e.key === 'v' && !e.metaKey && !e.ctrlKey) {
         setCanvasTool('select');
         return;
       }
