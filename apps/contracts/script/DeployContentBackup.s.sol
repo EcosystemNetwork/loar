@@ -74,7 +74,9 @@ contract DeployContentBackupScript is Script {
             console.log("    Setting backupRelayer:", backupRelayer);
             factory.setBackupRelayer(backupRelayer);
         } else {
-            console.log("    BACKUP_RELAYER not set - backupContent stays disabled until configured.");
+            console.log(
+                "    BACKUP_RELAYER not set - backupContent stays disabled until configured."
+            );
         }
 
         vm.stopBroadcast();

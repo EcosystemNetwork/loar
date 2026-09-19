@@ -72,9 +72,11 @@ interface IUniverse {
     ///         platform backup relayer (see UniverseManager.backupRelayer).
     ///         Idempotent: re-submitting an already-backed-up offChainId is a
     ///         no-op that returns false, so callers can retry safely.
-    function backupContent(BackupRecord calldata record, string calldata cid, string calldata metadataJson)
-        external
-        returns (bool);
+    function backupContent(
+        BackupRecord calldata record,
+        string calldata cid,
+        string calldata metadataJson
+    ) external returns (bool);
     /// @notice Batch version of backupContent. Skips (does not revert on)
     ///         records already backed up.
     function batchBackupContent(

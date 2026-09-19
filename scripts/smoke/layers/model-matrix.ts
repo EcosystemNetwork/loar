@@ -209,7 +209,9 @@ export async function runModelMatrixLayer(): Promise<ModelMatrixLayerResult> {
       const known = new Set(Object.keys(PROVIDER_REGISTRY));
       // Some registry rows use `provider: 'comfyui'` or `'meshy'` that
       // aren't BYOK-managed in the same way; explicitly allow-list those.
-      const allow = new Set(['comfyui']);
+      // `sambanova` is the documented hackathon exception: a server-pool
+      // SAMBANOVA_API_KEY (see llm-models/dispatch.ts), deliberately not BYOK.
+      const allow = new Set(['comfyui', 'sambanova']);
       const missing: string[] = [];
       for (const p of providerSeen) {
         if (allow.has(p)) continue;

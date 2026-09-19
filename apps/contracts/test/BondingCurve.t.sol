@@ -424,8 +424,11 @@ contract BondingCurveTest is Test {
 
         MockToken t = new MockToken("T", "T", supply, address(this));
 
-        try this._deployBondingCurve(address(t), address(manager), 99, supply, gradEth, 10000)
-        returns (BondingCurve c) {
+        try this._deployBondingCurve(
+            address(t), address(manager), 99, supply, gradEth, 10000
+        ) returns (
+            BondingCurve c
+        ) {
             assertGt(c.slopeScaled(), 0, "slopeScaled must be > 0");
 
             // Verify full curve cost ~ gradEth (within 1% for reasonable params)

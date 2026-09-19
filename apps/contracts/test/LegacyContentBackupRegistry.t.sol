@@ -73,7 +73,9 @@ contract LegacyContentBackupRegistryTest is Test {
 
         vm.prank(notRelayer);
         vm.expectRevert(
-            abi.encodeWithSelector(LegacyContentBackupRegistry.CallerNotBackupRelayer.selector, notRelayer)
+            abi.encodeWithSelector(
+                LegacyContentBackupRegistry.CallerNotBackupRelayer.selector, notRelayer
+            )
         );
         registry.backupContent(record, "ipfs://x", "{}");
     }

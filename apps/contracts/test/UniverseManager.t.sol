@@ -103,8 +103,9 @@ contract UniverseManagerTest is Test {
         (IUniverse universe,,,,,) = manager.getUniverseData(id);
 
         address relayer = address(0xBEEF);
-        BackupRecord memory record =
-            BackupRecord({kind: ContentKind.Entity, offChainId: keccak256("entity-1"), contentHash: keccak256("x")});
+        BackupRecord memory record = BackupRecord({
+            kind: ContentKind.Entity, offChainId: keccak256("entity-1"), contentHash: keccak256("x")
+        });
 
         // Not yet configured — even an otherwise-legitimate caller is rejected.
         vm.prank(relayer);

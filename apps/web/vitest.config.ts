@@ -9,6 +9,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // Mirror vite.config.ts: resolve workspace packages from source so tests
+      // don't depend on a built dist/ or a pnpm link that CI's install lacks.
+      '@loar/abis/addresses': path.resolve(__dirname, '../../packages/abis/src/addresses.ts'),
+      '@loar/abis/generated': path.resolve(__dirname, '../../packages/abis/src/generated.ts'),
+      '@loar/shared/trpc': path.resolve(__dirname, '../../packages/shared/src/trpc.ts'),
     },
   },
   test: {

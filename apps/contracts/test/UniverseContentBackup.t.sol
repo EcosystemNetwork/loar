@@ -46,9 +46,7 @@ contract UniverseContentBackupTest is Test {
 
     function _record(bytes32 offChainId) internal pure returns (BackupRecord memory) {
         return BackupRecord({
-            kind: ContentKind.Entity,
-            offChainId: offChainId,
-            contentHash: keccak256("pinned-bytes")
+            kind: ContentKind.Entity, offChainId: offChainId, contentHash: keccak256("pinned-bytes")
         });
     }
 
@@ -78,7 +76,9 @@ contract UniverseContentBackupTest is Test {
         BackupRecord memory record = _record(keccak256("entity-3"));
 
         vm.prank(notRelayer);
-        vm.expectRevert(abi.encodeWithSelector(IUniverse.CallerNotBackupRelayer.selector, notRelayer));
+        vm.expectRevert(
+            abi.encodeWithSelector(IUniverse.CallerNotBackupRelayer.selector, notRelayer)
+        );
         universe.backupContent(record, "ipfs://cid-3", "{}");
     }
 
@@ -170,8 +170,7 @@ contract UniverseContentBackupTest is Test {
     ///         payload) — informs the Phase 4 backfill batch-size cap. Not an
     ///         assertion beyond success; read the gas number in test output.
     function test_backupContent_gasAtRealisticMetadataSize() public {
-        string memory realisticMetadata =
-            '{"name":"Captain Elara Voss","kind":"person","description":'
+        string memory realisticMetadata = '{"name":"Captain Elara Voss","kind":"person","description":'
             '"A weathered starship captain who abandoned the Sol Fleet after the Kessler '
             'mutiny, now running cargo through contested space with a crew of exiles.",'
             '"imageUrl":"https://gateway.pinata.cloud/ipfs/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",'
@@ -183,9 +182,7 @@ contract UniverseContentBackupTest is Test {
         vm.prank(relayer);
         uint256 gasBefore = gasleft();
         universe.backupContent(
-            record,
-            "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
-            realisticMetadata
+            record, "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", realisticMetadata
         );
         uint256 gasUsed = gasBefore - gasleft();
         emit log_named_uint("gas used (realistic single record)", gasUsed);

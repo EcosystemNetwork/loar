@@ -64,12 +64,11 @@ contract LegacyContentBackupRegistry is Pausable, Ownable {
     /// @notice Idempotent: re-submitting an already-backed-up (universe, offChainId)
     ///         pair is a no-op that returns false, so the backfill script can
     ///         retry freely without pre-checking state.
-    function backupContent(LegacyBackupRecord calldata record, string calldata cid, string calldata metadataJson)
-        external
-        whenNotPaused
-        onlyBackupRelayer
-        returns (bool)
-    {
+    function backupContent(
+        LegacyBackupRecord calldata record,
+        string calldata cid,
+        string calldata metadataJson
+    ) external whenNotPaused onlyBackupRelayer returns (bool) {
         return _backupContent(record, cid, metadataJson);
     }
 
@@ -90,16 +89,23 @@ contract LegacyContentBackupRegistry is Pausable, Ownable {
         }
     }
 
-    function _backupContent(LegacyBackupRecord calldata record, string calldata cid, string calldata metadataJson)
-        internal
-        returns (bool)
-    {
+    function _backupContent(
+        LegacyBackupRecord calldata record,
+        string calldata cid,
+        string calldata metadataJson
+    ) internal returns (bool) {
         if (contentBackedUp[record.universe][record.offChainId]) {
             return false;
         }
         contentBackedUp[record.universe][record.offChainId] = true;
         emit ContentBackedUp(
-            record.kind, record.universe, record.offChainId, msg.sender, record.contentHash, cid, metadataJson
+            record.kind,
+            record.universe,
+            record.offChainId,
+            msg.sender,
+            record.contentHash,
+            cid,
+            metadataJson
         );
         return true;
     }

@@ -509,12 +509,11 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
     ///         Idempotent: re-submitting an already-backed-up offChainId is a
     ///         no-op that returns false, so the backfill script can retry
     ///         freely without pre-checking state.
-    function backupContent(BackupRecord calldata record, string calldata cid, string calldata metadataJson)
-        external
-        whenNotPaused
-        onlyBackupRelayer
-        returns (bool)
-    {
+    function backupContent(
+        BackupRecord calldata record,
+        string calldata cid,
+        string calldata metadataJson
+    ) external whenNotPaused onlyBackupRelayer returns (bool) {
         return _backupContent(record, cid, metadataJson);
     }
 
@@ -536,15 +535,18 @@ contract Universe is IUniverse, ReentrancyGuard, Pausable {
         }
     }
 
-    function _backupContent(BackupRecord calldata record, string calldata cid, string calldata metadataJson)
-        internal
-        returns (bool)
-    {
+    function _backupContent(
+        BackupRecord calldata record,
+        string calldata cid,
+        string calldata metadataJson
+    ) internal returns (bool) {
         if (contentBackedUp[record.offChainId]) {
             return false;
         }
         contentBackedUp[record.offChainId] = true;
-        emit ContentBackedUp(record.kind, record.offChainId, msg.sender, record.contentHash, cid, metadataJson);
+        emit ContentBackedUp(
+            record.kind, record.offChainId, msg.sender, record.contentHash, cid, metadataJson
+        );
         return true;
     }
 
