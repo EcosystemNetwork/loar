@@ -17,6 +17,13 @@
 const HUME_TTS_URL = 'https://api.hume.ai/v0/tts';
 const FETCH_TIMEOUT_MS = 30_000;
 
+/**
+ * Octave TTS overage rate for the platform's Starter/Pro plan, confirmed
+ * against hume.ai/pricing 2026-09-19. Update this if the account's plan
+ * tier changes — the other tiers run $0.05–$0.15/1K chars.
+ */
+export const HUME_TTS_COST_PER_1K_CHARS_USD = 0.12;
+
 export interface HumeSynthesizeOptions {
   text: string;
   /** Existing Hume voice id (from a saved voice or the voice library). */

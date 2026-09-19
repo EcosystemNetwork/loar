@@ -16,8 +16,9 @@ import { db } from '../lib/firebase';
 import { routeLlmModel } from './llm-models/router';
 import { dispatchLlm } from './llm-models/dispatch';
 import { buildGenerationContext } from './wiki-context';
-import { humeService } from './hume';
+import { humeService, HUME_TTS_COST_PER_1K_CHARS_USD } from './hume';
 import { getStorageManager } from './storage';
+import { assertProviderAllowed, recordProviderCost } from './cost-tracker';
 
 export type DirectorIntent = 'canon_query' | 'story_action';
 export type StoryActionKind = 'create_node' | 'branch_story' | 'generate_scene';
@@ -171,9 +172,16 @@ export interface CharacterVoiceResult {
 
 /**
  * Voice a director/character response through Hume (Character Voice → HUME).
- * Best-effort: when Hume isn't configured or the call fails, degrades to
- * `audioUrl: null` so the caller falls back to text — never blocks the
- * response the way `canon-check`'s vision call degrades to `null`.
+ * Best-effort: when Hume isn't configured, the admin kill-switch/cost caps
+ * reject it, or the call fails, degrades to `audioUrl: null` so the caller
+ * falls back to text — never blocks the response the way `canon-check`'s
+ * vision call degrades to `null`.
+ *
+ * Gated on the same `assertProviderAllowed` kill-switch/cap check every
+ * other paid provider dispatch goes through, and records actual spend via
+ * `recordProviderCost` so it shows up in the admin cost/margin dashboards —
+ * this is a server-pool key (not BYOK/user-credit-billed), so cost-tracker
+ * observability is the only spend guardrail it has.
  */
 export async function synthesizeCharacterVoice(opts: {
   text: string;
@@ -184,6 +192,8 @@ export async function synthesizeCharacterVoice(opts: {
   if (!humeService.isConfigured()) return { audioUrl: null };
 
   try {
+    await assertProviderAllowed({ provider: 'hume' });
+
     const result = await humeService.textToSpeech({
       text: opts.text,
       voiceId: opts.humeVoiceId,
@@ -195,6 +205,15 @@ export async function synthesizeCharacterVoice(opts: {
       `director-voice-${randomUUID()}.mp3`,
       result.contentType
     );
+
+    recordProviderCost({
+      provider: 'hume',
+      kind: 'audio_gen',
+      model: 'octave-tts',
+      costUsd: (opts.text.length / 1000) * HUME_TTS_COST_PER_1K_CHARS_USD,
+      extra: { characterCount: opts.text.length },
+    }).catch((err) => console.warn('[loar-director] recordProviderCost(hume) failed:', err));
+
     return { audioUrl: manifest.uploads[0]?.url ?? null };
   } catch (err) {
     console.warn(

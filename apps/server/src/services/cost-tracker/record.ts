@@ -32,6 +32,7 @@ export type CostProvider =
   | 'deepgram'
   | 'tripo'
   | 'minimax'
+  | 'hume'
   | 'other';
 
 export type CostKind =

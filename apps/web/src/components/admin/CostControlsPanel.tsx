@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Pause, Play, Save, Bell, BellOff } from 'lucide-react';
 
-const KNOWN_PROVIDERS = ['gemini', 'openai', 'fal', 'bytedance', 'elevenlabs', 'meshy'];
+const KNOWN_PROVIDERS = ['gemini', 'openai', 'fal', 'bytedance', 'elevenlabs', 'meshy', 'hume'];
 
 function parseNum(s: string): number | null {
   const t = s.trim();
