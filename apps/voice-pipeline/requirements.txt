@@ -1,0 +1,5 @@
+# Pinned to the minor version the service was built and verified against.
+pipecat-ai[websocket,silero,gradium,sambanova,hume]==1.11.0
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+httpx>=0.27,<1

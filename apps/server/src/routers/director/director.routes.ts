@@ -10,6 +10,9 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { protectedProcedure, router } from '../../lib/trpc';
 import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
+import { isUniverseCollaborator } from '../../lib/safe-admin';
+import { buildDirectorContext } from '../../services/director-context';
+import { mintVoiceSessionToken } from '../../services/voice-session';
 import {
   classifyDirectorIntent,
   answerCanonQuery,
@@ -193,6 +196,136 @@ export const directorRouter = router({
         hasContext: result.hasContext,
         audioUrl: voiceResult.audioUrl,
       };
+    }),
+
+  /**
+   * Tool-layer read for the Pipecat voice pipeline (get_universe_context /
+   * get_character / get_canon). `perspective: 'character'` returns a
+   * knowledge-scoped view (no universe synopsis, no other entities) so a
+   * character's persona prompt can't leak secrets it hasn't discovered.
+   */
+  getContext: protectedProcedure
+    .input(
+      z.object({
+        universeId: z.string().min(1),
+        entityId: z.string().optional(),
+        perspective: z.enum(['director', 'character']).default('director'),
+      })
+    )
+    .query(async ({ input }) => {
+      const ctxData = await buildDirectorContext(input);
+      if (!ctxData) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Universe or character not found' });
+      }
+      return ctxData;
+    }),
+
+  /**
+   * submit_canon_proposal: opens a community vote on whether a story node
+   * becomes canon, using the existing `polls` system (`canon_submission`
+   * type) rather than a parallel store.
+   */
+  submitCanonProposal: protectedProcedure
+    .input(
+      z.object({
+        universeId: z.string().min(1),
+        nodeId: z.number().int().min(1),
+        title: z.string().min(3).max(200),
+        description: z.string().max(1500).optional(),
+        durationHours: z
+          .number()
+          .int()
+          .min(1)
+          .max(24 * 14)
+          .default(72),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { appRouter } = (await import('../index')) as any;
+      const caller = appRouter.createCaller({ user: ctx.user, clientIp: ctx.clientIp });
+
+      const node = await caller.offChainNodes.get({
+        universeId: input.universeId,
+        nodeId: input.nodeId,
+      });
+      if (!node) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `Story node #${input.nodeId} not found`,
+        });
+      }
+
+      const endsAt = new Date(Date.now() + input.durationHours * 3_600_000).toISOString();
+      const poll = await caller.polls.create({
+        universeAddress: input.universeId,
+        title: input.title,
+        description: [
+          input.description,
+          node.plot ? `Story node #${input.nodeId}: ${node.plot}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n\n')
+          .slice(0, 2000),
+        options: ['Make it canon', 'Keep it as an alternate timeline'],
+        type: 'canon_submission',
+        endsAt,
+        allowMultiple: false,
+        tokenWeighted: false,
+        linkedContentId: `offchain-node:${input.nodeId}`,
+      });
+      return { pollId: poll.id as string, title: poll.title as string, endsAt };
+    }),
+
+  /**
+   * Mint a short-lived token + WebSocket URL for a live voice session with
+   * the Pipecat pipeline. Director mode can mutate the universe, so it's
+   * limited to collaborators; character mode is read-only, so any signed-in
+   * user may talk to a character.
+   */
+  createVoiceSession: protectedProcedure
+    .input(
+      z
+        .object({
+          universeId: z.string().min(1),
+          mode: z.enum(['director', 'character']),
+          entityId: z.string().optional(),
+        })
+        .refine((v) => v.mode !== 'character' || !!v.entityId, {
+          message: 'character mode requires entityId',
+        })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const secret = process.env.VOICE_SESSION_SECRET;
+      const wsBase = process.env.VOICE_PIPELINE_WS_URL;
+      if (!secret || !wsBase) {
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Live voice is not configured on this server',
+        });
+      }
+
+      if (input.mode === 'director') {
+        const caller = ctx.user.address ?? ctx.user.uid;
+        const allowed = await isUniverseCollaborator(input.universeId, caller);
+        if (!allowed) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only universe collaborators can direct by voice',
+          });
+        }
+      }
+
+      const { token, expiresAt } = mintVoiceSessionToken(
+        {
+          universeId: input.universeId,
+          mode: input.mode,
+          entityId: input.entityId,
+          uid: ctx.user.uid,
+        },
+        secret
+      );
+      const wsUrl = `${wsBase}${wsBase.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`;
+      return { wsUrl, expiresAt };
     }),
 
   /**
