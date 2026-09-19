@@ -69,6 +69,7 @@ Five layers, five failure modes: entry never tracked (boot), prices fluctuated a
 | `llama-3-3-70b-versatile-groq` | groq | standard | low | $0.5900 | $0.3000 | $0.7900 | $0.8000 | $1.07 | 1 | 1 | ✅ live |
 | `glm-4-6v` | zai | premium | low | $0.6000 | $0.1500 | $0.9000 | $0.8100 | $1.22 | 1 | 1 | 🚫 disabled |
 | `kimi-k2-instruct-groq` | groq | premium | medium | $0.6000 | $0.3000 | $2.5 | $0.8100 | $3.38 | 1 | 1 | ✅ live |
+| `llama-3-3-70b-sambanova` | sambanova | standard | low | $0.6000 | $0.3000 | $1.2 | $0.8100 | $1.62 | 1 | 1 | ✅ live |
 | `glm-5` | zai | premium | medium | $1 | $0.2500 | $3.2 | $1.35 | $4.32 | 1 | 1 | 🚫 disabled |
 | `o4-mini` | openai | standard | low | $1.1 | $0.2750 | $4.4 | $1.49 | $5.94 | 1 | 1 | ✅ live |
 | `gpt-5` | openai | premium | high | $1.25 | $0.1250 | $10 | $1.69 | $13.5 | 1 | 1 | ✅ live |
@@ -344,7 +345,7 @@ Five layers, five failure modes: entry never tracked (boot), prices fluctuated a
 
 | Registry | Total models | Enabled |
 | --- | --- | --- |
-| LLM | 30 | 22 |
+| LLM | 31 | 23 |
 | Image | 44 | 41 |
 | Video | 61 | 55 |
 | TTS | 17 | 17 |
@@ -352,6 +353,6 @@ Five layers, five failure modes: entry never tracked (boot), prices fluctuated a
 | 3D | 11 | 11 |
 | Audio | 20 | 20 |
 | Editing | 37 | 37 |
-| **TOTAL** | **241** | **223** |
+| **TOTAL** | **242** | **224** |
 
 _End of generated document._
