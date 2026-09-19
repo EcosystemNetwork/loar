@@ -34,14 +34,36 @@ describe('resolveDraftMedia', () => {
 });
 
 describe('mediaUrlSchema', () => {
-  it('accepts http(s) urls', () => {
-    expect(mediaUrlSchema.safeParse('https://media.loar.fun/x.png').success).toBe(true);
-    expect(mediaUrlSchema.safeParse('http://localhost:3000/x.png').success).toBe(true);
+  it('accepts trusted https hosts', () => {
+    for (const u of [
+      'https://media.loar.fun/x.png',
+      'https://x.mypinata.cloud/ipfs/abc',
+      'https://v3.fal.media/files/a.png',
+      'https://storage.googleapis.com/b/o.mp4',
+    ])
+      expect(mediaUrlSchema.safeParse(u).success, u).toBe(true);
   });
-  it('rejects non-http schemes and oversized urls', () => {
-    expect(mediaUrlSchema.safeParse('javascript:alert(1)').success).toBe(false);
-    expect(mediaUrlSchema.safeParse('data:image/png;base64,AAAA').success).toBe(false);
-    expect(mediaUrlSchema.safeParse('file:///etc/passwd').success).toBe(false);
-    expect(mediaUrlSchema.safeParse('https://x.com/' + 'a'.repeat(3000)).success).toBe(false);
+  it('accepts localhost http outside production only', () => {
+    expect(mediaUrlSchema.safeParse('http://localhost:3000/x.png').success).toBe(true);
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    expect(mediaUrlSchema.safeParse('http://localhost:3000/x.png').success).toBe(false);
+    process.env.NODE_ENV = prev;
+  });
+  it('rejects unknown hosts, non-http schemes and oversized urls', () => {
+    for (const u of [
+      'https://evil.example.com/x.png',
+      'https://loar.fun.evil.com/x.png',
+      'javascript:alert(1)',
+      'data:image/png;base64,AAAA',
+      'file:///etc/passwd',
+      'https://media.loar.fun/' + 'a'.repeat(3000),
+    ])
+      expect(mediaUrlSchema.safeParse(u).success, u).toBe(false);
+  });
+  it('honours DRAFT_MEDIA_EXTRA_HOSTS', () => {
+    process.env.DRAFT_MEDIA_EXTRA_HOSTS = 'cdn.example.com';
+    expect(mediaUrlSchema.safeParse('https://a.cdn.example.com/x.png').success).toBe(true);
+    delete process.env.DRAFT_MEDIA_EXTRA_HOSTS;
   });
 });

@@ -10,7 +10,7 @@
  */
 
 import { Link, useNavigate } from '@tanstack/react-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import type {
   VideoModel,
@@ -61,6 +61,8 @@ import {
   makeId,
   aspectToImageSize,
   aspectFromSize,
+  scopedStorageKey,
+  isRetryableGen,
 } from '@/components/sandbox/utils';
 import { GenerationCard } from '@/components/sandbox/GenerationCard';
 import { DraftCard, inferDraftKind } from '@/components/sandbox/DraftCard';
@@ -172,7 +174,12 @@ export function GenerateConsole({
   enableWorldKinds = false,
 }: GenerateConsoleProps) {
   const isConsole = variant === 'console';
-  const { isAuthenticated, isAuthenticating } = useWalletAuth();
+  const { isAuthenticated, isAuthenticating, address } = useWalletAuth();
+  // Queue / entity results persist per wallet so a shared browser never leaks
+  // one user's generations to the next. The route keys this component by
+  // address, so these are stable for the component's lifetime.
+  const QUEUE_KEY = scopedStorageKey(QUEUE_STORAGE_KEY, address);
+  const ENTITY_RESULTS_KEY = scopedStorageKey(ENTITY_RESULTS_STORAGE_KEY, address);
   const { generationEnabled } = useFeatureFlags();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -344,6 +351,9 @@ export function GenerateConsole({
     status: 'generating' | 'done' | 'failed';
     error?: string;
     entityId?: string;
+    /** Inputs kept so a failed roll can be retried as-is. */
+    prompt?: string;
+    rawName?: string;
     createdAt: number;
   };
 
@@ -354,7 +364,7 @@ export function GenerateConsole({
   const [entityResults, setEntityResults] = useState<EntityResult[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
-      const raw = window.localStorage.getItem(ENTITY_RESULTS_STORAGE_KEY);
+      const raw = window.localStorage.getItem(ENTITY_RESULTS_KEY);
       if (!raw) return [];
       const parsed: EntityResult[] = JSON.parse(raw);
       return parsed
@@ -378,13 +388,13 @@ export function GenerateConsole({
     if (typeof window === 'undefined') return;
     try {
       window.localStorage.setItem(
-        ENTITY_RESULTS_STORAGE_KEY,
+        ENTITY_RESULTS_KEY,
         JSON.stringify(entityResults.slice(0, ENTITY_RESULTS_MAX_PERSISTED))
       );
     } catch (e) {
       console.warn('[sandbox] entityResults localStorage save failed', e);
     }
-  }, [entityResults]);
+  }, [entityResults, ENTITY_RESULTS_KEY]);
 
   const removeEntity = useCallback((id: string) => {
     setEntityResults((prev) => prev.filter((r) => r.id !== id));
@@ -396,7 +406,7 @@ export function GenerateConsole({
   const [generations, setGenerations] = useState<Generation[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
-      const raw = window.localStorage.getItem(QUEUE_STORAGE_KEY);
+      const raw = window.localStorage.getItem(QUEUE_KEY);
       if (!raw) return [];
       const parsed: Generation[] = JSON.parse(raw);
       return parsed
@@ -424,18 +434,32 @@ export function GenerateConsole({
           return g;
         })
         .slice(0, QUEUE_MAX_PERSISTED);
-      window.localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(persistable));
+      window.localStorage.setItem(QUEUE_KEY, JSON.stringify(persistable));
     } catch (e) {
       console.warn('[sandbox] localStorage save failed', e);
     }
-  }, [generations]);
+  }, [generations, QUEUE_KEY]);
+
+  // One-time purge of the pre-scoping (shared) keys so an old queue can't leak.
+  React.useEffect(() => {
+    try {
+      window.localStorage.removeItem(QUEUE_STORAGE_KEY);
+      window.localStorage.removeItem(ENTITY_RESULTS_STORAGE_KEY);
+    } catch {
+      // localStorage unavailable — nothing to purge.
+    }
+  }, []);
 
   // Drafts panel
+  const DRAFT_PAGE = 200;
+  const [draftLimit, setDraftLimit] = useState(DRAFT_PAGE);
   const { data: drafts } = useQuery({
-    queryKey: ['sandbox-drafts'],
-    queryFn: () => trpcClient.sandbox.myDrafts.query(),
+    queryKey: ['sandbox-drafts', draftLimit],
+    queryFn: () => trpcClient.sandbox.myDrafts.query({ limit: draftLimit }),
     enabled: isAuthenticated,
+    placeholderData: keepPreviousData,
   });
+  const mayHaveMoreDrafts = Array.isArray(drafts) && drafts.length >= draftLimit;
 
   const updateGen = useCallback((id: string, patch: Partial<Generation>) => {
     setGenerations((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch } : g)));
@@ -1061,7 +1085,7 @@ export function GenerateConsole({
 
   const retryGen = useCallback(
     (g: Generation) => {
-      if (!g.retryable || (g.kind !== 'image' && g.kind !== 'video')) return;
+      if (!isRetryableGen(g)) return;
       if ((g.retryCount ?? 0) >= MAX_RETRIES_PER_GEN) {
         toast.error(
           `Hit retry limit (${MAX_RETRIES_PER_GEN}). Tweak the prompt or pick a different model.`
@@ -1111,12 +1135,12 @@ export function GenerateConsole({
   // Mirrors lib/random-entity.ts rollRandomEntity: generateProfile + a
   // portrait in parallel, then entities.create scoped to the universe.
   const runEntityGen = useCallback(
-    async (kind: WorldKind) => {
+    async (kind: WorldKind, retry?: { name: string; prompt: string; universeId: string }) => {
       if (!generationEnabled) {
         toast.error('AI generation is temporarily disabled. Please check back soon.');
         return;
       }
-      const target = autoSendTargetRef.current;
+      const target = retry?.universeId ?? autoSendTargetRef.current;
       if (!target || target === '__off__' || target === '__gallery__') {
         toast.error('Pick a wiki in “Generate into” above — world entities must belong to one.');
         return;
@@ -1136,8 +1160,8 @@ export function GenerateConsole({
       }
       if (checkConcurrency(1) === 0) return;
       const universeId = target;
-      const p = prompt.trim();
-      const submittedEntityName = entityName.trim();
+      const p = retry ? retry.prompt : prompt.trim();
+      const submittedEntityName = retry ? retry.name : entityName.trim();
       const name =
         submittedEntityName ||
         p.split(/[.\n]/)[0].slice(0, 60).trim() ||
@@ -1150,6 +1174,8 @@ export function GenerateConsole({
           name,
           imageUrl: null,
           universeId,
+          prompt: p,
+          rawName: submittedEntityName,
           status: 'generating' as const,
           createdAt: Date.now(),
         },
@@ -1523,12 +1549,14 @@ export function GenerateConsole({
     runTalkingScene,
   ]);
 
+  const composerRef = useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey)) return;
       const active = document.activeElement as HTMLElement | null;
       if (!active) return;
-      // Only fire when typing inside the sandbox form (textarea/input)
+      // Only fire when typing inside the composer — not dialogs or other inputs on the page
+      if (!composerRef.current?.contains(active)) return;
       const tag = active.tagName.toLowerCase();
       if (tag !== 'textarea' && tag !== 'input') return;
       e.preventDefault();
@@ -1619,7 +1647,10 @@ export function GenerateConsole({
             {/* Left: composer + queue */}
             <div className="flex flex-col gap-4 min-w-0">
               {/* Composer card — mode pills, wiki target, prompt, and generate live here */}
-              <div className="rounded-2xl border border-border bg-card shadow-sm p-4 sm:p-5 flex flex-col gap-4">
+              <div
+                ref={composerRef}
+                className="rounded-2xl border border-border bg-card shadow-sm p-4 sm:p-5 flex flex-col gap-4"
+              >
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   {/* Mode pills */}
                   <div className="flex flex-wrap gap-1 rounded-full border border-border p-1 bg-muted/20">
@@ -2903,6 +2934,21 @@ export function GenerateConsole({
                             {KIND_LABELS[r.kind] ?? r.kind}
                             {r.status === 'failed' ? ` · ${r.error ?? 'failed'}` : ''}
                           </p>
+                          {r.status === 'failed' && r.prompt !== undefined && (
+                            <button
+                              type="button"
+                              className="text-[10px] text-primary hover:underline"
+                              onClick={() => {
+                                void runEntityGen(r.kind, {
+                                  name: r.rawName ?? '',
+                                  prompt: r.prompt ?? '',
+                                  universeId: r.universeId,
+                                }).then(() => removeEntity(r.id));
+                              }}
+                            >
+                              Retry
+                            </button>
+                          )}
                           {r.status === 'done' && r.entityId && (
                             <div className="flex gap-2">
                               <Link
@@ -2952,6 +2998,17 @@ export function GenerateConsole({
                     />
                   );
                 })}
+              </div>
+            )}
+            {mayHaveMoreDrafts && (
+              <div className="flex justify-center mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDraftLimit((n) => n + DRAFT_PAGE)}
+                >
+                  Load older drafts
+                </Button>
               </div>
             )}
           </div>

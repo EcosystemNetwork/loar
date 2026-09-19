@@ -570,21 +570,29 @@ export const entitiesRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // Rate-limit: max 20 profile generations per user per hour
-      if (db) {
-        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-        const recentCount = await db
-          .collection('profileGenerations')
-          .where('userId', '==', ctx.user.uid)
-          .where('createdAt', '>=', oneHourAgo)
-          .count()
-          .get();
-        if (recentCount.data().count >= 20) {
-          throw new Error(
-            'Rate limit exceeded: max 20 AI profile generations per hour. Please wait before trying again.'
+      // Rate-limit: max 20 profile generations per user per hour. The window
+      // lives in one per-user doc updated in a transaction, so parallel calls
+      // (the console fires several at once) can't all read the same count and
+      // slip past the cap.
+      const limitRef = db ? db.collection('profileGenerationLimits').doc(ctx.user.uid) : null;
+      const startedAt = Date.now();
+      if (db && limitRef) {
+        await db.runTransaction(async (tx) => {
+          const snap = await tx.get(limitRef);
+          const cutoff = startedAt - 60 * 60 * 1000;
+          const recent = ((snap.data()?.timestamps as number[] | undefined) ?? []).filter(
+            (t) => t > cutoff
           );
-        }
-        // Track this generation
+          if (recent.length >= 20) {
+            throw new Error(
+              'Rate limit exceeded: max 20 AI profile generations per hour. Please wait before trying again.'
+            );
+          }
+          tx.set(limitRef, { timestamps: [...recent, startedAt] });
+        });
+      }
+      // Audit trail (also read by scripts/backfill-prompt-log.ts).
+      if (db) {
         await db.collection('profileGenerations').add({
           userId: ctx.user.uid,
           name: input.name,
@@ -593,8 +601,22 @@ export const entitiesRouter = router({
         });
       }
 
-      const profile = await geminiService.generateEntityProfile(input.name, input.kind, input.hint);
-      return profile;
+      try {
+        return await geminiService.generateEntityProfile(input.name, input.kind, input.hint);
+      } catch (err) {
+        // A failed Gemini call shouldn't burn the user's quota — give the slot back.
+        if (db && limitRef) {
+          await db
+            .runTransaction(async (tx) => {
+              const snap = await tx.get(limitRef);
+              const ts = (snap.data()?.timestamps as number[] | undefined) ?? [];
+              const idx = ts.indexOf(startedAt);
+              if (idx !== -1) tx.set(limitRef, { timestamps: ts.filter((_, n) => n !== idx) });
+            })
+            .catch(() => undefined);
+        }
+        throw err;
+      }
     }),
 
   // ── Reference Bundles (Character Identity Lock + Multi-Reference Editing) ──

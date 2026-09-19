@@ -251,57 +251,59 @@ export const sandboxRouter = router({
   // creatorAddress and dedupes, so drafts saved without an address still list.
   // Returns a flat array for backwards compatibility with existing consumers
   // (web sandbox UI, mobile drafts screen, ops scripts).
-  myDrafts: protectedProcedure.query(async ({ ctx }) => {
-    const PER_FIELD_LIMIT = 200;
+  myDrafts: protectedProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(1000).default(200) }).optional())
+    .query(async ({ ctx, input }) => {
+      const PER_FIELD_LIMIT = input?.limit ?? 200;
 
-    const buildQuery = (field: 'creatorUid' | 'creatorAddress', value: string) =>
-      sandboxCol()
-        .where(field, '==', value)
-        .orderBy('createdAt', 'desc')
-        .limit(PER_FIELD_LIMIT)
-        .get();
+      const buildQuery = (field: 'creatorUid' | 'creatorAddress', value: string) =>
+        sandboxCol()
+          .where(field, '==', value)
+          .orderBy('createdAt', 'desc')
+          .limit(PER_FIELD_LIMIT)
+          .get();
 
-    const queries: Promise<FirebaseFirestore.QuerySnapshot>[] = [
-      buildQuery('creatorUid', ctx.user.uid),
-    ];
-    if (ctx.user.address) {
-      queries.push(buildQuery('creatorAddress', ctx.user.address));
-    }
-    const snaps = await Promise.all(queries);
-
-    const seen = new Set<string>();
-    const merged: { id: string; data: FirebaseFirestore.DocumentData }[] = [];
-    for (const snap of snaps) {
-      for (const doc of snap.docs) {
-        if (seen.has(doc.id)) continue;
-        seen.add(doc.id);
-        merged.push({ id: doc.id, data: doc.data() });
+      const queries: Promise<FirebaseFirestore.QuerySnapshot>[] = [
+        buildQuery('creatorUid', ctx.user.uid),
+      ];
+      if (ctx.user.address) {
+        queries.push(buildQuery('creatorAddress', ctx.user.address));
       }
-    }
-    merged.sort((a, b) => {
-      const ta = a.data.createdAt?.toDate?.()?.getTime?.() ?? 0;
-      const tb = b.data.createdAt?.toDate?.()?.getTime?.() ?? 0;
-      return tb - ta;
-    });
+      const snaps = await Promise.all(queries);
 
-    return merged.slice(0, PER_FIELD_LIMIT).map(({ id, data: d }) => ({
-      id,
-      title: d.title as string,
-      prompt: d.prompt as string,
-      imageUrl: d.imageUrl as string | null,
-      videoUrl: d.videoUrl as string | null,
-      audioUrl: (d.audioUrl as string | null) ?? null,
-      audioFlavor: (d.audioFlavor as 'tts' | 'sfx' | 'music' | null) ?? null,
-      modelUrl: (d.modelUrl as string | null) ?? null,
-      thumbnailUrl: (d.thumbnailUrl as string | null) ?? (d.imageUrl as string | null) ?? null,
-      kind: (d.kind as string | null) ?? (d.videoUrl ? 'video' : 'image'),
-      model: d.model as string | null,
-      tags: d.tags as string[],
-      status: d.status as string,
-      createdAt: d.createdAt?.toDate?.()?.toISOString?.() ?? null,
-      updatedAt: d.updatedAt?.toDate?.()?.toISOString?.() ?? null,
-    }));
-  }),
+      const seen = new Set<string>();
+      const merged: { id: string; data: FirebaseFirestore.DocumentData }[] = [];
+      for (const snap of snaps) {
+        for (const doc of snap.docs) {
+          if (seen.has(doc.id)) continue;
+          seen.add(doc.id);
+          merged.push({ id: doc.id, data: doc.data() });
+        }
+      }
+      merged.sort((a, b) => {
+        const ta = a.data.createdAt?.toDate?.()?.getTime?.() ?? 0;
+        const tb = b.data.createdAt?.toDate?.()?.getTime?.() ?? 0;
+        return tb - ta;
+      });
+
+      return merged.slice(0, PER_FIELD_LIMIT).map(({ id, data: d }) => ({
+        id,
+        title: d.title as string,
+        prompt: d.prompt as string,
+        imageUrl: d.imageUrl as string | null,
+        videoUrl: d.videoUrl as string | null,
+        audioUrl: (d.audioUrl as string | null) ?? null,
+        audioFlavor: (d.audioFlavor as 'tts' | 'sfx' | 'music' | null) ?? null,
+        modelUrl: (d.modelUrl as string | null) ?? null,
+        thumbnailUrl: (d.thumbnailUrl as string | null) ?? (d.imageUrl as string | null) ?? null,
+        kind: (d.kind as string | null) ?? (d.videoUrl ? 'video' : 'image'),
+        model: d.model as string | null,
+        tags: d.tags as string[],
+        status: d.status as string,
+        createdAt: d.createdAt?.toDate?.()?.toISOString?.() ?? null,
+        updatedAt: d.updatedAt?.toDate?.()?.toISOString?.() ?? null,
+      }));
+    }),
 
   /**
    * List universes the caller can directly promote content into. Powers the

@@ -1,11 +1,41 @@
 import { z } from 'zod';
+import { isAllowedMediaHost } from '../../lib/media-hosts';
 
-/** Draft media URLs must be plain http(s) — rejects javascript:, data:, file: etc. */
+/** Extra hosts LOAR serves its own media from that `isAllowedMediaHost` doesn't list. */
+const EXTRA_SUFFIXES = ['loar.fun', 'meshy.ai', '4everland.io', 'nftstorage.link'];
+
+/**
+ * True when `raw` is a URL a draft may point at: https on a known media host,
+ * a LOAR domain, or an operator-approved host (DRAFT_MEDIA_EXTRA_HOSTS, comma
+ * separated suffixes). Outside production, http://localhost is also accepted so
+ * local dev against the emulator keeps working.
+ */
+export function isAllowedDraftMediaUrl(raw: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return false;
+  }
+  const host = u.hostname.toLowerCase();
+  if (process.env.NODE_ENV !== 'production' && u.protocol === 'http:') {
+    return host === 'localhost' || host === '127.0.0.1';
+  }
+  if (u.protocol !== 'https:') return false;
+  if (isAllowedMediaHost(raw)) return true;
+  const extra = (process.env.DRAFT_MEDIA_EXTRA_HOSTS ?? '')
+    .split(',')
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean);
+  return [...EXTRA_SUFFIXES, ...extra].some((sfx) => host === sfx || host.endsWith(`.${sfx}`));
+}
+
+/** Draft media URLs: bounded length, and restricted to trusted media hosts. */
 export const mediaUrlSchema = z
   .string()
   .max(2048)
   .url()
-  .refine((u) => /^https?:\/\//i.test(u), { message: 'Media URL must be http(s)' });
+  .refine(isAllowedDraftMediaUrl, { message: 'Media URL host is not allowed' });
 
 /**
  * Picks the canonical media for a sandbox draft. Shared by saveDraft (which

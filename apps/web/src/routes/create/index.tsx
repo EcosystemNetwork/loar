@@ -13,10 +13,12 @@ import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 import { trpcClient } from '@/utils/trpc';
 import { GenerateConsole } from '@/components/sandbox/GenerateConsole';
+import { useWalletAuth } from '@/lib/wallet-auth';
 import { RandomUniverseBuilder } from '@/components/RandomUniverseBuilder';
 
 function CreateHub() {
   const { universe: universeAddress } = useSearch({ from: '/create/' });
+  const { address } = useWalletAuth();
 
   const { data: universeResult } = useQuery({
     queryKey: ['universe', universeAddress],
@@ -27,7 +29,13 @@ function CreateHub() {
 
   return (
     <>
-      <GenerateConsole variant="console" enableWorldKinds initialUniverse={universeAddress} />
+      {/* keyed by wallet so per-user persisted queue state re-initialises on account switch */}
+      <GenerateConsole
+        key={address ?? 'anon'}
+        variant="console"
+        enableWorldKinds
+        initialUniverse={universeAddress}
+      />
       {universeAddress && (
         <div className="container mx-auto px-4 pb-bottom-nav md:pb-12 max-w-6xl">
           <RandomUniverseBuilder

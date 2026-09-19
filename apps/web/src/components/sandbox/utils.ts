@@ -39,3 +39,14 @@ export function aspectFromSize(size: ImageSize): AspectRatio {
   if (size === 'square_hd') return '1:1';
   return '16:9';
 }
+
+/** Namespaces a localStorage key by wallet so a shared browser never shows one
+ *  user's queue / results to the next. Anonymous sessions share an 'anon' bucket. */
+export function scopedStorageKey(base: string, address?: string | null): string {
+  return `${base}:${(address ?? 'anon').toLowerCase()}`;
+}
+
+/** Only plain image/video runs can be replayed faithfully by `retryGen`. */
+export function isRetryableGen(g: { kind: string; retryable?: boolean }): boolean {
+  return !!g.retryable && (g.kind === 'image' || g.kind === 'video');
+}
