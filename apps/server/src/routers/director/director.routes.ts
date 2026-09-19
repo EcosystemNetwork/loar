@@ -9,6 +9,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { protectedProcedure, router } from '../../lib/trpc';
+import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 import {
   classifyDirectorIntent,
   answerCanonQuery,
@@ -27,18 +28,62 @@ const voiceInputSchema = z
 export const directorRouter = router({
   dispatch: protectedProcedure
     .input(
-      z.object({
-        universeId: z.string().min(1),
-        entityId: z.string().optional(),
-        utterance: z.string().min(1).max(2000),
-        // Character Voice → HUME: when set, the spoken response is also
-        // synthesized to audio through Hume. Omit to get text only.
-        voice: voiceInputSchema,
-      })
+      z
+        .object({
+          universeId: z.string().min(1),
+          entityId: z.string().optional(),
+          // The VOICE step: either a already-transcribed line, or a
+          // recording URL (pre-uploaded by the client) to transcribe here.
+          utterance: z.string().min(1).max(2000).optional(),
+          audioUrl: z.string().url().optional(),
+          // Character Voice → HUME: when set, the spoken response is also
+          // synthesized to audio through Hume. Omit to get text only.
+          voice: voiceInputSchema,
+        })
+        .refine((v) => !!v.utterance || !!v.audioUrl, {
+          message: 'Provide either utterance or audioUrl',
+        })
     )
     .mutation(async ({ input, ctx }) => {
+      // Lazy import — break the index → directorRouter → index cycle
+      // (same trick as routers/marketing/marketing.routes.ts).
+      const { appRouter } = (await import('../index')) as any;
+      const caller = appRouter.createCaller({ user: ctx.user, clientIp: ctx.clientIp });
+
+      let utterance = input.utterance ?? null;
+      let transcript: string | null = null;
+
+      if (!utterance) {
+        try {
+          assertSafeExternalUrl(input.audioUrl!);
+        } catch (err) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: err instanceof Error ? err.message : 'audioUrl rejected',
+          });
+        }
+        // Billed transcription — reuses lipsync.transcribe so credits and
+        // `generation.lipsync` permission checks apply exactly as they
+        // would for any other caller of that endpoint.
+        const transcription = await caller.lipsync.transcribe({ audioUrl: input.audioUrl });
+        const text = transcription?.result?.text?.trim();
+        if (!text) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: "Couldn't make out any speech in that recording.",
+          });
+        }
+        utterance = text.slice(0, 2000);
+        transcript = utterance;
+      }
+      if (!utterance) {
+        // Unreachable: the zod refine + the branch above guarantee a value.
+        // Narrows `string | null` → `string` for the calls below.
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'No utterance resolved' });
+      }
+
       const classification = await classifyDirectorIntent({
-        utterance: input.utterance,
+        utterance,
         userId: ctx.user.uid,
       });
 
@@ -49,7 +94,7 @@ export const directorRouter = router({
 
       if (classification.intent === 'story_action') {
         const plan = await planStoryAction({
-          utterance: input.utterance,
+          utterance,
           universeId: input.universeId,
           userId: ctx.user.uid,
         });
@@ -57,7 +102,7 @@ export const directorRouter = router({
         payload = { intent: 'story_action', storyAction: plan };
       } else {
         const result = await answerCanonQuery({
-          utterance: input.utterance,
+          utterance,
           universeId: input.universeId,
           entityId: input.entityId,
           userId: ctx.user.uid,
@@ -78,6 +123,7 @@ export const directorRouter = router({
       return {
         ...payload,
         confidence: classification.confidence,
+        transcript,
         spokenResponse,
         audioUrl: voiceResult?.audioUrl ?? null,
       };
