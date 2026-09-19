@@ -25,6 +25,10 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TRPCError } from '@trpc/server';
+// The global setup (src/__tests__/setup.ts) stubs this to always resolve
+// false — entities.create now enforces universe ownership (IDOR guard on
+// createEntity), so the case-handling tests below must opt back in.
+import { isUniverseAdmin } from '../../lib/safe-admin';
 
 // The exact PDA from the reported incident (loar.fun/universe/H9E6T6...).
 const SOLANA_PDA = 'H9E6T6KyaL4xZMhttKAprcayQGonswqUnvXmtcb8a9kL';
@@ -214,6 +218,7 @@ describe('entitiesRouter accepts a Solana universeAddress', () => {
   });
 
   it('create: stores a Solana universeAddress verbatim, not lowercased', async () => {
+    vi.mocked(isUniverseAdmin).mockResolvedValueOnce(true);
     const caller = await makeCaller();
     const result = await caller.entities.create({
       name: 'Test Character',
@@ -229,6 +234,7 @@ describe('entitiesRouter accepts a Solana universeAddress', () => {
   });
 
   it('create: lowercases an EVM universeAddress on write (unchanged existing behavior)', async () => {
+    vi.mocked(isUniverseAdmin).mockResolvedValueOnce(true);
     const caller = await makeCaller();
     await caller.entities.create({
       name: 'Test Character',

@@ -3,82 +3,98 @@ export const STYLE_PRESETS = [
     id: 'cinematic',
     label: 'Cinematic',
     suffix: 'cinematic lighting, 35mm film, shallow depth of field, color graded',
+    swatch: 'from-slate-700 via-amber-600 to-slate-900',
   },
   {
     id: 'photoreal',
     label: 'Photoreal',
     suffix: 'hyperrealistic, sharp focus, natural lighting, DSLR photo, 8k',
+    swatch: 'from-sky-200 via-slate-300 to-slate-500',
   },
   {
     id: 'anime',
     label: 'Anime',
     suffix: 'anime style, vibrant colors, cel-shaded, expressive eyes, Studio Ghibli inspired',
+    swatch: 'from-pink-400 via-fuchsia-400 to-indigo-500',
   },
   {
     id: 'manga',
     label: 'Manga',
     suffix: 'black and white manga panel, ink lines, screentone shading, dynamic composition',
+    swatch: 'from-neutral-200 via-neutral-500 to-neutral-900',
   },
   {
     id: 'comic',
     label: 'Comic',
     suffix: 'western comic book art, bold ink outlines, halftone dots, dramatic shading',
+    swatch: 'from-yellow-400 via-red-500 to-blue-600',
   },
   {
     id: 'pixar',
     label: '3D Render',
     suffix:
       'pixar-style 3D render, soft global illumination, subsurface scattering, expressive character',
+    swatch: 'from-orange-300 via-rose-400 to-sky-400',
   },
   {
     id: 'watercolor',
     label: 'Watercolor',
     suffix: 'soft watercolor painting, paper texture, bleeding edges, pastel palette',
+    swatch: 'from-blue-200 via-purple-200 to-rose-200',
   },
   {
     id: 'oil',
     label: 'Oil Painting',
     suffix: 'classical oil painting, visible brushstrokes, rich impasto, chiaroscuro lighting',
+    swatch: 'from-amber-700 via-red-800 to-neutral-900',
   },
   {
     id: 'pixel',
     label: 'Pixel Art',
     suffix: '16-bit pixel art, limited palette, crisp pixels, retro game sprite',
+    swatch: 'from-lime-400 via-emerald-500 to-teal-700',
   },
   {
     id: 'cyberpunk',
     label: 'Cyberpunk',
     suffix: 'cyberpunk neon, rain-slick streets, holographic signs, cinematic rim lighting',
+    swatch: 'from-fuchsia-500 via-purple-700 to-cyan-500',
   },
   {
     id: 'noir',
     label: 'Film Noir',
     suffix: 'black and white film noir, harsh shadows, venetian blind lighting, 1940s mood',
+    swatch: 'from-neutral-300 via-neutral-600 to-black',
   },
   {
     id: 'fantasy',
     label: 'High Fantasy',
     suffix: 'epic fantasy concept art, painterly style, golden hour, mythic scale',
+    swatch: 'from-amber-300 via-orange-500 to-purple-700',
   },
   {
     id: 'studio',
     label: 'Studio Portrait',
     suffix: 'studio portrait photography, softbox lighting, plain backdrop, sharp eyes',
+    swatch: 'from-neutral-100 via-neutral-300 to-neutral-500',
   },
   {
     id: 'lowpoly',
     label: 'Low Poly',
     suffix: 'low poly 3D, flat shading, geometric facets, minimal palette',
+    swatch: 'from-teal-400 via-cyan-500 to-blue-600',
   },
   {
     id: 'isometric',
     label: 'Isometric',
     suffix: 'isometric illustration, clean vector shapes, soft shadows, game asset',
+    swatch: 'from-violet-300 via-indigo-400 to-blue-500',
   },
   {
     id: 'vaporwave',
     label: 'Vaporwave',
     suffix: 'vaporwave aesthetic, pastel pink and cyan, retro grid, 1990s VHS feel',
+    swatch: 'from-pink-400 via-purple-500 to-cyan-400',
   },
 ] as const;
 
@@ -204,6 +220,8 @@ export const MAX_CONCURRENT_GENS = 12;
 export const MAX_RETRIES_PER_GEN = 2;
 export const QUEUE_STORAGE_KEY = 'loar:sandbox:queue:v1';
 export const QUEUE_MAX_PERSISTED = 50;
+export const ENTITY_RESULTS_STORAGE_KEY = 'loar:sandbox:entityResults:v1';
+export const ENTITY_RESULTS_MAX_PERSISTED = 50;
 export const SANDBOX_TABS: { id: any; label: string; hint: string }[] = [
   { id: 'image', label: 'Image', hint: 'text→image, image→image, edits' },
   { id: 'video', label: 'Video', hint: 'text→video, image→video, v2v, extend' },

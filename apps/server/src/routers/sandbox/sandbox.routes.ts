@@ -52,6 +52,9 @@ export const sandboxRouter = router({
         imageUrl: z.string().url().optional(),
         videoUrl: z.string().url().optional(),
         audioUrl: z.string().url().optional(),
+        // Distinguishes music from TTS/SFX within kind: 'audio' — the client
+        // uses this on "reuse" to pick the matching composer tab.
+        audioFlavor: z.enum(['tts', 'sfx', 'music']).optional(),
         modelUrl: z.string().url().optional(),
         thumbnailUrl: z.string().url().optional(),
         kind: z.enum(['image', 'video', 'audio', '3d']).optional(),
@@ -92,6 +95,7 @@ export const sandboxRouter = router({
         imageUrl: input.imageUrl || null,
         videoUrl: input.videoUrl || null,
         audioUrl: input.audioUrl || null,
+        audioFlavor: input.audioFlavor || null,
         modelUrl: input.modelUrl || null,
         thumbnailUrl: input.thumbnailUrl || input.imageUrl || null,
         kind: input.kind || (input.videoUrl ? 'video' : input.imageUrl ? 'image' : 'image'),
@@ -291,6 +295,7 @@ export const sandboxRouter = router({
       imageUrl: d.imageUrl as string | null,
       videoUrl: d.videoUrl as string | null,
       audioUrl: (d.audioUrl as string | null) ?? null,
+      audioFlavor: (d.audioFlavor as 'tts' | 'sfx' | 'music' | null) ?? null,
       modelUrl: (d.modelUrl as string | null) ?? null,
       thumbnailUrl: (d.thumbnailUrl as string | null) ?? (d.imageUrl as string | null) ?? null,
       kind: (d.kind as string | null) ?? (d.videoUrl ? 'video' : 'image'),

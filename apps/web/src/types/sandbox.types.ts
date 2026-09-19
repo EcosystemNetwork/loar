@@ -83,6 +83,7 @@ export interface DraftData {
   imageUrl: string | null;
   videoUrl: string | null;
   audioUrl?: string | null;
+  audioFlavor?: 'tts' | 'sfx' | 'music' | null;
   modelUrl?: string | null;
   thumbnailUrl?: string | null;
   kind?: string | null;

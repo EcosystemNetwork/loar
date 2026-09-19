@@ -47,6 +47,8 @@ import {
   MAX_CONCURRENT_GENS,
   QUEUE_MAX_PERSISTED,
   QUEUE_STORAGE_KEY,
+  ENTITY_RESULTS_MAX_PERSISTED,
+  ENTITY_RESULTS_STORAGE_KEY,
   SANDBOX_TABS,
   VARIATION_OPTIONS,
   EDIT_OP_LABELS,
@@ -209,7 +211,11 @@ export function GenerateConsole({
   // straight into a universe (or the user's gallery). Persists across reloads.
   // '__off__' = drafts only, '__gallery__' = promote to personal gallery (no
   // universe), any other value = universe id (Firestore doc id / contract addr).
-  const AUTO_SEND_KEY = 'sandbox.autoSendTarget';
+  // Namespaced per variant — Console and Lab have different defaults
+  // ('__gallery__' vs '__off__'), so they must not read/write each other's
+  // stored value. Before this, a Lab-era '__off__' would silently persist
+  // into Console (readLocal only falls back when the key is fully absent).
+  const AUTO_SEND_KEY = `sandbox.autoSendTarget.${variant}`;
   const AUTO_SEND_CLASSIFICATION_KEY = 'sandbox.autoSendClassification';
   const AUTO_SEND_VISIBILITY_KEY = 'sandbox.autoSendVisibility';
   const TARGET_CHAIN_KEY = 'sandbox.targetChain';
@@ -259,7 +265,7 @@ export function GenerateConsole({
     } catch {
       // localStorage may be unavailable (SSR, private mode) — settings won't persist this turn.
     }
-  }, [autoSendTarget, autoSendClassification, autoSendVisibility, targetChainId]);
+  }, [autoSendTarget, autoSendClassification, autoSendVisibility, targetChainId, AUTO_SEND_KEY]);
 
   // Refs so autoSaveDraft reads the latest values without re-building every
   // run* callback (and their long dep chains) when settings change.
@@ -329,19 +335,56 @@ export function GenerateConsole({
   // A non-null worldKind takes over from the media `mode`.
   const [worldKind, setWorldKind] = useState<WorldKind | null>(null);
   const [entityName, setEntityName] = useState('');
-  const [entityResults, setEntityResults] = useState<
-    Array<{
-      id: string;
-      kind: WorldKind;
-      name: string;
-      imageUrl: string | null;
-      universeId: string;
-      status: 'generating' | 'done' | 'failed';
-      error?: string;
-      entityId?: string;
-      createdAt: number;
-    }>
-  >([]);
+  type EntityResult = {
+    id: string;
+    kind: WorldKind;
+    name: string;
+    imageUrl: string | null;
+    universeId: string;
+    status: 'generating' | 'done' | 'failed';
+    error?: string;
+    entityId?: string;
+    createdAt: number;
+  };
+
+  // Persists via localStorage like `generations` — otherwise a refresh drops
+  // successfully-created entity cards from the feed even though the entity
+  // still exists in the wiki. In-flight entries interrupted by navigation are
+  // mapped to 'failed', matching the generations-queue convention.
+  const [entityResults, setEntityResults] = useState<EntityResult[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem(ENTITY_RESULTS_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed: EntityResult[] = JSON.parse(raw);
+      return parsed
+        .filter(Boolean)
+        .map((r) =>
+          r.status === 'generating'
+            ? { ...r, status: 'failed' as const, error: 'Interrupted by navigation' }
+            : r
+        )
+        .slice(0, ENTITY_RESULTS_MAX_PERSISTED);
+    } catch {
+      return [];
+    }
+  });
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(
+        ENTITY_RESULTS_STORAGE_KEY,
+        JSON.stringify(entityResults.slice(0, ENTITY_RESULTS_MAX_PERSISTED))
+      );
+    } catch (e) {
+      console.warn('[sandbox] entityResults localStorage save failed', e);
+    }
+  }, [entityResults]);
+
+  const removeEntity = useCallback((id: string) => {
+    setEntityResults((prev) => prev.filter((r) => r.id !== id));
+  }, []);
 
   // Parallel generation queue — finished entries persist via localStorage so
   // a refresh doesn't lose what you generated. In-flight entries that are
@@ -438,6 +481,7 @@ export function GenerateConsole({
           imageUrl: gen.imageUrl,
           videoUrl: gen.videoUrl,
           audioUrl: gen.audioUrl,
+          audioFlavor: gen.kind === 'audio' ? gen.audioFlavor : undefined,
           modelUrl: gen.modelUrl,
           thumbnailUrl: gen.thumbnailUrl,
           kind: draftKind,
@@ -1070,10 +1114,24 @@ export function GenerateConsole({
         toast.error('Pick a wiki in “Generate into” above — world entities must belong to one.');
         return;
       }
+      // A ?universe= deep link (e.g. from a wiki tab's "Generate" button, open
+      // to any visitor) sets this optimistically before we've confirmed the
+      // caller actually administers it — entities.create enforces this
+      // server-side, but check client-side too so non-owners get a clear
+      // message instead of a raw server error.
+      if (!autoSendUniversesResult) {
+        toast.error('Still checking wiki access — try again in a moment.');
+        return;
+      }
+      if (!autoSendUniverses.some((u) => u.id === target)) {
+        toast.error("You don't have access to that wiki — pick one you own in “Generate into”.");
+        return;
+      }
       const universeId = target;
       const p = prompt.trim();
+      const submittedEntityName = entityName.trim();
       const name =
-        entityName.trim() ||
+        submittedEntityName ||
         p.split(/[.\n]/)[0].slice(0, 60).trim() ||
         pickRandom(RANDOM_NAME_SEEDS[kind] ?? ['Untitled']);
       const localId = makeId();
@@ -1133,8 +1191,10 @@ export function GenerateConsole({
         );
         queryClient.invalidateQueries({ queryKey: ['sandbox-drafts'] });
         toast.success(`${KIND_LABELS[kind] ?? kind} created`);
-        setPrompt('');
-        setEntityName('');
+        // Only clear fields the user hasn't already started overwriting with
+        // a new prompt/name while this generation was in flight.
+        setPrompt((cur) => (cur === p ? '' : cur));
+        setEntityName((cur) => (cur === submittedEntityName ? '' : cur));
       } catch (err: any) {
         setEntityResults((prev) =>
           prev.map((r) =>
@@ -1152,7 +1212,15 @@ export function GenerateConsole({
         inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1);
       }
     },
-    [generationEnabled, prompt, entityName, imageModel, queryClient]
+    [
+      generationEnabled,
+      prompt,
+      entityName,
+      imageModel,
+      queryClient,
+      autoSendUniverses,
+      autoSendUniversesResult,
+    ]
   );
 
   const handleAnimate = useCallback((g: Generation) => {
@@ -1458,27 +1526,6 @@ export function GenerateConsole({
     return () => window.removeEventListener('keydown', onKey);
   }, [submitCurrent]);
 
-  // Gradient swatches for the style-preset strip — a stand-in for real per-style
-  // thumbnails so presets read as visual chips (Higgsfield-style) not text pills.
-  const STYLE_SWATCHES: Record<string, string> = {
-    cinematic: 'from-slate-700 via-amber-600 to-slate-900',
-    photoreal: 'from-sky-200 via-slate-300 to-slate-500',
-    anime: 'from-pink-400 via-fuchsia-400 to-indigo-500',
-    manga: 'from-neutral-200 via-neutral-500 to-neutral-900',
-    comic: 'from-yellow-400 via-red-500 to-blue-600',
-    pixar: 'from-orange-300 via-rose-400 to-sky-400',
-    watercolor: 'from-blue-200 via-purple-200 to-rose-200',
-    oil: 'from-amber-700 via-red-800 to-neutral-900',
-    pixel: 'from-lime-400 via-emerald-500 to-teal-700',
-    cyberpunk: 'from-fuchsia-500 via-purple-700 to-cyan-500',
-    noir: 'from-neutral-300 via-neutral-600 to-black',
-    fantasy: 'from-amber-300 via-orange-500 to-purple-700',
-    studio: 'from-neutral-100 via-neutral-300 to-neutral-500',
-    lowpoly: 'from-teal-400 via-cyan-500 to-blue-600',
-    isometric: 'from-violet-300 via-indigo-400 to-blue-500',
-    vaporwave: 'from-pink-400 via-purple-500 to-cyan-400',
-  };
-
   // Unified feed — merge the live queue, world-entity rolls, and saved drafts
   // into one recency-sorted list. A draft still represented by a live queue
   // card (matching draftId) is suppressed so it doesn't render twice.
@@ -1497,8 +1544,13 @@ export function GenerateConsole({
       if (draftFilter !== 'all' && g.kind !== draftFilter) continue;
       items.push({ kind: 'gen', ts: g.createdAt, gen: g });
     }
-    if (draftFilter === 'all' || draftFilter === 'entity') {
-      for (const e of entityResults) items.push({ kind: 'entity', ts: e.createdAt, entity: e });
+    for (const e of entityResults) {
+      // Always surface work-in-progress/failed rolls regardless of the active
+      // filter chip — they have no other status surface, so hiding them looks
+      // like the generation silently vanished. Finished entities still
+      // respect the filter like every other feed source.
+      if (draftFilter !== 'all' && draftFilter !== 'entity' && e.status === 'done') continue;
+      items.push({ kind: 'entity', ts: e.createdAt, entity: e });
     }
     if (draftFilter !== 'entity') {
       for (const d of (drafts as DraftData[] | undefined) ?? []) {
@@ -1596,10 +1648,7 @@ export function GenerateConsole({
 
                   {/* Compact wiki picker, top-right of the composer */}
                   {isConsole && (
-                    <Select
-                      value={autoSendTarget === '__off__' ? '__gallery__' : autoSendTarget}
-                      onValueChange={setAutoSendTarget}
-                    >
+                    <Select value={autoSendTarget} onValueChange={setAutoSendTarget}>
                       <SelectTrigger
                         className="h-8 w-auto max-w-[220px] rounded-full border-primary/30 bg-primary/5 text-xs gap-1.5 px-3"
                         title="Which wiki this publishes into"
@@ -1608,7 +1657,8 @@ export function GenerateConsole({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__gallery__">My Gallery — drafts only</SelectItem>
+                        <SelectItem value="__off__">Off — save to drafts only</SelectItem>
+                        <SelectItem value="__gallery__">My Gallery — publish publicly</SelectItem>
                         {autoSendUniverses.length > 0 && (
                           <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
                             Your wikis
@@ -1626,8 +1676,9 @@ export function GenerateConsole({
                 </div>
                 {isConsole && (
                   <p className="text-[10px] text-muted-foreground -mt-2">
-                    Images & videos auto-publish to the chosen wiki's gallery. World entities
-                    require a wiki.
+                    {autoSendTarget === '__off__'
+                      ? 'Saved to drafts only — nothing publishes until you pick a wiki above. World entities require a wiki.'
+                      : "Images & videos auto-publish to the chosen wiki's gallery. World entities require a wiki."}
                   </p>
                 )}
 
@@ -1765,7 +1816,7 @@ export function GenerateConsole({
                           >
                             <span
                               className={`h-11 w-11 rounded-xl border-2 bg-gradient-to-br ${
-                                STYLE_SWATCHES[p.id] ?? 'from-muted to-muted-foreground/30'
+                                p.swatch ?? 'from-muted to-muted-foreground/30'
                               } transition-colors ${
                                 stylePreset === p.id
                                   ? 'border-primary'
@@ -2758,8 +2809,17 @@ export function GenerateConsole({
                     return (
                       <div
                         key={`e-${r.id}`}
-                        className="rounded-xl border border-border overflow-hidden bg-card hover:border-primary/30 transition-colors"
+                        className="relative rounded-xl border border-border overflow-hidden bg-card hover:border-primary/30 transition-colors"
                       >
+                        <Button
+                          size="icon"
+                          variant="secondary"
+                          className="absolute top-1.5 right-1.5 h-6 w-6 z-10 opacity-80 hover:opacity-100"
+                          onClick={() => removeEntity(r.id)}
+                          title="Dismiss"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
                         <div className="aspect-square bg-muted relative flex items-center justify-center">
                           {r.imageUrl ? (
                             <img src={r.imageUrl} alt="" className="w-full h-full object-cover" />
@@ -2808,10 +2868,14 @@ export function GenerateConsole({
                       onDelete={() => delDraftMutation.mutate(draft.id)}
                       onReuse={() => {
                         const kind = inferDraftKind(draft);
-                        // Switch to the right tab so the form matches the kind
+                        // Switch to the right tab so the form matches the kind.
+                        // inferDraftKind collapses music and TTS/SFX into one
+                        // 'audio' GenKind (they share filtering); audioFlavor
+                        // is what actually distinguishes the composer tab.
                         setWorldKind(null);
-                        if (kind === 'audio') setMode('voice');
-                        else if (kind === '3d-model') setMode('3d');
+                        if (kind === 'audio') {
+                          setMode(draft.audioFlavor === 'music' ? 'audio' : 'voice');
+                        } else if (kind === '3d-model') setMode('3d');
                         else if (kind === 'video') setMode('video');
                         else setMode('image');
                         setPrompt(draft.prompt);

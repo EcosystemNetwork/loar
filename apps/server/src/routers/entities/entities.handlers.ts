@@ -12,6 +12,7 @@
 import { db } from '../../lib/firebase';
 import { rehostEphemeralUrl } from '../../lib/rehost-ephemeral';
 import { normalizeUniverseId } from '../../lib/universe-id';
+import { isUniverseAdmin } from '../../lib/safe-admin';
 import {
   type Entity,
   type CreateEntityInput,
@@ -105,6 +106,20 @@ export async function createEntity(
   // Structural kinds must belong to a universe
   if (STRUCTURAL_KINDS.includes(input.kind) && !input.universeAddress) {
     throw new Error(`Structural kind "${input.kind}" requires a universeAddress`);
+  }
+
+  // IDOR guard — every path into this shared handler (direct create, ZAI
+  // worldbuild, notebook promotion, character pipeline, VLM proposal accept)
+  // ultimately takes a caller-influenced universeAddress. Without this check
+  // any authenticated wallet could write entities into a universe/wiki they
+  // don't own, the same class of bug `promoteToUniverse` was patched for.
+  // Creator kinds with no universeAddress (persona, voice, likeness) are
+  // unaffected since there's no universe to own.
+  if (input.universeAddress) {
+    const allowed = await isUniverseAdmin(input.universeAddress, creator);
+    if (!allowed) {
+      throw new Error('You do not have permission to create entities in this universe');
+    }
   }
 
   const col = entitiesCol();
