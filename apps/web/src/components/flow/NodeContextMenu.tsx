@@ -24,12 +24,20 @@ import {
 import type { Node } from 'reactflow';
 import type { TimelineNodeData } from './TimelineNodes';
 import type { ArcDefinition, ContextMenuState } from './types';
+import { getExplorerAddressUrl } from '@/configs/chains';
 
 interface NodeContextMenuProps {
   state: ContextMenuState;
   node: Node<TimelineNodeData> | null;
   arcs: ArcDefinition[];
   universeId: string;
+  chainId: number;
+  /** True only for a confirmed EVM on-chain universe — gates swap (an EVM
+   *  contract write) and the "View On-Chain" explorer link, which would
+   *  otherwise be reachable (and broken) for off-chain/fun-mode or
+   *  Solana-on-chain universes: every scene node gets a `blockchainNodeId`
+   *  regardless of data source, so that field alone isn't a safe gate. */
+  isOnChain: boolean;
   swapMarkNodeId: string | null;
   swapMarkLabel: string | null;
   isSwapping: boolean;
@@ -92,6 +100,8 @@ function NodeContextMenuImpl({
   node,
   arcs,
   universeId,
+  chainId,
+  isOnChain,
   swapMarkNodeId,
   swapMarkLabel,
   isSwapping,
@@ -134,9 +144,9 @@ function NodeContextMenuImpl({
   if (!state.visible || !node) return null;
 
   const eventId = node.data.eventId || '';
-  const isBlockchain = node.id.startsWith('blockchain-node-');
+  const isBlockchain = isOnChain && node.id.startsWith('blockchain-node-');
   const hasVideo = !!node.data.videoUrl;
-  const canSwap = node.data.blockchainNodeId !== undefined;
+  const canSwap = isOnChain && node.data.blockchainNodeId !== undefined;
   const isMarked = swapMarkNodeId === node.id;
   const hasOtherMark = !!swapMarkNodeId && !isMarked;
 
@@ -289,7 +299,7 @@ function NodeContextMenuImpl({
             icon={<ExternalLink className="h-3.5 w-3.5" />}
             label="View On-Chain"
             onClick={() => {
-              window.open(`https://basescan.org/address/${universeId}`, '_blank');
+              window.open(getExplorerAddressUrl(chainId, universeId), '_blank');
               onClose();
             }}
           />

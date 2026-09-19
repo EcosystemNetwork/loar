@@ -1008,7 +1008,14 @@ function UniverseTimelineEditorInner() {
     graphData,
     latestNodeId,
     universeId: id,
-    isBlockchainUniverse,
+    // NOT the raw `isBlockchainUniverse` address-shape heuristic — that's
+    // also true for a Solana-PDA-addressed universe, and useContractSave
+    // casts this straight into an EVM Address for writeContractAsync. Only
+    // a confirmed on-chain (real onChainUniverseId, resolved from data)
+    // universe has its own dedicated EVM contract to write to; everything
+    // else — including a Solana or off-chain universe whose id merely
+    // looks EVM-shaped — must use the shared Timeline contract fallback.
+    isBlockchainUniverse: isOnChain === true,
     chainId,
     setGeneratedVideoUrl,
     setStorageKey,
@@ -1196,6 +1203,15 @@ function UniverseTimelineEditorInner() {
   const swapTwoNodes = useCallback(
     async (flowIdA: string, flowIdB: string) => {
       if (flowIdA === flowIdB) return;
+      // Authoritative gate for every swap path (bulk toolbar button and the
+      // context-menu "mark for swap" flow both funnel through here):
+      // swapNodesOnChain always issues an EVM writeContractAsync, so this
+      // must never run for an off-chain/fun-mode or Solana-on-chain
+      // universe, even if a caller forgets to check canSwapSelected first.
+      if (isOnChain !== true) {
+        toast.error('Swapping is only available for on-chain universes');
+        return;
+      }
       const nodeA = nodesRef.current.find((n) => n.id === flowIdA);
       const nodeB = nodesRef.current.find((n) => n.id === flowIdB);
       if (!nodeA || !nodeB) {
@@ -1240,6 +1256,7 @@ function UniverseTimelineEditorInner() {
         );
         toast.success('Nodes swapped on-chain');
         setSelectedNodeIds(new Set());
+        setNodes((nds: any) => nds.map((n: any) => ({ ...n, selected: false })));
         setSwapMarkNodeId(null);
       } catch (err: any) {
         console.error('Swap failed:', err);
@@ -1248,13 +1265,18 @@ function UniverseTimelineEditorInner() {
         setIsSwapping(false);
       }
     },
-    [swapNodesOnChain, setNodes]
+    [isOnChain, swapNodesOnChain, setNodes]
   );
 
   // Derive whether the two currently-selected nodes can be swapped on-chain.
+  // Gate on `isOnChain` (not `isBlockchainUniverse`, which is also true for
+  // Solana address-shaped ids): `blockchainNodeId` is set on every scene
+  // node regardless of data source (on-chain, off-chain/fun-mode, or
+  // Solana), and swapNodesOnChain always issues an EVM `writeContractAsync`
+  // — reachable and broken for any non-EVM-on-chain universe without this.
   const canSwapSelected = useMemo(
-    () => canSwapOnChain(nodes, selectedNodeIds),
-    [selectedNodeIds, nodes]
+    () => isOnChain === true && canSwapOnChain(nodes, selectedNodeIds),
+    [isOnChain, selectedNodeIds, nodes]
   );
 
   const handleSwapSelected = useCallback(() => {
@@ -1888,7 +1910,13 @@ function UniverseTimelineEditorInner() {
     const sceneIds = nodes.filter((n: any) => n.data.nodeType === 'scene').map((n: any) => n.id);
     const inverted = new Set(sceneIds.filter((nid: string) => !selectedNodeIds.has(nid)));
     setSelectedNodeIds(inverted);
-  }, [nodes, selectedNodeIds]);
+    // Sync ReactFlow's native `selected` flag too — useOnSelectionChange
+    // recomputes selectedNodeIds from these flags on nearly every node-store
+    // update, so leaving them stale (as handleSelectAll/handleClearSelection
+    // do not) let the very next incidental update snap the selection back to
+    // the pre-invert set.
+    setNodes((nds: any) => nds.map((n: any) => ({ ...n, selected: inverted.has(n.id) })));
+  }, [nodes, selectedNodeIds, setNodes]);
 
   // Toggle canon on selected nodes (local-only toggle)
   const handleToggleCanon = useCallback(() => {
@@ -3759,6 +3787,8 @@ function UniverseTimelineEditorInner() {
               }
               arcs={nodeArcs.arcs}
               universeId={id}
+              chainId={chainId}
+              isOnChain={isOnChain === true}
               swapMarkNodeId={swapMarkNodeId}
               swapMarkLabel={swapMarkLabel}
               isSwapping={isSwapping}

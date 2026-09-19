@@ -46,6 +46,8 @@ function setup(over: Partial<React.ComponentProps<typeof NodeContextMenu>> = {})
     node: node(),
     arcs: [],
     universeId: '0xuni',
+    chainId: 8453,
+    isOnChain: true,
     swapMarkNodeId: null,
     swapMarkLabel: null,
     isSwapping: false,
@@ -91,6 +93,8 @@ function defaultProps(): React.ComponentProps<typeof NodeContextMenu> {
     node: node(),
     arcs: [],
     universeId: '0xuni',
+    chainId: 8453,
+    isOnChain: true,
     swapMarkNodeId: null,
     swapMarkLabel: null,
     isSwapping: false,
@@ -170,6 +174,32 @@ describe('NodeContextMenu — canon toggle label', () => {
   it('"Remove from Canon" for a canon node', () => {
     setup({ node: node({ isInCanonChain: true }) });
     expect(screen.getByRole('button', { name: /Remove from Canon/i })).toBeInTheDocument();
+  });
+});
+
+describe('NodeContextMenu — swap section respects isOnChain, not just blockchainNodeId', () => {
+  // Regression: `blockchainNodeId` is set on every scene node regardless of
+  // data source (on-chain, off-chain/fun-mode, or Solana) — see
+  // timelineFlowGraph.ts's buildSceneFlowGraph. Gating swap/View-On-Chain on
+  // that field alone made them reachable (and broken, since swap always
+  // issues an EVM contract write) for an off-chain or Solana universe.
+  it('"Mark for Swap" is absent when isOnChain is false, even with a blockchainNodeId set', () => {
+    setup({ isOnChain: false });
+    expect(screen.queryByRole('button', { name: /Mark for Swap/i })).not.toBeInTheDocument();
+  });
+
+  it('"View On-Chain" is absent when isOnChain is false, even for a blockchain-node-* id', () => {
+    setup({ isOnChain: false });
+    expect(screen.queryByRole('button', { name: /View On-Chain/i })).not.toBeInTheDocument();
+  });
+
+  it('"Copy Node ID" still works when isOnChain is false — it is generically useful, not EVM-specific', async () => {
+    const u = userEvent.setup();
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    setup({ isOnChain: false });
+    await u.click(screen.getByRole('button', { name: /Copy Node ID/i }));
+    expect(writeText).toHaveBeenCalledWith('5');
   });
 });
 
