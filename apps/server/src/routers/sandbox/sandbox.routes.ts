@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { db } from '../../lib/firebase';
 import { FieldValue } from 'firebase-admin/firestore';
+import { resolveDraftMedia } from './draft-media';
 
 const sandboxCol = () => {
   if (!db)
@@ -75,17 +76,12 @@ export const sandboxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
       const hasMedia = !!(input.videoUrl || input.imageUrl || input.audioUrl || input.modelUrl);
-      // Pick the canonical media URL + content media type. Priority follows the
-      // visual richness of the asset so the gallery shows the most useful preview.
-      const primaryMediaUrl =
-        input.videoUrl || input.modelUrl || input.audioUrl || input.imageUrl || '';
-      const mediaType = input.videoUrl
-        ? 'ai-video'
-        : input.modelUrl
-          ? 'ai-3d'
-          : input.audioUrl
-            ? 'ai-audio'
-            : 'ai-image';
+      // Canonical media URL + type — shared with promoteToUniverse.
+      const {
+        mediaUrl: primaryMediaUrl,
+        mediaType,
+        thumbnailUrl: contentThumbnailUrl,
+      } = resolveDraftMedia(input);
 
       const draftRef = await sandboxCol().add({
         creatorAddress: ctx.user.address,
@@ -138,7 +134,7 @@ export const sandboxRouter = router({
             title: input.title,
             description: input.prompt || '',
             mediaUrl,
-            thumbnailUrl: input.thumbnailUrl || input.imageUrl || null,
+            thumbnailUrl: contentThumbnailUrl,
             mediaType,
             classification: 'fan' as const,
             tags: input.tags || [],
@@ -414,8 +410,10 @@ export const sandboxRouter = router({
       }
 
       const now = new Date();
-      const mediaUrl = draft.videoUrl || draft.imageUrl || '';
-      const mediaType = draft.videoUrl ? 'ai-video' : draft.imageUrl ? 'ai-image' : 'image';
+      const { mediaUrl, mediaType, thumbnailUrl } = resolveDraftMedia(draft);
+      if (!mediaUrl) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Draft has no media to promote' });
+      }
 
       // ipDeclaration / reviewStatus follow content.routes.ts rules so the
       // moderation + monetization gates accept the record.
@@ -430,15 +428,26 @@ export const sandboxRouter = router({
       const reviewStatus = input.classification === 'licensed' ? 'pending' : 'not_required';
 
       const { contentId, created } = await db!.runTransaction(async (tx) => {
-        const existingSnap = await tx.get(
-          contentCol()
-            .where('mediaUrl', '==', mediaUrl)
-            .where('creatorUid', '==', ctx.user.uid)
-            .limit(1)
-        );
+        // Prefer the content record saveDraft mirrored for this draft; fall
+        // back to a mediaUrl match for drafts saved before that link existed.
+        let existingDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+        if (draft.galleryContentId) {
+          const linked = await tx.get(contentCol().doc(draft.galleryContentId as string));
+          if (linked.exists && linked.data()?.creatorUid === ctx.user.uid) {
+            existingDoc = linked as FirebaseFirestore.QueryDocumentSnapshot;
+          }
+        }
+        if (!existingDoc) {
+          const existingSnap = await tx.get(
+            contentCol()
+              .where('mediaUrl', '==', mediaUrl)
+              .where('creatorUid', '==', ctx.user.uid)
+              .limit(1)
+          );
+          if (!existingSnap.empty) existingDoc = existingSnap.docs[0];
+        }
 
-        if (!existingSnap.empty) {
-          const existingDoc = existingSnap.docs[0];
+        if (existingDoc) {
           const updates: Record<string, any> = {
             classification: input.classification,
             visibility: input.visibility,
@@ -457,7 +466,7 @@ export const sandboxRouter = router({
           title: draft.title,
           description: draft.prompt || '',
           mediaUrl,
-          thumbnailUrl: draft.imageUrl || null,
+          thumbnailUrl,
           mediaType,
           classification: input.classification,
           tags: draft.tags || [],

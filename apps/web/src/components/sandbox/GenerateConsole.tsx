@@ -560,6 +560,7 @@ export function GenerateConsole({
         referenceMode: useStyleRef ? 'style' : undefined,
         stylePresetId: opts.stylePresetId || undefined,
         retryCount: opts.retryOf ? (opts.retryOf.retryCount ?? 0) + 1 : 0,
+        retryable: true,
         createdAt: Date.now(),
       };
       setGenerations((prev) => [gen, ...prev]);
@@ -640,6 +641,7 @@ export function GenerateConsole({
         cameraIntensity: opts.cameraPreset ? opts.cameraIntensity : undefined,
         videoAudio: audio,
         retryCount: opts.retryOf ? (opts.retryOf.retryCount ?? 0) + 1 : 0,
+        retryable: true,
         createdAt: Date.now(),
       };
       setGenerations((prev) => [gen, ...prev]);
@@ -1055,6 +1057,7 @@ export function GenerateConsole({
 
   const retryGen = useCallback(
     (g: Generation) => {
+      if (!g.retryable || (g.kind !== 'image' && g.kind !== 'video')) return;
       if ((g.retryCount ?? 0) >= MAX_RETRIES_PER_GEN) {
         toast.error(
           `Hit retry limit (${MAX_RETRIES_PER_GEN}). Tweak the prompt or pick a different model.`

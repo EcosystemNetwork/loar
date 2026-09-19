@@ -299,13 +299,13 @@ export function GenerationCard({
               Modify voice
             </Button>
           )}
-          {gen.status === 'failed' && retriesLeft > 0 && (
+          {gen.status === 'failed' && gen.retryable && retriesLeft > 0 && (
             <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={onRetry}>
               <RefreshCw className="h-3 w-3 mr-1" />
               Retry ({retriesLeft} left)
             </Button>
           )}
-          {gen.status === 'failed' && retriesLeft <= 0 && (
+          {gen.status === 'failed' && gen.retryable && retriesLeft <= 0 && (
             <span className="text-[10px] text-muted-foreground">Retry limit reached</span>
           )}
         </div>

@@ -73,6 +73,9 @@ export type Generation = {
   draftId?: string;
   draftSaveError?: string;
   retryCount?: number;
+  /** True only for plain text/image→image|video runs that `retryGen` can faithfully replay.
+   *  Edits, voice, audio, 3D and talking scenes are not replayable from a Generation alone. */
+  retryable?: boolean;
   createdAt: number;
 };
 
