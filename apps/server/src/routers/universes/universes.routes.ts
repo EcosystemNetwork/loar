@@ -22,6 +22,7 @@ import {
   setUniverseHidden,
   setUniversePrivate,
   deleteUniverse,
+  withNodeCounts,
 } from './universes.handlers';
 import { isUniverseAdmin, isUniverseAdminStrict, getSafeInfo } from '../../lib/safe-admin';
 import { isEvmAddress, normalizeUniverseId } from '../../lib/universe-id';
@@ -658,9 +659,13 @@ export const universesRouter = router({
       return { ok: true };
     }),
 
-  /** Admin-only: list every universe (including hidden ones) for the admin dashboard. */
+  /**
+   * Admin-only: list every universe (including hidden ones) for the admin
+   * dashboard, with a live node count merged onto each entry.
+   */
   adminList: adminProcedure.query(async () => {
-    return await getAllUniverses({ includeHidden: true });
+    const result = await getAllUniverses({ includeHidden: true });
+    return { ...result, data: await withNodeCounts(result.data) };
   }),
 
   /** Admin-only: soft-delete a universe by flipping its isHidden flag. */

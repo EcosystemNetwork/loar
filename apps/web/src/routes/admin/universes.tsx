@@ -15,7 +15,7 @@ import { trpcClient } from '@/utils/trpc';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
-import { Shield, EyeOff, Eye, Loader2, Search, Trash2 } from 'lucide-react';
+import { Shield, EyeOff, Eye, Loader2, Search, Trash2, Hash } from 'lucide-react';
 import { SmartImage } from '@/components/SmartImage';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 
@@ -107,6 +107,10 @@ function AdminUniversesDashboard() {
 
   const visibleCount = items.filter((u) => !u.isHidden).length;
   const hiddenCount = items.filter((u) => u.isHidden).length;
+  const totalNodes = items.reduce(
+    (sum, u) => sum + (typeof u.nodeCount === 'number' ? u.nodeCount : 0),
+    0
+  );
 
   return (
     <div className="min-h-screen bg-background p-6 max-w-5xl mx-auto">
@@ -119,7 +123,7 @@ function AdminUniversesDashboard() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-3 gap-4 mb-6">
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
             <Eye className="h-7 w-7 text-green-500" />
@@ -135,6 +139,15 @@ function AdminUniversesDashboard() {
             <div>
               <p className="text-2xl font-bold">{hiddenCount}</p>
               <p className="text-xs text-muted-foreground">Hidden</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 flex items-center gap-3">
+            <Hash className="h-7 w-7 text-blue-500" />
+            <div>
+              <p className="text-2xl font-bold">{totalNodes.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground">Total nodes</p>
             </div>
           </CardContent>
         </Card>
@@ -187,6 +200,10 @@ function AdminUniversesDashboard() {
                         chain {u.chainId}
                       </Badge>
                     ) : null}
+                    <Badge variant="secondary" className="text-[10px] gap-1">
+                      <Hash className="h-2.5 w-2.5" />
+                      {typeof u.nodeCount === 'number' ? u.nodeCount.toLocaleString() : '—'} nodes
+                    </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground truncate font-mono">{u.id}</p>
                   {u.creator ? (

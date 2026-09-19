@@ -9,7 +9,7 @@ import { db } from '../../lib/firebase';
 import { randomUUID } from 'crypto';
 import { getSafeInfo } from '../../lib/safe-admin';
 import { TRPCError } from '@trpc/server';
-import { normalizeUniverseId } from '../../lib/universe-id';
+import { isEvmAddress, normalizeUniverseId } from '../../lib/universe-id';
 
 // ── Mint fee credit conversion (~$10 worth of generation credits) ─────────
 const UNIVERSE_MINT_CREDITS = parseInt(process.env.UNIVERSE_MINT_CREDITS ?? '333', 10);
@@ -206,6 +206,52 @@ export async function getAllUniverses(options?: {
     console.error('Error fetching all universes:', error);
     throw new Error('Failed to fetch universes', { cause: error });
   }
+}
+
+/**
+ * Merge a live node count onto each universe doc, for admin metrics.
+ *
+ * EVM universes track `nodeCount` on their `indexer_universes` mirror doc
+ * (incremented by the event-listener on every on-chain node). Solana has no
+ * equivalent counter, so this counts `solanaEpisodes` docs instead — episodes
+ * are LOAR's Solana node type. `null` means the count is unknown (no indexer
+ * mirror doc yet, or the aggregate query failed) — distinct from `0`.
+ */
+export async function withNodeCounts<T extends { id: string; chainId?: number }>(
+  universes: T[]
+): Promise<(T & { nodeCount: number | null })[]> {
+  const evmUniverses = universes.filter((u) => isEvmAddress(u.id));
+  const solanaUniverses = universes.filter((u) => !isEvmAddress(u.id));
+
+  const evmRefs = evmUniverses.map((u) =>
+    db.collection('indexer_universes').doc(`${u.chainId ?? 11155111}:${u.id.toLowerCase()}`)
+  );
+
+  const [evmDocs, solanaCounts] = await Promise.all([
+    evmRefs.length ? db.getAll(...evmRefs) : Promise.resolve([]),
+    Promise.all(
+      solanaUniverses.map((u) =>
+        db
+          .collection('solanaEpisodes')
+          .where('universe', '==', u.id)
+          .count()
+          .get()
+          .then((snap) => snap.data().count)
+          .catch(() => null)
+      )
+    ),
+  ]);
+
+  const nodeCountById = new Map<string, number | null>();
+  evmUniverses.forEach((u, i) => {
+    const doc = evmDocs[i];
+    nodeCountById.set(u.id, doc?.exists ? ((doc.data()?.nodeCount as number) ?? 0) : null);
+  });
+  solanaUniverses.forEach((u, i) => {
+    nodeCountById.set(u.id, solanaCounts[i]);
+  });
+
+  return universes.map((u) => ({ ...u, nodeCount: nodeCountById.get(u.id) ?? null }));
 }
 
 /**
