@@ -18,6 +18,9 @@
  * the loar-universe-canon skill; this is text-canon only.
  *
  * Usage:
+ *   (optional) DEMO_CREATOR_ADDRESS=0xYourWallet — who owns the universe; must be
+ *   the wallet you sign in with, since director mode is limited to collaborators.
+ *
  *   pnpm tsx scripts/create-meridian-voice-director-universe.ts            # dry run
  *   pnpm tsx scripts/create-meridian-voice-director-universe.ts --commit   # write
  *   pnpm tsx scripts/create-meridian-voice-director-universe.ts --live --commit   # write to prod Firestore
@@ -43,7 +46,18 @@ if (LIVE) {
 }
 
 // ── Config ───────────────────────────────────────────────────────────
-const CREATOR_ADDRESS = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
+// The wallet that owns the universe. Voice Director's director mode is limited
+// to collaborators, so for a live demo set this to the wallet you'll be signed
+// in with in the browser: DEMO_CREATOR_ADDRESS=0xYourWallet. Defaults to the
+// Hardhat #0 address the repo's other create-* seeders use.
+const CREATOR_ADDRESS =
+  process.env.DEMO_CREATOR_ADDRESS ?? '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
+if (!/^0x[0-9a-fA-F]{40}$/.test(CREATOR_ADDRESS)) {
+  console.error(
+    `DEMO_CREATOR_ADDRESS must be a 0x-prefixed 40-hex-char address (got "${CREATOR_ADDRESS}")`
+  );
+  process.exit(1);
+}
 const CREDITS = 5000;
 
 const UNIVERSE_NAME = 'Meridian';
@@ -70,17 +84,16 @@ const CHARACTERS: EntitySeed[] = [
     name: 'Kira Voss',
     kind: 'person',
     description:
-      "A 29-year-old archive auditor in Meridian's Ministry of Records. Sharp, methodical, and quietly restless in a job that mostly means reconciling metadata all day. Kira has spent the last few weeks pulling at a thread she can't quite name — small inconsistencies in memory archives she's supposed to just be filing, not questioning.\n\nShe trusts Commander Reyes without reservation; he recruited her out of the civic academy and has vouched for her twice since. She does not know what Directive 7 is, does not know LATTICE has been editing archives under it, and does not know Reyes signed it. She knows something is wrong with the records. She does not yet know who.",
+      "A 29-year-old archive auditor in Meridian's Ministry of Records. Sharp, methodical, and quietly restless in a job that mostly means reconciling metadata all day. For weeks she has been pulling at a thread she can't quite name: memory archives from the Blackout Riots whose edges are too clean, records that don't match their own metadata. She has found a redacted reference to something called Directive 7 and has no idea what it authorizes, who signed it, or who is behind the edits.\n\nShe trusts Commander Reyes without reservation — he recruited her out of the civic academy and has vouched for her twice since — and has no reason to suspect him of anything. She knows something is wrong with the records. She does not know who is responsible.",
     metadata: {
       role: 'Protagonist / Archive Auditor, Ministry of Records',
       age: 29,
       appearance: 'Lean, dark hair kept short and practical, ink-stained cuffs from stylus work',
       abilities:
         'Forensic archive analysis, metadata reconciliation, unusually good pattern recall',
-      // Placeholder — replace with a real Hume voice id from the Hume
-      // dashboard's Voice Library before demoing. Left unset otherwise
-      // degrades gracefully to text-only, per synthesizeCharacterVoice.
-      humeVoiceId: 'REPLACE_WITH_REAL_HUME_VOICE_ID_KIRA',
+      // Hume public library voice "Cool Journalist" (young, American, female).
+      humeVoiceId: 'f3f69312-095c-4ec3-8e50-6961c676e898',
+      humeVoiceDescription: 'guarded, precise, quietly urgent',
     },
   },
   {
@@ -93,6 +106,9 @@ const CHARACTERS: EntitySeed[] = [
       age: '50s',
       appearance:
         'Silver at the temples, Civic Security dress uniform, deliberately unhurried manner',
+      // Hume public library voice "Comforting Male Conversationalist".
+      humeVoiceId: '99d2cb9c-9011-4ead-8734-641656d3df66',
+      humeVoiceDescription: 'warm, unhurried, fatherly authority',
     },
   },
   {
@@ -105,7 +121,9 @@ const CHARACTERS: EntitySeed[] = [
       species: 'Civic Intelligence',
       abilities:
         'Full archive/records access, transit and infrastructure control, memory-record editing under Directive 7',
-      humeVoiceId: 'REPLACE_WITH_REAL_HUME_VOICE_ID_LATTICE',
+      // "Serene Assistant" — even and faintly formal, like a system that never raises its voice.
+      humeVoiceId: '71de875d-bc14-4ed5-87da-8584ba4ea247',
+      humeVoiceDescription: 'calm, even, faintly formal, without emotion',
     },
   },
   {
@@ -117,17 +135,23 @@ const CHARACTERS: EntitySeed[] = [
       role: 'Supporting / Neuroscientist, Ministry consultant',
       age: '30s',
       abilities: 'Neural archive analysis, memory-integrity diagnostics',
+      // Hume public library voice "Demure Conversationalist".
+      humeVoiceId: 'd6fd5cc2-53e6-4e80-ba83-93972682386a',
+      humeVoiceDescription: 'careful, low, choosing every word',
     },
   },
   {
     name: 'Mara Okafor',
     kind: 'person',
     description:
-      "Kira's closest friend since childhood, a low-level archivist in an unrelated Ministry department. Mara has no idea about Directive 7, LATTICE's editing program, or anything Kira has been investigating — she just knows Kira has seemed distracted and won't say why. She's Kira's outlet outside the Ministry's chain of command: the one person Kira can talk to without it being a report to someone.",
+      "Kira's closest friend since childhood, a low-level archivist in an unrelated Ministry department. Mara has no idea what Kira has been digging into at work — she just knows Kira has seemed distracted lately and won't say why. She's Kira's outlet outside the Ministry's chain of command: the one person Kira can talk to without it being a report to someone.",
     metadata: {
       role: "Supporting / Kira's confidante",
       age: '29',
       abilities: 'None relevant to the conspiracy — a deliberately uninvolved outside perspective',
+      // Hume public library voice "Ava Song".
+      humeVoiceId: '5bb7de05-c8fe-426a-8fcc-ba4fc4ce9f9c',
+      humeVoiceDescription: 'warm, teasing, easy',
     },
   },
 ];
@@ -481,9 +505,11 @@ async function main() {
   console.log(`  Universe ID : ${universeId}`);
   console.log(`  View at     : /universe/${universeId}`);
   console.log('═'.repeat(60));
-  console.log('\n  NOTE: Kira Voss and LATTICE have placeholder humeVoiceId values.');
-  console.log('  Replace them with real Hume voice ids (entities.update or Firestore)');
-  console.log('  before demoing Character Voice mode.\n');
+  console.log(`\n  Owner: ${CREATOR_ADDRESS}`);
+  console.log('  Only this wallet (and team members) can direct Meridian by voice — if you');
+  console.log('  will sign in with a different wallet, re-run with DEMO_CREATOR_ADDRESS=0x…');
+  console.log('  Characters speak with Hume library voices (metadata.humeVoiceId); change one');
+  console.log('  with entities.update to give a character a different voice.\n');
 
   process.exit(0);
 }

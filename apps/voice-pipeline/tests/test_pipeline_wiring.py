@@ -107,6 +107,8 @@ async def test_director_mode_builds_the_full_tool_calling_pipeline(harness):
 
     llm = next(p for p in processors_of(task) if isinstance(p, SambaNovaLLMService))
     assert llm._settings.model == "Meta-Llama-3.3-70B-Instruct"
+    assert "Voice Director" in llm._settings.system_instruction
+    assert "Ep 1" in llm._settings.system_instruction  # the story tree is in the prompt
     registered = set(llm._functions)
     assert {"create_story_node", "create_story_branch", "update_story_node",
             "get_canon", "get_character", "get_universe_context",
@@ -123,6 +125,7 @@ async def test_character_mode_is_read_only_and_speaks_with_the_characters_own_hu
     procs = processors_of(harness.runner.task)
     llm = next(p for p in procs if isinstance(p, SambaNovaLLMService))
     assert not llm._functions  # a character can't mutate the universe
+    assert "She trusts Reyes." in llm._settings.system_instruction
     tts = next(p for p in procs if isinstance(p, HumeTTSService))
     assert tts._settings.voice == "hume-kira"
 

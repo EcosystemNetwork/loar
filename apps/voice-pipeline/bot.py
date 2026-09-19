@@ -121,17 +121,17 @@ async def run_bot(websocket, claims: dict[str, Any], settings: Settings) -> None
         llm = SambaNovaLLMService(
             api_key=settings.sambanova_api_key,
             settings=SambaNovaLLMService.Settings(
-                model=settings.sambanova_model, temperature=temperature, max_tokens=500
+                model=settings.sambanova_model,
+                temperature=temperature,
+                max_tokens=500,
+                system_instruction=system_prompt,
             ),
             **llm_kwargs,
         )
         if session is not None:
             register_tools(llm, session)
 
-        context = LLMContext(
-            messages=[{"role": "system", "content": system_prompt}],
-            **({"tools": tools} if tools else {}),
-        )
+        context = LLMContext(**({"tools": tools} if tools else {}))
         user_agg, assistant_agg = LLMContextAggregatorPair(
             context, user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer())
         )
@@ -147,7 +147,7 @@ async def run_bot(websocket, claims: dict[str, Any], settings: Settings) -> None
             # Tool *names* reach the browser (for the live action checklist);
             # arguments and results never do.
             rtvi_observer_params=RTVIObserverParams(
-                function_call_report_level={"*": RTVIFunctionCallReportLevel.NAME}
+                function_call_report_level={"*": RTVIFunctionCallReportLevel.NAME},
             ),
         )
 

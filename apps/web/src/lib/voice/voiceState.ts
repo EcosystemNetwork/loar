@@ -75,6 +75,9 @@ export function stepLabel(step: ToolStep): string {
 
 function upsertUserTranscript(state: VoiceState, text: string, final: boolean): VoiceState {
   const last = state.transcript[state.transcript.length - 1];
+  // Providers can re-emit the same final transcript (e.g. an end-of-turn
+  // signal followed by the aggregator's own final); don't show it twice.
+  if (last && last.role === 'user' && last.final && last.text === text) return state;
   if (last && last.role === 'user' && !last.final) {
     const updated = { ...last, text, final };
     return { ...state, transcript: [...state.transcript.slice(0, -1), updated] };

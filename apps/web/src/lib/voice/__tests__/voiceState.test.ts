@@ -39,6 +39,16 @@ describe('voiceReducer', () => {
     ]);
   });
 
+  it('does not duplicate a final transcript that the pipeline emits twice', () => {
+    const state = run([
+      rtvi('user-transcription', { text: 'Create a scene.', final: true }),
+      rtvi('user-transcription', { text: 'Create a scene.', final: true }),
+    ]);
+    expect(state.transcript).toHaveLength(1);
+    const next = run([rtvi('user-transcription', { text: 'And another.', final: true })], state);
+    expect(next.transcript).toHaveLength(2);
+  });
+
   it('upserts bot output by segment id so streaming updates do not duplicate lines', () => {
     const state = run([
       rtvi('bot-output', { text: 'Kira found', segment_id: 3 }),
