@@ -90,18 +90,45 @@ function EpisodeStudioPage() {
   const [clips, setClips] = useState<EpisodeClip[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pasteUrl, setPasteUrl] = useState('');
-  const [hydrated, setHydrated] = useState(false);
+  // Which episode the local editing state was hydrated from. Keyed by id (not
+  // a boolean) so navigating episode → episode in the same mounted component
+  // re-hydrates instead of showing — and then saving over the new episode with —
+  // the previous one's clips.
+  const [hydratedFor, setHydratedFor] = useState<string | null>(null);
+  // JSON of the last saved/loaded editable state, for the unsaved-changes guard.
+  const [savedSnapshot, setSavedSnapshot] = useState('');
 
   // Hydrate local editing state once per episode load — mirrors
   // EpisodeBuilder/UniverseProfileEditor: don't clobber in-progress local
   // edits on background refetches.
   useEffect(() => {
-    if (!episodeQuery.data || hydrated) return;
-    setTitle(episodeQuery.data.title || '');
-    setDescription(episodeQuery.data.description || '');
-    setClips((episodeQuery.data.clips as EpisodeClip[]) || []);
-    setHydrated(true);
-  }, [episodeQuery.data, hydrated]);
+    if (!episodeQuery.data || hydratedFor === episodeId) return;
+    const nextTitle = episodeQuery.data.title || '';
+    const nextDescription = episodeQuery.data.description || '';
+    const nextClips = (episodeQuery.data.clips as EpisodeClip[]) || [];
+    setTitle(nextTitle);
+    setDescription(nextDescription);
+    setClips(nextClips);
+    setSelectedIds(new Set());
+    setMergeJobId(null);
+    setExportJobId(null);
+    setSavedSnapshot(JSON.stringify({ title: nextTitle, description: nextDescription, nextClips }));
+    setHydratedFor(episodeId);
+  }, [episodeQuery.data, hydratedFor, episodeId]);
+
+  const currentSnapshot = JSON.stringify({ title, description, nextClips: clips });
+  const isDirty = hydratedFor === episodeId && currentSnapshot !== savedSnapshot;
+
+  // Warn on tab close / reload with unsaved edits.
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
 
   const toggleSelect = (nodeId: string) => {
     setSelectedIds((prev) => {
@@ -123,6 +150,7 @@ function EpisodeStudioPage() {
       });
     },
     onSuccess: () => {
+      setSavedSnapshot(currentSnapshot);
       toast.success('Episode saved');
       queryClient.invalidateQueries({ queryKey: ['episode', episodeId] });
     },
@@ -142,7 +170,10 @@ function EpisodeStudioPage() {
       const { jobId } = await trpcClient.episodes.export.mutate({ episodeId });
       return jobId;
     },
-    onSuccess: (jobId) => setExportJobId(jobId),
+    onSuccess: (jobId) => {
+      setSavedSnapshot(currentSnapshot);
+      setExportJobId(jobId);
+    },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Export failed to start'),
   });
 
@@ -179,9 +210,14 @@ function EpisodeStudioPage() {
 
   // ── Merge selected clips into one persistent library clip ─────────────
   const [mergeJobId, setMergeJobId] = useState<string | null>(null);
+  // The clip ids sent to the merge, captured when it starts. The completion
+  // handler must use these, not the live selection — the user can change the
+  // selection while the render runs, which removed the wrong clips (or none).
+  const [mergeSourceIds, setMergeSourceIds] = useState<string[]>([]);
   const mergeMutation = useMutation({
     mutationFn: async () => {
       const selected = clips.filter((c) => selectedIds.has(c.nodeId));
+      setMergeSourceIds(selected.map((c) => c.nodeId));
       const { jobId } = await trpcClient.clipLibrary.merge.mutate({
         universeId,
         clips: selected.map((c) => ({
@@ -214,9 +250,10 @@ function EpisodeStudioPage() {
     if (status.status === 'completed' && status.outputUrl) {
       // Replace the merged-away clips with one new clip pointing at the
       // library asset, in the position of the first selected clip.
+      const sources = new Set(mergeSourceIds);
       setClips((prev) => {
-        const firstIndex = prev.findIndex((c) => selectedIds.has(c.nodeId));
-        const kept = prev.filter((c) => !selectedIds.has(c.nodeId));
+        const firstIndex = prev.findIndex((c) => sources.has(c.nodeId));
+        const kept = prev.filter((c) => !sources.has(c.nodeId));
         const mergedClip: EpisodeClip = {
           nodeId: `clip:${status.clipAssetId}`,
           label: `Merged clip`,
@@ -227,8 +264,9 @@ function EpisodeStudioPage() {
         const insertAt = firstIndex === -1 ? kept.length : Math.min(firstIndex, kept.length);
         return [...kept.slice(0, insertAt), mergedClip, ...kept.slice(insertAt)];
       });
-      setSelectedIds(new Set());
+      setSelectedIds((prev) => new Set([...prev].filter((nid) => !sources.has(nid))));
       setMergeJobId(null);
+      setMergeSourceIds([]);
       toast.success('Clips merged');
       queryClient.invalidateQueries({ queryKey: ['clipLibrary', universeId] });
     }
@@ -246,16 +284,23 @@ function EpisodeStudioPage() {
   });
 
   const addLibraryClipToEpisode = (asset: ClipAsset) => {
-    setClips((prev) => [
-      ...prev,
-      {
-        nodeId: `clip:${asset.id}`,
-        label: asset.label,
-        videoUrl: asset.videoUrl,
-        trimStart: 0,
-        trimEnd: 0,
-      },
-    ]);
+    setClips((prev) => {
+      // nodeId is the React key + selection/trim/remove handle, so adding the
+      // same asset twice must not reuse it.
+      const taken = new Set(prev.map((c) => c.nodeId));
+      let nodeId = `clip:${asset.id}`;
+      for (let n = 2; taken.has(nodeId); n++) nodeId = `clip:${asset.id}#${n}`;
+      return [
+        ...prev,
+        {
+          nodeId,
+          label: asset.label,
+          videoUrl: asset.videoUrl,
+          trimStart: 0,
+          trimEnd: 0,
+        },
+      ];
+    });
     toast.success(`Added "${asset.label}" to the episode`);
   };
 
@@ -296,6 +341,11 @@ function EpisodeStudioPage() {
         <Link
           to="/universe/$id"
           params={{ id: universeId }}
+          onClick={(e) => {
+            if (isDirty && !window.confirm('You have unsaved changes. Leave without saving?')) {
+              e.preventDefault();
+            }
+          }}
           className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />

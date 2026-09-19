@@ -30,7 +30,11 @@ export function useNodeArcs(universeId: string) {
   const persist = useCallback(
     (next: ArcDefinition[]) => {
       setArcs(next);
-      localStorage.setItem(storageKey(universeId), JSON.stringify(next));
+      try {
+        localStorage.setItem(storageKey(universeId), JSON.stringify(next));
+      } catch {
+        // quota / private mode — arcs still work for this session
+      }
     },
     [universeId]
   );
@@ -87,6 +91,17 @@ export function useNodeArcs(universeId: string) {
     [arcs, persist]
   );
 
+  /** Drop deleted nodes from every arc so they don't linger as stale ids. */
+  const pruneNodes = useCallback(
+    (nodeIds: string[]) => {
+      if (nodeIds.length === 0) return;
+      const gone = new Set(nodeIds);
+      if (!arcs.some((a) => a.nodeIds.some((nid) => gone.has(nid)))) return;
+      persist(arcs.map((a) => ({ ...a, nodeIds: a.nodeIds.filter((nid) => !gone.has(nid)) })));
+    },
+    [arcs, persist]
+  );
+
   const getArcForNode = useCallback(
     (nodeId: string): ArcDefinition | undefined => {
       return arcs.find((a) => a.nodeIds.includes(nodeId));
@@ -101,6 +116,7 @@ export function useNodeArcs(universeId: string) {
     renameArc,
     addNodesToArc,
     removeNodesFromArc,
+    pruneNodes,
     getArcForNode,
   };
 }

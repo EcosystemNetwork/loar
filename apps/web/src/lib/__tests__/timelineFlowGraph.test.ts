@@ -694,3 +694,30 @@ describe('end-to-end: an offChainNodes chain renders as a full canvas', () => {
     ]);
   });
 });
+
+describe('mergeDraftNodes — remove-video tombstone', () => {
+  it('keeps a draft whose video was removed on the canvas, without its videoUrl', () => {
+    const out = mergeDraftNodes({
+      nodes: [],
+      edges: [],
+      localEvents: { '5': { eventId: '5', title: 'x', videoRemoved: true, timestamp: 1 } },
+      onChainNodeIds: new Set(),
+      universeId: 'u',
+      timelineId: 't',
+    });
+    expect(out.nodes).toHaveLength(1);
+    expect(out.nodes[0].data.videoUrl).toBeUndefined();
+  });
+
+  it('still drops a draft that has neither a video nor a tombstone', () => {
+    const out = mergeDraftNodes({
+      nodes: [],
+      edges: [],
+      localEvents: { '5': { eventId: '5', title: 'x' } },
+      onChainNodeIds: new Set(),
+      universeId: 'u',
+      timelineId: 't',
+    });
+    expect(out.nodes).toHaveLength(0);
+  });
+});

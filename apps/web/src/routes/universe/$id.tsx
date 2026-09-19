@@ -119,6 +119,7 @@ import { GovernanceSidebar } from '@/components/GovernanceSidebar';
 import { GenerationsPanel } from '@/components/GenerationsPanel';
 import { AudioToolbar, type SelectedClip } from '@/components/AudioToolbar';
 import { calculateTreeLayout, normalizeNodeId } from '@/utils/treeLayout';
+import { nextSceneEventId } from '@/lib/sceneEventId';
 import {
   buildSceneFlowGraph,
   mergeDraftNodes,
@@ -520,6 +521,10 @@ function UniverseTimelineEditorInner() {
 
   // Node Management hooks
   const nodeArcs = useNodeArcs(id);
+  // Ref so delete handlers can prune arcs without taking `nodeArcs` (a fresh
+  // object every render) as a dependency — that would rebuild the graph.
+  const pruneArcNodesRef = useRef<(ids: string[]) => void>(() => {});
+  pruneArcNodesRef.current = nodeArcs.pruneNodes;
   const nodeFilter = useNodeFilter(nodes, nodeArcs.arcs);
 
   // Canvas UI state
@@ -597,9 +602,14 @@ function UniverseTimelineEditorInner() {
       }
 
       // 2. Check localStorage (just-created universes before Firestore record exists)
-      const stored = localStorage.getItem('createdUniverses');
-      const universes = stored ? JSON.parse(stored) : [];
-      const found = universes.find((u: any) => u.id === id);
+      let found: any;
+      try {
+        const stored = localStorage.getItem('createdUniverses');
+        const universes = stored ? JSON.parse(stored) : [];
+        found = Array.isArray(universes) ? universes.find((u: any) => u?.id === id) : undefined;
+      } catch {
+        // Corrupt/blocked storage — treat as "not found locally" and keep falling through.
+      }
       if (found) return found;
 
       // 3. Fall back to indexer (on-chain immutable values)
@@ -1102,6 +1112,17 @@ function UniverseTimelineEditorInner() {
       const nodeFlowId = nodeToDelete.id;
       const isBlockchain = nodeFlowId.startsWith('blockchain-node-');
 
+      // Same guard as bulk delete: deleting the last scene is a local soft-archive
+      // with no restore UI, which blanks the editor on the next load.
+      const sceneCount = nodesRef.current.filter((n) => n.data.nodeType === 'scene').length;
+      if (sceneCount <= 1) {
+        toast.error("Can't delete the last scene", {
+          description: 'Leave at least one node on the canvas.',
+        });
+        return;
+      }
+      pruneArcNodesRef.current([nodeFlowId]);
+
       if (isBlockchain) {
         // Soft-delete: archive the blockchain node (can't delete from chain)
         const archived = getArchivedNodeIds();
@@ -1182,6 +1203,7 @@ function UniverseTimelineEditorInner() {
 
     saveArchivedNodeIds(archived);
     setStoredEvents(eventsData);
+    pruneArcNodesRef.current([...selectedNodeIds]);
 
     // Remove all selected nodes and their edges from the flow
     setNodes((nds: any) => nds.filter((n: any) => !selectedNodeIds.has(n.id)));
@@ -1361,8 +1383,19 @@ function UniverseTimelineEditorInner() {
   );
 
   // ── Undo / Redo ────────────────────────────────────────────────────
+  // Undo snapshots are JSON-cloned, which drops the action callbacks on
+  // `node.data`. `restoreNodesRef` (assigned once the handlers below exist)
+  // re-attaches them and persists the restored positions.
+  const restoreNodesRef = useRef<(ns: Node<TimelineNodeData>[]) => Node<TimelineNodeData>[]>(
+    (ns) => ns
+  );
   const { pushUndoState, handleUndo, handleRedo, canUndo, canRedo, isUndoRedoAction } =
-    useUndoRedo<TimelineNodeData>(nodes, edges, setNodes as any, setEdges, 50);
+    useUndoRedo<TimelineNodeData>(nodes, edges, setNodes as any, setEdges, 50, (ns) =>
+      restoreNodesRef.current(ns)
+    );
+  // One undo entry per drag, snapshotted at drag *start* — at drag end the
+  // moved position is already in state, so undo restored the same place.
+  const dragUndoPushedRef = useRef(false);
 
   // ── Node Search ───────────────────────────────────────────────────
   const searchResults = useMemo(() => {
@@ -1397,18 +1430,15 @@ function UniverseTimelineEditorInner() {
     const sceneNodes = nodes.filter((n: any) => n.data.nodeType === 'scene');
     if (sceneNodes.length === 0) return;
 
-    // Build ID arrays for the layout algorithm
-    const nodeIds = sceneNodes.map((n: any) => {
-      const eid = n.data.blockchainNodeId || parseInt(n.data.eventId) || 0;
-      return eid;
-    });
+    // Key the layout by a unique 1-based index per scene node. Deriving the key
+    // from `parseInt(eventId)` collapsed drafts ("1b", "dup-…") onto the same
+    // id as real nodes ("1") or onto 0 (= root), stacking them.
+    const layoutKeyByFlowId: Record<string, number> = {};
+    sceneNodes.forEach((n: any, i: number) => (layoutKeyByFlowId[n.id] = i + 1));
+    const nodeIds = sceneNodes.map((n: any) => layoutKeyByFlowId[n.id]);
     const previousNodes = sceneNodes.map((n: any) => {
-      // Find parent from edges
-      const parentEdge = edges.find((e) => e.target === n.id);
-      if (!parentEdge) return 0;
-      const parentNode = sceneNodes.find((pn: any) => pn.id === parentEdge.source);
-      if (!parentNode) return 0;
-      return parentNode.data.blockchainNodeId || parseInt(parentNode.data.eventId) || 0;
+      const parentEdge = edges.find((e) => e.target === n.id && e.source in layoutKeyByFlowId);
+      return parentEdge ? layoutKeyByFlowId[parentEdge.source] : 0;
     });
 
     const layout = calculateTreeLayout(nodeIds, previousNodes, {
@@ -1429,9 +1459,7 @@ function UniverseTimelineEditorInner() {
           if (sourceEdge) {
             const sourceNode = nds.find((sn: any) => sn.id === sourceEdge.source);
             if (sourceNode) {
-              const sourcePos = layout.nodePositions.get(
-                sourceNode.data.blockchainNodeId || parseInt(sourceNode.data.eventId) || 0
-              );
+              const sourcePos = layout.nodePositions.get(layoutKeyByFlowId[sourceNode.id] ?? -1);
               if (sourcePos) {
                 const pos = { x: sourcePos.x + 420, y: sourcePos.y };
                 savePosition(n.id, pos);
@@ -1441,8 +1469,7 @@ function UniverseTimelineEditorInner() {
           }
           return n;
         }
-        const eid = n.data.blockchainNodeId || parseInt(n.data.eventId) || 0;
-        const pos = layout.nodePositions.get(eid);
+        const pos = layout.nodePositions.get(layoutKeyByFlowId[n.id] ?? -1);
         if (pos) savePosition(n.id, pos);
         return pos ? { ...n, position: pos } : n;
       })
@@ -1593,7 +1620,9 @@ function UniverseTimelineEditorInner() {
         return;
       }
 
-      const currentVideoUrl = eventData.videoUrl;
+      // The *latest* video, not whatever version is currently displayed —
+      // after "switch version" `videoUrl` holds a historical clip.
+      const currentVideoUrl = eventData.latestVideoUrl || eventData.videoUrl;
       if (!currentVideoUrl) {
         toast.error('No existing video to regenerate. Use Edit to add a video first.');
         return;
@@ -1681,6 +1710,8 @@ function UniverseTimelineEditorInner() {
           eventsData[eventId] = {
             ...eventData,
             videoUrl: result.videoUrl,
+            latestVideoUrl: result.videoUrl,
+            videoRemoved: undefined,
             videoVersions: versions,
             currentVersionIndex: -1, // -1 = latest
             timestamp: Date.now(),
@@ -1802,6 +1833,7 @@ function UniverseTimelineEditorInner() {
     const newNodes: Node<TimelineNodeData>[] = [];
     const newEdges: Edge[] = [];
     const idMapping: Record<string, string> = {}; // oldId -> newId
+    const dupEventIdByFlowId: Record<string, string> = {}; // oldFlowId -> new eventId
 
     // First pass: create duplicated nodes with new IDs
     for (const nodeFlowId of selectedNodeIds) {
@@ -1820,21 +1852,32 @@ function UniverseTimelineEditorInner() {
       const offsetX = 60;
       const offsetY = 180;
 
-      // Copy local event data
-      const sourceEventData = eventsData[eventId];
-      if (sourceEventData) {
-        eventsData[newEventId] = {
-          ...sourceEventData,
-          eventId: newEventId,
-          title: `${sourceEventData.title || `Event ${eventId}`} (copy)`,
-          timestamp: Date.now(),
-        };
-      }
+      const newPosition = { x: node.position.x + offsetX, y: node.position.y + offsetY };
+
+      // Persist the copy so it survives a reload. Duplicating an on-chain node
+      // usually has no local event record, and a draft only re-renders when it
+      // has one with a videoUrl — so seed it from the node itself. Position is
+      // the copy's own (the spread used to carry the source's, stacking the
+      // copy on the original after reload).
+      const sourceEventData = eventsData[eventId] ?? {
+        description: node.data.description,
+        videoUrl: node.data.videoUrl,
+      };
+      eventsData[newEventId] = {
+        ...sourceEventData,
+        eventId: newEventId,
+        title: `${sourceEventData.title || node.data.label || `Event ${eventId}`} (copy)`,
+        timestamp: Date.now(),
+        position: newPosition,
+        sourceNodeId: undefined, // resolved in the second pass
+        canonOverride: undefined,
+      };
+      dupEventIdByFlowId[nodeFlowId] = newEventId;
 
       newNodes.push({
         id: newFlowId,
         type: 'timelineEvent',
-        position: { x: node.position.x + offsetX, y: node.position.y + offsetY },
+        position: newPosition,
         data: {
           ...node.data,
           label: `${node.data.label} (copy)`,
@@ -1853,12 +1896,32 @@ function UniverseTimelineEditorInner() {
       });
     }
 
-    // Second pass: recreate edges between duplicated nodes
+    // Second pass: recreate edges between duplicated nodes, and hang each
+    // duplicated subtree root off its original parent — the same link
+    // mergeDraftNodes rebuilds after a reload (via `sourceNodeId`).
     const currentEdges = edges;
     for (const edge of currentEdges) {
       const newSource = idMapping[edge.source];
       const newTarget = idMapping[edge.target];
+      if (!newSource && newTarget) {
+        const parent = nodesRef.current.find((n) => n.id === edge.source);
+        if (parent?.data.nodeType === 'scene' && parent.data.eventId) {
+          const dupEventId = dupEventIdByFlowId[edge.target];
+          if (dupEventId) eventsData[dupEventId].sourceNodeId = parent.data.eventId;
+          newEdges.push({
+            id: `edge-dup-${edge.source}-${newTarget}`,
+            source: edge.source,
+            target: newTarget,
+            animated: true,
+            style: { stroke: '#8b5cf6', strokeWidth: 3 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: '#8b5cf6' },
+          });
+        }
+      }
       if (newSource && newTarget) {
+        const srcDup = dupEventIdByFlowId[edge.source];
+        const dstDup = dupEventIdByFlowId[edge.target];
+        if (srcDup && dstDup) eventsData[dstDup].sourceNodeId = srcDup;
         newEdges.push({
           id: `edge-dup-${newSource}-${newTarget}`,
           source: newSource,
@@ -1922,42 +1985,50 @@ function UniverseTimelineEditorInner() {
     setNodes((nds: any) => nds.map((n: any) => ({ ...n, selected: inverted.has(n.id) })));
   }, [nodes, selectedNodeIds, setNodes]);
 
-  // Toggle canon on selected nodes (local-only toggle)
+  // Set canon on the given nodes and persist it in the event store (as
+  // `canonOverride`) so it survives graph rebuilds and reloads — it used to
+  // live only in React state and reverted on the next refetch.
+  const applyCanon = useCallback(
+    (flowIds: Set<string>, value: boolean) => {
+      const eventsData = getStoredEvents();
+      for (const n of nodesRef.current) {
+        if (!flowIds.has(n.id) || n.data.nodeType !== 'scene' || !n.data.eventId) continue;
+        eventsData[n.data.eventId] = {
+          ...(eventsData[n.data.eventId] ?? { eventId: n.data.eventId }),
+          canonOverride: value,
+        };
+      }
+      setStoredEvents(eventsData);
+      setNodes((nds: any) =>
+        nds.map((n: any) =>
+          flowIds.has(n.id) && n.data.nodeType === 'scene'
+            ? { ...n, data: { ...n.data, isInCanonChain: value, isCanon: value } }
+            : n
+        )
+      );
+    },
+    [getStoredEvents, setStoredEvents, setNodes]
+  );
+
+  // Toggle canon on selected nodes: if every selected node is canon, clear it;
+  // otherwise set it on all (a mixed selection becomes uniform, not swapped).
   const handleToggleCanon = useCallback(() => {
     if (selectedNodeIds.size === 0) return;
-    setNodes((nds: any) =>
-      nds.map((n: any) => {
-        if (!selectedNodeIds.has(n.id)) return n;
-        return {
-          ...n,
-          data: {
-            ...n.data,
-            isInCanonChain: !n.data.isInCanonChain,
-            isCanon: !n.data.isCanon,
-          },
-        };
-      })
+    const selected = nodesRef.current.filter(
+      (n: any) => selectedNodeIds.has(n.id) && n.data.nodeType === 'scene'
     );
-  }, [selectedNodeIds, setNodes]);
+    if (selected.length === 0) return;
+    applyCanon(selectedNodeIds, !selected.every((n: any) => n.data.isInCanonChain));
+  }, [selectedNodeIds, applyCanon]);
 
   // Toggle canon on a single node
   const handleToggleCanonSingle = useCallback(
     (nodeId: string) => {
-      setNodes((nds: any) =>
-        nds.map((n: any) => {
-          if (n.id !== nodeId) return n;
-          return {
-            ...n,
-            data: {
-              ...n.data,
-              isInCanonChain: !n.data.isInCanonChain,
-              isCanon: !n.data.isCanon,
-            },
-          };
-        })
-      );
+      const node = nodesRef.current.find((n) => n.id === nodeId);
+      if (!node) return;
+      applyCanon(new Set([nodeId]), !node.data.isInCanonChain);
     },
-    [setNodes]
+    [applyCanon]
   );
 
   // Duplicate a single node (for context menu)
@@ -2024,11 +2095,35 @@ function UniverseTimelineEditorInner() {
   );
 
   // ── Keyboard Shortcuts ────────────────────────────────────────────
+  restoreNodesRef.current = (ns) =>
+    ns.map((n) => {
+      if (n.data.nodeType !== 'add') savePosition(n.id, n.position);
+      n.data.onAddScene = handleAddEvent;
+      if (n.data.nodeType !== 'add') {
+        n.data.onEditScene = handleEditScene;
+        n.data.onRegenerateScene = handleRegenerateScene;
+        n.data.onSwitchVersion = handleSwitchVersion;
+        n.data.onDeleteNode = handleDeleteNode;
+      }
+      return n;
+    });
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(
-        (e.target as HTMLElement)?.tagName || ''
-      );
+      const target = e.target as HTMLElement | null;
+      const isInput =
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName || '') ||
+        !!target?.isContentEditable;
+
+      // Don't fire canvas shortcuts (delete, duplicate, canon…) at the graph
+      // behind an open modal.
+      if (
+        document.querySelector(
+          '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]'
+        )
+      ) {
+        return;
+      }
 
       // Ctrl/Cmd+K — search & filter
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -2044,8 +2139,14 @@ function UniverseTimelineEditorInner() {
         return;
       }
 
-      // Ctrl/Cmd+Z — undo, Ctrl/Cmd+Shift+Z — redo
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !isInput) {
+      // Ctrl/Cmd+Z — undo, Ctrl/Cmd+Shift+Z / Ctrl+Y — redo. Shift makes
+      // `e.key` uppercase ('Z'), so compare case-insensitively.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y' && !isInput) {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !isInput) {
         e.preventDefault();
         if (e.shiftKey) {
           handleRedo();
@@ -2091,6 +2192,12 @@ function UniverseTimelineEditorInner() {
       if (e.key === 'g' && !e.metaKey && !e.ctrlKey && selectedNodeIds.size > 0) {
         if (nodeArcs.arcs.length === 1) {
           nodeArcs.addNodesToArc(nodeArcs.arcs[0].id, [...selectedNodeIds]);
+        } else {
+          toast(
+            nodeArcs.arcs.length === 0
+              ? 'Create an arc first (selection toolbar → arcs)'
+              : 'Multiple arcs — use the selection toolbar or right-click to pick one'
+          );
         }
         return;
       }
@@ -2131,7 +2238,7 @@ function UniverseTimelineEditorInner() {
         e.preventDefault();
         setConfirmDialog({
           title: 'Delete selected events?',
-          description: `Delete ${selectedNodeIds.size} selected event${selectedNodeIds.size > 1 ? 's' : ''} from the universe? This cannot be undone.`,
+          description: `Remove ${selectedNodeIds.size} selected event${selectedNodeIds.size > 1 ? 's' : ''} from your timeline? On-chain nodes are only hidden in this browser; local drafts are permanently removed.`,
           confirmLabel: 'Delete',
           onConfirm: handleDeleteSelected,
         });
@@ -2293,6 +2400,7 @@ function UniverseTimelineEditorInner() {
       }
       existingEvent.videoUrl = finalUrl;
       existingEvent.latestVideoUrl = finalUrl;
+      delete existingEvent.videoRemoved;
       existingEvent.currentVersionIndex = -1;
       eventsData[editingEventId] = existingEvent;
     } else {
@@ -2348,11 +2456,19 @@ function UniverseTimelineEditorInner() {
     if (!editingEventId) return;
 
     // Clear from localStorage
+    // Tombstone rather than delete: dropping `videoUrl` alone let the on-chain
+    // URL reappear on the next rebuild and made drafts (which require a
+    // videoUrl to render) vanish on reload.
     const eventsData = getStoredEvents();
-    if (eventsData[editingEventId]) {
-      delete eventsData[editingEventId].videoUrl;
-      setStoredEvents(eventsData);
-    }
+    const existing = eventsData[editingEventId] ?? { eventId: editingEventId };
+    eventsData[editingEventId] = {
+      ...existing,
+      videoRemoved: true,
+      videoUrl: undefined,
+      latestVideoUrl: undefined,
+      timestamp: Date.now(),
+    };
+    setStoredEvents(eventsData);
 
     // Clear videoUrl from the node
     setNodes((nds: any) =>
@@ -2387,7 +2503,8 @@ function UniverseTimelineEditorInner() {
 
     setConfirmDialog({
       title: 'Delete event?',
-      description: 'Delete this event from the universe? This cannot be undone.',
+      description:
+        'Remove this event from your timeline? On-chain nodes are only hidden in this browser; local drafts are permanently removed.',
       confirmLabel: 'Delete',
       onConfirm: () => {
         handleDeleteNode(eventIdToDelete);
@@ -2471,63 +2588,29 @@ function UniverseTimelineEditorInner() {
       const lastEventNode = nodes.filter((n: any) => n.data.nodeType === 'scene').pop();
       const referenceNode = sourceNode || lastEventNode;
 
-      // Generate appropriate event ID based on addition type - Keep universe branch logic
-      let newEventId: string;
-      let newAddId: string;
-
-      if (additionType === 'branch' && sourceNodeId) {
-        // For branches, add a letter suffix to the source node ID
-        const sourceEventId = sourceNodeId;
-
-        // Find all existing branches from this source node
-        const existingBranches = nodes.filter((n: any) => {
-          const eventId = n.data.eventId?.toString();
-          return eventId && eventId.startsWith(sourceEventId) && /[a-z]/.test(eventId);
-        });
-
-        // Determine the next branch letter
-        const branchLetter = String.fromCharCode(98 + existingBranches.length); // 'b', 'c', 'd', etc.
-        newEventId = `${sourceEventId}${branchLetter}`;
-        newAddId = `add-${newEventId}`;
-      } else {
-        // For linear continuation, determine if we're continuing a branch or main timeline
-        const sceneNodes = nodes.filter((n: any) => n.data.nodeType === 'scene');
-
-        if (sceneNodes.length === 0) {
-          // First event
-          newEventId = '1';
-        } else {
-          // Find the rightmost (last added) event to continue from
-          const lastNode = sceneNodes.reduce((latest: any, node: any) => {
-            if (!latest) return node;
-            // Compare positions to find the rightmost node
-            return node.position.x > latest.position.x ? node : latest;
-          }, null);
-
-          const lastEventId = lastNode?.data.eventId?.toString();
-
-          if (lastEventId && /[a-z]/.test(lastEventId)) {
-            // We're continuing a branch (e.g., from "1b" to "1c")
-            const baseNumber = lastEventId.replace(/[a-z]/g, '');
-            const lastLetter = lastEventId.match(/[a-z]/)?.[0] || 'a';
-            const nextLetter = String.fromCharCode(lastLetter.charCodeAt(0) + 1);
-            newEventId = `${baseNumber}${nextLetter}`;
-          } else {
-            // We're continuing the main timeline (e.g., from "2" to "3")
-            const maxEventId = sceneNodes.reduce((max: number, node: any) => {
-              const eventId = node.data.eventId;
-              if (eventId) {
-                // Extract numeric part only (ignore branch suffixes like 'b', 'c')
-                const numericId = parseInt(eventId.toString().replace(/[a-z]/g, ''));
-                return !isNaN(numericId) ? Math.max(max, numericId) : max;
-              }
-              return max;
-            }, 0);
-            newEventId = String(maxEventId + 1);
-          }
-        }
-        newAddId = `add-${newEventId}`;
+      // Allocate an id that can't collide with anything already in play: canvas
+      // nodes, locally stored events (incl. drafts not on the canvas), or the
+      // on-chain ids. See lib/sceneEventId.ts.
+      const existingIds = new Set<string>();
+      for (const n of nodes) {
+        if (n.data.eventId) existingIds.add(String(n.data.eventId));
+        existingIds.add(n.id);
       }
+      for (const k of Object.keys(getStoredEvents())) existingIds.add(k);
+      for (const nid of graphData.nodeIds) existingIds.add(normalizeNodeId(nid).toString());
+
+      const sceneNodesForId = nodes.filter((n: any) => n.data.nodeType === 'scene');
+      const rightmostScene = sceneNodesForId.reduce<any>(
+        (latest, node: any) => (!latest || node.position.x > latest.position.x ? node : latest),
+        null
+      );
+      const newEventId = nextSceneEventId({
+        additionType,
+        sourceEventId: sourceNode?.data.eventId?.toString() ?? sourceNodeId,
+        lastEventId: rightmostScene?.data.eventId?.toString() ?? null,
+        existingIds,
+      });
+      const newAddId = `add-${newEventId}`;
 
       // Calculate position based on addition type and depth in tree
       let newEventPosition;
@@ -2729,6 +2812,7 @@ function UniverseTimelineEditorInner() {
       generatedImageUrl,
       getStoredEvents,
       setStoredEvents,
+      graphData.nodeIds,
     ]
   );
 
@@ -3167,10 +3251,16 @@ function UniverseTimelineEditorInner() {
               edges={edges}
               onNodesChange={(changes) => {
                 if (!isUndoRedoAction.current) {
-                  const hasDrag = changes.some(
-                    (c) => c.type === 'position' && c.dragging === false
-                  );
-                  if (hasDrag) pushUndoState();
+                  if (
+                    !dragUndoPushedRef.current &&
+                    changes.some((c) => c.type === 'position' && c.dragging === true)
+                  ) {
+                    dragUndoPushedRef.current = true;
+                    pushUndoState();
+                  }
+                  if (changes.some((c) => c.type === 'position' && c.dragging === false)) {
+                    dragUndoPushedRef.current = false;
+                  }
                 }
                 for (const change of changes) {
                   if (change.type === 'position' && change.position && !change.dragging) {

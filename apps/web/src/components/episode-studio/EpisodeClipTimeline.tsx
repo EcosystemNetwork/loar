@@ -13,7 +13,15 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { GripVertical, Trash2, Scissors, Download, Music } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  GripVertical,
+  Trash2,
+  Scissors,
+  Download,
+  Music,
+} from 'lucide-react';
 import { VideoTrimmer } from '@/components/segments/VideoTrimmer';
 import type { VideoSegment } from '@/types/segments';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
@@ -59,6 +67,11 @@ function clipToTrimmerSegment(clip: EpisodeClip): VideoSegment {
   };
 }
 
+// Trims arrive as raw floats from the trimmer (ms / 1000); keep the badge readable.
+function formatSeconds(n: number): string {
+  return String(Math.round(n * 10) / 10);
+}
+
 export function EpisodeClipTimeline({
   clips,
   selectedIds,
@@ -86,6 +99,15 @@ export function EpisodeClipTimeline({
     setHoveredId(null);
   };
 
+  // Keyboard/touch-friendly reorder (native HTML5 drag is mouse-only).
+  const move = (index: number, delta: -1 | 1) => {
+    const target = index + delta;
+    if (target < 0 || target >= clips.length) return;
+    const next = [...clips];
+    [next[index], next[target]] = [next[target], next[index]];
+    onReorder(next);
+  };
+
   if (clips.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
@@ -104,6 +126,10 @@ export function EpisodeClipTimeline({
             <div
               draggable
               onDragStart={() => setDraggedId(clip.nodeId)}
+              onDragEnd={() => {
+                setDraggedId(null);
+                setHoveredId(null);
+              }}
               onDragOver={(e) => {
                 e.preventDefault();
                 if (draggedId && draggedId !== clip.nodeId) setHoveredId(clip.nodeId);
@@ -142,7 +168,8 @@ export function EpisodeClipTimeline({
                   {isTrimmed && (
                     <Badge variant="outline" className="gap-1 text-[9px]">
                       <Scissors className="h-2.5 w-2.5" />
-                      {clip.trimStart}s–{clip.trimEnd > 0 ? `${clip.trimEnd}s` : 'end'}
+                      {formatSeconds(clip.trimStart)}s–
+                      {clip.trimEnd > 0 ? `${formatSeconds(clip.trimEnd)}s` : 'end'}
                     </Badge>
                   )}
                   {clip.audioUrl && (
@@ -154,6 +181,28 @@ export function EpisodeClipTimeline({
                 </div>
               </div>
               <div className="flex flex-shrink-0 items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs"
+                  disabled={index === 0}
+                  onClick={() => move(index, -1)}
+                  title="Move earlier"
+                  aria-label="Move earlier"
+                >
+                  <ChevronUp className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs"
+                  disabled={index === clips.length - 1}
+                  onClick={() => move(index, 1)}
+                  title="Move later"
+                  aria-label="Move later"
+                >
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"

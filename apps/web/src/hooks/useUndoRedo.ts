@@ -27,8 +27,17 @@ export function useUndoRedo<TNodeData = unknown>(
   edges: Edge[],
   setNodes: (nodes: Node<TNodeData>[]) => void,
   setEdges: (edges: Edge[]) => void,
-  maxHistory = 50
+  maxHistory = 50,
+  /**
+   * Called with a restored snapshot's nodes before they're applied. Snapshots
+   * are JSON-cloned, so any function on `node.data` (action callbacks) is
+   * gone — this is where the caller re-attaches them, and persists whatever
+   * the restore changed (e.g. positions).
+   */
+  onRestore?: (nodes: Node<TNodeData>[]) => Node<TNodeData>[]
 ) {
+  const onRestoreRef = useRef(onRestore);
+  onRestoreRef.current = onRestore;
   const nodesRef = useRef(nodes);
   nodesRef.current = nodes;
   const edgesRef = useRef(edges);
@@ -62,7 +71,7 @@ export function useUndoRedo<TNodeData = unknown>(
     const prev = historyRef.current.undo(snapshot());
     if (!prev) return;
     isUndoRedoAction.current = true;
-    setNodes(prev.nodes);
+    setNodes(onRestoreRef.current ? onRestoreRef.current(prev.nodes) : prev.nodes);
     setEdges(prev.edges);
     setCanUndo(historyRef.current.canUndo);
     setCanRedo(true);
@@ -75,7 +84,7 @@ export function useUndoRedo<TNodeData = unknown>(
     const next = historyRef.current.redo(snapshot());
     if (!next) return;
     isUndoRedoAction.current = true;
-    setNodes(next.nodes);
+    setNodes(onRestoreRef.current ? onRestoreRef.current(next.nodes) : next.nodes);
     setEdges(next.edges);
     setCanRedo(historyRef.current.canRedo);
     setCanUndo(true);

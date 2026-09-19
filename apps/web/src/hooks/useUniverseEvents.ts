@@ -44,12 +44,16 @@ export function useUniverseEvents(universeId: string) {
       trpcClient.universeEvents.upsert.mutate({ universeId, events: patch }),
   });
 
-  // `lastSyncedRef` is the last event map the server is believed to hold
-  // (seeded from the initial hydration, advanced on every local write) —
-  // the diff base for turning a full setStoredEvents() call into a minimal
-  // patch. `pendingPatchRef` accumulates that patch across a debounce
-  // window so a burst of edits sends one request instead of one per call.
-  const lastSyncedRef = useRef<Record<string, any>>({});
+  // `pendingPatchRef` accumulates the patch across a debounce window so a
+  // burst of edits sends one request instead of one per call.
+  //
+  // The patch is diffed against what THIS browser held locally *before* the
+  // write — not against the last server copy. Diffing against the server made
+  // every stale local entry (one a teammate has since edited) look "changed"
+  // on the next unrelated save, so it was pushed back and silently clobbered
+  // their edit. Callers mutate the map returned by getStoredEvents() and pass
+  // it back, but getStoredEvents() re-parses storage on each call, so storage
+  // still holds the pre-mutation state here.
   const pendingPatchRef = useRef<Record<string, Record<string, any> | null>>({});
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -66,13 +70,13 @@ export function useUniverseEvents(universeId: string) {
 
   const setStoredEvents = useCallback(
     (events: Record<string, any>) => {
+      const prev = getStoredEvents();
       try {
         localStorage.setItem(storageKey, JSON.stringify(events));
       } catch {
         // best-effort — the debounced server push below is the durable copy
       }
 
-      const prev = lastSyncedRef.current;
       const patch = { ...pendingPatchRef.current };
       for (const key of Object.keys(events)) {
         if (JSON.stringify(events[key]) !== JSON.stringify(prev[key])) {
@@ -83,13 +87,12 @@ export function useUniverseEvents(universeId: string) {
         if (!(key in events)) patch[key] = null; // deleted — clears it server-side
       }
       pendingPatchRef.current = patch;
-      lastSyncedRef.current = events;
 
       if (Object.keys(patch).length === 0) return;
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(flush, SAVE_DEBOUNCE_MS);
     },
-    [storageKey, flush]
+    [storageKey, flush, getStoredEvents]
   );
 
   // Flush a pending patch on unmount so a quick nav-away doesn't drop it.
@@ -107,12 +110,32 @@ export function useUniverseEvents(universeId: string) {
     if (!serverQuery.data || hydratedRef.current === universeId) return;
     hydratedRef.current = universeId;
     const serverEvents = (serverQuery.data.events ?? {}) as Record<string, any>;
-    lastSyncedRef.current = serverEvents;
 
     const local = getStoredEvents();
     if (Object.keys(local).length === 0 && Object.keys(serverEvents).length > 0) {
       try {
         localStorage.setItem(storageKey, JSON.stringify(serverEvents));
+      } catch {
+        // best-effort
+      }
+      return;
+    }
+
+    // An existing local cache is trusted (see the header comment), except that
+    // an entry a collaborator has edited since — a strictly newer server
+    // `timestamp` — replaces the stale local copy. Only keys present on both
+    // sides are touched, so a local delete that hasn't synced can't resurrect.
+    let merged: Record<string, any> | null = null;
+    for (const key of Object.keys(local)) {
+      const srv = serverEvents[key];
+      if (srv && (srv.timestamp ?? 0) > (local[key]?.timestamp ?? 0)) {
+        merged ??= { ...local };
+        merged[key] = srv;
+      }
+    }
+    if (merged) {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(merged));
       } catch {
         // best-effort
       }

@@ -48,7 +48,13 @@ export const InpaintCanvas = forwardRef<InpaintCanvasHandle, InpaintCanvasProps>
     const [isDrawing, setIsDrawing] = useState(false);
     const [brushSize, setBrushSize] = useState(30);
     const [isErasing, setIsErasing] = useState(false);
+    // Undo history of the *mask layer* (not the composite): the exported mask is
+    // built from the layer, so restoring only the visible canvas left the
+    // undone stroke in what was actually sent to the model.
     const [history, setHistory] = useState<ImageData[]>([]);
+    // Last brush point of the current stroke, so fast drags are filled in
+    // instead of leaving one dot per mouse event.
+    const lastPointRef = useRef<{ x: number; y: number } | null>(null);
     const [polygonPoints, setPolygonPoints] = useState<{ x: number; y: number }[]>([]);
     const [invert, setInvert] = useState(false);
     const [feather, setFeather] = useState(0);
@@ -67,16 +73,21 @@ export const InpaintCanvas = forwardRef<InpaintCanvasHandle, InpaintCanvasProps>
       const maskCtx = maskLayer.getContext('2d');
       if (!maskCtx) return;
       maskCtx.clearRect(0, 0, width, height);
+      setHistory([maskCtx.getImageData(0, 0, width, height)]);
+      setPolygonPoints([]);
+      // The mask was just wiped — tell the parent, or it would keep submitting
+      // the previous image's mask against this one.
+      onMaskChange(null);
 
+      let cancelled = false; // a slow load of a superseded image must not draw over the new one
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
+        if (cancelled) return;
         composite(img);
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        setHistory([ctx.getImageData(0, 0, width, height)]);
       };
       img.onerror = () => {
+        if (cancelled) return;
         // CORS fail — draw a placeholder
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
@@ -88,6 +99,9 @@ export const InpaintCanvas = forwardRef<InpaintCanvasHandle, InpaintCanvasProps>
       };
       img.src = imageUrl;
       backgroundImgRef.current = img;
+      return () => {
+        cancelled = true;
+      };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [imageUrl, width, height]);
 
@@ -146,9 +160,20 @@ export const InpaintCanvas = forwardRef<InpaintCanvasHandle, InpaintCanvasProps>
 
         mctx.globalCompositeOperation = isErasing ? 'destination-out' : 'source-over';
         mctx.fillStyle = '#ff3232';
-        mctx.beginPath();
-        mctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
-        mctx.fill();
+
+        // Stamp along the segment from the previous point at ≤ ¼-brush spacing.
+        const last = lastPointRef.current;
+        const dist = last ? Math.hypot(x - last.x, y - last.y) : 0;
+        const steps = last ? Math.max(1, Math.ceil(dist / Math.max(1, brushSize / 4))) : 1;
+        for (let i = 1; i <= steps; i++) {
+          const t = i / steps;
+          const px = last ? last.x + (x - last.x) * t : x;
+          const py = last ? last.y + (y - last.y) * t : y;
+          mctx.beginPath();
+          mctx.arc(px, py, brushSize / 2, 0, Math.PI * 2);
+          mctx.fill();
+        }
+        lastPointRef.current = { x, y };
 
         composite();
       },
@@ -213,9 +238,7 @@ export const InpaintCanvas = forwardRef<InpaintCanvasHandle, InpaintCanvasProps>
     }, [width, height, feather, invert]);
 
     const pushHistory = useCallback(() => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
+      const ctx = maskLayerRef.current?.getContext('2d');
       if (!ctx) return;
       const data = ctx.getImageData(0, 0, width, height);
       setHistory((prev) => [...prev.slice(-10), data]);
@@ -232,6 +255,7 @@ export const InpaintCanvas = forwardRef<InpaintCanvasHandle, InpaintCanvasProps>
         const { x, y } = getCanvasPoint(e);
         if (tool === 'brush') {
           setIsDrawing(true);
+          lastPointRef.current = null;
           paintAt(x, y);
         } else if (tool === 'polygon') {
           setPolygonPoints((prev) => [...prev, { x, y }]);
@@ -277,6 +301,7 @@ export const InpaintCanvas = forwardRef<InpaintCanvasHandle, InpaintCanvasProps>
     const handleMouseUp = useCallback(() => {
       if (tool !== 'brush' || !isDrawing) return;
       setIsDrawing(false);
+      lastPointRef.current = null;
       pushHistory();
       publishMask();
     }, [tool, isDrawing, pushHistory, publishMask]);
@@ -309,19 +334,16 @@ export const InpaintCanvas = forwardRef<InpaintCanvasHandle, InpaintCanvasProps>
       if (history.length <= 1) return;
       const newHistory = history.slice(0, -1);
       const prev = newHistory[newHistory.length - 1];
-      const canvas = canvasRef.current;
-      if (!canvas || !prev) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.putImageData(prev, 0, 0);
-
-      // Rebuild the mask layer from the restored canvas minus the background.
-      // Simplest: clear mask layer — we can't perfectly reverse a paint stroke
-      // without storing mask-layer snapshots. Storing both would 2x memory.
-      // For correctness, maintain a parallel mask-layer history.
+      const mctx = maskLayerRef.current?.getContext('2d');
+      if (!mctx || !prev) return;
+      // Restore the mask layer itself, then re-composite the visible canvas and
+      // re-publish so the parent's exported mask matches what's on screen.
+      mctx.putImageData(prev, 0, 0);
+      setPolygonPoints([]);
+      composite();
       setHistory(newHistory);
       publishMask();
-    }, [history, publishMask]);
+    }, [history, composite, publishMask]);
 
     const handleClear = useCallback(() => {
       const maskLayer = maskLayerRef.current;
@@ -525,11 +547,16 @@ export const InpaintCanvas = forwardRef<InpaintCanvasHandle, InpaintCanvasProps>
             width={width}
             height={height}
             className="w-full cursor-crosshair"
-            style={{ aspectRatio: `${width}/${height}` }}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
+            style={{ aspectRatio: `${width}/${height}`, touchAction: 'none' }}
+            onPointerDown={(e) => {
+              // Capture so a stroke that leaves the canvas still ends cleanly,
+              // and so touch/pen work (mouse events never fired for them).
+              e.currentTarget.setPointerCapture?.(e.pointerId);
+              handleMouseDown(e);
+            }}
+            onPointerMove={handleMouseMove}
+            onPointerUp={handleMouseUp}
+            onPointerCancel={handleMouseUp}
           />
           <div className="absolute bottom-2 left-2 text-[9px] text-white/70 bg-black/60 px-1.5 py-0.5 rounded">
             {tool === 'brush'

@@ -124,8 +124,12 @@ export function buildSceneFlowGraph({
     const localEvent = localEvents[nodeId.toString()] || localEvents[String(nodeId)];
 
     const rawUrl = graphData.urls[index] || '';
-    const url =
-      localEvent?.videoUrl || (typeof rawUrl === 'string' && !isBytes32Hash(rawUrl) ? rawUrl : '');
+    // `videoRemoved` is the editor's "Remove video" tombstone — without it the
+    // on-chain URL would resurface on the very next rebuild.
+    const url = localEvent?.videoRemoved
+      ? ''
+      : localEvent?.videoUrl ||
+        (typeof rawUrl === 'string' && !isBytes32Hash(rawUrl) ? rawUrl : '');
 
     // description may arrive as a string or a {timestamp, description} object.
     const rawDesc = graphData.descriptions[index];
@@ -138,9 +142,13 @@ export function buildSceneFlowGraph({
     const previousNode = graphData.previousNodes[index] || '';
     const isCanon = graphData.flags[index] || false;
 
+    // A user's canon toggle (persisted as `canonOverride` in the event store)
+    // wins over the graph-derived value so it survives rebuilds and reloads.
     const isInCanonChain =
-      !!graphData.canonChain &&
-      graphData.canonChain.some((canonId: any) => normalizeNodeId(canonId) === nodeId);
+      typeof localEvent?.canonOverride === 'boolean'
+        ? localEvent.canonOverride
+        : !!graphData.canonChain &&
+          graphData.canonChain.some((canonId: any) => normalizeNodeId(canonId) === nodeId);
 
     const position = layout.nodePositions.get(nodeId) || { x: 100, y: 100 };
     const color = isCanon ? colors[0] : colors[(index + 1) % colors.length];
@@ -259,7 +267,10 @@ export function mergeDraftNodes({
   const outEdges = [...edges];
 
   const draftEntries = Object.entries(localEvents)
-    .filter(([eventId, ev]: [string, any]) => !onChainNodeIds.has(eventId) && ev?.videoUrl)
+    .filter(
+      ([eventId, ev]: [string, any]) =>
+        !onChainNodeIds.has(eventId) && (ev?.videoUrl || ev?.videoRemoved)
+    )
     .sort((a, b) => ((a[1] as any).timestamp || 0) - ((b[1] as any).timestamp || 0));
 
   let chainTailId: string | null = outNodes.length > 0 ? outNodes[outNodes.length - 1].id : null;
@@ -276,7 +287,7 @@ export function mergeDraftNodes({
       data: {
         label: ev.title || 'Untitled scene',
         description: ev.description || '',
-        videoUrl: ev.videoUrl,
+        videoUrl: ev.videoRemoved ? undefined : ev.videoUrl,
         timelineColor: '#a855f7',
         nodeType: 'scene',
         eventId,
@@ -284,6 +295,7 @@ export function mergeDraftNodes({
         timelineId,
         universeId,
         isDraft: true,
+        isInCanonChain: ev.canonOverride === true ? true : undefined,
         isSelected: false,
       } as TimelineNodeData,
     });
