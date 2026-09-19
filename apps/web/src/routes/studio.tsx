@@ -67,6 +67,20 @@ function StudioPage() {
     staleTime: 15_000,
   });
 
+  const { data: buildable, isLoading: isLoadingBuildable } = useQuery({
+    queryKey: ['studio', 'buildable-universes', address],
+    queryFn: async () => {
+      try {
+        return await trpcClient.universes.getEditableByMe.query();
+      } catch {
+        return await trpcClient.universes.getByCreator.query({ creator: address! });
+      }
+    },
+    enabled: !!address && isAuthenticated,
+    staleTime: 30_000,
+  });
+  const buildableList = ((buildable as any)?.data ?? buildable ?? []) as BuildableUniverse[];
+
   const ids = useMemo(() => (mine || []).map((u) => u.id.toLowerCase()), [mine]);
 
   const { data: ponderUniverses } = useQuery({
@@ -110,7 +124,7 @@ function StudioPage() {
     });
   }, [mine, ponderUniverses, tokens]);
 
-  if (isAuthenticating || (isAuthenticated && isLoading)) {
+  if (isAuthenticating || (isAuthenticated && (isLoading || isLoadingBuildable))) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -161,7 +175,7 @@ function StudioPage() {
 
       {/* ── Body ──────────────────────────────────────── */}
       <div className="max-w-[1440px] mx-auto px-4 md:px-8 py-8">
-        <BuildableUniverses />
+        <BuildableUniverses list={buildableList} />
         {enriched.length === 0 ? (
           <EmptyState onCreate={() => navigate({ to: '/cinematicUniverseCreate' })} />
         ) : (
@@ -176,38 +190,27 @@ function StudioPage() {
   );
 }
 
+type BuildableUniverse = {
+  id: string;
+  name?: string;
+  description?: string;
+  image_url?: string;
+  imageURL?: string;
+  portrait_image_url?: string;
+  isPrivate?: boolean;
+  roles?: Array<'creator' | 'safe_signer' | 'team_member'>;
+};
+
 /**
  * Universes the caller can author into — creator, Safe multi-sig signer, or
  * team member. Relocated here from the old `/create` hub. Each tile jumps
  * into the generation console scoped to that wiki.
+ *
+ * `list` is fetched by the parent and folded into its own loading gate so
+ * this section is present (or absent) on first paint rather than popping in
+ * and pushing the rest of the page down after the main grid has settled.
  */
-function BuildableUniverses() {
-  const { address, isAuthenticated } = useWalletAuth();
-
-  const { data: mine } = useQuery({
-    queryKey: ['studio', 'buildable-universes', address],
-    queryFn: async () => {
-      try {
-        return await trpcClient.universes.getEditableByMe.query();
-      } catch {
-        return await trpcClient.universes.getByCreator.query({ creator: address! });
-      }
-    },
-    enabled: !!address && isAuthenticated,
-    staleTime: 30_000,
-  });
-
-  const list = ((mine as any)?.data ?? mine ?? []) as Array<{
-    id: string;
-    name?: string;
-    description?: string;
-    image_url?: string;
-    imageURL?: string;
-    portrait_image_url?: string;
-    isPrivate?: boolean;
-    roles?: Array<'creator' | 'safe_signer' | 'team_member'>;
-  }>;
-
+function BuildableUniverses({ list }: { list: BuildableUniverse[] }) {
   if (list.length === 0) return null;
 
   const roleLabel = (roles: string[] | undefined): string | null => {
