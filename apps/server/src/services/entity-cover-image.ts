@@ -11,6 +11,7 @@
 
 import { db } from '../lib/firebase';
 import { googleImagenService } from './google-imagen';
+import { getStorageManager } from './storage';
 
 type EntityKind =
   | 'person'
@@ -230,23 +231,13 @@ async function uploadToPinata(
   entityId: string,
   entityName: string
 ): Promise<string> {
-  const pinataJwt = process.env.PINATA_JWT;
-  if (!pinataJwt) throw new Error('PINATA_JWT not configured');
-
   const buffer = Buffer.from(base64, 'base64');
-  const formData = new FormData();
-  formData.append('file', new Blob([buffer as BlobPart], { type: 'image/png' }), `${entityId}.png`);
-  formData.append('pinataMetadata', JSON.stringify({ name: `${entityName} cover` }));
-
-  const res = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${pinataJwt}` },
-    body: formData,
-  });
-  if (!res.ok) throw new Error(`Pinata upload failed: ${res.status}`);
-  const data = (await res.json()) as { IpfsHash: string };
-  const gateway = process.env.PINATA_GATEWAY_URL || 'https://gateway.pinata.cloud';
-  return `${gateway}/ipfs/${data.IpfsHash}`;
+  // StorageManager falls back Pinata → Lighthouse → Firebase, so a revoked
+  // PINATA_JWT no longer blocks cover generation.
+  const manifest = await getStorageManager().upload(buffer, `${entityId}.png`, 'image/png');
+  const url = manifest.uploads[0]?.url;
+  if (!url) throw new Error(`Cover upload for ${entityName} returned no URL`);
+  return url;
 }
 
 export interface EntityForCover {
