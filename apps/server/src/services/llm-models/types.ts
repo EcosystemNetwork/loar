@@ -22,7 +22,7 @@ export type LlmCapability =
 
 export interface LlmModelConfig {
   id: string;
-  provider: 'openai' | 'google' | 'zai' | 'bytedance' | 'groq' | 'anthropic-via-aai';
+  provider: 'openai' | 'google' | 'zai' | 'bytedance' | 'groq' | 'anthropic-via-aai' | 'sambanova';
 
   displayName: string;
   shortDescription: string;

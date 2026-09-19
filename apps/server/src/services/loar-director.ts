@@ -51,11 +51,25 @@ function toSpokenLength(text: string, max = MAX_SPOKEN_CHARS): string {
   return (lastStop > max * 0.5 ? cut.slice(0, lastStop + 1) : cut).trim();
 }
 
+/**
+ * The Director's reasoning core prefers SambaNova when a server key is
+ * configured (SAMBANOVA_API_KEY) — falls back to the normal cost-based
+ * router otherwise, same graceful-degrade shape as everything else here.
+ */
 function pickModel(json: boolean): string {
-  return routeLlmModel({
-    requires: json ? { chat: true, json_mode: true } : { chat: true },
-    costBudget: 'low',
-  }).chosenModelId;
+  const requires = json ? { chat: true, json_mode: true } : { chat: true };
+  if (process.env.SAMBANOVA_API_KEY) {
+    try {
+      return routeLlmModel({
+        requestedModelId: 'llama-3-3-70b-sambanova',
+        requires,
+        costBudget: 'low',
+      }).chosenModelId;
+    } catch {
+      // Fall through to the generic router below.
+    }
+  }
+  return routeLlmModel({ requires, costBudget: 'low' }).chosenModelId;
 }
 
 function parseJsonObject(text: string): Record<string, unknown> | null {

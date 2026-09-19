@@ -99,6 +99,8 @@ function costProviderFor(p: LlmModelConfig['provider']): CostProvider {
       return 'groq';
     case 'anthropic-via-aai':
       return 'other';
+    case 'sambanova':
+      return 'sambanova';
   }
 }
 
@@ -498,6 +500,46 @@ async function dispatchLlmInner(
       tools: input.tools,
       toolChoice: input.toolChoice,
       providerLabel: 'Groq',
+    });
+    return {
+      text: r.text,
+      toolCalls: r.toolCalls,
+      usage: r.usage,
+      finishReason: r.finishReason,
+      modelId: model.id,
+      provider: model.provider,
+    };
+  }
+
+  // ── SambaNova Cloud (OpenAI-compatible /chat/completions) ───────────
+  // Hackathon exception: a server-pool SAMBANOVA_API_KEY, not routed
+  // through the per-user BYOK resolver (which was retired to BYOK-only —
+  // see resolveProviderKey's docs). Mirrors services/hume.ts's trust
+  // tier rather than the standard per-provider BYOK flow every other
+  // branch here uses; revisit if SambaNova usage needs per-user billing.
+  if (model.provider === 'sambanova') {
+    const apiKey = process.env.SAMBANOVA_API_KEY;
+    if (!apiKey) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'SambaNova key missing — set SAMBANOVA_API_KEY',
+      });
+    }
+    const { callOpenAICompatChat } = await import('./openai-compat');
+    const r = await callOpenAICompatChat({
+      baseUrl: 'https://api.sambanova.ai/v1',
+      apiKey,
+      model: model.providerModelId,
+      messages: input.messages,
+      temperature: input.temperature,
+      topP: input.topP,
+      maxTokens: input.maxTokens,
+      jsonMode: input.jsonMode,
+      responseSchema: input.responseSchema,
+      skipResponseSchema: true,
+      tools: input.tools,
+      toolChoice: input.toolChoice,
+      providerLabel: 'SambaNova',
     });
     return {
       text: r.text,

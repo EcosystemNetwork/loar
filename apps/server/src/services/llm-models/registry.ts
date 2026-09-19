@@ -708,6 +708,33 @@ export const LLM_MODELS: LlmModelConfig[] = [
     tags: ['groq', 'kimi', 'k2', 'long-context', 'agent'],
     bestFor: 'Long-context coding/agent runs at Groq speed',
   },
+
+  // ── SambaNova Cloud ──────────────────────────────────────────────────
+  // Server-pool key (SAMBANOVA_API_KEY), not routed through BYOK — see the
+  // dispatch.ts sambanova branch. Pricing is an approximate carry-over from
+  // Llama 3.1 70B's published rate (SambaNova's 3.3 rate wasn't confirmed
+  // at write time) — verify before this model sees real cost-tracker volume.
+  {
+    id: 'llama-3-3-70b-sambanova',
+    provider: 'sambanova',
+    displayName: 'Llama 3.3 70B (SambaNova)',
+    shortDescription: 'Llama 3.3 70B on SambaNova RDU inference',
+    providerModelId: 'Meta-Llama-3.3-70B-Instruct',
+    contextTokens: 128_000,
+    maxOutputTokens: null,
+    capabilities: ['chat', 'tools', 'json_mode', 'long_context'],
+    qualityTier: 'standard',
+    speedTier: 'fast',
+    priceTier: 'low',
+    ...pricing({ inputUsd: 0.6, cachedInputUsd: 0.3, outputUsd: 1.2 }),
+    lastVerified: '2026-09-19',
+    isEnabled: true,
+    isVisibleToUsers: true,
+    allowedPlans: [],
+    serverPoolAvailable: true,
+    tags: ['sambanova', 'llama', '3.3', '70b', 'rdu'],
+    bestFor: 'LOAR Voice Director reasoning core — SambaNova-required path',
+  },
 ];
 
 // ── Lookup helpers ────────────────────────────────────────────────────

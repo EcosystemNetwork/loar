@@ -33,6 +33,7 @@ export type CostProvider =
   | 'tripo'
   | 'minimax'
   | 'hume'
+  | 'sambanova'
   | 'other';
 
 export type CostKind =
