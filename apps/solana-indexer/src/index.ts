@@ -234,9 +234,10 @@ async function handleAnchorEvents(tx: HeliusTx) {
             contentHashHex: event.contentHashHex,
             plotHashHex: event.plotHashHex,
             visibility: event.visibility,
-            // Only set canonCount=0 on first handling — never overwrite a
-            // counter that an EpisodeCanonized event has already incremented.
-            ...(isFirstHandling ? { canonCount: 0 } : {}),
+            // Only set canonCount/nodeCount=0 on first handling — never
+            // overwrite counters that EpisodeCanonized/EpisodeMinted events
+            // may have already incremented (out-of-order webhook delivery).
+            ...(isFirstHandling ? { canonCount: 0, nodeCount: 0 } : {}),
             createdSig: tx.signature,
           },
           { merge: true }
@@ -264,6 +265,16 @@ async function handleAnchorEvents(tx: HeliusTx) {
           },
           { merge: true }
         );
+      // Counter increment ONLY on first handling — FieldValue.increment is
+      // not idempotent, and Helius retries deliveries on 5xx. Mirrors the
+      // EVM `universe.nodeCount` counter (apps/event-listener) so both
+      // chains expose the same live field for admin metrics.
+      if (isFirstHandling) {
+        await db
+          .collection('solanaUniverses')
+          .doc(event.universe)
+          .set({ nodeCount: FieldValue.increment(1) }, { merge: true });
+      }
     } else if (event.kind === 'EpisodeCanonized') {
       await db
         .collection('solanaEpisodes')

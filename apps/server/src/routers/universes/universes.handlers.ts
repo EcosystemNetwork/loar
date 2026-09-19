@@ -212,10 +212,14 @@ export async function getAllUniverses(options?: {
  * Merge a live node count onto each universe doc, for admin metrics.
  *
  * EVM universes track `nodeCount` on their `indexer_universes` mirror doc
- * (incremented by the event-listener on every on-chain node). Solana has no
- * equivalent counter, so this counts `solanaEpisodes` docs instead — episodes
- * are LOAR's Solana node type. `null` means the count is unknown (no indexer
- * mirror doc yet, or the aggregate query failed) — distinct from `0`.
+ * (incremented by the event-listener on every on-chain node). Solana
+ * universes track the same field on `solanaUniverses` (incremented by
+ * apps/solana-indexer on every EpisodeMinted event — episodes are LOAR's
+ * Solana node type). Universes indexed before that counter existed have no
+ * `nodeCount` field yet, so those fall back to a one-off aggregate count of
+ * `solanaEpisodes` docs — exact, just not O(1). `null` means the count is
+ * unknown (no indexer mirror doc at all, or the aggregate query failed) —
+ * distinct from `0`.
  */
 export async function withNodeCounts<T extends { id: string; chainId?: number }>(
   universes: T[]
@@ -226,11 +230,35 @@ export async function withNodeCounts<T extends { id: string; chainId?: number }>
   const evmRefs = evmUniverses.map((u) =>
     db.collection('indexer_universes').doc(`${u.chainId ?? 11155111}:${u.id.toLowerCase()}`)
   );
+  const solanaRefs = solanaUniverses.map((u) => db.collection('solanaUniverses').doc(u.id));
 
-  const [evmDocs, solanaCounts] = await Promise.all([
+  const [evmDocs, solanaDocs] = await Promise.all([
     evmRefs.length ? db.getAll(...evmRefs) : Promise.resolve([]),
-    Promise.all(
-      solanaUniverses.map((u) =>
+    solanaRefs.length ? db.getAll(...solanaRefs) : Promise.resolve([]),
+  ]);
+
+  const nodeCountById = new Map<string, number | null>();
+  evmUniverses.forEach((u, i) => {
+    const doc = evmDocs[i];
+    nodeCountById.set(u.id, doc?.exists ? ((doc.data()?.nodeCount as number) ?? 0) : null);
+  });
+
+  // Solana universes whose doc predates the nodeCount counter (field absent,
+  // not just 0) fall back to a per-universe aggregate query.
+  const needsFallback: T[] = [];
+  solanaUniverses.forEach((u, i) => {
+    const data = solanaDocs[i]?.data();
+    const count = data?.nodeCount;
+    if (typeof count === 'number') {
+      nodeCountById.set(u.id, count);
+    } else {
+      needsFallback.push(u);
+    }
+  });
+
+  if (needsFallback.length) {
+    const fallbackCounts = await Promise.all(
+      needsFallback.map((u) =>
         db
           .collection('solanaEpisodes')
           .where('universe', '==', u.id)
@@ -239,17 +267,9 @@ export async function withNodeCounts<T extends { id: string; chainId?: number }>
           .then((snap) => snap.data().count)
           .catch(() => null)
       )
-    ),
-  ]);
-
-  const nodeCountById = new Map<string, number | null>();
-  evmUniverses.forEach((u, i) => {
-    const doc = evmDocs[i];
-    nodeCountById.set(u.id, doc?.exists ? ((doc.data()?.nodeCount as number) ?? 0) : null);
-  });
-  solanaUniverses.forEach((u, i) => {
-    nodeCountById.set(u.id, solanaCounts[i]);
-  });
+    );
+    needsFallback.forEach((u, i) => nodeCountById.set(u.id, fallbackCounts[i]));
+  }
 
   return universes.map((u) => ({ ...u, nodeCount: nodeCountById.get(u.id) ?? null }));
 }
