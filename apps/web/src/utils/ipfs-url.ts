@@ -660,3 +660,21 @@ export function resolveIpfsUrlPreferred(url?: string | null): string {
   const candidates = getIpfsUrlCandidatesPreferred(url);
   return candidates[0] || resolveIpfsUrl(url);
 }
+
+// ── Debug/diagnostics snapshot ──────────────────────────────────────────
+//
+// Read-only view of the module state that decides gateway resolution, for
+// the console diagnostics run from the universe editor (see
+// utils/ipfsDiagnostics.ts). Exists because SERVER_URL/ACTIVE_GATEWAY/
+// dedicatedConfig are otherwise module-private — surfacing them here is
+// cheaper than re-deriving the same env-var logic in a second file.
+export function getIpfsGatewayDebugInfo() {
+  return {
+    serverUrl: SERVER_URL || null,
+    activeGateway: ACTIVE_GATEWAY,
+    preferPublic: PREFER_PUBLIC,
+    dedicatedConfigured: Boolean(dedicatedConfig),
+    dedicatedHost: dedicatedConfig?.host ?? null,
+    dedicatedHasToken: Boolean(dedicatedConfig?.token),
+  };
+}

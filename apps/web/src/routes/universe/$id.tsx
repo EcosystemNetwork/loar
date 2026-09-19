@@ -58,6 +58,7 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
 import { resolveIpfsUrl as resolveMediaUrl, resolveIpfsUrlAsync } from '@/utils/ipfs-url';
+import { runIpfsNodeDiagnostics, registerIpfsDiagRerun } from '@/utils/ipfsDiagnostics';
 import { isBytes32Hash } from '@/utils/bytes32';
 import {
   Dialog,
@@ -1448,7 +1449,7 @@ function UniverseTimelineEditorInner() {
     );
 
     requestAnimationFrame(() => {
-      fitView({ padding: 0.15, duration: 500 });
+      fitView({ padding: 0.15, duration: 500, maxZoom: 1 });
     });
   }, [nodes, edges, setNodes, fitView, pushUndoState, savePosition]);
 
@@ -2096,7 +2097,7 @@ function UniverseTimelineEditorInner() {
 
       // F — fit view
       if (e.key === 'f' && !e.metaKey && !e.ctrlKey) {
-        fitView({ padding: 0.15, duration: 300 });
+        fitView({ padding: 0.15, duration: 300, maxZoom: 1 });
         return;
       }
 
@@ -2866,7 +2867,11 @@ function UniverseTimelineEditorInner() {
         });
       } else {
         requestAnimationFrame(() => {
-          fitView({ padding: 0.15, duration: 300 });
+          // Cap at 100% — an uncapped fitView snaps to the canvas's maxZoom
+          // (2x) on a sparse graph (e.g. a universe with only one or two
+          // nodes), which reads as the editor "opening zoomed in" instead of
+          // a normal fitted view.
+          fitView({ padding: 0.15, duration: 300, maxZoom: 1 });
         });
       }
     }
@@ -2885,6 +2890,20 @@ function UniverseTimelineEditorInner() {
     setCenter,
     applySavedPositions,
   ]);
+
+  // Media-loading diagnostics — probes every node's resolved gateway
+  // candidates and logs a copy-pasteable report. Auto-runs in dev builds
+  // (this is what a "content failing to load" bug report should be built
+  // from instead of a live repro session); always registers the manual
+  // `window.__loarIpfsDiag()` trigger so it can be run on demand in any
+  // build, including prod, without probing every visitor's browser.
+  useEffect(() => {
+    if (!graphData.nodeIds.length) return;
+    registerIpfsDiagRerun(graphData, id);
+    if (import.meta.env.DEV) {
+      void runIpfsNodeDiagnostics(graphData, id);
+    }
+  }, [graphData, id]);
 
   // Handle connections between nodes
   const onConnect = useCallback(
@@ -3584,7 +3603,7 @@ function UniverseTimelineEditorInner() {
                       <ZoomOut className="h-4 w-4" />
                     </button>
                     <button
-                      onClick={() => fitView({ padding: 0.15, duration: 300 })}
+                      onClick={() => fitView({ padding: 0.15, duration: 300, maxZoom: 1 })}
                       className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white"
                       title="Fit to view (F)"
                     >
