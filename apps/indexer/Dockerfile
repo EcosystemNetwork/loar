@@ -13,6 +13,8 @@ WORKDIR /app
 
 # Copy workspace root files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# pnpm patchedDependencies (root package.json) — install fails without the patch files.
+COPY patches ./patches
 COPY apps/indexer/package.json ./apps/indexer/
 COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/

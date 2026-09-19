@@ -14,6 +14,8 @@ WORKDIR /app
 # Lockfile + every workspace member's package.json so `--frozen-lockfile`
 # resolves against the exact same tree committed to git.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# pnpm patchedDependencies (root package.json) — install fails without the patch files.
+COPY patches ./patches
 COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/
 COPY apps/indexer/package.json ./apps/indexer/
@@ -45,6 +47,8 @@ RUN apk add --no-cache curl
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# pnpm patchedDependencies (root package.json) — install fails without the patch files.
+COPY patches ./patches
 COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/
 COPY apps/indexer/package.json ./apps/indexer/

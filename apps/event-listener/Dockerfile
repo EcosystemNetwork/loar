@@ -4,6 +4,8 @@ RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# pnpm patchedDependencies (root package.json) — install fails without the patch files.
+COPY patches ./patches
 COPY apps/event-listener/package.json ./apps/event-listener/
 COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/
@@ -31,6 +33,8 @@ RUN apk add --no-cache curl
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# pnpm patchedDependencies (root package.json) — install fails without the patch files.
+COPY patches ./patches
 COPY apps/event-listener/package.json ./apps/event-listener/
 COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/

@@ -11,6 +11,8 @@ WORKDIR /app
 # Workspace root + per-package manifests so pnpm can resolve the workspace
 # graph. Only the manifests the indexer actually links against are needed.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# pnpm patchedDependencies (root package.json) — install fails without the patch files.
+COPY patches ./patches
 COPY apps/solana-indexer/package.json ./apps/solana-indexer/
 COPY packages/abis/package.json ./packages/abis/
 
