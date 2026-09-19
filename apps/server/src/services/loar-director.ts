@@ -11,9 +11,12 @@
  * universeEvents.create, generation.*), so ownership/credit checks never
  * get bypassed by a voice shortcut.
  */
+import { randomUUID } from 'crypto';
 import { routeLlmModel } from './llm-models/router';
 import { dispatchLlm } from './llm-models/dispatch';
 import { buildGenerationContext } from './wiki-context';
+import { humeService } from './hume';
+import { getStorageManager } from './storage';
 
 export type DirectorIntent = 'canon_query' | 'story_action';
 export type StoryActionKind = 'create_node' | 'branch_story' | 'generate_scene';
@@ -159,6 +162,46 @@ Question: """${opts.utterance}"""`;
   }
 
   return { answer: toSpokenLength(result.text), hasContext: true };
+}
+
+export interface CharacterVoiceResult {
+  audioUrl: string | null;
+}
+
+/**
+ * Voice a director/character response through Hume (Character Voice → HUME).
+ * Best-effort: when Hume isn't configured or the call fails, degrades to
+ * `audioUrl: null` so the caller falls back to text — never blocks the
+ * response the way `canon-check`'s vision call degrades to `null`.
+ */
+export async function synthesizeCharacterVoice(opts: {
+  text: string;
+  humeVoiceId?: string;
+  humeVoiceName?: string;
+  description?: string;
+}): Promise<CharacterVoiceResult> {
+  if (!humeService.isConfigured()) return { audioUrl: null };
+
+  try {
+    const result = await humeService.textToSpeech({
+      text: opts.text,
+      voiceId: opts.humeVoiceId,
+      voiceName: opts.humeVoiceName,
+      description: opts.description,
+    });
+    const manifest = await getStorageManager().upload(
+      result.audioBuffer,
+      `director-voice-${randomUUID()}.mp3`,
+      result.contentType
+    );
+    return { audioUrl: manifest.uploads[0]?.url ?? null };
+  } catch (err) {
+    console.warn(
+      '[loar-director] Hume synthesis failed:',
+      err instanceof Error ? err.message : err
+    );
+    return { audioUrl: null };
+  }
 }
 
 const STORY_ACTION_LABELS: Record<StoryActionKind, string> = {
