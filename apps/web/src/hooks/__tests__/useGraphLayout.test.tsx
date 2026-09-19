@@ -200,3 +200,20 @@ describe('useGraphLayout — savePosition debounce/flush', () => {
     );
   });
 });
+
+describe('useGraphLayout — applySavedPositions rejects corrupt layouts', () => {
+  it('falls back to computed positions for NaN and collapsed saved layouts', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockGet.mockResolvedValue({
+      positions: { a: { x: NaN, y: 0 }, b: { x: 7, y: 8 } },
+      updatedAt: null,
+    });
+    const { result } = renderLayout('0xabc');
+    await waitFor(() => expect(result.current.isLoaded).toBe(true));
+    const out = result.current.applySavedPositions([node('a', 1, 1), node('b', 2, 2)]);
+    expect(out[0].position).toEqual({ x: 1, y: 1 });
+    expect(out[1].position).toEqual({ x: 7, y: 8 });
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});

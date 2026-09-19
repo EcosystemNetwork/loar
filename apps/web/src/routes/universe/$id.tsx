@@ -681,6 +681,8 @@ function UniverseTimelineEditorInner() {
     isLoadingFullGraph,
     isLoadingCanonChain,
     isLoadingAny,
+    isOffChainError,
+    offChainError,
     isError: isGraphError,
     graphError,
     graphErrorReason,
@@ -2824,6 +2826,15 @@ function UniverseTimelineEditorInner() {
       });
     };
   }, [handleCreateEvent]);
+
+  // A failed off-chain node fetch otherwise renders as a silently empty canvas.
+  useEffect(() => {
+    if (!isOffChainError) return;
+    console.error(`[universe ${id}] offChainNodes.list failed`, offChainError);
+    toast.error("Couldn't load this universe's nodes", {
+      description: 'The node list failed to load, so the canvas may look empty. Try reloading.',
+    });
+  }, [isOffChainError, offChainError, id]);
 
   // Convert blockchain data to timeline nodes
   useEffect(() => {

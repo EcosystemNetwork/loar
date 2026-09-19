@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Node } from 'reactflow';
 import { trpcClient } from '@/utils/trpc';
+import { sanitizeSavedPositions } from '@/lib/savedLayout';
 
 type Position = { x: number; y: number };
 type LayoutQueryData = { positions: Record<string, Position>; updatedAt: string | null } | null;
@@ -81,11 +82,26 @@ export function useGraphLayout(universeId: string | undefined, graphKey: string)
   /** Overlay saved positions onto freshly computed nodes — saved wins. */
   const applySavedPositions = useCallback(
     <T extends Node>(nodes: T[]): T[] => {
-      const saved = layoutQuery.data?.positions;
-      if (!saved) return nodes;
+      const rawSaved = layoutQuery.data?.positions;
+      if (!rawSaved) return nodes;
+      const {
+        positions: saved,
+        rejected,
+        collapsed,
+      } = sanitizeSavedPositions(
+        rawSaved,
+        nodes.map((n) => n.id)
+      );
+      if (collapsed || rejected.length > 0) {
+        console.warn(
+          `[graphLayout ${graphKey}] ignoring ${rejected.length} unusable saved position(s)` +
+            (collapsed ? ' (all collapsed onto one point)' : '') +
+            ` for universe ${universeId}; using the computed layout for them.`
+        );
+      }
       return nodes.map((n) => (saved[n.id] ? { ...n, position: saved[n.id] } : n));
     },
-    [layoutQuery.data]
+    [layoutQuery.data, graphKey, universeId]
   );
 
   return {

@@ -58,6 +58,15 @@ export interface UseUniverseBlockchainReturn {
   isLoadingOffChain: boolean;
   isLoadingAny: boolean;
 
+  /**
+   * The off-chain node list (Firestore `offChainNodes.list`) failed. Not
+   * folded into `isError` (that screen is on-chain-only), but without this
+   * signal a failed fetch is indistinguishable from "this universe has no
+   * nodes" — the canvas just renders empty with nothing in the console.
+   */
+  isOffChainError: boolean;
+  offChainError: Error | null;
+
   // Error states
   isError: boolean;
   graphError: Error | null;
@@ -351,6 +360,7 @@ export function useUniverseBlockchain({
     data: offChainData,
     isLoading: rqIsLoadingOffChain,
     status: offChainStatus,
+    error: offChainFetchError,
   } = useQuery({
     queryKey: ['offChainNodes', normalizedUniverseId],
     queryFn: () => trpcClient.offChainNodes.list.query({ universeId: normalizedUniverseId }),
@@ -428,6 +438,8 @@ export function useUniverseBlockchain({
     isLoadingCanonChain,
     isLoadingOffChain,
     isLoadingAny,
+    isOffChainError: offChainStatus === 'error',
+    offChainError: offChainStatus === 'error' ? ((offChainFetchError as Error) ?? null) : null,
     isError: graphErrorActive,
     graphError: graphErrorActive ? (graphFetchError ?? null) : null,
     graphErrorReason: graphErrorActive ? graphErrorReason : 'none',
