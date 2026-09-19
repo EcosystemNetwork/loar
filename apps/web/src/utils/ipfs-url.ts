@@ -473,6 +473,16 @@ export async function raceIpfsGateways(
   if (candidates.length === 0) return null;
   if (candidates.length === 1) return candidates[0];
 
+  // Our own dedicated gateway is primed and is candidates[0]: it's the one we
+  // trust, so skip the public HEAD fan-out entirely. Probing ipfs.io /
+  // gateway.pinata.cloud / dweb.link / w3s.link for every CID on a media-heavy
+  // page (landing, discover) is what tripped their 429 rate limits and spammed
+  // the console; SmartImage's onError chain still reaches them if the
+  // dedicated URL actually fails.
+  const dedicatedParts = extractIpfsPath(url || candidates[0]);
+  const dedicatedFirst = dedicatedParts ? composeDedicatedUrl(dedicatedParts.cidPath) : null;
+  if (dedicatedFirst && candidates[0] === dedicatedFirst) return dedicatedFirst;
+
   const timeoutMs = opts.timeoutMs ?? 4000;
   const release = await acquireGatewayRaceSlot();
   if (opts.signal?.aborted) {
