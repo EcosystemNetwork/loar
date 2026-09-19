@@ -1644,6 +1644,16 @@ export function GenerateConsole({
                           {KIND_LABELS[k] ?? k}
                         </button>
                       ))}
+                    {isConsole && (
+                      <button
+                        type="button"
+                        onClick={() => navigate({ to: '/cinematicUniverseCreate' })}
+                        className="text-[11px] px-3 py-1.5 rounded-full transition-colors text-primary border border-primary/30 bg-primary/5 hover:bg-primary/10"
+                        title="Launch a new universe"
+                      >
+                        + Universe
+                      </button>
+                    )}
                   </div>
 
                   {/* Compact wiki picker, top-right of the composer */}
