@@ -12,6 +12,7 @@
  * get bypassed by a voice shortcut.
  */
 import { randomUUID } from 'crypto';
+import { db } from '../lib/firebase';
 import { routeLlmModel } from './llm-models/router';
 import { dispatchLlm } from './llm-models/dispatch';
 import { buildGenerationContext } from './wiki-context';
@@ -202,6 +203,71 @@ export async function synthesizeCharacterVoice(opts: {
     );
     return { audioUrl: null };
   }
+}
+
+interface EntityVoiceProfile {
+  humeVoiceId?: string;
+  humeVoiceName?: string;
+  description?: string;
+}
+
+/**
+ * Per-character voice mapping: reads `metadata.humeVoiceId` /
+ * `metadata.humeVoiceName` / `metadata.humeVoiceDescription` off a
+ * character (or any) entity — the same loosely-typed metadata bag other
+ * entity fields already live in (see `USEFUL_METADATA` in
+ * `wiki-context.ts`). Set via the existing `entities.update` mutation;
+ * no new write path needed. Returns null when the entity has no voice
+ * assigned, so callers can fall back to text-only.
+ */
+async function resolveEntityVoiceProfile(entityId: string): Promise<EntityVoiceProfile | null> {
+  if (!db) return null;
+  try {
+    const doc = await db.collection('entities').doc(entityId).get();
+    if (!doc.exists) return null;
+    const metadata = (doc.data()?.metadata ?? {}) as Record<string, unknown>;
+    const humeVoiceId =
+      typeof metadata.humeVoiceId === 'string' && metadata.humeVoiceId
+        ? metadata.humeVoiceId
+        : undefined;
+    const humeVoiceName =
+      typeof metadata.humeVoiceName === 'string' && metadata.humeVoiceName
+        ? metadata.humeVoiceName
+        : undefined;
+    if (!humeVoiceId && !humeVoiceName) return null;
+    const description =
+      typeof metadata.humeVoiceDescription === 'string' ? metadata.humeVoiceDescription : undefined;
+    return { humeVoiceId, humeVoiceName, description };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve which voice to speak with — an explicit override first, else the
+ * target entity's assigned voice — then synthesize through Hume. Returns
+ * `audioUrl: null` (never throws) when nothing is resolvable or the call
+ * fails, so a character without a voice assigned just stays text-only.
+ */
+export async function resolveAndSynthesizeCharacterVoice(opts: {
+  text: string;
+  entityId?: string;
+  override?: { humeVoiceId?: string; humeVoiceName?: string; description?: string };
+}): Promise<CharacterVoiceResult> {
+  let profile: EntityVoiceProfile | null = null;
+  if (opts.override?.humeVoiceId || opts.override?.humeVoiceName) {
+    profile = opts.override;
+  } else if (opts.entityId) {
+    profile = await resolveEntityVoiceProfile(opts.entityId);
+  }
+  if (!profile) return { audioUrl: null };
+
+  return synthesizeCharacterVoice({
+    text: opts.text,
+    humeVoiceId: profile.humeVoiceId,
+    humeVoiceName: profile.humeVoiceName,
+    description: opts.override?.description ?? profile.description,
+  });
 }
 
 const STORY_ACTION_LABELS: Record<StoryActionKind, string> = {

@@ -14,14 +14,18 @@ import {
   classifyDirectorIntent,
   answerCanonQuery,
   planStoryAction,
-  synthesizeCharacterVoice,
+  resolveAndSynthesizeCharacterVoice,
 } from '../../services/loar-director';
 
 const voiceInputSchema = z
   .object({
+    // Explicit overrides. If both are omitted, the voice is resolved from
+    // the target entity's own `metadata.humeVoiceId`/`humeVoiceName`
+    // (voiceEntityId if given, else the request's top-level entityId).
     humeVoiceId: z.string().optional(),
     humeVoiceName: z.string().optional(),
     description: z.string().max(200).optional(),
+    voiceEntityId: z.string().optional(),
   })
   .optional();
 
@@ -112,11 +116,14 @@ export const directorRouter = router({
       }
 
       const voiceResult = input.voice
-        ? await synthesizeCharacterVoice({
+        ? await resolveAndSynthesizeCharacterVoice({
             text: spokenResponse,
-            humeVoiceId: input.voice.humeVoiceId,
-            humeVoiceName: input.voice.humeVoiceName,
-            description: input.voice.description,
+            entityId: input.voice.voiceEntityId ?? input.entityId,
+            override: {
+              humeVoiceId: input.voice.humeVoiceId,
+              humeVoiceName: input.voice.humeVoiceName,
+              description: input.voice.description,
+            },
           })
         : null;
 
