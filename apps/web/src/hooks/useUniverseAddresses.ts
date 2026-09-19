@@ -10,7 +10,7 @@ import { ponderGql, ponderQueryDefaults } from '@/utils/ponder-api';
 import { universeManagerAbi } from '@loar/abis/generated';
 import { UniverseManager } from '@loar/abis/addresses';
 import { trpcClient } from '@/utils/trpc';
-import { asEvmAddressOrUndefined } from '@/lib/utils';
+import { asEvmAddressOrUndefined, isEvmAddress } from '@/lib/utils';
 
 interface UniverseAddresses {
   universeAddress: `0x${string}` | undefined;
@@ -37,8 +37,11 @@ export function useUniverseAddresses(
     | `0x${string}`
     | undefined;
 
-  // Try Ponder first — works when universeId is a contract address
-  const isAddress = universeId?.startsWith('0x');
+  // Try Ponder first — works when universeId is a contract address. A real
+  // shape check (not a bare `startsWith('0x')`) so a malformed/truncated
+  // 0x-prefixed id can't fall through to the final unvalidated-cast branch
+  // below and reach a checksum-expecting caller as a garbage `Address`.
+  const isAddress = !!universeId && isEvmAddress(universeId);
   const ponder = useQuery({
     queryKey: ['universe-addresses-ponder', universeId],
     queryFn: async () => {

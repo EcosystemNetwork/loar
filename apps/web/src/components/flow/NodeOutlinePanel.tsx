@@ -27,13 +27,57 @@ interface NodeOutlinePanelProps {
   onToggleSelect: (nodeId: string) => void;
 }
 
+/**
+ * A node matches an active search if it directly matches OR any descendant
+ * does. Computed once, bottom-up, over every scene node — O(n) total via
+ * memoization — rather than each TreeNode instance independently re-walking
+ * its own subtree on every render (the previous approach: O(n) work per
+ * node × n nodes = O(n²), noticeable once a timeline has enough nodes and
+ * branching for the outline panel's search box to actually get used).
+ * Returns null when there's no active filter (every node matches).
+ */
+function computeSearchMatches(
+  query: string,
+  allNodes: Map<string, Node<TimelineNodeData>>,
+  childrenMap: Map<string, string[]>
+): Set<string> | null {
+  const q = query.trim().toLowerCase();
+  if (!q) return null;
+  const memo = new Map<string, boolean>();
+  const compute = (nid: string): boolean => {
+    const cached = memo.get(nid);
+    if (cached !== undefined) return cached;
+    memo.set(nid, false); // cycle guard — a malformed graph can't infinite-loop here
+    const n = allNodes.get(nid);
+    let matches = false;
+    if (n) {
+      const text = [n.data.label, n.data.description, n.data.eventId, n.data.displayName]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      matches = text.includes(q);
+    }
+    if (!matches) {
+      const kids = childrenMap.get(nid) || [];
+      matches = kids.some(compute);
+    }
+    memo.set(nid, matches);
+    return matches;
+  };
+  for (const nid of allNodes.keys()) compute(nid);
+  const out = new Set<string>();
+  for (const [nid, matches] of memo) if (matches) out.add(nid);
+  return out;
+}
+
 interface TreeNodeProps {
   node: Node<TimelineNodeData>;
   childrenMap: Map<string, string[]>;
   allNodes: Map<string, Node<TimelineNodeData>>;
   arcs: ArcDefinition[];
   selectedNodeIds: Set<string>;
-  searchQuery: string;
+  /** Precomputed by computeSearchMatches — null means no active filter. */
+  matchingIds: Set<string> | null;
   onNavigate: (node: Node<TimelineNodeData>) => void;
   onToggleSelect: (nodeId: string) => void;
   depth: number;
@@ -45,7 +89,7 @@ function TreeNode({
   allNodes,
   arcs,
   selectedNodeIds,
-  searchQuery,
+  matchingIds,
   onNavigate,
   onToggleSelect,
   depth,
@@ -56,25 +100,7 @@ function TreeNode({
   const arc = arcs.find((a) => a.nodeIds.includes(node.id));
   const isSelected = selectedNodeIds.has(node.id);
 
-  // Check if this node or any descendant matches the search
-  const matchesSearch = useMemo(() => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    const checkNode = (nid: string): boolean => {
-      const n = allNodes.get(nid);
-      if (!n) return false;
-      const text = [n.data.label, n.data.description, n.data.eventId, n.data.displayName]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      if (text.includes(q)) return true;
-      const kids = childrenMap.get(nid) || [];
-      return kids.some(checkNode);
-    };
-    return checkNode(node.id);
-  }, [searchQuery, node.id, allNodes, childrenMap]);
-
-  if (!matchesSearch) return null;
+  if (matchingIds && !matchingIds.has(node.id)) return null;
 
   const label = node.data.displayName || node.data.label || `Event ${node.data.eventId || '?'}`;
 
@@ -163,7 +189,7 @@ function TreeNode({
               allNodes={allNodes}
               arcs={arcs}
               selectedNodeIds={selectedNodeIds}
-              searchQuery={searchQuery}
+              matchingIds={matchingIds}
               onNavigate={onNavigate}
               onToggleSelect={onToggleSelect}
               depth={depth + 1}
@@ -190,6 +216,10 @@ function NodeOutlinePanelImpl({
   const allNodesMap = useMemo(() => new Map(sceneNodes.map((n) => [n.id, n])), [sceneNodes]);
   const childrenMap = useMemo(() => buildParentMap(nodes, edges), [nodes, edges]);
   const roots = useMemo(() => findRootNodes(nodes, edges), [nodes, edges]);
+  const matchingIds = useMemo(
+    () => computeSearchMatches(searchQuery, allNodesMap, childrenMap),
+    [searchQuery, allNodesMap, childrenMap]
+  );
 
   // Count stats
   const totalScenes = sceneNodes.length;
@@ -240,7 +270,7 @@ function NodeOutlinePanelImpl({
                 allNodes={allNodesMap}
                 arcs={arcs}
                 selectedNodeIds={selectedNodeIds}
-                searchQuery={searchQuery}
+                matchingIds={matchingIds}
                 onNavigate={onNavigateToNode}
                 onToggleSelect={onToggleSelect}
                 depth={0}

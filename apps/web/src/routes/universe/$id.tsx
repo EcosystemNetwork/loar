@@ -4567,7 +4567,10 @@ function ReactFlowProviderWithInner() {
 function EditorAdminGate() {
   const { id } = useParams({ from: '/universe/$id' });
   const navigate = useNavigate();
-  const admin = useIsUniverseAdmin(id as `0x${string}`);
+  // useIsUniverseAdmin accepts any universe id shape (EVM or Solana) — no
+  // cast needed; a `0x${string}` cast here was misleading (zero runtime
+  // effect, but reads as "this hook is EVM-only," which it isn't).
+  const admin = useIsUniverseAdmin(id);
   const isMobile = useIsMobile();
 
   useEffect(() => {

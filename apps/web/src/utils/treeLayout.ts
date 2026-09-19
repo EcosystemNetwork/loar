@@ -122,39 +122,43 @@ export function calculateTreeLayout(
       previousNode && String(previousNode) !== '0' ? normalizeNodeId(previousNode) : 0;
 
     const depth = nodeDepths.get(nodeId) || 0;
-    let x: number, y: number;
 
-    if (parentId === 0) {
-      // Root node - positioned at starting coordinates
-      x = startX;
-      y = startY;
+    // A universe's timeline is a FOREST, not always a single tree: multiple
+    // independent node streams (previousNodeId 0/empty) can coexist — e.g.
+    // separate episodes that never connect to each other. Root nodes
+    // (parentId 0) are treated as siblings of a virtual parent at
+    // (startX, startY - verticalSpacing) and get the exact same
+    // subtree-height-based vertical offset real siblings get below, instead
+    // of every root being hard-placed at identical coordinates. A universe
+    // with only one root is unaffected: that root still lands at exactly
+    // (startX, startY), same as before.
+    const siblings = nodesByParent.get(parentId) || [];
+    const siblingIndex = siblings.indexOf(nodeId);
+
+    // X position based on depth (creates vertical columns)
+    const x = startX + (parentId === 0 ? 0 : depth * horizontalSpacing);
+
+    let y: number;
+    if (siblingIndex === 0) {
+      // First child/root stays at the parent's (or startY, for a root) Y
+      // level — main timeline continuation.
+      const parentPos = parentId === 0 ? undefined : nodePositions.get(parentId);
+      y = parentPos ? parentPos.y : startY;
     } else {
-      const siblings = nodesByParent.get(parentId) || [];
-      const siblingIndex = siblings.indexOf(nodeId);
+      // Subsequent children/roots offset vertically based on previous
+      // siblings' subtree sizes, so a second independent stream lands below
+      // the first instead of on top of it.
+      const parentPos = parentId === 0 ? undefined : nodePositions.get(parentId);
+      const baseY = parentPos ? parentPos.y : startY;
 
-      // X position based on depth (creates vertical columns)
-      x = startX + depth * horizontalSpacing;
-
-      // Y position based on sibling index and subtree heights
-      if (siblingIndex === 0) {
-        // First child stays at parent's Y level (main timeline continuation)
-        const parentPos = nodePositions.get(parentId);
-        y = parentPos ? parentPos.y : startY;
-      } else {
-        // Subsequent children offset vertically based on previous siblings' subtree sizes
-        const parentPos = nodePositions.get(parentId);
-        const baseY = parentPos ? parentPos.y : startY;
-
-        // Accumulate vertical offset from all previous siblings
-        let yOffset = 0;
-        for (let i = 0; i < siblingIndex; i++) {
-          const prevSiblingId = siblings[i];
-          const prevSiblingHeight = subtreeHeights.get(prevSiblingId) || 1;
-          yOffset += prevSiblingHeight * verticalSpacing;
-        }
-
-        y = baseY + yOffset;
+      let yOffset = 0;
+      for (let i = 0; i < siblingIndex; i++) {
+        const prevSiblingId = siblings[i];
+        const prevSiblingHeight = subtreeHeights.get(prevSiblingId) || 1;
+        yOffset += prevSiblingHeight * verticalSpacing;
       }
+
+      y = baseY + yOffset;
     }
 
     nodePositions.set(nodeId, { x, y });

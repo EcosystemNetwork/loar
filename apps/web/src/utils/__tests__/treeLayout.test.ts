@@ -168,12 +168,45 @@ describe('calculateTreeLayout — edge cases', () => {
     expect(r.subtreeHeights.size).toBe(0);
   });
 
-  it('overlaps multiple roots at the same coordinates (documented quirk)', () => {
-    // Every parentId===0 node is hard-placed at (startX, startY); the editor
-    // relies on saved/auto-layout positions to separate real multi-root graphs.
+  it('spaces multiple independent roots vertically instead of stacking them', () => {
+    // Fixed 2026-09-19: a universe's timeline is a forest, not always a
+    // single tree — independent node streams (e.g. separate episodes that
+    // never connect to each other) are a normal, expected shape, not an
+    // edge case. Roots used to be hard-placed at identical (startX, startY)
+    // coordinates, stacking every stream's nodes exactly on top of each
+    // other — visually indistinguishable from nodes being missing, even
+    // though every node was present in the DOM. Roots are now treated as
+    // siblings of a virtual parent and get the same subtree-height-based
+    // vertical offset real siblings already got.
     const { nodePositions } = calculateTreeLayout([10, 20], [0, 0], CFG);
+    // The first root by id is unaffected — identical to a single-root graph.
     expect(nodePositions.get(10)).toEqual({ x: 100, y: 200 });
-    expect(nodePositions.get(20)).toEqual({ x: 100, y: 200 });
+    // The second independent stream lands one verticalSpacing below, not on
+    // top of the first.
+    expect(nodePositions.get(20)).toEqual({ x: 100, y: 500 });
+  });
+
+  it('spaces three independent single-node streams into three distinct rows', () => {
+    const { nodePositions } = calculateTreeLayout([10, 20, 30], [0, 0, 0], CFG);
+    expect(nodePositions.get(10)).toEqual({ x: 100, y: 200 });
+    expect(nodePositions.get(20)).toEqual({ x: 100, y: 500 });
+    expect(nodePositions.get(30)).toEqual({ x: 100, y: 800 });
+  });
+
+  it('offsets a second independent stream past the FULL subtree of the first, not just past its root', () => {
+    // First stream: root 10 with two children (11, 12) — subtree height 2.
+    // Second stream: root 20, unrelated to the first entirely.
+    const { nodePositions } = calculateTreeLayout([10, 11, 12, 20], [0, 10, 10, 0], CFG);
+    // Root 10's subtree occupies rows at y=200 (10, first child 11) and
+    // y=500 (second child 12, offset by one verticalSpacing). The second
+    // stream's root must clear the WHOLE first subtree (height 2), landing
+    // at 200 + 2*300 = 800, not immediately after just node 10 itself.
+    expect(nodePositions.get(20)).toEqual({ x: 100, y: 800 });
+  });
+
+  it('keeps a genuinely single-root graph pixel-identical to before this fix', () => {
+    const { nodePositions } = calculateTreeLayout([1, 2, 3], [0, 1, 1], CFG);
+    expect(nodePositions.get(1)).toEqual({ x: 100, y: 200 });
   });
 
   it('falls back to startY when a child is listed before its parent', () => {
