@@ -46,11 +46,9 @@ vi.mock('@/utils/trpc', () => ({
 // instantly instead of adding unrelated real-network latency to a test
 // whose whole point is deterministic timing.
 vi.mock('@/utils/ponder-api', () => ({
-  ponderGql: vi
-    .fn()
-    .mockResolvedValue({
-      nodeContents: { items: [], pageInfo: { hasNextPage: false, endCursor: '' } },
-    }),
+  ponderGql: vi.fn().mockResolvedValue({
+    nodeContents: { items: [], pageInfo: { hasNextPage: false, endCursor: '' } },
+  }),
   ponderQueryDefaults: {},
 }));
 
