@@ -112,7 +112,11 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          # jsdom 30 calls webidl.util.markAsUncloneable, added to Node's
+          # internal webidl utils in Node 22 — jsdom's test:unit project
+          # fails to start its worker pool on Node 20. Other jobs stay on
+          # 20; only this one needs the bump.
+          node-version: 22
           cache: pnpm
 
       - name: Install dependencies
