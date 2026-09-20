@@ -68,9 +68,11 @@ test.describe('Create flow', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('AI Generation', () => {
+  // `/sandbox` redirects to `/create` (see src/routes/sandbox.tsx) —
+  // asserts the redirect still lands on the real console.
   test('sandbox page loads', async ({ page }) => {
     await page.goto('/sandbox');
-    await expect(page).toHaveURL(/\/sandbox/);
+    await expect(page).toHaveURL(/\/create/);
   });
 });
 

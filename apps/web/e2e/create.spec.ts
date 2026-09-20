@@ -43,7 +43,10 @@ test.describe('Create Console — Generation UI', () => {
     await injectMockSession(page);
     await page.goto('/create');
     await page.waitForTimeout(1500);
-    await expect(page.getByText(/generate into/i).first()).toBeVisible();
+    // The picker is a compact icon+value trigger (no separate visible label,
+    // by design — see the "Compact wiki picker" comment in GenerateConsole.tsx);
+    // its accessible name is the tooltip title.
+    await expect(page.getByTitle(/which wiki this publishes into/i).first()).toBeVisible();
   });
 
   test('offers world-entity kinds (Person, Place, Faction)', async ({ page }) => {

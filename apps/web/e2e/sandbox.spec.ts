@@ -17,9 +17,12 @@
 import { test, expect, injectMockSession } from './fixtures';
 
 test.describe('Sandbox — Page Load', () => {
+  // `/sandbox` is a permanent redirect to `/create` (the console consolidated
+  // the old sandbox page — see src/routes/sandbox.tsx) so old links/bookmarks
+  // keep working. These assert the redirect lands on the real console.
   test('sandbox page loads', async ({ page }) => {
     await page.goto('/sandbox');
-    await expect(page).toHaveURL(/\/sandbox/);
+    await expect(page).toHaveURL(/\/create/);
   });
 
   test('shows Sandbox heading', async ({ page }) => {
@@ -27,9 +30,9 @@ test.describe('Sandbox — Page Load', () => {
     await expect(page.locator('body')).toContainText(/sandbox/i);
   });
 
-  test('shows Beta badge', async ({ page }) => {
+  test('shows console tagline', async ({ page }) => {
     await page.goto('/sandbox');
-    await expect(page.locator('body')).toContainText(/beta/i);
+    await expect(page.locator('body')).toContainText(/create anything|one prompt for images/i);
   });
 
   test('has header', async ({ page }) => {
