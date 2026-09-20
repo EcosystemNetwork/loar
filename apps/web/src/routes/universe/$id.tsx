@@ -148,6 +148,7 @@ import { BulkOperationsToolbar } from '@/components/flow/BulkOperationsToolbar';
 import { NodeContextMenu } from '@/components/flow/NodeContextMenu';
 import { ShortcutsHelpDialog } from '@/components/flow/ShortcutsHelpDialog';
 import { NodeArcOverlay } from '@/components/flow/NodeArcOverlay';
+import { NodeCountChip } from '@/components/flow/NodeCountChip';
 import { EpisodeBuilder } from '@/components/episodes/EpisodeBuilder';
 import { EpisodeList } from '@/components/episodes/EpisodeList';
 import { ScriptToEpisode } from '@/components/episodes/ScriptToEpisode';
@@ -675,6 +676,8 @@ function UniverseTimelineEditorInner() {
   // Blockchain data fetching - using extracted hook
   const {
     graphData,
+    graphSource,
+    rawOnChainNodeCount,
     latestNodeId,
     leavesData,
     isLoadingLeaves,
@@ -3686,6 +3689,17 @@ function UniverseTimelineEditorInner() {
                     <Film className="h-4 w-4" />
                     Episodes
                   </button>
+
+                  {/* Always-visible node count + source, so "why is the canvas
+                      empty / why did nodes disappear" is answerable from a
+                      screenshot of the toolbar instead of a Firestore/RPC dig. */}
+                  <NodeCountChip
+                    liveCount={nodes.filter((n: any) => n.data?.nodeType !== 'add').length}
+                    graphDataCount={graphData.nodeIds.length}
+                    rawOnChainNodeCount={rawOnChainNodeCount}
+                    graphSource={graphSource}
+                    isLoadingAny={isLoadingAny}
+                  />
 
                   {/* Canvas Tool Mode */}
                   <div className="flex bg-zinc-900/80 backdrop-blur-sm border border-zinc-700 rounded-lg overflow-hidden">

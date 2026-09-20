@@ -45,9 +45,35 @@ export interface UseUniverseBlockchainProps {
   isOnChain?: boolean;
 }
 
+/**
+ * Where `graphData.nodeIds` actually came from — surfaced so the UI can show
+ * a live "N nodes (source)" readout instead of a screenshot having to be
+ * forensically reconstructed after the fact (see the 2026-09-19 "Cyber War"
+ * and "Orange Pills" incidents: nodes popping up then disappearing, and an
+ * on-chain-minted-but-empty universe silently rendering nothing, both took
+ * direct Firestore/RPC queries to diagnose because nothing on screen said
+ * which data source — or how many nodes — was actually in play).
+ *  - 'on-chain'          → the contract's own graph had nodes.
+ *  - 'off-chain-fallback' → minted (isOnChain) but the contract graph is
+ *    empty; rendering Firestore's offChainNodes instead (a legitimate,
+ *    intentional case — see buildGraphData's doc comment).
+ *  - 'off-chain'          → a fun-mode (never on-chain) universe.
+ *  - 'empty'              → no nodes from either source (or not loaded yet).
+ */
+export type GraphSource = 'on-chain' | 'off-chain-fallback' | 'off-chain' | 'empty';
+
 export interface UseUniverseBlockchainReturn {
   // Data
   graphData: GraphData;
+  /** See `GraphSource`'s doc comment. */
+  graphSource: GraphSource;
+  /**
+   * On-chain-mode only: how many nodes the contract's own graph has *before*
+   * `nodeMedia.list` `hidden: true` overrides are filtered out. 0 in every
+   * other `graphSource`. `rawOnChainNodeCount - graphData.nodeIds.length`
+   * (when graphSource is 'on-chain') is how many are hidden by an override.
+   */
+  rawOnChainNodeCount: number;
   latestNodeId: number;
   leavesData: any;
 
@@ -421,6 +447,26 @@ export function useUniverseBlockchain({
     ]
   );
 
+  // Mirrors buildGraphData's own branching (see universeGraphData.ts) without
+  // touching its return shape — purely a diagnostic label. `fullGraphData[0]`
+  // is the raw on-chain nodeIds array, straight off the contract, before any
+  // hidden-override filtering.
+  const rawOnChainNodeCount = useOnChain
+    ? ((fullGraphData as Parameters<typeof buildGraphData>[0]['fullGraphData'])?.[0]?.length ?? 0)
+    : 0;
+  const graphSource: GraphSource = useMemo(() => {
+    if (!useOnChain) return graphData.nodeIds.length > 0 ? 'off-chain' : 'empty';
+    if (!onChainContractAddress || !fullGraphData) return 'empty';
+    if (rawOnChainNodeCount > 0) return 'on-chain';
+    return graphData.nodeIds.length > 0 ? 'off-chain-fallback' : 'empty';
+  }, [
+    useOnChain,
+    onChainContractAddress,
+    fullGraphData,
+    rawOnChainNodeCount,
+    graphData.nodeIds.length,
+  ]);
+
   // Include off-chain and media-override loading so callers waiting on
   // `isLoadingAny` don't release their loading UI before those fetches have
   // resolved. off-chain: for universes whose id happens to look like a 0x
@@ -452,6 +498,8 @@ export function useUniverseBlockchain({
 
   return {
     graphData,
+    graphSource,
+    rawOnChainNodeCount,
     latestNodeId,
     leavesData,
     isLoadingLeaves,
