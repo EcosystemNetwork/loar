@@ -332,7 +332,11 @@ export function useUniverseBlockchain({
   // it takes precedence over Ponder's event-derived videoLink. An override
   // with `hidden: true` drops the node from the rendered timeline entirely —
   // used when the original content is unrecoverable.
-  const { data: mediaOverrides } = useQuery({
+  const {
+    data: mediaOverrides,
+    isLoading: rqIsLoadingMediaOverrides,
+    status: mediaOverridesStatus,
+  } = useQuery({
     queryKey: ['nodeMediaOverrides', onChainContractAddress],
     queryFn: async () => {
       if (!onChainContractAddress)
@@ -343,6 +347,16 @@ export function useUniverseBlockchain({
     enabled: !!onChainContractAddress,
     staleTime: 30_000,
   });
+  // Same "enabled but not yet settled" gap as isLoadingOffChain below: on the
+  // render where onChainContractAddress first resolves, react-query's
+  // isLoading (isPending && isFetching) can still be false for one frame.
+  // Without covering that frame, isLoadingAny releases as soon as the
+  // on-chain graph itself has loaded, rendering every node unfiltered by
+  // `hidden` overrides — then, a moment later, this query resolves,
+  // hidden nodes drop out of graphData, and the canvas visibly shrinks.
+  // Reported live: a universe's nodes "pop up and disappear seconds later".
+  const isLoadingMediaOverrides =
+    rqIsLoadingMediaOverrides || (!!onChainContractAddress && mediaOverridesStatus === 'pending');
 
   // ── Off-chain timeline nodes (Fun-Mode universes) ──
   // Only loads when this universe is explicitly off-chain. On-chain universes
@@ -407,15 +421,22 @@ export function useUniverseBlockchain({
     ]
   );
 
-  // Include off-chain loading so callers waiting on `isLoadingAny` don't
-  // release their loading UI before the off-chain fetch (offChainNodes.list)
-  // has resolved for universes whose id happens to look like a 0x address
-  // but aren't actually on-chain (see universe/$id.tsx's loading guard,
-  // which used to key off the static `id.startsWith('0x')` heuristic and
-  // let the canvas render empty before this query even started — reported
-  // as nodes "disappearing right away").
+  // Include off-chain and media-override loading so callers waiting on
+  // `isLoadingAny` don't release their loading UI before those fetches have
+  // resolved. off-chain: for universes whose id happens to look like a 0x
+  // address but aren't actually on-chain (see universe/$id.tsx's loading
+  // guard, which used to key off the static `id.startsWith('0x')` heuristic
+  // and let the canvas render empty before this query even started —
+  // reported as nodes "disappearing right away"). media-overrides: without
+  // it, an on-chain universe's full node set renders before `hidden`
+  // overrides are known, then shrinks once they arrive — reported as nodes
+  // "popping up and disappearing seconds later".
   const isLoadingAny =
-    isLoadingLeaves || isLoadingFullGraph || isLoadingCanonChain || isLoadingOffChain;
+    isLoadingLeaves ||
+    isLoadingFullGraph ||
+    isLoadingCanonChain ||
+    isLoadingOffChain ||
+    isLoadingMediaOverrides;
 
   // Only surface on-chain graph errors when we're actually in on-chain mode.
   // While the universe doc is still loading, `isOnChain` is undefined and this

@@ -236,3 +236,16 @@ describe('useUniverseBlockchain — off-chain node population', () => {
     expect(result.current.graphData.nodeIds).toEqual([]);
   });
 });
+
+// The on-chain "media-override loading race" regression (nodes pop up then
+// disappear seconds later) is covered by:
+//  - useUniverseBlockchain.mediaOverrideRace.test.tsx — a deterministic,
+//    mocked test that pins the actual race by holding the override fetch
+//    open on demand. Real network timing can't be paused mid-flight, so
+//    this one has to stay mocked (see that file's header for why the
+//    real-stack attempt gave false confidence).
+//  - universeCanvasNodesOnScreen.test.tsx — a real-stack test (real Sepolia
+//    RPC against the actual "Cyber War" contract, a real
+//    Firestore-emulator-backed nodeMedia.list, a real Ponder indexer read)
+//    proving the real universe settles to its real visible node set and
+//    stays there.
