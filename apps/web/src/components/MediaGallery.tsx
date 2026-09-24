@@ -24,7 +24,7 @@ import type {
 } from '@/hooks/useMediaAttachments';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ModelViewer } from '@/components/ModelViewer';
+import { ModelViewer } from '@/components/ModelViewerLazy';
 import {
   ExternalLink,
   X,

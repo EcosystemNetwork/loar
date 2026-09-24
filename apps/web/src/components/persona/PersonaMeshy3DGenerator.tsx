@@ -21,7 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { ModelViewer } from '@/components/ModelViewer';
+import { ModelViewer } from '@/components/ModelViewerLazy';
 
 interface Generation3DResult {
   generationId: string;

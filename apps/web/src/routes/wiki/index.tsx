@@ -72,7 +72,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { ModelViewer } from '@/components/ModelViewer';
+import { ModelViewer } from '@/components/ModelViewerLazy';
 import { resolveIpfsUrl, resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import { SmartImage } from '@/components/SmartImage';
 import { useResolvedIpfsUrl } from '@/hooks/useResolvedIpfsUrl';

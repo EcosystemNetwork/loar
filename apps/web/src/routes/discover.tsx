@@ -21,8 +21,8 @@ import { QueryState } from '@/components/QueryState';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import { SmartImage } from '@/components/SmartImage';
 import { useResolvedIpfsUrl } from '@/hooks/useResolvedIpfsUrl';
-import { ModelViewer } from '@/components/ModelViewer';
-import { Model3DThumbnail } from '@/components/Model3DThumbnail';
+import { ModelViewer } from '@/components/ModelViewerLazy';
+import { Model3DThumbnail } from '@/components/Model3DThumbnailLazy';
 import {
   Dialog,
   DialogContent,

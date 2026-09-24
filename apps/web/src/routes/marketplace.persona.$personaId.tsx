@@ -31,7 +31,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { ModelViewer } from '@/components/ModelViewer';
+import { ModelViewer } from '@/components/ModelViewerLazy';
 import { ListPersonaForSaleDialog } from '@/components/likeness-marketplace/ListPersonaForSaleDialog';
 
 export const Route = createFileRoute('/marketplace/persona/$personaId')({

@@ -31,7 +31,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { ModelViewer } from '@/components/ModelViewer';
+import { ModelViewer } from '@/components/ModelViewerLazy';
 
 interface Universe3DModelDialogProps {
   open: boolean;

@@ -45,7 +45,7 @@ import { Separator } from '@/components/ui/separator';
 import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PersonaMeshy3DGenerator } from '@/components/persona/PersonaMeshy3DGenerator';
-import { ModelViewer } from '@/components/ModelViewer';
+import { ModelViewer } from '@/components/ModelViewerLazy';
 
 export const Route = createFileRoute('/create/persona')({
   component: CreatePersonaPage,

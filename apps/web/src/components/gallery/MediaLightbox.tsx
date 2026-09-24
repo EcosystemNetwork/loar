@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useGalleryLineage } from '@/hooks/useGallery';
 import { getIpfsUrlCandidatesPreferred, raceIpfsGateways, resolveIpfsUrl } from '@/utils/ipfs-url';
-import { ModelViewer } from '@/components/ModelViewer';
+import { ModelViewer } from '@/components/ModelViewerLazy';
 import { SmartImage } from '@/components/SmartImage';
 import { useResolvedIpfsUrl } from '@/hooks/useResolvedIpfsUrl';
 
