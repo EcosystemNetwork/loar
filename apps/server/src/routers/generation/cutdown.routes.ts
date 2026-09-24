@@ -20,6 +20,8 @@ import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 import { withReservation } from '../../services/credits';
+import { transcriptionService } from '../../services/transcription';
+import { probeVideo } from '../../services/ffmpeg/probe';
 
 const clientTokenSchema = z
   .string()
@@ -147,44 +149,46 @@ function pickHighlightSegments(
     : [{ startSec: 0, endSec: Math.min(maxDurationSec, 30), importance: 0.5 }];
 }
 
-// ── Whisper transcription stub ───────────────────────────────────────────
+// ── Whisper transcription ────────────────────────────────────────────────
 
 /**
- * Transcribe video audio using FAL Whisper.
- * Returns word-level or segment-level timestamps.
+ * Transcribe the source video's audio track via the shared FAL Whisper
+ * service. Returns segment-level timestamps.
  *
- * In production this calls fal-ai/whisper; for now returns a simulated
- * transcription if FAL is unavailable, ensuring the pipeline always completes.
+ * A provider failure (missing FAL_KEY, upstream error) THROWS so the
+ * reservation is refunded and the job is marked failed — returning an empty
+ * transcript here would have billed the user for a fabricated "first 30s"
+ * highlight. A video with no speech is the one legitimate empty case.
  */
 async function transcribeVideo(
   videoUrl: string
 ): Promise<Array<{ start: number; end: number; text: string }>> {
-  try {
-    // Attempt FAL Whisper transcription
-    const { fal } = (await import(/* @vite-ignore */ '@fal-ai/client' as string)) as any;
-    const result = await (fal as any).subscribe('fal-ai/whisper', {
-      input: { audio_url: videoUrl },
-    });
-
-    const chunks: Array<{ start: number; end: number; text: string }> =
-      result?.data?.chunks ?? result?.chunks ?? [];
-
-    if (chunks.length > 0) return chunks;
-
-    // Fallback: if no chunks but we have text, create a single segment
-    const text = result?.data?.text ?? result?.text;
-    if (text) {
-      return [{ start: 0, end: 60, text }];
-    }
-
-    return [];
-  } catch (err) {
-    console.warn(
-      '[cutdown] Whisper transcription failed, returning empty transcript:',
-      (err as Error).message
-    );
-    return [];
+  const result = await transcriptionService.transcribe({ audioUrl: videoUrl });
+  if (result.status === 'failed') {
+    // The service reports "no speech" as a failure with this prefix.
+    if (result.error?.startsWith('No transcription returned')) return [];
+    throw new Error(`Transcription failed: ${result.error ?? 'unknown error'}`);
   }
+  if (result.segments?.length) {
+    return result.segments.map(({ start, end, text }) => ({ start, end, text }));
+  }
+  return result.text ? [{ start: 0, end: 0, text: result.text }] : [];
+}
+
+/** Clamp segments to the real video duration, dropping any that fall outside it. */
+function clampSegmentsToDuration<T extends { startSec: number; endSec: number }>(
+  segments: T[],
+  durationSec: number
+): T[] {
+  if (!(durationSec > 0)) return segments;
+  const clamped = segments
+    .map((s) => ({
+      ...s,
+      startSec: Math.min(s.startSec, durationSec),
+      endSec: Math.min(s.endSec, durationSec),
+    }))
+    .filter((s) => s.endSec > s.startSec);
+  return clamped.length ? clamped : [{ ...segments[0], startSec: 0, endSec: durationSec }];
 }
 
 // ── Router ───────────────────────────────────────────────────────────────
@@ -306,14 +310,26 @@ export const cutdownRouter = router({
             },
           },
           async () => {
-            // 3. Transcribe audio
-            const transcription = await transcribeVideo(input.sourceVideoUrl);
+            // 3. Probe the source (real dimensions + duration) and transcribe audio
+            const [source, transcription] = await Promise.all([
+              probeVideo(input.sourceVideoUrl).catch((err) => {
+                throw new Error(`Could not read source video: ${(err as Error).message}`);
+              }),
+              transcribeVideo(input.sourceVideoUrl),
+            ]);
 
-            // 4. Pick highlight segments
-            const segments = pickHighlightSegments(transcription, input.maxDurationSec, input.mode);
+            // 4. Pick highlight segments, bounded by the real duration
+            const segments = clampSegmentsToDuration(
+              pickHighlightSegments(transcription, input.maxDurationSec, input.mode),
+              source.durationSec
+            );
 
-            // 5. Compute crop parameters (assume 1920x1080 source — standard 16:9)
-            const cropParams = computeCropParams(1920, 1080, input.targetAspectRatio);
+            // 5. Compute crop parameters from the probed source dimensions
+            const cropParams = computeCropParams(
+              source.width,
+              source.height,
+              input.targetAspectRatio
+            );
 
             // 6. Generate captions if requested
             let captions: Array<{ start: number; end: number; text: string }> | undefined;

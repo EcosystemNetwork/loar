@@ -13,9 +13,18 @@
  */
 
 import { createHash } from 'node:crypto';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { extractFramePng, probeVideo } from '../ffmpeg/probe';
 import type { FingerprintProvider, FingerprintOutcome, MediaRef } from './types';
 
 const HASH_SIZE = 8; // 8×8 = 64 bits
+
+/** Relative positions sampled for a video fingerprint (skips fades at 0%/100%). */
+const VIDEO_SAMPLE_POINTS = [0.25, 0.5, 0.75] as const;
+/** Refuse to download more than this for fingerprinting — it runs on the upload path. */
+const MAX_VIDEO_BYTES = 300 * 1024 * 1024;
 
 // Typed loosely on purpose — `sharp` is an optional peer dep and may not be
 // installed. The local pHash provider returns `configured: false` when the
@@ -75,23 +84,62 @@ async function computeAhash(buffer: Buffer): Promise<string> {
   return hex;
 }
 
+/**
+ * Fingerprint a video as the concatenation of the aHash of frames sampled at
+ * 25% / 50% / 75% of its duration (3 × 64 bits = 48 hex chars). Comparing two
+ * videos is then a per-frame Hamming distance, which survives re-encoding and
+ * resolution changes the same way the image hash does.
+ *
+ * The bytes are spooled to a temp file (rather than handing ffmpeg the URL) so
+ * the fetch goes through `safeFetch`'s SSRF pinning and ffmpeg never touches
+ * the network.
+ */
+async function computeVideoHash(media: MediaRef): Promise<string> {
+  const workDir = await mkdtemp(join(tmpdir(), 'vphash-'));
+  try {
+    const path = join(workDir, 'input');
+    if (media.bytes) {
+      if (media.bytes.length > MAX_VIDEO_BYTES) throw new Error('video too large to fingerprint');
+      await writeFile(path, media.bytes);
+    } else {
+      const { safeFetch } = await import('../../lib/url-validator');
+      const res = await safeFetch(media.url, { redirect: 'error' });
+      if (!res.ok) throw new Error(`fetch ${media.url} returned ${res.status}`);
+      const declared = Number(res.headers.get('content-length') ?? 0);
+      if (declared > MAX_VIDEO_BYTES) throw new Error('video too large to fingerprint');
+      const bytes = Buffer.from(await res.arrayBuffer());
+      if (bytes.length > MAX_VIDEO_BYTES) throw new Error('video too large to fingerprint');
+      await writeFile(path, bytes);
+    }
+
+    const { durationSec } = await probeVideo(path);
+    let hash = '';
+    for (const point of VIDEO_SAMPLE_POINTS) {
+      const frame = await extractFramePng(path, durationSec * point);
+      hash += await computeAhash(frame);
+    }
+    return hash;
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+}
+
 export class LocalPhashProvider implements FingerprintProvider {
   readonly name = 'local-ahash';
 
   async compute(media: MediaRef): Promise<FingerprintOutcome> {
-    if (media.kind === 'video') {
-      // Video fingerprinting needs a frame extraction step (ffmpeg). Out of
-      // scope for the baseline — VLM moderation already covers video, so the
-      // gap is copyright-dedup of video which we defer.
-      return { configured: false, reason: 'video fingerprinting not implemented locally' };
-    }
-
     const sharp = await loadSharp();
     if (!sharp) {
       return {
         configured: false,
         reason: 'sharp not installed — run `pnpm add sharp` in apps/server to enable local pHash',
       };
+    }
+
+    if (media.kind === 'video') {
+      const start = Date.now();
+      const hash = await computeVideoHash(media);
+      return { configured: true, algorithm: 'ahash', hash, computeMs: Date.now() - start };
     }
 
     const start = Date.now();
