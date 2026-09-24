@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { trpc } from '@/utils/trpc';
+import { useWalletAuth } from '@/lib/wallet-auth';
 
 export const Route = createFileRoute('/activity')({
   component: ActivityPage,
@@ -27,10 +28,18 @@ const EVENT_ICONS: Record<string, string> = {
 };
 
 function ActivityPage() {
-  const [tab, setTab] = useState<'following' | 'global'>('following');
+  const { isAuthenticated } = useWalletAuth();
+  // The following feed is auth-only; signed-out visitors land on the public
+  // global feed instead of a "Failed to load" error.
+  const [pickedTab, setTab] = useState<'following' | 'global' | null>(null);
+  const tab = pickedTab ?? (isAuthenticated ? 'following' : 'global');
+  const needsSignIn = tab === 'following' && !isAuthenticated;
 
   const followingFeed = useQuery(
-    trpc.social.getActivityFeed.queryOptions({ limit: 30 }, { enabled: tab === 'following' })
+    trpc.social.getActivityFeed.queryOptions(
+      { limit: 30 },
+      { enabled: tab === 'following' && isAuthenticated }
+    )
   );
 
   const globalFeed = useQuery(
@@ -63,7 +72,13 @@ function ActivityPage() {
         </div>
 
         {/* Feed */}
-        {feed.isError ? (
+        {needsSignIn ? (
+          <div className="text-center py-12">
+            <p className="text-zinc-400 text-lg">
+              Sign in to see activity from creators you follow
+            </p>
+          </div>
+        ) : feed.isError ? (
           <div className="bg-red-900/20 border border-red-800 rounded-xl p-6 text-center">
             <p className="text-red-400">Failed to load activity feed</p>
           </div>
