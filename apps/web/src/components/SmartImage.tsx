@@ -196,7 +196,9 @@ export function SmartImage({
           alt={alt}
           loading={priority ? 'eager' : 'lazy'}
           decoding="async"
-          fetchPriority={priority ? 'high' : 'auto'}
+          // React 18 only knows the lowercase DOM spelling; camelCase `fetchPriority`
+          // (React 19) logs an "unrecognized prop" warning on every image render.
+          {...({ fetchpriority: priority ? 'high' : 'auto' } as Record<string, string>)}
           onLoad={handleLoad}
           onError={handleError}
           className={cn(
