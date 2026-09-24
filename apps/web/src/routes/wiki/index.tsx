@@ -55,6 +55,7 @@ import {
   Activity,
   BarChart3,
   Heart,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UserText } from '@/components/user-text';
@@ -98,6 +99,7 @@ import { ActivityTab } from '@/components/wiki/ActivityTab';
 import { StatsTab } from '@/components/wiki/StatsTab';
 import { CreatorsTab } from '@/components/wiki/CreatorsTab';
 import { BookmarksTab } from '@/components/wiki/BookmarksTab';
+import { AskTab } from '@/components/wiki/AskTab';
 import {
   STRUCTURAL_KIND_DESCRIPTIONS,
   type EntityKind,
@@ -149,6 +151,7 @@ const TABS: {
   { id: 'episodes', label: 'Episodes', icon: Film, section: 'narrative' },
   { id: 'audio', label: 'Audio', icon: Music, section: 'narrative' },
   // Discovery / wiki-native views
+  { id: 'ask', label: 'Ask', icon: Sparkles, section: 'discovery' },
   { id: 'graph', label: 'Graph', icon: Network, section: 'discovery' },
   { id: 'event-timeline', label: 'Timeline', icon: CalendarDays, section: 'discovery' },
   { id: 'places-map', label: 'Map', icon: MapIcon, section: 'discovery' },
@@ -1810,6 +1813,8 @@ function WikiPage() {
         <StatsTab universeAddress={universeAddress} />
       ) : activeTab === 'creators' ? (
         <CreatorsTab />
+      ) : activeTab === 'ask' ? (
+        <AskTab universeAddress={universeAddress} />
       ) : activeTab === 'bookmarks' ? (
         <BookmarksTab />
       ) : null}

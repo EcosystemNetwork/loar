@@ -17,7 +17,9 @@ import {
   REFERENCE_SLOTS,
   IDENTITY_LOCKS,
   MAX_REFS_PER_SLOT,
+  type Entity,
 } from './entities.types';
+import { findMentions } from './entities.mentions';
 import {
   createEntity,
   getEntity,
@@ -503,6 +505,26 @@ export const entitiesRouter = router({
         ),
         nextCursor: nextCursorId,
       };
+    }),
+
+  /**
+   * Backlinks: other entities in the same universe whose description mentions
+   * this entity by name. Scans the universe's entities (bounded) — no index.
+   */
+  mentions: publicProcedure
+    .input(z.object({ entityId: z.string().min(1) }))
+    .query(async ({ input, ctx }) => {
+      const entity = await assertEntityVisible(input.entityId, ctx.user?.address);
+      if (!entity.universeAddress || !db) return { mentions: [] };
+      const snap = await db
+        .collection('entities')
+        .where('universeAddress', '==', entity.universeAddress)
+        .limit(500)
+        .get();
+      const candidates = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }) as Entity)
+        .filter((e) => CREATOR_KINDS.includes(e.kind));
+      return { mentions: findMentions(entity, candidates) };
     }),
 
   /** Get all relationships within a universe. */

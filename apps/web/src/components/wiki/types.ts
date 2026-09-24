@@ -76,6 +76,7 @@ export type WikiTab =
   | 'places-map'
   | 'az-index'
   | 'activity'
+  | 'ask'
   | 'stats'
   | 'creators'
   | 'bookmarks';

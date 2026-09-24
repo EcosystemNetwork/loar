@@ -684,6 +684,60 @@ function ChildEntities({ entityId }: { entityId: string }) {
   );
 }
 
+/** Backlinks — other entities in this universe whose text mentions this one by name. */
+function MentionedIn({ entityId }: { entityId: string }) {
+  const { data } = useQuery({
+    queryKey: ['entity-mentions', entityId],
+    queryFn: () => trpcClient.entities.mentions.query({ entityId }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const mentions = data?.mentions ?? [];
+  if (mentions.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Link2 className="w-4 h-4" />
+          Mentioned in ({mentions.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-2">
+          {mentions.map((m) => {
+            const Icon = DETAIL_KIND_ICONS[m.kind] ?? Package;
+            return (
+              <li key={m.id}>
+                <Link
+                  to="/wiki/entity/$id"
+                  params={{ id: m.id }}
+                  className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors"
+                >
+                  <div className="w-6 h-6 rounded bg-muted flex items-center justify-center relative overflow-hidden shrink-0 mt-0.5">
+                    <Icon className="w-4 h-4 text-muted-foreground/40" />
+                    {m.imageUrl && (
+                      <SmartImage
+                        src={m.imageUrl}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    )}
+                  </div>
+                  <span className="min-w-0">
+                    <span className="text-sm font-medium block truncate">{m.name}</span>
+                    <span className="text-xs text-muted-foreground line-clamp-2">{m.snippet}</span>
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
 function EntityPage() {
   const { id } = Route.useParams();
   const { address } = useAccount();
@@ -1162,6 +1216,9 @@ function EntityPage() {
 
           {/* Child entities */}
           <ChildEntities entityId={id} />
+
+          {/* Backlinks */}
+          <MentionedIn entityId={id} />
 
           {/* Character pipeline status */}
           {hasPipeline && <PipelineStatus pipelineId={pipelineId!} />}

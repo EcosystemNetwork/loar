@@ -11,7 +11,19 @@ import { throwApiError, wrapError } from '../../lib/errors';
 import { wikiaService } from '../../services/wikia';
 import { geminiService } from '../../services/gemini';
 import { isUniverseAdmin } from '../../lib/safe-admin';
-import { normalizeUniverseId } from '../../lib/universe-id';
+import { isUniverseExcluded, normalizeUniverseId } from '../../lib/universe-id';
+import { universeAddressSchema } from '../../lib/universe-address-schema';
+import { getExcludedUniverseIds } from '../universes/universes.handlers';
+import { dispatchLlm } from '../../services/llm-models';
+import { routeLlmModel } from '../../services/llm-models/router';
+import {
+  MAX_QUESTION_CHARS,
+  WIKI_QA_SYSTEM_PROMPT,
+  buildQaUserPrompt,
+  citedSources,
+  rankEntities,
+} from '../../services/wiki-qa';
+import { CREATOR_KINDS, type Entity } from '../entities/entities.types';
 
 /** Doc ids can't contain '/', and the `${universeId}-${eventId}` key must be unambiguous. */
 const wikiKeyPart = z
@@ -20,6 +32,9 @@ const wikiKeyPart = z
   .max(200)
   .refine((v) => !v.includes('/'), 'Must not contain "/"');
 const MAX_WIKI_GENERATIONS_PER_HOUR = 20;
+const MAX_WIKI_QUESTIONS_PER_HOUR = 30;
+/** Entities scanned per question; a universe rarely holds more than a few hundred. */
+const QA_ENTITY_SCAN_LIMIT = 500;
 
 const charactersCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -31,6 +46,105 @@ const eventWikisCol = () => {
 };
 
 export const wikiRouter = router({
+  /**
+   * Ask the wiki: answer a question about a universe from its canon only.
+   * Retrieval is keyword-ranked over the universe's entities; the LLM sees
+   * just the top hits and must cite them. Returns the cited entities so the
+   * UI can link to them. No LLM call is made when nothing in canon matches.
+   */
+  ask: protectedProcedure
+    .input(
+      z.object({
+        universeAddress: universeAddressSchema,
+        question: z.string().trim().min(3).max(MAX_QUESTION_CHARS),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user.address });
+      if (isUniverseExcluded(excluded, input.universeAddress)) {
+        throwApiError('NOT_FOUND', 'Universe not found');
+      }
+
+      const snap = await db
+        .collection('entities')
+        .where('universeAddress', '==', normalizeUniverseId(input.universeAddress))
+        .limit(QA_ENTITY_SCAN_LIMIT)
+        .get();
+      const entities = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }) as Entity)
+        .filter((e) => CREATOR_KINDS.includes(e.kind));
+      const ranked = rankEntities(input.question, entities);
+
+      if (ranked.length === 0) {
+        return {
+          answer:
+            "The canon doesn't cover that yet — no entries in this universe match your question.",
+          sources: [] as {
+            id: string;
+            name: string;
+            kind: string;
+            imageUrl: string | null;
+            cited: boolean;
+          }[],
+          grounded: false,
+        };
+      }
+
+      // Cost guard: fixed 1h window per user, single doc (no composite index).
+      const rateRef = db.collection('wikiAskRate').doc(ctx.user.uid);
+      const allowed = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(rateRef);
+        const now = Date.now();
+        const d = snap.data() as { windowStart?: number; count?: number } | undefined;
+        const fresh = !d?.windowStart || now - d.windowStart > 60 * 60 * 1000;
+        const count = fresh ? 0 : (d?.count ?? 0);
+        if (count >= MAX_WIKI_QUESTIONS_PER_HOUR) return false;
+        tx.set(rateRef, { windowStart: fresh ? now : d!.windowStart, count: count + 1 });
+        return true;
+      });
+      if (!allowed) {
+        throwApiError(
+          'TOO_MANY_REQUESTS',
+          `Rate limit exceeded: max ${MAX_WIKI_QUESTIONS_PER_HOUR} wiki questions per hour`
+        );
+      }
+
+      try {
+        const { chosenModelId } = routeLlmModel({
+          requires: { chat: true },
+          qualityTarget: 'standard',
+          costBudget: 'low',
+        });
+        const result = await dispatchLlm({
+          modelId: chosenModelId,
+          userId: ctx.user.uid,
+          messages: [
+            { role: 'system', content: WIKI_QA_SYSTEM_PROMPT },
+            { role: 'user', content: buildQaUserPrompt(input.question, ranked) },
+          ],
+          temperature: 0.2,
+          maxTokens: 600,
+        });
+        const answer = result.text.trim();
+        const citedIds = new Set(citedSources(answer, ranked).map((e) => e.id));
+        return {
+          answer,
+          // All retrieved sources in prompt order, so the answer's [n] markers
+          // index straight into this list.
+          sources: ranked.map((e) => ({
+            id: e.id,
+            name: e.name,
+            kind: e.kind,
+            imageUrl: e.imageUrl ?? null,
+            cited: citedIds.has(e.id),
+          })),
+          grounded: true,
+        };
+      } catch (error) {
+        throw wrapError(error, 'Could not answer that question');
+      }
+    }),
+
   /**
    * List characters from the wiki database, optionally filtered by universe.
    *
