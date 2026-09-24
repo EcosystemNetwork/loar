@@ -7,26 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { allEntitiesKey, fetchAllEntities } from './fetchAll';
+import { WIKI_BROWSABLE_KINDS } from './types';
 import type { WikiEntity, EntityKind } from './types';
 import { SmartImage } from '@/components/SmartImage';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
-const KINDS: EntityKind[] = [
-  'person',
-  'place',
-  'thing',
-  'faction',
-  'event',
-  'lore',
-  'species',
-  'vehicle',
-  'technology',
-  'organization',
-  'moodboard',
-  'style_pack',
-];
+const KINDS = WIKI_BROWSABLE_KINDS;
 
 interface ProfileSummary {
   uid: string;

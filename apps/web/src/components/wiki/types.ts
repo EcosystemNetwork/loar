@@ -25,6 +25,26 @@ export type EntityKind =
   | 'realm'
   | 'domain';
 
+/**
+ * Kinds shown in the wiki's browsable lists (A–Z index, random entity,
+ * creators). Excludes the world-structure kinds (timeline, reality,
+ * dimension, plane, realm, domain), which have their own views.
+ */
+export const WIKI_BROWSABLE_KINDS: readonly EntityKind[] = [
+  'person',
+  'place',
+  'thing',
+  'faction',
+  'event',
+  'lore',
+  'species',
+  'vehicle',
+  'technology',
+  'organization',
+  'moodboard',
+  'style_pack',
+];
+
 export type RightsDeclaration = 'original' | 'licensed' | null;
 
 export interface WikiEntity {

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Shuffle, Loader2 } from 'lucide-react';
 import { pickRandom } from './sort';
 import { allEntitiesKey, fetchAllEntities } from './fetchAll';
+import { WIKI_BROWSABLE_KINDS } from './types';
 import type { EntityKind, WikiEntity } from './types';
 import { toast } from 'sonner';
 
@@ -13,20 +14,7 @@ interface RandomEntityButtonProps {
   universeAddress?: string;
 }
 
-const KINDS: EntityKind[] = [
-  'person',
-  'place',
-  'thing',
-  'faction',
-  'event',
-  'lore',
-  'species',
-  'vehicle',
-  'technology',
-  'organization',
-  'moodboard',
-  'style_pack',
-];
+const KINDS = WIKI_BROWSABLE_KINDS;
 
 export function RandomEntityButton({ universeAddress }: RandomEntityButtonProps) {
   const navigate = useNavigate();

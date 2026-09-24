@@ -5,26 +5,14 @@ import { trpcClient } from '@/utils/trpc';
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { allEntitiesKey, fetchAllEntities } from './fetchAll';
+import { WIKI_BROWSABLE_KINDS } from './types';
 import type { EntityKind, WikiEntity } from './types';
 
 interface AZIndexTabProps {
   universeAddress?: string;
 }
 
-const KINDS: EntityKind[] = [
-  'person',
-  'place',
-  'thing',
-  'faction',
-  'event',
-  'lore',
-  'species',
-  'vehicle',
-  'technology',
-  'organization',
-  'moodboard',
-  'style_pack',
-];
+const KINDS = WIKI_BROWSABLE_KINDS;
 
 const ALPHABET = '#ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
