@@ -23,6 +23,7 @@ import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
 import { elevenLabsService, type ElevenLabsVoiceModel } from '../../services/elevenlabs';
 import { getStorageManager } from '../../services/storage';
+import { resolveProviderKey } from '../../lib/byok';
 import { lipSyncService } from '../../services/lipsync';
 import { dispatchGeneration, generateInputSchema } from './generation.routes';
 import { getModelById } from '../../services/video-models';
@@ -328,6 +329,7 @@ export const talkingSceneRouter = router({
               videoUrl,
               audioUrl,
               model: 'fal-ai/lipsync',
+              apiKey: await resolveProviderKey(ctx.user.uid, 'fal'),
             });
             if (lipsyncResult.status !== 'completed' || !lipsyncResult.videoUrl) {
               throw new Error(lipsyncResult.error || 'Lip-sync stage failed');

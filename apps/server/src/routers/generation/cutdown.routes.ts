@@ -20,6 +20,7 @@ import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 import { withReservation } from '../../services/credits';
+import { resolveProviderKey } from '../../lib/byok';
 import { transcriptionService } from '../../services/transcription';
 import { probeVideo } from '../../services/ffmpeg/probe';
 
@@ -155,15 +156,16 @@ function pickHighlightSegments(
  * Transcribe the source video's audio track via the shared FAL Whisper
  * service. Returns segment-level timestamps.
  *
- * A provider failure (missing FAL_KEY, upstream error) THROWS so the
+ * A provider failure (missing BYOK fal key, upstream error) THROWS so the
  * reservation is refunded and the job is marked failed — returning an empty
  * transcript here would have billed the user for a fabricated "first 30s"
  * highlight. A video with no speech is the one legitimate empty case.
  */
 async function transcribeVideo(
-  videoUrl: string
+  videoUrl: string,
+  apiKey: string | undefined
 ): Promise<Array<{ start: number; end: number; text: string }>> {
-  const result = await transcriptionService.transcribe({ audioUrl: videoUrl });
+  const result = await transcriptionService.transcribe({ audioUrl: videoUrl, apiKey });
   if (result.status === 'failed') {
     // The service reports "no speech" as a failure with this prefix.
     if (result.error?.startsWith('No transcription returned')) return [];
@@ -310,12 +312,13 @@ export const cutdownRouter = router({
             },
           },
           async () => {
+            const falKey = await resolveProviderKey(userId, 'fal');
             // 3. Probe the source (real dimensions + duration) and transcribe audio
             const [source, transcription] = await Promise.all([
               probeVideo(input.sourceVideoUrl).catch((err) => {
                 throw new Error(`Could not read source video: ${(err as Error).message}`);
               }),
-              transcribeVideo(input.sourceVideoUrl),
+              transcribeVideo(input.sourceVideoUrl, falKey),
             ]);
 
             // 4. Pick highlight segments, bounded by the real duration

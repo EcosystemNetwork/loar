@@ -14,6 +14,8 @@ export interface LipSyncOptions {
   videoUrl: string;
   audioUrl: string;
   model?: 'fal-ai/lipsync' | 'fal-ai/sadtalker';
+  /** The caller's own fal.ai key (BYOK). Required — there is no platform fallback. */
+  apiKey?: string;
 }
 
 export interface LipSyncResult {
@@ -35,17 +37,21 @@ const HEALTH_RECOVERY_MS = 5 * 60 * 1000; // 5 minutes
 // ── Service ──────────────────────────────────────────────────────────
 
 class LipSyncService {
-  private configured = false;
   private providerHealth: Record<string, ProviderHealth> = {};
 
-  private ensureConfigured(): void {
-    if (!this.configured && process.env.FAL_KEY) {
-      fal.config({ credentials: process.env.FAL_KEY });
-      this.configured = true;
+  /**
+   * The FAL client only has a global `fal.config({ credentials })`, so we set it
+   * before each call (same tradeoff as `FalService.configureCall`). No `FAL_KEY`
+   * env fallback — callers must route through `resolveProviderKey(uid, 'fal')`.
+   */
+  private configureCall(apiKey?: string): void {
+    const key = apiKey?.trim();
+    if (!key) {
+      throw new Error(
+        'No fal.ai API key available — add one at /settings/api-keys to use lip-sync.'
+      );
     }
-    if (!this.configured) {
-      throw new Error('FAL_KEY environment variable is required for lip-sync');
-    }
+    fal.config({ credentials: key });
   }
 
   private getHealth(provider: string): ProviderHealth {
@@ -85,7 +91,7 @@ class LipSyncService {
   }
 
   async sync(options: LipSyncOptions): Promise<LipSyncResult> {
-    this.ensureConfigured();
+    this.configureCall(options.apiKey);
 
     const primaryModel = options.model || 'fal-ai/lipsync';
     const fallbackModel: 'fal-ai/lipsync' | 'fal-ai/sadtalker' =

@@ -18,6 +18,7 @@ import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 import { FieldValue } from 'firebase-admin/firestore';
 import { logFailedRefund } from '../../lib/refund-audit';
 import { reserveClientToken } from '../../lib/jobIdempotency';
+import { resolveProviderKey } from '../../lib/byok';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 
 const loraModelsCol = () => {
@@ -31,6 +32,18 @@ const trainingJobsCol = () => {
 };
 
 const TRAINING_COST_CREDITS = 75;
+
+/** BYOK-only: LoRA training/inference run on the caller's own fal.ai account. */
+async function requireFalKey(uid: string): Promise<string> {
+  const key = await resolveProviderKey(uid, 'fal');
+  if (!key) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'No fal.ai API key on file — add one at /settings/api-keys to use LoRA models.',
+    });
+  }
+  return key;
+}
 
 export const loraRouter = router({
   /** Start LoRA training for a character */
@@ -113,6 +126,9 @@ export const loraRouter = router({
         validatedWebhookUrl = check.url;
       }
 
+      // BYOK: resolve before any credit movement so a missing key fails cleanly.
+      const FAL_KEY = await requireFalKey(ctx.user.uid);
+
       // Deduct credits transactionally BEFORE calling FAL
       const userCreditsRef = db!.collection('userCredits').doc(ctx.user.uid);
       await db!.runTransaction(async (tx) => {
@@ -146,11 +162,6 @@ export const loraRouter = router({
 
       // Kick off training via FAL
       try {
-        const FAL_KEY = process.env.FAL_KEY;
-        if (!FAL_KEY) {
-          throw new Error('FAL_KEY not configured');
-        }
-
         const response = await fetch('https://queue.fal.run/fal-ai/flux-lora-fast-training', {
           method: 'POST',
           headers: {
@@ -243,7 +254,8 @@ export const loraRouter = router({
 
         if (!jobSnap.empty) {
           const job = jobSnap.docs[0].data();
-          const FAL_KEY = process.env.FAL_KEY;
+          // The job was submitted on the owner's own fal account, so poll with their key.
+          const FAL_KEY = await resolveProviderKey(ctx.user.uid, 'fal');
 
           if (FAL_KEY && job.externalJobId) {
             try {
@@ -353,6 +365,8 @@ export const loraRouter = router({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Model not ready' });
       }
 
+      const FAL_KEY = await requireFalKey(ctx.user.uid);
+
       // Deduct credits transactionally BEFORE generation
       const userCreditsRef = db!.collection('userCredits').doc(ctx.user.uid);
       await db!.runTransaction(async (tx) => {
@@ -369,10 +383,6 @@ export const loraRouter = router({
           { merge: true }
         );
       });
-
-      const FAL_KEY = process.env.FAL_KEY;
-      if (!FAL_KEY)
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'FAL_KEY not set' });
 
       try {
         // Generate with LoRA

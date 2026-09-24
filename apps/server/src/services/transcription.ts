@@ -31,6 +31,8 @@ export interface TranscriptionOptions {
   diarize?: boolean;
   /** Optional hint to the diarizer about the expected number of speakers. */
   numSpeakers?: number;
+  /** The caller's own fal.ai key (BYOK). Required — there is no platform fallback. */
+  apiKey?: string;
 }
 
 export interface TranscriptionWord {
@@ -74,20 +76,23 @@ const WORD_GROUPING = {
 // ── Service ──────────────────────────────────────────────────────────
 
 class TranscriptionService {
-  private configured = false;
-
-  private ensureConfigured(): void {
-    if (!this.configured && process.env.FAL_KEY) {
-      fal.config({ credentials: process.env.FAL_KEY });
-      this.configured = true;
+  /**
+   * The FAL client only has a global `fal.config({ credentials })`, so we set it
+   * before each call (same tradeoff as `FalService.configureCall`). No `FAL_KEY`
+   * env fallback — callers must route through `resolveProviderKey(uid, 'fal')`.
+   */
+  private configureCall(apiKey?: string): void {
+    const key = apiKey?.trim();
+    if (!key) {
+      throw new Error(
+        'No fal.ai API key available — add one at /settings/api-keys to use transcription.'
+      );
     }
-    if (!this.configured) {
-      throw new Error('FAL_KEY environment variable is required for transcription');
-    }
+    fal.config({ credentials: key });
   }
 
   async transcribe(options: TranscriptionOptions): Promise<TranscriptionResult> {
-    this.ensureConfigured();
+    this.configureCall(options.apiKey);
 
     const wantsWords = !!options.wordTimings;
     const wantsSpeakers = !!options.diarize;

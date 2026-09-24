@@ -18,6 +18,7 @@ import { router, protectedProcedure, requirePermission, expensiveProcedure } fro
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
+import { resolveProviderKey } from '../../lib/byok';
 import { lipSyncService } from '../../services/lipsync';
 import { transcriptionService } from '../../services/transcription';
 import { firebaseStorageService } from '../../services/firebase-storage';
@@ -171,10 +172,12 @@ export const lipsyncRouter = router({
           async () => {
             await lipsyncGenerationsCol().doc(genId).update({ status: 'running' });
 
+            const falKey = await resolveProviderKey(ctx.user.uid, 'fal');
             const result = await lipSyncService.sync({
               videoUrl: input.videoUrl,
               audioUrl: input.audioUrl,
               model: input.model,
+              apiKey: falKey,
             });
 
             if (result.status === 'failed' || !result.videoUrl) {
@@ -335,9 +338,11 @@ export const lipsyncRouter = router({
           async () => {
             await transcriptionsCol().doc(transcriptionId).update({ status: 'running' });
 
+            const falKey = await resolveProviderKey(ctx.user.uid, 'fal');
             const result = await transcriptionService.transcribe({
               audioUrl: input.audioUrl,
               language: input.language,
+              apiKey: falKey,
             });
 
             if (result.status === 'failed' || (!result.text && !result.segments)) {
@@ -435,9 +440,11 @@ export const lipsyncRouter = router({
             await captionsCol().doc(captionId).update({ status: 'running' });
 
             // Transcribe the video's audio (FAL Whisper accepts video URLs too)
+            const falKey = await resolveProviderKey(ctx.user.uid, 'fal');
             const result = await transcriptionService.transcribe({
               audioUrl: input.videoUrl,
               language: input.language,
+              apiKey: falKey,
             });
 
             if (result.status === 'failed' || !result.segments || result.segments.length === 0) {

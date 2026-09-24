@@ -26,6 +26,7 @@ import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
 import { elevenLabsService, type ElevenLabsVoiceModel } from '../../services/elevenlabs';
 import { getStorageManager } from '../../services/storage';
+import { resolveProviderKey } from '../../lib/byok';
 import { lipSyncService } from '../../services/lipsync';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import { assertVoiceUsageAllowed } from '../../lib/likeness-access';
@@ -607,7 +608,11 @@ export const dubbingRouter = router({
         let finalVideoUrl: string | undefined;
         if (baseVideoUrl) {
           if (input.mode === 'lipsync') {
-            const sync = await lipSyncService.sync({ videoUrl: baseVideoUrl, audioUrl: mergedUrl });
+            const sync = await lipSyncService.sync({
+              videoUrl: baseVideoUrl,
+              audioUrl: mergedUrl,
+              apiKey: await resolveProviderKey(ctx.user.uid, 'fal'),
+            });
             if (sync.status !== 'completed' || !sync.videoUrl) {
               throw new Error(sync.error || 'Lip-sync failed');
             }

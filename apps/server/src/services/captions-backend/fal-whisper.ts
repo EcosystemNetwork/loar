@@ -13,12 +13,10 @@ export const falWhisperBackend: CaptionBackend = {
   modelId: 'whisper-fal',
   provider: 'fal',
   async transcribe(input: CaptionBackendInput): Promise<CaptionBackendResult> {
-    // The existing service reads FAL_KEY from process.env, so we don't
-    // pass the resolved key through here — Phase 1 stays untouched.
-    // BYOK for FAL is a Phase 3 follow-up (requires service refactor).
     const result = await transcriptionService.transcribe({
       audioUrl: input.audioUrl,
       language: input.language,
+      apiKey: input.apiKey,
     });
     if (result.status === 'failed') {
       return {
