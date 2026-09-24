@@ -454,6 +454,19 @@ export async function assertProviderAllowed(args: AssertArgs): Promise<void> {
 export interface SpendHold {
   /** Idempotent; safe to call more than once. */
   release(): Promise<void>;
+  /**
+   * JSON-serializable handle. Lets a hold outlive this process — e.g. carried in
+   * a queue job's data and released by the worker via `releaseSpendHold`.
+   */
+  readonly ref: SpendHoldRef;
+}
+
+export type SpendHoldRef = import('./redis-spend').RedisHold;
+
+/** Release a hold from its serialized `ref` (idempotent; the hold's expiry is the backstop). */
+export async function releaseSpendHold(ref: SpendHoldRef): Promise<void> {
+  const { releaseRedisHold } = await import('./redis-spend');
+  await releaseRedisHold(ref);
 }
 
 export interface ReserveArgs extends AssertArgs {
@@ -534,6 +547,7 @@ export async function reserveProviderBudget(args: ReserveArgs): Promise<SpendHol
 
   let released = false;
   return {
+    ref: outcome.hold,
     async release() {
       if (released) return;
       released = true;

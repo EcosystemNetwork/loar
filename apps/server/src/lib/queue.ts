@@ -39,6 +39,12 @@ export interface GenerationJobData {
   originalPrompt: string;
   resolvedCastUrls?: string[];
   genConfig?: any;
+  /**
+   * Budget hold booked at admission (see cost-tracker `reserveProviderBudget`).
+   * The worker releases it once the job's actual cost is recorded — or the
+   * hold's own expiry does if the job is lost.
+   */
+  spendHold?: import('../services/cost-tracker').SpendHoldRef;
 }
 
 export interface GenerationJobResult {

@@ -214,6 +214,21 @@ describe.skipIf(!haveRedis)('redis spend reservation (real Redis)', () => {
     });
   });
 
+  it('a hold can cross a process boundary: releaseSpendHold frees a JSON round-tripped ref', async () => {
+    await asUser('ctl5', async () => {
+      const hold = await controls.reserveProviderBudget({ provider: 'p', estimatedUsd: 0.9 });
+      // What the queue does to job data between enqueue and the worker.
+      const ref = JSON.parse(JSON.stringify(hold!.ref));
+      await expect(
+        controls.reserveProviderBudget({ provider: 'p', estimatedUsd: 0.9 })
+      ).rejects.toBeInstanceOf(controls.CostCapExceededError);
+      await controls.releaseSpendHold(ref); // what the generation worker does
+      const again = await controls.reserveProviderBudget({ provider: 'p', estimatedUsd: 0.9 });
+      expect(again).not.toBeNull();
+      await again!.release();
+    });
+  });
+
   it('honors the provider kill-switch and skips reservation with no estimate', async () => {
     await asUser('ctl4', async () => {
       await expect(

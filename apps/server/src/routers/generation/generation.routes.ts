@@ -265,9 +265,36 @@ export async function dispatchGeneration(
 
   // Per-provider concurrency gate — wraps the entire branch so Sora's
   // 10-min poll loop counts against the OpenAI semaphore for its full life.
-  return withProviderRateLimit(videoCostProviderFor(model.provider), () =>
-    dispatchGenerationInner(model, input, resolvedCastUrls, callerUid, callerSignal)
-  );
+  const costProvider = videoCostProviderFor(model.provider);
+  const run = () =>
+    withProviderRateLimit(costProvider, () =>
+      dispatchGenerationInner(model, input, resolvedCastUrls, callerUid, callerSignal)
+    );
+
+  // Free/local models (ComfyUI) cost nothing — nothing to reserve or cap.
+  if (!(model.providerCostUsd > 0)) return run();
+
+  // Kill-switch + HARD daily-cap reservation. Booked before the call and
+  // released once its cost is recorded (inside `dispatchGenerationInner`), so
+  // a burst of concurrent generations can't all slip under a cap that none of
+  // them has consumed yet, and one call can't exceed the remaining budget.
+  const { withSpendHold, ProviderPausedError, CostCapExceededError } =
+    await import('../../services/cost-tracker');
+  try {
+    return await withSpendHold(
+      { provider: costProvider, estimatedUsd: model.providerCostUsd },
+      run
+    );
+  } catch (err) {
+    // Surface budget/kill-switch refusals as 4xx, not a generic 500.
+    if (err instanceof ProviderPausedError) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: err.message, cause: err });
+    }
+    if (err instanceof CostCapExceededError) {
+      throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: err.message, cause: err });
+    }
+    throw err;
+  }
 }
 
 async function dispatchGenerationInner(
@@ -320,7 +347,11 @@ async function dispatchGenerationInner(
       const userKey = await resolveProviderKey(callerUid, 'bytedance');
       if (userKey) bdInput.apiKey = userKey;
     }
-    return bytedanceService.generateVideo(bdInput);
+    const bdResult = await bytedanceService.generateVideo(bdInput);
+    if (bdResult.videoUrl && !bdResult.error && bdResult.status !== 'failed') {
+      await recordSyncVideoCost('bytedance', model, bdResult.id);
+    }
+    return bdResult;
   }
 
   if (model.provider === 'openai') {
@@ -393,7 +424,7 @@ async function dispatchGenerationInner(
       // accounting; this separate call powers admin dashboards + caps.
       if (current.status === 'completed') {
         const { recordProviderCost } = await import('../../services/cost-tracker');
-        recordProviderCost({
+        await recordProviderCost({
           provider: 'openai',
           model: model.id,
           kind: 'video_gen',
@@ -454,7 +485,7 @@ async function dispatchGenerationInner(
       );
       if (result.status === 'completed') {
         const { recordProviderCost } = await import('../../services/cost-tracker');
-        recordProviderCost({
+        await recordProviderCost({
           provider: 'gemini',
           model: result.modelUsed,
           kind: 'video_gen',
@@ -508,7 +539,7 @@ async function dispatchGenerationInner(
     });
     if (result.status === 'completed') {
       const { recordProviderCost } = await import('../../services/cost-tracker');
-      recordProviderCost({
+      await recordProviderCost({
         provider: 'zai',
         model: model.id,
         kind: 'video_gen',
@@ -541,7 +572,7 @@ async function dispatchGenerationInner(
     });
     if (result.status === 'completed') {
       const { recordProviderCost } = await import('../../services/cost-tracker');
-      recordProviderCost({
+      await recordProviderCost({
         provider: 'minimax',
         model: model.id,
         kind: 'video_gen',
@@ -604,7 +635,31 @@ async function dispatchGenerationInner(
   const falInput = buildFalInput(model, input);
   const { resolveProviderKey } = await import('../../lib/byok');
   const apiKey = await resolveProviderKey(callerUid, 'fal');
-  return falService.generateVideo({ ...falInput, apiKey });
+  const falResult = await falService.generateVideo({ ...falInput, apiKey });
+  if (falResult.videoUrl && !falResult.error && falResult.status !== 'failed') {
+    await recordSyncVideoCost('fal', model, falResult.id);
+  }
+  return falResult;
+}
+
+/**
+ * Ledger entry for a video finished on the synchronous path. The queue worker
+ * records its own (generation.worker.ts); FAL/ByteDance inline runs used to
+ * record nothing, so their spend never counted toward any daily cap.
+ */
+async function recordSyncVideoCost(
+  provider: 'fal' | 'bytedance',
+  model: NonNullable<ReturnType<typeof getModelById>>,
+  taskId: string
+): Promise<void> {
+  const { recordProviderCost } = await import('../../services/cost-tracker');
+  await recordProviderCost({
+    provider,
+    model: model.id,
+    kind: 'video_gen',
+    costUsd: model.providerCostUsd,
+    extra: { taskId, path: 'inline' },
+  });
 }
 
 export async function saveGenerationRecord(record: VideoGenerationRecord): Promise<void> {
@@ -1521,6 +1576,55 @@ export const generationRouter = router({
 
       // ── Enqueue or inline generate ─────────────────────────────────
       if (useQueue) {
+        // Kill-switch + HARD daily-cap reservation for the queued job. The hold
+        // rides along in the job data and is released by the worker after the
+        // job's cost is recorded (or by its own expiry if the job is lost).
+        // Done BEFORE the try below so a denial isn't swallowed into the
+        // inline fallback.
+        let spendHold: import('../../services/cost-tracker').SpendHold | null = null;
+        if (providerCostUsd > 0) {
+          const { reserveProviderBudget, ProviderPausedError, CostCapExceededError } =
+            await import('../../services/cost-tracker');
+          try {
+            spendHold = await reserveProviderBudget({
+              provider: videoCostProviderFor(model.provider),
+              estimatedUsd: providerCostUsd,
+              // Queued jobs can wait behind others — longer safety expiry than inline.
+              holdTtlSec: 45 * 60,
+            });
+          } catch (budgetErr) {
+            if (creditsCharged > 0) {
+              await userCreditsRef.update({
+                balance: FieldValue.increment(creditsCharged),
+                totalSpent: FieldValue.increment(-creditsCharged),
+                updatedAt: new Date(),
+              });
+            }
+            await generationsCol()
+              .doc(generationId)
+              .update({
+                status: 'failed',
+                failureReason: budgetErr instanceof Error ? budgetErr.message : 'Budget exceeded',
+                completedAt: new Date(),
+              });
+            if (budgetErr instanceof ProviderPausedError) {
+              throw new TRPCError({
+                code: 'FORBIDDEN',
+                message: budgetErr.message,
+                cause: budgetErr,
+              });
+            }
+            if (budgetErr instanceof CostCapExceededError) {
+              throw new TRPCError({
+                code: 'TOO_MANY_REQUESTS',
+                message: budgetErr.message,
+                cause: budgetErr,
+              });
+            }
+            throw budgetErr;
+          }
+        }
+
         // Async queue-based generation: return immediately, client uses SSE to watch progress
         try {
           const { getGenerationQueue } = await import('../../lib/queue');
@@ -1542,6 +1646,7 @@ export const generationRouter = router({
               originalPrompt,
               resolvedCastUrls,
               genConfig,
+              ...(spendHold ? { spendHold: spendHold.ref } : {}),
             },
             { jobId: generationId }
           );
@@ -1561,8 +1666,10 @@ export const generationRouter = router({
             streamUrl: `/api/jobs/${generationId}/stream`,
           };
         } catch (queueErr) {
-          // Queue add failed — fall back to inline
+          // Queue add failed — fall back to inline. The inline dispatch books its
+          // own hold, so drop the queued job's now-orphaned one first.
           console.warn('[generation] Queue unavailable, falling back to inline:', queueErr);
+          await spendHold?.release();
           useQueue = false;
         }
       }
@@ -2910,7 +3017,10 @@ async function attemptFallback(
       }
     } catch (err) {
       console.error(`Fallback ${candidate.id} also failed:`, err);
-      markProviderUnhealthy(candidate.provider);
+      // A budget/kill-switch refusal says nothing about the provider's health.
+      const refused =
+        err instanceof TRPCError && ['FORBIDDEN', 'TOO_MANY_REQUESTS'].includes(err.code);
+      if (!refused) markProviderUnhealthy(candidate.provider);
     }
   }
 
