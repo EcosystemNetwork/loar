@@ -254,6 +254,8 @@ function useNodeContents(contractAddress?: string) {
       const map = new Map<string, IndexerNodeContent>();
       let after: string | null = null;
       const PAGE_SIZE = 1000;
+      // Hard stop: even if the indexer misbehaves, never loop unbounded.
+      const MAX_PAGES = 200;
 
       interface NodeContentPage {
         nodeContents: {
@@ -262,8 +264,7 @@ function useNodeContents(contractAddress?: string) {
         };
       }
 
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
+      for (let pageNo = 0; pageNo < MAX_PAGES; pageNo++) {
         const page: NodeContentPage = await ponderGql<NodeContentPage>(
           `query($universePrefix: String!, $limit: Int!, $after: String) {
             nodeContents(where: { id_starts_with: $universePrefix }, limit: $limit, after: $after) {
@@ -279,8 +280,12 @@ function useNodeContents(contractAddress?: string) {
           if (nodeId) map.set(nodeId, item);
         }
 
-        if (!page?.nodeContents?.pageInfo?.hasNextPage) break;
-        after = page.nodeContents.pageInfo.endCursor;
+        // Strict `=== true`: an offline-indexer placeholder is never a valid
+        // "keep going" signal. Also stop if the cursor didn't advance.
+        const pageInfo = page?.nodeContents?.pageInfo;
+        if (pageInfo?.hasNextPage !== true || typeof pageInfo.endCursor !== 'string') break;
+        if (pageInfo.endCursor === after) break;
+        after = pageInfo.endCursor;
       }
 
       return map;

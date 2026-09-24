@@ -64,6 +64,12 @@ const EMPTY_RESULT: any = new Proxy(
   {
     get(_target, prop) {
       if (prop === 'items') return [];
+      // Pagination flag must read as "no more pages". Otherwise the proxy's
+      // truthy default makes any `while (pageInfo.hasNextPage)` loop spin
+      // forever on microtasks alone (every await resolves instantly) and
+      // freezes the tab — the universe editor did exactly that whenever the
+      // indexer was unreachable.
+      if (prop === 'hasNextPage') return false;
       if (prop === Symbol.toPrimitive) return () => '';
       if (prop === 'then' || prop === Symbol.iterator) return undefined;
       return EMPTY_RESULT;

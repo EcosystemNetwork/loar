@@ -63,7 +63,12 @@ export function useUniverseAddresses(
         }`,
         { id: universeId }
       );
-      return data.universe;
+      // When the indexer is offline ponderGql resolves a deep placeholder proxy
+      // whose every field is itself a truthy proxy. Returning it would leak a
+      // fake `tokenAddress` into wagmi (whose query-key JSON.stringify then
+      // throws and crashes the editor). Only accept a real row.
+      const row = data?.universe;
+      return row && typeof row.id === 'string' ? row : null;
     },
     enabled: !!universeId && isAddress,
     ...ponderQueryDefaults,
