@@ -155,6 +155,26 @@ export interface FalVideoGenerationResult {
   error?: string;
 }
 
+export interface FalTtsOptions {
+  /** FAL endpoint id, e.g. `fal-ai/minimax/speech-2.8-hd`. */
+  endpoint: string;
+  text: string;
+  /** MiniMax voice id; FAL's default is `Wise_Woman`. */
+  voiceId?: string;
+  /** 0.5–2.0 (FAL's accepted range). */
+  speed?: number;
+  format?: 'mp3' | 'pcm' | 'flac';
+  /** Only used with `pcm` — echoed back so the caller can wrap it as WAV. */
+  sampleRate?: 8000 | 16000 | 22050 | 24000 | 32000 | 44100;
+  apiKey?: string;
+}
+
+export interface FalTtsResult {
+  audioUrl: string;
+  contentType?: string;
+  durationMs?: number;
+}
+
 class FalService {
   constructor() {
     // Defer config — credentials are set per-call via configureCall() so BYOK
@@ -181,6 +201,45 @@ class FalService {
       );
     }
     fal.config({ credentials: key });
+  }
+
+  /**
+   * MiniMax speech via FAL (`fal-ai/minimax/speech-*`). Throws on any failure —
+   * callers (tts dispatch) translate that into a 5xx so the credit hold is
+   * cancelled rather than reconciled for a fabricated result.
+   */
+  async textToSpeech(options: FalTtsOptions): Promise<FalTtsResult> {
+    this.configureCall(options.apiKey);
+
+    const input: Record<string, unknown> = {
+      prompt: options.text,
+      output_format: 'url',
+      voice_setting: {
+        voice_id: options.voiceId || 'Wise_Woman',
+        ...(options.speed != null ? { speed: options.speed } : {}),
+      },
+    };
+    if (options.format && options.format !== 'mp3') {
+      input.audio_setting = {
+        format: options.format,
+        ...(options.format === 'pcm' ? { sample_rate: String(options.sampleRate ?? 32000) } : {}),
+        channel: '1',
+      };
+    }
+
+    const result = await fal.subscribe(options.endpoint, { input, logs: true });
+    const data: any = (result as any).data ?? result;
+    const url: unknown = data?.audio?.url;
+    if (typeof url !== 'string' || !url) {
+      throw new Error(
+        `FAL TTS returned no audio url. Response keys: ${Object.keys(data ?? {}).join(', ')}`
+      );
+    }
+    return {
+      audioUrl: url,
+      contentType: data.audio.content_type,
+      durationMs: typeof data.duration_ms === 'number' ? data.duration_ms : undefined,
+    };
   }
 
   async generateImage(options: FalImageGenerationOptions): Promise<FalImageGenerationResult> {

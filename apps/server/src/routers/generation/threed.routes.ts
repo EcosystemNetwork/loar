@@ -47,6 +47,7 @@ import { reserveClientToken } from '../../lib/jobIdempotency';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 import { TRPCError } from '@trpc/server';
+import { releaseHoldOnError, reserveThreedBudget, settleThreedJob } from '../../lib/threed-budget';
 
 const clientTokenSchema = z
   .string()
@@ -211,6 +212,10 @@ async function autoAttach3DModel(opts: {
 }
 
 // ── Background completion handler ─────────────────────────────────────
+
+/** Final status of a 3D generation doc — 'completed' means the provider was billed. */
+const genStatus = (genId: string) => async () =>
+  (await threeDGenCol().doc(genId).get()).data()?.status as string | undefined;
 
 async function completeThreeDTask(opts: {
   genId: string;
@@ -395,6 +400,9 @@ export const threedRouter = router({
       const { fiatMargin, loarMargin } = await getMargins();
       const cost = COSTS.text_preview;
       const credits = toCredits(cost, fiatMargin);
+      // Kill-switch + HARD daily-cap reservation, BEFORE any doc/credit charge so a
+      // denial needs no refund. Released by settleThreedJob when the job ends.
+      const hold = await reserveThreedBudget('meshy', cost);
 
       await threeDGenCol()
         .doc(genId)
@@ -451,20 +459,28 @@ export const threedRouter = router({
             // The reservation is reconciled when this withReservation block
             // returns successfully — post-completion failures are handled by
             // the background helper using `refundCreditsAfterReconcile`.
-            completeThreeDTask({
-              genId,
-              userId: ctx.user.uid,
-              entityId: input.entityId || null,
-              meshyTaskId: taskId,
-              meshyTaskType: 'text-to-3d',
-              generationType: 'text_preview',
-              credits,
-              webhookUrl: validatedWebhookUrl,
-              clientToken: input.clientToken,
-              timeoutMs: 10 * 60 * 1000,
-              prompt: input.prompt,
-              universeId: input.universeId || null,
-            }).catch((err) => console.error(`Background 3D preview ${genId} error:`, err));
+            settleThreedJob({
+              hold,
+              done: completeThreeDTask({
+                genId,
+                userId: ctx.user.uid,
+                entityId: input.entityId || null,
+                meshyTaskId: taskId,
+                meshyTaskType: 'text-to-3d',
+                generationType: 'text_preview',
+                credits,
+                webhookUrl: validatedWebhookUrl,
+                clientToken: input.clientToken,
+                timeoutMs: 10 * 60 * 1000,
+                prompt: input.prompt,
+                universeId: input.universeId || null,
+              }).catch((err) => console.error(`Background 3D preview ${genId} error:`, err)),
+              provider: 'meshy',
+              model: 'meshy-text-to-3d-preview',
+              costUsd: cost,
+              readStatus: genStatus(genId),
+              extra: { generationId: genId },
+            });
 
             return {
               result: {
@@ -479,6 +495,7 @@ export const threedRouter = router({
           }
         );
       } catch (error) {
+        await hold?.release();
         await threeDGenCol()
           .doc(genId)
           .update({
@@ -530,6 +547,7 @@ export const threedRouter = router({
       const genId = randomUUID();
       const cost = COSTS.text_refine;
       const credits = toCredits(cost, fiatMargin);
+      const hold = await reserveThreedBudget('meshy', cost);
 
       await threeDGenCol()
         .doc(genId)
@@ -575,19 +593,27 @@ export const threedRouter = router({
             await threeDGenCol().doc(genId).update({ meshyTaskId: taskId });
 
             // Fire-and-forget: complete in background, client polls via getTask
-            completeThreeDTask({
-              genId,
-              userId: ctx.user.uid,
-              entityId: input.entityId || previewData.entityId || null,
-              meshyTaskId: taskId,
-              meshyTaskType: 'text-to-3d',
-              generationType: 'text_refine',
-              credits,
-              timeoutMs: 15 * 60 * 1000,
-              prompt: previewData.prompt ?? null,
-              universeId: previewData.universeId ?? null,
-              parentGenerationId: input.previewGenerationId,
-            }).catch((err) => console.error(`Background 3D refine ${genId} error:`, err));
+            settleThreedJob({
+              hold,
+              done: completeThreeDTask({
+                genId,
+                userId: ctx.user.uid,
+                entityId: input.entityId || previewData.entityId || null,
+                meshyTaskId: taskId,
+                meshyTaskType: 'text-to-3d',
+                generationType: 'text_refine',
+                credits,
+                timeoutMs: 15 * 60 * 1000,
+                prompt: previewData.prompt ?? null,
+                universeId: previewData.universeId ?? null,
+                parentGenerationId: input.previewGenerationId,
+              }).catch((err) => console.error(`Background 3D refine ${genId} error:`, err)),
+              provider: 'meshy',
+              model: 'meshy-text-to-3d-refine',
+              costUsd: cost,
+              readStatus: genStatus(genId),
+              extra: { generationId: genId },
+            });
 
             return {
               result: {
@@ -601,6 +627,7 @@ export const threedRouter = router({
           }
         );
       } catch (error) {
+        await hold?.release();
         await threeDGenCol()
           .doc(genId)
           .update({
@@ -679,6 +706,7 @@ export const threedRouter = router({
       const { fiatMargin, loarMargin } = await getMargins();
       const cost = COSTS.image_to_3d;
       const credits = toCredits(cost, fiatMargin);
+      const hold = await reserveThreedBudget('meshy', cost);
       const isMulti = input.imageUrls.length > 1;
 
       await threeDGenCol()
@@ -741,20 +769,28 @@ export const threedRouter = router({
             await threeDGenCol().doc(genId).update({ meshyTaskId: taskId });
 
             // Fire-and-forget: complete in background, client polls via getTask
-            completeThreeDTask({
-              genId,
-              userId: ctx.user.uid,
-              entityId: input.entityId || null,
-              meshyTaskId: taskId,
-              meshyTaskType: 'image-to-3d',
-              generationType: isMulti ? 'multi_image_to_3d' : 'image_to_3d',
-              credits,
-              webhookUrl: validatedWebhookUrl,
-              clientToken: input.clientToken,
-              timeoutMs: 15 * 60 * 1000,
-              universeId: input.universeId || null,
-              sourceImageUrl: input.imageUrls[0] ?? null,
-            }).catch((err) => console.error(`Background 3D image-to-3d ${genId} error:`, err));
+            settleThreedJob({
+              hold,
+              done: completeThreeDTask({
+                genId,
+                userId: ctx.user.uid,
+                entityId: input.entityId || null,
+                meshyTaskId: taskId,
+                meshyTaskType: 'image-to-3d',
+                generationType: isMulti ? 'multi_image_to_3d' : 'image_to_3d',
+                credits,
+                webhookUrl: validatedWebhookUrl,
+                clientToken: input.clientToken,
+                timeoutMs: 15 * 60 * 1000,
+                universeId: input.universeId || null,
+                sourceImageUrl: input.imageUrls[0] ?? null,
+              }).catch((err) => console.error(`Background 3D image-to-3d ${genId} error:`, err)),
+              provider: 'meshy',
+              model: 'meshy-image-to-3d',
+              costUsd: cost,
+              readStatus: genStatus(genId),
+              extra: { generationId: genId },
+            });
 
             return {
               result: {
@@ -769,6 +805,7 @@ export const threedRouter = router({
           }
         );
       } catch (error) {
+        await hold?.release();
         await threeDGenCol()
           .doc(genId)
           .update({
@@ -933,38 +970,84 @@ export const threedRouter = router({
 
       const { fiatMargin } = await getMargins();
       const credits = toCredits(RIG_COST, fiatMargin);
+      const hold = await reserveThreedBudget(provider, RIG_COST);
       const genId = randomUUID();
       const sourceTitle = (content.title as string | undefined) ?? '3D model';
       const sourceUrl = content.mediaUrl as string;
       const universeId = (content.universeId as string | null | undefined) ?? null;
       const parentGenerationId = (content.generationId as string | null | undefined) ?? null;
 
-      return withReservation(
-        {
-          userId: ctx.user.uid,
-          modelId: `${provider}-rigging:${input.rigType}`,
-          provider,
-          estimatedCredits: credits,
-          byok: false,
-          meta: {
-            genId,
-            sourceContentId: input.contentId,
-            rigType: input.rigType,
-            kind: 'rig',
+      return releaseHoldOnError(hold, () =>
+        withReservation(
+          {
+            userId: ctx.user.uid,
+            modelId: `${provider}-rigging:${input.rigType}`,
+            provider,
+            estimatedCredits: credits,
+            byok: false,
+            meta: {
+              genId,
+              sourceContentId: input.contentId,
+              rigType: input.rigType,
+              kind: 'rig',
+            },
           },
-        },
-        async () => {
-          const { resolveProviderKey } = await import('../../lib/byok');
+          async () => {
+            const { resolveProviderKey } = await import('../../lib/byok');
 
-          if (provider === 'meshy') {
-            const apiKey = await resolveProviderKey(ctx.user.uid, 'meshy');
-            const { taskId } = await meshyService.rigModel({ modelUrl: sourceUrl, apiKey });
+            if (provider === 'meshy') {
+              const apiKey = await resolveProviderKey(ctx.user.uid, 'meshy');
+              const { taskId } = await meshyService.rigModel({ modelUrl: sourceUrl, apiKey });
+              await threeDGenCol().doc(genId).set({
+                id: genId,
+                userId: ctx.user.uid,
+                type: 'meshy_rigging',
+                status: 'running',
+                meshyTaskId: taskId,
+                sourceContentId: input.contentId,
+                sourceMediaUrl: sourceUrl,
+                rigType: input.rigType,
+                universeId,
+                parentGenerationId,
+                createdAt: new Date(),
+              });
+              settleThreedJob({
+                hold,
+                done: completeMeshyRiggingTask({
+                  genId,
+                  userId: ctx.user.uid,
+                  meshyTaskId: taskId,
+                  sourceTitle,
+                  universeId,
+                  parentGenerationId,
+                  credits,
+                }),
+                provider: 'meshy',
+                model: 'meshy-rigging',
+                costUsd: RIG_COST,
+                readStatus: genStatus(genId),
+                extra: { generationId: genId },
+              });
+              return { result: { jobId: genId, providerTaskId: taskId }, actualCredits: credits };
+            }
+
+            // Tripo3D path — upload the GLB, then rig (animate is a separate
+            // request). v3's rig endpoint takes the file_token directly, so the
+            // old import_model task + inline poll are gone.
+            // Key was resolved and non-null-checked before the reservation above.
+            const apiKey = tripoApiKey;
+            const fileToken = await tripo3dService.uploadRemoteGlb(sourceUrl, apiKey);
+            const { taskId } = await tripo3dService.rigModel({
+              input: fileToken,
+              rigType: input.rigType as TripoRigType,
+              apiKey,
+            });
             await threeDGenCol().doc(genId).set({
               id: genId,
               userId: ctx.user.uid,
-              type: 'meshy_rigging',
+              type: 'tripo_rigging',
               status: 'running',
-              meshyTaskId: taskId,
+              tripoRigTaskId: taskId,
               sourceContentId: input.contentId,
               sourceMediaUrl: sourceUrl,
               rigType: input.rigType,
@@ -972,54 +1055,27 @@ export const threedRouter = router({
               parentGenerationId,
               createdAt: new Date(),
             });
-            void completeMeshyRiggingTask({
-              genId,
-              userId: ctx.user.uid,
-              meshyTaskId: taskId,
-              sourceTitle,
-              universeId,
-              parentGenerationId,
-              credits,
+            settleThreedJob({
+              hold,
+              done: completeTripoRiggingTask({
+                genId,
+                userId: ctx.user.uid,
+                tripoRigTaskId: taskId,
+                sourceTitle,
+                rigType: input.rigType as TripoRigType,
+                universeId,
+                parentGenerationId,
+                credits,
+              }),
+              provider: 'tripo',
+              model: 'tripo-rigging',
+              costUsd: RIG_COST,
+              readStatus: genStatus(genId),
+              extra: { generationId: genId },
             });
             return { result: { jobId: genId, providerTaskId: taskId }, actualCredits: credits };
           }
-
-          // Tripo3D path — upload the GLB, then rig (animate is a separate
-          // request). v3's rig endpoint takes the file_token directly, so the
-          // old import_model task + inline poll are gone.
-          // Key was resolved and non-null-checked before the reservation above.
-          const apiKey = tripoApiKey;
-          const fileToken = await tripo3dService.uploadRemoteGlb(sourceUrl, apiKey);
-          const { taskId } = await tripo3dService.rigModel({
-            input: fileToken,
-            rigType: input.rigType as TripoRigType,
-            apiKey,
-          });
-          await threeDGenCol().doc(genId).set({
-            id: genId,
-            userId: ctx.user.uid,
-            type: 'tripo_rigging',
-            status: 'running',
-            tripoRigTaskId: taskId,
-            sourceContentId: input.contentId,
-            sourceMediaUrl: sourceUrl,
-            rigType: input.rigType,
-            universeId,
-            parentGenerationId,
-            createdAt: new Date(),
-          });
-          void completeTripoRiggingTask({
-            genId,
-            userId: ctx.user.uid,
-            tripoRigTaskId: taskId,
-            sourceTitle,
-            rigType: input.rigType as TripoRigType,
-            universeId,
-            parentGenerationId,
-            credits,
-          });
-          return { result: { jobId: genId, providerTaskId: taskId }, actualCredits: credits };
-        }
+        )
       );
     }),
 
@@ -1086,42 +1142,88 @@ export const threedRouter = router({
 
       const { fiatMargin } = await getMargins();
       const credits = toCredits(ANIMATION_COST, fiatMargin);
+      const hold = await reserveThreedBudget(parsed.provider, ANIMATION_COST);
       const genId = randomUUID();
       const riggedTitle = (rigged.title as string | undefined) ?? '3D model';
       const universeId = (rigged.universeId as string | null | undefined) ?? null;
       const rigGenId = rigged.generationId as string;
 
-      return withReservation(
-        {
-          userId: ctx.user.uid,
-          modelId: `${parsed.provider}-animation:${input.actionRef}`,
-          provider: parsed.provider,
-          estimatedCredits: credits,
-          byok: false,
-          meta: {
-            genId,
-            riggedContentId: input.riggedContentId,
-            actionRef: input.actionRef,
-            kind: 'animate',
+      return releaseHoldOnError(hold, () =>
+        withReservation(
+          {
+            userId: ctx.user.uid,
+            modelId: `${parsed.provider}-animation:${input.actionRef}`,
+            provider: parsed.provider,
+            estimatedCredits: credits,
+            byok: false,
+            meta: {
+              genId,
+              riggedContentId: input.riggedContentId,
+              actionRef: input.actionRef,
+              kind: 'animate',
+            },
           },
-        },
-        async () => {
-          const { resolveProviderKey } = await import('../../lib/byok');
+          async () => {
+            const { resolveProviderKey } = await import('../../lib/byok');
 
-          if (parsed.provider === 'meshy') {
-            const apiKey = await resolveProviderKey(ctx.user.uid, 'meshy');
-            const actionId = Number(input.actionRef.slice('meshy:'.length));
-            const { taskId } = await meshyService.applyAnimation({
-              rigTaskId: parsed.taskId,
-              actionId,
+            if (parsed.provider === 'meshy') {
+              const apiKey = await resolveProviderKey(ctx.user.uid, 'meshy');
+              const actionId = Number(input.actionRef.slice('meshy:'.length));
+              const { taskId } = await meshyService.applyAnimation({
+                rigTaskId: parsed.taskId,
+                actionId,
+                apiKey,
+              });
+              await threeDGenCol().doc(genId).set({
+                id: genId,
+                userId: ctx.user.uid,
+                type: 'meshy_animation',
+                status: 'running',
+                meshyTaskId: taskId,
+                riggedContentId: input.riggedContentId,
+                actionRef: input.actionRef,
+                actionName: preset.name,
+                universeId,
+                parentGenerationId: rigGenId,
+                createdAt: new Date(),
+              });
+              settleThreedJob({
+                hold,
+                done: completeMeshyAnimationTask({
+                  genId,
+                  userId: ctx.user.uid,
+                  meshyTaskId: taskId,
+                  riggedTitle,
+                  actionRef: input.actionRef,
+                  actionName: preset.name,
+                  universeId,
+                  parentGenerationId: rigGenId,
+                  credits,
+                }),
+                provider: 'meshy',
+                model: 'meshy-animation',
+                costUsd: ANIMATION_COST,
+                readStatus: genStatus(genId),
+                extra: { generationId: genId },
+              });
+              return { result: { jobId: genId, providerTaskId: taskId }, actualCredits: credits };
+            }
+
+            // Tripo3D animation retarget — key resolved + checked before the
+            // reservation above.
+            const apiKey = tripoApiKey;
+            const tripoAnimation = input.actionRef.slice('tripo:'.length) as TripoAnimation;
+            const { taskId } = await tripo3dService.retargetAnimation({
+              input: parsed.taskId,
+              animation: tripoAnimation,
               apiKey,
             });
             await threeDGenCol().doc(genId).set({
               id: genId,
               userId: ctx.user.uid,
-              type: 'meshy_animation',
+              type: 'tripo_animation',
               status: 'running',
-              meshyTaskId: taskId,
+              tripoAnimationTaskId: taskId,
               riggedContentId: input.riggedContentId,
               actionRef: input.actionRef,
               actionName: preset.name,
@@ -1129,55 +1231,28 @@ export const threedRouter = router({
               parentGenerationId: rigGenId,
               createdAt: new Date(),
             });
-            void completeMeshyAnimationTask({
-              genId,
-              userId: ctx.user.uid,
-              meshyTaskId: taskId,
-              riggedTitle,
-              actionRef: input.actionRef,
-              actionName: preset.name,
-              universeId,
-              parentGenerationId: rigGenId,
-              credits,
+            settleThreedJob({
+              hold,
+              done: completeTripoAnimationTask({
+                genId,
+                userId: ctx.user.uid,
+                tripoAnimationTaskId: taskId,
+                riggedTitle,
+                actionRef: input.actionRef,
+                actionName: preset.name,
+                universeId,
+                parentGenerationId: rigGenId,
+                credits,
+              }),
+              provider: 'tripo',
+              model: 'tripo-animation',
+              costUsd: ANIMATION_COST,
+              readStatus: genStatus(genId),
+              extra: { generationId: genId },
             });
             return { result: { jobId: genId, providerTaskId: taskId }, actualCredits: credits };
           }
-
-          // Tripo3D animation retarget — key resolved + checked before the
-          // reservation above.
-          const apiKey = tripoApiKey;
-          const tripoAnimation = input.actionRef.slice('tripo:'.length) as TripoAnimation;
-          const { taskId } = await tripo3dService.retargetAnimation({
-            input: parsed.taskId,
-            animation: tripoAnimation,
-            apiKey,
-          });
-          await threeDGenCol().doc(genId).set({
-            id: genId,
-            userId: ctx.user.uid,
-            type: 'tripo_animation',
-            status: 'running',
-            tripoAnimationTaskId: taskId,
-            riggedContentId: input.riggedContentId,
-            actionRef: input.actionRef,
-            actionName: preset.name,
-            universeId,
-            parentGenerationId: rigGenId,
-            createdAt: new Date(),
-          });
-          void completeTripoAnimationTask({
-            genId,
-            userId: ctx.user.uid,
-            tripoAnimationTaskId: taskId,
-            riggedTitle,
-            actionRef: input.actionRef,
-            actionName: preset.name,
-            universeId,
-            parentGenerationId: rigGenId,
-            credits,
-          });
-          return { result: { jobId: genId, providerTaskId: taskId }, actualCredits: credits };
-        }
+        )
       );
     }),
 });

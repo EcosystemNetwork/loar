@@ -13,7 +13,9 @@
  * Required env var: MESHY_API_KEY
  */
 
-const API_HOST = 'https://api.meshy.ai';
+// Overridable (ops-controlled env) so the client can be exercised against a local
+// contract server; production always uses the real host.
+const API_HOST = process.env.MESHY_API_HOST?.replace(/\/+$/, '') || 'https://api.meshy.ai';
 // Different endpoint families use different API versions
 const IMAGE_TO_3D_BASE = `${API_HOST}/openapi/v1`;
 const TEXT_TO_3D_BASE = `${API_HOST}/openapi/v2`;
@@ -174,6 +176,50 @@ export interface MeshyAnimationTask {
   thumbnail_url?: string;
   thumbnailUrl?: string;
   consumed_credits?: number;
+}
+
+// ── Remesh (retopology / decimation) ──────────────────────────────────
+
+export type MeshyRemeshFormat = 'glb' | 'fbx' | 'obj' | 'usdz' | 'blend' | 'stl' | '3mf';
+export const MESHY_REMESH_FORMATS: readonly MeshyRemeshFormat[] = [
+  'glb',
+  'fbx',
+  'obj',
+  'usdz',
+  'blend',
+  'stl',
+  '3mf',
+];
+/** Documented bounds for `target_polycount` (https://docs.meshy.ai/en/api/remesh). */
+export const MESHY_REMESH_MIN_POLYCOUNT = 100;
+export const MESHY_REMESH_MAX_POLYCOUNT = 300_000;
+
+export interface RemeshOptions {
+  /** Public URL / data URI of a .glb .gltf .obj .fbx .stl mesh. */
+  modelUrl?: string;
+  /** Alternative — a completed Meshy image-to-3D / text-to-3D task. Wins if both are given. */
+  inputTaskId?: string;
+  /** Output formats (Meshy default: glb only). */
+  targetFormats?: MeshyRemeshFormat[];
+  /** Meshy default: triangle. */
+  topology?: 'quad' | 'triangle';
+  /** 100–300,000 (Meshy default 30,000). */
+  targetPolycount?: number;
+  /** BYOK override. */
+  apiKey?: string;
+}
+
+export interface MeshyRemeshTask {
+  id: string;
+  status: MeshyTaskStatus;
+  progress: number;
+  task_error?: { message: string };
+  taskError?: { message: string };
+  /** Only the formats that were requested are present (snake_case from API). */
+  model_urls?: Partial<Record<MeshyRemeshFormat, string>>;
+  modelUrls?: Partial<Record<MeshyRemeshFormat, string>>;
+  thumbnail_url?: string;
+  thumbnailUrl?: string;
 }
 
 // ── Service ───────────────────────────────────────────────────────────
@@ -485,6 +531,74 @@ class MeshyService {
       await new Promise((r) => setTimeout(r, pollIntervalMs));
     }
     throw new Error(`Meshy rigging task ${taskId} timed out after ${maxWaitMs / 1000}s`);
+  }
+
+  // ── Remesh ────────────────────────────────────────────────────────────
+
+  /**
+   * Start a remesh (retopology / decimation) task. Returns immediately with a
+   * task ID — poll `getRemeshTask` / `waitForRemesh` until SUCCEEDED.
+   */
+  async remesh(options: RemeshOptions): Promise<{ taskId: string }> {
+    if (!options.modelUrl && !options.inputTaskId) {
+      throw new Error('remesh requires modelUrl or inputTaskId');
+    }
+    const { targetPolycount, targetFormats } = options;
+    if (
+      targetPolycount !== undefined &&
+      (!Number.isInteger(targetPolycount) ||
+        targetPolycount < MESHY_REMESH_MIN_POLYCOUNT ||
+        targetPolycount > MESHY_REMESH_MAX_POLYCOUNT)
+    ) {
+      throw new Error(
+        `targetPolycount must be an integer between ${MESHY_REMESH_MIN_POLYCOUNT} and ${MESHY_REMESH_MAX_POLYCOUNT}`
+      );
+    }
+    const badFormat = targetFormats?.find((f) => !MESHY_REMESH_FORMATS.includes(f));
+    if (badFormat) throw new Error(`unsupported remesh format: ${badFormat}`);
+
+    const apiKey = this.resolveKey(options.apiKey);
+    const body: Record<string, unknown> = {};
+    // Meshy: input_task_id takes priority when both are supplied.
+    if (options.inputTaskId) body.input_task_id = options.inputTaskId;
+    else body.model_url = options.modelUrl;
+    if (targetFormats?.length) body.target_formats = targetFormats;
+    if (options.topology) body.topology = options.topology;
+    if (targetPolycount !== undefined) body.target_polycount = targetPolycount;
+    const data = await this.post<{ result: string }>('/remesh', body, apiKey, IMAGE_TO_3D_BASE);
+    return { taskId: data.result };
+  }
+
+  async getRemeshTask(taskId: string, apiKey?: string): Promise<MeshyRemeshTask> {
+    const key = this.resolveKey(apiKey);
+    const task = await this.get<MeshyRemeshTask>(`/remesh/${taskId}`, key, IMAGE_TO_3D_BASE);
+    task.modelUrls = task.model_urls ?? task.modelUrls;
+    task.thumbnailUrl = task.thumbnail_url ?? task.thumbnailUrl;
+    task.taskError = task.task_error ?? task.taskError;
+    return task;
+  }
+
+  async waitForRemesh(
+    taskId: string,
+    maxWaitMs = 5 * 60 * 1000,
+    pollIntervalMs = 5000,
+    apiKey?: string
+  ): Promise<MeshyRemeshTask> {
+    const deadline = Date.now() + maxWaitMs;
+    while (Date.now() < deadline) {
+      const task = await this.getRemeshTask(taskId, apiKey);
+      if (task.status === 'SUCCEEDED') return task;
+      if (task.status === 'FAILED') {
+        throw new Error(
+          `Meshy remesh task ${taskId} failed: ${task.taskError?.message || 'unknown'}`
+        );
+      }
+      if (task.status === 'EXPIRED') {
+        throw new Error(`Meshy remesh task ${taskId} expired`);
+      }
+      await new Promise((r) => setTimeout(r, pollIntervalMs));
+    }
+    throw new Error(`Meshy remesh task ${taskId} timed out after ${maxWaitMs / 1000}s`);
   }
 
   // ── Animation library ─────────────────────────────────────────────────

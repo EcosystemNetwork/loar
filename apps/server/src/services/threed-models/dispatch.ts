@@ -8,6 +8,12 @@
  * a per-task budget (defaults to 5 min for geometry, 3 min for rig/anim).
  */
 import { TRPCError } from '@trpc/server';
+import {
+  MESHY_REMESH_FORMATS,
+  MESHY_REMESH_MAX_POLYCOUNT,
+  MESHY_REMESH_MIN_POLYCOUNT,
+  type MeshyRemeshFormat,
+} from '../meshy';
 import { resolveProviderKey } from '../../lib/byok';
 import { withProviderRateLimit } from '../../lib/rate-limit';
 import {
@@ -63,6 +69,8 @@ export interface ThreedDispatchInput {
   /** Texture / retopo hints. */
   topology?: 'quad' | 'triangle';
   targetPolycount?: number;
+  /** Remesh only — output formats (Meshy default: glb). */
+  targetFormats?: MeshyRemeshFormat[];
   /** Caller uid for BYOK key resolution. */
   userId?: string | null;
   /** Override the default per-task poll budget (ms). */
@@ -81,6 +89,9 @@ export interface ThreedDispatchResult {
     obj?: string;
     mtl?: string;
     usdz?: string;
+    stl?: string;
+    blend?: string;
+    '3mf'?: string;
     thumbnail?: string;
   };
   thumbnailUrl?: string;
@@ -236,13 +247,52 @@ async function dispatchThreedInner(
           };
         }
         case 'remesh': {
-          // Meshy remesh isn't exposed as a typed method on meshyService —
-          // surface a clear error pointing callers at retexture/refine.
-          throw new TRPCError({
-            code: 'NOT_IMPLEMENTED',
-            message:
-              'Meshy remesh dispatcher is not wired yet. Use text_to_3d_refine or retexture for now.',
+          const modelUrl = input.modelUrl;
+          const inputTaskId = input.inputTaskId;
+          if (!modelUrl && !inputTaskId) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'remesh task requires modelUrl OR inputTaskId',
+            });
+          }
+          const { targetPolycount, targetFormats } = input;
+          if (
+            targetPolycount !== undefined &&
+            (!Number.isInteger(targetPolycount) ||
+              targetPolycount < MESHY_REMESH_MIN_POLYCOUNT ||
+              targetPolycount > MESHY_REMESH_MAX_POLYCOUNT)
+          ) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: `targetPolycount must be an integer between ${MESHY_REMESH_MIN_POLYCOUNT} and ${MESHY_REMESH_MAX_POLYCOUNT}`,
+            });
+          }
+          const badFormat = targetFormats?.find((f) => !MESHY_REMESH_FORMATS.includes(f));
+          if (badFormat) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: `Unsupported remesh format "${badFormat}" — use one of ${MESHY_REMESH_FORMATS.join(', ')}`,
+            });
+          }
+          const { taskId } = await meshyService.remesh({
+            apiKey,
+            modelUrl,
+            inputTaskId,
+            targetFormats,
+            topology: input.topology,
+            targetPolycount,
           });
+          const task = await meshyService.waitForRemesh(taskId, waitMs, 5000, apiKey);
+          const urls = task.modelUrls;
+          return {
+            ...baseOut,
+            taskId,
+            status: 'completed',
+            // GLB is the canonical output; fall back to whichever format was asked for.
+            modelUrl: urls?.glb ?? Object.values(urls ?? {})[0],
+            modelUrls: urls,
+            thumbnailUrl: task.thumbnailUrl,
+          };
         }
         case 'rigging': {
           const modelUrl = input.modelUrl;

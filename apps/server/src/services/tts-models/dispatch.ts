@@ -525,13 +525,55 @@ async function dispatchTtsInner(
     };
   }
 
-  // ── FAL passthrough TTS (MiniMax, etc.) ────────────────────────────
+  // ── FAL passthrough TTS (MiniMax speech) ───────────────────────────
   if (model.provider === 'fal') {
-    throw new TRPCError({
-      code: 'NOT_IMPLEMENTED',
-      message:
-        'FAL TTS passthrough dispatcher is not wired yet. Pick an ElevenLabs / OpenAI / Deepgram voice for now.',
-    });
+    const apiKey = await resolveProviderKey(input.userId ?? null, 'fal');
+    if (!apiKey) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'fal.ai key missing — add one at /settings/api-keys',
+      });
+    }
+    // MiniMax emits mp3 / pcm / flac. WAV isn't native: take PCM and wrap it.
+    const falFormat =
+      format === 'wav' || format === 'pcm' ? 'pcm' : format === 'flac' ? 'flac' : 'mp3';
+    const sampleRate = 32000;
+    try {
+      const { falService } = await import('../fal');
+      const out = await falService.textToSpeech({
+        apiKey,
+        endpoint: `fal-ai/${model.providerModelId}`,
+        text: input.text,
+        voiceId: input.voiceId,
+        // FAL accepts 0.5–2.0 (the shared field allows 0.25–4.0).
+        speed: input.speed != null ? Math.min(2, Math.max(0.5, input.speed)) : undefined,
+        format: falFormat,
+        sampleRate,
+      });
+      const { safeFetch } = await import('../../lib/url-validator');
+      const res = await safeFetch(out.audioUrl, {
+        signal: AbortSignal.timeout(60_000),
+        redirect: 'error',
+      });
+      if (!res.ok) {
+        throw new Error(`fetching generated audio failed: HTTP ${res.status}`);
+      }
+      const raw = Buffer.from(await res.arrayBuffer());
+      if (raw.length === 0) throw new Error('FAL returned an empty audio file');
+      const audioBuffer = format === 'wav' ? pcmToWav(raw, sampleRate, 1) : raw;
+      return {
+        audioBuffer,
+        contentType: audioMime(format === 'opus' ? 'mp3' : format),
+        modelId: model.id,
+        provider: model.provider,
+      };
+    } catch (err) {
+      if (err instanceof TRPCError) throw err;
+      throw new TRPCError({
+        code: 'BAD_GATEWAY',
+        message: `FAL TTS failed: ${redactSecrets(err instanceof Error ? err.message : String(err)).slice(0, 200)}`,
+      });
+    }
   }
 
   // Exhaustiveness guard
