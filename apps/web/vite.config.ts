@@ -141,7 +141,8 @@ export default defineConfig({
     dedupe: ['wagmi', 'viem', '@tanstack/react-query', 'react', 'react-dom'],
   },
   build: {
-    // Main entry stays ~470KB gzip after splitting MetaMask/WalletConnect/viem.
+    // Initial load is ~258KB gzip (entry ~210KB + react-vendor ~48KB) after splitting
+    // MetaMask/WalletConnect and Sentry/hls.js/three.js off the boot path.
     // Further splitting (radix, wagmi) risks dual-React-instance crashes and
     // is deferred to a post-testnet pass. Bumping the warn limit to 1700KB
     // to silence the noisy warning on chunks we've audited.
@@ -149,7 +150,13 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // Split large non-React deps into their own chunks to reduce initial
-        // bundle size. IMPORTANT: @radix-ui, wagmi, @tanstack/* and anything
+        // bundle size. viem/@noble/abitype and @safe-global are deliberately NOT
+        // listed: forcing them into manual chunks made the entry statically
+        // depend on the whole 170KB viem chunk (signing crypto and all) even
+        // though it only needs createConfig/getAddress/formatUnits, and a `safe`
+        // chunk swallowed viem when `viem` was removed alone. Let Rollup split
+        // them naturally — the entry keeps only the tree-shaken pieces it uses.
+        // IMPORTANT: @radix-ui, wagmi, @tanstack/* and anything
         // that calls React hooks at load time must stay in the default chunk
         // with React to avoid dual-React-instance crashes (React error #310).
         manualChunks(id) {
@@ -173,13 +180,6 @@ export default defineConfig({
               id.includes('/qrcode.react/')
             ) {
               return 'wallet-adapters';
-            }
-            if (id.includes('viem') || id.includes('@noble') || id.includes('abitype')) {
-              return 'viem';
-            }
-            // Safe (Gnosis multisig) SDK — only used by admin/safe pages.
-            if (id.includes('@safe-global')) {
-              return 'safe';
             }
             // Waveform lib — pure non-React, used only by the voice studio.
             // (hls.js is dynamically imported by useHlsVideo, so it splits on
