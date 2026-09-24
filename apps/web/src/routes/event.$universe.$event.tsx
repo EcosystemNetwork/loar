@@ -47,6 +47,7 @@ import {
   AddSegmentDialog,
   type SegmentGenerationConfig,
 } from '@/components/segments/AddSegmentDialog';
+import { resolveSegmentVideoModel } from '@/lib/segmentModels';
 import type { VideoSegment, MultiSegmentEvent } from '@/types/segments';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { migrateLegacyEvent, generateSegmentId, sortSegments } from '@/types/segments';
@@ -253,7 +254,7 @@ function EventPage() {
           ]
         : [];
 
-  // Handle adding a new segment via generation (text-to-video only from segment dialog)
+  // Handle adding a new segment via generation (text-to-video, or image-to-video from a character frame)
   const handleGenerateSegment = useCallback(
     async (config: SegmentGenerationConfig) => {
       if (!generationEnabled) {
@@ -262,26 +263,12 @@ function EventPage() {
       }
       setIsGeneratingSegment(true);
       try {
-        // All segment dialog generations use text-to-video via the unified generateVideo route
-        // Image-to-video requires the main FlowCreationPanel flow (character selection → image gen → video)
+        // Text- and image-to-video both go through the unified generateVideo route;
+        // the model id is resolved per mode (see lib/segmentModels).
         const result = await trpcClient.generation.generateVideo.mutate({
           prompt: config.prompt,
-          model: config.model?.endsWith('-google')
-            ? // Google-direct Veo: the registry id IS the server enum value (routes to the Google API).
-              (config.model as any)
-            : config.model === 'fal-veo3'
-              ? ('fal-ai/veo3.1/fast' as any)
-              : config.model === 'fal-kling'
-                ? ('fal-ai/kling-video/v2.1/standard/text-to-video' as any)
-                : config.model === 'fal-wan25'
-                  ? ('fal-ai/wan/v2.1/text-to-video' as any)
-                  : config.model === 'fal-sora'
-                    ? ('fal-ai/sora-2/text-to-video' as any)
-                    : config.model === 'seedance-fast'
-                      ? ('bytedance/seedance-2.0/fast' as any)
-                      : config.model === 'seedance'
-                        ? ('bytedance/seedance-2.0' as any)
-                        : undefined,
+          model: resolveSegmentVideoModel(config.model, !!config.imageUrl) as any,
+          imageUrl: config.imageUrl,
           duration: config.duration,
           aspectRatio: config.aspectRatio,
           negativePrompt: config.negativePrompt || undefined,
@@ -302,6 +289,13 @@ function EventPage() {
           aspectRatio: config.aspectRatio,
           generationMode: config.mode,
           negativePrompt: config.negativePrompt,
+          ...(config.imageUrl
+            ? {
+                imageUrl: config.imageUrl,
+                characterIds: config.characterIds,
+                characterNames: config.characterNames,
+              }
+            : {}),
         };
 
         persistSegments([...eventSegments, newSegment]);
@@ -650,6 +644,7 @@ function EventPage() {
           onGenerate={handleGenerateSegment}
           isGenerating={isGeneratingSegment}
           eventDescription={eventDescription}
+          characters={charactersData?.characters ?? []}
         />
 
         {/* Navigation Buttons */}
