@@ -7,8 +7,10 @@ import type { Node } from 'reactflow';
 import type { TimelineNodeData } from '../TimelineNodes';
 import {
   ROW_BAND_PX,
+  applyNativeSelection,
   canSwapOnChain,
   compareByCanvasFlow,
+  isSelectableScene,
   nodeDisplayTitle,
   selectedVideoScenesInFlowOrder,
 } from '../selection';
@@ -24,6 +26,7 @@ function n(
     label?: string;
     displayName?: string;
     eventId?: string;
+    isPending?: boolean;
   } = {}
 ): Node<TimelineNodeData> {
   const { x = 0, y = 0, ...data } = opts;
@@ -143,5 +146,42 @@ describe('canSwapOnChain', () => {
   it('treats blockchainNodeId 0 (genesis) as a real id, not missing', () => {
     const nodes = [onchain('a', 0), onchain('b', 1)];
     expect(canSwapOnChain(nodes, new Set(['a', 'b']))).toBe(true);
+  });
+});
+
+describe('isSelectableScene', () => {
+  it('accepts a real scene node', () => {
+    expect(isSelectableScene(n('a', { eventId: '1' }))).toBe(true);
+  });
+  it('rejects the add node and other non-scene node types', () => {
+    expect(isSelectableScene(n('add', { nodeType: 'add' }))).toBe(false);
+  });
+  it('rejects a still-generating placeholder', () => {
+    expect(isSelectableScene(n('pending-video-1', { isPending: true }))).toBe(false);
+  });
+});
+
+describe('applyNativeSelection', () => {
+  it('sets selected on the given ids and clears it everywhere else', () => {
+    const nodes = [{ ...n('a'), selected: true }, n('b'), { ...n('c'), selected: true }];
+    const out = applyNativeSelection(nodes, new Set(['b', 'c']));
+    expect(out.map((x) => !!x.selected)).toEqual([false, true, true]);
+  });
+
+  it('returns the same array (no store churn) when nothing changes', () => {
+    const nodes = [{ ...n('a'), selected: true }, n('b')];
+    expect(applyNativeSelection(nodes, new Set(['a']))).toBe(nodes);
+  });
+
+  it('leaves unchanged node objects referentially intact', () => {
+    const nodes = [{ ...n('a'), selected: true }, n('b')];
+    const out = applyNativeSelection(nodes, new Set(['a', 'b']));
+    expect(out[0]).toBe(nodes[0]);
+    expect(out[1]).not.toBe(nodes[1]);
+  });
+
+  it('deselects everything for an empty set', () => {
+    const nodes = [{ ...n('a'), selected: true }];
+    expect(applyNativeSelection(nodes, new Set())[0].selected).toBe(false);
   });
 });

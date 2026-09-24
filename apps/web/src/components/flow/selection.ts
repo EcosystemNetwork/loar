@@ -22,6 +22,40 @@ export function compareByCanvasFlow(a: Pick<Node, 'position'>, b: Pick<Node, 'po
   return a.position.x - b.position.x;
 }
 
+/**
+ * Whether a node can take part in a multi-selection / bulk action. Only real
+ * scene nodes qualify: the "+" add node isn't a scene, and a still-generating
+ * placeholder (`isPending`) has no event behind it — letting it into a bulk
+ * delete/duplicate either no-ops or removes an in-flight job's placeholder,
+ * and counting it as a scene defeats the "don't delete the last scene" guards.
+ */
+export function isSelectableScene(n: Pick<Node<TimelineNodeData>, 'data'>): boolean {
+  return n.data?.nodeType === 'scene' && !n.data.isPending;
+}
+
+/**
+ * Mirror a selection set into ReactFlow's native `selected` flags.
+ *
+ * `useOnSelectionChange` recomputes `selectedNodeIds` from those flags, so any
+ * code that edits `selectedNodeIds` directly (outline panel, context menu,
+ * duplicate…) must also flip the flags — otherwise the next canvas
+ * click/shift-click snaps the selection back to the stale native set.
+ * Returns the *same* array when nothing changes so it's a no-op store update.
+ */
+export function applyNativeSelection<T extends Node>(
+  nodes: T[],
+  selectedIds: ReadonlySet<string>
+): T[] {
+  let changed = false;
+  const next = nodes.map((n) => {
+    const shouldBeSelected = selectedIds.has(n.id);
+    if (!!n.selected === shouldBeSelected) return n;
+    changed = true;
+    return { ...n, selected: shouldBeSelected };
+  });
+  return changed ? next : nodes;
+}
+
 /** A scene node that is selected and actually has a video, in canvas flow order. */
 export function selectedVideoScenesInFlowOrder(
   nodes: Node<TimelineNodeData>[],

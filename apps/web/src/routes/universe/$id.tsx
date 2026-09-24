@@ -161,7 +161,9 @@ import { useNodeFilter } from '@/hooks/useNodeFilter';
 import type { ContextMenuState } from '@/components/flow/types';
 import { getSceneNodes } from '@/components/flow/types';
 import {
+  applyNativeSelection,
   canSwapOnChain,
+  isSelectableScene,
   nodeDisplayTitle,
   selectedVideoScenesInFlowOrder,
 } from '@/components/flow/selection';
@@ -1067,9 +1069,7 @@ function UniverseTimelineEditorInner() {
   // Bail out to the *same* Set reference when the ids are unchanged.
   useOnSelectionChange({
     onChange: useCallback(({ nodes: selectedNodes }: OnSelectionChangeParams) => {
-      const nextIds = selectedNodes
-        .filter((n: any) => n.data?.nodeType === 'scene')
-        .map((n: any) => n.id);
+      const nextIds = selectedNodes.filter((n: any) => isSelectableScene(n)).map((n: any) => n.id);
       setSelectedNodeIds((prev) => {
         if (prev.size === nextIds.length && nextIds.every((idv) => prev.has(idv))) {
           return prev;
@@ -1119,7 +1119,7 @@ function UniverseTimelineEditorInner() {
 
       // Same guard as bulk delete: deleting the last scene is a local soft-archive
       // with no restore UI, which blanks the editor on the next load.
-      const sceneCount = nodesRef.current.filter((n) => n.data.nodeType === 'scene').length;
+      const sceneCount = nodesRef.current.filter((n) => isSelectableScene(n)).length;
       if (sceneCount <= 1) {
         toast.error("Can't delete the last scene", {
           description: 'Leave at least one node on the canvas.',
@@ -1176,7 +1176,7 @@ function UniverseTimelineEditorInner() {
     // exactly how universes ended up with a blank editor). The graph rebuild
     // now also ignores an all-covering archive list as a safety net, but
     // don't create that state in the first place.
-    const sceneNodesOnCanvas = nodesRef.current.filter((n: any) => n.data?.nodeType === 'scene');
+    const sceneNodesOnCanvas = nodesRef.current.filter((n: any) => isSelectableScene(n));
     const selectedSceneCount = sceneNodesOnCanvas.filter((n: any) =>
       selectedNodeIds.has(n.id)
     ).length;
@@ -1829,157 +1829,164 @@ function UniverseTimelineEditorInner() {
     [getStoredEvents, setStoredEvents, setNodes]
   );
 
-  // Duplicate selected nodes
-  const handleDuplicateSelected = useCallback(() => {
-    if (selectedNodeIds.size === 0) return;
+  // Duplicate the given nodes (by flow id). Takes the ids explicitly so the
+  // single-node context-menu path doesn't depend on a `selectedNodeIds` state
+  // update landing first.
+  const duplicateNodes = useCallback(
+    (sourceIds: ReadonlySet<string>) => {
+      if (sourceIds.size === 0) return;
 
-    const eventsData = getStoredEvents();
+      const eventsData = getStoredEvents();
 
-    const newNodes: Node<TimelineNodeData>[] = [];
-    const newEdges: Edge[] = [];
-    const idMapping: Record<string, string> = {}; // oldId -> newId
-    const dupEventIdByFlowId: Record<string, string> = {}; // oldFlowId -> new eventId
+      const newNodes: Node<TimelineNodeData>[] = [];
+      const newEdges: Edge[] = [];
+      const idMapping: Record<string, string> = {}; // oldId -> newId
+      const dupEventIdByFlowId: Record<string, string> = {}; // oldFlowId -> new eventId
 
-    // First pass: create duplicated nodes with new IDs
-    for (const nodeFlowId of selectedNodeIds) {
-      const node = nodesRef.current.find((n) => n.id === nodeFlowId);
-      if (!node || node.data.nodeType !== 'scene') continue;
+      // First pass: create duplicated nodes with new IDs
+      for (const nodeFlowId of sourceIds) {
+        const node = nodesRef.current.find((n) => n.id === nodeFlowId);
+        if (!node || !isSelectableScene(node)) continue;
 
-      const eventId = node.data.eventId;
-      if (!eventId) continue;
+        const eventId = node.data.eventId;
+        if (!eventId) continue;
 
-      // Generate a new unique ID
-      const newEventId = `dup-${eventId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      const newFlowId = `local-node-${newEventId}`;
-      idMapping[nodeFlowId] = newFlowId;
+        // Generate a new unique ID
+        const newEventId = `dup-${eventId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const newFlowId = `local-node-${newEventId}`;
+        idMapping[nodeFlowId] = newFlowId;
 
-      // Position offset (below and to the right)
-      const offsetX = 60;
-      const offsetY = 180;
+        // Position offset (below and to the right)
+        const offsetX = 60;
+        const offsetY = 180;
 
-      const newPosition = { x: node.position.x + offsetX, y: node.position.y + offsetY };
+        const newPosition = { x: node.position.x + offsetX, y: node.position.y + offsetY };
 
-      // Persist the copy so it survives a reload. Duplicating an on-chain node
-      // usually has no local event record, and a draft only re-renders when it
-      // has one with a videoUrl — so seed it from the node itself. Position is
-      // the copy's own (the spread used to carry the source's, stacking the
-      // copy on the original after reload).
-      const sourceEventData = eventsData[eventId] ?? {
-        description: node.data.description,
-        videoUrl: node.data.videoUrl,
-      };
-      eventsData[newEventId] = {
-        ...sourceEventData,
-        eventId: newEventId,
-        title: `${sourceEventData.title || node.data.label || `Event ${eventId}`} (copy)`,
-        timestamp: Date.now(),
-        position: newPosition,
-        sourceNodeId: undefined, // resolved in the second pass
-        canonOverride: undefined,
-      };
-      dupEventIdByFlowId[nodeFlowId] = newEventId;
-
-      newNodes.push({
-        id: newFlowId,
-        type: 'timelineEvent',
-        position: newPosition,
-        data: {
-          ...node.data,
-          label: `${node.data.label} (copy)`,
+        // Persist the copy so it survives a reload. Duplicating an on-chain node
+        // usually has no local event record, and a draft only re-renders when it
+        // has one with a videoUrl — so seed it from the node itself. Position is
+        // the copy's own (the spread used to carry the source's, stacking the
+        // copy on the original after reload).
+        const sourceEventData = eventsData[eventId] ?? {
+          description: node.data.description,
+          videoUrl: node.data.videoUrl,
+        };
+        eventsData[newEventId] = {
+          ...sourceEventData,
           eventId: newEventId,
-          blockchainNodeId: undefined, // Duplicated nodes are local-only
-          displayName: newEventId,
-          isRoot: false,
-          isInCanonChain: false,
-          isSelected: false,
-          onAddScene: handleAddEvent,
-          onEditScene: handleEditScene,
-          onRegenerateScene: handleRegenerateScene,
-          onSwitchVersion: handleSwitchVersion,
-          onDeleteNode: handleDeleteNode,
-        },
-      });
-    }
+          title: `${sourceEventData.title || node.data.label || `Event ${eventId}`} (copy)`,
+          timestamp: Date.now(),
+          position: newPosition,
+          sourceNodeId: undefined, // resolved in the second pass
+          canonOverride: undefined,
+        };
+        dupEventIdByFlowId[nodeFlowId] = newEventId;
 
-    // Second pass: recreate edges between duplicated nodes, and hang each
-    // duplicated subtree root off its original parent — the same link
-    // mergeDraftNodes rebuilds after a reload (via `sourceNodeId`).
-    const currentEdges = edges;
-    for (const edge of currentEdges) {
-      const newSource = idMapping[edge.source];
-      const newTarget = idMapping[edge.target];
-      if (!newSource && newTarget) {
-        const parent = nodesRef.current.find((n) => n.id === edge.source);
-        if (parent?.data.nodeType === 'scene' && parent.data.eventId) {
-          const dupEventId = dupEventIdByFlowId[edge.target];
-          if (dupEventId) eventsData[dupEventId].sourceNodeId = parent.data.eventId;
-          newEdges.push({
-            id: `edge-dup-${edge.source}-${newTarget}`,
-            source: edge.source,
-            target: newTarget,
-            animated: true,
-            style: { stroke: '#8b5cf6', strokeWidth: 3 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#8b5cf6' },
-          });
-        }
-      }
-      if (newSource && newTarget) {
-        const srcDup = dupEventIdByFlowId[edge.source];
-        const dstDup = dupEventIdByFlowId[edge.target];
-        if (srcDup && dstDup) eventsData[dstDup].sourceNodeId = srcDup;
-        newEdges.push({
-          id: `edge-dup-${newSource}-${newTarget}`,
-          source: newSource,
-          target: newTarget,
-          animated: true,
-          style: { stroke: '#8b5cf6', strokeWidth: 3 },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: '#8b5cf6',
+        newNodes.push({
+          id: newFlowId,
+          type: 'timelineEvent',
+          position: newPosition,
+          data: {
+            ...node.data,
+            label: `${node.data.label} (copy)`,
+            eventId: newEventId,
+            blockchainNodeId: undefined, // Duplicated nodes are local-only
+            displayName: newEventId,
+            isRoot: false,
+            isInCanonChain: false,
+            isSelected: false,
+            onAddScene: handleAddEvent,
+            onEditScene: handleEditScene,
+            onRegenerateScene: handleRegenerateScene,
+            onSwitchVersion: handleSwitchVersion,
+            onDeleteNode: handleDeleteNode,
           },
         });
       }
-    }
 
-    // Save updated localStorage
-    setStoredEvents(eventsData);
+      // Second pass: recreate edges between duplicated nodes, and hang each
+      // duplicated subtree root off its original parent — the same link
+      // mergeDraftNodes rebuilds after a reload (via `sourceNodeId`).
+      const currentEdges = edges;
+      for (const edge of currentEdges) {
+        const newSource = idMapping[edge.source];
+        const newTarget = idMapping[edge.target];
+        if (!newSource && newTarget) {
+          const parent = nodesRef.current.find((n) => n.id === edge.source);
+          if (parent?.data.nodeType === 'scene' && parent.data.eventId) {
+            const dupEventId = dupEventIdByFlowId[edge.target];
+            if (dupEventId) eventsData[dupEventId].sourceNodeId = parent.data.eventId;
+            newEdges.push({
+              id: `edge-dup-${edge.source}-${newTarget}`,
+              source: edge.source,
+              target: newTarget,
+              animated: true,
+              style: { stroke: '#8b5cf6', strokeWidth: 3 },
+              markerEnd: { type: MarkerType.ArrowClosed, color: '#8b5cf6' },
+            });
+          }
+        }
+        if (newSource && newTarget) {
+          const srcDup = dupEventIdByFlowId[edge.source];
+          const dstDup = dupEventIdByFlowId[edge.target];
+          if (srcDup && dstDup) eventsData[dstDup].sourceNodeId = srcDup;
+          newEdges.push({
+            id: `edge-dup-${newSource}-${newTarget}`,
+            source: newSource,
+            target: newTarget,
+            animated: true,
+            style: { stroke: '#8b5cf6', strokeWidth: 3 },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: '#8b5cf6',
+            },
+          });
+        }
+      }
 
-    // Add new nodes and edges to the flow
-    setNodes((nds: any) => [...nds, ...newNodes]);
-    setEdges((eds: any) => [...eds, ...newEdges]);
+      // Save updated localStorage
+      setStoredEvents(eventsData);
 
-    // Clear selection
-    setSelectedNodeIds(new Set());
-  }, [
-    selectedNodeIds,
-    edges,
-    getStoredEvents,
-    setStoredEvents,
-    handleAddEvent,
-    handleEditScene,
-    handleRegenerateScene,
-    handleSwitchVersion,
-    handleDeleteNode,
-    setNodes,
-    setEdges,
-  ]);
+      // Add new nodes and edges to the flow, dropping the sources' native
+      // selection along with `selectedNodeIds` so the two can't disagree.
+      setNodes((nds: any) => [...applyNativeSelection(nds, new Set()), ...newNodes]);
+      setEdges((eds: any) => [...eds, ...newEdges]);
+
+      // Clear selection
+      setSelectedNodeIds(new Set());
+    },
+    [
+      edges,
+      getStoredEvents,
+      setStoredEvents,
+      handleAddEvent,
+      handleEditScene,
+      handleRegenerateScene,
+      handleSwitchVersion,
+      handleDeleteNode,
+      setNodes,
+      setEdges,
+    ]
+  );
+
+  // Duplicate every selected node
+  const handleDuplicateSelected = useCallback(
+    () => duplicateNodes(selectedNodeIds),
+    [duplicateNodes, selectedNodeIds]
+  );
 
   // ── Node Management Actions ──────────────────────────────────────────
 
   // Select all scene nodes
   const handleSelectAll = useCallback(() => {
-    const sceneIds = new Set(
-      nodes.filter((n: any) => n.data.nodeType === 'scene').map((n: any) => n.id)
-    );
+    const sceneIds = new Set(nodes.filter((n: any) => isSelectableScene(n)).map((n: any) => n.id));
     setSelectedNodeIds(sceneIds);
-    setNodes((nds: any) =>
-      nds.map((n: any) => (n.data.nodeType === 'scene' ? { ...n, selected: true } : n))
-    );
+    setNodes((nds: any) => applyNativeSelection(nds, sceneIds));
   }, [nodes, setNodes]);
 
   // Invert selection
   const handleInvertSelection = useCallback(() => {
-    const sceneIds = nodes.filter((n: any) => n.data.nodeType === 'scene').map((n: any) => n.id);
+    const sceneIds = nodes.filter((n: any) => isSelectableScene(n)).map((n: any) => n.id);
     const inverted = new Set(sceneIds.filter((nid: string) => !selectedNodeIds.has(nid)));
     setSelectedNodeIds(inverted);
     // Sync ReactFlow's native `selected` flag too — useOnSelectionChange
@@ -1987,7 +1994,7 @@ function UniverseTimelineEditorInner() {
     // update, so leaving them stale (as handleSelectAll/handleClearSelection
     // do not) let the very next incidental update snap the selection back to
     // the pre-invert set.
-    setNodes((nds: any) => nds.map((n: any) => ({ ...n, selected: inverted.has(n.id) })));
+    setNodes((nds: any) => applyNativeSelection(nds, inverted));
   }, [nodes, selectedNodeIds, setNodes]);
 
   // Set canon on the given nodes and persist it in the event store (as
@@ -2039,22 +2046,30 @@ function UniverseTimelineEditorInner() {
   // Duplicate a single node (for context menu)
   const handleDuplicateSingle = useCallback(
     (nodeId: string) => {
-      setSelectedNodeIds(new Set([nodeId]));
-      // Slight delay to let selection update then trigger duplicate
-      requestAnimationFrame(() => handleDuplicateSelected());
+      // Duplicate just this node. Going through handleDuplicateSelected here
+      // (after a deferred setSelectedNodeIds) ran with the *previous* render's
+      // selection: nothing happened with an empty selection, and it cloned the
+      // wrong nodes when others were selected.
+      duplicateNodes(new Set([nodeId]));
     },
-    [handleDuplicateSelected]
+    [duplicateNodes]
   );
 
   // Toggle select for outline panel
-  const handleToggleSelect = useCallback((nodeId: string) => {
-    setSelectedNodeIds((prev) => {
-      const next = new Set(prev);
+  const handleToggleSelect = useCallback(
+    (nodeId: string) => {
+      const node = nodesRef.current.find((n) => n.id === nodeId);
+      if (!node || !isSelectableScene(node)) return;
+      const next = new Set(selectedNodeIds);
       if (next.has(nodeId)) next.delete(nodeId);
       else next.add(nodeId);
-      return next;
-    });
-  }, []);
+      setSelectedNodeIds(next);
+      // Keep ReactFlow's native flags in step, or the next canvas click drops
+      // everything the outline panel selected.
+      setNodes((nds: any) => applyNativeSelection(nds, next));
+    },
+    [selectedNodeIds, setNodes]
+  );
 
   // Navigate to node (for outline panel and search)
   const handleNavigateToNode = useCallback(
@@ -3050,6 +3065,18 @@ function UniverseTimelineEditorInner() {
     });
   }, [selectedNodeIds, nodeFilter.matchingNodeIds, setNodes]);
 
+  // `selectedNode` is a snapshot taken at click time, so the scene panel kept
+  // showing pre-edit data (regenerated video, canon flag, title…) and stayed
+  // open on a node that had since been deleted / undone away. Re-point it at
+  // the live node each time the node list changes, or clear it if it's gone.
+  useEffect(() => {
+    setSelectedNode((prev) => {
+      if (!prev) return prev;
+      const live = nodes.find((n) => n.id === prev.id);
+      return live ?? null;
+    });
+  }, [nodes]);
+
   // Handle node selection — shift+click toggles multi-select without navigating
   const onNodeClick = useCallback((event: React.MouseEvent, node: any) => {
     // Still-generating placeholder — total no-op, same as the old
@@ -3971,7 +3998,9 @@ function UniverseTimelineEditorInner() {
               onAssignToArc={nodeArcs.addNodesToArc}
               onCreateArc={(name) => nodeArcs.addArc(name)}
               onPlay={(nodeId) => {
-                setSelectedNodeIds(new Set([nodeId]));
+                const only = new Set([nodeId]);
+                setSelectedNodeIds(only);
+                setNodes((nds: any) => applyNativeSelection(nds, only));
                 setShowSelectionPlayer(true);
               }}
               onMarkForSwap={handleMarkForSwap}
