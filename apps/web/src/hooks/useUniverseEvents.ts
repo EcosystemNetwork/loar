@@ -57,6 +57,19 @@ export function useUniverseEvents(universeId: string) {
   const pendingPatchRef = useRef<Record<string, Record<string, any> | null>>({});
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // `useMutation` returns a brand-new result object on EVERY render, so
+  // depending on it (or on `upsertMutation`) would give `flush` — and through
+  // it `setStoredEvents` — a new identity each render. The editor lists
+  // setStoredEvents in the deps of its delete/regenerate/switch-version
+  // handlers, which in turn are deps of the effect that rebuilds every canvas
+  // node with setNodes(): so each render re-ran the rebuild, which re-rendered,
+  // ~170x/sec. Every rebuild discards ReactFlow's measured node dimensions, so
+  // no node was ever marked initialized and the whole canvas stayed
+  // `visibility: hidden` ("nodes disappear when I open the editor"). Read the
+  // mutate fn through a ref so the callbacks stay referentially stable.
+  const mutateRef = useRef(upsertMutation.mutate);
+  mutateRef.current = upsertMutation.mutate;
+
   const flush = useCallback(() => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
@@ -65,8 +78,8 @@ export function useUniverseEvents(universeId: string) {
     const patch = pendingPatchRef.current;
     pendingPatchRef.current = {};
     if (Object.keys(patch).length === 0 || !universeId) return;
-    upsertMutation.mutate(patch);
-  }, [universeId, upsertMutation]);
+    mutateRef.current(patch);
+  }, [universeId]);
 
   const setStoredEvents = useCallback(
     (events: Record<string, any>) => {

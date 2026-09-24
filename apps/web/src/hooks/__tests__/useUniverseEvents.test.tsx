@@ -82,4 +82,41 @@ describe('useUniverseEvents', () => {
     const { result } = setup();
     await waitFor(() => expect(result.current.getStoredEvents()['5']?.title).toBe('teammate'));
   });
+
+  // Regression: `useMutation` returns a fresh object every render. Depending on
+  // it made setStoredEvents change identity on every render, and the editor
+  // lists it in the deps of the handlers that feed the node-rebuild effect —
+  // a ~170/sec render loop that kept every ReactFlow node `visibility:hidden`
+  // (measured dimensions were wiped each cycle). Identity MUST stay stable.
+  describe('referential stability (editor render-loop regression)', () => {
+    it('getStoredEvents / setStoredEvents keep their identity across re-renders', () => {
+      mockGet.mockReturnValue(new Promise(() => {}));
+      const { result, rerender } = setup();
+      const first = { ...result.current };
+      for (let i = 0; i < 5; i++) rerender();
+      expect(result.current.setStoredEvents).toBe(first.setStoredEvents);
+      expect(result.current.getStoredEvents).toBe(first.getStoredEvents);
+    });
+
+    it('stays stable through a mutation state change (mutate → pending → settled)', async () => {
+      mockGet.mockReturnValue(new Promise(() => {}));
+      const { result } = setup();
+      const before = result.current.setStoredEvents;
+      act(() => {
+        const ev = result.current.getStoredEvents();
+        ev['1'] = { title: 'x', timestamp: 1 };
+        result.current.setStoredEvents(ev);
+      });
+      await waitFor(() => expect(mockUpsert).toHaveBeenCalled(), { timeout: 3000 });
+      expect(result.current.setStoredEvents).toBe(before);
+    });
+
+    it('still flushes through the latest mutate after re-renders', async () => {
+      mockGet.mockReturnValue(new Promise(() => {}));
+      const { result, rerender } = setup();
+      rerender();
+      act(() => result.current.setStoredEvents({ '9': { title: 'n', timestamp: 1 } }));
+      await waitFor(() => expect(mockUpsert).toHaveBeenCalledTimes(1), { timeout: 3000 });
+    });
+  });
 });
