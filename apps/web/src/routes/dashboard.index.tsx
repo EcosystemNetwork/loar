@@ -49,7 +49,7 @@ import { useWalletAuth } from '@/lib/wallet-auth';
 import { normalizeUniverseId } from '@/lib/utils';
 import { useMemo } from 'react';
 
-export const Route = createFileRoute('/dashboard')({
+export const Route = createFileRoute('/dashboard/')({
   beforeLoad: ({ context }) => {
     if (!context.hasSession()) {
       throw redirect({ to: '/login', search: { redirect: '/dashboard' } });

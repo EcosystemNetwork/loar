@@ -36,7 +36,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-export const Route = createFileRoute('/studio')({
+export const Route = createFileRoute('/studio/')({
   // WEB-6: await /auth/me before studio mutations become reachable.
   beforeLoad: async ({ context }) => {
     if (!context.hasSession()) {

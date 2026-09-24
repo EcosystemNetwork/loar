@@ -26,7 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ListPersonaForSaleDialog } from '@/components/likeness-marketplace/ListPersonaForSaleDialog';
 
-export const Route = createFileRoute('/dashboard/personas')({
+export const Route = createFileRoute('/dashboard/personas/')({
   component: DashboardPersonasPage,
 });
 

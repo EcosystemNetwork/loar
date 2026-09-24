@@ -195,7 +195,7 @@ function NotebookList() {
   );
 }
 
-export const Route = createFileRoute('/notebook')({
+export const Route = createFileRoute('/notebook/')({
   beforeLoad: ({ context }) => {
     if (!context.hasSession()) {
       throw redirect({ to: '/login', search: { redirect: '/notebook' } });

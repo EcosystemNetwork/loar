@@ -64,7 +64,7 @@ const VIDEO_MODELS = [
 ] as const;
 type VideoModelId = (typeof VIDEO_MODELS)[number]['id'];
 
-export const Route = createFileRoute('/lab/zai')({
+export const Route = createFileRoute('/lab/zai/')({
   component: ZaiLabPage,
 });
 

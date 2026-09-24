@@ -32,7 +32,7 @@ import {
   type LikenessModality,
 } from '@/hooks/useEntities';
 
-export const Route = createFileRoute('/marketplace/likeness')({
+export const Route = createFileRoute('/marketplace/likeness/')({
   component: LikenessMarketplacePage,
 });
 

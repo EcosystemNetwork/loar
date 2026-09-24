@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
 import { useWalletAuth } from '@/lib/wallet-auth';
 
-export const Route = createFileRoute('/canvas')({
+export const Route = createFileRoute('/canvas/')({
   component: CanvasListPage,
 });
 
