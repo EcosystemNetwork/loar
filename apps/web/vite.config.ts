@@ -153,6 +153,18 @@ export default defineConfig({
         // that calls React hooks at load time must stay in the default chunk
         // with React to avoid dual-React-instance crashes (React error #310).
         manualChunks(id) {
+          // React + its CJS interop shims get an explicit home. Without this,
+          // Rollup parks `commonjsHelpers` and the react interop wrapper in
+          // whichever manual chunk touches them first (it was `sentry`), so the
+          // entry statically depended on the 130KB Sentry chunk just to boot
+          // React and Sentry could never be loaded lazily. One chunk = still a
+          // single React instance.
+          if (
+            id.includes('commonjsHelpers') ||
+            /node_modules\/(react|react-dom|scheduler|use-sync-external-store)\//.test(id)
+          ) {
+            return 'react-vendor';
+          }
           if (id.includes('node_modules')) {
             // Heavy crypto/wallet libs that don't import React directly.
             if (

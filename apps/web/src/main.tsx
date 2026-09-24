@@ -13,9 +13,18 @@
 import { validateWebEnv } from './lib/env';
 validateWebEnv();
 
-// Side-effect import: initializes Sentry if VITE_SENTRY_DSN is set.
-// Must run before router/providers so bootstrap errors are captured.
-import './lib/sentry';
+// Sentry (~140KB gzip) initializes after first paint instead of blocking it.
+// Trade-off: errors thrown before it loads (typically < 1s) are not reported.
+// Skipped entirely when VITE_SENTRY_DSN is unset so dev/preview never fetch it.
+if (import.meta.env.VITE_SENTRY_DSN) {
+  const loadSentry = () => void import('./lib/sentry');
+  const whenIdle = () =>
+    'requestIdleCallback' in window
+      ? window.requestIdleCallback(loadSentry, { timeout: 3000 })
+      : setTimeout(loadSentry, 1500);
+  if (document.readyState === 'complete') whenIdle();
+  else window.addEventListener('load', whenIdle, { once: true });
+}
 
 // Product analytics — PostHog. Lazy-loads when VITE_POSTHOG_KEY is set,
 // silent no-op otherwise. Autocaptures clicks + pageviews + session replay.

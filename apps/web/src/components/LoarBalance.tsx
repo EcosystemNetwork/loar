@@ -5,7 +5,7 @@
  * purchasable — the CreditStore modal is kept only for the QA/admin
  * `OPEN_CREDIT_STORE` event, never the user-facing click.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { lazy, Suspense, useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -17,9 +17,23 @@ import { useWalletAccount } from '@/hooks/useWalletAccount';
 import { useWeb3Mode } from '@/lib/web3-mode';
 import { getEvmAddresses } from '@/configs/addresses';
 import { SUPPORTED_EVM_CHAIN_IDS } from '@/configs/chains';
-import { loarTokenAbi } from '@loar/abis/generated';
 import { QA_EVENTS } from '@/lib/qa-events';
-import { CreditStore } from './CreditStore';
+
+// Stripe + the store UI only matter once the modal opens — keep them out of the
+// entry chunk (the header renders this component on every page).
+const CreditStore = lazy(() => import('./CreditStore').then((m) => ({ default: m.CreditStore })));
+
+// Only balanceOf is needed here. Importing the full generated ABI module would
+// pull every contract ABI (~185KB) into the entry chunk via the header.
+const loarTokenAbi = [
+  {
+    type: 'function',
+    name: 'balanceOf',
+    stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const;
 
 function useLoarTokenBalance() {
   const { address, chainId } = useWalletAccount();
@@ -125,7 +139,9 @@ export function LoarBalance() {
             }}
           >
             <div className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-y-auto p-6 mx-4">
-              <CreditStore onClose={() => setShowStore(false)} />
+              <Suspense fallback={null}>
+                <CreditStore onClose={() => setShowStore(false)} />
+              </Suspense>
             </div>
           </div>,
           document.body

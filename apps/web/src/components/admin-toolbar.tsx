@@ -31,18 +31,7 @@ import {
 } from 'lucide-react';
 import { AdminModelAnalytics } from './AdminModelAnalytics';
 import { toast } from 'sonner';
-
-// ── Admin gate ──────────────────────────────────────────────────
-const ADMIN_ADDRESSES = (import.meta.env.VITE_ADMIN_ADDRESSES ?? '')
-  .split(',')
-  .map((a: string) => a.trim().toLowerCase())
-  .filter(Boolean);
-
-function isAdmin(address: string | null | undefined): boolean {
-  if (!address) return false;
-  if (ADMIN_ADDRESSES.length === 0) return false;
-  return ADMIN_ADDRESSES.includes(address.toLowerCase());
-}
+import { isAdminAddress } from '@/lib/admin-address';
 
 // ── Types ───────────────────────────────────────────────────────
 interface PerfMetrics {
@@ -364,7 +353,7 @@ export default function AdminToolbar() {
   }, [open]);
 
   // Don't render for non-admins
-  if (!isAuthenticated || !isAdmin(walletAddress)) return null;
+  if (!isAuthenticated || !isAdminAddress(walletAddress)) return null;
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);

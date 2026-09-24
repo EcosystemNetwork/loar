@@ -8,7 +8,7 @@
 
 import Loader from '@/components/loader';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import AdminToolbar from '@/components/admin-toolbar';
+import { AdminToolbarGate } from '@/components/AdminToolbarGate';
 import { CookieConsent } from '@/components/CookieConsent';
 import { ApiKeyGateModal } from '@/components/ApiKeyGateModal';
 import Header from '@/components/header';
@@ -19,7 +19,6 @@ import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import type { trpc } from '@/utils/trpc';
 import type { QueryClient } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import {
   HeadContent,
   Link,
@@ -27,10 +26,25 @@ import {
   createRootRouteWithContext,
   useRouterState,
 } from '@tanstack/react-router';
-import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { useTrackWalletLogin } from '@/hooks/useTrackWalletLogin';
-import { useRef, useEffect } from 'react';
+import { lazy, Suspense, useRef, useEffect } from 'react';
 import '../index.css';
+
+// Dev-only. `import.meta.env.DEV` is a build-time constant, so in production
+// the dynamic imports are dead-code-eliminated and the devtools packages
+// (~130KB) never reach the bundle.
+const TanStackRouterDevtools = import.meta.env.DEV
+  ? lazy(() =>
+      import('@tanstack/react-router-devtools').then((m) => ({
+        default: m.TanStackRouterDevtools,
+      }))
+    )
+  : null;
+const ReactQueryDevtools = import.meta.env.DEV
+  ? lazy(() =>
+      import('@tanstack/react-query-devtools').then((m) => ({ default: m.ReactQueryDevtools }))
+    )
+  : null;
 
 export interface RouterAppContext {
   trpc: typeof trpc;
@@ -208,13 +222,15 @@ function RootComponent() {
           <MobileBottomNav />
         </div>
         <Toaster richColors position="top-right" toastOptions={{ duration: 5000 }} />
-        <AdminToolbar />
+        <AdminToolbarGate />
         <CookieConsent />
         <ApiKeyGateModal />
       </ThemeProvider>
-      {import.meta.env.DEV && <TanStackRouterDevtools position="bottom-left" />}
-      {import.meta.env.DEV && (
-        <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+      {TanStackRouterDevtools && ReactQueryDevtools && (
+        <Suspense fallback={null}>
+          <TanStackRouterDevtools position="bottom-left" />
+          <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+        </Suspense>
       )}
     </ErrorBoundary>
   );
