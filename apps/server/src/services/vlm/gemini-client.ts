@@ -17,7 +17,8 @@ import { GoogleAIFileManager } from '@google/generative-ai/server';
 import type { z } from 'zod';
 import { safeFetch } from '../../lib/url-validator';
 import type { CostSummary, VlmModel } from './types';
-import { recordProviderCost, assertProviderAllowed } from '../cost-tracker';
+import { recordProviderCost, withSpendHold } from '../cost-tracker';
+import { estimateVlmCostUsd } from './estimate';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 
@@ -119,10 +120,29 @@ export interface JsonResult<T> {
   raw: string;
 }
 
-export async function callJson<T>(args: CallJsonArgs<T>): Promise<JsonResult<T>> {
+/**
+ * Admin kill-switch + HARD cost-cap reservation around one Gemini call: books
+ * the estimated cost before it goes out, releases after the actual cost is
+ * recorded. Throws ProviderPausedError / CostCapExceededError.
+ */
+async function withGeminiHold<T>(
+  args: { model: VlmModel; system?: string; prompt: string; media?: MediaPart[] },
+  fn: () => Promise<T>
+): Promise<T> {
   ensureKey();
-  // Admin kill-switch + cap preflight. Throws ProviderPausedError / CostCapExceededError.
-  await assertProviderAllowed({ provider: 'gemini' });
+  const estimatedUsd = estimateVlmCostUsd(
+    args,
+    PRICE_USD_PER_1M_IN[args.model],
+    PRICE_USD_PER_1M_OUT[args.model]
+  );
+  return withSpendHold({ provider: 'gemini', estimatedUsd }, fn);
+}
+
+export async function callJson<T>(args: CallJsonArgs<T>): Promise<JsonResult<T>> {
+  return withGeminiHold(args, () => callJsonUnheld(args));
+}
+
+async function callJsonUnheld<T>(args: CallJsonArgs<T>): Promise<JsonResult<T>> {
   const m = genAI.getGenerativeModel({
     model: args.model,
     ...(args.system ? { systemInstruction: args.system } : {}),
@@ -193,8 +213,15 @@ export async function callText(args: {
   media?: MediaPart[];
   label: string;
 }): Promise<{ text: string; cost: CostSummary }> {
-  ensureKey();
-  await assertProviderAllowed({ provider: 'gemini' });
+  return withGeminiHold(args, () => callTextUnheld(args));
+}
+
+async function callTextUnheld(args: {
+  model: VlmModel;
+  prompt: string;
+  media?: MediaPart[];
+  label: string;
+}): Promise<{ text: string; cost: CostSummary }> {
   const m = genAI.getGenerativeModel({ model: args.model });
   const parts: any[] = [];
   if (args.media) for (const mp of args.media) parts.push(mp);

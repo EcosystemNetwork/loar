@@ -16,7 +16,7 @@ import { getLlmModelById } from './registry';
 import type { LlmModelConfig } from './types';
 import {
   recordProviderCost,
-  assertProviderAllowed,
+  reserveProviderBudget,
   ProviderPausedError,
   CostCapExceededError,
   llmFallbackHopTotal,
@@ -25,7 +25,9 @@ import {
   providerCallFailureTotal,
   type CostProvider,
   type CostKind,
+  type SpendHold,
 } from '../cost-tracker';
+import { estimateLlmCostUsd } from './estimate';
 
 /**
  * Coarse failure classification for the providerCallFailureTotal metric.
@@ -275,10 +277,16 @@ export async function dispatchLlm(input: LlmDispatchInput): Promise<LlmDispatchR
     });
   }
 
-  // Admin kill-switch + platform cost cap preflight. Throws
+  // Admin kill-switch + HARD cost-cap reservation. Books the estimated cost
+  // against every applicable daily cap before the call goes out (released in
+  // the `finally` below, after the actual cost is recorded). Throws
   // ProviderPausedError / CostCapExceededError before we burn a real call.
+  let hold: SpendHold | null = null;
   try {
-    await assertProviderAllowed({ provider: costProviderFor(model.provider) });
+    hold = await reserveProviderBudget({
+      provider: costProviderFor(model.provider),
+      estimatedUsd: estimateLlmCostUsd(model, input),
+    });
   } catch (err) {
     providerCallFailureTotal
       .labels(
@@ -336,6 +344,8 @@ export async function dispatchLlm(input: LlmDispatchInput): Promise<LlmDispatchR
       )
       .inc();
     throw err;
+  } finally {
+    await hold?.release();
   }
 }
 

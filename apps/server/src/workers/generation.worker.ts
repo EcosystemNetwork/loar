@@ -18,6 +18,7 @@ import { getCircuitBreaker, CircuitOpenError } from '../lib/circuit-breaker';
 import { recordAiGeneration, recordStorageUpload } from '../lib/metrics';
 import { withCostScope } from '../services/cost-tracker/scope';
 import { recordProviderCost } from '../services/cost-tracker';
+import { runReleasingSpendHold } from '../lib/video-budget';
 
 // ── Connection ─────────────────────────────────────────────────────────
 
@@ -36,17 +37,6 @@ function getConnectionOpts() {
 }
 
 // ── Worker Logic ───────────────────────────────────────────────────────
-
-/** Drop the admission-time budget hold, if the job carries one. Never throws. */
-async function releaseJobSpendHold(job: Job<GenerationJobData, GenerationJobResult>) {
-  if (!job.data.spendHold) return;
-  try {
-    const { releaseSpendHold } = await import('../services/cost-tracker');
-    await releaseSpendHold(job.data.spendHold);
-  } catch (err) {
-    console.warn('[worker] spend hold release failed (it will expire):', (err as Error).message);
-  }
-}
 
 async function processGenerationBody(
   job: Job<GenerationJobData, GenerationJobResult>
@@ -650,18 +640,7 @@ export function startGenerationWorker(
       requestId: job.data.generationId,
     };
     return Promise.resolve(
-      withCostScope(rootScope, async () => {
-        try {
-          const result = await processGenerationBody(job);
-          await releaseJobSpendHold(job);
-          return result;
-        } catch (err) {
-          // A thrown (non-final) attempt is retried — keep the hold so the retry
-          // stays protected; release once no further attempt will run.
-          if (job.attemptsMade + 1 >= (job.opts?.attempts ?? 1)) await releaseJobSpendHold(job);
-          throw err;
-        }
-      })
+      withCostScope(rootScope, () => runReleasingSpendHold(job, () => processGenerationBody(job)))
     );
   };
 

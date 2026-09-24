@@ -61,6 +61,11 @@ import { recordAssetEventAsync } from '../../services/lineage';
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { enqueueWebhook, validateWebhookUrl } from '../../lib/webhooks';
 import { withProviderRateLimit } from '../../lib/rate-limit';
+import {
+  budgetErrorToTrpc,
+  isBudgetRefusal,
+  reserveQueuedVideoBudget,
+} from '../../lib/video-budget';
 import type { CostProvider } from '../../services/cost-tracker';
 import { getByokProviderSet, computeModelUsability } from '../../services/provider-keys';
 
@@ -278,8 +283,7 @@ export async function dispatchGeneration(
   // released once its cost is recorded (inside `dispatchGenerationInner`), so
   // a burst of concurrent generations can't all slip under a cap that none of
   // them has consumed yet, and one call can't exceed the remaining budget.
-  const { withSpendHold, ProviderPausedError, CostCapExceededError } =
-    await import('../../services/cost-tracker');
+  const { withSpendHold } = await import('../../services/cost-tracker');
   try {
     return await withSpendHold(
       { provider: costProvider, estimatedUsd: model.providerCostUsd },
@@ -287,13 +291,7 @@ export async function dispatchGeneration(
     );
   } catch (err) {
     // Surface budget/kill-switch refusals as 4xx, not a generic 500.
-    if (err instanceof ProviderPausedError) {
-      throw new TRPCError({ code: 'FORBIDDEN', message: err.message, cause: err });
-    }
-    if (err instanceof CostCapExceededError) {
-      throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: err.message, cause: err });
-    }
-    throw err;
+    throw (await budgetErrorToTrpc(err)) ?? err;
   }
 }
 
@@ -1581,18 +1579,10 @@ export const generationRouter = router({
         // job's cost is recorded (or by its own expiry if the job is lost).
         // Done BEFORE the try below so a denial isn't swallowed into the
         // inline fallback.
-        let spendHold: import('../../services/cost-tracker').SpendHold | null = null;
-        if (providerCostUsd > 0) {
-          const { reserveProviderBudget, ProviderPausedError, CostCapExceededError } =
-            await import('../../services/cost-tracker');
-          try {
-            spendHold = await reserveProviderBudget({
-              provider: videoCostProviderFor(model.provider),
-              estimatedUsd: providerCostUsd,
-              // Queued jobs can wait behind others — longer safety expiry than inline.
-              holdTtlSec: 45 * 60,
-            });
-          } catch (budgetErr) {
+        const spendHold = await reserveQueuedVideoBudget({
+          provider: videoCostProviderFor(model.provider),
+          providerCostUsd,
+          onDenied: async (budgetErr) => {
             if (creditsCharged > 0) {
               await userCreditsRef.update({
                 balance: FieldValue.increment(creditsCharged),
@@ -1600,30 +1590,13 @@ export const generationRouter = router({
                 updatedAt: new Date(),
               });
             }
-            await generationsCol()
-              .doc(generationId)
-              .update({
-                status: 'failed',
-                failureReason: budgetErr instanceof Error ? budgetErr.message : 'Budget exceeded',
-                completedAt: new Date(),
-              });
-            if (budgetErr instanceof ProviderPausedError) {
-              throw new TRPCError({
-                code: 'FORBIDDEN',
-                message: budgetErr.message,
-                cause: budgetErr,
-              });
-            }
-            if (budgetErr instanceof CostCapExceededError) {
-              throw new TRPCError({
-                code: 'TOO_MANY_REQUESTS',
-                message: budgetErr.message,
-                cause: budgetErr,
-              });
-            }
-            throw budgetErr;
-          }
-        }
+            await generationsCol().doc(generationId).update({
+              status: 'failed',
+              failureReason: budgetErr.message,
+              completedAt: new Date(),
+            });
+          },
+        });
 
         // Async queue-based generation: return immediately, client uses SSE to watch progress
         try {
@@ -3018,9 +2991,7 @@ async function attemptFallback(
     } catch (err) {
       console.error(`Fallback ${candidate.id} also failed:`, err);
       // A budget/kill-switch refusal says nothing about the provider's health.
-      const refused =
-        err instanceof TRPCError && ['FORBIDDEN', 'TOO_MANY_REQUESTS'].includes(err.code);
-      if (!refused) markProviderUnhealthy(candidate.provider);
+      if (!isBudgetRefusal(err)) markProviderUnhealthy(candidate.provider);
     }
   }
 
