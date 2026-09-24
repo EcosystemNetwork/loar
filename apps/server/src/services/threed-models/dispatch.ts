@@ -12,7 +12,7 @@ import { resolveProviderKey } from '../../lib/byok';
 import { withProviderRateLimit } from '../../lib/rate-limit';
 import {
   recordProviderCost,
-  assertProviderAllowed,
+  withSpendHold,
   assertCostCeiling,
   type CostProvider,
 } from '../cost-tracker';
@@ -117,19 +117,25 @@ export async function dispatchThreed(input: ThreedDispatchInput): Promise<Threed
     });
   }
 
-  // Admin kill-switch + platform cost-cap preflight.
-  await assertProviderAllowed({ provider: threedCostProviderFor(model.provider) });
-
   // Per-call cost ceiling — refuse if MAX_THREED_CALL_USD is set and exceeded.
   assertCostCeiling('threed_gen', model.providerCostUsd);
 
-  // Per-provider concurrency gate around the actual dispatch + cost record.
-  const startedAt = Date.now();
-  const result = await withProviderRateLimit(threedCostProviderFor(model.provider), () =>
-    dispatchThreedInner(model, input)
+  // Admin kill-switch + HARD cost-cap reservation. 3D jobs run for minutes,
+  // which is exactly the window where concurrent calls used to all slip under
+  // a cap none of them had consumed yet. Released after the cost is recorded.
+  const costProvider = threedCostProviderFor(model.provider);
+  return withSpendHold(
+    { provider: costProvider, estimatedUsd: model.providerCostUsd },
+    async () => {
+      // Per-provider concurrency gate around the actual dispatch + cost record.
+      const startedAt = Date.now();
+      const result = await withProviderRateLimit(costProvider, () =>
+        dispatchThreedInner(model, input)
+      );
+      await recordThreedDispatchCost(model, Date.now() - startedAt);
+      return result;
+    }
   );
-  await recordThreedDispatchCost(model, Date.now() - startedAt);
-  return result;
 }
 
 async function dispatchThreedInner(

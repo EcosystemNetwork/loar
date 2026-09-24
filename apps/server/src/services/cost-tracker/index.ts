@@ -54,6 +54,8 @@ export {
   setControls,
   invalidateControlsCache,
   assertProviderAllowed,
+  reserveProviderBudget,
+  withSpendHold,
   assertCostCeiling,
   getPerCallCeilings,
   ProviderPausedError,
@@ -61,7 +63,7 @@ export {
   CostCeilingExceededError,
   DEFAULT_CONTROLS,
 } from './controls';
-export type { CostControls, AssertArgs } from './controls';
+export type { CostControls, AssertArgs, ReserveArgs, SpendHold } from './controls';
 
 // Alerts
 export {

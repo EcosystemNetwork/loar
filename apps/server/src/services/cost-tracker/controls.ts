@@ -34,10 +34,14 @@ export class CostCapExceededError extends Error {
   constructor(
     readonly scope: 'platform' | 'user' | 'apiKey' | 'universe',
     readonly capUsd: number,
-    readonly spentUsd: number
+    readonly spentUsd: number,
+    /** Set when a reservation was refused: the estimated cost of the call that didn't fit. */
+    readonly attemptedUsd?: number
   ) {
     super(
-      `Cost cap exceeded for scope=${scope}: spent $${spentUsd.toFixed(4)} of $${capUsd.toFixed(2)} daily cap`
+      attemptedUsd !== undefined
+        ? `Cost cap exceeded for scope=${scope}: $${spentUsd.toFixed(4)} of $${capUsd.toFixed(2)} daily cap is spent or reserved, and this call needs ~$${attemptedUsd.toFixed(4)}`
+        : `Cost cap exceeded for scope=${scope}: spent $${spentUsd.toFixed(4)} of $${capUsd.toFixed(2)} daily cap`
     );
   }
 }
@@ -381,24 +385,19 @@ export interface AssertArgs {
  *
  * Cap semantics — IMPORTANT for ops:
  *
- *   - **Caps are SOFT LIMITS, not hard quotas.** This function runs preflight
- *     against the eventually-consistent `costAggregates` doc. Under burst
- *     load the same "spent" value is observed by many concurrent callers
- *     before any of them increments the aggregate, so all of them pass and
- *     the daily total can exceed the cap.
- *   - **A single call can exceed the cap.** If cap=$5 and current spend=$0,
- *     a $10 video-gen call passes preflight and is billed in full.
- *   - **Read errors fail OPEN.** If Firestore is unreachable while reading
- *     the aggregate, `readAggregate` returns 0 so we don't block all paid
- *     calls during a Firestore outage. Trade-off: during outages, caps are
- *     unenforced.
- *   - **Multi-instance pause has up to 30s lag.** The controls doc is cached
- *     in-process for COST_CONTROLS_CACHE_MS. Calling `setControls()` only
- *     invalidates the calling instance — other instances see the old
- *     `pausedProviders` list until their cache expires.
+ *   - **This check is soft.** It compares *already-recorded* spend to the cap,
+ *     and spend is only recorded once the paid call finishes. Concurrent
+ *     calls all pass while an earlier one is still in flight, and one call
+ *     can exceed the cap by its whole cost. Spend reads come from the atomic
+ *     Redis counter (see redis-spend.ts), so the read itself is not stale.
+ *   - **Read errors fail OPEN.** If both Redis and Firestore are unreachable
+ *     `readAggregate` returns 0 so an outage doesn't block every paid call.
+ *   - Pause/cap edits reach other instances immediately via the Redis
+ *     invalidation channel (`setControls` -> `publishInvalidate`); the
+ *     in-process cache TTL is only the fallback if that publish is lost.
  *
- * For hard reservations / atomic compare-and-decrement, see the per-user
- * Redis-backed budget reserve (not implemented at this layer).
+ * For a HARD cap use `reserveProviderBudget` / `withSpendHold` below: it books
+ * the call's estimated cost atomically before the call goes out.
  */
 export async function assertProviderAllowed(args: AssertArgs): Promise<void> {
   const controls = await getControls();
@@ -446,5 +445,114 @@ export async function assertProviderAllowed(args: AssertArgs): Promise<void> {
       const spent = await readAggregate('universe', uni);
       if (spent >= cap) throw new CostCapExceededError('universe', cap, spent);
     }
+  }
+}
+
+// ── Hard budget reservation ───────────────────────────────────────────
+
+/** A booked slice of today's budget. Release it after the call's actual cost is recorded. */
+export interface SpendHold {
+  /** Idempotent; safe to call more than once. */
+  release(): Promise<void>;
+}
+
+export interface ReserveArgs extends AssertArgs {
+  /** Modeled cost of the call about to be made. Must be > 0 to reserve anything. */
+  estimatedUsd: number;
+  /** Safety expiry for the hold in seconds (crashed callers). Default 15 min. */
+  holdTtlSec?: number;
+}
+
+/**
+ * Every scope cap that applies to the current cost scope, as reservation
+ * targets. Mirrors the per-scope resolution in `assertProviderAllowed`
+ * (override -> default); keep the two in step.
+ */
+function applicableCaps(controls: CostControls, scope: ReturnType<typeof getCostScope>) {
+  const out: Array<{ scope: string; key: string; capUsd: number }> = [];
+  const platform = controls.caps.platformDailyUsd;
+  if (platform && platform > 0) out.push({ scope: 'platform', key: 'all', capUsd: platform });
+  const scoped: Array<[string, string | null | undefined, Record<string, number>, number | null]> =
+    [
+      ['user', scope.userId, controls.overrides.userDailyUsd, controls.caps.userDailyUsd],
+      ['apiKey', scope.apiKeyId, controls.overrides.apiKeyDailyUsd, controls.caps.apiKeyDailyUsd],
+      [
+        'universe',
+        scope.universeAddress,
+        controls.overrides.universeDailyUsd,
+        controls.caps.universeDailyUsd,
+      ],
+    ];
+  for (const [name, id, overrides, def] of scoped) {
+    if (!id) continue;
+    const cap = overrides[id] ?? def;
+    if (cap && cap > 0) out.push({ scope: name, key: id, capUsd: cap });
+  }
+  return out;
+}
+
+/**
+ * Hard version of `assertProviderAllowed`: after the kill-switch check, books
+ * `estimatedUsd` against every applicable cap in ONE atomic Redis script.
+ * Throws `CostCapExceededError` if `spent + already-reserved + estimate` would
+ * exceed any cap — so concurrent calls can no longer all slip under a cap
+ * that only the first of them has consumed, and a single call bigger than the
+ * remaining budget is refused up-front.
+ *
+ * Returns `null` when nothing needed reserving: no estimate, no caps
+ * configured, or Redis unavailable (then it degrades to the soft
+ * `assertProviderAllowed` check — never harder than before).
+ *
+ * The caller MUST release the hold once the actual cost is recorded; prefer
+ * `withSpendHold`, which does it in a `finally`.
+ */
+export async function reserveProviderBudget(args: ReserveArgs): Promise<SpendHold | null> {
+  const controls = await getControls();
+  if (controls.pausedProviders.includes(args.provider)) {
+    throw new ProviderPausedError(args.provider);
+  }
+  const targets = args.estimatedUsd > 0 ? applicableCaps(controls, getCostScope()) : [];
+  if (targets.length === 0) {
+    await assertProviderAllowed(args);
+    return null;
+  }
+
+  const { reserveRedisSpend, releaseRedisHold } = await import('./redis-spend');
+  const outcome = await reserveRedisSpend(targets, args.estimatedUsd, args.holdTtlSec);
+  if (outcome.status === 'denied') {
+    throw new CostCapExceededError(
+      outcome.scope as 'platform' | 'user' | 'apiKey' | 'universe',
+      outcome.capUsd,
+      outcome.committedUsd,
+      args.estimatedUsd
+    );
+  }
+  if (outcome.status === 'unavailable') {
+    await assertProviderAllowed(args);
+    return null;
+  }
+
+  let released = false;
+  return {
+    async release() {
+      if (released) return;
+      released = true;
+      await releaseRedisHold(outcome.hold);
+    },
+  };
+}
+
+/**
+ * Run `fn` under a budget hold: reserve, run, always release. Record the
+ * call's actual cost (`recordProviderCost`) INSIDE `fn` so the spent counter
+ * has the real figure before the hold drops — the brief overlap over-counts
+ * (safe) rather than under-counts.
+ */
+export async function withSpendHold<T>(args: ReserveArgs, fn: () => Promise<T>): Promise<T> {
+  const hold = await reserveProviderBudget(args);
+  try {
+    return await fn();
+  } finally {
+    await hold?.release();
   }
 }

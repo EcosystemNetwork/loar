@@ -18,7 +18,7 @@ import { withProviderRateLimit } from '../../lib/rate-limit';
 import { sanitizePrompt } from '../../lib/prompt-sanitize';
 import {
   recordProviderCost,
-  assertProviderAllowed,
+  withSpendHold,
   assertCostCeiling,
   type CostProvider,
 } from '../cost-tracker';
@@ -178,21 +178,25 @@ export async function dispatchTts(input: TtsDispatchInput): Promise<TtsDispatchR
     instructions: input.instructions ? sanitizePrompt(input.instructions) : undefined,
   };
 
-  // Kill-switch + platform cost-cap preflight. Throws ProviderPausedError /
-  // CostCapExceededError before we burn a real call.
-  await assertProviderAllowed({ provider: ttsCostProviderFor(model.provider) });
-
   // Per-call cost ceiling — refuse if MAX_AUDIO_CALL_USD is set and exceeded.
   const charCount = sanitized.text.length;
-  assertCostCeiling('audio_gen', computeTtsCostUsd(model, charCount));
+  const estimatedUsd = computeTtsCostUsd(model, charCount);
+  assertCostCeiling('audio_gen', estimatedUsd);
 
-  // Per-provider concurrency gate.
-  const startedAt = Date.now();
-  const result = await withProviderRateLimit(ttsCostProviderFor(model.provider), () =>
-    dispatchTtsInner(model, sanitized)
-  );
-  await recordTtsDispatchCost(model, charCount, Date.now() - startedAt);
-  return result;
+  // Kill-switch + HARD cost-cap reservation: books the estimated cost against
+  // every applicable daily cap before the call goes out, throwing
+  // ProviderPausedError / CostCapExceededError if it doesn't fit. The hold is
+  // released after the actual cost is recorded.
+  const costProvider = ttsCostProviderFor(model.provider);
+  return withSpendHold({ provider: costProvider, estimatedUsd }, async () => {
+    // Per-provider concurrency gate.
+    const startedAt = Date.now();
+    const result = await withProviderRateLimit(costProvider, () =>
+      dispatchTtsInner(model, sanitized)
+    );
+    await recordTtsDispatchCost(model, charCount, Date.now() - startedAt);
+    return result;
+  });
 }
 
 async function dispatchTtsInner(
