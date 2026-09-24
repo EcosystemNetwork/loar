@@ -17,7 +17,9 @@ import { EmptyState } from '../../src/components/ui/EmptyState';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { SectionHeader } from '../../src/components/ui/SectionHeader';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { trpc } from '../../src/lib/trpc';
+import { trpc, type RouterOutputs } from '../../src/lib/trpc';
+
+type Onchain = RouterOutputs['revenue']['getOnchainBalances'];
 
 export default function TokensScreen() {
   const router = useRouter();
@@ -37,8 +39,16 @@ export default function TokensScreen() {
       ? universesQuery.data.data
       : ((universesQuery.data ?? []) as any[]);
 
-  // $LOAR platform token (tracked separately — currently placeholder)
-  const loarBalance = '0'; // TODO: query LoarToken contract via indexer
+  // $LOAR platform token — read live from the LoarToken contract (server-side, via
+  // `revenue.getOnchainBalances`; mobile has no EVM stack of its own).
+  const onchainQuery = useQuery(trpc.revenue.getOnchainBalances.queryOptions());
+  const onchain = onchainQuery.data as Onchain | undefined;
+  const loarBalance = onchainQuery.isLoading ? '…' : onchain?.supported ? onchain.loarBalance : '–';
+  const loarSubtitle = onchainQuery.isError
+    ? 'Balance unavailable — pull to retry'
+    : onchain && !onchain.supported
+      ? 'Connect an EVM wallet to see your balance'
+      : 'LOAR governance & utility token';
 
   if (isLoading) return <LoadingSpinner message="Loading tokens…" />;
 
@@ -54,8 +64,11 @@ export default function TokensScreen() {
         }}
         refreshControl={
           <RefreshControl
-            refreshing={universesQuery.isFetching}
-            onRefresh={() => universesQuery.refetch()}
+            refreshing={universesQuery.isFetching || onchainQuery.isRefetching}
+            onRefresh={() => {
+              void universesQuery.refetch();
+              void onchainQuery.refetch();
+            }}
             tintColor="#7c3aed"
           />
         }
@@ -64,12 +77,7 @@ export default function TokensScreen() {
         <View>
           <SectionHeader title="Platform Token" />
           <View className="bg-card rounded-2xl border border-border px-4">
-            <AssetRow
-              icon="⬡"
-              label="$LOAR"
-              subtitle="LOAR governance & utility token"
-              value={loarBalance === '0' ? '–' : loarBalance}
-            />
+            <AssetRow icon="⬡" label="$LOAR" subtitle={loarSubtitle} value={loarBalance} />
           </View>
         </View>
 
@@ -105,9 +113,8 @@ export default function TokensScreen() {
         <View className="bg-zinc-900 rounded-2xl p-4 gap-2">
           <Text className="text-text-primary font-semibold text-sm">On-Chain Token Balances</Text>
           <Text className="text-text-tertiary text-xs leading-relaxed">
-            Token balances are read directly from the Sepolia blockchain. Make sure your wallet is
-            connected to Sepolia to see accurate holdings. Full balance tracking via the LOAR
-            indexer is coming in the next release.
+            Your $LOAR balance is read directly from the Sepolia blockchain. Per-universe token
+            balances aren't shown yet — each universe below lists its token contract.
           </Text>
         </View>
       </ScrollView>

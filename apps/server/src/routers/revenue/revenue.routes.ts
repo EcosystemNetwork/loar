@@ -11,6 +11,7 @@ import { sepolia } from 'viem/chains';
 import { protectedProcedure, adminProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
 import { FieldValue } from 'firebase-admin/firestore';
+import { isEvmAddress, readOnchainBalances } from '../../services/onchain-balances';
 
 const sepoliaClient = createPublicClient({
   chain: sepolia,
@@ -87,6 +88,26 @@ export const revenueRouter = router({
       bySource,
       recentClaims: claims,
     };
+  }),
+
+  /**
+   * Live on-chain figures for the caller's wallet: what they can claim from
+   * PaymentRouter and their $LOAR balance. `supported: false` when the session
+   * wallet isn't an EVM address (e.g. a Solana wallet) — there is nothing to read.
+   */
+  getOnchainBalances: protectedProcedure.query(async ({ ctx }) => {
+    const address = ctx.user.address;
+    if (!isEvmAddress(address)) return { supported: false as const };
+    try {
+      const balances = await readOnchainBalances(sepoliaClient, address);
+      return { supported: true as const, address, ...balances };
+    } catch (err) {
+      console.error('[revenue.getOnchainBalances] chain read failed:', err);
+      throw new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Could not read on-chain balances right now. Please retry shortly.',
+      });
+    }
   }),
 
   /** Get historical revenue data for charts */

@@ -1,13 +1,14 @@
 /**
  * Earnings tab — aggregate revenue across all monetization channels.
  *
- * Categories from PRD:
- *   - NFT sales
- *   - Appearance royalties
- *   - Subscriptions received
- *   - Canon rewards
- *   - Ads
- *   - Licensing / merch
+ * Everything here is live:
+ *   - all-time total + per-channel breakdown → `revenueDashboard.summary`
+ *   - per-universe revenue                   → `revenueDashboard.byUniverse`
+ *   - pending payout (claimable ETH / $LOAR) → `revenue.getOnchainBalances`,
+ *     read straight from the PaymentRouter contract on Sepolia
+ *
+ * Channels the server doesn't track a figure for (e.g. appearance royalties)
+ * are not listed, rather than shown as a made-up zero.
  */
 import { useQuery } from '@tanstack/react-query';
 import React from 'react';
@@ -16,50 +17,93 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AssetRow } from '../../src/components/portfolio/AssetRow';
 import { StatCard } from '../../src/components/ui/StatCard';
 import { SectionHeader } from '../../src/components/ui/SectionHeader';
-import { useAuth } from '../../src/contexts/AuthContext';
-import { trpc } from '../../src/lib/trpc';
+import { trpc, type RouterOutputs } from '../../src/lib/trpc';
+
+type Summary = RouterOutputs['revenueDashboard']['summary'];
+type ByUniverse = RouterOutputs['revenueDashboard']['byUniverse'];
+type Onchain = RouterOutputs['revenue']['getOnchainBalances'];
 
 interface EarningsCategory {
   icon: string;
   label: string;
-  amount: number;
   desc: string;
+  amount: number;
+}
+
+const usd = (n: number) => `$${n.toFixed(2)}`;
+
+/** The channels `revenueDashboard.summary` reports a figure for. */
+function categoriesFrom(summary: Summary | undefined): EarningsCategory[] {
+  const by = summary?.revenueBySource;
+  return [
+    {
+      icon: '🎬',
+      label: 'NFT Sales',
+      desc: 'Episode & character NFT sales',
+      amount: by?.nftSales ?? 0,
+    },
+    {
+      icon: '⚖️',
+      label: 'Canon Marketplace',
+      desc: 'Canon marketplace sales',
+      amount: by?.canonMarketplace ?? 0,
+    },
+    {
+      icon: '🔁',
+      label: 'Subscriptions',
+      desc: 'Universe subscription revenue',
+      amount: by?.subscriptions ?? 0,
+    },
+    { icon: '📢', label: 'Ad Revenue', desc: 'Sponsored content placements', amount: by?.ads ?? 0 },
+    {
+      icon: '📜',
+      label: 'Licensing',
+      desc: 'IP licensing & merch deals',
+      amount: by?.licensing ?? 0,
+    },
+  ];
+}
+
+function pendingPayout(query: { data?: Onchain; isLoading: boolean; isError: boolean }) {
+  if (query.isLoading) return { value: '…', subtitle: 'reading chain' };
+  if (query.isError) return { value: '—', subtitle: 'unavailable — pull to retry' };
+  const d = query.data;
+  if (!d || !d.supported) return { value: '—', subtitle: 'EVM wallet required' };
+  const loar = d.claimableLoar !== '0' ? ` · ${d.claimableLoar} LOAR` : '';
+  return { value: `${d.claimableEth} ETH`, subtitle: `claimable${loar}` };
 }
 
 export default function EarningsScreen() {
-  const { address } = useAuth();
+  const summaryQuery = useQuery(trpc.revenueDashboard.summary.queryOptions({ period: 'all' }));
+  const byUniverseQuery = useQuery(trpc.revenueDashboard.byUniverse.queryOptions({}));
+  const onchainQuery = useQuery(trpc.revenue.getOnchainBalances.queryOptions());
 
-  // Pull subscription revenue (subscriptionRevenue collection filtered to creator)
-  // Using existing subscription stats for universes the user created
-  const universesQuery = useQuery(
-    trpc.universes.getByCreator.queryOptions(
-      { creator: address ?? '' },
-      { enabled: Boolean(address) }
-    )
+  const summary = summaryQuery.data as Summary | undefined;
+  const universes = ((byUniverseQuery.data as ByUniverse | undefined)?.universes ?? []).filter(
+    (u) => u.totalRevenue > 0 || u.subscribers > 0 || u.holders > 0
   );
+  const categories = categoriesFrom(summary);
+  const payout = pendingPayout({
+    data: onchainQuery.data as Onchain | undefined,
+    isLoading: onchainQuery.isLoading,
+    isError: onchainQuery.isError,
+  });
 
-  const universes =
-    universesQuery.data && !Array.isArray(universesQuery.data)
-      ? universesQuery.data.data
-      : ((universesQuery.data ?? []) as any[]);
+  const refreshing =
+    summaryQuery.isRefetching || byUniverseQuery.isRefetching || onchainQuery.isRefetching;
+  const refetchAll = () => {
+    void summaryQuery.refetch();
+    void byUniverseQuery.refetch();
+    void onchainQuery.refetch();
+  };
 
-  // Aggregate subscription stats per universe
-  const subStatsQueries = universes
-    .slice(0, 5)
-    .map((u: any) => trpc.subscriptions.getUniverseStats.queryOptions({ universeId: u.id }));
-
-  // Placeholder breakdowns — these will be populated as monetization backends mature
-  const categories: EarningsCategory[] = [
-    { icon: '🎬', label: 'NFT Sales', amount: 0, desc: 'Episode & character NFT sales' },
-    { icon: '👑', label: 'Royalties', amount: 0, desc: 'Appearance & derivative royalties' },
-    { icon: '🔁', label: 'Subscriptions', amount: 0, desc: 'Universe subscription revenue' },
-    { icon: '⚖️', label: 'Canon Rewards', amount: 0, desc: 'Accepted canon submissions' },
-    { icon: '📢', label: 'Ad Revenue', amount: 0, desc: 'Sponsored content placements' },
-    { icon: '📜', label: 'Licensing', amount: 0, desc: 'IP licensing & merch deals' },
-  ];
-
-  const totalEarnings = categories.reduce((s, c) => s + c.amount, 0);
-  const pendingPayout = 0; // TODO: claimable balance from contracts
+  const totalValue = summaryQuery.isLoading
+    ? '…'
+    : summary
+      ? usd(summary.totalRevenue)
+      : summaryQuery.isError
+        ? '—'
+        : usd(0);
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['bottom']}>
@@ -72,27 +116,27 @@ export default function EarningsScreen() {
           gap: 24,
         }}
         refreshControl={
-          <RefreshControl
-            refreshing={universesQuery.isFetching}
-            onRefresh={() => universesQuery.refetch()}
-            tintColor="#7c3aed"
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={refetchAll} tintColor="#7c3aed" />
         }
       >
         {/* Summary row */}
         <View className="flex-row gap-3">
-          <StatCard
-            label="All-Time Earnings"
-            value={`$${totalEarnings.toFixed(2)}`}
-            accent="text-warning"
-          />
+          <StatCard label="All-Time Earnings" value={totalValue} accent="text-warning" />
           <StatCard
             label="Pending Payout"
-            value={`$${pendingPayout.toFixed(2)}`}
-            subtitle="claimable"
+            value={payout.value}
+            subtitle={payout.subtitle}
             accent="text-success"
           />
         </View>
+
+        {summaryQuery.isError ? (
+          <View className="bg-zinc-900 rounded-2xl p-4">
+            <Text className="text-text-tertiary text-xs">
+              Couldn't load your earnings. Pull down to retry.
+            </Text>
+          </View>
+        ) : null}
 
         {/* Breakdown by category */}
         <View>
@@ -104,24 +148,24 @@ export default function EarningsScreen() {
                 icon={cat.icon}
                 label={cat.label}
                 subtitle={cat.desc}
-                value={cat.amount > 0 ? `$${cat.amount.toFixed(2)}` : '—'}
+                value={cat.amount > 0 ? usd(cat.amount) : '—'}
               />
             ))}
           </View>
         </View>
 
-        {/* Universes with revenue potential */}
+        {/* Universes that have earned or have an audience */}
         {universes.length > 0 ? (
           <View>
             <SectionHeader title="Earning Universes" count={universes.length} />
             <View className="bg-card rounded-2xl border border-border px-4">
-              {universes.map((u: any) => (
+              {universes.map((u) => (
                 <AssetRow
-                  key={u.id}
+                  key={u.universeAddress}
                   icon="🌌"
-                  label={u.name ?? u.description?.slice(0, 28) ?? 'Universe'}
-                  subtitle="Active revenue channels"
-                  value="—"
+                  label={u.universeName}
+                  subtitle={`${u.subscribers} subscribers · ${u.holders} holders`}
+                  value={u.totalRevenue > 0 ? usd(u.totalRevenue) : '—'}
                 />
               ))}
             </View>
@@ -130,11 +174,13 @@ export default function EarningsScreen() {
 
         {/* Info */}
         <View className="bg-zinc-900 rounded-2xl p-4 gap-2">
-          <Text className="text-text-primary font-semibold text-sm">Earnings Aggregation</Text>
+          <Text className="text-text-primary font-semibold text-sm">
+            Where these numbers come from
+          </Text>
           <Text className="text-text-tertiary text-xs leading-relaxed">
-            On-chain revenue (NFT royalties, canon rewards, subscription payments) requires the LOAR
-            indexer to index your universes. Off-chain revenue (ad placements, licensing deals) is
-            tracked in the LOAR server.
+            Earnings are the sales, subscriptions, ad and licensing revenue recorded by the LOAR
+            server. Pending payout is read live from the PaymentRouter contract on Sepolia — it is
+            what you can claim on-chain right now.
           </Text>
         </View>
       </ScrollView>
