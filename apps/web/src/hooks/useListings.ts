@@ -3,6 +3,7 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
+import { useWalletAuth } from '@/lib/wallet-auth';
 
 export function useListingsBrowse(
   filters: {
@@ -31,9 +32,12 @@ export function useListing(listingId: string) {
 export function useMyListings(
   status: 'ALL' | 'ACTIVE' | 'DRAFT' | 'SOLD_OUT' | 'DELISTED' = 'ALL'
 ) {
+  // protectedProcedure — don't fire (and 401) for signed-out visitors.
+  const { isAuthenticated, sessionReady } = useWalletAuth();
   return useQuery({
     queryKey: ['my-listings', status],
     queryFn: () => trpcClient.listings.myListings.query({ status }),
+    enabled: sessionReady && isAuthenticated,
   });
 }
 

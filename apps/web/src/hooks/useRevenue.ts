@@ -144,9 +144,12 @@ export function useSubscriptionTiers(universeId: string) {
 }
 
 export function useMySubscriptions() {
+  // protectedProcedure — don't fire (and 401) for signed-out visitors.
+  const { isAuthenticated, sessionReady } = useWalletAuth();
   return useQuery({
     queryKey: ['my-subs'],
     queryFn: () => trpcClient.subscriptions.mySubscriptions.query(),
+    enabled: sessionReady && isAuthenticated,
   });
 }
 
