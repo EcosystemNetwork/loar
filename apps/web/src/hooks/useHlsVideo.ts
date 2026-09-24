@@ -1,5 +1,5 @@
 import { useEffect, type RefObject } from 'react';
-import Hls from 'hls.js';
+import type HlsType from 'hls.js';
 
 /**
  * Attach an HLS manifest to a `<video>` element. For browsers that natively
@@ -30,32 +30,41 @@ export function useHlsVideo(
       return;
     }
 
-    // Other browsers: use Media Source Extensions via hls.js.
-    if (!Hls.isSupported()) {
-      // Last-resort: try setting the src anyway. Some browsers will refuse;
-      // the <video> element's onError will surface the failure.
-      video.src = src;
-      return;
-    }
+    // Other browsers: use Media Source Extensions via hls.js. Loaded on demand —
+    // it is ~130KB gzip and only this branch (non-Safari + an .m3u8) needs it.
+    let cancelled = false;
+    let hls: HlsType | undefined;
 
-    const hls = new Hls({
-      // Conservative defaults tuned for IPFS-served playlists where segment
-      // RTT can spike. Hls.js's defaults assume a CDN.
-      maxBufferLength: 30,
-      maxMaxBufferLength: 60,
-      lowLatencyMode: false,
-      backBufferLength: 30,
-      // Let hls.js do its own ABR picking — start at the lowest rendition so
-      // first-frame is fast, then ramp.
-      startLevel: 0,
+    void import('hls.js').then(({ default: Hls }) => {
+      if (cancelled) return;
+
+      if (!Hls.isSupported()) {
+        // Last-resort: try setting the src anyway. Some browsers will refuse;
+        // the <video> element's onError will surface the failure.
+        video.src = src;
+        return;
+      }
+
+      hls = new Hls({
+        // Conservative defaults tuned for IPFS-served playlists where segment
+        // RTT can spike. Hls.js's defaults assume a CDN.
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        lowLatencyMode: false,
+        backBufferLength: 30,
+        // Let hls.js do its own ABR picking — start at the lowest rendition so
+        // first-frame is fast, then ramp.
+        startLevel: 0,
+      });
+
+      hls.loadSource(src);
+      hls.attachMedia(video);
     });
 
-    hls.loadSource(src);
-    hls.attachMedia(video);
-
     return () => {
+      cancelled = true;
       try {
-        hls.destroy();
+        hls?.destroy();
       } catch {
         /* ignore */
       }

@@ -181,8 +181,10 @@ export default defineConfig({
             if (id.includes('@safe-global')) {
               return 'safe';
             }
-            // Media libs — pure non-React, used only on viewer routes.
-            if (id.includes('/hls.js/') || id.includes('/wavesurfer.js/')) {
+            // Waveform lib — pure non-React, used only by the voice studio.
+            // (hls.js is dynamically imported by useHlsVideo, so it splits on
+            // its own; lumping it in here made the voice studio pay for it.)
+            if (id.includes('/wavesurfer.js/')) {
               return 'media';
             }
             // Sentry — initialized once at boot but shouldn't bloat the
