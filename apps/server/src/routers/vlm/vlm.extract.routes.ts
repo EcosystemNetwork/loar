@@ -35,7 +35,7 @@ export const vlmExtractRouter = router({
     .input(
       z.object({
         mediaUrl: z.string().url(),
-        assetType: z.enum(['video', 'image']).default('video'),
+        assetType: z.enum(['video', 'image', 'audio']).default('video'),
         mimeType: z.string().optional(),
         contentId: z.string().optional(),
         generationId: z.string().optional(),

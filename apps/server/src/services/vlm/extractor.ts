@@ -74,9 +74,6 @@ export async function runExtraction({
   input,
   creatorUid,
 }: ExtractorArgs): Promise<ExtractorResultBundle> {
-  if (input.assetType === 'audio') {
-    throw new Error('Audio-only extraction is not implemented; convert via transcription first.');
-  }
   if (!firebaseAvailable) {
     throw new Error('Firestore is required for VLM extraction');
   }
@@ -119,6 +116,7 @@ export async function runExtraction({
     universeName: universeDoc,
     priorEntities,
     userNotes: (input.options as any)?.userNotes,
+    assetType: input.assetType,
   });
 
   const { data: output, cost } = await callJson<ExtractionOutput>({

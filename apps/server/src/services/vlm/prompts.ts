@@ -63,11 +63,21 @@ const EXTRACTION_SCHEMA_BLOCK = `{
   ]
 }`;
 
+/** Replaces the video/image framing when the asset is audio-only (dialogue, score, ambience). */
+const AUDIO_EXTRACTION_RULES = `AUDIO-ONLY ASSET — there is nothing to see, so:
+- "scenes" are time-coded audio segments (a speaker's line, a musical passage, an ambient stretch); startSec/endSec must match what you hear.
+- In each scene, "description" says what is heard; quote dialogue only when clearly audible. Leave "shotType" and "location" out unless the audio itself states a place.
+- "subjects" are speakers/voices/instruments; "actions" are what they say or do (e.g. "argues about the treaty").
+- Entities come from what is named or clearly described in the audio. Never guess a speaker's identity from their voice alone.
+- Visual risk kinds (nsfw, violence, copyright_logo, watermark, ocr_credits, franchise_lookalike) cannot apply — return "risks": [] unless spoken/sung content clearly matches copyright_character.`;
+
 export function buildExtractionPrompt(input: {
   universeName?: string;
   priorEntities?: Array<{ name: string; kind: string; description: string }>;
   userNotes?: string;
+  assetType?: 'video' | 'image' | 'audio';
 }): string {
+  const isAudio = input.assetType === 'audio';
   const prior = input.priorEntities?.length
     ? `\n\nEXISTING CANON ENTITIES (prefer reusing these names when you recognize them):\n${input.priorEntities
         .slice(0, 40)
@@ -77,10 +87,10 @@ export function buildExtractionPrompt(input: {
   const universe = input.universeName ? `\nUNIVERSE: ${input.universeName}` : '';
   const notes = input.userNotes ? `\nCREATOR NOTES: ${input.userNotes}` : '';
 
-  return `You are a structured video/image analyst for a worldbuilding platform.
-Your job is to watch the asset and produce strict JSON — no prose, no markdown.
+  return `You are a structured ${isAudio ? 'audio' : 'video/image'} analyst for a worldbuilding platform.
+Your job is to ${isAudio ? 'listen to' : 'watch'} the asset and produce strict JSON — no prose, no markdown.
 ${universe}${notes}${prior}
-
+${isAudio ? `\n${AUDIO_EXTRACTION_RULES}\n` : ''}
 RULES:
 - Describe ONLY what is visible or audible. Never invent names, dialogue, or events.
 - Timestamps must reflect what you actually observe.
