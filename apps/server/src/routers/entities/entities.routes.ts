@@ -24,7 +24,7 @@ import {
   CHARACTER_FIELDS,
   CHARACTER_FIELD_KEYS,
   buildCharacterProfile,
-  isFilled,
+  readField,
   mergeGeneratedFields,
 } from './entities.character-profile';
 import { getAttachmentsByTarget } from '../media/media.handlers';
@@ -744,11 +744,13 @@ export const entitiesRouter = router({
         throw new Error('Forbidden: only the entity creator can update it');
       }
       const current = existing.metadata ?? {};
-      const missing = CHARACTER_FIELD_KEYS.filter((k) => !isFilled(current[k]));
+      const missing = CHARACTER_FIELDS.filter((f) => readField(current, f) === '').map(
+        (f) => f.key
+      );
       if (missing.length === 0) return { added: [] as string[], entity: existing };
 
-      const known = CHARACTER_FIELDS.filter((f) => isFilled(current[f.key]))
-        .map((f) => `${f.label}: ${String(current[f.key]).trim()}`)
+      const known = CHARACTER_FIELDS.filter((f) => readField(current, f) !== '')
+        .map((f) => `${f.label}: ${readField(current, f)}`)
         .join('\n');
       const hint = [existing.description, known].filter(Boolean).join('\n\n');
 

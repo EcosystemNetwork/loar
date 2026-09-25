@@ -20,6 +20,8 @@ export interface CharacterField {
   hint: string;
   /** Long-form prose vs. a short line. */
   long?: boolean;
+  /** Older / seeded metadata keys that mean the same thing — read as fallbacks. */
+  legacyKeys?: string[];
 }
 
 export interface CharacterSection {
@@ -39,6 +41,7 @@ export const CHARACTER_PROFILE_SECTIONS: CharacterSection[] = [
       {
         key: 'ancestry',
         label: 'Species / Ancestry',
+        legacyKeys: ['species'],
         hint: 'What they are and where they come from',
       },
       {
@@ -59,7 +62,12 @@ export const CHARACTER_PROFILE_SECTIONS: CharacterSection[] = [
         label: 'Distinguishing Features',
         hint: 'Scars, tells, silhouette, signature colors',
       },
-      { key: 'outfit', label: 'Signature Outfit & Gear', hint: 'What they wear and carry' },
+      {
+        key: 'outfit',
+        label: 'Signature Outfit & Gear',
+        legacyKeys: ['signatureOutfit'],
+        hint: 'What they wear and carry',
+      },
     ],
   },
   {
@@ -77,6 +85,7 @@ export const CHARACTER_PROFILE_SECTIONS: CharacterSection[] = [
       {
         key: 'speechStyle',
         label: 'Voice & Speech Style',
+        legacyKeys: ['voice'],
         hint: 'How they talk; a signature line',
       },
     ],
@@ -128,6 +137,24 @@ export function isFilled(value: unknown): boolean {
   if (value === null || value === undefined) return false;
   const text = String(value).trim();
   return text.length > 0 && !/^[-–—?.]+$/.test(text);
+}
+
+/** The value of a field, falling back to its legacy keys. Empty string when unset. */
+export function readField(md: Record<string, unknown>, field: CharacterField): string {
+  for (const k of [field.key, ...(field.legacyKeys ?? [])]) {
+    if (isFilled(md[k])) return String(md[k]).trim();
+  }
+  return '';
+}
+
+/** camelCase / snake_case metadata key → "Camel case" label for unknown fields. */
+export function humanizeKey(key: string): string {
+  const spaced = key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .toLowerCase();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
 /** Asset/connection signals gathered by the route; all optional so the builder stays pure. */
@@ -186,15 +213,15 @@ export function buildCharacterProfile(
   signals: CharacterProfileSignals = {}
 ): CharacterProfile {
   const md = (entity.metadata ?? {}) as Record<string, unknown>;
-  const spec = new Set(CHARACTER_FIELD_KEYS);
+  const spec = new Set(CHARACTER_FIELDS.flatMap((f) => [f.key, ...(f.legacyKeys ?? [])]));
 
   const sections = CHARACTER_PROFILE_SECTIONS.map((s) => ({
     id: s.id,
     title: s.title,
     fields: s.fields.map((f) => ({
       ...f,
-      value: isFilled(md[f.key]) ? String(md[f.key]).trim() : '',
-      filled: isFilled(md[f.key]),
+      value: readField(md, f),
+      filled: readField(md, f) !== '',
     })),
   }));
 
@@ -204,7 +231,7 @@ export function buildCharacterProfile(
 
   const extra = Object.entries(md)
     .filter(([k, v]) => !spec.has(k) && !NON_DISPLAY_KEYS.has(k) && isFilled(v))
-    .map(([key, v]) => ({ key, value: String(v) }));
+    .map(([key, v]) => ({ key: humanizeKey(key), value: String(v) }));
 
   const relationCount = signals.relationCount ?? 0;
   const mediaCount = signals.mediaCount ?? 0;
@@ -255,9 +282,10 @@ export function mergeGeneratedFields(
 ): { metadata: Record<string, unknown>; added: string[] } {
   const metadata = { ...existing };
   const added: string[] = [];
-  const spec = new Set(CHARACTER_FIELD_KEYS);
+  const byKey = new Map(CHARACTER_FIELDS.map((f) => [f.key, f]));
   for (const [key, value] of Object.entries(generated)) {
-    if (!spec.has(key) || isFilled(existing[key]) || !isFilled(value)) continue;
+    const field = byKey.get(key);
+    if (!field || readField(existing, field) !== '' || !isFilled(value)) continue;
     metadata[key] = String(value).trim().slice(0, 1200);
     added.push(key);
   }

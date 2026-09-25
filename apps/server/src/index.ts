@@ -273,6 +273,12 @@ const { imgResizeRoutes } = await import('./routes/img-resize');
 app.use('/api/img/*', rateLimiter({ windowMs: 60_000, max: 240, name: 'img' }));
 app.route('/api/img', imgResizeRoutes);
 
+// Link-preview pages for social crawlers (Open Graph tags + redirect to the SPA).
+// Public and cheap, but each hit fans out to the indexer, so keep it rate-limited.
+const { shareRoutes } = await import('./routes/share');
+app.use('/share/*', rateLimiter({ windowMs: 60_000, max: 120, name: 'share' }));
+app.route('/share', shareRoutes);
+
 // Admin cost ledger CSV download (admin-address-gated). Lives outside tRPC
 // because tRPC batches JSON — CSV streaming is simpler as a plain REST route.
 const { adminCostRoutes } = await import('./routes/admin-cost');

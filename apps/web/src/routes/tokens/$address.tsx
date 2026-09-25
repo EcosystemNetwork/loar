@@ -76,6 +76,7 @@ import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 import { UniverseStakePanel } from '@/components/UniverseStakePanel';
 import { LPYieldManager } from '@/components/LPYieldManager';
 import { pushRecentToken } from '@/hooks/useRecentTokens';
+import { SERVER_URL } from '@/utils/query-client';
 
 export const Route = createFileRoute('/tokens/$address')({
   validateSearch: (search: Record<string, unknown>): { buy?: string } => ({
@@ -157,7 +158,10 @@ function TokenDetailPage() {
   };
 
   const shareToken = () => {
-    const url = window.location.href;
+    // The server's /share page carries the Open Graph tags (the SPA has none)
+    // and forwards people on to this page, so pasted links unfurl with a preview.
+    const url =
+      SERVER_URL && token ? `${SERVER_URL}/share/token/${token.id}` : window.location.href;
     const text = `Check out $${token?.symbol} on LOAR`;
     if (navigator.share) {
       navigator.share({ title: text, url }).catch(() => {});

@@ -3,6 +3,7 @@ import {
   buildCharacterProfile,
   mergeGeneratedFields,
   isFilled,
+  humanizeKey,
   CHARACTER_FIELD_KEYS,
 } from './entities.character-profile';
 
@@ -49,7 +50,7 @@ describe('buildCharacterProfile', () => {
     const p = buildCharacterProfile(
       person({ catchphrase: 'Again.', modelUrl: 'https://x/y.glb', characterVariants: [] })
     );
-    expect(p.extra).toEqual([{ key: 'catchphrase', value: 'Again.' }]);
+    expect(p.extra).toEqual([{ key: 'Catchphrase', value: 'Again.' }]);
   });
 
   it('derives asset checks from signals, portrait and 3D variants', () => {
@@ -95,5 +96,35 @@ describe('mergeGeneratedFields', () => {
   it('caps runaway generated text', () => {
     const { metadata } = mergeGeneratedFields({}, { backstory: 'a'.repeat(5000) });
     expect((metadata.backstory as string).length).toBe(1200);
+  });
+});
+
+describe('legacy keys', () => {
+  it('counts seeded keys toward the spec field and hides them from extras', () => {
+    const p = buildCharacterProfile(
+      person({
+        species: 'Vacation Bunny',
+        signatureOutfit: 'Navy dress',
+        voice: 'None',
+        eyes: 'Purple',
+      })
+    );
+    const by = Object.fromEntries(p.sections.flatMap((s) => s.fields).map((f) => [f.key, f]));
+    expect(by.ancestry).toMatchObject({ filled: true, value: 'Vacation Bunny' });
+    expect(by.outfit.value).toBe('Navy dress');
+    expect(by.speechStyle.filled).toBe(true);
+    expect(p.extra).toEqual([{ key: 'Eyes', value: 'Purple' }]);
+  });
+  it('does not let AI overwrite a value held under a legacy key', () => {
+    const { metadata, added } = mergeGeneratedFields({ species: 'Bunny' }, { ancestry: 'Robot' });
+    expect(added).toEqual([]);
+    expect(metadata.ancestry).toBeUndefined();
+  });
+});
+
+describe('humanizeKey', () => {
+  it('turns camelCase and snake_case into readable labels', () => {
+    expect(humanizeKey('signatureOutfit')).toBe('Signature outfit');
+    expect(humanizeKey('home_world')).toBe('Home world');
   });
 });
