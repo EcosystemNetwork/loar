@@ -80,6 +80,7 @@ import {
   KIND_LABELS,
   pickRandom,
 } from '@/lib/random-entity';
+import { FIELDS_BY_KIND } from '@/lib/entity-kind-fields';
 
 /** World-entity kinds the console can roll. A deliberate subset of the full
  *  entity ontology — structural kinds stay on the `/create/$kind` forms. */
@@ -352,6 +353,9 @@ export function GenerateConsole({
   // A non-null worldKind takes over from the media `mode`.
   const [worldKind, setWorldKind] = useState<WorldKind | null>(null);
   const [entityName, setEntityName] = useState('');
+  // Kind-specific detail fields (role, atmosphere, ideology, …), keyed by kind
+  // so each World workspace keeps its own answers.
+  const [entityFields, setEntityFields] = useState<Record<string, Record<string, string>>>({});
 
   // The active workspace's prompt, backed by the per-type `prompts` map above.
   // `setPromptFor` targets an explicit workspace so async callbacks and
@@ -365,6 +369,8 @@ export function GenerateConsole({
       return prev[key] === next ? prev : { ...prev, [key]: next };
     });
   }, []);
+  const entityFieldsRef = useRef(entityFields);
+  entityFieldsRef.current = entityFields;
   const promptKeyRef = useRef(promptKey);
   promptKeyRef.current = promptKey;
   const setPrompt = useCallback(
@@ -383,6 +389,7 @@ export function GenerateConsole({
     /** Inputs kept so a failed roll can be retried as-is. */
     prompt?: string;
     rawName?: string;
+    fields?: Record<string, string>;
     createdAt: number;
   };
 
@@ -1232,7 +1239,15 @@ export function GenerateConsole({
   // Mirrors lib/random-entity.ts rollRandomEntity: generateProfile + a
   // portrait in parallel, then entities.create scoped to the universe.
   const runEntityGen = useCallback(
-    async (kind: WorldKind, retry?: { name: string; prompt: string; universeId: string }) => {
+    async (
+      kind: WorldKind,
+      retry?: {
+        name: string;
+        prompt: string;
+        universeId: string;
+        fields?: Record<string, string>;
+      }
+    ) => {
       if (!generationEnabled) {
         toast.error('AI generation is temporarily disabled. Please check back soon.');
         return;
@@ -1263,6 +1278,28 @@ export function GenerateConsole({
         submittedEntityName ||
         p.split(/[.\n]/)[0].slice(0, 60).trim() ||
         pickRandom(RANDOM_NAME_SEEDS[kind] ?? ['Untitled']);
+      // Only the fields the creator actually filled in — the AI fills the rest.
+      const kindFields = FIELDS_BY_KIND[kind] ?? [];
+      const rawFields = retry ? (retry.fields ?? {}) : (entityFieldsRef.current[kind] ?? {});
+      const givenFields: Record<string, string> = {};
+      for (const f of kindFields) {
+        const v = rawFields[f.key]?.trim();
+        if (v) givenFields[f.key] = v;
+      }
+      const detailLines = kindFields
+        .filter((f) => givenFields[f.key])
+        .map((f) => `${f.label}: ${givenFields[f.key]}`);
+      const profileHint = (
+        detailLines.length
+          ? `${p}\n\nCreator-specified details (treat as canon):\n${detailLines.join('\n')}`
+          : p
+      ).slice(0, 1000);
+      // Feed the look-defining details to the portrait so it matches them.
+      const VISUAL_KEYS = ['appearance', 'atmosphere', 'traits', 'capabilities', 'powersAndUse'];
+      const visualHint = [p, ...VISUAL_KEYS.map((k) => givenFields[k]).filter(Boolean)]
+        .filter(Boolean)
+        .join(', ')
+        .slice(0, 400);
       const localId = makeId();
       setEntityResults((prev) => [
         {
@@ -1273,6 +1310,7 @@ export function GenerateConsole({
           universeId,
           prompt: p,
           rawName: submittedEntityName,
+          fields: givenFields,
           status: 'generating' as const,
           createdAt: Date.now(),
         },
@@ -1281,9 +1319,9 @@ export function GenerateConsole({
       inFlightCountRef.current += 1;
       try {
         const preset = pickRandom(STYLE_PRESETS);
-        const artPrompt = `${baseArtPromptForKind(kind, name, p)}, ${preset.suffix}`;
+        const artPrompt = `${baseArtPromptForKind(kind, name, visualHint)}, ${preset.suffix}`;
         const [profile, img] = await Promise.all([
-          trpcClient.entities.generateProfile.mutate({ name, kind, hint: p }),
+          trpcClient.entities.generateProfile.mutate({ name, kind, hint: profileHint }),
           trpcClient.image.generate
             .mutate({
               prompt: artPrompt,
@@ -1304,6 +1342,10 @@ export function GenerateConsole({
         const stringMeta: Record<string, string> = {};
         for (const [k, v] of Object.entries(profile.metadata ?? {})) {
           if (typeof v === 'string' && v) stringMeta[k] = v;
+        }
+        // What the creator typed wins over what the AI invented.
+        for (const f of kindFields) {
+          if (f.metadataKey && givenFields[f.key]) stringMeta[f.key] = givenFields[f.key];
         }
         const created = await trpcClient.entities.create.mutate({
           name,
@@ -1329,6 +1371,7 @@ export function GenerateConsole({
         // a new prompt/name while this generation was in flight.
         setPromptFor(kind, (cur) => (cur === p ? '' : cur));
         setEntityName((cur) => (cur === submittedEntityName ? '' : cur));
+        if (!retry) setEntityFields((cur) => ({ ...cur, [kind]: {} }));
       } catch (err: any) {
         setEntityResults((prev) =>
           prev.map((r) =>
@@ -2005,6 +2048,50 @@ export function GenerateConsole({
                         KIND_LABELS[worldKind] ?? worldKind
                       ).toLowerCase()} — its role, look, history, secrets…`}
                     />
+                    {(FIELDS_BY_KIND[worldKind] ?? []).length > 0 && (
+                      <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-muted/10 p-3">
+                        <p className="text-[11px] text-muted-foreground">
+                          {KIND_LABELS[worldKind] ?? worldKind} details — all optional. Anything you
+                          leave blank, the AI fills in.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {(FIELDS_BY_KIND[worldKind] ?? []).map((f) => {
+                            const value = entityFields[worldKind]?.[f.key] ?? '';
+                            const onChange = (v: string) =>
+                              setEntityFields((cur) => ({
+                                ...cur,
+                                [worldKind]: { ...cur[worldKind], [f.key]: v },
+                              }));
+                            return (
+                              <label
+                                key={f.key}
+                                className={`flex flex-col gap-1 ${
+                                  f.type === 'textarea' ? 'sm:col-span-2' : ''
+                                }`}
+                              >
+                                <span className="text-[11px] font-medium">{f.label}</span>
+                                {f.type === 'textarea' ? (
+                                  <Textarea
+                                    value={value}
+                                    onChange={(e) => onChange(e.target.value)}
+                                    rows={2}
+                                    className="resize-none text-sm"
+                                    placeholder={f.placeholder}
+                                  />
+                                ) : (
+                                  <Input
+                                    value={value}
+                                    onChange={(e) => onChange(e.target.value)}
+                                    className="h-9 text-sm"
+                                    placeholder={f.placeholder}
+                                  />
+                                )}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                     <ModelSelector
                       type="image"
                       value={imageModel}
@@ -3163,6 +3250,7 @@ export function GenerateConsole({
                                   name: r.rawName ?? '',
                                   prompt: r.prompt ?? '',
                                   universeId: r.universeId,
+                                  fields: r.fields,
                                 }).then(() => removeEntity(r.id));
                               }}
                             >

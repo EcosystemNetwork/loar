@@ -65,4 +65,31 @@ describe('GenerateConsole workspaces', () => {
     fireEvent.click(tab('Video'));
     expect(promptBox().value).toBe('slow dolly in');
   });
+
+  it('gives each World kind its own detail fields', () => {
+    renderConsole();
+    fireEvent.click(tab('Person'));
+    expect(screen.getByText('Role / Archetype')).toBeTruthy();
+    expect(screen.queryByText('Atmosphere')).toBeNull();
+
+    fireEvent.click(tab('Place'));
+    expect(screen.getByText('Atmosphere')).toBeTruthy();
+    expect(screen.queryByText('Role / Archetype')).toBeNull();
+
+    fireEvent.click(tab('Faction'));
+    expect(screen.getByText('Ideology')).toBeTruthy();
+  });
+
+  it('keeps detail answers per kind', () => {
+    renderConsole();
+    fireEvent.click(tab('Person'));
+    fireEvent.change(screen.getByPlaceholderText(/Protagonist, Villain/), {
+      target: { value: 'Mentor' },
+    });
+    fireEvent.click(tab('Place'));
+    fireEvent.click(tab('Person'));
+    expect((screen.getByPlaceholderText(/Protagonist, Villain/) as HTMLInputElement).value).toBe(
+      'Mentor'
+    );
+  });
 });
