@@ -5,6 +5,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import { getAddress, isAddress } from 'viem';
 import {
   ponderGql,
   ponderQueryDefaults,
@@ -61,47 +62,63 @@ function useAllTokens() {
 
 // ─── Token detail with universe info ───────────────────────────────────
 
+/**
+ * The indexer keys `tokens` by the EIP-55 checksummed address, while
+ * `tokenHolders.tokenAddress` (and other foreign keys) are lowercase — and ids
+ * match case-sensitively. Candidate ids for `token(id:)`, most likely first:
+ * checksummed (what the launchpad links carry), then as-given, then lowercase.
+ */
+export function tokenIdCandidates(tokenAddress: string): string[] {
+  const candidates: string[] = [];
+  if (isAddress(tokenAddress, { strict: false })) candidates.push(getAddress(tokenAddress));
+  candidates.push(tokenAddress, tokenAddress.toLowerCase());
+  return [...new Set(candidates)];
+}
+
 export function useTokenDetail(tokenAddress: string | undefined) {
   return useQuery({
     queryKey: ['token-detail', tokenAddress],
     queryFn: async () => {
-      const data = await ponderGql<{
-        token: Token | null;
-        tokenHolders: { items: TokenHolder[] };
-      }>(
-        `query ($tokenAddress: String!) {
-          token(id: $tokenAddress) {
-            id
-            name
-            symbol
-            imageURL
-            universeAddress
-            deployer
-            tokenAdmin
-            metadata
-            context
-            startingTick
-            poolHook
-            poolId
-            pairedToken
-            locker
-            createdAt
-          }
-          tokenHolders(where: { tokenAddress: $tokenAddress }, limit: 50, orderBy: "balance", orderDirection: "desc") {
-            items {
+      const lowerAddress = tokenAddress!.toLowerCase();
+      let result: { token: Token | null; holders: TokenHolder[] } = { token: null, holders: [] };
+      for (const id of tokenIdCandidates(tokenAddress!)) {
+        const data = await ponderGql<{
+          token: Token | null;
+          tokenHolders: { items: TokenHolder[] };
+        }>(
+          `query ($id: String!, $tokenAddress: String!) {
+            token(id: $id) {
               id
-              tokenAddress
-              holderAddress
-              balance
+              name
+              symbol
+              imageURL
+              universeAddress
+              deployer
+              tokenAdmin
+              metadata
+              context
+              startingTick
+              poolHook
+              poolId
+              pairedToken
+              locker
+              createdAt
             }
-          }
-        }`,
-        { tokenAddress: tokenAddress!.toLowerCase() }
-      );
-      return {
-        token: data.token,
-        holders: data.tokenHolders.items,
-      };
+            tokenHolders(where: { tokenAddress: $tokenAddress }, limit: 50, orderBy: "balance", orderDirection: "desc") {
+              items {
+                id
+                tokenAddress
+                holderAddress
+                balance
+              }
+            }
+          }`,
+          { id, tokenAddress: lowerAddress }
+        );
+        result = { token: data.token, holders: data.tokenHolders?.items ?? [] };
+        if (result.token) break;
+      }
+      return result;
     },
     enabled: !!tokenAddress,
     ...ponderQueryDefaults,
