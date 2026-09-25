@@ -11,6 +11,7 @@ import {
   useUniverseForToken,
   useBondingCurveForToken,
   ethPricePerToken,
+  bondingSpotPrice,
   ethPriceFromTick,
   formatTokenAmount,
   formatCompactEth,
@@ -177,9 +178,14 @@ function TokenDetailPage() {
   // ETH-per-token quote; null for untraded pools so we render "--"
   // instead of a bogus 1.0.
   const currentPrice = useMemo(() => {
-    if (!pool || !token) return null;
+    if (!token) return null;
+    // Pre-graduation the curve is the only price source (see bondingSpotPrice).
+    if (bondingCurve && !bondingCurve.graduated) {
+      return bondingSpotPrice(bondingCurve.ethRaised, bondingCurve.tokensSold);
+    }
+    if (!pool) return null;
     return ethPricePerToken(pool, token.id);
-  }, [pool, token]);
+  }, [pool, token, bondingCurve]);
 
   // Chart data from swaps — quote each tick as ETH/token and pull the ETH
   // leg (amount1 when the token is currency0, else amount0).
@@ -266,23 +272,25 @@ function TokenDetailPage() {
 
   // 24h price change
   const priceChange = useMemo(() => {
-    if (chartData.length < 2) return null;
-    const latest = chartData[chartData.length - 1].price;
+    if (seriesForChart.length < 2) return null;
+    const latest = seriesForChart[seriesForChart.length - 1].price;
     const oneDayAgo = Math.floor(Date.now() / 1000) - 86400;
-    const oldPrice = chartData.find((d) => d.timestamp >= oneDayAgo)?.price ?? chartData[0].price;
-    if (oldPrice === 0) return null;
+    const oldPrice =
+      seriesForChart.find((d) => d.timestamp >= oneDayAgo)?.price ?? seriesForChart[0].price;
+    if (!oldPrice) return null;
     return ((latest - oldPrice) / oldPrice) * 100;
-  }, [chartData]);
+  }, [seriesForChart]);
 
   // Filter the bonding-curve contract out of the holder list. The curve isn't
   // a real holder — it's the smart contract holding the unsold portion of the
   // mint until graduation, and counting it as a top holder produces a
   // misleading >50% concentration warning for every fresh token.
   const visibleHolders = useMemo(() => {
-    if (!holders.length) return holders;
+    // Also drop zero-balance rows — the indexer keeps addresses that fully sold.
+    const funded = holders.filter((h) => h.balance && h.balance !== '0');
     const curveAddr = bondingCurve?.id?.toLowerCase();
-    if (!curveAddr) return holders;
-    return holders.filter((h) => h.holderAddress.toLowerCase() !== curveAddr);
+    if (!curveAddr) return funded;
+    return funded.filter((h) => h.holderAddress.toLowerCase() !== curveAddr);
   }, [holders, bondingCurve]);
 
   // Circulating supply: tokens currently in user wallets / LP. During bonding
@@ -316,7 +324,8 @@ function TokenDetailPage() {
   // `fdv` below.
   const marketCap = currentPrice != null ? currentPrice * circulatingSupply : null;
   const fdv = currentPrice != null ? currentPrice * 1_000_000_000 : null;
-  const totalSwaps = swaps?.length ?? 0;
+  // Pool swaps + bonding-curve trades — a token still on the curve has no swaps.
+  const totalSwaps = (swaps?.length ?? 0) + curveTrades.length;
 
   // Maturity milestones
   const milestones = [

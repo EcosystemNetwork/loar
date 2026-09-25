@@ -32,16 +32,17 @@ function priceFromSqrtX96(sqrtPriceX96: string): number | null {
   }
 }
 
-function weiToNumber(raw: string | bigint, decimals = 18): number {
-  const wei = typeof raw === 'bigint' ? raw : BigInt(raw || '0');
-  if (wei === 0n) return 0;
-  const neg = wei < 0n;
-  const abs = neg ? -wei : wei;
-  const divisor = 10n ** BigInt(decimals);
-  const whole = abs / divisor;
-  const rem = abs - whole * divisor;
-  const out = Number(whole) + Number(rem) / Number(divisor);
-  return neg ? -out : out;
+/** Spot price (ETH per token) on the linear bonding curve: 2·raised / sold. */
+export function bondingSpotPrice(ethRaised: string, tokensSold: string): number | null {
+  try {
+    const raised = BigInt(ethRaised || '0');
+    const sold = BigInt(tokensSold || '0');
+    if (raised <= 0n || sold <= 0n) return null;
+    const v = Number((2n * raised * 10n ** 30n) / sold) / 1e30;
+    return Number.isFinite(v) && v > 0 ? v : null;
+  } catch {
+    return null;
+  }
 }
 
 export interface TokenPriceResult {
@@ -61,13 +62,15 @@ export async function getTokenPriceEth(
   if (!db) return null;
   const addr = tokenAddress.toLowerCase();
 
-  // Bonding-curve tokens: the curve's lastPrice is already ETH/token in wei.
+  // Bonding-curve tokens. The curve's own `lastPrice` is integer wei per raw
+  // token unit, which truncates to 0 for realistic curves, so derive the spot
+  // price from exact amounts: linear curve ⇒ p = 2·ethRaised / tokensSold.
   try {
     const curveSnap = await db.collection(CURVES).where('tokenAddress', '==', addr).limit(1).get();
     const curve = curveSnap.docs[0]?.data();
-    if (curve && !curve.graduated && curve.lastPrice && curve.lastPrice !== '0') {
-      const p = weiToNumber(curve.lastPrice as string, 18);
-      if (p > 0) return p;
+    if (curve && !curve.graduated) {
+      const p = bondingSpotPrice(curve.ethRaised as string, curve.tokensSold as string);
+      if (p != null) return p;
     }
   } catch {
     /* fall through to pool */

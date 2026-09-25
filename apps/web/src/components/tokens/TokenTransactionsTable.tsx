@@ -9,7 +9,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
-import { ethPriceFromTick, formatEth, timeAgo, weiToNumber } from '@/hooks/useTokens';
+import {
+  bondingTradePrice,
+  ethPriceFromTick,
+  formatEth,
+  timeAgo,
+  weiToNumber,
+} from '@/hooks/useTokens';
 import type { BondingCurveTrade } from '@/hooks/useTokens';
 import type { Swap } from '@/utils/ponder-api';
 import { getExplorerTxUrl } from '@/configs/chains';
@@ -72,7 +78,7 @@ export function TokenTransactionsTable({
         isBuy: t.isBuy,
         ethAmount: weiToNumber(t.ethAmount, 18),
         ethWei: t.ethAmount,
-        priceEth: weiToNumber(t.price, 18),
+        priceEth: bondingTradePrice(t.ethAmount, t.tokenAmount),
         txHash: t.id.split(':')[0]?.split('-')[0],
       });
     }

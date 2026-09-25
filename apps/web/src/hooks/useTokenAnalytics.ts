@@ -14,7 +14,12 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { ponderGql, ponderQueryDefaults, type Swap } from '@/utils/ponder-api';
 import { jitteredInterval, POLL_INTERVALS } from './useSmartPolling';
-import { ethPriceFromTick, weiToNumber, type BondingCurveTrade } from './useTokens';
+import {
+  bondingSpotPrice,
+  ethPriceFromTick,
+  weiToNumber,
+  type BondingCurveTrade,
+} from './useTokens';
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -176,9 +181,12 @@ export function usePriceSeries({
       const raised = weiToNumber(s.ethRaised, 18);
       const vol = Math.abs(raised - prevRaised);
       prevRaised = raised;
+      // Fully-sold-back curve (tokensSold = 0) has no meaningful price — skip.
+      const price = bondingSpotPrice(s.ethRaised, s.tokensSold);
+      if (price == null) continue;
       points.push({
         timestamp: s.timestamp,
-        price: weiToNumber(s.price, 18),
+        price,
         isBuy: s.trigger !== 'sell',
         ethAmount: vol,
       });

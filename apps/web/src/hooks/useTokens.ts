@@ -870,6 +870,45 @@ export function weiToNumber(raw: string | bigint, decimals = 18): number {
 }
 
 /**
+ * Bonding-curve prices. The contract's `newPrice` (indexed as `lastPrice` and
+ * each snapshot's `price`) is slope·tokensSold in *integer wei per raw token
+ * unit*, which truncates to 0 for any realistic curve — so it can't be shown.
+ * Derive prices from amounts that are exact instead. Both are ETH per whole
+ * token (wei/raw-unit ratios equal ETH/token because both sides carry 1e18).
+ */
+const PRICE_SCALE = 10n ** 30n;
+
+/** Spot price on the linear curve: p = k·s and ethRaised = k·s²/2 ⇒ p = 2·raised/sold. */
+export function bondingSpotPrice(
+  ethRaised: string | bigint | null | undefined,
+  tokensSold: string | bigint | null | undefined
+): number | null {
+  try {
+    const raised = BigInt(ethRaised ?? '0');
+    const sold = BigInt(tokensSold ?? '0');
+    if (sold <= 0n || raised <= 0n) return null;
+    return Number((2n * raised * PRICE_SCALE) / sold) / 1e30;
+  } catch {
+    return null;
+  }
+}
+
+/** Average execution price of one curve trade: ETH paid/received per token. */
+export function bondingTradePrice(
+  ethAmount: string | bigint | null | undefined,
+  tokenAmount: string | bigint | null | undefined
+): number {
+  try {
+    const eth = BigInt(ethAmount ?? '0');
+    const tokens = BigInt(tokenAmount ?? '0');
+    if (tokens <= 0n || eth <= 0n) return 0;
+    return Number((eth * PRICE_SCALE) / tokens) / 1e30;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Format token amount from raw bigint string (18 decimals)
  */
 export function formatTokenAmount(raw: string, decimals = 18): string {
@@ -1037,10 +1076,10 @@ export function useTokenListData() {
     queryKey: ['all-holder-counts'],
     queryFn: async () => {
       const data = await ponderGql<{
-        tokenHolders: { items: { tokenAddress: string }[] };
+        tokenHolders: { items: { tokenAddress: string; holderAddress: string; balance: string }[] };
       }>(`query {
         tokenHolders(limit: 1000) {
-          items { tokenAddress }
+          items { tokenAddress holderAddress balance }
         }
       }`);
       return data.tokenHolders?.items ?? [];
@@ -1100,9 +1139,15 @@ export function useTokenListData() {
       bondingTradesByCurve.set(key, list);
     }
 
-    // Count holders per token address (lowercased)
+    // Count holders per token address (lowercased). The indexer keeps a row for
+    // every address that ever held a token, so skip fully-sold (zero-balance)
+    // rows and the bonding-curve contract — it escrows the unsold supply and
+    // isn't a real holder (the token detail page excludes it the same way).
+    const curveAddrs = new Set((curvesQuery.data ?? []).map((c) => c.id.toLowerCase()));
     const holderCounts = new Map<string, number>();
     for (const h of holdersQuery.data ?? []) {
+      if (!h.balance || h.balance === '0') continue;
+      if (curveAddrs.has(h.holderAddress?.toLowerCase())) continue;
       const key = h.tokenAddress.toLowerCase();
       holderCounts.set(key, (holderCounts.get(key) ?? 0) + 1);
     }
@@ -1128,7 +1173,14 @@ export function useTokenListData() {
 
       // Current ETH-per-token quote. `ethPricePerToken` returns null for
       // untraded pools so the card shows "--" instead of a bogus 1.0.
-      const price = pool ? ethPricePerToken(pool, token.id) : null;
+      // While bonding, the curve is the only price source (its pool is a zero
+      // placeholder); after graduation the Uniswap pool takes over.
+      const price =
+        bondingCurve && !bondingCurve.graduated
+          ? bondingSpotPrice(bondingCurve.ethRaised, bondingCurve.tokensSold)
+          : pool
+            ? ethPricePerToken(pool, token.id)
+            : null;
 
       // 24h price change — compare now to the oldest swap in the window,
       // using the same side-of-pool convention as `price`.
@@ -1187,8 +1239,10 @@ export function useTokenListData() {
           .filter((t) => t.timestamp >= oneHourAgo)
           .sort((a, b) => a.timestamp - b.timestamp);
         if (hourCurveTrades.length >= 2) {
-          const first = weiToNumber(hourCurveTrades[0].price, 18);
-          const last = weiToNumber(hourCurveTrades[hourCurveTrades.length - 1].price, 18);
+          const firstTrade = hourCurveTrades[0];
+          const lastTrade = hourCurveTrades[hourCurveTrades.length - 1];
+          const first = bondingTradePrice(firstTrade.ethAmount, firstTrade.tokenAmount);
+          const last = bondingTradePrice(lastTrade.ethAmount, lastTrade.tokenAmount);
           if (first > 0) priceChange1h = ((last - first) / first) * 100;
         }
       }
