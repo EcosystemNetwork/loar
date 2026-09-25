@@ -7,3 +7,4 @@
  * This is a type-only module: it emits zero runtime code.
  */
 export type { AppRouter } from '../../../apps/server/src/routers';
+export type { LaunchpadRow } from '../../../apps/server/src/services/launchpad';

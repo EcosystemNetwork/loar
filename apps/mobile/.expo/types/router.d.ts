@@ -25,6 +25,10 @@ declare module 'expo-router' {
         | { pathname: `${'/(tabs)'}/tokens` | `/tokens`; params?: Router.UnknownInputParams }
         | { pathname: `/asset/[id]`; params: Router.UnknownInputParams & { id: string | number } }
         | {
+            pathname: `/token/[address]`;
+            params: Router.UnknownInputParams & { address: string | number };
+          }
+        | {
             pathname: `/universe/[id]`;
             params: Router.UnknownInputParams & { id: string | number };
           };
@@ -46,6 +50,7 @@ declare module 'expo-router' {
         | { pathname: `${'/(tabs)'}/profile` | `/profile`; params?: Router.UnknownOutputParams }
         | { pathname: `${'/(tabs)'}/tokens` | `/tokens`; params?: Router.UnknownOutputParams }
         | { pathname: `/asset/[id]`; params: Router.UnknownOutputParams & { id: string } }
+        | { pathname: `/token/[address]`; params: Router.UnknownOutputParams & { address: string } }
         | { pathname: `/universe/[id]`; params: Router.UnknownOutputParams & { id: string } };
       href:
         | Router.RelativePathString
@@ -84,8 +89,13 @@ declare module 'expo-router' {
         | { pathname: `${'/(tabs)'}/profile` | `/profile`; params?: Router.UnknownInputParams }
         | { pathname: `${'/(tabs)'}/tokens` | `/tokens`; params?: Router.UnknownInputParams }
         | `/asset/${Router.SingleRoutePart<T>}`
+        | `/token/${Router.SingleRoutePart<T>}`
         | `/universe/${Router.SingleRoutePart<T>}`
         | { pathname: `/asset/[id]`; params: Router.UnknownInputParams & { id: string | number } }
+        | {
+            pathname: `/token/[address]`;
+            params: Router.UnknownInputParams & { address: string | number };
+          }
         | {
             pathname: `/universe/[id]`;
             params: Router.UnknownInputParams & { id: string | number };

@@ -13,6 +13,11 @@ import React from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AssetRow } from '../../src/components/portfolio/AssetRow';
+import {
+  KingOfTheHillCard,
+  TokenRow,
+  type LaunchpadToken,
+} from '../../src/components/launchpad/TokenRow';
 import { EmptyState } from '../../src/components/ui/EmptyState';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { SectionHeader } from '../../src/components/ui/SectionHeader';
@@ -32,6 +37,13 @@ export default function TokensScreen() {
       { enabled: Boolean(address) }
     )
   );
+
+  // Public launchpad feed — top tokens by market cap, plus the King of the Hill.
+  const launchpadQuery = useQuery(trpc.launchpad.list.queryOptions({ limit: 10 }));
+  // Annotated explicitly: the inferred AppRouter output degrades to `any` under mobile's tsc.
+  const launchpad = launchpadQuery.data as
+    | { tokens: LaunchpadToken[]; king: LaunchpadToken | null }
+    | undefined;
 
   const isLoading = universesQuery.isLoading;
   const universes =
@@ -64,10 +76,13 @@ export default function TokensScreen() {
         }}
         refreshControl={
           <RefreshControl
-            refreshing={universesQuery.isFetching || onchainQuery.isRefetching}
+            refreshing={
+              universesQuery.isFetching || onchainQuery.isRefetching || launchpadQuery.isRefetching
+            }
             onRefresh={() => {
               void universesQuery.refetch();
               void onchainQuery.refetch();
+              void launchpadQuery.refetch();
             }}
             tintColor="#7c3aed"
           />
@@ -79,6 +94,38 @@ export default function TokensScreen() {
           <View className="bg-card rounded-2xl border border-border px-4">
             <AssetRow icon="⬡" label="$LOAR" subtitle={loarSubtitle} value={loarBalance} />
           </View>
+        </View>
+
+        {/* Launchpad — discover tokens (read-only; trading opens on web) */}
+        <View className="gap-3">
+          <SectionHeader title="Launchpad" count={launchpad?.tokens.length} />
+          {launchpad?.king && (
+            <KingOfTheHillCard
+              token={launchpad.king}
+              onPress={() => router.push(`/token/${launchpad.king!.id}`)}
+            />
+          )}
+          {launchpadQuery.isLoading ? (
+            <Text className="text-text-tertiary text-sm">Loading launchpad…</Text>
+          ) : launchpadQuery.isError ? (
+            <EmptyState
+              icon="📡"
+              title="Launchpad unavailable"
+              description="Couldn't reach the indexer. Pull down to retry."
+            />
+          ) : (launchpad?.tokens.length ?? 0) === 0 ? (
+            <EmptyState
+              icon="🚀"
+              title="No tokens yet"
+              description="Launched tokens will show up here."
+            />
+          ) : (
+            <View className="bg-card rounded-2xl border border-border px-4">
+              {launchpad!.tokens.map((t) => (
+                <TokenRow key={t.id} token={t} onPress={() => router.push(`/token/${t.id}`)} />
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Universe tokens */}
