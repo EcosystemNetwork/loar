@@ -4,13 +4,16 @@
  * Renders GLB/GLTF files with orbit controls, auto-rotate, and AR support.
  * Falls back gracefully if the poster (thumbnail) is provided.
  *
+ * A texture/geometry toggle lets viewers strip every material texture to
+ * inspect the raw mesh shape (and restore them) without reloading the GLB.
+ *
  * Pass `testbench` to surface animation/lighting controls — used by the wiki
  * 3D-models dialog so creators can preview baked animations, tweak exposure,
  * and toggle auto-rotate without leaving the page.
  */
 import '@google/model-viewer';
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
-import { Loader2, Maximize2, Minimize2, Play, Pause, RotateCcw } from 'lucide-react';
+import { Box, Loader2, Maximize2, Minimize2, Palette, Play, Pause, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -28,6 +31,55 @@ import { getIpfsUrlCandidatesPreferred, raceIpfsGateways } from '@/utils/ipfs-ur
 // MediaLightbox already guards against for video/audio. Race the stall timer
 // against a real `load` event and advance to the next gateway either way.
 const STALL_MS = 10000;
+
+/** Neutral clay material used by the "Geometry" view. */
+const GEOMETRY_BASE_COLOR: [number, number, number, number] = [0.85, 0.85, 0.85, 1];
+
+/** Per-material values captured before the geometry view overwrites them. */
+export interface SavedMaterial {
+  baseTexture: unknown;
+  baseFactor: number[];
+  metallicRoughnessTexture: unknown;
+  normalTexture: unknown;
+  emissiveTexture: unknown;
+  occlusionTexture: unknown;
+  metallicFactor: number;
+  roughnessFactor: number;
+}
+
+/**
+ * Swap every material on a loaded <model-viewer> between its authored textures
+ * and a plain untextured clay look. Originals are stashed in `saved` on first
+ * use so switching back restores the exact authored look.
+ */
+export function applyTextureMode(el: any, textured: boolean, saved: Map<number, SavedMaterial>) {
+  const materials: any[] | undefined = el?.model?.materials;
+  if (!materials) return;
+  materials.forEach((mat, i) => {
+    const pbr = mat.pbrMetallicRoughness;
+    if (!saved.has(i)) {
+      saved.set(i, {
+        baseTexture: pbr.baseColorTexture?.texture ?? null,
+        baseFactor: [...pbr.baseColorFactor],
+        metallicRoughnessTexture: pbr.metallicRoughnessTexture?.texture ?? null,
+        normalTexture: mat.normalTexture?.texture ?? null,
+        emissiveTexture: mat.emissiveTexture?.texture ?? null,
+        occlusionTexture: mat.occlusionTexture?.texture ?? null,
+        metallicFactor: pbr.metallicFactor,
+        roughnessFactor: pbr.roughnessFactor,
+      });
+    }
+    const orig = saved.get(i)!;
+    pbr.baseColorTexture?.setTexture(textured ? orig.baseTexture : null);
+    pbr.metallicRoughnessTexture?.setTexture(textured ? orig.metallicRoughnessTexture : null);
+    mat.normalTexture?.setTexture(textured ? orig.normalTexture : null);
+    mat.emissiveTexture?.setTexture(textured ? orig.emissiveTexture : null);
+    mat.occlusionTexture?.setTexture(textured ? orig.occlusionTexture : null);
+    pbr.setBaseColorFactor(textured ? orig.baseFactor : GEOMETRY_BASE_COLOR);
+    pbr.setMetallicFactor(textured ? orig.metallicFactor : 0);
+    pbr.setRoughnessFactor(textured ? orig.roughnessFactor : 0.7);
+  });
+}
 
 interface ModelViewerProps {
   /** URL to the GLB/GLTF model */
@@ -62,6 +114,8 @@ export function ModelViewer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [autoRotate, setAutoRotate] = useState(true);
   const [exposure, setExposure] = useState(1);
+  const [textured, setTextured] = useState(true);
+  const savedMaterialsRef = useRef<Map<number, SavedMaterial>>(new Map());
 
   // Same gateway fallback chain SmartImage/MediaLightbox already use for
   // images and video — `src` here can be a raw ipfs:// URL or an
@@ -123,6 +177,9 @@ export function ModelViewer({
     el.addEventListener('load', () => {
       clearTimeout(stallTimer);
       setLoading(false);
+      // A fresh model always starts in its authored (textured) look.
+      savedMaterialsRef.current = new Map();
+      setTextured(true);
       // availableAnimations is populated after the GLB is parsed. Empty array
       // for static meshes — the controls hide themselves in that case.
       const available: string[] = Array.isArray(el.availableAnimations)
@@ -174,6 +231,11 @@ export function ModelViewer({
     if (!el) return;
     el.setAttribute('exposure', String(exposure));
   }, [exposure]);
+
+  useEffect(() => {
+    if (loading) return;
+    applyTextureMode(modelElRef.current, textured, savedMaterialsRef.current);
+  }, [textured, loading]);
 
   useEffect(() => {
     const el = modelElRef.current;
@@ -229,6 +291,19 @@ export function ModelViewer({
       <div ref={viewerRef} className="w-full h-full" />
 
       <div className="absolute top-2 right-2 flex gap-1">
+        {!loading && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-7 gap-1 px-2 text-xs bg-background/80 backdrop-blur-sm"
+            onClick={() => setTextured((v) => !v)}
+            aria-pressed={!textured}
+            title={textured ? 'Show geometry without textures' : 'Show textures'}
+          >
+            {textured ? <Box className="w-3.5 h-3.5" /> : <Palette className="w-3.5 h-3.5" />}
+            {textured ? 'Geometry' : 'Textured'}
+          </Button>
+        )}
         {allowFullscreen && (
           <Button
             variant="secondary"
