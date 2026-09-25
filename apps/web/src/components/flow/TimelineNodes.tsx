@@ -479,6 +479,11 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
                       title="Clip is trimmed"
                     >
                       <Scissors className="h-3 w-3" />
+                      {data.trimEnd != null && (
+                        <span className="ml-0.5 tabular-nums">
+                          {((data.trimEnd - (data.trimStart ?? 0)) / 1000).toFixed(1)}s
+                        </span>
+                      )}
                     </Badge>
                   )}
                   {/* Scene control indicators */}

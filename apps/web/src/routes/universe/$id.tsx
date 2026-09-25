@@ -4344,6 +4344,23 @@ function UniverseTimelineEditorInner() {
                   className="w-full h-full object-contain"
                   controls
                   muted
+                  // Play only the trimmed range (the trimmer panel has its own
+                  // full-length preview, so leave this one unbounded while it's open).
+                  onLoadedMetadata={(e) => {
+                    const trim = editingEventId ? getStoredEvents()[editingEventId] : null;
+                    if (!showTrimPanel && trim?.trimStart > 0) {
+                      e.currentTarget.currentTime = trim.trimStart / 1000;
+                    }
+                  }}
+                  onTimeUpdate={(e) => {
+                    const trim = editingEventId ? getStoredEvents()[editingEventId] : null;
+                    if (showTrimPanel || trim?.trimEnd == null) return;
+                    const v = e.currentTarget;
+                    if (v.currentTime >= trim.trimEnd / 1000) {
+                      v.pause();
+                      v.currentTime = (trim.trimStart ?? 0) / 1000;
+                    }
+                  }}
                   onError={(e) => {
                     const target = e.currentTarget;
                     target.style.display = 'none';
@@ -4381,6 +4398,25 @@ function UniverseTimelineEditorInner() {
                 </button>
               </div>
             )}
+
+            {/* Trimmed length — the video's own controls always show the full
+                source duration, so state the kept range explicitly. */}
+            {editVideoPreview &&
+              !showTrimPanel &&
+              editingEventId &&
+              (() => {
+                const ev = getStoredEvents()[editingEventId];
+                if (ev?.trimEnd == null) return null;
+                const start = (ev.trimStart ?? 0) / 1000;
+                const end = ev.trimEnd / 1000;
+                return (
+                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Scissors className="h-3 w-3" />
+                    Trimmed to {(end - start).toFixed(1)}s ({start.toFixed(1)}s – {end.toFixed(1)}s
+                    of the full clip)
+                  </p>
+                );
+              })()}
 
             {/* Trim in/out points — instant, non-destructive (respected by the
                 published watch/event/episode players via the shared segment

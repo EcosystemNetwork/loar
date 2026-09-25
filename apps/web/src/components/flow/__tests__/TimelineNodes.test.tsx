@@ -530,6 +530,11 @@ describe('TimelineEventNode — status badges', () => {
       expect(screen.getByTitle('Clip is trimmed')).toBeInTheDocument();
     });
 
+    it('shows the trimmed length in seconds', async () => {
+      await renderWithVideo({ trimStart: 1000, trimEnd: 7500 });
+      expect(screen.getByTitle('Clip is trimmed')).toHaveTextContent('6.5s');
+    });
+
     it('hidden for trimStart 0 with no trimEnd', async () => {
       await renderWithVideo({ trimStart: 0 });
       expect(screen.queryByTitle('Clip is trimmed')).toBeNull();
