@@ -97,7 +97,23 @@ async function processGenerationBody(
 
   // Update status to running
   await job.updateProgress(10);
-  await generationsCol.doc(data.generationId).update({ status: 'running' });
+  // Cancelled while it sat in the queue (or before this worker picked it up):
+  // don't flip it back to running or spend a provider call on it.
+  const startedRunning = await db.runTransaction(async (tx) => {
+    const ref = generationsCol.doc(data.generationId);
+    const snap = await tx.get(ref);
+    if (snap.exists && snap.data()?.status === 'cancelled') return false;
+    tx.update(ref, { status: 'running' });
+    return true;
+  });
+  if (!startedRunning) {
+    return {
+      generationId: data.generationId,
+      status: 'cancelled',
+      wasFallback: false,
+      latencyMs: Date.now() - startTime,
+    };
+  }
 
   // Populated by the `google` dispatch branch below with the exact BYOK/pool
   // key used to create the file — Gemini Files API downloads are scoped to
@@ -366,7 +382,10 @@ async function processGenerationBody(
       });
     }
 
-    await generationsCol.doc(data.generationId).update({
+    // A cancel that landed while the provider call was in flight wins: the
+    // provider bill is already recorded above, but the result is discarded and
+    // the record stays `cancelled` (no completion write, no auto-attach).
+    const completionData = {
       status: 'completed',
       videoUrl: finalMediaUrl,
       ephemeralVideoUrl: result.videoUrl, // kept for debugging / provenance audit
@@ -381,7 +400,22 @@ async function processGenerationBody(
       ...(storageContentHash ? { storageContentHash, storagePersisted: true } : {}),
       latencyMs,
       completedAt: new Date(),
+    };
+    const wroteCompletion = await db.runTransaction(async (tx) => {
+      const ref = generationsCol.doc(data.generationId);
+      const snap = await tx.get(ref);
+      if (snap.exists && snap.data()?.status === 'cancelled') return false;
+      tx.update(ref, completionData);
+      return true;
     });
+    if (!wroteCompletion) {
+      return {
+        generationId: data.generationId,
+        status: 'cancelled',
+        wasFallback: false,
+        latencyMs,
+      };
+    }
 
     if (!permanentUrl) {
       console.error(

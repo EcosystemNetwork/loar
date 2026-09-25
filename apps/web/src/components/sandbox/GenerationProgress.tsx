@@ -8,7 +8,7 @@ import { estimateProgress, formatEta, getLatencyStats, latencyKey } from '@/lib/
  * the model to draw a progress bar + ETA; with too little history it stays a
  * plain spinner instead of guessing.
  */
-export function GenerationProgress({ gen }: { gen: Generation }) {
+export function GenerationProgress({ gen, onCancel }: { gen: Generation; onCancel?: () => void }) {
   const stats = useMemo(
     () => getLatencyStats(latencyKey(gen)),
     // Stats only need to be read once per run; the key inputs are fixed at creation.
@@ -51,6 +51,15 @@ export function GenerationProgress({ gen }: { gen: Generation }) {
                 : 'Almost there…'}
           </span>
         </>
+      )}
+      {onCancel && (
+        <button
+          type="button"
+          onClick={onCancel}
+          className="mt-1 text-[10px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+        >
+          Cancel
+        </button>
       )}
     </div>
   );

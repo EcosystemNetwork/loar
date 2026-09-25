@@ -49,7 +49,7 @@ export interface GenerationJobData {
 
 export interface GenerationJobResult {
   generationId: string;
-  status: 'completed' | 'failed';
+  status: 'completed' | 'failed' | 'cancelled';
   videoUrl?: string;
   fallbackModelId?: string;
   wasFallback: boolean;

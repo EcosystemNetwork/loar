@@ -15,6 +15,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
+import { resolveVideoResult } from '@/lib/generation-job';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -76,7 +77,7 @@ export function ViralPresetsPanel({ imageUrl, onComplete }: ViralPresetsPanelPro
           : `${preset.label}. ${preset.tagline}`) +
           (preset.promptHint ? `, ${preset.promptHint}` : '');
 
-      return await trpcClient.generation.generate.mutate({
+      const r: any = await trpcClient.generation.generate.mutate({
         prompt: finalPrompt,
         mode,
         imageUrl: imageUrl || undefined,
@@ -90,6 +91,8 @@ export function ViralPresetsPanel({ imageUrl, onComplete }: ViralPresetsPanelPro
         stylePresetId: preset.style,
         shotPresetId: preset.shot,
       } as any);
+      // Queued jobs come back as an id — wait for the finished video.
+      return { ...r, videoUrl: await resolveVideoResult(r) };
     },
     onMutate: (id: string) => setGeneratingId(id),
     onSuccess: (r: any) => {

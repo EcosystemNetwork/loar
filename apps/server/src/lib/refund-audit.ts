@@ -21,6 +21,7 @@ export type GenerationFailureResult =
   | 'refunded'
   | 'already_refunded'
   | 'already_completed'
+  | 'already_cancelled'
   | 'not_charged';
 
 export async function finalizeGenerationFailure(
@@ -36,6 +37,8 @@ export async function finalizeGenerationFailure(
     const generation = generationDoc.data() ?? {};
     if (generation.creditsRefundedAt) return 'already_refunded';
     if (generation.status === 'completed') return 'already_completed';
+    // A user cancel already settled this record — don't relabel it as a failure.
+    if (generation.status === 'cancelled') return 'already_cancelled';
 
     const completedAt = new Date();
     // Credits/points retired — generation is BYOK, nothing was charged, so

@@ -34,6 +34,7 @@ import {
   Footprints,
 } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
+import { resolveVideoResult } from '@/lib/generation-job';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
@@ -131,7 +132,7 @@ export function AnimateImagePanel({ imageUrl, onComplete }: AnimateImagePanelPro
         prompt.trim() ||
         `Cinematic ${preset.label.toLowerCase()} on the subject, ${preset.description.toLowerCase()}`;
 
-      return await trpcClient.generation.generate.mutate({
+      const r: any = await trpcClient.generation.generate.mutate({
         prompt: finalPrompt,
         mode: 'image_to_video',
         imageUrl,
@@ -146,6 +147,8 @@ export function AnimateImagePanel({ imageUrl, onComplete }: AnimateImagePanelPro
         stylePresetId: stylePresetId ?? undefined,
         shotPresetId: shotPresetId ?? undefined,
       } as any);
+      // Queued jobs come back as an id — wait for the finished video.
+      return { ...r, videoUrl: await resolveVideoResult(r) };
     },
     onSuccess: (r: any) => {
       const url = r?.videoUrl;

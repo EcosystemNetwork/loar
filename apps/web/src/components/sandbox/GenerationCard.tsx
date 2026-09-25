@@ -70,6 +70,8 @@ interface GenerationCardProps {
   gen: Generation;
   onDismiss: () => void;
   onRetry: () => void;
+  /** Present only while a queued render can be stopped server-side. */
+  onCancel?: () => void;
   onAnimate: () => void;
   onUseAsStyleRef: () => void;
   onEditOp: (
@@ -95,6 +97,7 @@ export function GenerationCard({
   gen,
   onDismiss,
   onRetry,
+  onCancel,
   onAnimate,
   onUseAsStyleRef,
   onEditOp,
@@ -129,7 +132,7 @@ export function GenerationCard({
                 className="w-full h-full object-cover opacity-30"
               />
             )}
-            <GenerationProgress gen={gen} />
+            <GenerationProgress gen={gen} onCancel={onCancel} />
           </>
         )}
         {gen.status === 'failed' && (

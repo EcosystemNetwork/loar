@@ -1991,30 +1991,38 @@ export const generationRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const ref = generationsCol().doc(input.jobId);
-      const doc = await ref.get();
-      if (!doc.exists) {
+      const { cancelGenerationRecord, dequeueGenerationJob } =
+        await import('../../lib/generation-cancel');
+      const outcome = await cancelGenerationRecord(db!, {
+        generationId: input.jobId,
+        userId: ctx.user.uid,
+        reason: input.reason,
+      });
+      if (outcome.kind === 'not_found') {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Generation not found' });
       }
-      const d = doc.data() as any;
-      if (d.userId !== ctx.user.uid) {
+      if (outcome.kind === 'not_owner') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not the job owner' });
       }
-
       // Terminal states can't be cancelled; return idempotent no-op.
-      const terminal = ['completed', 'failed', 'cancelled'];
-      if (terminal.includes(d.status)) {
+      if (outcome.kind === 'already_terminal') {
         return {
           ok: true,
           refunded: 0,
           alreadyTerminal: true as const,
-          status: d.status as string,
+          status: outcome.status,
+          jobStopped: false,
         };
       }
 
-      const creditsToRefund = (d.creditsCharged ?? 0) as number;
+      // The record is now `cancelled`. Pull a not-yet-started job out of the
+      // queue (releasing its spend hold); a running one can't be aborted and the
+      // worker will leave the cancelled record alone when it finishes.
+      const dequeued = await dequeueGenerationJob(input.jobId);
+
+      const creditsToRefund = outcome.creditsCharged;
       let refunded = 0;
-      if (creditsToRefund > 0 && !d.creditsRefunded) {
+      if (creditsToRefund > 0 && !outcome.creditsRefunded) {
         try {
           const userCreditsRef = db!.collection('userCredits').doc(ctx.user.uid);
           await userCreditsRef.update({
@@ -2023,6 +2031,7 @@ export const generationRouter = router({
             updatedAt: new Date(),
           });
           refunded = creditsToRefund;
+          await generationsCol().doc(input.jobId).update({ creditsRefunded: true });
         } catch (refundErr) {
           logFailedRefund({
             userId: ctx.user.uid,
@@ -2034,15 +2043,14 @@ export const generationRouter = router({
         }
       }
 
-      await ref.update({
-        status: 'cancelled',
-        cancelledAt: new Date(),
-        cancelReason: input.reason ?? null,
-        creditsRefunded: refunded > 0 ? true : (d.creditsRefunded ?? false),
-        completedAt: new Date(),
-      });
-
-      return { ok: true, refunded, alreadyTerminal: false as const, status: 'cancelled' as const };
+      return {
+        ok: true,
+        refunded,
+        alreadyTerminal: false as const,
+        status: 'cancelled' as const,
+        // false when the provider call was already in flight — it still runs (and bills) to the end.
+        jobStopped: dequeued !== 'running',
+      };
     }),
 
   /**

@@ -67,6 +67,7 @@ import {
 import { GenerationCard } from '@/components/sandbox/GenerationCard';
 import { VideoCostHint } from '@/components/sandbox/VideoCostHint';
 import { latencyKey, recordLatency } from '@/lib/generation-latency';
+import { GenerationCancelledError, resolveVideoResult } from '@/lib/generation-job';
 import { DraftCard, inferDraftKind } from '@/components/sandbox/DraftCard';
 import {
   RANDOM_NAME_SEEDS,
@@ -492,6 +493,31 @@ export function GenerateConsole({
     setGenerations((prev) => prev.filter((g) => g.id !== id));
   }, []);
 
+  // Cancel a queued/running video render on the server. Only cards that carry a
+  // server generation id (i.e. the job went through the queue) offer this.
+  const cancelGen = useCallback(
+    async (g: Generation) => {
+      if (!g.pollGenerationId) return;
+      try {
+        const r = await trpcClient.generation.cancel.mutate({ jobId: g.pollGenerationId });
+        if (r.alreadyTerminal) {
+          // Finished (or failed) a moment ago — the poll loop will deliver the outcome.
+          toast.info(`This generation already ${r.status === 'completed' ? 'finished' : 'ended'}.`);
+          return;
+        }
+        removeGen(g.id);
+        toast.success(
+          r.jobStopped
+            ? 'Generation cancelled'
+            : 'Cancelled — the render had already started, so the provider may still bill for it.'
+        );
+      } catch (err: any) {
+        toast.error('Could not cancel: ' + (err?.message || 'unknown error'));
+      }
+    },
+    [removeGen]
+  );
+
   const clearDone = useCallback(() => {
     setGenerations((prev) => prev.filter((g) => g.status === 'generating'));
   }, []);
@@ -714,19 +740,26 @@ export function GenerateConsole({
             ? { cameraIntensity: opts.cameraIntensity }
             : {}),
         });
-        const url = r?.videoUrl;
-        if (!url) throw new Error('No video returned');
+        // Queued server-side (Redis) → returns just an id; inline → returns the url.
+        const url = await resolveVideoResult(r, {
+          onQueued: (serverId) => updateGen(id, { pollGenerationId: serverId }),
+        });
         const updated: Generation = { ...gen, status: 'done', videoUrl: url };
         setGenerations((prev) => prev.map((g) => (g.id === id ? updated : g)));
         autoSaveDraft(updated);
       } catch (err: any) {
+        if (err instanceof GenerationCancelledError) {
+          // The user cancelled — not a failure, so drop the card quietly.
+          removeGen(id);
+          return;
+        }
         updateGen(id, { status: 'failed', error: err?.message || 'Video generation failed' });
         toast.error('Video generation failed: ' + (err?.message || ''));
       } finally {
         inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1);
       }
     },
-    [autoSaveDraft, updateGen, generationEnabled]
+    [autoSaveDraft, updateGen, removeGen, generationEnabled]
   );
 
   // ── Voice (TTS + SFX) ─────────────────────────────────────────────────
@@ -2965,6 +2998,9 @@ export function GenerateConsole({
                         gen={g}
                         onDismiss={() => removeGen(g.id)}
                         onRetry={() => retryGen(g)}
+                        onCancel={
+                          g.kind === 'video' && g.pollGenerationId ? () => cancelGen(g) : undefined
+                        }
                         onAnimate={() => handleAnimate(g)}
                         onUseAsStyleRef={() => handleUseAsStyleRef(g)}
                         onEditOp={(op, opts) => runEditOp(g, op, opts)}
