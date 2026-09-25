@@ -180,7 +180,7 @@ export function Fader({
   );
 }
 
-function HeaderShell({
+export function HeaderShell({
   height,
   children,
   className,
@@ -527,8 +527,11 @@ export function AudioLaneRows({
                 isVideoAudible(shown) ? 'text-primary' : 'text-muted-foreground'
               )}
             />
-            <span className="min-w-0 flex-1 truncate text-xs font-medium" title="Video audio">
-              Video
+            <span
+              className="min-w-0 flex-1 truncate text-xs font-medium"
+              title="The video clips' own audio"
+            >
+              Clip audio
             </span>
             <ToggleButton
               label="M"

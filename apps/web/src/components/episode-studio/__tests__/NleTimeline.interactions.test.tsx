@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { NleTimeline } from '../NleTimeline';
+import { GUTTER_PX } from '../AudioLanes';
 import type { EpisodeClip } from '../EpisodeClipTimeline';
 import { CLIP_DRAG_MIME, encodeClipDrag, type TextOverlay } from '@/lib/episodeCut';
 
@@ -140,7 +141,8 @@ describe('drag and drop', () => {
   it('drops library clips into the slot under the cursor', () => {
     const { props } = setup();
     const payload = encodeClipDrag([{ id: 'x', label: 'X', videoUrl: 'https://v/x.mp4' }]);
-    // jsdom lays everything out at x=0, so clientX/pxPerSec is the timeline time.
+    // jsdom lays everything out at x=0, so (clientX − GUTTER_PX)/pxPerSec is the timeline time
+    // (each row starts with a GUTTER_PX header column).
     drag('drop', track(), {
       clientX: 0,
       ...dt([CLIP_DRAG_MIME], { [CLIP_DRAG_MIME]: payload }),
@@ -150,7 +152,7 @@ describe('drag and drop', () => {
       0
     );
     drag('drop', track(), {
-      clientX: 100, // 5s: past A's midpoint → before B
+      clientX: GUTTER_PX + 100, // 5s: past A's midpoint → before B
       ...dt([CLIP_DRAG_MIME], { [CLIP_DRAG_MIME]: payload }),
     });
     expect(props.onDropClips).toHaveBeenLastCalledWith(expect.any(Array), 1);
@@ -210,7 +212,7 @@ describe('caption lane', () => {
 
   it('adds a caption where the lane is double-clicked', () => {
     const { props } = setup();
-    fireEvent.doubleClick(screen.getByLabelText('Captions'), { clientX: 60 });
+    fireEvent.doubleClick(screen.getByLabelText('Captions'), { clientX: GUTTER_PX + 60 });
     expect(props.onOverlayAdd).toHaveBeenCalledWith(3);
   });
 

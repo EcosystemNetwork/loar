@@ -223,7 +223,7 @@ describe('EpisodeEditor context actions', () => {
 describe('EpisodeEditor inspector', () => {
   it('appears for a selection and patches every selected clip', () => {
     const props = setup({ selectedIds: new Set(['a', 'b']) });
-    fireEvent.click(screen.getByRole('button', { name: /^Mute/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^(Un)?mute$/i }));
     const next = vi.mocked(props.onChange).mock.calls[0][0] as EpisodeClip[];
     expect(next.map((c) => c.volume)).toEqual([0, 0]);
   });

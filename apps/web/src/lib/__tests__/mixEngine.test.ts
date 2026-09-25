@@ -88,7 +88,7 @@ function twoTrackMix(): {
   mix: AudioMix;
   ids: { music: string; voice: string; m: string; v: string };
 } {
-  let mix = newTrack(newTrack(EMPTY_MIX, 'music'), 'voice');
+  const mix = newTrack(newTrack(EMPTY_MIX, 'music'), 'voice');
   const [music, voice] = mix.tracks.map((t) => t.id);
   const a = addClip(mix, music, { url: 'music', label: 'M', start: 2, length: 10, trimStart: 1 });
   const b = addClip(a.mix, voice, { url: 'voice', label: 'V', start: 5, length: 3 });
@@ -165,9 +165,12 @@ describe('MixEngine scheduling', () => {
 
   it('automates fades with linear ramps and applies clip × track gain', () => {
     const { ctx, sources } = fakeContext();
-    let { mix, ids } = twoTrackMix();
-    mix = patchTrack(mix, ids.voice, { volume: 0.5 });
-    mix = patchClip(mix, ids.v, { volume: 0.8, fadeIn: 1, fadeOut: 1 });
+    const { mix: base, ids } = twoTrackMix();
+    const mix = patchClip(patchTrack(base, ids.voice, { volume: 0.5 }), ids.v, {
+      volume: 0.8,
+      fadeIn: 1,
+      fadeOut: 1,
+    });
     new MixEngine(ctx, lookup({ music: 30, voice: 8 })).play(mix, 0);
     const g = sources[1].gainNode;
     const when = 10 + LEAD + 5;

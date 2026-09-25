@@ -53,6 +53,7 @@ import { ExportPanel } from '@/components/episode-studio/ExportPanel';
 import { VersionHistory, type RestoredVersion } from '@/components/episode-studio/VersionHistory';
 import { useAutosave } from '@/hooks/useAutosave';
 import { useUndoableState } from '@/hooks/useUndoableState';
+import type { AudioMix } from '@/lib/audioMix';
 import {
   clipFromDragged,
   CLIP_DRAG_MIME,
@@ -284,6 +285,10 @@ function EpisodeStudioPage() {
     (next: TextOverlay[]) => setCut((c) => (next === c.overlays ? c : { ...c, overlays: next })),
     [setCut]
   );
+  const setAudioMix = useCallback(
+    (next: AudioMix) => setCut((c) => (next === c.audioMix ? c : { ...c, audioMix: next })),
+    [setCut]
+  );
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pasteUrl, setPasteUrl] = useState('');
@@ -317,6 +322,7 @@ function EpisodeStudioPage() {
       clips: data.clips as EpisodeClip[] | undefined,
       overlays: data.overlays as TextOverlay[] | undefined,
       soundtrack: data.soundtrack as Cut['soundtrack'],
+      audioMix: data.audioMix,
     });
     const nextSettings = { ...DEFAULT_EXPORT_SETTINGS, ...(data.exportSettings ?? {}) };
     setTitle(nextTitle);
@@ -367,6 +373,7 @@ function EpisodeStudioPage() {
         clips: snap.cut.clips,
         overlays: snap.cut.overlays,
         soundtrack: snap.cut.soundtrack,
+        audioMix: snap.cut.audioMix,
         exportSettings: snap.exportSettings,
         versionKind: kind,
       });
@@ -867,6 +874,8 @@ function EpisodeStudioPage() {
           onChange={setClips}
           overlays={overlays}
           onOverlaysChange={setOverlays}
+          audioMix={cut.audioMix}
+          onAudioMixChange={setAudioMix}
           aspect={exportSettings.aspect}
           framing={exportSettings.framing}
           onDropClips={insertClips}

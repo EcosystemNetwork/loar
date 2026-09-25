@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { NleTimeline } from '../NleTimeline';
+import { GUTTER_PX } from '../AudioLanes';
 import type { EpisodeClip } from '../EpisodeClipTimeline';
 
 const clip = (nodeId: string, over: Partial<EpisodeClip> = {}): EpisodeClip => ({
@@ -87,7 +88,7 @@ describe('NleTimeline', () => {
       />
     );
     const head = container.querySelector('.bg-red-500') as HTMLElement;
-    expect(head.style.left).toBe('50px');
+    expect(head.style.left).toBe(`${GUTTER_PX + 50}px`); // header column + 2.5s × 20px
   });
 
   it('shows an empty-state prompt with no clips', () => {

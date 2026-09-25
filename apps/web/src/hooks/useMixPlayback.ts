@@ -51,8 +51,15 @@ export function useMixPlayback({
   const getBufferRef = useRef(getBuffer);
   getBufferRef.current = getBuffer;
 
-  const engine = () => {
-    if (!engineRef.current) engineRef.current = createEngine((url) => getBufferRef.current(url));
+  const engine = (): MixEngineLike | null => {
+    if (!engineRef.current) {
+      try {
+        engineRef.current = createEngine((url) => getBufferRef.current(url));
+      } catch {
+        // No Web Audio (very old browser / jsdom): the preview simply stays video-only.
+        return null;
+      }
+    }
     return engineRef.current;
   };
 
@@ -64,7 +71,7 @@ export function useMixPlayback({
     }
     // Browsers keep a context suspended until a gesture; play is always gesture-driven.
     void getAudioContextSafe()?.resume();
-    engine().play(mixRef.current, playheadRef.current);
+    engine()?.play(mixRef.current, playheadRef.current);
     // `mix` / `buffersVersion` are deliberate triggers: changing them mid-play re-schedules.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, mix, buffersVersion]);

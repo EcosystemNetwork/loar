@@ -38,6 +38,11 @@ interface SequencePreviewProps {
   overlays?: TextOverlay[];
   aspect?: ExportSettings['aspect'];
   framing?: ExportSettings['framing'];
+  /**
+   * The mixer's level for the video track's own audio (0–1): mute / solo / fader /
+   * master from the audio mix, applied on top of each clip's own volume and fades.
+   */
+  videoVolume?: number;
   /** Timeline time, fired every frame while playing. */
   onTick: (t: number) => void;
   /** Playback ran off the end of the last clip. */
@@ -76,6 +81,7 @@ export function SequencePreview({
   overlays = [],
   aspect = '16:9',
   framing = 'fit',
+  videoVolume = 1,
   onTick,
   onEnded,
 }: SequencePreviewProps) {
@@ -98,6 +104,8 @@ export function SequencePreview({
   onTickRef.current = onTick;
   const onEndedRef = useRef(onEnded);
   onEndedRef.current = onEnded;
+  const videoVolumeRef = useRef(videoVolume);
+  videoVolumeRef.current = videoVolume;
 
   /** Point a slot at a clip: its video, and its audio overlay if it has one. */
   const prepare = useCallback((slot: Slot, p: PlacedClip | undefined, sourceTime?: number) => {
@@ -139,7 +147,7 @@ export function SequencePreview({
     if (!video) return;
     const visible = fadeLevel(p.clip, p.length, localT);
     video.style.opacity = String(visible);
-    const gain = clipGain(p.clip, p.length, localT);
+    const gain = clipGain(p.clip, p.length, localT) * videoVolumeRef.current;
     video.volume = gain;
     if (audio) audio.volume = gain;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -161,7 +169,7 @@ export function SequencePreview({
     showOnly(activeRef.current);
     applyLevels(activeRef.current, hit.placed, hit.sourceTime - hit.placed.srcStart);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playhead, playing, placed, prepare, applyLevels]);
+  }, [playhead, playing, placed, videoVolume, prepare, applyLevels]);
 
   useEffect(() => {
     const pauseAll = () => {

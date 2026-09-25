@@ -8,6 +8,7 @@
  */
 import type { EpisodeClip } from '@/components/episode-studio/EpisodeClipTimeline';
 import type { PlacedClip } from '@/lib/timelineEdit';
+import { EMPTY_MIX, normalizeMix, soundtrackToMix, type AudioMix } from '@/lib/audioMix';
 
 export type OverlayPosition = 'top' | 'center' | 'bottom';
 export type OverlaySize = 'sm' | 'md' | 'lg';
@@ -46,10 +47,13 @@ export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
 export interface Cut {
   clips: EpisodeClip[];
   overlays: TextOverlay[];
+  /** Legacy single bed. Always null after hydration — it becomes a track in `audioMix`. */
   soundtrack: Soundtrack | null;
+  /** Multi-track audio: tracks of timed clips + the mixer, mixed down into one final track. */
+  audioMix: AudioMix;
 }
 
-export const EMPTY_CUT: Cut = { clips: [], overlays: [], soundtrack: null };
+export const EMPTY_CUT: Cut = { clips: [], overlays: [], soundtrack: null, audioMix: EMPTY_MIX };
 
 export const MAX_OVERLAYS = 50;
 /** Caption height as a fraction of frame height. Mirrors the server's export so the preview matches. */
@@ -253,16 +257,39 @@ export function overlaysBeyond(overlays: TextOverlay[], total: number): TextOver
 
 // ── Server hydration ────────────────────────────────────────────────────
 
-/** Coerce whatever the server returned into a well-formed Cut (older episodes have no overlays). */
+/**
+ * Rough episode length from the clips alone, for placing a migrated soundtrack
+ * before any media has loaded: trimmed clips are exact, untrimmed ones assumed.
+ */
+function estimateLength(clips: EpisodeClip[]): number {
+  const total = clips.reduce(
+    (sum, c) => sum + (c.trimEnd > 0 ? Math.max(0, c.trimEnd - c.trimStart) : 8),
+    0
+  );
+  return Math.max(1, total);
+}
+
+/**
+ * Coerce whatever the server returned into a well-formed Cut (older episodes
+ * have no overlays or audio mix). A legacy single `soundtrack` is folded into
+ * the mix as a looping music track, so it's editable like any other audio.
+ */
 export function cutFromEpisode(data: {
   clips?: EpisodeClip[] | null;
   overlays?: TextOverlay[] | null;
   soundtrack?: Soundtrack | null;
+  audioMix?: unknown;
 }): Cut {
+  const clips = data.clips ?? [];
+  let audioMix = normalizeMix(data.audioMix);
+  if (data.soundtrack?.url) {
+    audioMix = soundtrackToMix(audioMix, data.soundtrack, estimateLength(clips));
+  }
   return {
-    clips: data.clips ?? [],
+    clips,
     overlays: (data.overlays ?? []).map(normalizeOverlay),
-    soundtrack: data.soundtrack?.url ? data.soundtrack : null,
+    soundtrack: null,
+    audioMix,
   };
 }
 

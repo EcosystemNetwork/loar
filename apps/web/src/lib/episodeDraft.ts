@@ -5,6 +5,7 @@
  * (private windows and blocked storage must not break the editor).
  */
 import type { Cut, ExportSettings } from '@/lib/episodeCut';
+import { normalizeMix } from '@/lib/audioMix';
 
 export interface EpisodeDraft {
   title: string;
@@ -33,7 +34,17 @@ export function loadDraft(episodeId: string): EpisodeDraft | null {
     if (!parsed || !Array.isArray(parsed.cut?.clips) || typeof parsed.savedAt !== 'number') {
       return null;
     }
-    return parsed as EpisodeDraft;
+    // Backups written before the audio mix existed (or by an older tab) lack it.
+    const cut = parsed.cut as Partial<Cut> & { clips: Cut['clips'] };
+    return {
+      ...(parsed as EpisodeDraft),
+      cut: {
+        clips: cut.clips,
+        overlays: cut.overlays ?? [],
+        soundtrack: null,
+        audioMix: normalizeMix(cut.audioMix),
+      },
+    };
   } catch {
     return null;
   }

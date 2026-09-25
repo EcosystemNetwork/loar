@@ -19,7 +19,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { trpcClient } from '@/utils/trpc';
-import type { Cut } from '@/lib/episodeCut';
+import { cutFromEpisode, type Cut } from '@/lib/episodeCut';
 
 export interface RestoredVersion {
   title: string;
@@ -49,11 +49,12 @@ export function VersionHistory({ episodeId, open, onOpenChange, onRestore }: Ver
       onRestore({
         title: v.title,
         description: v.description,
-        cut: {
+        cut: cutFromEpisode({
           clips: v.clips as Cut['clips'],
           overlays: v.overlays as Cut['overlays'],
           soundtrack: v.soundtrack as Cut['soundtrack'],
-        },
+          audioMix: v.audioMix,
+        }),
       });
       onOpenChange(false);
       toast.success('Version restored', { description: 'Press ⌘Z / Ctrl+Z to undo.' });

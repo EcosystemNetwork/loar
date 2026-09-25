@@ -18,7 +18,7 @@
  * to `onCommit` on release, so undo history gets one entry per gesture.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Copy, Download, Music, Scissors, Trash2, Volume2 } from 'lucide-react';
+import { Copy, Download, Film, Music, Scissors, Trash2, Type, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   ContextMenu,
@@ -49,6 +49,7 @@ import {
 } from '@/lib/timelineEdit';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import type { EpisodeClip } from './EpisodeClipTimeline';
+import { GUTTER_PX, HeaderShell } from './AudioLanes';
 
 export const MIN_PX_PER_SEC = 4;
 export const MAX_PX_PER_SEC = 400;
@@ -91,6 +92,12 @@ interface NleTimelineProps {
   onDropFiles?: (files: File[], index: number) => void;
   /** Context menu / keyboard actions on a clip; `at` is the timeline time under the cursor. */
   onClipAction?: (action: ClipAction, nodeId: string, at: number) => void;
+  /**
+   * Extra rows rendered below the caption lane (the audio tracks). They share this
+   * timeline's horizontal scroll, zoom and playhead, and use the same header
+   * column: time 0 is `GUTTER_PX` from the left of every row.
+   */
+  lanes?: React.ReactNode;
 }
 
 type ClipDrag = { kind: 'move' | 'trim'; id: string } | null;
@@ -134,6 +141,7 @@ export function NleTimeline({
   onDropClips,
   onDropFiles,
   onClipAction,
+  lanes,
 }: NleTimelineProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -158,7 +166,7 @@ export function NleTimeline({
   const timeAt = useCallback(
     (clientX: number) => {
       const rect = innerRef.current?.getBoundingClientRect();
-      return rect ? (clientX - rect.left) / pxPerSec : 0;
+      return rect ? (clientX - rect.left - GUTTER_PX) / pxPerSec : 0;
     },
     [pxPerSec]
   );
@@ -177,7 +185,7 @@ export function NleTimeline({
         MAX_PX_PER_SEC,
         Math.max(MIN_PX_PER_SEC, pxPerSec * (e.deltaY < 0 ? 1.15 : 1 / 1.15))
       );
-      zoomAnchor.current = { time: (el.scrollLeft + x) / pxPerSec, x };
+      zoomAnchor.current = { time: (el.scrollLeft + x - GUTTER_PX) / pxPerSec, x };
       onPxPerSecChange(next);
     };
     el.addEventListener('wheel', onWheel, { passive: false });
@@ -188,7 +196,7 @@ export function NleTimeline({
     const el = scrollRef.current;
     const anchor = zoomAnchor.current;
     if (!el || !anchor) return;
-    el.scrollLeft = Math.max(0, anchor.time * pxPerSec - anchor.x);
+    el.scrollLeft = Math.max(0, anchor.time * pxPerSec + GUTTER_PX - anchor.x);
     zoomAnchor.current = null;
   }, [pxPerSec]);
 
@@ -196,9 +204,10 @@ export function NleTimeline({
   useEffect(() => {
     const el = scrollRef.current;
     if (!follow || !el) return;
-    const x = playhead * pxPerSec;
-    if (x > el.scrollLeft + el.clientWidth - 40 || x < el.scrollLeft) {
-      el.scrollLeft = Math.max(0, x - 40);
+    const x = GUTTER_PX + playhead * pxPerSec;
+    // The sticky header column covers the left GUTTER_PX of the viewport.
+    if (x > el.scrollLeft + el.clientWidth - 40 || x < el.scrollLeft + GUTTER_PX) {
+      el.scrollLeft = Math.max(0, x - GUTTER_PX - 40);
     }
   }, [playhead, pxPerSec, follow]);
 
@@ -427,241 +436,269 @@ export function NleTimeline({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
-      <div ref={innerRef} className="relative select-none" style={{ width, minWidth: '100%' }}>
+      <div
+        ref={innerRef}
+        className="relative select-none"
+        style={{ width: GUTTER_PX + width, minWidth: '100%' }}
+      >
         {/* Ruler */}
-        <div
-          className="relative cursor-col-resize border-b border-border bg-muted/40"
-          style={{ height: RULER_H, touchAction: 'none' }}
-          onPointerDown={onScrubStart}
-        >
-          {ticks.map((t) => (
-            <div
-              key={t}
-              className="pointer-events-none absolute top-0 h-full border-l border-border/70"
-              style={{ left: t * pxPerSec }}
-            >
-              <span className="absolute left-1 top-1 text-[10px] tabular-nums text-muted-foreground">
-                {formatRuler(t, tickStep)}
-              </span>
-            </div>
-          ))}
+        <div className="flex">
+          <HeaderShell height={RULER_H} className="border-border bg-muted/60">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Timeline
+            </span>
+          </HeaderShell>
+          <div
+            className="relative flex-1 cursor-col-resize border-b border-border bg-muted/40"
+            style={{ height: RULER_H, touchAction: 'none' }}
+            onPointerDown={onScrubStart}
+          >
+            {ticks.map((t) => (
+              <div
+                key={t}
+                className="pointer-events-none absolute top-0 h-full border-l border-border/70"
+                style={{ left: t * pxPerSec }}
+              >
+                <span className="absolute left-1 top-1 text-[10px] tabular-nums text-muted-foreground">
+                  {formatRuler(t, tickStep)}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Track */}
-        <div
-          className="relative"
-          style={{ height: TRACK_H + 12 }}
-          role="list"
-          aria-label="Episode clips"
-          onPointerDown={onEmptyTrackDown}
-        >
-          {placed.length === 0 && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-xs text-muted-foreground">
-              Add clips from your library to start cutting — or drag them (or a video file) here
+        <div className="flex">
+          <HeaderShell height={TRACK_H + 12}>
+            <div className="flex items-center gap-1">
+              <Film className="h-3.5 w-3.5 shrink-0 text-primary" />
+              <span className="text-xs font-medium">Video</span>
             </div>
-          )}
-          {placed.map((p) => {
-            const selected = selectedIds.has(p.clip.nodeId);
-            const dragging = drag?.id === p.clip.nodeId;
-            const w = Math.max(2, p.length * pxPerSec - 2);
-            const trimmed = p.clip.trimStart > 0 || p.clip.trimEnd > 0;
-            const label = p.clip.label || p.clip.nodeId;
-            const hasVolume = p.clip.volume !== undefined && p.clip.volume !== 1;
-            const fadeInPx = Math.min((p.clip.fadeIn ?? 0) * pxPerSec, w / 2);
-            const fadeOutPx = Math.min((p.clip.fadeOut ?? 0) * pxPerSec, w / 2);
-            const act = (action: ClipAction) => () =>
-              onClipAction?.(action, p.clip.nodeId, menuTime.current);
-            return (
-              <ContextMenu key={p.clip.nodeId}>
-                <ContextMenuTrigger asChild>
-                  <div
-                    role="listitem"
-                    tabIndex={0}
-                    aria-label={`${label}, ${p.length.toFixed(1)} seconds, clip ${p.index + 1} of ${placed.length}${selected ? ', selected' : ''}. Enter to select, Alt plus arrow keys to move.`}
-                    aria-selected={selected}
-                    className={cn(
-                      'group absolute top-1.5 overflow-hidden rounded-md border bg-primary/25 outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                      selected ? 'border-primary ring-2 ring-primary/60' : 'border-primary/40',
-                      dragging && 'z-10 opacity-90 shadow-lg',
-                      locked ? 'cursor-progress' : 'cursor-grab active:cursor-grabbing'
-                    )}
-                    style={{
-                      left: p.start * pxPerSec,
-                      width: w,
-                      height: TRACK_H,
-                      touchAction: 'none',
-                    }}
-                    onPointerDown={(e) => onClipDown(e, p)}
-                    onContextMenu={(e) => {
-                      menuTime.current = Math.min(
-                        Math.max(timeAt(e.clientX), p.start),
-                        p.start + p.length
-                      );
-                      if (!selectedIds.has(p.clip.nodeId)) {
-                        onSelectedIdsChange(new Set([p.clip.nodeId]));
-                      }
-                    }}
-                    onKeyDown={(e) => onClipKeyDown(e, p)}
-                    title={`${p.clip.label || p.clip.nodeId} · ${p.length.toFixed(2)}s`}
-                  >
-                    {w > 90 && (
-                      <video
-                        src={`${resolveIpfsUrlPreferred(p.clip.videoUrl)}#t=${p.srcStart.toFixed(2)}`}
-                        preload="metadata"
-                        muted
-                        tabIndex={-1}
-                        className="pointer-events-none absolute inset-y-0 left-0 h-full w-24 object-cover opacity-50"
-                      />
-                    )}
-                    {fadeInPx > 1 && (
+            <span className="text-[10px] text-muted-foreground">{placed.length} clips</span>
+          </HeaderShell>
+          <div
+            className="relative flex-1"
+            style={{ height: TRACK_H + 12 }}
+            role="list"
+            aria-label="Episode clips"
+            onPointerDown={onEmptyTrackDown}
+          >
+            {placed.length === 0 && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-xs text-muted-foreground">
+                Add clips from your library to start cutting — or drag them (or a video file) here
+              </div>
+            )}
+            {placed.map((p) => {
+              const selected = selectedIds.has(p.clip.nodeId);
+              const dragging = drag?.id === p.clip.nodeId;
+              const w = Math.max(2, p.length * pxPerSec - 2);
+              const trimmed = p.clip.trimStart > 0 || p.clip.trimEnd > 0;
+              const label = p.clip.label || p.clip.nodeId;
+              const hasVolume = p.clip.volume !== undefined && p.clip.volume !== 1;
+              const fadeInPx = Math.min((p.clip.fadeIn ?? 0) * pxPerSec, w / 2);
+              const fadeOutPx = Math.min((p.clip.fadeOut ?? 0) * pxPerSec, w / 2);
+              const act = (action: ClipAction) => () =>
+                onClipAction?.(action, p.clip.nodeId, menuTime.current);
+              return (
+                <ContextMenu key={p.clip.nodeId}>
+                  <ContextMenuTrigger asChild>
+                    <div
+                      role="listitem"
+                      tabIndex={0}
+                      aria-label={`${label}, ${p.length.toFixed(1)} seconds, clip ${p.index + 1} of ${placed.length}${selected ? ', selected' : ''}. Enter to select, Alt plus arrow keys to move.`}
+                      aria-selected={selected}
+                      className={cn(
+                        'group absolute top-1.5 overflow-hidden rounded-md border bg-primary/25 outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        selected ? 'border-primary ring-2 ring-primary/60' : 'border-primary/40',
+                        dragging && 'z-10 opacity-90 shadow-lg',
+                        locked ? 'cursor-progress' : 'cursor-grab active:cursor-grabbing'
+                      )}
+                      style={{
+                        left: p.start * pxPerSec,
+                        width: w,
+                        height: TRACK_H,
+                        touchAction: 'none',
+                      }}
+                      onPointerDown={(e) => onClipDown(e, p)}
+                      onContextMenu={(e) => {
+                        menuTime.current = Math.min(
+                          Math.max(timeAt(e.clientX), p.start),
+                          p.start + p.length
+                        );
+                        if (!selectedIds.has(p.clip.nodeId)) {
+                          onSelectedIdsChange(new Set([p.clip.nodeId]));
+                        }
+                      }}
+                      onKeyDown={(e) => onClipKeyDown(e, p)}
+                      title={`${p.clip.label || p.clip.nodeId} · ${p.length.toFixed(2)}s`}
+                    >
+                      {w > 90 && (
+                        <video
+                          src={`${resolveIpfsUrlPreferred(p.clip.videoUrl)}#t=${p.srcStart.toFixed(2)}`}
+                          preload="metadata"
+                          muted
+                          tabIndex={-1}
+                          className="pointer-events-none absolute inset-y-0 left-0 h-full w-24 object-cover opacity-50"
+                        />
+                      )}
+                      {fadeInPx > 1 && (
+                        <div
+                          className="pointer-events-none absolute inset-y-0 left-0 bg-gradient-to-r from-black/70 to-transparent"
+                          style={{ width: fadeInPx }}
+                        />
+                      )}
+                      {fadeOutPx > 1 && (
+                        <div
+                          className="pointer-events-none absolute inset-y-0 right-0 bg-gradient-to-l from-black/70 to-transparent"
+                          style={{ width: fadeOutPx }}
+                        />
+                      )}
+                      <div className="pointer-events-none relative flex h-full flex-col justify-between p-1.5 pl-2 pr-3">
+                        <span className="truncate text-xs font-medium text-foreground drop-shadow">
+                          {label}
+                        </span>
+                        <span className="flex items-center gap-1 text-[10px] tabular-nums text-foreground/80">
+                          {p.length.toFixed(1)}s{trimmed && <Scissors className="h-2.5 w-2.5" />}
+                          {p.clip.audioUrl && <Music className="h-2.5 w-2.5" />}
+                          {hasVolume && <Volume2 className="h-2.5 w-2.5" />}
+                        </span>
+                      </div>
+                      {/* Trim handles — wider on touch screens */}
                       <div
-                        className="pointer-events-none absolute inset-y-0 left-0 bg-gradient-to-r from-black/70 to-transparent"
-                        style={{ width: fadeInPx }}
+                        aria-hidden
+                        className="absolute inset-y-0 left-0 w-2 cursor-ew-resize bg-foreground/20 hover:bg-primary [@media(pointer:coarse)]:w-4"
+                        style={{ touchAction: 'none' }}
+                        onPointerDown={(e) => onHandleDown(e, p, 'start')}
                       />
-                    )}
-                    {fadeOutPx > 1 && (
                       <div
-                        className="pointer-events-none absolute inset-y-0 right-0 bg-gradient-to-l from-black/70 to-transparent"
-                        style={{ width: fadeOutPx }}
+                        aria-hidden
+                        className="absolute inset-y-0 right-0 w-2 cursor-ew-resize bg-foreground/20 hover:bg-primary [@media(pointer:coarse)]:w-4"
+                        style={{ touchAction: 'none' }}
+                        onPointerDown={(e) => onHandleDown(e, p, 'end')}
                       />
-                    )}
-                    <div className="pointer-events-none relative flex h-full flex-col justify-between p-1.5 pl-2 pr-3">
-                      <span className="truncate text-xs font-medium text-foreground drop-shadow">
-                        {label}
-                      </span>
-                      <span className="flex items-center gap-1 text-[10px] tabular-nums text-foreground/80">
-                        {p.length.toFixed(1)}s{trimmed && <Scissors className="h-2.5 w-2.5" />}
-                        {p.clip.audioUrl && <Music className="h-2.5 w-2.5" />}
-                        {hasVolume && <Volume2 className="h-2.5 w-2.5" />}
-                      </span>
                     </div>
-                    {/* Trim handles — wider on touch screens */}
-                    <div
-                      aria-hidden
-                      className="absolute inset-y-0 left-0 w-2 cursor-ew-resize bg-foreground/20 hover:bg-primary [@media(pointer:coarse)]:w-4"
-                      style={{ touchAction: 'none' }}
-                      onPointerDown={(e) => onHandleDown(e, p, 'start')}
-                    />
-                    <div
-                      aria-hidden
-                      className="absolute inset-y-0 right-0 w-2 cursor-ew-resize bg-foreground/20 hover:bg-primary [@media(pointer:coarse)]:w-4"
-                      style={{ touchAction: 'none' }}
-                      onPointerDown={(e) => onHandleDown(e, p, 'end')}
-                    />
-                  </div>
-                </ContextMenuTrigger>
-                <ContextMenuContent>
-                  <ContextMenuItem onSelect={act('split')} disabled={locked}>
-                    <Scissors /> Split here <ContextMenuShortcut>S</ContextMenuShortcut>
-                  </ContextMenuItem>
-                  <ContextMenuItem onSelect={act('trim-in')} disabled={locked}>
-                    Trim start to playhead <ContextMenuShortcut>Q</ContextMenuShortcut>
-                  </ContextMenuItem>
-                  <ContextMenuItem onSelect={act('trim-out')} disabled={locked}>
-                    Trim end to playhead <ContextMenuShortcut>W</ContextMenuShortcut>
-                  </ContextMenuItem>
-                  <ContextMenuSeparator />
-                  <ContextMenuItem onSelect={act('duplicate')}>
-                    <Copy /> Duplicate <ContextMenuShortcut>⌘D</ContextMenuShortcut>
-                  </ContextMenuItem>
-                  <ContextMenuItem onSelect={act('move-earlier')} disabled={p.index === 0}>
-                    Move earlier <ContextMenuShortcut>Alt ←</ContextMenuShortcut>
-                  </ContextMenuItem>
-                  <ContextMenuItem
-                    onSelect={act('move-later')}
-                    disabled={p.index === placed.length - 1}
-                  >
-                    Move later <ContextMenuShortcut>Alt →</ContextMenuShortcut>
-                  </ContextMenuItem>
-                  <ContextMenuItem onSelect={act('download')}>
-                    <Download /> Download source
-                  </ContextMenuItem>
-                  <ContextMenuSeparator />
-                  <ContextMenuItem variant="destructive" onSelect={act('delete')}>
-                    <Trash2 /> Delete <ContextMenuShortcut>Del</ContextMenuShortcut>
-                  </ContextMenuItem>
-                </ContextMenuContent>
-              </ContextMenu>
-            );
-          })}
-          {dropX !== null && (
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-y-0 z-30 w-0.5 bg-primary"
-              style={{ left: dropX * pxPerSec - 1 }}
-            />
-          )}
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem onSelect={act('split')} disabled={locked}>
+                      <Scissors /> Split here <ContextMenuShortcut>S</ContextMenuShortcut>
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={act('trim-in')} disabled={locked}>
+                      Trim start to playhead <ContextMenuShortcut>Q</ContextMenuShortcut>
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={act('trim-out')} disabled={locked}>
+                      Trim end to playhead <ContextMenuShortcut>W</ContextMenuShortcut>
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem onSelect={act('duplicate')}>
+                      <Copy /> Duplicate <ContextMenuShortcut>⌘D</ContextMenuShortcut>
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={act('move-earlier')} disabled={p.index === 0}>
+                      Move earlier <ContextMenuShortcut>Alt ←</ContextMenuShortcut>
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      onSelect={act('move-later')}
+                      disabled={p.index === placed.length - 1}
+                    >
+                      Move later <ContextMenuShortcut>Alt →</ContextMenuShortcut>
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={act('download')}>
+                      <Download /> Download source
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem variant="destructive" onSelect={act('delete')}>
+                      <Trash2 /> Delete <ContextMenuShortcut>Del</ContextMenuShortcut>
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
+              );
+            })}
+            {dropX !== null && (
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-y-0 z-30 w-0.5 bg-primary"
+                style={{ left: dropX * pxPerSec - 1 }}
+              />
+            )}
+          </div>
         </div>
 
         {/* Caption lane */}
-        <div
-          className="relative border-t border-border/60 bg-muted/30"
-          style={{ height: OVERLAY_LANE_H }}
-          aria-label="Captions"
-          onDoubleClick={(e) => {
-            if (e.target === e.currentTarget) onOverlayAdd?.(Math.max(0, timeAt(e.clientX)));
-          }}
-          onPointerDown={(e) => {
-            if (e.target === e.currentTarget) {
-              onSelectOverlay?.(null);
-              onScrubStart(e);
-            }
-          }}
-        >
-          {shownOverlays.length === 0 && (
-            <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
-              Captions — double-click to add one
-            </span>
-          )}
-          {shownOverlays.map((o) => {
-            const selected = o.id === selectedOverlayId;
-            return (
-              <div
-                key={o.id}
-                role="button"
-                tabIndex={0}
-                aria-pressed={selected}
-                aria-label={`Caption: ${o.text}`}
-                title={`${o.text} · ${o.start.toFixed(1)}s–${o.end.toFixed(1)}s`}
-                className={cn(
-                  'absolute top-0.5 flex cursor-grab items-center overflow-hidden rounded border bg-amber-500/30 outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing',
-                  selected ? 'border-amber-500 ring-1 ring-amber-500' : 'border-amber-500/50'
-                )}
-                style={{
-                  left: o.start * pxPerSec,
-                  width: Math.max(6, (o.end - o.start) * pxPerSec),
-                  height: OVERLAY_LANE_H - 4,
-                  touchAction: 'none',
-                }}
-                onPointerDown={(e) => onOverlayDown(e, o, 'move')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') onSelectOverlay?.(o.id);
-                }}
-              >
-                <span className="pointer-events-none truncate px-2 text-[10px] font-medium">
-                  {o.text}
-                </span>
+        <div className="flex">
+          <HeaderShell height={OVERLAY_LANE_H} className="!flex-row items-center gap-1 !py-0">
+            <Type className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+            <span className="text-xs font-medium">Captions</span>
+          </HeaderShell>
+          <div
+            className="relative flex-1 border-t border-border/60 bg-muted/30"
+            style={{ height: OVERLAY_LANE_H }}
+            aria-label="Captions"
+            onDoubleClick={(e) => {
+              if (e.target === e.currentTarget) onOverlayAdd?.(Math.max(0, timeAt(e.clientX)));
+            }}
+            onPointerDown={(e) => {
+              if (e.target === e.currentTarget) {
+                onSelectOverlay?.(null);
+                onScrubStart(e);
+              }
+            }}
+          >
+            {shownOverlays.length === 0 && (
+              <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
+                Captions — double-click to add one
+              </span>
+            )}
+            {shownOverlays.map((o) => {
+              const selected = o.id === selectedOverlayId;
+              return (
                 <div
-                  aria-hidden
-                  className="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize bg-amber-500/60 [@media(pointer:coarse)]:w-3"
-                  style={{ touchAction: 'none' }}
-                  onPointerDown={(e) => onOverlayDown(e, o, 'start')}
-                />
-                <div
-                  aria-hidden
-                  className="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize bg-amber-500/60 [@media(pointer:coarse)]:w-3"
-                  style={{ touchAction: 'none' }}
-                  onPointerDown={(e) => onOverlayDown(e, o, 'end')}
-                />
-              </div>
-            );
-          })}
+                  key={o.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={selected}
+                  aria-label={`Caption: ${o.text}`}
+                  title={`${o.text} · ${o.start.toFixed(1)}s–${o.end.toFixed(1)}s`}
+                  className={cn(
+                    'absolute top-0.5 flex cursor-grab items-center overflow-hidden rounded border bg-amber-500/30 outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing',
+                    selected ? 'border-amber-500 ring-1 ring-amber-500' : 'border-amber-500/50'
+                  )}
+                  style={{
+                    left: o.start * pxPerSec,
+                    width: Math.max(6, (o.end - o.start) * pxPerSec),
+                    height: OVERLAY_LANE_H - 4,
+                    touchAction: 'none',
+                  }}
+                  onPointerDown={(e) => onOverlayDown(e, o, 'move')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') onSelectOverlay?.(o.id);
+                  }}
+                >
+                  <span className="pointer-events-none truncate px-2 text-[10px] font-medium">
+                    {o.text}
+                  </span>
+                  <div
+                    aria-hidden
+                    className="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize bg-amber-500/60 [@media(pointer:coarse)]:w-3"
+                    style={{ touchAction: 'none' }}
+                    onPointerDown={(e) => onOverlayDown(e, o, 'start')}
+                  />
+                  <div
+                    aria-hidden
+                    className="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize bg-amber-500/60 [@media(pointer:coarse)]:w-3"
+                    style={{ touchAction: 'none' }}
+                    onPointerDown={(e) => onOverlayDown(e, o, 'end')}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
+
+        {lanes}
 
         {/* Playhead */}
         <div
           className="pointer-events-none absolute top-0 z-20 h-full w-px bg-red-500"
-          style={{ left: playhead * pxPerSec }}
+          style={{ left: GUTTER_PX + playhead * pxPerSec }}
         >
           <div className="absolute -left-[5px] top-0 h-0 w-0 border-x-[5.5px] border-t-[8px] border-x-transparent border-t-red-500" />
         </div>

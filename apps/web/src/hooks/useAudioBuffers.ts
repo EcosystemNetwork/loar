@@ -8,7 +8,11 @@ import { audioBuffers, type AudioStatus, type LoadedAudio } from '@/lib/audioBuf
  */
 export function useAudioBuffers(urls: string[]) {
   // Re-render on any store change; only the URLs we asked about matter to callers.
-  useSyncExternalStore(audioBuffers.subscribe, audioBuffers.snapshot, audioBuffers.snapshot);
+  const version = useSyncExternalStore(
+    audioBuffers.subscribe,
+    audioBuffers.snapshot,
+    audioBuffers.snapshot
+  );
 
   const key = useMemo(() => [...new Set(urls.filter(Boolean))].sort().join('\n'), [urls]);
   useEffect(() => {
@@ -21,5 +25,5 @@ export function useAudioBuffers(urls: string[]) {
     (url: string): AudioStatus | undefined => audioBuffers.status(url),
     []
   );
-  return { get, getBuffer, status };
+  return { get, getBuffer, status, version };
 }

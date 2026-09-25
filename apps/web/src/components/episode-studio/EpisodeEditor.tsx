@@ -33,6 +33,7 @@ import {
   Trash2,
   Type,
   Undo2,
+  Volume2,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
@@ -40,6 +41,22 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useClipDurations } from '@/hooks/useClipDurations';
+import { useAudioBuffers } from '@/hooks/useAudioBuffers';
+import { useMixPlayback } from '@/hooks/useMixPlayback';
+import {
+  EMPTY_MIX,
+  MIN_AUDIO_CLIP_SEC,
+  addClip,
+  clipEnd,
+  findClip,
+  newTrack,
+  patchClip as patchAudioClip,
+  previewVideoVolume,
+  removeAudioClips,
+  setMaster,
+  splitAudioClipAt,
+  type AudioMix,
+} from '@/lib/audioMix';
 import {
   duplicateClip,
   newOverlay,
@@ -59,6 +76,9 @@ import {
   trimEdgeToTime,
 } from '@/lib/timelineEdit';
 import type { EpisodeClip } from './EpisodeClipTimeline';
+import { AddAudioDialog, type AudioSource } from './AddAudioDialog';
+import { AudioClipInspector } from './AudioClipInspector';
+import { AudioLaneRows, Fader, GUTTER_PX } from './AudioLanes';
 import { CaptionPanel } from './CaptionPanel';
 import { ClipInspector } from './ClipInspector';
 import { MAX_PX_PER_SEC, MIN_PX_PER_SEC, NleTimeline, type ClipAction } from './NleTimeline';
@@ -83,6 +103,9 @@ interface EpisodeEditorProps {
   onChange: (clips: EpisodeClip[]) => void;
   overlays: TextOverlay[];
   onOverlaysChange: (overlays: TextOverlay[]) => void;
+  /** Multi-track audio (tracks of timed clips + mixer), mixed down into the final audio track. */
+  audioMix?: AudioMix;
+  onAudioMixChange?: (mix: AudioMix) => void;
   aspect: ExportSettings['aspect'];
   framing: ExportSettings['framing'];
   /** Library clips dropped on the timeline. */
@@ -144,6 +167,8 @@ export function EpisodeEditor({
   onChange,
   overlays,
   onOverlaysChange,
+  audioMix = EMPTY_MIX,
+  onAudioMixChange = () => {},
   aspect,
   framing,
   onDropClips,
@@ -160,11 +185,22 @@ export function EpisodeEditor({
   const placed = useMemo(() => placeClips(clips, durations), [clips, durations]);
   const total = totalDuration(placed);
 
+  // Audio tracks: decode every clip's audio once (waveforms + preview), and play the
+  // mix in step with the video. The video's own audio is leveled by the mixer too.
+  const audioUrls = useMemo(
+    () => audioMix.tracks.flatMap((t) => t.clips.map((c) => c.url)),
+    [audioMix]
+  );
+  const buffers = useAudioBuffers(audioUrls);
+
   const [playhead, setPlayhead] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [pxPerSec, setPxPerSec] = useState(30);
   const [snapping, setSnapping] = useState(true);
   const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null);
+  const [selectedAudioIds, setSelectedAudioIds] = useState<Set<string>>(new Set());
+  /** Track that the "Add audio" dialog will drop into (`''` = pick / create one). */
+  const [addAudioFor, setAddAudioFor] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [hintDismissed, setHintDismissed] = useState(readHintDismissed);
   /** Spoken by screen readers after each edit (there's no other feedback for them). */
@@ -190,6 +226,18 @@ export function EpisodeEditor({
     setPlaying(false);
   }, [clips]);
 
+  // The audio-track mix plays alongside the video, re-scheduled from the playhead if
+  // you mute / solo / re-level / edit a track mid-play (unlike clip edits, those
+  // don't stop playback — you can mix by ear).
+  useMixPlayback({
+    mix: audioMix,
+    playing,
+    playhead,
+    getBuffer: buffers.getBuffer,
+    buffersVersion: buffers.version,
+  });
+  const videoVolume = previewVideoVolume(audioMix);
+
   const setZoom = useCallback(
     (px: number) => setPxPerSec(Math.min(MAX_PX_PER_SEC, Math.max(MIN_PX_PER_SEC, px))),
     []
@@ -202,7 +250,8 @@ export function EpisodeEditor({
 
   const fit = useCallback(() => {
     const width = editorRef.current?.clientWidth ?? 0;
-    if (total > 0 && width > 0) setZoom((width - 200) / total);
+    // Room for the header column, the timeline's empty tail runway and the card padding.
+    if (total > 0 && width > 0) setZoom((width - GUTTER_PX - 190) / total);
   }, [total, setZoom]);
 
   // Start zoomed to show the whole episode (once — after that, zoom is the user's).
@@ -222,7 +271,103 @@ export function EpisodeEditor({
 
   const say = (message: string) => setAnnouncement(message);
 
+  // ── Audio tracks ───────────────────────────────────────────────────────
+  // Selection is exclusive across video clips, captions and audio clips so Delete / S
+  // always act on the thing you last picked.
+  const selectAudio = (ids: Set<string>) => {
+    setSelectedAudioIds(ids);
+    if (ids.size) {
+      onSelectedIdsChange(new Set());
+      setSelectedOverlayId(null);
+    }
+  };
+  const selectVideo = (ids: Set<string>) => {
+    onSelectedIdsChange(ids);
+    if (ids.size) setSelectedAudioIds(new Set());
+  };
+  const selectOverlay = (id: string | null) => {
+    setSelectedOverlayId(id);
+    if (id) setSelectedAudioIds(new Set());
+  };
+
+  const selectedAudioClips = audioMix.tracks
+    .flatMap((t) => t.clips)
+    .filter((c) => selectedAudioIds.has(c.id));
+
+  const deleteAudioSelection = () => {
+    if (!selectedAudioIds.size) return;
+    onAudioMixChange(removeAudioClips(audioMix, selectedAudioIds));
+    say(
+      selectedAudioIds.size === 1
+        ? 'Audio clip deleted'
+        : `${selectedAudioIds.size} audio clips deleted`
+    );
+    setSelectedAudioIds(new Set());
+  };
+
+  /** Split every selected audio clip that the playhead is inside. */
+  const splitSelectedAudio = () => {
+    let next = audioMix;
+    const created: string[] = [];
+    for (const id of selectedAudioIds) {
+      const r = splitAudioClipAt(next, id, playhead);
+      if (r) {
+        next = r.mix;
+        created.push(r.rightId);
+      }
+    }
+    if (next === audioMix) return false;
+    onAudioMixChange(next);
+    say(
+      `Split ${created.length} audio clip${created.length === 1 ? '' : 's'} at ${formatTimecode(playhead, FPS)}`
+    );
+    return true;
+  };
+  const canSplitAudio = selectedAudioClips.some(
+    (c) => playhead - c.start >= MIN_AUDIO_CLIP_SEC && clipEnd(c) - playhead >= MIN_AUDIO_CLIP_SEC
+  );
+
+  const patchSelectedAudio = (patch: Parameters<typeof patchAudioClip>[2]) => {
+    let next = audioMix;
+    for (const id of selectedAudioIds) next = patchAudioClip(next, id, patch);
+    if (next !== audioMix) onAudioMixChange(next);
+  };
+
+  /** Drop an audio file on a track at the playhead (creating a track if there is none). */
+  const addAudioClip = (source: AudioSource, trackId: string | null) => {
+    let mix = audioMix;
+    let target = trackId && mix.tracks.some((t) => t.id === trackId) ? trackId : null;
+    if (!target) {
+      target = mix.tracks[0]?.id ?? null;
+    }
+    if (!target) {
+      mix = newTrack(mix, source.loop ? 'music' : 'audio');
+      target = mix.tracks[mix.tracks.length - 1]?.id ?? null;
+    }
+    if (!target) return;
+    // A looped bed fills from the playhead to the end of the picture; otherwise the
+    // file's own length (10 s if its metadata couldn't be read).
+    const length = source.loop ? Math.max(total - playhead, 1) : (source.duration ?? 10);
+    const result = addClip(mix, target, {
+      url: source.url,
+      label: source.label,
+      start: playhead,
+      length,
+      sourceDuration: source.duration ?? undefined,
+      loop: source.loop,
+    });
+    if (!result.clipId) {
+      say('Could not add audio: track or clip limit reached');
+      return;
+    }
+    onAudioMixChange(result.mix);
+    selectAudio(new Set([result.clipId]));
+    say(`Added audio "${source.label}"`);
+  };
+
   const split = (at = playhead) => {
+    // With audio clips selected, S cuts those (like a razor on the selected tracks).
+    if (selectedAudioIds.size && at === playhead && splitSelectedAudio()) return;
     if (!canEdit) return;
     const result = splitClipAt(clips, durations, at);
     if (!result) return;
@@ -373,7 +518,10 @@ export function EpisodeEditor({
         break;
       case 'delete':
       case 'backspace':
-        if (selectedIds.size) {
+        if (selectedAudioIds.size) {
+          e.preventDefault();
+          deleteAudioSelection();
+        } else if (selectedIds.size) {
           e.preventDefault();
           deleteSelected();
         } else if (selectedOverlayId) {
@@ -444,6 +592,7 @@ export function EpisodeEditor({
               overlays={overlays}
               aspect={aspect}
               framing={framing}
+              videoVolume={videoVolume}
               onTick={setPlayhead}
               onEnded={() => {
                 setPlaying(false);
@@ -519,7 +668,7 @@ export function EpisodeEditor({
             size="sm"
             className="h-8 gap-1.5"
             title="Split the clip at the playhead (S)"
-            disabled={!splitResult}
+            disabled={!splitResult && !canSplitAudio}
             onClick={() => split()}
           >
             <Scissors className="h-3.5 w-3.5" />
@@ -555,6 +704,12 @@ export function EpisodeEditor({
             <Copy />
           </ToolButton>
           <ToolButton
+            title="Add audio at the playhead — music, voice-over, effects"
+            onClick={() => setAddAudioFor('')}
+          >
+            <Volume2 />
+          </ToolButton>
+          <ToolButton
             title="Add a caption at the playhead (C)"
             onClick={() => addCaption()}
             disabled={total <= 0}
@@ -571,6 +726,17 @@ export function EpisodeEditor({
 
           <div className="flex-1" />
 
+          <div
+            className="mr-1 flex w-28 items-center gap-1.5 text-[10px] text-muted-foreground"
+            title="Master level — applies to everything mixed into the final audio track"
+          >
+            <span>Master</span>
+            <Fader
+              label="Master level"
+              value={audioMix.mixer.master}
+              onCommit={(v) => onAudioMixChange(setMaster(audioMix, v))}
+            />
+          </div>
           <ToolButton title="Keyboard shortcuts (?)" onClick={() => setHelpOpen(true)}>
             <Keyboard />
           </ToolButton>
@@ -601,18 +767,34 @@ export function EpisodeEditor({
           follow={playing}
           locked={pending}
           selectedIds={selectedIds}
-          onSelectedIdsChange={onSelectedIdsChange}
+          onSelectedIdsChange={selectVideo}
           onPlayhead={onPlayhead}
           onCommit={onChange}
           onPxPerSecChange={setZoom}
           overlays={overlays}
           selectedOverlayId={selectedOverlayId}
-          onSelectOverlay={setSelectedOverlayId}
+          onSelectOverlay={selectOverlay}
           onOverlaysCommit={onOverlaysChange}
           onOverlayAdd={addCaption}
           onDropClips={onDropClips}
           onDropFiles={onDropFiles}
           onClipAction={onClipAction}
+          lanes={
+            <AudioLaneRows
+              mix={audioMix}
+              pxPerSec={pxPerSec}
+              playhead={playhead}
+              snapping={snapping}
+              locked={false}
+              selectedClipIds={selectedAudioIds}
+              onSelectedClipIdsChange={selectAudio}
+              onPlayhead={onPlayhead}
+              onCommit={onAudioMixChange}
+              extraSnapPoints={placed.flatMap((p) => [p.start, p.start + p.length])}
+              loaded={buffers}
+              onAddAudio={(trackId) => setAddAudioFor(trackId)}
+            />
+          }
         />
 
         {selectedClips.length > 0 && (
@@ -621,6 +803,9 @@ export function EpisodeEditor({
             minLength={Number.isFinite(selectedMinLength) ? selectedMinLength : 1}
             onPatch={patchSelected}
           />
+        )}
+        {selectedAudioClips.length > 0 && (
+          <AudioClipInspector clips={selectedAudioClips} onPatch={patchSelectedAudio} />
         )}
         <CaptionPanel
           overlays={overlays}
@@ -639,14 +824,24 @@ export function EpisodeEditor({
         <p className={cn('hidden text-[11px] text-muted-foreground md:block')}>
           Click the ruler to scrub · <kbd>S</kbd> split · <kbd>Q</kbd>/<kbd>W</kbd> trim to playhead
           · drag a clip's edge to ripple-trim, its body to reorder · <kbd>⌘</kbd>/<kbd>Ctrl</kbd>
-          +scroll to zoom · <kbd>?</kbd> all shortcuts. Preview plays each clip's own audio, volume
-          and fades exactly as exported.
+          +scroll to zoom · <kbd>?</kbd> all shortcuts. Audio tracks mix down into one final track;
+          the preview plays the same mix.
         </p>
 
         <div className="sr-only" role="status" aria-live="polite">
           {announcement}
         </div>
         <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} />
+        <AddAudioDialog
+          open={addAudioFor !== null}
+          onOpenChange={(open) => {
+            if (!open) setAddAudioFor(null);
+          }}
+          trackName={
+            addAudioFor ? audioMix.tracks.find((t) => t.id === addAudioFor)?.name : undefined
+          }
+          onAdd={(source) => addAudioClip(source, addAudioFor || null)}
+        />
       </Card>
     </div>
   );
