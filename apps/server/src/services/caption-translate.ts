@@ -15,7 +15,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { CaptionSegment } from '../lib/captions-format';
 
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-2.5-flash';
 const CHUNK_SEGMENTS = 30;
 const CHUNK_CHARS = 6_000;
@@ -111,6 +110,8 @@ export interface TranslateCaptionsInput {
   segments: CaptionSegment[];
   sourceLanguage: string;
   targetLanguage: string;
+  /** The caller's own Google AI key (BYOK). Required — no platform fallback. */
+  apiKey?: string;
 }
 
 export interface TranslateCaptionsResult {
@@ -131,8 +132,11 @@ export interface TranslateCaptionsResult {
 export async function translateCaptions(
   input: TranslateCaptionsInput
 ): Promise<TranslateCaptionsResult> {
-  if (!GOOGLE_API_KEY) {
-    throw new Error('GOOGLE_API_KEY is required for caption translation');
+  const apiKey = input.apiKey?.trim();
+  if (!apiKey) {
+    throw new Error(
+      'No Google AI API key available — add one at /settings/api-keys to translate captions.'
+    );
   }
   if (input.sourceLanguage === input.targetLanguage) {
     return {
@@ -142,7 +146,7 @@ export async function translateCaptions(
       sourceChars: input.segments.reduce((n, s) => n + s.text.length, 0),
     };
   }
-  const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
+  const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
     model: MODEL,
     generationConfig: { temperature: 0.2 },

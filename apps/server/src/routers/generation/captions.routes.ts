@@ -306,6 +306,17 @@ export const captionsRouter = router({
         return { translations: {}, charged: 0, sourceLanguage, availableTranslations: [] };
       }
 
+      // BYOK: resolve first so a missing key fails before any reservation.
+      let googleKey: string;
+      try {
+        googleKey = (await resolveProviderKey(ctx.user.uid, 'google')).apiKey;
+      } catch {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'No Google AI API key on file — add one at /settings/api-keys to translate.',
+        });
+      }
+
       const credits = TRANSLATION_CREDITS_PER_LANGUAGE * targets.length;
       const { reservationId } = await reserve({
         userId: ctx.user.uid,
@@ -323,6 +334,7 @@ export const captionsRouter = router({
             segments,
             sourceLanguage,
             targetLanguage: target,
+            apiKey: googleKey,
           });
           out[target] = result.segments;
           await ref.collection('translations').doc(target).set({

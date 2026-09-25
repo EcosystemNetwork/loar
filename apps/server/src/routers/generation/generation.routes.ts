@@ -793,12 +793,14 @@ async function persistVideoToStorage(opts: {
     // Fetch the video, sign with C2PA provenance, then upload. Attach the
     // Gemini Files auth header or this 401s and the video is lost once
     // Google's copy expires (see markRehostNeeded below).
+    // The file was created with the user's own (BYOK) key, so only it can read it.
     const isGeminiFilesHost = isGeminiFilesUrl(opts.videoUrl);
+    const { resolveProviderKey } = await import('../../lib/byok');
+    const filesKey = isGeminiFilesHost
+      ? await resolveProviderKey(opts.userId, 'google')
+      : undefined;
     const response = await fetch(opts.videoUrl, {
-      headers:
-        isGeminiFilesHost && process.env.GOOGLE_API_KEY
-          ? { 'x-goog-api-key': process.env.GOOGLE_API_KEY }
-          : undefined,
+      headers: filesKey ? { 'x-goog-api-key': filesKey } : undefined,
     });
     if (!response.ok) {
       throw new Error(`Source fetch failed: ${response.status} ${response.statusText}`);
@@ -2515,12 +2517,14 @@ export const generationRouter = router({
         let falApiKey: string | undefined;
         const { resolveProviderKey } = await import('../../lib/byok');
         if (isGoogle) {
-          // resolveProviderKey falls back to process.env.GOOGLE_API_KEY when no BYOK key is set.
+          // BYOK-only: no platform GOOGLE_API_KEY fallback — a missing key means we can't dispatch.
           const googleKey = await resolveProviderKey(ctx.user.uid, 'google');
           resolvedGoogleKey = googleKey;
           if (!googleKey) {
             await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);
-            throw new Error('GOOGLE_API_KEY is not configured — set one in /settings/api-keys');
+            throw new Error(
+              'No Google AI API key on file — add one at /settings/api-keys to use Veo.'
+            );
           }
           const gModel = getModelById(input.model!);
           if (!gModel?.googleModelId) {

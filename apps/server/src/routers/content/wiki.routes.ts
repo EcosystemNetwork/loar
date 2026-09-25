@@ -9,6 +9,7 @@ import { join } from 'path';
 import { db } from '../../lib/firebase';
 import { throwApiError, wrapError } from '../../lib/errors';
 import { wikiaService } from '../../services/wikia';
+import { resolveProviderKey } from '../../lib/byok';
 import { geminiService } from '../../services/gemini';
 import { isUniverseAdmin } from '../../lib/safe-admin';
 import { isUniverseExcluded, normalizeUniverseId } from '../../lib/universe-id';
@@ -394,14 +395,18 @@ export const wikiRouter = router({
             });
         }
 
-        const result = await geminiService.generateWikiFromVideo(input.videoUrl, {
-          eventId: input.eventId,
-          title: input.title,
-          description: input.description,
-          characterIds: input.characterIds,
-          characters: characterData,
-          previousEvents: input.previousEvents,
-        });
+        const result = await geminiService.generateWikiFromVideo(
+          input.videoUrl,
+          {
+            eventId: input.eventId,
+            title: input.title,
+            description: input.description,
+            characterIds: input.characterIds,
+            characters: characterData,
+            previousEvents: input.previousEvents,
+          },
+          await resolveProviderKey(ctx.user.uid, 'google')
+        );
 
         const wikiEntry = {
           universeId: normalizeUniverseId(input.universeId),

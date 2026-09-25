@@ -33,6 +33,7 @@ import { randomUUID } from 'crypto';
 import { falService } from '../../services/fal';
 import { bytedanceService } from '../../services/bytedance';
 import { db } from '../../lib/firebase';
+import { resolveProviderKey } from '../../lib/byok';
 import { geminiService } from '../../services/gemini';
 import { wrapError } from '../../lib/errors';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -2147,7 +2148,8 @@ export const imageRouter = router({
         const detailedDescription = await geminiService.analyzeCharacterImage(
           input.imageUrl,
           input.userDescription,
-          input.characterName
+          input.characterName,
+          await resolveProviderKey(ctx.user.uid, 'google')
         );
         return {
           success: true,

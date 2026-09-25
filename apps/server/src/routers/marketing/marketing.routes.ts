@@ -22,6 +22,7 @@ import {
   listAdFormats,
   resolveAdFormat,
 } from '../../services/marketing/ad-formats';
+import { resolveProviderKey } from '../../lib/byok';
 import { geminiService, type AdDecomposition } from '../../services/gemini';
 
 const generateInputSchema = z.object({
@@ -135,9 +136,12 @@ export const marketingRouter = router({
 
   decomposeAd: protectedProcedure
     .input(z.object({ videoUrl: z.string().url() }))
-    .mutation(async ({ input }): Promise<AdDecomposition> => {
+    .mutation(async ({ ctx, input }): Promise<AdDecomposition> => {
       try {
-        return await geminiService.decomposeAdVideo(input.videoUrl);
+        return await geminiService.decomposeAdVideo(
+          input.videoUrl,
+          await resolveProviderKey(ctx.user.uid, 'google')
+        );
       } catch (err) {
         throw new TRPCError({
           code: 'BAD_REQUEST',

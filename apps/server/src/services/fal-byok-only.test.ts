@@ -48,3 +48,31 @@ describe('fal-backed services are BYOK-only', () => {
     expect(config).toHaveBeenCalledWith({ credentials: 'user-key' });
   });
 });
+
+describe('Google-backed services are BYOK-only', () => {
+  const original = process.env.GOOGLE_API_KEY;
+  beforeEach(() => {
+    process.env.GOOGLE_API_KEY = 'platform-google-key-must-not-be-used';
+  });
+  afterEach(() => {
+    if (original === undefined) delete process.env.GOOGLE_API_KEY;
+    else process.env.GOOGLE_API_KEY = original;
+  });
+
+  it('Gemini entity lore/profile/ad-decompose reject without a caller key', async () => {
+    const g = await vi.importActual<typeof import('./gemini')>('./gemini');
+    await expect(g.generateEntityLore('A', 'character', 'd')).rejects.toThrow(/Google AI API key/);
+    await expect(g.generateEntityProfile('A', 'character', 'h')).rejects.toThrow(
+      /Google AI API key/
+    );
+    await expect(g.decomposeAdVideo('https://x/v.mp4')).rejects.toThrow(/Google AI API key/);
+  });
+
+  it('caption translation rejects without a caller key', async () => {
+    const { translateCaptions } =
+      await vi.importActual<typeof import('./caption-translate')>('./caption-translate');
+    await expect(
+      translateCaptions({ segments: [], sourceLanguage: 'en', targetLanguage: 'es' })
+    ).rejects.toThrow(/Google AI API key/);
+  });
+});

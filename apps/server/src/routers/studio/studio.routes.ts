@@ -355,12 +355,18 @@ async function run3DTask(
 async function runLoreTask(
   entityName: string,
   entityKind: string,
-  description: string
+  description: string,
+  apiKey?: string
 ): Promise<TaskResult> {
   const creditsUsed = toCredits(CAPABILITY_COST_USD.lore_card);
 
   try {
-    const text = await geminiService.generateEntityLore(entityName, entityKind, description);
+    const text = await geminiService.generateEntityLore(
+      entityName,
+      entityKind,
+      description,
+      apiKey
+    );
     return {
       capability: 'lore_card',
       status: 'completed',
@@ -613,12 +619,13 @@ async function runPackJob(
   const results: TaskResult[] = [];
   let creditsActuallyUsed = 0;
 
-  // Resolve BYOK keys once for the whole job (user-supplied → env fallback)
+  // Resolve BYOK keys once for the whole job (user-supplied only — no platform fallback)
   const { resolveProviderKey } = await import('../../lib/byok');
-  const [falKey, elevenKey, meshyKey] = await Promise.all([
+  const [falKey, elevenKey, meshyKey, googleKey] = await Promise.all([
     resolveProviderKey(userId, 'fal'),
     resolveProviderKey(userId, 'elevenlabs'),
     resolveProviderKey(userId, 'meshy'),
+    resolveProviderKey(userId, 'google'),
   ]);
 
   // Image prompt used across image/video/3d tasks
@@ -683,7 +690,12 @@ async function runPackJob(
         break;
 
       case 'lore_card':
-        result = await runLoreTask(input.entityName, input.entityKind, input.entityDescription);
+        result = await runLoreTask(
+          input.entityName,
+          input.entityKind,
+          input.entityDescription,
+          googleKey
+        );
         break;
     }
 

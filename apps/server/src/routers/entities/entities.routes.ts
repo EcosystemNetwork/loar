@@ -50,6 +50,7 @@ import {
   revertVisualDescriptor,
   getDescriptorHistory,
 } from './entities.visual-descriptor';
+import { resolveProviderKey } from '../../lib/byok';
 import { geminiService } from '../../services/gemini';
 import { triggerCoverImageGenerationAsync } from '../../services/entity-cover-image';
 import { db } from '../../lib/firebase';
@@ -624,7 +625,12 @@ export const entitiesRouter = router({
       }
 
       try {
-        return await geminiService.generateEntityProfile(input.name, input.kind, input.hint);
+        return await geminiService.generateEntityProfile(
+          input.name,
+          input.kind,
+          input.hint,
+          await resolveProviderKey(ctx.user.uid, 'google')
+        );
       } catch (err) {
         // A failed Gemini call shouldn't burn the user's quota — give the slot back.
         if (db && limitRef) {

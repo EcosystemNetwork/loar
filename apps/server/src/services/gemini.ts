@@ -26,28 +26,26 @@ export function sanitizeForPrompt(text: string, maxLen = 5000): string {
   );
 }
 
-// Initialize Gemini — fail fast if key missing
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-if (!GOOGLE_API_KEY) {
-  console.warn(
-    '⚠️  GOOGLE_API_KEY not set — Gemini features (wiki generation, character analysis) will be unavailable'
-  );
-}
-const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY || 'missing');
-const fileManager = new GoogleAIFileManager(GOOGLE_API_KEY || 'missing');
-
-function ensureGeminiKey() {
-  if (!GOOGLE_API_KEY) {
-    throw new Error('GOOGLE_API_KEY environment variable is required for Gemini features');
+/**
+ * BYOK-only: there is no platform `GOOGLE_API_KEY` client. Every call builds
+ * its SDK clients from the caller's own key (resolve via
+ * `resolveProviderKey(uid, 'google')`).
+ */
+function requireGeminiKey(apiKey?: string): string {
+  const key = apiKey?.trim();
+  if (!key) {
+    throw new Error(
+      'No Google AI API key available — add one at /settings/api-keys to use Gemini features.'
+    );
   }
+  return key;
 }
 
-async function ensureGeminiAllowed() {
-  if (!GOOGLE_API_KEY) {
-    throw new Error('GOOGLE_API_KEY environment variable is required for Gemini features');
-  }
+async function geminiClients(apiKey?: string) {
+  const key = requireGeminiKey(apiKey);
   // Cost-tracker admin controls: kill-switch + daily caps.
   await assertProviderAllowed({ provider: 'gemini' });
+  return { genAI: new GoogleGenerativeAI(key), fileManager: new GoogleAIFileManager(key) };
 }
 
 function safeJsonParse<T>(text: string, label: string): T {
@@ -114,9 +112,10 @@ export async function generateWikiFromVideo(
       visualDescription?: string;
     }>;
     previousEvents?: Array<{ title: string; description: string }>;
-  }
+  },
+  apiKey?: string
 ): Promise<VideoAnalysisResult> {
-  await ensureGeminiAllowed();
+  const { genAI, fileManager } = await geminiClients(apiKey);
   console.log(`🎬 Generating wiki for event ${eventData.eventId}`);
   console.log(`📝 Characters provided: ${eventData.characters?.length || 0}`);
   if (eventData.characters && eventData.characters.length > 0) {
@@ -343,9 +342,10 @@ Output valid JSON only. Be precise and factual.`;
 export async function analyzeCharacterImage(
   imageUrl: string,
   userDescription: string,
-  characterName: string
+  characterName: string,
+  apiKey?: string
 ): Promise<string> {
-  await ensureGeminiAllowed();
+  const { genAI } = await geminiClients(apiKey);
   console.log(`🎨 Analyzing character image for: ${characterName}`);
 
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
@@ -602,9 +602,10 @@ Generate the improved prompt now:`;
 export async function generateEntityLore(
   entityName: string,
   entityKind: string,
-  description: string
+  description: string,
+  apiKey?: string
 ): Promise<string> {
-  await ensureGeminiAllowed();
+  const { genAI } = await geminiClients(apiKey);
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const prompt = `You are a worldbuilding writer creating a concise wiki/lore card entry.
@@ -662,9 +663,10 @@ const METADATA_FIELDS_BY_KIND: Record<string, string[]> = {
 export async function generateEntityProfile(
   entityName: string,
   entityKind: string,
-  userHint: string
+  userHint: string,
+  apiKey?: string
 ): Promise<{ description: string; metadata: Record<string, string> }> {
-  await ensureGeminiAllowed();
+  const { genAI } = await geminiClients(apiKey);
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
   const fields = METADATA_FIELDS_BY_KIND[entityKind] ?? [];
 
@@ -737,11 +739,7 @@ RULES:
 const GEMINI_REST = 'https://generativelanguage.googleapis.com/v1beta';
 
 function resolveGeminiKey(apiKey?: string): string {
-  const key = apiKey ?? GOOGLE_API_KEY;
-  if (!key) {
-    throw new Error('Google API key missing — set GOOGLE_API_KEY or pass apiKey for BYOK');
-  }
-  return key;
+  return requireGeminiKey(apiKey);
 }
 
 export interface GeminiChatPart {
@@ -1187,8 +1185,11 @@ export interface AdDecomposition {
   totalDurationSec: number;
 }
 
-export async function decomposeAdVideo(videoUrl: string): Promise<AdDecomposition> {
-  await ensureGeminiAllowed();
+export async function decomposeAdVideo(
+  videoUrl: string,
+  apiKey?: string
+): Promise<AdDecomposition> {
+  const { genAI, fileManager } = await geminiClients(apiKey);
   // safeFetch: SSRF validation + IP pinning (no DNS-rebinding window).
   const videoResponse = await safeFetch(videoUrl, {
     signal: AbortSignal.timeout(60_000),

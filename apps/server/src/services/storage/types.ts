@@ -114,10 +114,8 @@ export async function fetchToBuffer(
     // Google's Gemini Files API (used by Google-direct Veo video generation)
     // scopes downloads to the API key that created them — an unauthenticated
     // fetch gets a 401/403, silently failing the mirror-to-permanent-storage
-    // step. Attach that key when mirroring from that host: the caller's
-    // resolved key (BYOK or platform) when it knows one, else the platform
-    // key as a best-effort fallback — which is wrong for a file a BYOK key
-    // created, so callers that resolved their own key should always pass it.
+    // step. Callers must pass the caller's own (BYOK) key; there is no
+    // platform-key fallback, since it could never read a BYOK-created file.
     const isGeminiFilesHost = (() => {
       try {
         return new URL(url).hostname === 'generativelanguage.googleapis.com';
@@ -125,7 +123,7 @@ export async function fetchToBuffer(
         return false;
       }
     })();
-    const googleApiKey = opts?.googleApiKey ?? process.env.GOOGLE_API_KEY;
+    const googleApiKey = opts?.googleApiKey;
 
     // safeFetch validates + pins the resolved IP, so DNS rebinding between
     // the check and the connection cannot redirect us to link-local / cloud

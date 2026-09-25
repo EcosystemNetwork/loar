@@ -61,11 +61,10 @@ async function rehostUrl(
     } catch {
       // malformed URL — let the fetch below surface the real error
     }
+    // The file was created with the user's own key, so only that key can read it.
+    const filesKey = isGeminiFilesHost && userId ? await resolveKey(userId) : undefined;
     const res = await fetch(fileUrl, {
-      headers:
-        isGeminiFilesHost && process.env.GOOGLE_API_KEY
-          ? { 'x-goog-api-key': process.env.GOOGLE_API_KEY }
-          : undefined,
+      headers: filesKey ? { 'x-goog-api-key': filesKey } : undefined,
       signal: AbortSignal.timeout(60_000),
     });
     if (!res.ok) return fileUrl;
