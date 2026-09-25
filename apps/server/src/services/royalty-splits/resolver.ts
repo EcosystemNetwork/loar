@@ -84,7 +84,9 @@ export async function getUniversePolicy(
 
 export async function setUniversePolicy(
   universeId: string,
-  config: RoyaltyPolicyConfig
+  config: RoyaltyPolicyConfig,
+  /** Who made the change — stored for accountability (splits are money). */
+  actor?: { uid: string; address?: string | null }
 ): Promise<void> {
   await policiesCol()
     .doc(universeId.toLowerCase())
@@ -92,6 +94,7 @@ export async function setUniversePolicy(
       {
         ...config,
         updatedAt: new Date(),
+        ...(actor ? { updatedBy: actor.uid, updatedByAddress: actor.address ?? null } : {}),
       },
       { merge: true }
     );

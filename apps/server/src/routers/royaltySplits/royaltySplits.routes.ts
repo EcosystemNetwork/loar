@@ -5,9 +5,8 @@
  *   resolve         Resolve the final split for an asset (reads Firestore lineage).
  *   preview         Pure math preview — no DB reads, takes a hypothetical chain.
  *   getPolicy       Read the policy attached to a universe (or platform default).
- *   setPolicy       Universe owner sets per-universe policy. Admin-gated for now;
- *                   per-universe-owner check is a TODO once universe ownership
- *                   helpers are extracted (see `universesRouter.isOwner`).
+ *   setPolicy       Universe owner (creator, Safe signer, confirmed on-chain owner)
+ *                   or platform admin sets the per-universe policy.
  *
  * The resolver is deliberately read-only — it never mints anything on-chain.
  * The on-chain settlement path lives in `contentLicensing` + `likenessMarketplace`
@@ -15,7 +14,9 @@
  */
 
 import { z } from 'zod';
-import { router, publicProcedure, protectedProcedure, adminProcedure } from '../../lib/trpc';
+import { TRPCError } from '@trpc/server';
+import { router, publicProcedure, protectedProcedure, isAdminAddress } from '../../lib/trpc';
+import { isUniverseAdminStrict } from '../../lib/safe-admin';
 import {
   resolveSplitsForAsset,
   previewSplit,
@@ -98,18 +99,49 @@ export const royaltySplitsRouter = router({
     }),
 
   /**
-   * Set per-universe policy. Admin-gated for v1 — opens to universe
-   * owners once we have a reusable ownership-check helper.
+   * Set per-universe policy. Allowed for the universe's owner — creator, Safe
+   * signer, or (when the universe has a contract) the confirmed on-chain
+   * `owner()` — and for platform admins.
+   *
+   * This decides who gets paid on derivative works, so it uses the STRICT
+   * ownership check (fails closed if the chain can't confirm the owner) and
+   * needs a real session: an API key must not be able to rewrite splits.
+   * Universes with no Firestore doc are refused for non-admins — never
+   * "no owner on file, so anyone may".
+   *
+   * NOTE: the resolver reads the policy at resolve time, so a change also
+   * applies to splits computed for assets that already exist.
    */
-  setPolicy: adminProcedure
+  setPolicy: protectedProcedure
     .input(
       z.object({
         universeId: z.string().min(1),
         config: policyConfigSchema,
       })
     )
-    .mutation(async ({ input }) => {
-      await setUniversePolicy(input.universeId, input.config);
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.apiKeyId) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Changing royalty policy requires a session token, not an API key',
+        });
+      }
+      const address = ctx.user.address;
+      if (!address) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'A wallet address is required' });
+      }
+      const allowed =
+        isAdminAddress(address) || (await isUniverseAdminStrict(input.universeId, address));
+      if (!allowed) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the universe owner can change its royalty policy',
+        });
+      }
+      await setUniversePolicy(input.universeId, input.config, {
+        uid: ctx.user.uid,
+        address,
+      });
       return { ok: true as const };
     }),
 
