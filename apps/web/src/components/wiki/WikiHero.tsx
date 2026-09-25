@@ -1,15 +1,21 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Globe, Lock, Plus, Search, X } from 'lucide-react';
+import { Globe, Lock, Pencil, Plus, Search, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SmartImage } from '@/components/SmartImage';
+import { UniverseProfileEditor } from '@/components/UniverseProfileEditor';
+import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
 import { RandomEntityButton } from './RandomEntityButton';
 import { UniverseSwitcher, type SwitcherUniverse } from './UniverseSwitcher';
 
 export interface ScopedUniverse extends SwitcherUniverse {
   accessModel?: string;
+  description?: string;
+  portrait_image_url?: string;
+  isPrivate?: boolean;
+  universeType?: 'fun' | 'monetized';
 }
 
 interface WikiHeroProps {
@@ -41,6 +47,11 @@ export function WikiHero({
   onUniverseChange,
 }: WikiHeroProps) {
   const searchRef = useRef<HTMLInputElement | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  // Owner (creator / Safe signer) gets an inline profile editor; the server
+  // re-checks on save, so this gate is purely cosmetic.
+  const admin = useIsUniverseAdmin(universeAddress);
+  const canEdit = !!universe && admin.isAdmin && !admin.isLoading;
 
   // "/" jumps to search, like most wikis.
   useEffect(() => {
@@ -92,6 +103,18 @@ export function WikiHero({
               </Badge>
             )}
             <div className="flex flex-shrink-0 items-center gap-2">
+              {canEdit && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => setEditorOpen(true)}
+                >
+                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                  Edit universe
+                </Button>
+              )}
               <Button asChild size="sm" variant="outline" className="gap-1.5">
                 <Link to="/universe/$id/watch" params={{ id: universe.id }}>
                   <Globe className="h-3.5 w-3.5" aria-hidden="true" />
@@ -111,6 +134,22 @@ export function WikiHero({
             </div>
           </div>
         </div>
+      )}
+
+      {canEdit && universe && (
+        <UniverseProfileEditor
+          open={editorOpen}
+          onOpenChange={setEditorOpen}
+          universe={{
+            id: universe.id,
+            name: universe.name,
+            description: universe.description,
+            image_url: universe.image_url,
+            portrait_image_url: universe.portrait_image_url,
+            isPrivate: universe.isPrivate,
+            universeType: universe.universeType,
+          }}
+        />
       )}
 
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">

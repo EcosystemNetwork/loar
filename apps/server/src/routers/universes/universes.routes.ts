@@ -629,7 +629,7 @@ export const universesRouter = router({
         name: z.string().min(1).max(200).optional(),
         imageUrl: z.string().url('Invalid image URL').optional(),
         portraitImageUrl: z.string().url('Invalid portrait image URL').optional().nullable(),
-        description: z.string().min(1).max(4000).optional(),
+        description: z.string().max(4000).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {

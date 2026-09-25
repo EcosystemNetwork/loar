@@ -90,7 +90,7 @@ export function UniverseProfileEditor({ open, onOpenChange, universe }: Props) {
       if (name.trim() && name !== (universe.name ?? '')) {
         metadataUpdates.name = name.trim();
       }
-      if (description.trim() && description !== (universe.description ?? '')) {
+      if (description.trim() !== (universe.description ?? '').trim()) {
         metadataUpdates.description = description.trim();
       }
       if (imageUrl && imageUrl !== (universe.image_url ?? '')) {
@@ -293,10 +293,7 @@ export function UniverseProfileEditor({ open, onOpenChange, universe }: Props) {
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={save.isPending}>
             Cancel
           </Button>
-          <Button
-            onClick={() => save.mutate()}
-            disabled={!dirty || save.isPending || !name.trim() || !description.trim()}
-          >
+          <Button onClick={() => save.mutate()} disabled={!dirty || save.isPending || !name.trim()}>
             {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save profile
           </Button>

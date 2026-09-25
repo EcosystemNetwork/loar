@@ -25,6 +25,7 @@ import {
   type Universe as PonderUniverse,
 } from '@/utils/ponder-api';
 import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
+import { UniverseProfileEditor } from '@/components/UniverseProfileEditor';
 import {
   Play,
   ChevronLeft,
@@ -36,6 +37,7 @@ import {
   BookOpen,
   Share2,
   Info,
+  Pencil,
   Loader2,
   RefreshCw,
   CheckCircle2,
@@ -161,6 +163,7 @@ function WatchPage() {
 
   // Admin check so managers can pivot to the editor from here
   const admin = useIsUniverseAdmin(idLower as `0x${string}`);
+  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
 
   // Build episodes — merge timeline nodes with curated Firestore episodes,
   // then collapse nodes that belong to the same multi-clip episode into a
@@ -410,17 +413,28 @@ function WatchPage() {
                   </Link>
                 </Button>
                 {admin.isAdmin && !admin.isLoading && (
-                  <Button
-                    asChild
-                    variant="outline"
-                    size="lg"
-                    className="rounded-full border-primary/50 bg-primary/10 text-primary hover:bg-primary/20"
-                  >
-                    <Link to="/universe/$id" params={{ id: idLower }}>
-                      <Wand2 className="h-4 w-4 mr-2" />
-                      Open editor
-                    </Link>
-                  </Button>
+                  <>
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      className="rounded-full border-white/20 bg-white/5 text-white hover:bg-white/15 backdrop-blur-sm"
+                      onClick={() => setProfileEditorOpen(true)}
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit universe
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="lg"
+                      className="rounded-full border-primary/50 bg-primary/10 text-primary hover:bg-primary/20"
+                    >
+                      <Link to="/universe/$id" params={{ id: idLower }}>
+                        <Wand2 className="h-4 w-4 mr-2" />
+                        Open editor
+                      </Link>
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -461,6 +475,22 @@ function WatchPage() {
           </section>
         )}
       </div>
+
+      {admin.isAdmin && !admin.isLoading && universe && (
+        <UniverseProfileEditor
+          open={profileEditorOpen}
+          onOpenChange={setProfileEditorOpen}
+          universe={{
+            id: idLower,
+            name: universe.name,
+            description: universe.description,
+            image_url: universe.image_url,
+            portrait_image_url: universe.portrait_image_url,
+            isPrivate: Boolean(universe.isPrivate),
+            universeType: universe.universeType ?? 'monetized',
+          }}
+        />
+      )}
     </div>
   );
 }
