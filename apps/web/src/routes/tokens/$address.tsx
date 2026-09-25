@@ -39,6 +39,7 @@ import { TokenGovernanceCard } from '@/components/tokens/TokenGovernanceCard';
 import { TokenAlertButton } from '@/components/tokens/TokenAlertButton';
 import { TokenComments } from '@/components/tokens/TokenComments';
 import { TokenSocialLinks } from '@/components/tokens/TokenSocialLinks';
+import { HolderBubbleMap } from '@/components/tokens/HolderBubbleMap';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -958,6 +959,15 @@ function TokenDetailPage() {
             <HolderInsights
               holders={visibleHolders}
               transfers={transfers}
+              circulatingSupplyWei={circulatingSupplyWei}
+            />
+
+            {/* Holder map — bubble map + early sniper / bundle detection */}
+            <HolderBubbleMap
+              holders={holders}
+              transfers={transfers}
+              creators={[token.deployer, token.tokenAdmin]}
+              contracts={[bondingCurve?.id, token.locker].filter((a): a is string => !!a)}
               circulatingSupplyWei={circulatingSupplyWei}
             />
 
