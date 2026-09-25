@@ -15,6 +15,7 @@ import { promisify } from 'util';
 import { join } from 'path';
 import { writeFile, unlink, access } from 'fs/promises';
 import { probeHasAudio, probeVideo } from './probe';
+import { buildMixdownArgs, isNeutral, resolveMix, type StoredMix } from './audio-mix';
 import {
   FONT_CANDIDATES,
   buildClipArgs,
@@ -138,8 +139,13 @@ export async function concatNormalizedClips(
 export interface FinalizeOptions {
   overlays?: TextOverlay[];
   soundtrack?: Soundtrack | null;
+  /** Multi-track audio: mixed into one final audio track after everything else. */
+  mix?: StoredMix | null;
   target: RenderTarget;
 }
+
+/** Per-file cap for downloaded audio clips (they're decoded by ffmpeg, not held in a request). */
+const MAX_MIX_AUDIO_BYTES = 100 * 1024 * 1024;
 
 async function findFont(): Promise<string | null> {
   for (const candidate of FONT_CANDIDATES) {
@@ -208,8 +214,69 @@ export async function finalizeEpisode(
     soundtrackPath,
     soundtrackVolume: opts.soundtrack?.volume,
   });
-  if (!args) return { path: inputPath, warnings };
+  let current = inputPath;
+  if (args) {
+    await execFileAsync('ffmpeg', args, { timeout: 600_000 });
+    current = outputPath;
+  }
 
+  const mixed = await mixdownAudioTracks(current, workDir, opts.mix, warnings);
+  return { path: mixed ?? current, warnings };
+}
+
+/**
+ * Sum every audio track (and the video's own audio) into ONE final audio
+ * track. Returns the new file's path, or null when the mix changes nothing.
+ * A clip that can't be fetched or has no audio is skipped with a warning
+ * rather than failing the whole export.
+ */
+async function mixdownAudioTracks(
+  inputPath: string,
+  workDir: string,
+  mix: StoredMix | null | undefined,
+  warnings: string[]
+): Promise<string | null> {
+  if (!mix) return null;
+  const resolved = resolveMix(mix);
+  if (isNeutral(resolved)) return null;
+
+  const { safeFetch } = await import('../../lib/url-validator');
+  // One download per distinct URL — the same music file can back several clips.
+  const files = new Map<string, string | null>();
+  for (const clip of resolved.clips) {
+    if (files.has(clip.url)) continue;
+    const label =
+      mix.tracks.flatMap((t) => t.clips).find((c) => c.id === clip.id)?.label || clip.url;
+    try {
+      const res = await safeFetch(clip.url, { redirect: 'error' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const declared = Number(res.headers.get('content-length') ?? 0);
+      if (declared > MAX_MIX_AUDIO_BYTES) throw new Error('file is too large');
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.length > MAX_MIX_AUDIO_BYTES) throw new Error('file is too large');
+      const path = join(workDir, `mix-${files.size}.audio`);
+      await writeFile(path, buf);
+      if (!(await probeHasAudio(path))) throw new Error('it has no audio track');
+      files.set(clip.url, path);
+    } catch (err) {
+      files.set(clip.url, null);
+      warnings.push(`Audio "${label}" was skipped: ${(err as Error).message}.`);
+    }
+  }
+
+  const clips = resolved.clips.flatMap((clip) => {
+    const path = files.get(clip.url);
+    return path ? [{ ...clip, path }] : [];
+  });
+  const outputPath = join(workDir, 'mixed.mp4');
+  const args = buildMixdownArgs({
+    inputPath,
+    outputPath,
+    clips,
+    videoGain: resolved.videoGain,
+    masterGain: resolved.masterGain,
+  });
+  if (!args) return null;
   await execFileAsync('ffmpeg', args, { timeout: 600_000 });
-  return { path: outputPath, warnings };
+  return outputPath;
 }
