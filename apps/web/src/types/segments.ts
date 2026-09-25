@@ -44,7 +44,7 @@ export interface VideoSegment {
   /** Position in sequence (0, 1, 2...) */
   order: number;
 
-  // Trimming (future feature - not implemented yet)
+  // Trimming — set via the timeline edge handles or the VideoTrimmer; SegmentPlayer applies it
   /** Start trim in milliseconds (default: 0) */
   startTrim?: number;
 

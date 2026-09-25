@@ -8,7 +8,7 @@
  * - Timeline view with segment blocks
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +27,7 @@ import type { VideoSegment } from '@/types/segments';
 import { getEffectiveDuration } from '@/types/segments';
 import { VideoTrimmer } from './VideoTrimmer';
 import { cn } from '@/lib/utils';
+import { trimFromHandleDrag } from '@/lib/segmentTrim';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 
 interface VideoTimelineProps {
@@ -256,6 +257,7 @@ export function VideoTimeline({
                       onSelect={() => setSelectedSegment(segment.id)}
                       onDelete={() => onSegmentDelete(segment.id)}
                       formatTime={formatTime}
+                      onTrim={onSegmentTrim}
                     />
                   );
                 })}
@@ -382,6 +384,8 @@ interface SegmentBlockProps {
   onDrop: (e: React.DragEvent, segmentId: string) => void;
   onSelect: () => void;
   onDelete: () => void;
+  /** Commit a new trim (ms, relative to the original clip). Handles are inert without it. */
+  onTrim?: (segmentId: string, startTrim: number, endTrim: number) => void;
   formatTime: (seconds: number) => string;
 }
 
@@ -399,8 +403,68 @@ function SegmentBlock({
   onDrop,
   onSelect,
   onDelete,
+  onTrim,
   formatTime,
 }: SegmentBlockProps) {
+  const blockRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{
+    edge: 'start' | 'end';
+    x0: number;
+    widthPx: number;
+    startMs: number;
+    endMs: number;
+    durationMs: number;
+  } | null>(null);
+  /** Live preview of the trim while a handle is being dragged. */
+  const [liveTrim, setLiveTrim] = useState<{ startTrimMs: number; endTrimMs: number } | null>(null);
+
+  const beginTrim = (edge: 'start' | 'end') => (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!onTrim) return;
+    e.stopPropagation();
+    const durationMs = segment.duration * 1000;
+    dragRef.current = {
+      edge,
+      x0: e.clientX,
+      widthPx: blockRef.current?.getBoundingClientRect().width ?? 0,
+      startMs: segment.startTrim ?? 0,
+      endMs: segment.endTrim ?? durationMs,
+      durationMs,
+    };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    setLiveTrim({ startTrimMs: dragRef.current.startMs, endTrimMs: dragRef.current.endMs });
+  };
+
+  const currentTrimFor = useCallback((clientX: number) => {
+    const d = dragRef.current;
+    if (!d) return null;
+    return trimFromHandleDrag({
+      edge: d.edge,
+      dxPx: clientX - d.x0,
+      blockWidthPx: d.widthPx,
+      startTrimMs: d.startMs,
+      endTrimMs: d.endMs,
+      durationMs: d.durationMs,
+    });
+  }, []);
+
+  const moveTrim = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current) return;
+    setLiveTrim(currentTrimFor(e.clientX));
+  };
+
+  const endTrim = (commit: boolean) => (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const next = currentTrimFor(e.clientX);
+    dragRef.current = null;
+    setLiveTrim(null);
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+    // Only commit a real change.
+    if (commit && next && (next.startTrimMs !== d.startMs || next.endTrimMs !== d.endMs)) {
+      onTrim?.(segment.id, next.startTrimMs, next.endTrimMs);
+    }
+  };
+  const isTrimming = liveTrim !== null;
   // Color gradient based on model
   const getModelGradient = (model: string) => {
     switch (model) {
@@ -442,7 +506,8 @@ function SegmentBlock({
 
   return (
     <div
-      draggable
+      ref={blockRef}
+      draggable={!isTrimming}
       onDragStart={(e) => onDragStart(e, segment.id)}
       onDragOver={(e) => onDragOver(e, segment.id)}
       onDrop={(e) => onDrop(e, segment.id)}
@@ -511,16 +576,45 @@ function SegmentBlock({
         <Trash2 className="h-2.5 w-2.5" />
       </button>
 
-      {/* Resize handles (visual only for now) */}
+      {/* Trim handles — drag an edge to trim; commits on release. Inert without onTrim. */}
+      {liveTrim && (
+        <div className="absolute inset-x-0 bottom-0 z-10 bg-black/70 text-[9px] text-white text-center py-0.5 pointer-events-none">
+          {((liveTrim.endTrimMs - liveTrim.startTrimMs) / 1000).toFixed(2)}s
+        </div>
+      )}
       <div
-        className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-gradient-to-r from-white/60 to-transparent hover:from-white/80 transition-all"
+        role="slider"
+        aria-label="Trim start"
+        aria-valuenow={segment.startTrim ?? 0}
+        className={cn(
+          'absolute left-0 top-0 bottom-0 w-1.5 opacity-0 group-hover:opacity-100 bg-gradient-to-r from-white/60 to-transparent hover:from-white/80 transition-all touch-none',
+          onTrim ? 'cursor-ew-resize' : 'pointer-events-none',
+          isTrimming && 'opacity-100'
+        )}
         title="Trim start"
+        onPointerDown={beginTrim('start')}
+        onPointerMove={moveTrim}
+        onPointerUp={endTrim(true)}
+        onPointerCancel={endTrim(false)}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-white/80 rounded-r" />
       </div>
       <div
-        className="absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-gradient-to-l from-white/60 to-transparent hover:from-white/80 transition-all"
+        role="slider"
+        aria-label="Trim end"
+        aria-valuenow={segment.endTrim ?? segment.duration * 1000}
+        className={cn(
+          'absolute right-0 top-0 bottom-0 w-1.5 opacity-0 group-hover:opacity-100 bg-gradient-to-l from-white/60 to-transparent hover:from-white/80 transition-all touch-none',
+          onTrim ? 'cursor-ew-resize' : 'pointer-events-none',
+          isTrimming && 'opacity-100'
+        )}
         title="Trim end"
+        onPointerDown={beginTrim('end')}
+        onPointerMove={moveTrim}
+        onPointerUp={endTrim(true)}
+        onPointerCancel={endTrim(false)}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="absolute right-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-white/80 rounded-l" />
       </div>
