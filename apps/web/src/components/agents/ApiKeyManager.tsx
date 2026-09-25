@@ -5,6 +5,7 @@ import {
   useApiKeys,
   useCreateApiKey,
   useRevokeApiKey,
+  useDeleteRevokedApiKeys,
   useAvailablePermissions,
 } from '@/hooks/useApiKeys';
 import { Card } from '@/components/ui/card';
@@ -13,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useState } from 'react';
-import { Key, Plus, Trash2, Copy, Shield, Terminal } from 'lucide-react';
+import { Key, Plus, Trash2, XCircle, Copy, Shield, Terminal } from 'lucide-react';
 
 const LOAR_SERVER_URL = (import.meta as any).env?.VITE_API_URL || 'https://api.loar.fun';
 
@@ -45,6 +46,7 @@ export function ApiKeyManager({ aiAgentId }: Props) {
   const { data: availablePermissions } = useAvailablePermissions();
   const createKey = useCreateApiKey();
   const revokeKey = useRevokeApiKey();
+  const deleteRevoked = useDeleteRevokedApiKeys();
   const [showCreate, setShowCreate] = useState(false);
   const [newKey, setNewKey] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -57,6 +59,8 @@ export function ApiKeyManager({ aiAgentId }: Props) {
   const filteredKeys = aiAgentId
     ? (keys as any[])?.filter((k: any) => k.aiAgentId === aiAgentId)
     : keys;
+
+  const revokedKeys = ((filteredKeys as any[]) ?? []).filter((k: any) => k.status === 'revoked');
 
   const togglePermission = (p: string) => {
     setForm((prev) => ({
@@ -109,6 +113,28 @@ export function ApiKeyManager({ aiAgentId }: Props) {
     }
   };
 
+  const handleDelete = async (keyId: string) => {
+    try {
+      await deleteRevoked.mutateAsync(keyId);
+      toast.success('Revoked key deleted');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete key');
+    }
+  };
+
+  // Deletes only the revoked keys currently shown, so an agent-scoped view
+  // never clears keys belonging to other agents.
+  const handleClearRevoked = async () => {
+    try {
+      for (const k of revokedKeys) await deleteRevoked.mutateAsync(k.id);
+      toast.success(
+        `Cleared ${revokedKeys.length} revoked key${revokedKeys.length === 1 ? '' : 's'}`
+      );
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to clear revoked keys');
+    }
+  };
+
   const copyKey = async (key: string) => {
     // navigator.clipboard is undefined outside a secure context (e.g. served
     // over a LAN IP instead of localhost/https), so guard + fall back to the
@@ -142,10 +168,24 @@ export function ApiKeyManager({ aiAgentId }: Props) {
           <Key className="h-5 w-5 text-amber-400" />
           API Keys
         </h3>
-        <Button size="sm" onClick={() => setShowCreate(!showCreate)} className="gap-1">
-          <Plus className="h-3 w-3" />
-          New Key
-        </Button>
+        <div className="flex items-center gap-2">
+          {revokedKeys.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleClearRevoked}
+              disabled={deleteRevoked.isPending}
+              className="gap-1"
+            >
+              <XCircle className="h-3 w-3" />
+              Clear revoked ({revokedKeys.length})
+            </Button>
+          )}
+          <Button size="sm" onClick={() => setShowCreate(!showCreate)} className="gap-1">
+            <Plus className="h-3 w-3" />
+            New Key
+          </Button>
+        </div>
       </div>
 
       {/* New key reveal */}
@@ -315,6 +355,19 @@ export function ApiKeyManager({ aiAgentId }: Props) {
                   variant="ghost"
                   onClick={() => handleRevoke(key.id)}
                   className="text-red-400 hover:text-red-300"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+              {key.status === 'revoked' && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleDelete(key.id)}
+                  disabled={deleteRevoked.isPending}
+                  title="Delete permanently"
+                  aria-label="Delete revoked key"
+                  className="text-zinc-400 hover:text-red-300"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

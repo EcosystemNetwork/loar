@@ -32,6 +32,17 @@ export function useRevokeApiKey() {
   });
 }
 
+/** Delete one revoked key (pass keyId) or clear all revoked keys (omit it). */
+export function useDeleteRevokedApiKeys() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (keyId?: string) => trpcClient.apiKeys.deleteRevoked.mutate({ keyId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['apiKeys'] });
+    },
+  });
+}
+
 export function useAvailablePermissions() {
   return useQuery({
     queryKey: ['apiKeys', 'permissions'],

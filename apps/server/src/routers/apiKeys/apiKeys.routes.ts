@@ -7,6 +7,7 @@ import { TRPCError } from '@trpc/server';
 import {
   generateApiKey,
   revokeApiKey,
+  deleteRevokedApiKeys,
   listApiKeys,
   getApiKeyUsage,
   API_KEY_SCOPES,
@@ -81,6 +82,17 @@ export const apiKeysRouter = router({
     .mutation(async ({ input, ctx }) => {
       await revokeApiKey(input.keyId, ctx.user.uid);
       return { ok: true };
+    }),
+
+  /**
+   * Permanently delete revoked keys. With `keyId` deletes that one key
+   * (must already be revoked); without it, clears all of the caller's revoked keys.
+   */
+  deleteRevoked: protectedProcedure
+    .input(z.object({ keyId: z.string().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      const deleted = await deleteRevokedApiKeys(ctx.user.uid, input.keyId);
+      return { ok: true, deleted };
     }),
 
   /**

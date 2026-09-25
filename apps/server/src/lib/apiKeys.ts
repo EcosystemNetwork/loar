@@ -349,6 +349,53 @@ export async function revokeApiKey(keyId: string, ownerUid: string): Promise<voi
   await apiKeysCol().doc(keyId).update({ status: 'revoked', updatedAt: new Date() });
 }
 
+/** Delete a key's usage log docs in batches (Firestore caps a batch at 500 writes). */
+async function deleteApiKeyUsage(keyId: string): Promise<void> {
+  for (;;) {
+    const snap = await apiKeyUsageCol().where('apiKeyId', '==', keyId).limit(400).get();
+    if (snap.empty) return;
+    const batch = db!.batch();
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+    if (snap.size < 400) return;
+  }
+}
+
+/**
+ * Permanently delete revoked keys (and their usage logs). Active keys are never
+ * deleted — they must be revoked first, so a stray click can't take down a live
+ * integration. Pass `keyId` to delete one, or omit it to clear every revoked key
+ * the owner has. Returns the number of keys deleted.
+ */
+export async function deleteRevokedApiKeys(ownerUid: string, keyId?: string): Promise<number> {
+  let docs: FirebaseFirestore.QueryDocumentSnapshot[] | FirebaseFirestore.DocumentSnapshot[];
+
+  if (keyId) {
+    const doc = await apiKeysCol().doc(keyId).get();
+    if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND', message: 'API key not found' });
+    if (doc.data()?.ownerUid !== ownerUid) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Not the key owner' });
+    }
+    if (doc.data()?.status !== 'revoked') {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Only revoked keys can be deleted — revoke it first',
+      });
+    }
+    docs = [doc];
+  } else {
+    // Owner-only query; filter status in memory to avoid a new composite index.
+    const snapshot = await apiKeysCol().where('ownerUid', '==', ownerUid).get();
+    docs = snapshot.docs.filter((d) => d.data().status === 'revoked');
+  }
+
+  for (const d of docs) {
+    await deleteApiKeyUsage(d.id);
+    await d.ref.delete();
+  }
+  return docs.length;
+}
+
 export async function listApiKeys(ownerUid: string): Promise<Omit<ApiKeyDoc, 'keyHash'>[]> {
   const snapshot = await apiKeysCol()
     .where('ownerUid', '==', ownerUid)
