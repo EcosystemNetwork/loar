@@ -99,6 +99,7 @@ import { stripeRouter } from './credits/stripe.routes';
 import { pricingRouter } from './pricing/pricing.routes';
 import { tokenSocialRouter } from './tokenSocial/tokenSocial.routes';
 import { tokenAlertsRouter } from './tokenAlerts/tokenAlerts.routes';
+import { launchpadRouter } from './launchpad/launchpad.routes';
 import { platformSubscriptionsRouter } from './platformSubscriptions/platformSubscriptions.routes';
 import { castRouter } from './cast/cast.routes';
 import { sceneControlsRouter } from './sceneControls/sceneControls.routes';
@@ -309,6 +310,7 @@ export const appRouter = router({
   // ── Token Social (comments, watchlist, portfolio) ──────────────────
   tokenSocial: tokenSocialRouter,
   tokenAlerts: tokenAlertsRouter,
+  launchpad: launchpadRouter,
 
   // ── Node Editor Expansion (v1) ────────────────────────────────────
   cast: castRouter,

@@ -18,7 +18,7 @@ const CURVES = 'indexer_bondingCurves';
 const scopedId = (chainId: number, id: string) => `${chainId}:${id.toLowerCase()}`;
 
 /** price = (sqrtPriceX96 / 2^96)^2, kept in bigint until the final ratio. */
-function priceFromSqrtX96(sqrtPriceX96: string): number | null {
+export function priceFromSqrtX96(sqrtPriceX96: string): number | null {
   try {
     const sqrtP = BigInt(sqrtPriceX96);
     if (sqrtP === 0n) return null;
