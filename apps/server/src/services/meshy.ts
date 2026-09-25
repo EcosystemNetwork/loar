@@ -13,6 +13,8 @@
  * Required env var: MESHY_API_KEY
  */
 
+import { NoKeyAvailableError } from './provider-keys/types';
+
 // Overridable (ops-controlled env) so the client can be exercised against a local
 // contract server; production always uses the real host.
 const API_HOST = process.env.MESHY_API_HOST?.replace(/\/+$/, '') || 'https://api.meshy.ai';
@@ -234,7 +236,8 @@ class MeshyService {
   private resolveKey(override?: string): string {
     const key = override?.trim();
     if (!key) {
-      throw new Error(
+      throw new NoKeyAvailableError(
+        'meshy',
         'No Meshy API key available — add one at /settings/api-keys to use this model.'
       );
     }

@@ -8,139 +8,99 @@
  * provider's API — usually a "list models" or "get balance" route. No
  * generation, no audio upload.
  */
-import type { ProviderId, ProviderRegistryEntry } from './types';
+import {
+  KeyVerificationUnavailableError,
+  type ProviderId,
+  type ProviderRegistryEntry,
+} from './types';
 
-async function testFalKey(key: string): Promise<boolean> {
-  // FAL doesn't expose a dedicated whoami; the public-models list works
-  // unauthenticated, so we instead hit the queue status of a known
-  // model with the auth header — invalid keys return 401.
-  const res = await fetch('https://queue.fal.run/fal-ai/whisper/requests/__health', {
-    method: 'GET',
-    headers: { Authorization: `Key ${key}` },
-    signal: AbortSignal.timeout(8_000),
-  });
-  // 401/403 = bad key. Anything else (including 404 from the made-up
-  // request id) means auth passed.
-  if (res.status === 401 || res.status === 403) return false;
+/**
+ * Shared key probe. Three outcomes, deliberately distinct:
+ *   - resolves `false` → the provider rejected the key (`invalidStatuses`).
+ *   - resolves `true`  → auth passed. Any other status counts (200, a 404 from
+ *     a made-up resource id, a 429 rate limit — a rate-limited key is a *valid*
+ *     key), because we only care whether authentication succeeded.
+ *   - throws `KeyVerificationUnavailableError` → we couldn't tell (network
+ *     error, timeout, provider 5xx). Never conflated with "rejected", and never
+ *     silently treated as valid.
+ */
+async function probeKey(
+  provider: ProviderId,
+  url: string,
+  headers: Record<string, string>,
+  invalidStatuses: number[] = [401, 403]
+): Promise<boolean> {
+  let res: Response;
+  try {
+    res = await fetch(url, { method: 'GET', headers, signal: AbortSignal.timeout(8_000) });
+  } catch {
+    throw new KeyVerificationUnavailableError(provider);
+  }
+  if (invalidStatuses.includes(res.status)) return false;
+  if (res.status >= 500) throw new KeyVerificationUnavailableError(provider);
   return true;
 }
 
-async function testAssemblyAIKey(key: string): Promise<boolean> {
-  const res = await fetch('https://api.assemblyai.com/v2/transcript', {
-    method: 'GET',
-    headers: { Authorization: key },
-    signal: AbortSignal.timeout(8_000),
+// FAL doesn't expose a dedicated whoami; the public-models list works
+// unauthenticated, so we hit the queue status of a known model with the auth
+// header — invalid keys return 401, the made-up request id returns 404.
+const testFalKey = (key: string) =>
+  probeKey('fal', 'https://queue.fal.run/fal-ai/whisper/requests/__health', {
+    Authorization: `Key ${key}`,
   });
-  if (res.status === 401) return false;
-  return res.ok;
-}
 
-async function testDeepgramKey(key: string): Promise<boolean> {
-  const res = await fetch('https://api.deepgram.com/v1/projects', {
-    method: 'GET',
-    headers: { Authorization: `Token ${key}` },
-    signal: AbortSignal.timeout(8_000),
-  });
-  if (res.status === 401 || res.status === 403) return false;
-  return res.ok;
-}
+const testAssemblyAIKey = (key: string) =>
+  probeKey('assemblyai', 'https://api.assemblyai.com/v2/transcript', { Authorization: key });
 
-async function testGroqKey(key: string): Promise<boolean> {
-  const res = await fetch('https://api.groq.com/openai/v1/models', {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${key}` },
-    signal: AbortSignal.timeout(8_000),
-  });
-  if (res.status === 401 || res.status === 403) return false;
-  return res.ok;
-}
+const testDeepgramKey = (key: string) =>
+  probeKey('deepgram', 'https://api.deepgram.com/v1/projects', { Authorization: `Token ${key}` });
 
-async function testElevenLabsKey(key: string): Promise<boolean> {
-  const res = await fetch('https://api.elevenlabs.io/v1/user', {
-    method: 'GET',
-    headers: { 'xi-api-key': key },
-    signal: AbortSignal.timeout(8_000),
-  });
-  if (res.status === 401 || res.status === 403) return false;
-  return res.ok;
-}
+const testGroqKey = (key: string) =>
+  probeKey('groq', 'https://api.groq.com/openai/v1/models', { Authorization: `Bearer ${key}` });
 
-async function testBytedanceKey(key: string): Promise<boolean> {
-  const res = await fetch('https://ark.cn-beijing.volces.com/api/v3/models', {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${key}` },
-    signal: AbortSignal.timeout(8_000),
-  });
-  if (res.status === 401 || res.status === 403) return false;
-  return true;
-}
+const testElevenLabsKey = (key: string) =>
+  probeKey('elevenlabs', 'https://api.elevenlabs.io/v1/user', { 'xi-api-key': key });
 
-async function testZaiKey(key: string): Promise<boolean> {
-  const res = await fetch('https://open.bigmodel.cn/api/paas/v4/models', {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${key}` },
-    signal: AbortSignal.timeout(8_000),
+const testBytedanceKey = (key: string) =>
+  probeKey('bytedance', 'https://ark.cn-beijing.volces.com/api/v3/models', {
+    Authorization: `Bearer ${key}`,
   });
-  if (res.status === 401 || res.status === 403) return false;
-  return true;
-}
 
-async function testOpenAIKey(key: string): Promise<boolean> {
-  const res = await fetch('https://api.openai.com/v1/models', {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${key}` },
-    signal: AbortSignal.timeout(8_000),
+const testZaiKey = (key: string) =>
+  probeKey('zai', 'https://open.bigmodel.cn/api/paas/v4/models', {
+    Authorization: `Bearer ${key}`,
   });
-  if (res.status === 401 || res.status === 403) return false;
-  return res.ok;
-}
 
-async function testGoogleKey(key: string): Promise<boolean> {
-  // Key goes in the `x-goog-api-key` header, NOT the URL query string —
-  // URL keys land in load-balancer access logs / outbound proxy logs.
-  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
-    method: 'GET',
-    headers: { 'x-goog-api-key': key },
-    signal: AbortSignal.timeout(8_000),
-  });
-  if (res.status === 401 || res.status === 403 || res.status === 400) return false;
-  return res.ok;
-}
+const testOpenAIKey = (key: string) =>
+  probeKey('openai', 'https://api.openai.com/v1/models', { Authorization: `Bearer ${key}` });
 
-async function testMeshyKey(key: string): Promise<boolean> {
-  const res = await fetch('https://api.meshy.ai/v2/text-to-3d?page_size=1', {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${key}` },
-    signal: AbortSignal.timeout(8_000),
-  });
-  if (res.status === 401 || res.status === 403) return false;
-  return true;
-}
+// Key goes in the `x-goog-api-key` header, NOT the URL query string — URL keys
+// land in load-balancer access logs / outbound proxy logs. Google answers a bad
+// key with 400 (API_KEY_INVALID) as well as 401/403.
+const testGoogleKey = (key: string) =>
+  probeKey(
+    'google',
+    'https://generativelanguage.googleapis.com/v1beta/models',
+    { 'x-goog-api-key': key },
+    [400, 401, 403]
+  );
 
-async function testMiniMaxKey(key: string): Promise<boolean> {
-  // MiniMax's lightest reachable endpoint — files list. 200 = valid,
-  // 401/403 = bad key.
-  const res = await fetch('https://api.minimaxi.chat/v1/files/list', {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${key}` },
-    signal: AbortSignal.timeout(8_000),
+const testMeshyKey = (key: string) =>
+  probeKey('meshy', 'https://api.meshy.ai/v2/text-to-3d?page_size=1', {
+    Authorization: `Bearer ${key}`,
   });
-  if (res.status === 401 || res.status === 403) return false;
-  return true;
-}
 
-async function testTripoKey(key: string): Promise<boolean> {
-  // Tripo's lightest reachable endpoint — account balance (OpenAPI v3).
-  // 200 == valid, 401/403 == bad key, anything else we treat as transient
-  // (don't reject).
-  const res = await fetch('https://openapi.tripo3d.ai/v3/account/balance', {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${key}` },
-    signal: AbortSignal.timeout(8_000),
+// MiniMax's lightest reachable endpoint — files list.
+const testMiniMaxKey = (key: string) =>
+  probeKey('minimax', 'https://api.minimaxi.chat/v1/files/list', {
+    Authorization: `Bearer ${key}`,
   });
-  if (res.status === 401 || res.status === 403) return false;
-  return true;
-}
+
+// Tripo's lightest reachable endpoint — account balance (OpenAPI v3).
+const testTripoKey = (key: string) =>
+  probeKey('tripo', 'https://openapi.tripo3d.ai/v3/account/balance', {
+    Authorization: `Bearer ${key}`,
+  });
 
 export const PROVIDER_REGISTRY: Record<ProviderId, ProviderRegistryEntry> = {
   fal: {

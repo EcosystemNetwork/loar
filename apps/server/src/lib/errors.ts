@@ -12,6 +12,7 @@
  *   details?: unknown;   // Optional structured details (validation errors, etc.)
  * }
  */
+import { NoKeyAvailableError } from '../services/provider-keys/types';
 import { TRPCError } from '@trpc/server';
 
 type ErrorCode =
@@ -53,6 +54,14 @@ export function wrapError(
   fallbackMessage = 'An unexpected error occurred'
 ): TRPCError {
   if (error instanceof TRPCError) return error;
+
+  // A missing BYOK key is expected control flow — the client shows the "add
+  // your key" modal off `cause` (see errorFormatter in lib/trpc.ts). Keep its
+  // actionable message (it contains no secrets) and don't log it as an
+  // internal error.
+  if (error instanceof NoKeyAvailableError) {
+    return new TRPCError({ code: 'FORBIDDEN', message: error.message, cause: error });
+  }
 
   const isProd = process.env.NODE_ENV === 'production';
 

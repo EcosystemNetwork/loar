@@ -19,8 +19,19 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ApiKeyManager } from '@/components/agents/ApiKeyManager';
-import { PROVIDER_META, type Provider } from '@/lib/providerMeta';
-import { ArrowRight, Bot, ExternalLink, KeyRound, Lock, ShieldCheck, Trash2 } from 'lucide-react';
+import { PROVIDER_META, formatRelativeTime, keyStatus, type Provider } from '@/lib/providerMeta';
+import {
+  AlertTriangle,
+  ArrowRight,
+  Bot,
+  ExternalLink,
+  KeyRound,
+  Lock,
+  PauseCircle,
+  RefreshCw,
+  ShieldCheck,
+  Trash2,
+} from 'lucide-react';
 
 export const Route = createFileRoute('/settings/api-keys')({
   component: ApiKeysPage,
@@ -161,6 +172,32 @@ function ProviderCard({ provider }: { provider: Provider }) {
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Remove failed'),
   });
 
+  const testKey = useMutation({
+    mutationFn: () => trpcClient.providers.testKey.mutate({ provider }),
+    onSuccess: (res) => {
+      if (res.lastCheckStatus === 'invalid') {
+        toast.error(`${meta.label} rejected this key — it may have been revoked. Paste a new one.`);
+      } else {
+        toast.success(`${meta.label} key is working`);
+      }
+      queryClient.invalidateQueries({ queryKey: ['providers', 'listKeys'] });
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Test failed'),
+  });
+
+  const toggleEnabled = useMutation({
+    mutationFn: (enabled: boolean) =>
+      trpcClient.providers.setKeyEnabled.mutate({ provider, enabled }),
+    onSuccess: (_res, enabled) => {
+      toast.success(`${meta.label} key ${enabled ? 'enabled' : 'disabled'}`);
+      queryClient.invalidateQueries({ queryKey: ['providers', 'listKeys'] });
+      queryClient.invalidateQueries({ queryKey: ['providers', 'listModels'] });
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Update failed'),
+  });
+
+  const status = stored ? keyStatus(stored) : null;
+
   const handleSave = () => {
     const trimmed = value.trim();
     if (!trimmed) return;
@@ -176,12 +213,28 @@ function ProviderCard({ provider }: { provider: Provider }) {
           <div>
             <CardTitle className="flex items-center gap-2">
               {meta.label}
-              {stored ? (
+              {status === 'active' ? (
                 <Badge
                   variant="default"
                   className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
                 >
                   Active
+                </Badge>
+              ) : status === 'disabled' ? (
+                <Badge
+                  variant="secondary"
+                  className="bg-amber-500/20 text-amber-300 border-amber-500/30 gap-1"
+                >
+                  <PauseCircle className="h-2.5 w-2.5" />
+                  Disabled
+                </Badge>
+              ) : status === 'rejected' ? (
+                <Badge
+                  variant="secondary"
+                  className="bg-red-500/20 text-red-300 border-red-500/30 gap-1"
+                >
+                  <AlertTriangle className="h-2.5 w-2.5" />
+                  Key rejected
                 </Badge>
               ) : (
                 <Badge
@@ -209,25 +262,70 @@ function ProviderCard({ provider }: { provider: Provider }) {
         {isLoading ? (
           <div className="text-sm text-muted-foreground">Loading…</div>
         ) : stored ? (
-          <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div className="font-mono text-emerald-300">
+          <div
+            className={`rounded-lg border p-3 text-sm ${
+              status === 'rejected'
+                ? 'border-red-500/30 bg-red-500/5'
+                : status === 'disabled'
+                  ? 'border-amber-500/20 bg-amber-500/5'
+                  : 'border-emerald-500/20 bg-emerald-500/5'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div
+                className={`font-mono ${status === 'rejected' ? 'text-red-300' : status === 'disabled' ? 'text-amber-300' : 'text-emerald-300'}`}
+              >
                 •••• {stored.last4 || stored.fingerprint.slice(-4)}
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={clearKey.isPending}
-                onClick={() => clearKey.mutate()}
-                className="text-red-400 hover:text-red-300 gap-1"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Remove
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={testKey.isPending}
+                  onClick={() => testKey.mutate()}
+                  className="gap-1"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${testKey.isPending ? 'animate-spin' : ''}`} />
+                  {testKey.isPending ? 'Testing…' : 'Test'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={toggleEnabled.isPending}
+                  onClick={() => toggleEnabled.mutate(!stored.enabled)}
+                >
+                  {stored.enabled ? 'Disable' : 'Enable'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={clearKey.isPending}
+                  onClick={() => clearKey.mutate()}
+                  className="text-red-400 hover:text-red-300 gap-1"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Remove
+                </Button>
+              </div>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Saved {new Date(stored.createdAt).toLocaleString()}
+              Saved {new Date(stored.createdAt).toLocaleDateString()}
+              {stored.testedAt ? ` · verified ${formatRelativeTime(stored.testedAt)}` : ''}
+              {stored.lastUsedAt
+                ? ` · last used ${formatRelativeTime(stored.lastUsedAt)}`
+                : ' · not used yet'}
             </p>
+            {status === 'rejected' && (
+              <p className="text-xs text-red-300 mt-2">
+                {meta.label} rejected this key on the last check — it was probably revoked or
+                rotated. Paste a new one below to unlock these models again.
+              </p>
+            )}
+            {status === 'disabled' && (
+              <p className="text-xs text-amber-300 mt-2">
+                Disabled — models on this provider stay locked until you enable it again.
+              </p>
+            )}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground italic flex items-center gap-1.5">

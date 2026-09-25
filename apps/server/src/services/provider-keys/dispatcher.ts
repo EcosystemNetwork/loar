@@ -12,7 +12,9 @@
  */
 import { isKnownProvider, PROVIDER_REGISTRY } from './registry';
 import { exists, loadPlaintext } from './store';
-import { UnknownProviderError, type ProviderId } from './types';
+import { NoKeyAvailableError, UnknownProviderError, type ProviderId } from './types';
+
+export { NoKeyAvailableError };
 
 export interface ResolvedKey {
   apiKey: string;
@@ -20,15 +22,6 @@ export interface ResolvedKey {
   /** Set when source='byok' — for audit logging. */
   keyFingerprint?: string;
   provider: ProviderId;
-}
-
-export class NoKeyAvailableError extends Error {
-  constructor(public provider: ProviderId) {
-    super(
-      `No key available for provider '${provider}' — user has not added a BYOK key and the server pool is empty.`
-    );
-    this.name = 'NoKeyAvailableError';
-  }
 }
 
 export async function resolveProviderKey(userId: string, provider: string): Promise<ResolvedKey> {

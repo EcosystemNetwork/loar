@@ -67,7 +67,11 @@ import {
   reserveQueuedVideoBudget,
 } from '../../lib/video-budget';
 import type { CostProvider } from '../../services/cost-tracker';
-import { getByokProviderSet, computeModelUsability } from '../../services/provider-keys';
+import {
+  getByokProviderSet,
+  computeModelUsability,
+  NoKeyAvailableError,
+} from '../../services/provider-keys';
 
 /** VideoModelConfig.provider → CostProvider for the rate-limit gate. */
 function videoCostProviderFor(p: string): CostProvider {
@@ -2522,7 +2526,8 @@ export const generationRouter = router({
           resolvedGoogleKey = googleKey;
           if (!googleKey) {
             await refundCredits(ctx.user.uid, LEGACY_CREDIT_COSTS.video);
-            throw new Error(
+            throw new NoKeyAvailableError(
+              'google',
               'No Google AI API key on file — add one at /settings/api-keys to use Veo.'
             );
           }

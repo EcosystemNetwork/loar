@@ -36,6 +36,7 @@
 import { getStorageManager } from './storage';
 import { safeFetch } from '../lib/url-validator';
 import { redactSecrets } from '../lib/redact-secrets';
+import { NoKeyAvailableError } from './provider-keys/types';
 
 // ── Common ───────────────────────────────────────────────────────────────
 
@@ -267,7 +268,8 @@ const DEFAULT_TRANSCRIBE_MODEL = 'gemini-2-5-flash-transcribe';
 function resolveKey(apiKey?: string): string {
   const key = apiKey?.trim();
   if (!key) {
-    throw new Error(
+    throw new NoKeyAvailableError(
+      'google',
       'No Google AI API key available — add one at /settings/api-keys to use the Model Lab.'
     );
   }

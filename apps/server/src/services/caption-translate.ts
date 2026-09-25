@@ -14,6 +14,7 @@
  */
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { CaptionSegment } from '../lib/captions-format';
+import { NoKeyAvailableError } from './provider-keys/types';
 
 const MODEL = 'gemini-2.5-flash';
 const CHUNK_SEGMENTS = 30;
@@ -134,7 +135,8 @@ export async function translateCaptions(
 ): Promise<TranslateCaptionsResult> {
   const apiKey = input.apiKey?.trim();
   if (!apiKey) {
-    throw new Error(
+    throw new NoKeyAvailableError(
+      'google',
       'No Google AI API key available — add one at /settings/api-keys to translate captions.'
     );
   }

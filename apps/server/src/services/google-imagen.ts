@@ -7,6 +7,8 @@
  * Required env var: GOOGLE_API_KEY
  */
 
+import { NoKeyAvailableError } from './provider-keys/types';
+
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 /** Models using the predict endpoint (Imagen-style) */
@@ -80,7 +82,8 @@ class GoogleImagenService {
   private resolveKey(override?: string): string {
     const key = override?.trim();
     if (!key) {
-      throw new Error(
+      throw new NoKeyAvailableError(
+        'google',
         'No Google AI API key available — add one at /settings/api-keys to use this model.'
       );
     }

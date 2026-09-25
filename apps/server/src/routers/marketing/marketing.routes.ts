@@ -145,6 +145,7 @@ export const marketingRouter = router({
       } catch (err) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
+          cause: err,
           message: err instanceof Error ? err.message : 'Ad decomposition failed',
         });
       }

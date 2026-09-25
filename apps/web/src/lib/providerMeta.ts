@@ -57,18 +57,18 @@ export const PROVIDER_META: Record<Provider, ProviderMeta> = {
   google: {
     label: 'Google AI (Imagen + Gemini)',
     blurb:
-      'Powers Imagen 4 / nano-banana-pro image generation, Veo video, Gemini video analysis, character image analysis, and prompt enhancement.',
+      'Powers Imagen 4 / nano-banana-pro image generation, Veo video, Gemini wiki generation, entity lore & profiles, ad decomposition, character image analysis, and caption translation.',
     docsUrl: 'https://ai.google.dev/gemini-api/docs/api-key',
     placeholder: 'Paste your Google AI Studio key (AIza…)…',
-    lockedNote: 'Add a key to unlock Imagen, Veo, and Gemini-backed generation.',
+    lockedNote: 'Add a key to unlock Imagen, Veo, wiki generation, and caption translation.',
   },
   fal: {
     label: 'fal.ai',
     blurb:
-      "Powers FLUX, Veo3, Sora 2, Kling, Runway Gen-3, WAN, PixVerse, Stable Audio, MusicGen, LoRA training, inpainting/outpainting, upscaling, frame interpolation, and background removal. The studio's broadest provider.",
+      "Powers FLUX, Veo3, Sora 2, Kling, Runway Gen-3, WAN, PixVerse, Stable Audio, MusicGen, LoRA training & inference, lip-sync, Whisper transcription & captions, video cutdowns, inpainting/outpainting, upscaling, frame interpolation, and background removal. The studio's broadest provider.",
     docsUrl: 'https://fal.ai/dashboard/keys',
     placeholder: 'Paste your fal.ai key (uuid:secret)…',
-    lockedNote: 'Add a key to unlock most video, image, and editing models.',
+    lockedNote: 'Add a key to unlock most video, image, lip-sync, and editing models.',
   },
   elevenlabs: {
     label: 'ElevenLabs',
@@ -138,4 +138,40 @@ export function isKnownProviderMeta(id: string): id is Provider {
 /** Fallback label for a provider id the client doesn't recognize (new server-side addition). */
 export function providerLabel(id: string): string {
   return isKnownProviderMeta(id) ? PROVIDER_META[id].label : id;
+}
+
+/** Minimal shape of a stored key as returned by `providers.listKeys`. */
+export interface StoredKeyState {
+  enabled: boolean;
+  lastCheckStatus?: 'valid' | 'invalid' | null;
+}
+
+export type KeyStatus = 'active' | 'disabled' | 'rejected';
+
+/**
+ * Display status of a stored key. `rejected` (the provider rejected it on the
+ * last re-test — revoked or rotated at the provider) outranks `disabled`,
+ * since replacing the key is the action the user needs to take.
+ */
+export function keyStatus(key: StoredKeyState): KeyStatus {
+  if (key.lastCheckStatus === 'invalid') return 'rejected';
+  return key.enabled ? 'active' : 'disabled';
+}
+
+/** Coarse "3 days ago"-style label; falls back to the date for anything older than 30 days. */
+export function formatRelativeTime(
+  value: string | number | Date,
+  now: number = Date.now()
+): string {
+  const t = new Date(value).getTime();
+  if (!Number.isFinite(t)) return 'unknown';
+  const sec = Math.max(0, Math.round((now - t) / 1000));
+  if (sec < 60) return 'just now';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day <= 30) return `${day}d ago`;
+  return new Date(t).toLocaleDateString();
 }

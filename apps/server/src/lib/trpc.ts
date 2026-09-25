@@ -27,16 +27,21 @@ export const t = initTRPC.context<Context>().create({
    * of pattern-matching error strings per call site.
    */
   errorFormatter({ shape, error }) {
-    const cause = error.cause;
-    if (cause instanceof NoKeyAvailableError) {
-      return {
-        ...shape,
-        data: {
-          ...shape.data,
-          byokRequired: true,
-          provider: cause.provider,
-        },
-      };
+    // Walk the cause chain: routes that catch a provider error and re-wrap it
+    // in a TRPCError (`{ cause: err }`) would otherwise hide it from the client.
+    let cause: unknown = error.cause;
+    for (let depth = 0; cause && depth < 5; depth++) {
+      if (cause instanceof NoKeyAvailableError) {
+        return {
+          ...shape,
+          data: {
+            ...shape.data,
+            byokRequired: true,
+            provider: cause.provider,
+          },
+        };
+      }
+      cause = (cause as { cause?: unknown }).cause;
     }
     return shape;
   },

@@ -19,6 +19,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { logFailedRefund } from '../../lib/refund-audit';
 import { reserveClientToken } from '../../lib/jobIdempotency';
 import { resolveProviderKey } from '../../lib/byok';
+import { NoKeyAvailableError } from '../../services/provider-keys';
 import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/webhooks';
 
 const loraModelsCol = () => {
@@ -37,9 +38,11 @@ const TRAINING_COST_CREDITS = 75;
 async function requireFalKey(uid: string): Promise<string> {
   const key = await resolveProviderKey(uid, 'fal');
   if (!key) {
+    const message = 'No fal.ai API key on file — add one at /settings/api-keys to use LoRA models.';
     throw new TRPCError({
       code: 'FORBIDDEN',
-      message: 'No fal.ai API key on file — add one at /settings/api-keys to use LoRA models.',
+      message,
+      cause: new NoKeyAvailableError('fal', message),
     });
   }
   return key;

@@ -148,6 +148,7 @@ export const captionsRouter = router({
             err instanceof Error
               ? err.message
               : `No API key available for provider ${model.provider}. Add one in Settings → Providers.`,
+          cause: err,
         });
       }
       const isByok = resolvedKey.source === 'byok';
@@ -310,10 +311,11 @@ export const captionsRouter = router({
       let googleKey: string;
       try {
         googleKey = (await resolveProviderKey(ctx.user.uid, 'google')).apiKey;
-      } catch {
+      } catch (err) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'No Google AI API key on file — add one at /settings/api-keys to translate.',
+          cause: err,
         });
       }
 

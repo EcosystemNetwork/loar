@@ -1,6 +1,14 @@
 export * from './types';
 export { PROVIDER_REGISTRY, KNOWN_PROVIDERS, isKnownProvider } from './registry';
-export { listForUser, exists, upsert, setEnabled, remove, loadPlaintext } from './store';
+export {
+  listForUser,
+  exists,
+  upsert,
+  verifyStored,
+  setEnabled,
+  remove,
+  loadPlaintext,
+} from './store';
 export {
   resolveProviderKey,
   serverPoolAvailable,

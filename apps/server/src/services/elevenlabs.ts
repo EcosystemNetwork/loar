@@ -13,6 +13,7 @@
  */
 
 import { redactSecrets } from '../lib/redact-secrets';
+import { NoKeyAvailableError } from './provider-keys/types';
 
 const BASE_URL = 'https://api.elevenlabs.io/v1';
 
@@ -248,7 +249,8 @@ class ElevenLabsService {
   private resolveKey(override?: string): string {
     const key = override?.trim();
     if (!key) {
-      throw new Error(
+      throw new NoKeyAvailableError(
+        'elevenlabs',
         'No ElevenLabs API key available — add one at /settings/api-keys to use this feature.'
       );
     }
@@ -740,7 +742,8 @@ class ElevenLabsService {
     // added their own BYOK key.
     const key = apiKey?.trim() || this.platformKey;
     if (!key) {
-      throw new Error(
+      throw new NoKeyAvailableError(
+        'elevenlabs',
         'No ElevenLabs API key available — add one at /settings/api-keys to use this feature.'
       );
     }

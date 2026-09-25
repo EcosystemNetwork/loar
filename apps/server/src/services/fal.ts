@@ -1,4 +1,5 @@
 import * as fal from '@fal-ai/serverless-client';
+import { NoKeyAvailableError } from './provider-keys/types';
 
 export interface FalImageGenerationOptions {
   prompt: string;
@@ -196,7 +197,8 @@ class FalService {
   private configureCall(apiKey?: string) {
     const key = apiKey?.trim();
     if (!key) {
-      throw new Error(
+      throw new NoKeyAvailableError(
+        'fal',
         'No fal.ai API key available — add one at /settings/api-keys to use this model.'
       );
     }

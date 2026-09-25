@@ -16,6 +16,8 @@
  * Base URL: https://ark.ap-southeast.bytepluses.com/api/v3
  */
 
+import { NoKeyAvailableError } from './provider-keys/types';
+
 // ── Types ────────────────────────────────────────────────────────────────
 
 /** Common option carried by every method to support BYO-key. */
@@ -161,7 +163,8 @@ export class ByteDanceService {
   ): Promise<T> {
     const key = overrideKey?.trim();
     if (!key) {
-      throw new Error(
+      throw new NoKeyAvailableError(
+        'bytedance',
         'No ByteDance ModelArk API key available — add one at /settings/api-keys to use this model.'
       );
     }

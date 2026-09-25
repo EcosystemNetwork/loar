@@ -20,6 +20,8 @@
  * Required env var: TRIPO_API_KEY (or BYOK via provider-keys store).
  */
 
+import { NoKeyAvailableError } from './provider-keys/types';
+
 const BASE_URL = 'https://openapi.tripo3d.ai/v3';
 
 /** Rig model versions. v2.5 covers every non-humanoid rig type; v1.0 is biped-only. */
@@ -108,7 +110,8 @@ class Tripo3dService {
   private resolveKey(override?: string): string {
     const key = override?.trim();
     if (!key) {
-      throw new Error(
+      throw new NoKeyAvailableError(
+        'tripo',
         'No Tripo3D API key available — add one at /settings/api-keys to use this model.'
       );
     }

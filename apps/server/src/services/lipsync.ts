@@ -7,6 +7,7 @@
  * Provider health is tracked so the router can fall back gracefully.
  */
 import * as fal from '@fal-ai/serverless-client';
+import { NoKeyAvailableError } from './provider-keys/types';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -47,7 +48,8 @@ class LipSyncService {
   private configureCall(apiKey?: string): void {
     const key = apiKey?.trim();
     if (!key) {
-      throw new Error(
+      throw new NoKeyAvailableError(
+        'fal',
         'No fal.ai API key available — add one at /settings/api-keys to use lip-sync.'
       );
     }

@@ -37,6 +37,7 @@ function toPublic(doc: ProviderKeyDoc): ProviderKeyPublic {
     last4: doc.last4 ?? '',
     enabled: doc.enabled,
     testedAt: doc.testedAt,
+    lastCheckStatus: doc.lastCheckStatus ?? null,
     lastUsedAt: doc.lastUsedAt,
     createdAt: doc.createdAt,
   };
@@ -88,12 +89,34 @@ export async function upsert(
     encryptedKey,
     enabled: prior.exists ? ((prior.data()?.enabled as boolean) ?? true) : true,
     testedAt: now,
+    lastCheckStatus: 'valid',
     lastUsedAt: prior.exists ? ((prior.data()?.lastUsedAt as Date | null) ?? null) : null,
     createdAt: prior.exists ? ((prior.data()?.createdAt as Date) ?? now) : now,
     updatedAt: now,
   };
   await ref.set(doc, { merge: true });
   return toPublic(doc);
+}
+
+/**
+ * Re-probe a stored key against its provider and record the verdict. Lets a
+ * user find out a key was revoked/rotated at the provider before a generation
+ * fails. An inconclusive probe (provider down) throws and leaves the record
+ * untouched rather than marking a possibly-good key invalid.
+ */
+export async function verifyStored(
+  userId: string,
+  provider: ProviderId
+): Promise<ProviderKeyPublic> {
+  const ref = col().doc(docId(userId, provider));
+  const snap = await ref.get();
+  if (!snap.exists) throw new ProviderKeyNotFoundError(userId, provider);
+  const data = snap.data() as ProviderKeyDoc;
+  const passed = await PROVIDER_REGISTRY[provider].testKey(await unseal(data.encryptedKey));
+  const now = new Date();
+  const lastCheckStatus = passed ? 'valid' : 'invalid';
+  await ref.update({ testedAt: now, lastCheckStatus, updatedAt: now });
+  return toPublic({ ...data, testedAt: now, lastCheckStatus });
 }
 
 export async function setEnabled(

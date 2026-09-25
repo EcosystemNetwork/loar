@@ -4,6 +4,7 @@ import { safeFetch } from '../lib/url-validator';
 import { redactSecrets } from '../lib/redact-secrets';
 import { recordProviderCost, assertProviderAllowed } from './cost-tracker';
 import { routeLlmModel, dispatchLlmWithFallback } from './llm-models';
+import { NoKeyAvailableError } from './provider-keys/types';
 
 /**
  * Sanitize user-supplied text before interpolating into AI prompts.
@@ -34,7 +35,8 @@ export function sanitizeForPrompt(text: string, maxLen = 5000): string {
 function requireGeminiKey(apiKey?: string): string {
   const key = apiKey?.trim();
   if (!key) {
-    throw new Error(
+    throw new NoKeyAvailableError(
+      'google',
       'No Google AI API key available — add one at /settings/api-keys to use Gemini features.'
     );
   }

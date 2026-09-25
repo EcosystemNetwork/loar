@@ -6,6 +6,7 @@
  *   providers.listKeys        — User's keys (fingerprint + status only, no plaintext).
  *   providers.upsertKey       — Add or replace a key. Server tests the key against
  *                               the provider before persisting; bad keys never hit disk.
+ *   providers.testKey         — Re-probe a stored key against its provider (catches revoked keys).
  *   providers.setKeyEnabled   — Toggle a stored key on/off without deleting.
  *   providers.deleteKey       — Remove a stored key.
  *   providers.listModels      — Transcription model catalog with `usableByMe` flag
@@ -17,10 +18,13 @@ import { TRPCError } from '@trpc/server';
 import { protectedProcedure, router } from '../../lib/trpc';
 import {
   KNOWN_PROVIDERS,
+  KeyVerificationUnavailableError,
   PROVIDER_REGISTRY,
+  ProviderKeyNotFoundError,
   isKnownProvider,
   listForUser,
   upsert,
+  verifyStored,
   setEnabled,
   remove,
   serverPoolAvailable,
@@ -73,6 +77,25 @@ export const providersRouter = router({
           code: 'BAD_REQUEST',
           message: err instanceof Error ? err.message : 'Key upsert failed',
         });
+      }
+    }),
+
+  testKey: protectedProcedure
+    .input(z.object({ provider: providerIdSchema }))
+    .mutation(async ({ input, ctx }) => {
+      if (!isKnownProvider(input.provider)) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Unknown provider' });
+      }
+      try {
+        return await verifyStored(ctx.user.uid, input.provider);
+      } catch (err) {
+        if (err instanceof ProviderKeyNotFoundError) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'No key on file for this provider' });
+        }
+        if (err instanceof KeyVerificationUnavailableError) {
+          throw new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: err.message });
+        }
+        throw err;
       }
     }),
 

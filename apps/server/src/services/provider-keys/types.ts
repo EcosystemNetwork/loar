@@ -41,8 +41,13 @@ export interface ProviderKeyDoc {
   /** base64(nonce || ciphertext || authTag). Decryption owns the master key. */
   encryptedKey: string;
   enabled: boolean;
-  /** Last successful test-call ping. Null until first test. */
+  /** Last time we probed the provider with this key. Null until first test. */
   testedAt: Date | null;
+  /**
+   * Outcome of the last probe. `invalid` means the provider rejected the stored
+   * key (revoked/rotated at the provider) — the UI prompts the user to replace it.
+   */
+  lastCheckStatus?: 'valid' | 'invalid' | null;
   /** Last time the dispatcher decrypted + used this key. */
   lastUsedAt: Date | null;
   createdAt: Date;
@@ -56,6 +61,7 @@ export interface ProviderKeyPublic {
   last4: string;
   enabled: boolean;
   testedAt: Date | null;
+  lastCheckStatus: 'valid' | 'invalid' | null;
   lastUsedAt: Date | null;
   createdAt: Date;
 }
@@ -69,8 +75,9 @@ export interface ProviderRegistryEntry {
   serverPoolEnvVar: string;
   /**
    * Lightweight test call to verify a key is valid. Should call a
-   * cheap/free endpoint on the provider. Returns true on success,
-   * throws on auth failure or network error.
+   * cheap/free endpoint on the provider. Resolves `true` if auth passed,
+   * `false` if the provider rejected the key, and throws
+   * `KeyVerificationUnavailableError` if no verdict could be reached.
    */
   testKey: (plaintextKey: string) => Promise<boolean>;
 }
@@ -96,5 +103,38 @@ export class ProviderKeyDecryptError extends Error {
   constructor(message: string) {
     super(`Decrypt failed: ${message}`);
     this.name = 'ProviderKeyDecryptError';
+  }
+}
+
+/**
+ * Thrown by a provider's `testKey` when it could not reach a verdict (network
+ * error, timeout, provider 5xx). Distinct from a `false` result, which means
+ * the provider explicitly rejected the key.
+ */
+export class KeyVerificationUnavailableError extends Error {
+  constructor(public provider: string) {
+    super(`Could not reach ${provider} to verify the key right now — try again in a moment.`);
+    this.name = 'KeyVerificationUnavailableError';
+  }
+}
+
+/**
+ * A caller tried to use a provider they have no (enabled) BYOK key for. This is
+ * expected control flow, not a bug: `lib/trpc.ts`'s errorFormatter turns it
+ * (direct or as any `error.cause`) into `data.byokRequired` + `data.provider`,
+ * which the web client shows as the "add your key" modal. Every "no key" guard
+ * — service `configureCall`s, route pre-checks, the dispatcher — should throw
+ * this rather than a bare `Error`, or the modal never opens.
+ */
+export class NoKeyAvailableError extends Error {
+  constructor(
+    public provider: ProviderId,
+    message?: string
+  ) {
+    super(
+      message ??
+        `No ${provider} API key on file — add one at /settings/api-keys to use this feature.`
+    );
+    this.name = 'NoKeyAvailableError';
   }
 }
