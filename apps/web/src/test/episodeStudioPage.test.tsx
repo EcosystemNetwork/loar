@@ -110,7 +110,7 @@ describe('Episode Studio page', () => {
     mount();
     await loaded();
     expect(screen.getByDisplayValue('First episode')).toBeInTheDocument();
-    expect(headerBadge().getByText('1 clips')).toBeInTheDocument();
+    expect(headerBadge().getByText('1 clip')).toBeInTheDocument();
     expect(screen.getByText('All changes saved')).toBeInTheDocument();
   });
 

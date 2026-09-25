@@ -777,7 +777,7 @@ function EpisodeStudioPage() {
           <Film className="h-5 w-5 text-primary" />
           <h1 className="text-xl font-semibold">Episode Studio</h1>
           <Badge variant="outline" className="text-[10px]">
-            {clips.length} clips
+            {clips.length} {clips.length === 1 ? 'clip' : 'clips'}
           </Badge>
           <div className="flex-1" />
           <span
@@ -892,7 +892,9 @@ function EpisodeStudioPage() {
         {/* Merge toolbar */}
         {selectedIds.size > 0 && (
           <Card className="mb-3 flex items-center justify-between gap-3 border-primary/30 bg-primary/5 p-3">
-            <span className="text-sm">{selectedIds.size} clips selected</span>
+            <span className="text-sm">
+              {selectedIds.size} {selectedIds.size === 1 ? 'clip' : 'clips'} selected
+            </span>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
                 Clear
