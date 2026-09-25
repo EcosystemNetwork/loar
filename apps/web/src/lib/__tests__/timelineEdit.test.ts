@@ -214,3 +214,18 @@ describe('formatTimecode', () => {
     expect(formatTimecode(1.9999)).toBe('00:01:29');
   });
 });
+
+describe('clips missing trim fields (episodes seeded outside the studio)', () => {
+  const bare = (nodeId: string) =>
+    ({ nodeId, label: nodeId, videoUrl: `https://v/${nodeId}.mp4` }) as unknown as EpisodeClip;
+
+  it('lays out with finite numbers before durations have loaded', () => {
+    const placed = placeClips([bare('a'), bare('b')], {});
+    for (const p of placed) {
+      expect(Number.isFinite(p.start)).toBe(true);
+      expect(Number.isFinite(p.length)).toBe(true);
+      expect(Number.isFinite(p.srcStart)).toBe(true);
+    }
+    expect(totalDuration(placed)).toBeGreaterThan(0);
+  });
+});

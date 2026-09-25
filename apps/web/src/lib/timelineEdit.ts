@@ -41,7 +41,9 @@ const round3 = (n: number) => Math.round(n * 1000) / 1000;
 export function sourceDuration(clip: EpisodeClip, durations: DurationMap): number {
   const known = durations[clip.videoUrl];
   if (known && Number.isFinite(known) && known > 0) return known;
-  return clip.trimEnd > 0 ? clip.trimEnd : Math.max(FALLBACK_SOURCE_SEC, clip.trimStart + 1);
+  // Episodes seeded outside the studio can lack trimStart/trimEnd entirely;
+  // `undefined + 1` is NaN, which would poison every position downstream.
+  return clip.trimEnd > 0 ? clip.trimEnd : Math.max(FALLBACK_SOURCE_SEC, (clip.trimStart || 0) + 1);
 }
 
 export function clipRange(

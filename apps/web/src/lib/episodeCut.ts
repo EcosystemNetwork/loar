@@ -269,6 +269,17 @@ function estimateLength(clips: EpisodeClip[]): number {
   return Math.max(1, total);
 }
 
+/** Trim points are optional on episodes not authored in the studio; make them real numbers. */
+export function normalizeClip(clip: EpisodeClip): EpisodeClip {
+  const start = Number(clip.trimStart);
+  const end = Number(clip.trimEnd);
+  const trimStart = Number.isFinite(start) && start > 0 ? start : 0;
+  const trimEnd = Number.isFinite(end) && end > 0 ? end : 0;
+  return clip.trimStart === trimStart && clip.trimEnd === trimEnd
+    ? clip
+    : { ...clip, trimStart, trimEnd };
+}
+
 /**
  * Coerce whatever the server returned into a well-formed Cut (older episodes
  * have no overlays or audio mix). A legacy single `soundtrack` is folded into
@@ -280,7 +291,7 @@ export function cutFromEpisode(data: {
   soundtrack?: Soundtrack | null;
   audioMix?: unknown;
 }): Cut {
-  const clips = data.clips ?? [];
+  const clips = (data.clips ?? []).map(normalizeClip);
   let audioMix = normalizeMix(data.audioMix);
   if (data.soundtrack?.url) {
     audioMix = soundtrackToMix(audioMix, data.soundtrack, estimateLength(clips));

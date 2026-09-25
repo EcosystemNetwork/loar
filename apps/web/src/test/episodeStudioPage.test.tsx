@@ -4,7 +4,7 @@
  * else — autosave, draft recovery, export, undo — is the real code.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const t = vi.hoisted(() => ({
@@ -78,6 +78,10 @@ function mount() {
   );
 }
 
+/** The clip-count badge in the page header (the lanes below also mention clips). */
+const headerBadge = () =>
+  within(screen.getByRole('heading', { name: 'Episode Studio' }).parentElement as HTMLElement);
+
 const loaded = () => screen.findByDisplayValue('Pilot');
 const typeTitle = (value: string) =>
   fireEvent.change(screen.getByLabelText('Title'), { target: { value } });
@@ -106,7 +110,7 @@ describe('Episode Studio page', () => {
     mount();
     await loaded();
     expect(screen.getByDisplayValue('First episode')).toBeInTheDocument();
-    expect(screen.getByText('1 clips')).toBeInTheDocument();
+    expect(headerBadge().getByText('1 clips')).toBeInTheDocument();
     expect(screen.getByText('All changes saved')).toBeInTheDocument();
   });
 
@@ -127,6 +131,7 @@ describe('Episode Studio page', () => {
       clips: [clip()],
       overlays: [],
       soundtrack: null,
+      audioMix: expect.anything(),
       exportSettings: DEFAULT_EXPORT_SETTINGS,
       versionKind: 'auto',
     });
@@ -353,7 +358,7 @@ describe('Episode Studio page', () => {
     fireEvent.click(screen.getByRole('button', { name: /History/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'Restore' }));
     await waitFor(() => expect(screen.getByDisplayValue('Older cut')).toBeInTheDocument());
-    expect(screen.getByText('2 clips')).toBeInTheDocument();
+    expect(headerBadge().getByText('2 clips')).toBeInTheDocument();
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument(); // it will autosave next
   });
 

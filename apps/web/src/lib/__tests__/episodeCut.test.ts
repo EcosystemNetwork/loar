@@ -17,6 +17,7 @@ import {
   insertClipsAt,
   insertIndexAtTime,
   newOverlay,
+  normalizeClip,
   normalizeOverlay,
   patchClip,
   patchOverlay,
@@ -187,5 +188,19 @@ describe('clip drag payload', () => {
       trimStart: 0,
       trimEnd: 0,
     });
+  });
+});
+
+describe('normalizeClip', () => {
+  it('fills in trim points a seeded episode does not have', () => {
+    const bare = { nodeId: 'a', label: 'A', videoUrl: 'https://v/a.mp4' } as unknown as EpisodeClip;
+    expect(normalizeClip(bare)).toMatchObject({ trimStart: 0, trimEnd: 0 });
+    expect(cutFromEpisode({ clips: [bare] }).clips[0]).toMatchObject({ trimStart: 0, trimEnd: 0 });
+  });
+  it('repairs junk values and leaves good clips untouched (same reference)', () => {
+    const junk = { ...clip('a'), trimStart: 'x', trimEnd: -3 } as unknown as EpisodeClip;
+    expect(normalizeClip(junk)).toMatchObject({ trimStart: 0, trimEnd: 0 });
+    const good = clip('a', { trimStart: 1, trimEnd: 4 });
+    expect(normalizeClip(good)).toBe(good);
   });
 });

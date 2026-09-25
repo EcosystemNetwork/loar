@@ -52,6 +52,8 @@ interface SequencePreviewProps {
 type Slot = 0 | 1;
 
 function seek(media: HTMLMediaElement, time: number) {
+  // A non-finite time throws from `currentTime`; skipping just leaves the frame put.
+  if (!Number.isFinite(time)) return;
   if (media.readyState >= 1) {
     if (Math.abs(media.currentTime - time) > 0.001) media.currentTime = time;
   } else {
