@@ -30,6 +30,7 @@ import {
   EMPTY_FILTERS,
   SCREENER_PRESETS,
   runScreener,
+  pickKingOfTheHill,
 } from '@/lib/token-screener';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -37,6 +38,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sparkline } from '@/components/tokens/Sparkline';
 import { TokenTable } from '@/components/tokens/TokenTable';
+import { KingOfTheHill } from '@/components/tokens/KingOfTheHill';
 import { TokenScreenerControls } from '@/components/tokens/TokenScreenerControls';
 import { QuickBuyButton } from '@/components/tokens/QuickBuyButton';
 import {
@@ -162,6 +164,8 @@ function TokenLaunchpad() {
     recentBondingTrades,
     totalMarketCap,
   } = useTokenListData();
+
+  const king = useMemo(() => pickKingOfTheHill(tokens), [tokens]);
 
   const applyPreset = (id: string | null) => {
     if (!id) {
@@ -355,6 +359,9 @@ function TokenLaunchpad() {
           />
           <StatCard icon={Zap} tint="blue" value="LP Locked" label="Forever. No Rugs." />
         </div>
+
+        {/* King of the Hill — top market cap still on the curve */}
+        {king && search.tab === 'all' && <KingOfTheHill token={king} />}
 
         {/* Recently viewed */}
         {recentTokens.length > 0 && search.tab === 'all' && (

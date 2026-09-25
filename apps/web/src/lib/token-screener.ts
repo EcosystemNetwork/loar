@@ -108,6 +108,32 @@ export const SCREENER_PRESETS: ScreenerPreset[] = [
   },
 ];
 
+// ─── King of the Hill ───────────────────────────────────────────────
+
+/**
+ * The featured token: highest market cap among tokens still on their bonding
+ * curve (bonding or graduating). Graduated/halted tokens are out — the crown is
+ * for whatever is closest to breaking out, as on pump.fun. Untraded tokens
+ * (no market cap) can't win. Ties → nearer graduation, then newer.
+ */
+export function pickKingOfTheHill(tokens: EnrichedToken[]): EnrichedToken | null {
+  let king: EnrichedToken | null = null;
+  for (const t of tokens) {
+    if (t.stage !== 'bonding' && t.stage !== 'graduating') continue;
+    if (!(t.marketCap != null && t.marketCap > 0)) continue;
+    if (
+      !king ||
+      t.marketCap > (king.marketCap ?? 0) ||
+      (t.marketCap === king.marketCap &&
+        (t.graduationPct > king.graduationPct ||
+          (t.graduationPct === king.graduationPct && t.createdAt > king.createdAt)))
+    ) {
+      king = t;
+    }
+  }
+  return king;
+}
+
 // ─── Filtering + sorting ────────────────────────────────────────────
 
 const nowSec = () => Math.floor(Date.now() / 1000);
