@@ -5,6 +5,17 @@ import { redactSecrets } from '../lib/redact-secrets';
 import { recordProviderCost, assertProviderAllowed } from './cost-tracker';
 import { routeLlmModel, dispatchLlmWithFallback } from './llm-models';
 import { NoKeyAvailableError } from './provider-keys/types';
+import {
+  extractToolCalls,
+  functionCallPart,
+  functionResponsePart,
+  toFunctionDeclarations,
+  toToolConfig,
+  type GeminiFunctionCallPart,
+  type GeminiToolCall,
+  type GeminiToolChoice,
+  type GeminiToolDef,
+} from './gemini-tools';
 
 /**
  * Sanitize user-supplied text before interpolating into AI prompts.
@@ -739,7 +750,11 @@ RULES:
 // we need per-call BYOK — the surfaces below speak the REST API directly
 // so a caller can pass any user-supplied key.
 
-const GEMINI_REST = 'https://generativelanguage.googleapis.com/v1beta';
+// Overridable (ops-controlled env) so the client can be exercised against a local
+// contract server; production always uses the real host.
+const GEMINI_REST =
+  process.env.GEMINI_API_BASE?.replace(/\/+$/, '') ||
+  'https://generativelanguage.googleapis.com/v1beta';
 
 function resolveGeminiKey(apiKey?: string): string {
   return requireGeminiKey(apiKey);
@@ -752,9 +767,15 @@ export interface GeminiChatPart {
 }
 
 export interface GeminiChatMessage {
-  role: 'system' | 'user' | 'assistant';
-  /** Plain text or parts (text + inline image URLs). */
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  /** Plain text or parts (text + inline image URLs). For `tool`, the tool's result. */
   content: string | GeminiChatPart[];
+  /** Assistant turn only: the tool calls it made (replayed as `functionCall` parts). */
+  toolCalls?: GeminiToolCall[];
+  /** Tool turn only: which call this answers. Resolved to a function name via `toolCalls`. */
+  toolCallId?: string;
+  /** Tool turn only: the function name (needed when the call isn't in the history). */
+  name?: string;
 }
 
 export interface GeminiChatOptions {
@@ -769,10 +790,15 @@ export interface GeminiChatOptions {
   jsonMode?: boolean;
   /** Structured response schema (Gemini-flavoured JSON Schema). */
   responseSchema?: Record<string, unknown>;
+  /** Function tools the model may call. Cannot be combined with jsonMode/responseSchema. */
+  tools?: Array<{ type: 'function'; function: GeminiToolDef }>;
+  toolChoice?: GeminiToolChoice;
 }
 
 export interface GeminiChatResult {
   text: string;
+  /** Function calls the model made this turn (empty/undefined when it answered in text). */
+  toolCalls?: GeminiToolCall[];
   usage: {
     promptTokens?: number;
     completionTokens?: number;
@@ -795,12 +821,56 @@ function extractGeminiText(parts: GeminiChatPart[]): string {
 export async function geminiChat(opts: GeminiChatOptions): Promise<GeminiChatResult> {
   const apiKey = resolveGeminiKey(opts.apiKey);
 
-  type GeminiPart = { text?: string; inline_data?: { mime_type: string; data: string } };
+  type GeminiPart = {
+    text?: string;
+    inline_data?: { mime_type: string; data: string };
+    functionCall?: GeminiFunctionCallPart['functionCall'];
+    functionResponse?: ReturnType<typeof functionResponsePart>['functionResponse'];
+    thoughtSignature?: string;
+  };
   type GeminiContent = { role: 'user' | 'model'; parts: GeminiPart[] };
+
+  if (opts.tools?.length && (opts.jsonMode || opts.responseSchema)) {
+    // Gemini rejects function calling together with a JSON response mime type.
+    throw new Error(
+      'Gemini cannot combine tools[] with jsonMode/responseSchema — use one or the other.'
+    );
+  }
 
   const systemTexts: string[] = [];
   const contents: GeminiContent[] = [];
+  // Consecutive tool results collapse into ONE user turn (Gemini requires the
+  // functionResponse parts to line up with the preceding functionCall parts).
+  let pendingToolParts: GeminiPart[] = [];
+  const flushToolParts = () => {
+    if (pendingToolParts.length) contents.push({ role: 'user', parts: pendingToolParts });
+    pendingToolParts = [];
+  };
+  const callNameById = new Map<string, string>();
   for (const m of opts.messages) {
+    if (m.role === 'tool') {
+      const text = typeof m.content === 'string' ? m.content : extractGeminiText(m.content);
+      const name = m.name ?? (m.toolCallId ? callNameById.get(m.toolCallId) : undefined);
+      if (!name) {
+        throw new Error(
+          'Gemini tool message needs `name` (or a `toolCallId` matching an earlier assistant toolCalls entry).'
+        );
+      }
+      pendingToolParts.push(functionResponsePart(name, text, m.toolCallId));
+      continue;
+    }
+    flushToolParts();
+    if (m.role === 'assistant' && m.toolCalls?.length) {
+      const parts: GeminiPart[] = [];
+      const text = typeof m.content === 'string' ? m.content : extractGeminiText(m.content);
+      if (text) parts.push({ text });
+      for (const call of m.toolCalls) {
+        if (call.id) callNameById.set(call.id, call.name);
+        parts.push(functionCallPart(call));
+      }
+      contents.push({ role: 'model', parts });
+      continue;
+    }
     if (m.role === 'system') {
       systemTexts.push(typeof m.content === 'string' ? m.content : extractGeminiText(m.content));
       continue;
@@ -825,7 +895,13 @@ export async function geminiChat(opts: GeminiChatOptions): Promise<GeminiChatRes
     if (parts.length > 0) contents.push({ role, parts });
   }
 
+  flushToolParts();
+
   const body: Record<string, unknown> = { contents };
+  if (opts.tools?.length) {
+    body.tools = toFunctionDeclarations(opts.tools);
+    body.toolConfig = toToolConfig(opts.toolChoice);
+  }
   if (systemTexts.length > 0) {
     body.system_instruction = { parts: [{ text: systemTexts.join('\n\n') }] };
   }
@@ -860,7 +936,7 @@ export async function geminiChat(opts: GeminiChatOptions): Promise<GeminiChatRes
   }
   interface GeminiResp {
     candidates?: Array<{
-      content?: { parts?: Array<{ text?: string }> };
+      content?: { parts?: Array<Record<string, any>> };
       finishReason?: string;
     }>;
     promptFeedback?: {
@@ -892,9 +968,12 @@ export async function geminiChat(opts: GeminiChatOptions): Promise<GeminiChatRes
       `Gemini returned no usable text (finishReason=${finishReason}) — safety, recitation, or another non-completion stop.`
     );
   }
-  const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
+  const respParts = data.candidates?.[0]?.content?.parts;
+  const text = respParts?.map((p) => p.text ?? '').join('') ?? '';
+  const toolCalls = extractToolCalls(respParts);
   return {
     text,
+    ...(toolCalls.length ? { toolCalls } : {}),
     usage: {
       promptTokens: data.usageMetadata?.promptTokenCount,
       completionTokens: data.usageMetadata?.candidatesTokenCount,

@@ -173,6 +173,19 @@ export interface LlmMessage {
       >;
   tool_call_id?: string;
   name?: string;
+  /**
+   * Assistant turn only: the tool calls that turn made — the same shape the
+   * dispatcher returns in `LlmDispatchResult.toolCalls`, so a result can be fed
+   * straight back into the history. Sent to OpenAI-compatible providers as
+   * `tool_calls`, and to Gemini as `functionCall` parts.
+   */
+  toolCalls?: Array<{
+    id?: string;
+    name: string;
+    arguments: Record<string, unknown>;
+    /** Gemini thinking models: signature to echo back on replay. */
+    thoughtSignature?: string;
+  }>;
 }
 
 export interface LlmTool {
@@ -208,6 +221,7 @@ export interface LlmDispatchResult {
     id?: string;
     name: string;
     arguments: Record<string, unknown>;
+    thoughtSignature?: string;
   }>;
   usage: {
     promptTokens?: number;
@@ -349,6 +363,30 @@ export async function dispatchLlm(input: LlmDispatchInput): Promise<LlmDispatchR
   }
 }
 
+/**
+ * OpenAI-compatible providers take assistant tool calls as `tool_calls`
+ * (`{ id, type:'function', function:{ name, arguments: <JSON string> } }`), not
+ * our `toolCalls`. Convert, and drop the camelCase key so it's never sent raw.
+ */
+export function toWireMessages(messages: LlmMessage[]): LlmMessage[] {
+  return messages.map((m) => {
+    if (!m.toolCalls?.length) {
+      if (!('toolCalls' in m)) return m;
+      const { toolCalls: _drop, ...rest } = m;
+      return rest;
+    }
+    const { toolCalls, ...rest } = m;
+    return {
+      ...rest,
+      tool_calls: toolCalls.map((c, i) => ({
+        id: c.id ?? `call_${i}`,
+        type: 'function',
+        function: { name: c.name, arguments: JSON.stringify(c.arguments ?? {}) },
+      })),
+    } as LlmMessage;
+  });
+}
+
 async function dispatchLlmInner(
   model: LlmModelConfig,
   input: LlmDispatchInput
@@ -374,7 +412,7 @@ async function dispatchLlmInner(
         | 'gpt-4.1'
         | 'gpt-4.1-mini'
         | 'gpt-4.1-nano',
-      messages: input.messages,
+      messages: toWireMessages(input.messages),
       temperature: input.temperature,
       topP: input.topP,
       maxTokens: input.maxTokens,
@@ -413,7 +451,7 @@ async function dispatchLlmInner(
     const r = await zaiService.chat({
       apiKey,
       model: model.providerModelId,
-      messages: input.messages as Parameters<typeof zaiService.chat>[0]['messages'],
+      messages: toWireMessages(input.messages) as Parameters<typeof zaiService.chat>[0]['messages'],
       temperature: input.temperature,
       topP: input.topP,
       maxTokens: input.maxTokens,
@@ -498,7 +536,7 @@ async function dispatchLlmInner(
       baseUrl: 'https://api.groq.com/openai/v1',
       apiKey,
       model: model.providerModelId,
-      messages: input.messages,
+      messages: toWireMessages(input.messages),
       temperature: input.temperature,
       topP: input.topP,
       maxTokens: input.maxTokens,
@@ -540,7 +578,7 @@ async function dispatchLlmInner(
       baseUrl: 'https://api.sambanova.ai/v1',
       apiKey,
       model: model.providerModelId,
-      messages: input.messages,
+      messages: toWireMessages(input.messages),
       temperature: input.temperature,
       topP: input.topP,
       maxTokens: input.maxTokens,
@@ -563,20 +601,12 @@ async function dispatchLlmInner(
 
   // ── Google Gemini ──────────────────────────────────────────────────
   if (model.provider === 'google') {
-    // Fail loudly when callers request unsupported features instead of
-    // silently dropping them — Gemini's tool-call wiring is not yet
-    // bridged through this dispatcher, and tool messages can't be flattened
-    // into a model turn without corrupting multi-turn sessions.
-    if (input.tools && input.tools.length > 0) {
-      throw new TRPCError({
-        code: 'NOT_IMPLEMENTED',
-        message: `tools[] is not supported on the Gemini dispatcher yet — use an OpenAI / Z.AI / Doubao / Groq model for tool calls.`,
-      });
-    }
-    if (input.messages.some((m) => m.role === 'tool')) {
+    if (input.tools?.length && (input.jsonMode || input.responseSchema)) {
+      // Gemini rejects function calling combined with a JSON response mime type.
       throw new TRPCError({
         code: 'BAD_REQUEST',
-        message: `role:'tool' messages are not supported on Gemini — wrap the tool result into a 'user' message.`,
+        message:
+          'Gemini cannot combine tools[] with jsonMode/responseSchema — use one or the other.',
       });
     }
     const apiKey = await resolveProviderKey(input.userId ?? null, 'google');
@@ -589,19 +619,24 @@ async function dispatchLlmInner(
     const { geminiChat } = await import('../gemini');
     // Map OpenAI-style content blocks to Gemini's text/image parts.
     const messages = input.messages.map((m) => {
+      // Tool-call bookkeeping rides along on every message; geminiChat turns it
+      // into functionCall / functionResponse parts.
+      const tool = {
+        ...(m.toolCalls ? { toolCalls: m.toolCalls } : {}),
+        ...(m.tool_call_id ? { toolCallId: m.tool_call_id } : {}),
+        ...(m.name ? { name: m.name } : {}),
+      };
       if (typeof m.content === 'string') {
-        return {
-          role: m.role === 'tool' ? 'assistant' : m.role,
-          content: m.content,
-        } as const;
+        return { role: m.role, content: m.content, ...tool } as const;
       }
       return {
-        role: m.role === 'tool' ? 'assistant' : m.role,
+        role: m.role,
         content: m.content.map((c) =>
           c.type === 'text'
             ? { type: 'text' as const, text: c.text }
             : { type: 'image_url' as const, imageUrl: c.image_url.url }
         ),
+        ...tool,
       } as const;
     });
     const r = await geminiChat({
@@ -613,9 +648,12 @@ async function dispatchLlmInner(
       maxOutputTokens: input.maxTokens,
       jsonMode: input.jsonMode,
       responseSchema: input.responseSchema,
+      tools: input.tools?.map((t) => ({ type: 'function' as const, function: t.function })),
+      toolChoice: input.toolChoice,
     });
     return {
       text: r.text,
+      toolCalls: r.toolCalls,
       usage: {
         promptTokens: r.usage.promptTokens,
         completionTokens: r.usage.completionTokens,
