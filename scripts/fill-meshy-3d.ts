@@ -111,6 +111,7 @@ async function main() {
           ai_model: 'meshy-6',
           topology: 'quad',
           target_polycount: 30000,
+          should_texture: true,
           should_remesh: true,
         }
       );

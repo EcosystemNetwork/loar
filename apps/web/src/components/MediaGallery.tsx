@@ -123,16 +123,25 @@ function isGlb(item: MediaAttachment): boolean {
   );
 }
 
-/** Find the best GLB model from a list of 3D attachments (prefer textured) */
-function findBestGlb(items: MediaAttachment[]): MediaAttachment | null {
-  // Prefer textured model, then game_ready, then any GLB
+/**
+ * Find the best GLB model from a list of 3D attachments (prefer textured).
+ *
+ * Meshy text-to-3D is two-stage: the `preview` stage is untextured geometry
+ * only, the `refine` stage adds the texture. Both get attached to the entity
+ * (subCategory `preview` / `high_poly`, see autoAttach3DModel), so ranking must
+ * put the untextured preview last — otherwise `glbs[0]` can be the preview.
+ */
+export function findBestGlb(items: MediaAttachment[]): MediaAttachment | null {
   const glbs = items.filter(isGlb);
-  return (
-    glbs.find((g) => g.label?.toLowerCase().includes('textured')) ||
-    glbs.find((g) => g.subCategory === 'game_ready') ||
-    glbs[0] ||
-    null
-  );
+  const rank = (g: MediaAttachment): number => {
+    const label = g.label?.toLowerCase() ?? '';
+    if (g.subCategory === 'preview' || label.includes('preview')) return 3;
+    if (label.includes('textured') || g.subCategory === 'high_poly') return 0;
+    if (g.subCategory === 'game_ready') return 1;
+    return 2;
+  };
+  // Array.prototype.sort is stable, so ties keep their original order.
+  return [...glbs].sort((a, b) => rank(a) - rank(b))[0] ?? null;
 }
 
 /** Find a thumbnail among sibling attachments (for 3D model poster) */
