@@ -40,6 +40,7 @@ import { TokenAlertButton } from '@/components/tokens/TokenAlertButton';
 import { TokenComments } from '@/components/tokens/TokenComments';
 import { TokenSocialLinks } from '@/components/tokens/TokenSocialLinks';
 import { HolderBubbleMap } from '@/components/tokens/HolderBubbleMap';
+import { LiveStream } from '@/components/tokens/LiveStream';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -610,6 +611,17 @@ function TokenDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left: Chart + Trades + Comments */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Live stream — creator announces YouTube/Twitch/Kick, everyone can watch */}
+            <LiveStream
+              tokenAddress={token.id}
+              isCreator={
+                !!userAddress &&
+                [token.deployer, token.tokenAdmin].some(
+                  (a) => a.toLowerCase() === userAddress.toLowerCase()
+                )
+              }
+            />
+
             {/* Candlestick Chart */}
             <Card>
               <CardContent className="p-4">

@@ -11,6 +11,9 @@ import { db, firebaseAvailable } from '../../lib/firebase';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { sendNotification } from '../../services/activity';
+import { parseLiveUrl } from '../../services/live-url';
+import { ponderQuery } from '../../lib/ponder';
+import { getAddress } from 'viem';
 
 const shortAddr = (a: string) => (a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
 
@@ -25,6 +28,14 @@ const tokenWatchlistCol = () => {
   if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Firebase unavailable' });
   return db.collection('tokenWatchlist');
 };
+
+const tokenLiveCol = () => {
+  if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Firebase unavailable' });
+  return db.collection('tokenLive');
+};
+
+/** A stream is "live" for at most this long unless the creator re-announces it. */
+const LIVE_TTL_MS = 12 * 60 * 60 * 1000;
 
 const tokenTradesCol = () => {
   if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Firebase unavailable' });
@@ -288,6 +299,88 @@ export const tokenSocialRouter = router({
       if (!snap.empty) {
         await snap.docs[0].ref.delete();
       }
+      return { ok: true };
+    }),
+
+  // ─── Livestream ──────────────────────────────────────────────────────
+  // Creators (the token's deployer / admin) announce a YouTube / Twitch / Kick
+  // stream that the token page embeds. Off-chain on purpose: token metadata is
+  // immutable, and a creator goes live long after launch.
+
+  /** Current live stream for a token, or null (expired streams read as null). */
+  getLive: publicProcedure
+    .input(z.object({ tokenAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/) }))
+    .query(async ({ input }) => {
+      const doc = await tokenLiveCol().doc(input.tokenAddress.toLowerCase()).get();
+      const d = doc.data();
+      if (!d || d.expiresAt.toMillis() <= Date.now()) return null;
+      return { platform: d.platform as string, ref: d.ref as string, url: d.url as string };
+    }),
+
+  /** Tokens with an active stream, most recently announced first. */
+  getLiveTokens: publicProcedure.query(async () => {
+    const snap = await tokenLiveCol()
+      .where('expiresAt', '>', new Date())
+      .orderBy('expiresAt', 'desc')
+      .limit(20)
+      .get();
+    return snap.docs.map((d) => ({
+      tokenAddress: d.id,
+      platform: d.data().platform as string,
+      url: d.data().url as string,
+    }));
+  }),
+
+  /** Announce (or replace) a stream. Only the token's deployer / admin may. */
+  setLive: protectedProcedure
+    .input(
+      z.object({ tokenAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/), url: z.string().max(300) })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const live = parseLiveUrl(input.url);
+      if (!live) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Use a YouTube, Twitch or Kick stream link.',
+        });
+      }
+      const me = (ctx.user.address ?? ctx.user.uid).toLowerCase();
+      const found = await ponderQuery<{
+        token: { deployer: string; tokenAdmin: string } | null;
+      }>(`query ($id: String!) { token(id: $id) { deployer tokenAdmin } }`, {
+        id: getAddress(input.tokenAddress),
+      });
+      if (!found) {
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Could not verify token ownership right now. Try again shortly.',
+        });
+      }
+      const t = found.token;
+      if (!t || (t.deployer.toLowerCase() !== me && t.tokenAdmin.toLowerCase() !== me)) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Only the token creator can go live.' });
+      }
+      await tokenLiveCol()
+        .doc(input.tokenAddress.toLowerCase())
+        .set({
+          ...live,
+          uid: ctx.user.uid,
+          startedAt: new Date(),
+          expiresAt: new Date(Date.now() + LIVE_TTL_MS),
+        });
+      return { ok: true, ...live };
+    }),
+
+  /** End the stream early. Same ownership rule as setLive. */
+  endLive: protectedProcedure
+    .input(z.object({ tokenAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/) }))
+    .mutation(async ({ ctx, input }) => {
+      const ref = tokenLiveCol().doc(input.tokenAddress.toLowerCase());
+      const doc = await ref.get();
+      if (doc.exists && doc.data()?.uid !== ctx.user.uid) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Only the token creator can end this.' });
+      }
+      if (doc.exists) await ref.delete();
       return { ok: true };
     }),
 
