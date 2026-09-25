@@ -4,6 +4,9 @@
  * (`myListings`, `mySales`, `myPurchases`, `updateListing`,
  * `deactivateListing`, `reactivateListing`) but had no frontend caller
  * anywhere in the app, plus the new `startVerification` (Phase 4 KYC).
+ *
+ * The "New listing" tab is where a seller creates something to list: upload
+ * their own likeness, list a character they made, or list a cloned voice.
  */
 
 import { useState } from 'react';
@@ -23,6 +26,7 @@ import {
   ShieldCheck,
   ExternalLink,
   AlertTriangle,
+  Plus,
 } from 'lucide-react';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { trpcClient } from '@/utils/trpc';
@@ -34,6 +38,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { safeParseEther } from '@/components/likeness-marketplace/consent-pricing-steps';
+import { NewListingTab } from '@/components/likeness-marketplace/NewListingTab';
 import { LIKENESS_USE_CASE_LABELS, type LikenessUseCase } from '@/hooks/useEntities';
 
 export const Route = createFileRoute('/marketplace/likeness/my-listings')({
@@ -71,6 +76,18 @@ interface MyDeal {
   startTime: string;
 }
 
+const MY_LISTINGS_KEY = ['likenessMarketplace', 'myListings'] as const;
+
+function useMyListings(enabled = true) {
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: MY_LISTINGS_KEY,
+    enabled,
+    queryFn: () =>
+      trpcClient.likenessMarketplace.myListings.query({ includeInactive: true, limit: 100 }),
+  });
+  return { listings: (data ?? []) as MyListing[], isLoading, isError, error, refetch };
+}
+
 function weiToEthInput(wei: string): string {
   if (wei === '0') return '';
   try {
@@ -92,6 +109,9 @@ function kindIcon(kind: MyListing['entityKind']) {
 
 function MyListingsPage() {
   const { isAuthenticated } = useWalletAuth();
+  const queryClient = useQueryClient();
+  const [tab, setTab] = useState('listings');
+  const { listings } = useMyListings(isAuthenticated);
 
   if (!isAuthenticated) {
     return (
@@ -107,23 +127,39 @@ function MyListingsPage() {
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
-      <header className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">My Listings</h1>
-        <p className="text-muted-foreground mt-2">
-          Manage what you've listed on the Likeness Marketplace — pricing, pause/resume, and
-          identity verification.
-        </p>
+      <header className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">My Listings</h1>
+          <p className="text-muted-foreground mt-2">
+            Upload your likeness or list the characters you create, then manage pricing,
+            pause/resume, and identity verification.
+          </p>
+        </div>
+        <Button className="shrink-0" onClick={() => setTab('new')}>
+          <Plus className="size-4 mr-1.5" />
+          New listing
+        </Button>
       </header>
 
-      <Tabs defaultValue="listings">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="listings">Listings</TabsTrigger>
+          <TabsTrigger value="new">New listing</TabsTrigger>
           <TabsTrigger value="sales">Sales</TabsTrigger>
           <TabsTrigger value="purchases">Purchases</TabsTrigger>
         </TabsList>
 
         <TabsContent value="listings">
-          <ListingsTab />
+          <ListingsTab onCreate={() => setTab('new')} />
+        </TabsContent>
+        <TabsContent value="new">
+          <NewListingTab
+            listedEntityIds={new Set(listings.map((l) => l.entityId))}
+            onListed={() => {
+              queryClient.invalidateQueries({ queryKey: ['likenessMarketplace'] });
+              setTab('listings');
+            }}
+          />
         </TabsContent>
         <TabsContent value="sales">
           <DealsTab kind="sales" />
@@ -136,16 +172,11 @@ function MyListingsPage() {
   );
 }
 
-function ListingsTab() {
+function ListingsTab({ onCreate }: { onCreate: () => void }) {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['likenessMarketplace', 'myListings'],
-    queryFn: () =>
-      trpcClient.likenessMarketplace.myListings.query({ includeInactive: true, limit: 100 }),
-  });
-  const listings = (data ?? []) as MyListing[];
+  const { listings, isLoading, isError, error, refetch } = useMyListings();
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['likenessMarketplace'] });
 
@@ -199,10 +230,11 @@ function ListingsTab() {
       <Card className="mt-4">
         <CardContent className="py-12 text-center">
           <p className="text-sm text-muted-foreground mb-4">
-            You haven't listed anything on the Likeness Marketplace yet.
+            You haven't listed anything yet — upload your likeness or list a character you created.
           </p>
-          <Button asChild size="sm">
-            <Link to="/create/likeness">List your likeness</Link>
+          <Button size="sm" onClick={onCreate}>
+            <Plus className="size-3.5 mr-1.5" />
+            Create your first listing
           </Button>
         </CardContent>
       </Card>

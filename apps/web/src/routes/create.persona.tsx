@@ -49,6 +49,13 @@ import { ModelViewer } from '@/components/ModelViewerLazy';
 
 export const Route = createFileRoute('/create/persona')({
   component: CreatePersonaPage,
+  // `?origin=fictional` lets My Listings deep-link into the original-character path.
+  validateSearch: (
+    search: Record<string, unknown>
+  ): { origin?: 'self' | 'parody' | 'fictional' } =>
+    search.origin === 'self' || search.origin === 'parody' || search.origin === 'fictional'
+      ? { origin: search.origin }
+      : {},
 });
 
 const STAGES = ['basics', 'components', 'personality', 'attest', 'review'] as const;
@@ -97,7 +104,8 @@ function CreatePersonaPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-  const [origin, setOrigin] = useState<Origin>('self');
+  const { origin: originParam } = Route.useSearch();
+  const [origin, setOrigin] = useState<Origin>(originParam ?? 'self');
 
   // Parody / fictional fields
   const [parodySubject, setParodySubject] = useState('');
