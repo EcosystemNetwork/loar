@@ -255,7 +255,7 @@ function LaunchTokenPage() {
                 placeholder="e.g. Sunset Protocol"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                maxLength={60}
+                maxLength={50}
               />
             </div>
 
