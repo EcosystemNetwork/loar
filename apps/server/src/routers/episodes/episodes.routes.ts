@@ -31,6 +31,7 @@ import { validateAgainstLaws } from '../physics/physics.handlers';
 import { runEpisodeCanonCheck, shouldBlockCanonPublish } from '../../services/canon-check';
 import { decodeEventLog, getAddress, keccak256, toBytes } from 'viem';
 import type { ExportSettings, Soundtrack, TextOverlay } from '../../services/ffmpeg/episode-render';
+import { decideVersion, stableJson, VERSIONS_KEEP } from './episode-versions';
 import {
   isDefaultMix,
   isNeutral,
@@ -181,11 +182,6 @@ const MAX_OVERLAYS = 50;
 
 // ── Version history ─────────────────────────────────────────────────────
 
-/** Restore points kept per episode. */
-const VERSIONS_KEEP = 30;
-/** Autosaves only add a restore point this often; manual saves always do. */
-const AUTO_VERSION_MIN_MS = 10 * 60 * 1000;
-
 const versionsCol = (episodeId: string) => episodesCol().doc(episodeId).collection('versions');
 
 // ── Credit cost ─────────────────────────────────────────────────────────
@@ -215,15 +211,6 @@ async function refundCredits(_uid: string, _credits: number): Promise<void> {
 
 // ── Version history helpers ─────────────────────────────────────────────
 
-/** JSON with sorted keys, so equal content compares equal regardless of key order. */
-function stableJson(value: unknown): string {
-  return JSON.stringify(value ?? null, (_k, v) =>
-    v && typeof v === 'object' && !Array.isArray(v)
-      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : 1)))
-      : v
-  );
-}
-
 async function assertEpisodeCreator(episodeId: string, uid: string): Promise<void> {
   const doc = await episodesCol().doc(episodeId).get();
   if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND' });
@@ -249,10 +236,7 @@ async function recordVersion(
 
   const latest = await versionsCol(episodeId).orderBy('createdAt', 'desc').limit(1).get();
   const last = latest.docs[0]?.data();
-  if (last?.hash === hash) return;
-  if (kind === 'auto' && last && Date.now() - Date.parse(last.createdAt) < AUTO_VERSION_MIN_MS) {
-    return;
-  }
+  if (decideVersion({ hash, kind, last }) !== 'record') return;
 
   await versionsCol(episodeId)
     .doc(randomUUID())
