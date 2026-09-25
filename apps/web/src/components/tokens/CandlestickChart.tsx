@@ -3,7 +3,14 @@
  * averages, a log-scale toggle, a buy/sell-split volume pane, timeframe
  * selection and hover crosshair. Pure SVG — no charting library.
  */
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import {
+  clampWindow,
+  panWindow,
+  resolveWindow,
+  zoomWindow,
+  type ChartWindow,
+} from '@/lib/chart-view';
 import { Button } from '@/components/ui/button';
 
 interface TradePoint {
@@ -124,9 +131,50 @@ export function CandlestickChart({ data }: { data: TradePoint[] }) {
   const [logScale, setLogScale] = useState(false);
   const [showMA, setShowMA] = useState(true);
 
-  const candles = useMemo(() => buildCandles(data, timeframe), [data, timeframe]);
-  const ma7 = useMemo(() => sma(candles, 7), [candles]);
-  const ma25 = useMemo(() => sma(candles, 25), [candles]);
+  // Zoom / pan: keep every candle, render a window. MAs are computed on the full
+  // series (so they're warmed up) and sliced to the window.
+  const [view, setView] = useState<ChartWindow | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const drag = useRef<{ x: number; win: ChartWindow } | null>(null);
+
+  const allCandles = useMemo(() => buildCandles(data, timeframe), [data, timeframe]);
+  const win = resolveWindow(allCandles.length, view);
+  const candles = useMemo(
+    () => allCandles.slice(win.start, win.end),
+    [allCandles, win.start, win.end]
+  );
+  const ma7 = useMemo(
+    () => sma(allCandles, 7).slice(win.start, win.end),
+    [allCandles, win.start, win.end]
+  );
+  const ma25 = useMemo(
+    () => sma(allCandles, 25).slice(win.start, win.end),
+    [allCandles, win.start, win.end]
+  );
+  const isZoomed = view !== null;
+  const zoomBy = useCallback(
+    (factor: number, anchor = 0.5) =>
+      setView((v) =>
+        zoomWindow(allCandles.length, resolveWindow(allCandles.length, v), factor, anchor)
+      ),
+    [allCandles.length]
+  );
+
+  // Ctrl/⌘ + wheel zooms (plain wheel keeps scrolling the page). Needs a native,
+  // non-passive listener — React's onWheel can't preventDefault.
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const anchor = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+      zoomBy(e.deltaY > 0 ? 1.25 : 0.8, anchor);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [zoomBy, candles.length]);
 
   const chartW = CHART_W;
 
@@ -191,10 +239,17 @@ export function CandlestickChart({ data }: { data: TradePoint[] }) {
     (e: React.MouseEvent<SVGSVGElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
       const mouseX = ((e.clientX - rect.left) / rect.width) * W - PAD.left;
+      // Dragging pans instead of hovering: 1 candle per candleW of horizontal travel.
+      if (drag.current) {
+        const dxUnits = ((e.clientX - drag.current.x) / rect.width) * W;
+        const delta = -Math.round(dxUnits / candleW);
+        setView(panWindow(allCandles.length, drag.current.win, delta));
+        return;
+      }
       const idx = Math.floor(mouseX / candleW);
       if (idx >= 0 && idx < candles.length) setHoverIndex(idx);
     },
-    [candles.length, candleW]
+    [candles.length, candleW, allCandles.length]
   );
 
   if (candles.length === 0) {
@@ -218,7 +273,10 @@ export function CandlestickChart({ data }: { data: TradePoint[] }) {
               variant={timeframe === t ? 'default' : 'ghost'}
               size="sm"
               className="h-6 px-2 font-mono text-[10px]"
-              onClick={() => setTimeframe(t)}
+              onClick={() => {
+                setTimeframe(t);
+                setView(null);
+              }}
             >
               {t}
             </Button>
@@ -241,6 +299,39 @@ export function CandlestickChart({ data }: { data: TradePoint[] }) {
           >
             Line
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 px-0 text-[12px]"
+            onClick={() => zoomBy(0.7)}
+            disabled={candles.length <= Math.min(10, allCandles.length)}
+            title="Zoom in (Ctrl/⌘ + scroll)"
+            aria-label="Zoom in"
+          >
+            +
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 px-0 text-[12px]"
+            onClick={() => zoomBy(1.4)}
+            disabled={!isZoomed}
+            title="Zoom out"
+            aria-label="Zoom out"
+          >
+            −
+          </Button>
+          {isZoomed && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-[10px]"
+              onClick={() => setView(null)}
+              title="Show all candles"
+            >
+              Reset
+            </Button>
+          )}
           <Button
             variant={showMA ? 'default' : 'ghost'}
             size="sm"
@@ -290,10 +381,21 @@ export function CandlestickChart({ data }: { data: TradePoint[] }) {
       )}
 
       <svg
+        ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
-        className="h-auto w-full"
+        className={`h-auto w-full select-none ${isZoomed ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        style={{ touchAction: 'pan-y' }}
         onMouseMove={handleMouseMove}
-        onMouseLeave={() => setHoverIndex(null)}
+        onMouseLeave={() => {
+          setHoverIndex(null);
+          drag.current = null;
+        }}
+        onMouseDown={(e) => {
+          if (isZoomed) drag.current = { x: e.clientX, win: clampWindow(allCandles.length, win) };
+        }}
+        onMouseUp={() => {
+          drag.current = null;
+        }}
       >
         {yTicks.map((tick, i) => (
           <line
