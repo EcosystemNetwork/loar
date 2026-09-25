@@ -41,7 +41,11 @@ export type NotificationType =
   | 'mention'
   | 'agent_contract_proposal'
   | 'agent_commission_earned'
-  | 'ai_pipeline_failed';
+  | 'ai_pipeline_failed'
+  | 'token_graduated'
+  | 'token_halted'
+  | 'token_launch'
+  | 'token_reply';
 
 interface EmitActivityParams {
   actorUid: string;

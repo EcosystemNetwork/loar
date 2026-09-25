@@ -52,6 +52,10 @@ export const socialRouter = router({
       const alreadyFollowing = await db!.runTransaction(async (tx) => {
         const followDoc = await tx.get(followsCol().doc(docId));
         if (followDoc.exists) return true;
+        // Reads before writes. Pure token launchers often have no profile doc, and
+        // tx.update() on a missing doc throws — so only bump counters that exist.
+        const followerProfile = await tx.get(profilesCol().doc(followerUid));
+        const targetProfile = await tx.get(profilesCol().doc(targetUid));
 
         tx.set(followsCol().doc(docId), {
           followerUid,
@@ -59,12 +63,12 @@ export const socialRouter = router({
           followerAddress: ctx.user.address?.toLowerCase(),
           createdAt: new Date(),
         });
-        tx.update(profilesCol().doc(followerUid), {
-          following: FieldValue.increment(1),
-        });
-        tx.update(profilesCol().doc(targetUid), {
-          followers: FieldValue.increment(1),
-        });
+        if (followerProfile.exists) {
+          tx.update(profilesCol().doc(followerUid), { following: FieldValue.increment(1) });
+        }
+        if (targetProfile.exists) {
+          tx.update(profilesCol().doc(targetUid), { followers: FieldValue.increment(1) });
+        }
         return false;
       });
 
@@ -107,17 +111,30 @@ export const socialRouter = router({
       await db!.runTransaction(async (tx) => {
         const followDoc = await tx.get(followsCol().doc(docId));
         if (!followDoc.exists) return;
+        const followerProfile = await tx.get(profilesCol().doc(ctx.user.uid));
+        const targetProfile = await tx.get(profilesCol().doc(input.targetUid));
 
         tx.delete(followsCol().doc(docId));
-        tx.update(profilesCol().doc(ctx.user.uid), {
-          following: FieldValue.increment(-1),
-        });
-        tx.update(profilesCol().doc(input.targetUid), {
-          followers: FieldValue.increment(-1),
-        });
+        if (followerProfile.exists) {
+          tx.update(profilesCol().doc(ctx.user.uid), { following: FieldValue.increment(-1) });
+        }
+        if (targetProfile.exists) {
+          tx.update(profilesCol().doc(input.targetUid), { followers: FieldValue.increment(-1) });
+        }
       });
 
       return { ok: true };
+    }),
+
+  /** Follower / following counts straight from the follows collection (works without a profile doc). */
+  getFollowCounts: publicProcedure
+    .input(z.object({ uid: z.string().min(1) }))
+    .query(async ({ input }) => {
+      const [followers, following] = await Promise.all([
+        followsCol().where('followedUid', '==', input.uid).count().get(),
+        followsCol().where('followerUid', '==', input.uid).count().get(),
+      ]);
+      return { followers: followers.data().count, following: following.data().count };
     }),
 
   /** Check if current user follows a target */

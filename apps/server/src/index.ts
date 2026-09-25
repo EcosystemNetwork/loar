@@ -1516,6 +1516,12 @@ import('./jobs/token-alerts')
   .then(({ startTokenAlertJob }) => startTokenAlertJob())
   .catch((err) => console.warn('[token-alerts] failed to start:', err));
 
+// Token event notifications — new launch by a followed creator, watched token
+// graduated/halted (opt-in via TOKEN_EVENTS_ENABLED=true, one replica).
+import('./jobs/token-events')
+  .then(({ startTokenEventJob }) => startTokenEventJob())
+  .catch((err) => console.warn('[token-events] failed to start:', err));
+
 const port = env.PORT;
 
 console.log(`Starting server on port ${port}`);

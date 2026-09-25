@@ -17,11 +17,11 @@
 import { Hono } from 'hono';
 import { getAddress } from 'viem';
 import { bondingSpotPrice } from '../services/token-price';
+import { ponderQuery as ponder } from '../lib/ponder';
 
 export const shareRoutes = new Hono();
 
 const ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
-const PONDER_URL = () => (process.env.PONDER_URL || 'https://idx.loar.fun').replace(/\/$/, '');
 const APP_URL = () =>
   (
     process.env.PUBLIC_WEB_URL ||
@@ -147,22 +147,6 @@ export function buildSharePage(opts: {
     `<meta http-equiv="refresh" content="0;url=${escapeHtml(target)}">`,
   ].filter(Boolean);
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">${tags.join('')}</head><body><p><a href="${escapeHtml(target)}">Continue to ${SITE}</a></p></body></html>`;
-}
-
-async function ponder<T>(query: string, variables: Record<string, unknown>): Promise<T | null> {
-  try {
-    const res = await fetch(`${PONDER_URL()}/graphql`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ query, variables }),
-      signal: AbortSignal.timeout(4000),
-    });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { data?: T; errors?: unknown[] };
-    return json.errors?.length ? null : (json.data ?? null);
-  } catch {
-    return null;
-  }
 }
 
 shareRoutes.get('/token/:address', async (c) => {

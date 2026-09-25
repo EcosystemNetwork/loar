@@ -10,6 +10,9 @@ import { protectedProcedure, publicProcedure, router } from '../../lib/trpc';
 import { db, firebaseAvailable } from '../../lib/firebase';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import { sendNotification } from '../../services/activity';
+
+const shortAddr = (a: string) => (a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
 
 // ── Collection refs ────────────────────────────────────────────────────
 
@@ -118,6 +121,29 @@ export const tokenSocialRouter = router({
         flagged: false,
       };
       await ref.set(comment);
+
+      // Tell the parent comment's author about the reply (best-effort — never
+      // fail the comment over a notification).
+      if (input.parentId) {
+        void (async () => {
+          try {
+            const parent = await tokenCommentsCol().doc(input.parentId!).get();
+            const parentUid = parent.data()?.authorUid as string | undefined;
+            if (parentUid && parentUid !== ctx.user.uid) {
+              await sendNotification({
+                recipientUid: parentUid,
+                type: 'token_reply',
+                actorUid: ctx.user.uid,
+                message: `${shortAddr(ctx.user.address ?? ctx.user.uid)} replied to your comment`,
+                targetType: 'token',
+                targetId: input.tokenAddress.toLowerCase(),
+              });
+            }
+          } catch (err) {
+            console.warn('[tokenSocial] reply notification failed:', err);
+          }
+        })();
+      }
       return { id: ref.id, ...comment };
     }),
 
