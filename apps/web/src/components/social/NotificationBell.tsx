@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from '@tanstack/react-router';
+import { notificationTokenAddress } from '../../lib/notification-links';
 import { Bell } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { trpc } from '../../utils/trpc';
@@ -6,6 +8,7 @@ import { useWalletAuth } from '../../lib/wallet-auth';
 
 export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAuthenticated } = useWalletAuth();
 
@@ -102,9 +105,24 @@ export function NotificationBell() {
                 notificationsData?.notifications.map((notif: any) => (
                   <div
                     key={notif.id}
+                    role={notificationTokenAddress(notif) ? 'menuitem' : undefined}
+                    tabIndex={notificationTokenAddress(notif) ? 0 : undefined}
+                    onClick={() => {
+                      const token = notificationTokenAddress(notif);
+                      if (!token) return;
+                      setIsOpen(false);
+                      navigate({ to: '/tokens/$address', params: { address: token } });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key !== 'Enter') return;
+                      const token = notificationTokenAddress(notif);
+                      if (!token) return;
+                      setIsOpen(false);
+                      navigate({ to: '/tokens/$address', params: { address: token } });
+                    }}
                     className={`px-4 py-3 border-b border-zinc-800/50 hover:bg-zinc-800/50 transition-colors ${
-                      !notif.read ? 'bg-violet-900/10' : ''
-                    }`}
+                      notificationTokenAddress(notif) ? 'cursor-pointer' : ''
+                    } ${!notif.read ? 'bg-violet-900/10' : ''}`}
                   >
                     <div className="flex items-start gap-3">
                       {notif.actorAvatarUrl ? (

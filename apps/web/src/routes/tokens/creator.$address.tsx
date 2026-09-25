@@ -21,6 +21,8 @@ import { useState } from 'react';
 import { useChainId } from 'wagmi';
 import { getExplorerAddressUrl } from '@/configs/chains';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
+import { CreatorFollow } from '@/components/tokens/CreatorFollow';
+import { CreatorEarnings } from '@/components/tokens/CreatorEarnings';
 
 export const Route = createFileRoute('/tokens/creator/$address')({
   component: CreatorProfilePage,
@@ -91,11 +93,11 @@ function CreatorProfilePage() {
         </div>
 
         {/* Creator Info */}
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex flex-wrap items-center gap-4 mb-6">
           <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/30 flex items-center justify-center">
             <Rocket className="h-8 w-8 text-primary/60" />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-bold">Token Creator</h1>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <AddressDisplay address={creatorAddress} showAvatar className="text-sm" />
@@ -116,7 +118,11 @@ function CreatorProfilePage() {
               </a>
             </div>
           </div>
+          <CreatorFollow creatorAddress={creatorAddress} />
         </div>
+
+        {/* Unclaimed LP fees — visible to everyone, claimable by the creator */}
+        <CreatorEarnings creatorAddress={creatorAddress} tokens={creatorTokens} />
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">

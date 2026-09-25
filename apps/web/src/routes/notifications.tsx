@@ -2,7 +2,8 @@
  * Notification Center — Full-page view of all user notifications.
  * Supports filtering (all/unread), mark-as-read, and load-more pagination.
  */
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { notificationTokenAddress } from '@/lib/notification-links';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bell, Check, CheckCheck, Loader2 } from 'lucide-react';
@@ -51,6 +52,7 @@ function NotificationSkeleton() {
 }
 
 function NotificationsPage() {
+  const navigate = useNavigate();
   const { isAuthenticated } = useWalletAuth();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
@@ -195,6 +197,8 @@ function NotificationsPage() {
                     if (!notif.read) {
                       markRead.mutate({ notificationId: notif.id });
                     }
+                    const token = notificationTokenAddress(notif);
+                    if (token) navigate({ to: '/tokens/$address', params: { address: token } });
                   }}
                   className={`w-full text-left px-4 py-4 hover:bg-zinc-800/50 transition-colors flex items-start gap-3 ${
                     !notif.read ? 'bg-violet-950/20' : ''
