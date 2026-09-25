@@ -322,6 +322,16 @@ describe('mergeDraftNodes', () => {
     });
   });
 
+  it("carries a draft's saved trim in/out points onto its node", () => {
+    const { nodes } = mergeDrafts({
+      d: { videoUrl: 'https://v.mp4', timestamp: 1, trimStart: 1500, trimEnd: 6000 },
+    });
+    expect(nodes.find((n) => n.id === 'd')!.data).toMatchObject({
+      trimStart: 1500,
+      trimEnd: 6000,
+    });
+  });
+
   it('labels a title-less draft "Untitled scene" and blanks a missing description', () => {
     const { nodes } = mergeDrafts({ d: { videoUrl: 'https://v.mp4', timestamp: 1 } });
     const d = nodes.find((n) => n.id === 'd')!;

@@ -297,6 +297,10 @@ export function mergeDraftNodes({
         isDraft: true,
         isInCanonChain: ev.canonOverride === true ? true : undefined,
         isSelected: false,
+        // Trim in/out points — without these a draft node loses its trim (and
+        // the "trimmed" badge / hover-loop bounds) on every graph rebuild.
+        trimStart: ev.trimStart,
+        trimEnd: ev.trimEnd,
       } as TimelineNodeData,
     });
 
