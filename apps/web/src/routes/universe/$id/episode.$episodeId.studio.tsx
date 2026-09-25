@@ -39,6 +39,8 @@ import {
   EpisodeClipTimeline,
   type EpisodeClip,
 } from '@/components/episode-studio/EpisodeClipTimeline';
+import { EpisodeEditor } from '@/components/episode-studio/EpisodeEditor';
+import { useUndoableState } from '@/hooks/useUndoableState';
 import { trpcClient, SERVER_URL } from '@/utils/trpc';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 
@@ -87,7 +89,17 @@ function EpisodeStudioPage() {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [clips, setClips] = useState<EpisodeClip[]>([]);
+  // Undoable so timeline edits (split / trim / reorder / delete) can be reverted;
+  // server hydration goes through `resetClips` and is deliberately not undoable.
+  const {
+    value: clips,
+    set: setClips,
+    reset: resetClips,
+    undo: undoClips,
+    redo: redoClips,
+    canUndo,
+    canRedo,
+  } = useUndoableState<EpisodeClip[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pasteUrl, setPasteUrl] = useState('');
   // Which episode the local editing state was hydrated from. Keyed by id (not
@@ -108,7 +120,7 @@ function EpisodeStudioPage() {
     const nextClips = (episodeQuery.data.clips as EpisodeClip[]) || [];
     setTitle(nextTitle);
     setDescription(nextDescription);
-    setClips(nextClips);
+    resetClips(nextClips);
     setSelectedIds(new Set());
     setMergeJobId(null);
     setExportJobId(null);
@@ -337,7 +349,7 @@ function EpisodeStudioPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-5xl px-4 py-6 md:px-8">
+      <div className="mx-auto max-w-6xl px-4 py-6 md:px-8">
         <Link
           to="/universe/$id"
           params={{ id: universeId }}
@@ -383,6 +395,18 @@ function EpisodeStudioPage() {
             />
           </div>
         </Card>
+
+        {/* Timeline editor — split / ripple-trim / reorder with live preview */}
+        <EpisodeEditor
+          clips={clips}
+          onChange={setClips}
+          selectedIds={selectedIds}
+          onSelectedIdsChange={setSelectedIds}
+          undo={undoClips}
+          redo={redoClips}
+          canUndo={canUndo}
+          canRedo={canRedo}
+        />
 
         {/* Merge toolbar */}
         {selectedIds.size > 0 && (
