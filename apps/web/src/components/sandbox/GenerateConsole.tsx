@@ -53,6 +53,7 @@ import {
   VARIATION_OPTIONS,
   EDIT_OP_LABELS,
   MAX_RETRIES_PER_GEN,
+  UNDO_WINDOW_MS,
 } from '@/components/sandbox/constants';
 import {
   applyStylePreset,
@@ -63,9 +64,13 @@ import {
   aspectFromSize,
   scopedStorageKey,
   isRetryableGen,
+  isResumableGen,
+  restoreGenerations,
 } from '@/components/sandbox/utils';
 import { GenerationCard } from '@/components/sandbox/GenerationCard';
-import { VideoCostHint } from '@/components/sandbox/VideoCostHint';
+import { CostHint } from '@/components/sandbox/CostHint';
+import { useImageCostEstimate, useVideoCostEstimate } from '@/hooks/useGenerationCost';
+import { formatUsd, needsSpendConfirm } from '@/lib/generation-cost';
 import { latencyKey, recordLatency } from '@/lib/generation-latency';
 import { GenerationCancelledError, resolveVideoResult } from '@/lib/generation-job';
 import { DraftCard, inferDraftKind } from '@/components/sandbox/DraftCard';
@@ -436,7 +441,10 @@ export function GenerateConsole({
       return parsed
         .filter(Boolean)
         .map((g) =>
-          g.status === 'generating'
+          // A queued video job keeps running on the server — leave it 'generating'
+          // and let the resume effect pick its polling back up. Anything else
+          // (inline runs, 3D, edits) died with the page.
+          g.status === 'generating' && !isResumableGen(g)
             ? { ...g, status: 'failed' as const, error: 'Interrupted by navigation' }
             : g
         )
@@ -519,10 +527,40 @@ export function GenerateConsole({
   );
 
   const clearDone = useCallback(() => {
+    const removed = generations.filter((g) => g.status !== 'generating');
+    if (removed.length === 0) return;
     setGenerations((prev) => prev.filter((g) => g.status === 'generating'));
-  }, []);
+    toast(`Cleared ${removed.length} ${removed.length === 1 ? 'item' : 'items'}`, {
+      duration: UNDO_WINDOW_MS,
+      action: {
+        label: 'Undo',
+        onClick: () => setGenerations((prev) => restoreGenerations(prev, removed)),
+      },
+    });
+  }, [generations]);
+
+  // Dismissing a card is easy to fat-finger, so offer a short undo window.
+  const dismissGen = useCallback(
+    (g: Generation) => {
+      removeGen(g.id);
+      toast('Removed', {
+        duration: UNDO_WINDOW_MS,
+        action: {
+          label: 'Undo',
+          onClick: () => setGenerations((prev) => restoreGenerations(prev, [g])),
+        },
+      });
+    },
+    [removeGen]
+  );
 
   const inFlightCountRef = React.useRef(0);
+  // Card ids whose queued job is already being polled (live or resumed) so the
+  // resume effect never starts a second poll loop for the same card.
+  const pollingIdsRef = React.useRef(new Set<string>());
+  // Resumed cards span a page reload, so their elapsed time says nothing about
+  // how long the model takes — keep them out of the latency history.
+  const skipLatencyIdsRef = React.useRef(new Set<string>());
   const isMounted = React.useRef(true);
   React.useEffect(() => {
     return () => {
@@ -742,7 +780,10 @@ export function GenerateConsole({
         });
         // Queued server-side (Redis) → returns just an id; inline → returns the url.
         const url = await resolveVideoResult(r, {
-          onQueued: (serverId) => updateGen(id, { pollGenerationId: serverId }),
+          onQueued: (serverId) => {
+            pollingIdsRef.current.add(id);
+            updateGen(id, { pollGenerationId: serverId });
+          },
         });
         const updated: Generation = { ...gen, status: 'done', videoUrl: url };
         setGenerations((prev) => prev.map((g) => (g.id === id ? updated : g)));
@@ -1486,6 +1527,24 @@ export function GenerateConsole({
   });
 
   const canGenerate = prompt.trim().length > 0;
+  const imageCost = useImageCostEstimate({
+    imageModel,
+    styleRef: referenceImage?.mode === 'style',
+  });
+  const videoCost = useVideoCostEstimate({
+    videoModel,
+    animate: referenceImage?.mode === 'animate',
+    durationSec: videoDuration,
+    resolution: videoResolution,
+    audio: videoAudioOn,
+  });
+  // Big spends get one explicit confirmation; cheap ones never interrupt.
+  const confirmSpend = useCallback((unitUsd: number, count: number, noun: string): boolean => {
+    if (!needsSpendConfirm(unitUsd, count)) return true;
+    return window.confirm(
+      `This will generate ${count} ${noun} for about ${formatUsd(unitUsd * count)}. Continue?`
+    );
+  }, []);
   // Models without native text-to-video (FAL kling/wan/veo3) run image-to-video only, so
   // they need a reference. Seedance + Google-direct Veo support text-to-video natively.
   const videoNeedsImage = !T2V_CAPABLE_MODELS.has(videoModel) && !referenceImage;
@@ -1499,12 +1558,61 @@ export function GenerateConsole({
   useEffect(() => {
     const prev = prevGenStatusRef.current;
     for (const g of generations) {
-      if (prev.get(g.id) === 'generating' && g.status === 'done') {
+      if (
+        prev.get(g.id) === 'generating' &&
+        g.status === 'done' &&
+        !skipLatencyIdsRef.current.has(g.id)
+      ) {
         recordLatency(latencyKey(g), Date.now() - g.createdAt);
       }
       prev.set(g.id, g.status);
     }
   }, [generations]);
+
+  // Stops resumed polls when the console unmounts.
+  const pollAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const ctl = new AbortController();
+    pollAbortRef.current = ctl;
+    return () => ctl.abort();
+  }, []);
+
+  // A queued video keeps rendering server-side while the page is closed. On
+  // load those cards come back still 'generating' with their server id — pick
+  // their polling up again instead of reporting them as interrupted.
+  useEffect(() => {
+    for (const g of generations) {
+      if (!isResumableGen(g)) continue;
+      if (pollingIdsRef.current.has(g.id)) continue;
+      pollingIdsRef.current.add(g.id);
+      skipLatencyIdsRef.current.add(g.id);
+      inFlightCountRef.current += 1;
+      resolveVideoResult(
+        { status: 'queued', generationId: g.pollGenerationId! },
+        { signal: pollAbortRef.current?.signal }
+      )
+        .then((url) => {
+          const updated: Generation = { ...g, status: 'done', videoUrl: url };
+          setGenerations((prev) => prev.map((x) => (x.id === g.id ? updated : x)));
+          autoSaveDraft(updated);
+        })
+        .catch((err: any) => {
+          if (err?.name === 'AbortError') {
+            // Unmounted (or a dev double-mount) — let the next mount resume it.
+            pollingIdsRef.current.delete(g.id);
+            return;
+          }
+          if (err instanceof GenerationCancelledError) {
+            removeGen(g.id);
+            return;
+          }
+          updateGen(g.id, { status: 'failed', error: err?.message || 'Video generation failed' });
+        })
+        .finally(() => {
+          inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1);
+        });
+    }
+  }, [generations, autoSaveDraft, updateGen, removeGen]);
 
   // ⌘/Ctrl+Enter triggers the primary action of the active tab.
   const submitCurrent = useCallback(() => {
@@ -1516,6 +1624,7 @@ export function GenerateConsole({
       if (!canGenerate) return;
       const slots = checkConcurrency(variations);
       if (slots === 0) return;
+      if (!confirmSpend(imageCost?.unitUsd ?? 0, slots, 'images')) return;
       const finalPrompt = applyStylePreset(prompt, stylePreset);
       const isStyleRef = referenceImage?.mode === 'style';
       for (let i = 0; i < slots; i++) {
@@ -1533,6 +1642,7 @@ export function GenerateConsole({
     } else if (mode === 'video') {
       if (!canGenerate || videoNeedsImage) return;
       if (checkConcurrency(1) === 0) return;
+      if (!confirmSpend(videoCost?.unitUsd ?? 0, 1, 'video')) return;
       const finalPrompt = applyStylePreset(prompt, stylePreset);
       const useAnimate = referenceImage?.mode === 'animate';
       runVideoGen(finalPrompt, {
@@ -1599,6 +1709,9 @@ export function GenerateConsole({
     canGenerate,
     videoNeedsImage,
     checkConcurrency,
+    confirmSpend,
+    imageCost,
+    videoCost,
     variations,
     prompt,
     stylePreset,
@@ -2335,6 +2448,7 @@ export function GenerateConsole({
                           onClick={() => {
                             const slots = checkConcurrency(variations);
                             if (slots === 0) return;
+                            if (!confirmSpend(imageCost?.unitUsd ?? 0, slots, 'images')) return;
                             const finalPrompt = applyStylePreset(prompt, stylePreset);
                             const isStyleRef = referenceImage?.mode === 'style';
                             for (let i = 0; i < slots; i++) {
@@ -2367,6 +2481,7 @@ export function GenerateConsole({
                           }
                           onClick={() => {
                             if (checkConcurrency(1) === 0) return;
+                            if (!confirmSpend(videoCost?.unitUsd ?? 0, 1, 'video')) return;
                             const finalPrompt = applyStylePreset(prompt, stylePreset);
                             const useAnimate = referenceImage?.mode === 'animate';
                             runVideoGen(finalPrompt, {
@@ -2391,15 +2506,10 @@ export function GenerateConsole({
                       )}
                     </div>
 
-                    {mode === 'video' && (
-                      <VideoCostHint
-                        videoModel={videoModel}
-                        animate={referenceImage?.mode === 'animate'}
-                        durationSec={videoDuration}
-                        resolution={videoResolution}
-                        audio={videoAudioOn}
-                      />
+                    {mode === 'image' && (
+                      <CostHint noun="image" estimate={imageCost} count={variations} />
                     )}
+                    {mode === 'video' && <CostHint noun="video" estimate={videoCost} />}
 
                     <p className="text-[11px] text-muted-foreground -mt-1">
                       Up to {MAX_CONCURRENT_GENS} generations run in parallel. Each run auto-saves
@@ -2996,7 +3106,7 @@ export function GenerateConsole({
                       <GenerationCard
                         key={`g-${g.id}`}
                         gen={g}
-                        onDismiss={() => removeGen(g.id)}
+                        onDismiss={() => dismissGen(g)}
                         onRetry={() => retryGen(g)}
                         onCancel={
                           g.kind === 'video' && g.pollGenerationId ? () => cancelGen(g) : undefined

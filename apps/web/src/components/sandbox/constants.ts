@@ -220,6 +220,8 @@ export const MAX_CONCURRENT_GENS = 12;
 export const MAX_RETRIES_PER_GEN = 2;
 export const QUEUE_STORAGE_KEY = 'loar:sandbox:queue:v1';
 export const QUEUE_MAX_PERSISTED = 50;
+/** How long the "Undo" toast stays up after dismissing a card. */
+export const UNDO_WINDOW_MS = 6000;
 export const ENTITY_RESULTS_STORAGE_KEY = 'loar:sandbox:entityResults:v1';
 export const ENTITY_RESULTS_MAX_PERSISTED = 50;
 export const SANDBOX_TABS: { id: any; label: string; hint: string }[] = [

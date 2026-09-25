@@ -50,3 +50,30 @@ export function scopedStorageKey(base: string, address?: string | null): string 
 export function isRetryableGen(g: { kind: string; retryable?: boolean }): boolean {
   return !!g.retryable && (g.kind === 'image' || g.kind === 'video');
 }
+
+/**
+ * Puts dismissed cards back (undo). Merges by id — a card that reappeared in
+ * the meantime isn't duplicated — and keeps the list newest-first.
+ */
+export function restoreGenerations<T extends { id: string; createdAt: number }>(
+  current: T[],
+  removed: T[]
+): T[] {
+  const have = new Set(current.map((g) => g.id));
+  const back = removed.filter((g) => !have.has(g.id));
+  if (back.length === 0) return current;
+  return [...current, ...back].sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/**
+ * A card that was mid-render when the page closed and can be picked back up:
+ * a queued video job keeps running on the server and is polled by its id. Every
+ * other kind of in-flight work (inline runs, 3D, edits) died with the page.
+ */
+export function isResumableGen(g: {
+  kind: string;
+  status: string;
+  pollGenerationId?: string;
+}): boolean {
+  return g.status === 'generating' && g.kind === 'video' && !!g.pollGenerationId;
+}
