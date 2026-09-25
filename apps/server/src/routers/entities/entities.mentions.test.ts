@@ -37,3 +37,22 @@ describe('findMentions', () => {
     expect(findMentions(kael, many, 5)).toHaveLength(5);
   });
 });
+
+import { findEpisodeAppearances } from './entities.mentions';
+
+describe('findEpisodeAppearances', () => {
+  const eps = [
+    { id: 'a', title: 'Ep 1', description: 'Sable wakes at the fracture.' },
+    { id: 'b', title: 'Sable Returns', description: '' },
+    { id: 'c', title: 'Ep 3', description: 'Unrelated sabled text.' },
+  ];
+  it('matches by description or title, whole-name only', () => {
+    const r = findEpisodeAppearances('Sable', eps);
+    expect(r.map((e) => e.id)).toEqual(['a', 'b']);
+    expect(r[0].snippet).toContain('Sable');
+    expect(r[1].snippet).toBe('');
+  });
+  it('ignores too-short names', () => {
+    expect(findEpisodeAppearances('Ed', eps)).toEqual([]);
+  });
+});

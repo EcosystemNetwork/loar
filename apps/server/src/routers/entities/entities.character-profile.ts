@@ -11,6 +11,7 @@
  * keys are the historical person fields; the rest are additive.
  */
 import type { Entity } from './entities.types';
+import type { EpisodeAppearance } from './entities.mentions';
 
 export interface CharacterField {
   key: string;
@@ -134,6 +135,7 @@ export interface CharacterProfileSignals {
   relationCount?: number;
   mediaCount?: number;
   referenceCount?: number;
+  appearances?: EpisodeAppearance[];
 }
 
 export interface CharacterAssetCheck {
@@ -162,6 +164,8 @@ export interface CharacterProfile {
     hasDescription: boolean;
   };
   assets: CharacterAssetCheck[];
+  /** Canon episodes that mention the character by name. */
+  appearances: EpisodeAppearance[];
 }
 
 /** Metadata keys that hold structured blobs, not display text. */
@@ -219,6 +223,7 @@ export function buildCharacterProfile(
       missing: all.filter((f) => !f.filled).map((f) => f.key),
       hasDescription,
     },
+    appearances: signals.appearances ?? [],
     assets: [
       { key: 'portrait', label: 'Portrait', done: isFilled(entity.imageUrl) },
       {

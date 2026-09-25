@@ -18,6 +18,13 @@ vi.mock('@/utils/trpc', () => ({
     },
   },
 }));
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children, params, to: _to, ...rest }: any) => (
+    <a href={`/episode/${params?.id}`} {...rest}>
+      {children}
+    </a>
+  ),
+}));
 vi.mock('@/lib/apiKeyGate', () => ({ requireProviderKey: vi.fn() }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
@@ -43,6 +50,7 @@ const profile = () => ({
     },
     { id: 'history', title: 'History', fields: [field('backstory', 'Backstory')] },
   ],
+  appearances: [{ id: 'ep1', title: 'Ep 1 — Fracture', snippet: 'Sable wakes.' }],
   extra: [{ key: 'catchphrase', value: 'Again.' }],
   completeness: {
     filled: 1,
@@ -77,6 +85,9 @@ describe('CharacterProfileCard', () => {
     expect(await screen.findByText('Protagonist')).toBeTruthy();
     expect(screen.getByText('33%')).toBeTruthy();
     expect(screen.getByText('Again.')).toBeTruthy();
+    expect(screen.getByText('Ep 1 — Fracture').closest('a')?.getAttribute('href')).toBe(
+      '/episode/ep1'
+    );
     expect(screen.queryByText(/Add age/i)).toBeNull();
     expect(screen.queryByText(/Complete with AI/i)).toBeNull();
     expect(screen.queryByText('History')).toBeNull();

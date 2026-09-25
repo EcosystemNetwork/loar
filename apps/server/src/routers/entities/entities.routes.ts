@@ -19,7 +19,7 @@ import {
   MAX_REFS_PER_SLOT,
   type Entity,
 } from './entities.types';
-import { findMentions } from './entities.mentions';
+import { findMentions, findEpisodeAppearances } from './entities.mentions';
 import {
   CHARACTER_FIELDS,
   CHARACTER_FIELD_KEYS,
@@ -147,6 +147,28 @@ async function withProfileRateLimit<T>(
         .catch(() => undefined);
     }
     throw err;
+  }
+}
+
+/** Canon episodes in the entity's universe that mention it by name (public data only). */
+async function findAppearances(entity: Entity) {
+  if (!entity.universeAddress || !db) return [];
+  try {
+    const snap = await db
+      .collection('episodes')
+      .where('universeId', '==', entity.universeAddress)
+      .where('isCanon', '==', true)
+      .limit(200)
+      .get();
+    return findEpisodeAppearances(
+      entity.name,
+      snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as { title?: string; description?: string }),
+      }))
+    );
+  } catch {
+    return [];
   }
 }
 
@@ -689,14 +711,16 @@ export const entitiesRouter = router({
     .query(async ({ input, ctx }) => {
       const entity = await assertEntityVisible(input.entityId, ctx.user?.address);
       if (entity.kind !== 'person') throw new Error('Character profiles are for person entities');
-      const [relations, attachments, bundle] = await Promise.all([
+      const [relations, attachments, bundle, appearances] = await Promise.all([
         getEntityRelations(entity.id, { limit: 200 }).catch(() => ({ relations: [] })),
         getAttachmentsByTarget('entity', entity.id).catch(() => []),
         resolveReferenceBundle(entity.id).catch(() => null),
+        findAppearances(entity),
       ]);
       return buildCharacterProfile(entity, {
         relationCount: relations.relations.length,
         mediaCount: attachments.length,
+        appearances,
         referenceCount: Object.values(bundle?.slots ?? {}).reduce(
           (n, urls) => n + (urls?.length ?? 0),
           0

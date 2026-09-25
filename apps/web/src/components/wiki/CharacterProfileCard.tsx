@@ -7,6 +7,7 @@
  * a human is ever overwritten.
  */
 import { useState } from 'react';
+import { Link } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Check, Circle, Loader2, Pencil, Plus, Sparkles } from 'lucide-react';
@@ -93,7 +94,7 @@ export function CharacterProfileCard({ entityId, metadata, isOwner, onChanged }:
     }
   };
 
-  const { completeness, sections, extra, assets } = profile;
+  const { completeness, sections, extra, assets, appearances } = profile;
   const canComplete = isOwner && completeness.missing.length > 0;
 
   return (
@@ -220,6 +221,32 @@ export function CharacterProfileCard({ entityId, metadata, isOwner, onChanged }:
             </section>
           );
         })}
+
+        {appearances.length > 0 && (
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Appears in ({appearances.length})
+            </h3>
+            <ul className="space-y-2">
+              {appearances.map((a) => (
+                <li key={a.id}>
+                  <Link
+                    to="/episode/$id"
+                    params={{ id: a.id }}
+                    className="block rounded-md p-2 -mx-2 hover:bg-muted/50 transition-colors"
+                  >
+                    <span className="text-sm font-medium block">{a.title}</span>
+                    {a.snippet && (
+                      <span className="text-xs text-muted-foreground line-clamp-2">
+                        {a.snippet}
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {extra.length > 0 && (
           <section className="space-y-3">

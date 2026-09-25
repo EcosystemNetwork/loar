@@ -52,3 +52,40 @@ export function findMentions(target: Entity, candidates: Entity[], limit = 30): 
   }
   return out;
 }
+
+export interface EpisodeAppearance {
+  id: string;
+  title: string;
+  snippet: string;
+}
+
+/**
+ * Episodes whose title or description mention the entity by name — how a
+ * character's profile lists where they appear. Pure; the caller supplies the
+ * (already visibility-filtered) episodes.
+ */
+export function findEpisodeAppearances(
+  targetName: string,
+  episodes: Array<{ id: string; title?: string; description?: string }>,
+  limit = 30
+): EpisodeAppearance[] {
+  const name = (targetName ?? '').trim();
+  if (name.length < MIN_NAME_LENGTH) return [];
+  const re = nameRegex(name);
+  const out: EpisodeAppearance[] = [];
+  for (const ep of episodes) {
+    const title = ep.title ?? '';
+    const description = ep.description ?? '';
+    const inDescription = re.exec(description);
+    if (!inDescription && !re.test(title)) continue;
+    out.push({
+      id: ep.id,
+      title,
+      snippet: inDescription
+        ? snippetAround(description, inDescription.index, inDescription[0].length)
+        : '',
+    });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
