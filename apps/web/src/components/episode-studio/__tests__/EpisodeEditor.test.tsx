@@ -89,7 +89,7 @@ describe('EpisodeEditor keyboard', () => {
     const props = setup();
     key('ArrowRight', { shiftKey: true }); // playhead → 1s
     key('s');
-    const [next] = props.onChange.mock.calls[0];
+    const [next] = vi.mocked(props.onChange).mock.calls[0];
     expect(next.map((c: EpisodeClip) => c.nodeId)).toEqual(['a', 'a#2', 'b']);
     expect(next[0].trimEnd).toBe(1);
   });
@@ -101,14 +101,16 @@ describe('EpisodeEditor keyboard', () => {
     cleanup();
     const withSel = setup({ selectedIds: new Set(['a']) });
     key('Delete');
-    expect(withSel.onChange.mock.calls[0][0].map((c: EpisodeClip) => c.nodeId)).toEqual(['b']);
+    expect(vi.mocked(withSel.onChange).mock.calls[0][0].map((c: EpisodeClip) => c.nodeId)).toEqual([
+      'b',
+    ]);
     expect(withSel.onSelectedIdsChange).toHaveBeenCalledWith(new Set());
   });
 
   it('Ctrl+D duplicates the selected clip next to itself', () => {
     const props = setup({ selectedIds: new Set(['b']) });
     key('d', { ctrlKey: true });
-    expect(props.onChange.mock.calls[0][0].map((c: EpisodeClip) => c.nodeId)).toEqual([
+    expect(vi.mocked(props.onChange).mock.calls[0][0].map((c: EpisodeClip) => c.nodeId)).toEqual([
       'a',
       'b',
       'b#2',
@@ -186,7 +188,10 @@ describe('EpisodeEditor context actions', () => {
       key: 'ArrowRight',
       altKey: true,
     });
-    expect(props.onChange.mock.calls[0][0].map((c: EpisodeClip) => c.nodeId)).toEqual(['b', 'a']);
+    expect(vi.mocked(props.onChange).mock.calls[0][0].map((c: EpisodeClip) => c.nodeId)).toEqual([
+      'b',
+      'a',
+    ]);
   });
 
   it('will not move the last clip later', () => {
@@ -209,7 +214,9 @@ describe('EpisodeEditor context actions', () => {
     const props = setup({ selectedIds: new Set(['a']) });
     fireEvent.contextMenu(screen.getByRole('listitem', { name: /^B,/ }));
     fireEvent.click(await screen.findByRole('menuitem', { name: /Delete/ }));
-    expect(props.onChange.mock.calls[0][0].map((c: EpisodeClip) => c.nodeId)).toEqual(['a']);
+    expect(vi.mocked(props.onChange).mock.calls[0][0].map((c: EpisodeClip) => c.nodeId)).toEqual([
+      'a',
+    ]);
   });
 });
 
@@ -217,7 +224,7 @@ describe('EpisodeEditor inspector', () => {
   it('appears for a selection and patches every selected clip', () => {
     const props = setup({ selectedIds: new Set(['a', 'b']) });
     fireEvent.click(screen.getByRole('button', { name: /^Mute/ }));
-    const next = props.onChange.mock.calls[0][0] as EpisodeClip[];
+    const next = vi.mocked(props.onChange).mock.calls[0][0] as EpisodeClip[];
     expect(next.map((c) => c.volume)).toEqual([0, 0]);
   });
 
