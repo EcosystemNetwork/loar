@@ -153,6 +153,15 @@ export function effectiveClipGain(mix: AudioMix, track: AudioTrack, clip: AudioC
   return clamp(clip.volume, 0, MAX_GAIN) * clamp(track.volume, 0, MAX_GAIN);
 }
 
+/**
+ * Volume for the preview's <video> elements. An HTMLMediaElement can't go
+ * above 1, so boosts past unity aren't audible in the preview (the export does
+ * apply them); cuts, mute, solo and master all are.
+ */
+export function previewVideoVolume(mix: AudioMix): number {
+  return clamp(videoAudioGain(mix) * clamp(mix.mixer.master, 0, MAX_GAIN), 0, 1);
+}
+
 /** True when the mix changes nothing about the video audio — export can skip the mix pass. */
 export function isMixNeutral(mix: AudioMix): boolean {
   return (

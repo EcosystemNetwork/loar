@@ -23,6 +23,7 @@ import {
   patchTrack,
   patchVideoChannel,
   peaksWindow,
+  previewVideoVolume,
   removeAudioClips,
   removeTrack,
   setMaster,
@@ -475,5 +476,22 @@ describe('clipPeakColumns', () => {
     const cols = clipPeakColumns({ ...base, loop: true, length: 4 }, short, 2, 8, 1);
     const q = (v: number) => (v < 0.5 ? 'q' : 'L');
     expect(Array.from(cols).map(q).join('')).toBe('qqLLqqLL');
+  });
+});
+
+describe('previewVideoVolume', () => {
+  it('follows the video channel and master, capped at 1 (elements cannot boost)', () => {
+    expect(previewVideoVolume(EMPTY_MIX)).toBe(1);
+    expect(previewVideoVolume(patchVideoChannel(EMPTY_MIX, { volume: 0.5 }))).toBe(0.5);
+    expect(previewVideoVolume(setMaster(patchVideoChannel(EMPTY_MIX, { volume: 0.5 }), 0.5))).toBe(
+      0.25
+    );
+    expect(previewVideoVolume(patchVideoChannel(EMPTY_MIX, { volume: 2 }))).toBe(1);
+    expect(previewVideoVolume(patchVideoChannel(EMPTY_MIX, { muted: true }))).toBe(0);
+  });
+
+  it('is silent when another channel is soloed', () => {
+    const mix = newTrack(EMPTY_MIX);
+    expect(previewVideoVolume(patchTrack(mix, mix.tracks[0].id, { solo: true }))).toBe(0);
   });
 });
