@@ -30,7 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
 import {
   Search,
   Users,
@@ -67,6 +67,8 @@ function DiscoverPage() {
     'all'
   );
   const [mediaFilter, setMediaFilter] = useState<string | undefined>();
+  // Item opened from any card — shown in place instead of routing to /gallery or /wiki.
+  const [viewing, setViewing] = useState<any | null>(null);
 
   const {
     data: profilesData,
@@ -106,197 +108,205 @@ function DiscoverPage() {
   const trendingItems = trendingData?.items || [];
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Hero — Trending Section */}
-      <div className="border-b bg-gradient-to-br from-primary/5 via-purple-500/5 to-pink-500/5">
-        <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-10">
-          <div className="flex items-center justify-between mb-4 sm:mb-6">
-            <div>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-1 sm:mb-2">Discover</h1>
-              <p className="text-muted-foreground text-sm sm:text-base md:text-lg">
-                Explore universes, creators, and AI-generated stories.
-              </p>
-            </div>
-            <Link
-              to="/leaderboard"
-              className="hidden md:flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Trending Now
-            </Link>
-          </div>
-
-          {/* Search */}
-          <div className="max-w-xl relative mb-6 sm:mb-8">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search universes, creators, content..."
-              className="pl-10 h-11 sm:h-12 text-base sm:text-lg"
-            />
-          </div>
-
-          {/* Trending Cards */}
-          {trendingItems.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              {trendingItems.map((item: any, i: number) => (
-                <TrendingCard key={item.id || item.contentId || i} item={item} rank={i} />
-              ))}
-            </div>
-          )}
-          {trendingLoading && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="rounded-xl bg-muted animate-pulse aspect-[3/4]" />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="flex items-center justify-between mb-4 sm:mb-6 flex-wrap gap-3 sm:gap-4">
-            <div className="-mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto scrollbar-none">
-              <TabsList className="w-max">
-                <TabsTrigger value="universes" className="gap-1">
-                  <Globe className="h-4 w-4" /> Universes
-                </TabsTrigger>
-                <TabsTrigger value="creators" className="gap-1">
-                  <Users className="h-4 w-4" /> Creators
-                </TabsTrigger>
-                <TabsTrigger value="content" className="gap-1">
-                  <Grid3X3 className="h-4 w-4" /> Content
-                </TabsTrigger>
-                <TabsTrigger value="videos" className="gap-1">
-                  <Film className="h-4 w-4" /> Videos
-                </TabsTrigger>
-                <TabsTrigger value="3d" className="gap-1">
-                  <Rotate3d className="h-4 w-4" /> 3D Models
-                </TabsTrigger>
-              </TabsList>
+    <DiscoverViewerContext.Provider value={setViewing}>
+      <div className="min-h-screen bg-background">
+        {/* Hero — Trending Section */}
+        <div className="border-b bg-gradient-to-br from-primary/5 via-purple-500/5 to-pink-500/5">
+          <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-10">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <div>
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-1 sm:mb-2">
+                  Discover
+                </h1>
+                <p className="text-muted-foreground text-sm sm:text-base md:text-lg">
+                  Explore universes, creators, and AI-generated stories.
+                </p>
+              </div>
+              <Link
+                to="/leaderboard"
+                className="hidden md:flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Trending Now
+              </Link>
             </div>
 
-            {/* Content sub-filters */}
-            {activeTab === 'content' && (
-              <div className="flex gap-2 flex-wrap">
-                {(
-                  [
-                    { value: 'all', label: 'All', icon: Grid3X3 },
-                    { value: 'fan', label: 'Fan', icon: Sparkles },
-                    { value: 'original', label: 'Original', icon: DollarSign },
-                    { value: 'licensed', label: 'Licensed', icon: Lock },
-                  ] as const
-                ).map((opt) => (
-                  <Button
-                    key={opt.value}
-                    variant={contentFilter === opt.value ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setContentFilter(opt.value)}
-                    className="gap-1"
-                  >
-                    <opt.icon className="h-3 w-3" />
-                    {opt.label}
-                  </Button>
+            {/* Search */}
+            <div className="max-w-xl relative mb-6 sm:mb-8">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search universes, creators, content..."
+                className="pl-10 h-11 sm:h-12 text-base sm:text-lg"
+              />
+            </div>
+
+            {/* Trending Cards */}
+            {trendingItems.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {trendingItems.map((item: any, i: number) => (
+                  <TrendingCard key={item.id || item.contentId || i} item={item} rank={i} />
                 ))}
-                <div className="w-px bg-border mx-1" />
-                {[
-                  { value: undefined, label: 'All Types', icon: Grid3X3 },
-                  { value: 'video', label: 'Video', icon: Film },
-                  { value: 'ai-video', label: 'AI Video', icon: Play },
-                  { value: 'image', label: 'Image', icon: ImageIcon },
-                ].map((opt) => (
-                  <Button
-                    key={opt.label}
-                    variant={mediaFilter === opt.value ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setMediaFilter(opt.value)}
-                    className="gap-1"
-                  >
-                    <opt.icon className="h-3 w-3" />
-                    {opt.label}
-                  </Button>
+              </div>
+            )}
+            {trendingLoading && (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="rounded-xl bg-muted animate-pulse aspect-[3/4]" />
                 ))}
               </div>
             )}
           </div>
+        </div>
 
-          {/* Universes Tab */}
-          <TabsContent value="universes">
-            <UniversesTabContent search={search} />
-          </TabsContent>
-
-          {/* Creators Tab */}
-          <TabsContent value="creators">
-            <QueryState
-              isLoading={profilesLoading}
-              isError={profilesError}
-              isEmpty={profiles.length === 0}
-              onRetry={() => profilesRefetch()}
-              errorMessage="Failed to load creators. Please try again."
-              skeletonCount={8}
-              skeletonAspect="aspect-[4/5]"
-              emptyState={
-                <div className="text-center py-16">
-                  <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No creators found</h3>
-                  <p className="text-muted-foreground">
-                    {search
-                      ? `No results for "${search}"`
-                      : 'Be the first to create a public profile!'}
-                  </p>
-                </div>
-              }
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {profiles.map((profile: any) => (
-                  <CreatorCard key={profile.id} profile={profile} />
-                ))}
+        {/* Main Content */}
+        <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <div className="flex items-center justify-between mb-4 sm:mb-6 flex-wrap gap-3 sm:gap-4">
+              <div className="-mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto scrollbar-none">
+                <TabsList className="w-max">
+                  <TabsTrigger value="universes" className="gap-1">
+                    <Globe className="h-4 w-4" /> Universes
+                  </TabsTrigger>
+                  <TabsTrigger value="creators" className="gap-1">
+                    <Users className="h-4 w-4" /> Creators
+                  </TabsTrigger>
+                  <TabsTrigger value="content" className="gap-1">
+                    <Grid3X3 className="h-4 w-4" /> Content
+                  </TabsTrigger>
+                  <TabsTrigger value="videos" className="gap-1">
+                    <Film className="h-4 w-4" /> Videos
+                  </TabsTrigger>
+                  <TabsTrigger value="3d" className="gap-1">
+                    <Rotate3d className="h-4 w-4" /> 3D Models
+                  </TabsTrigger>
+                </TabsList>
               </div>
-            </QueryState>
-          </TabsContent>
 
-          {/* Content Tab */}
-          <TabsContent value="content">
-            <QueryState
-              isLoading={contentLoading}
-              isError={contentError}
-              isEmpty={contentItems.length === 0}
-              onRetry={() => contentRefetch()}
-              errorMessage="Failed to load content. Please try again."
-              skeletonCount={8}
-              skeletonAspect="aspect-video"
-              emptyState={
-                <div className="text-center py-16">
-                  <Grid3X3 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No content found</h3>
-                  <p className="text-muted-foreground">
-                    {search ? `No results for "${search}"` : 'No public content yet.'}
-                  </p>
+              {/* Content sub-filters */}
+              {activeTab === 'content' && (
+                <div className="flex gap-2 flex-wrap">
+                  {(
+                    [
+                      { value: 'all', label: 'All', icon: Grid3X3 },
+                      { value: 'fan', label: 'Fan', icon: Sparkles },
+                      { value: 'original', label: 'Original', icon: DollarSign },
+                      { value: 'licensed', label: 'Licensed', icon: Lock },
+                    ] as const
+                  ).map((opt) => (
+                    <Button
+                      key={opt.value}
+                      variant={contentFilter === opt.value ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setContentFilter(opt.value)}
+                      className="gap-1"
+                    >
+                      <opt.icon className="h-3 w-3" />
+                      {opt.label}
+                    </Button>
+                  ))}
+                  <div className="w-px bg-border mx-1" />
+                  {[
+                    { value: undefined, label: 'All Types', icon: Grid3X3 },
+                    { value: 'video', label: 'Video', icon: Film },
+                    { value: 'ai-video', label: 'AI Video', icon: Play },
+                    { value: 'image', label: 'Image', icon: ImageIcon },
+                  ].map((opt) => (
+                    <Button
+                      key={opt.label}
+                      variant={mediaFilter === opt.value ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setMediaFilter(opt.value)}
+                      className="gap-1"
+                    >
+                      <opt.icon className="h-3 w-3" />
+                      {opt.label}
+                    </Button>
+                  ))}
                 </div>
-              }
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {contentItems.map((item: any) => (
-                  <ContentFeedCard key={item.id} item={item} />
-                ))}
-              </div>
-            </QueryState>
-          </TabsContent>
+              )}
+            </div>
 
-          {/* Videos Tab */}
-          <TabsContent value="videos">
-            <VideosTabContent search={search} />
-          </TabsContent>
+            {/* Universes Tab */}
+            <TabsContent value="universes">
+              <UniversesTabContent search={search} />
+            </TabsContent>
 
-          {/* 3D Models Tab */}
-          <TabsContent value="3d">
-            <ThreeDModelsTabContent search={search} />
-          </TabsContent>
-        </Tabs>
+            {/* Creators Tab */}
+            <TabsContent value="creators">
+              <QueryState
+                isLoading={profilesLoading}
+                isError={profilesError}
+                isEmpty={profiles.length === 0}
+                onRetry={() => profilesRefetch()}
+                errorMessage="Failed to load creators. Please try again."
+                skeletonCount={8}
+                skeletonAspect="aspect-[4/5]"
+                emptyState={
+                  <div className="text-center py-16">
+                    <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No creators found</h3>
+                    <p className="text-muted-foreground">
+                      {search
+                        ? `No results for "${search}"`
+                        : 'Be the first to create a public profile!'}
+                    </p>
+                  </div>
+                }
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {profiles.map((profile: any) => (
+                    <CreatorCard key={profile.id} profile={profile} />
+                  ))}
+                </div>
+              </QueryState>
+            </TabsContent>
+
+            {/* Content Tab */}
+            <TabsContent value="content">
+              <QueryState
+                isLoading={contentLoading}
+                isError={contentError}
+                isEmpty={contentItems.length === 0}
+                onRetry={() => contentRefetch()}
+                errorMessage="Failed to load content. Please try again."
+                skeletonCount={8}
+                skeletonAspect="aspect-video"
+                emptyState={
+                  <div className="text-center py-16">
+                    <Grid3X3 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No content found</h3>
+                    <p className="text-muted-foreground">
+                      {search ? `No results for "${search}"` : 'No public content yet.'}
+                    </p>
+                  </div>
+                }
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {contentItems.map((item: any) => (
+                    <ContentFeedCard key={item.id} item={item} />
+                  ))}
+                </div>
+              </QueryState>
+            </TabsContent>
+
+            {/* Videos Tab */}
+            <TabsContent value="videos">
+              <VideosTabContent search={search} />
+            </TabsContent>
+
+            {/* 3D Models Tab */}
+            <TabsContent value="3d">
+              <ThreeDModelsTabContent search={search} />
+            </TabsContent>
+          </Tabs>
+        </div>
+        <DiscoverItemViewerDialog
+          item={viewing}
+          onOpenChange={(open) => !open && setViewing(null)}
+        />
       </div>
-    </div>
+    </DiscoverViewerContext.Provider>
   );
 }
 
@@ -757,9 +767,11 @@ function MobileShortCard({ item, isActive }: { item: any; isActive: boolean }) {
 
   const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
 
+  const openItem = useOpenItem();
+
   return (
-    <Link
-      to="/gallery"
+    <OpenableCard
+      onOpen={() => openItem(item)}
       className="relative flex-shrink-0 rounded-2xl overflow-hidden bg-muted border border-border/40"
       style={{
         width: 'calc(85vw)',
@@ -837,7 +849,7 @@ function MobileShortCard({ item, isActive }: { item: any; isActive: boolean }) {
           </button>
         )}
       </div>
-    </Link>
+    </OpenableCard>
   );
 }
 
@@ -848,6 +860,7 @@ function DesktopShortsPlayer({ items }: { items: any[] }) {
   const [muted, setMuted] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  const openItem = useOpenItem();
   const item = items[index];
   const posterUrl = useResolvedIpfsUrl(item?.thumbnailUrl);
   const isVideo = item && (item.mediaType === 'video' || item.mediaType === 'ai-video');
@@ -887,8 +900,8 @@ function DesktopShortsPlayer({ items }: { items: any[] }) {
         <ChevronLeft className="h-6 w-6" />
       </button>
 
-      <Link
-        to="/gallery"
+      <OpenableCard
+        onOpen={() => openItem(item)}
         className="relative rounded-2xl overflow-hidden bg-black shadow-2xl border border-border/30"
         style={{ width: 360, aspectRatio: '9/16' }}
       >
@@ -970,7 +983,7 @@ function DesktopShortsPlayer({ items }: { items: any[] }) {
         >
           {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
         </button>
-      </Link>
+      </OpenableCard>
 
       <button
         onClick={() => go(1)}
@@ -991,12 +1004,13 @@ function LongCard({ item }: { item: any }) {
   const [muted, setMuted] = useState(true);
   const [playing, setPlaying] = useState(false);
   const posterUrl = useResolvedIpfsUrl(item.thumbnailUrl);
+  const openItem = useOpenItem();
 
   const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
 
   return (
-    <Link
-      to="/gallery"
+    <OpenableCard
+      onOpen={() => openItem(item)}
       className="rounded-xl overflow-hidden bg-muted border border-border/50 hover:border-primary/40 transition-all duration-200 hover:shadow-xl hover:-translate-y-1 cursor-pointer group block"
       onMouseEnter={() => {
         setPlaying(true);
@@ -1092,7 +1106,7 @@ function LongCard({ item }: { item: any }) {
           <span className="text-[10px] text-muted-foreground">{item.views ?? 0} views</span>
         </div>
       </div>
-    </Link>
+    </OpenableCard>
   );
 }
 
@@ -1185,10 +1199,10 @@ function CreatorCard({ profile }: { profile: any }) {
 /* ─── Content feed card — clickable with universe context ───── */
 
 function ContentFeedCard({ item }: { item: any }) {
+  const openItem = useOpenItem();
   const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
-  // 3D: `mediaUrl` is a .glb/.fbx binary, never a decodable image. Route the
-  // card to the wiki's 3D-models tab (its `ModelViewer` dialog is the only
-  // place the model is actually viewable) and only ever render `thumbnailUrl`.
+  // 3D: `mediaUrl` is a .glb/.fbx binary, never a decodable image — only ever
+  // render `thumbnailUrl` (or a client-side screenshot) in the card itself.
   const is3D = item.mediaType === '3d';
 
   const cubeFallback = (
@@ -1290,24 +1304,13 @@ function ContentFeedCard({ item }: { item: any }) {
     </Card>
   );
 
-  return is3D ? (
-    <Link
-      to="/wiki"
-      search={{
-        ...(item.universeId ? { universe: item.universeId } : {}),
-        tab: '3d-models',
-      }}
-    >
-      {inner}
-    </Link>
-  ) : (
-    <Link to="/gallery">{inner}</Link>
-  );
+  return <OpenableCard onOpen={() => openItem(item)}>{inner}</OpenableCard>;
 }
 
 /* ─── Trending hero card ───────────────────────────────────────── */
 
 function TrendingCard({ item, rank }: { item: any; rank: number }) {
+  const openItem = useOpenItem();
   // 3D `mediaUrl` is a .glb/.fbx binary — never an <img> source. Route 3D
   // trending cards straight to the wiki's 3D-models tab (the only surface
   // that can actually render the model) instead of the generic gallery.
@@ -1370,29 +1373,17 @@ function TrendingCard({ item, rank }: { item: any; rank: number }) {
   const className =
     'group relative rounded-xl overflow-hidden bg-muted aspect-[3/4] hover:ring-2 hover:ring-primary/50 transition-all';
 
-  return is3D ? (
-    <Link
-      to="/wiki"
-      search={{ ...(item.universeId ? { universe: item.universeId } : {}), tab: '3d-models' }}
-      className={className}
-    >
+  return (
+    <OpenableCard onOpen={() => openItem(item)} className={className}>
       {inner}
-    </Link>
-  ) : (
-    <Link
-      to="/gallery"
-      search={item.universeId ? { universe: item.universeId } : {}}
-      className={className}
-    >
-      {inner}
-    </Link>
+    </OpenableCard>
   );
 }
 
 /* ─── 3D Models Tab ───────────────────────────────────────────── */
 
 function ThreeDModelsTabContent({ search }: { search: string }) {
-  const [selected, setSelected] = useState<any | null>(null);
+  const openItem = useOpenItem();
 
   const query = useInfiniteQuery({
     queryKey: ['discover-3d'],
@@ -1443,7 +1434,7 @@ function ThreeDModelsTabContent({ search }: { search: string }) {
       >
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {items.map((item: any) => (
-            <ThreeDModelCard key={item.id} item={item} onSelect={() => setSelected(item)} />
+            <ThreeDModelCard key={item.id} item={item} onSelect={() => openItem(item)} />
           ))}
         </div>
         {query.hasNextPage && (
@@ -1460,8 +1451,6 @@ function ThreeDModelsTabContent({ search }: { search: string }) {
           </div>
         )}
       </QueryState>
-
-      <Discover3DViewerDialog item={selected} onOpenChange={(open) => !open && setSelected(null)} />
     </>
   );
 }
@@ -1518,12 +1507,53 @@ function ThreeDModelCard({ item, onSelect }: { item: any; onSelect: () => void }
   );
 }
 
+/* ─── In-place item viewer ────────────────────────────────────── */
+
+const DiscoverViewerContext = createContext<(item: any) => void>(() => {});
+const useOpenItem = () => useContext(DiscoverViewerContext);
+
+/** A clickable card that opens the item in the viewer (div, so cards may hold buttons). */
+function OpenableCard({
+  onOpen,
+  className,
+  style,
+  onMouseEnter,
+  onMouseLeave,
+  children,
+}: {
+  onOpen: () => void;
+  className?: string;
+  style?: React.CSSProperties;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className={`cursor-pointer text-left ${className ?? ''}`}
+      style={style}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      {children}
+    </div>
+  );
+}
+
 /**
- * Lightweight in-place 3D viewer for the Discover 3D lane. Wraps <ModelViewer>
- * (Google <model-viewer>, orbit + auto-rotate) so a model is viewable without
- * leaving Discover; the wiki's testbench dialog stays the place to rig/animate.
+ * Shows the clicked Discover item itself — video player, image, audio or 3D
+ * viewer — without leaving the page. Rig/animate stays in the wiki's testbench.
  */
-function Discover3DViewerDialog({
+function DiscoverItemViewerDialog({
   item,
   onOpenChange,
 }: {
@@ -1531,41 +1561,84 @@ function Discover3DViewerDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const posterUrl = useResolvedIpfsUrl(item?.thumbnailUrl);
+  const type: string = item?.mediaType ?? '';
+  const isVideo = type === 'video' || type === 'ai-video';
+  const isAudio = type === 'audio' || type === 'ai-audio';
+  const is3D = type === '3d';
+
+  let body: React.ReactNode;
+  if (!item) {
+    body = null;
+  } else if (is3D) {
+    body = item.mediaUrl ? (
+      <div className="h-[60vh] w-full">
+        <ModelViewer
+          src={item.mediaUrl}
+          poster={posterUrl}
+          alt={item.title || '3D Model'}
+          className="h-full"
+          testbench
+        />
+      </div>
+    ) : (
+      <div className="py-16 text-center text-muted-foreground">Model unavailable.</div>
+    );
+  } else if (isVideo && item.mediaUrl) {
+    body = (
+      <video
+        key={item.mediaUrl}
+        src={resolveIpfsUrlPreferred(item.mediaUrl)}
+        poster={posterUrl}
+        className="w-full max-h-[70vh] rounded-lg bg-black"
+        controls
+        autoPlay
+        playsInline
+      />
+    );
+  } else if (isAudio && item.mediaUrl) {
+    body = (
+      <audio
+        key={item.mediaUrl}
+        src={resolveIpfsUrlPreferred(item.mediaUrl)}
+        className="w-full"
+        controls
+        autoPlay
+      />
+    );
+  } else if (item.mediaUrl || item.thumbnailUrl) {
+    body = (
+      <SmartImage
+        src={item.mediaUrl || item.thumbnailUrl}
+        alt={item.title || 'Content'}
+        className="w-full max-h-[70vh] object-contain rounded-lg"
+      />
+    );
+  } else {
+    body = <div className="py-16 text-center text-muted-foreground">Content unavailable.</div>;
+  }
 
   return (
     <Dialog open={!!item} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>{item?.title || '3D Model'}</DialogTitle>
+          <DialogTitle>{item?.title || 'Untitled'}</DialogTitle>
           {item?.description && (
             <DialogDescription className="line-clamp-3">{item.description}</DialogDescription>
           )}
         </DialogHeader>
-        {item?.mediaUrl ? (
-          <div className="space-y-3">
-            <div className="h-[60vh] w-full">
-              <ModelViewer
-                src={item.mediaUrl}
-                poster={posterUrl}
-                alt={item.title || '3D Model'}
-                className="h-full"
-                testbench
-              />
-            </div>
-            {item.universeId && (
-              <Link
-                to="/wiki"
-                search={{ universe: item.universeId, tab: '3d-models' }}
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-              >
-                <Globe className="h-3 w-3" />
-                Open in Wiki → 3D Models
-              </Link>
-            )}
-          </div>
-        ) : (
-          <div className="py-16 text-center text-muted-foreground">Model unavailable.</div>
-        )}
+        <div className="space-y-3">
+          {body}
+          {item?.universeId && (
+            <Link
+              to="/universe/$id/watch"
+              params={{ id: item.universeId }}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <Globe className="h-3 w-3" />
+              {item.universeName ? `Open ${item.universeName}` : 'Open universe'}
+            </Link>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
