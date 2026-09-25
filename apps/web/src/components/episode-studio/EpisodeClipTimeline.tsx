@@ -34,6 +34,11 @@ export interface EpisodeClip {
   audioUrl?: string;
   trimStart: number;
   trimEnd: number;
+  /** Clip audio level, 0–2 (1 = unchanged). */
+  volume?: number;
+  /** Fade from / to black (and silence), in seconds. */
+  fadeIn?: number;
+  fadeOut?: number;
 }
 
 interface EpisodeClipTimelineProps {
