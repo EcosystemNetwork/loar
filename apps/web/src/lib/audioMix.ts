@@ -617,3 +617,29 @@ export function peaksWindow(
   }
   return out;
 }
+
+/**
+ * Peak columns for drawing a clip on the timeline: `widthPx` values, one per
+ * pixel, covering the clip's timeline length. A looped clip repeats the source
+ * window; a normal clip shows [trimStart, trimStart+length) of the source.
+ */
+export function clipPeakColumns(
+  clip: AudioClip,
+  peaks: Float32Array,
+  sourceDuration: number,
+  widthPx: number,
+  binsPerSec = PEAKS_PER_SEC
+): Float32Array {
+  const width = Math.max(0, Math.floor(widthPx));
+  if (!clip.loop || sourceDuration <= 0) {
+    return peaksWindow(peaks, binsPerSec, clip.trimStart, clip.length, width);
+  }
+  const out = new Float32Array(width);
+  const one = peaksWindow(peaks, binsPerSec, 0, sourceDuration, 512);
+  for (let x = 0; x < width; x++) {
+    const t = (x / width) * clip.length;
+    const cycle = (t % sourceDuration) / sourceDuration;
+    out[x] = one[Math.min(one.length - 1, Math.floor(cycle * one.length))];
+  }
+  return out;
+}

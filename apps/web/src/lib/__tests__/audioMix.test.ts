@@ -8,6 +8,7 @@ import {
   activeAudioClips,
   addClip,
   audioSnapPoints,
+  clipPeakColumns,
   computePeaks,
   effectiveClipGain,
   fadeLevelAt,
@@ -444,5 +445,35 @@ describe('peaks', () => {
       [0.6, 1.0].map((v) => Math.fround(v))
     );
     expect(peaksWindow(new Float32Array(0), 1, 0, 1, 5)).toEqual(new Float32Array(5));
+  });
+});
+
+describe('clipPeakColumns', () => {
+  const peaks = Float32Array.from([0.1, 0.1, 0.9, 0.9]); // 1 bin/sec, 4 s: quiet then loud
+  const base: AudioClip = {
+    id: 'c',
+    url: 'u',
+    label: '',
+    start: 0,
+    trimStart: 0,
+    length: 4,
+    volume: 1,
+    fadeIn: 0,
+    fadeOut: 0,
+  };
+
+  it('shows the trimmed source window, one value per pixel', () => {
+    const cols = clipPeakColumns({ ...base, trimStart: 2, length: 2 }, peaks, 4, 4, 1);
+    expect(Array.from(cols).map((v) => Math.fround(v))).toEqual(
+      [0.9, 0.9, 0.9, 0.9].map((v) => Math.fround(v))
+    );
+  });
+
+  it('tiles a looped clip across its length', () => {
+    // 2 s source (quiet 1 s, loud 1 s) looped to 4 s → quiet, loud, quiet, loud
+    const short = Float32Array.from([0.1, 0.9]);
+    const cols = clipPeakColumns({ ...base, loop: true, length: 4 }, short, 2, 8, 1);
+    const q = (v: number) => (v < 0.5 ? 'q' : 'L');
+    expect(Array.from(cols).map(q).join('')).toBe('qqLLqqLL');
   });
 });

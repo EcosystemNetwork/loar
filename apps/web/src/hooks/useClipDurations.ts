@@ -7,7 +7,7 @@ import type { DurationMap } from '@/lib/timelineEdit';
 const durationCache = new Map<string, number>();
 const inflight = new Map<string, Promise<number | null>>();
 
-function probeDuration(url: string): Promise<number | null> {
+export function probeDuration(url: string): Promise<number | null> {
   const pending = inflight.get(url);
   if (pending) return pending;
 
