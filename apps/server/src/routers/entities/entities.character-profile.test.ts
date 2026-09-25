@@ -115,6 +115,22 @@ describe('legacy keys', () => {
     expect(by.speechStyle.filled).toBe(true);
     expect(p.extra).toEqual([{ key: 'Eyes', value: 'Purple' }]);
   });
+  it('maps the older seeded person keys (faction, skills, augmentations, location)', () => {
+    const p = buildCharacterProfile(
+      person({
+        faction: 'The Panopticon Authority',
+        skills: 'Biometric analysis',
+        augmentations: 'Scanner eyes',
+        location: 'The Spire',
+      })
+    );
+    const by = Object.fromEntries(p.sections.flatMap((s) => s.fields).map((f) => [f.key, f]));
+    expect(by.affiliations.value).toBe('The Panopticon Authority');
+    expect(by.abilities.value).toBe('Biometric analysis');
+    expect(by.distinguishingFeatures.value).toBe('Scanner eyes');
+    expect(by.homePlace.value).toBe('The Spire');
+    expect(p.extra).toEqual([]);
+  });
   it('does not let AI overwrite a value held under a legacy key', () => {
     const { metadata, added } = mergeGeneratedFields({ species: 'Bunny' }, { ancestry: 'Robot' });
     expect(added).toEqual([]);

@@ -49,7 +49,12 @@ export const CHARACTER_PROFILE_SECTIONS: CharacterSection[] = [
         label: 'Status',
         hint: 'Alive, missing, dead, dormant… and where they stand now',
       },
-      { key: 'homePlace', label: 'Home / Origin', hint: 'Where they are from or live' },
+      {
+        key: 'homePlace',
+        label: 'Home / Origin',
+        legacyKeys: ['location'],
+        hint: 'Where they are from or live',
+      },
     ],
   },
   {
@@ -60,6 +65,7 @@ export const CHARACTER_PROFILE_SECTIONS: CharacterSection[] = [
       {
         key: 'distinguishingFeatures',
         label: 'Distinguishing Features',
+        legacyKeys: ['augmentations'],
         hint: 'Scars, tells, silhouette, signature colors',
       },
       {
@@ -97,6 +103,7 @@ export const CHARACTER_PROFILE_SECTIONS: CharacterSection[] = [
       {
         key: 'abilities',
         label: 'Abilities / Skills',
+        legacyKeys: ['skills'],
         hint: 'Powers, skills, talents',
         long: true,
       },
@@ -122,7 +129,12 @@ export const CHARACTER_PROFILE_SECTIONS: CharacterSection[] = [
         label: 'First Appearance',
         hint: 'Episode, scene or event where they debut',
       },
-      { key: 'affiliations', label: 'Affiliations', hint: 'Factions, organizations, allies' },
+      {
+        key: 'affiliations',
+        label: 'Affiliations',
+        legacyKeys: ['faction'],
+        hint: 'Factions, organizations, allies',
+      },
     ],
   },
 ];

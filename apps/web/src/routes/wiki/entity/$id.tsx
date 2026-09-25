@@ -56,6 +56,7 @@ import {
 } from 'lucide-react';
 import { MediaGallery } from '@/components/MediaGallery';
 import { CharacterProfileCard } from '@/components/wiki/CharacterProfileCard';
+import { CharacterChips, ClampedText } from '@/components/wiki/CharacterHero';
 import { useMediaAttachments } from '@/hooks/useMediaAttachments';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
 import { MintContentDialog } from '@/components/MintContentDialog';
@@ -954,7 +955,7 @@ function EntityPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column — image + metadata */}
-        <div className="space-y-4">
+        <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
           <Card>
             <CardContent className="p-4">
               <div className="aspect-square w-full overflow-hidden rounded-lg">
@@ -1168,11 +1169,16 @@ function EntityPage() {
                     )}
                   </div>
                 </CardHeader>
+                {entity.kind === 'person' && <CharacterChips metadata={entity.metadata} />}
                 {entity.description && (
                   <CardContent>
-                    <p className="text-muted-foreground leading-relaxed break-words">
-                      <UserText>{entity.description}</UserText>
-                    </p>
+                    {entity.kind === 'person' ? (
+                      <ClampedText text={entity.description} />
+                    ) : (
+                      <p className="text-muted-foreground leading-relaxed break-words">
+                        <UserText>{entity.description}</UserText>
+                      </p>
+                    )}
                   </CardContent>
                 )}
               </Card>

@@ -244,6 +244,8 @@ export function VoiceProfileCard({
   // If not a character-like entity, don't show
   const VOICE_ELIGIBLE_KINDS = ['person', 'species', 'faction', 'organization'];
   if (!VOICE_ELIGIBLE_KINDS.includes(entityKind)) return null;
+  // Visitors have nothing to do with an empty voice card.
+  if (!isOwner && !loadingProfiles && entityProfiles.length === 0) return null;
 
   return (
     <Card>

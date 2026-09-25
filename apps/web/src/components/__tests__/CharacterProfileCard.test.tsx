@@ -83,7 +83,8 @@ describe('CharacterProfileCard', () => {
   it('shows only filled fields, extras and completeness to visitors', async () => {
     renderCard(false);
     expect(await screen.findByText('Protagonist')).toBeTruthy();
-    expect(screen.getByText('33%')).toBeTruthy();
+    expect(screen.queryByText('33%')).toBeNull();
+    expect(screen.queryByText('Portrait')).toBeNull();
     expect(screen.getByText('Again.')).toBeTruthy();
     expect(screen.getByText('Ep 1 — Fracture').closest('a')?.getAttribute('href')).toBe(
       '/episode/ep1'
@@ -91,6 +92,12 @@ describe('CharacterProfileCard', () => {
     expect(screen.queryByText(/Add age/i)).toBeNull();
     expect(screen.queryByText(/Complete with AI/i)).toBeNull();
     expect(screen.queryByText('History')).toBeNull();
+  });
+
+  it('shows owners the completeness bar and asset checklist', async () => {
+    renderCard(true);
+    expect(await screen.findByText('33%')).toBeTruthy();
+    expect(screen.getByText('Portrait')).toBeTruthy();
   });
 
   it('lets an owner add an empty field, merging into existing metadata', async () => {
