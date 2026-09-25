@@ -46,6 +46,7 @@ import {
   deleteRelation,
   getEntityRelations,
   getUniverseRelations,
+  canManageEntity,
 } from './entities.handlers';
 import {
   setReferenceBundle,
@@ -393,8 +394,8 @@ export const entitiesRouter = router({
     .mutation(async ({ input, ctx }) => {
       const existing = await getEntity(input.entityId);
       if (!existing) throw new Error('Entity not found');
-      if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
-        throw new Error('Forbidden: only the entity creator can update it');
+      if (!(await canManageEntity(existing, ctx.user.address))) {
+        throw new Error('Forbidden: only the entity creator or a universe manager can update it');
       }
       const { entityId, universeAddress: _unused, ...updates } = input;
       const entity = await updateEntity(entityId, updates);
@@ -435,8 +436,10 @@ export const entitiesRouter = router({
     .mutation(async ({ input, ctx }) => {
       const existing = await getEntity(input.entityId);
       if (!existing) throw new Error('Entity not found');
-      if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
-        throw new Error('Forbidden: only the entity creator can modify node associations');
+      if (!(await canManageEntity(existing, ctx.user.address))) {
+        throw new Error(
+          'Forbidden: only the entity creator or a universe manager can modify node associations'
+        );
       }
       const entity = await addNodeToEntity(input.entityId, input.nodeId);
       return { success: true, data: entity };
@@ -456,8 +459,10 @@ export const entitiesRouter = router({
     .mutation(async ({ input, ctx }) => {
       const existing = await getEntity(input.entityId);
       if (!existing) throw new Error('Entity not found');
-      if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
-        throw new Error('Forbidden: only the entity creator can modify node associations');
+      if (!(await canManageEntity(existing, ctx.user.address))) {
+        throw new Error(
+          'Forbidden: only the entity creator or a universe manager can modify node associations'
+        );
       }
       const entity = await removeNodeFromEntity(input.entityId, input.nodeId);
       return { success: true, data: entity };
@@ -480,11 +485,10 @@ export const entitiesRouter = router({
       ]);
       if (!entityA) throw new Error('Entity A not found');
       if (!entityB) throw new Error('Entity B not found');
-      const addr = ctx.user.address?.toLowerCase();
-      if (entityA.creator?.toLowerCase() !== addr) {
+      if (!(await canManageEntity(entityA, ctx.user.address))) {
         throw new Error('Forbidden: you must own entity A to swap nodes');
       }
-      if (entityB.creator?.toLowerCase() !== addr) {
+      if (!(await canManageEntity(entityB, ctx.user.address))) {
         throw new Error('Forbidden: you must own entity B to swap nodes');
       }
       const result = await swapNodesBetweenEntities(
@@ -652,7 +656,7 @@ export const entitiesRouter = router({
       // Must own the source entity
       const source = await getEntity(input.sourceId);
       if (!source) throw new Error('Source entity not found');
-      if (source.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
+      if (!(await canManageEntity(source, ctx.user.address))) {
         throw new Error('Forbidden: you must own the source entity to create relationships');
       }
       // Target must be visible to the caller — otherwise this doubles as an
@@ -740,8 +744,8 @@ export const entitiesRouter = router({
       const existing = await getEntity(input.entityId);
       if (!existing) throw new Error('Entity not found');
       if (existing.kind !== 'person') throw new Error('Character profiles are for person entities');
-      if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
-        throw new Error('Forbidden: only the entity creator can update it');
+      if (!(await canManageEntity(existing, ctx.user.address))) {
+        throw new Error('Forbidden: only the entity creator or a universe manager can update it');
       }
       const current = existing.metadata ?? {};
       const missing = CHARACTER_FIELDS.filter((f) => readField(current, f) === '').map(
@@ -810,8 +814,10 @@ export const entitiesRouter = router({
     .mutation(async ({ input, ctx }) => {
       const existing = await getEntity(input.entityId);
       if (!existing) throw new Error('Entity not found');
-      if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
-        throw new Error('Forbidden: only the entity creator can edit its reference bundle');
+      if (!(await canManageEntity(existing, ctx.user.address))) {
+        throw new Error(
+          'Forbidden: only the entity creator or a universe manager can edit its reference bundle'
+        );
       }
       const bundle = await setReferenceBundle(input.entityId, {
         slots: input.slots ?? {},
@@ -828,8 +834,10 @@ export const entitiesRouter = router({
     .mutation(async ({ input, ctx }) => {
       const existing = await getEntity(input.entityId);
       if (!existing) throw new Error('Entity not found');
-      if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
-        throw new Error('Forbidden: only the entity creator can edit its reference bundle');
+      if (!(await canManageEntity(existing, ctx.user.address))) {
+        throw new Error(
+          'Forbidden: only the entity creator or a universe manager can edit its reference bundle'
+        );
       }
       await clearReferenceBundle(input.entityId);
       return { success: true };
@@ -877,8 +885,10 @@ export const entitiesRouter = router({
       .mutation(async ({ input, ctx }) => {
         const existing = await getEntity(input.entityId);
         if (!existing) throw new Error('Entity not found');
-        if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
-          throw new Error('Forbidden: only the entity creator can pin reference assets');
+        if (!(await canManageEntity(existing, ctx.user.address))) {
+          throw new Error(
+            'Forbidden: only the entity creator or a universe manager can pin reference assets'
+          );
         }
         const descriptor = await pinReferenceAsset(input.entityId, input.cid, input.pinned);
         return { success: true, descriptor };
@@ -896,8 +906,10 @@ export const entitiesRouter = router({
       .mutation(async ({ input, ctx }) => {
         const existing = await getEntity(input.entityId);
         if (!existing) throw new Error('Entity not found');
-        if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
-          throw new Error('Forbidden: only the entity creator can revert descriptor versions');
+        if (!(await canManageEntity(existing, ctx.user.address))) {
+          throw new Error(
+            'Forbidden: only the entity creator or a universe manager can revert descriptor versions'
+          );
         }
         const descriptor = await revertVisualDescriptor(input.entityId, input.version);
         return { success: true, descriptor };

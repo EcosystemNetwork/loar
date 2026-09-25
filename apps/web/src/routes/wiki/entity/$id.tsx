@@ -10,7 +10,7 @@
  *   - Music generation panel
  *   - Collaborative editing
  */
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
@@ -53,6 +53,7 @@ import {
   Plus,
   Trash2,
   Search,
+  Tag,
 } from 'lucide-react';
 import { MediaGallery } from '@/components/MediaGallery';
 import { CharacterProfileCard } from '@/components/wiki/CharacterProfileCard';
@@ -743,6 +744,7 @@ function MentionedIn({ entityId }: { entityId: string }) {
 function EntityPage() {
   const { id } = Route.useParams();
   const { address } = useAccount();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [generating, setGenerating] = useState(false);
   const [showMusicPanel, setShowMusicPanel] = useState(false);
@@ -1140,6 +1142,28 @@ function EntityPage() {
                           <Wand2 className="w-4 h-4 mr-2" />
                         )}
                         {launchingPipeline ? 'Starting...' : 'Generate 3D Character'}
+                      </Button>
+                    )}
+                    {isOwner && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          navigate({
+                            to: '/sell/new',
+                            search: {
+                              assetRef: entity.id,
+                              universeId: entity.universeAddress ?? undefined,
+                              productType: entity.kind === 'person' ? 'CHARACTER_NFT' : 'ARTIFACT',
+                              title: entity.name,
+                              description: entity.description || undefined,
+                              thumbnailUrl: entity.imageUrl || undefined,
+                            },
+                          })
+                        }
+                      >
+                        <Tag className="w-4 h-4 mr-2" />
+                        List for Sale
                       </Button>
                     )}
                     {isOwner && (

@@ -172,6 +172,23 @@ export async function getEntity(first: string, second?: string): Promise<Entity 
 }
 
 /**
+ * Whether `callerAddress` may edit / list this entity: its creator, or an admin
+ * of the universe it lives in (owner, Safe co-owner, or platform admin). The
+ * wiki UI already shows edit controls to universe managers, so the server has
+ * to agree — a universe owner owns everything in their wiki, not just the
+ * entities they personally created.
+ */
+export async function canManageEntity(
+  entity: { creator?: string | null; universeAddress?: string | null },
+  callerAddress: string | null | undefined
+): Promise<boolean> {
+  if (!callerAddress) return false;
+  if (entity.creator?.toLowerCase() === callerAddress.toLowerCase()) return true;
+  if (!entity.universeAddress) return false;
+  return isUniverseAdmin(entity.universeAddress, callerAddress);
+}
+
+/**
  * Default page size applied when a caller omits `limit`. Previously an omitted
  * limit meant "read the entire universe's entities" — an unbounded scan that
  * grows with the universe. We now always bound the read; callers wanting more
@@ -571,7 +588,7 @@ export async function deleteRelation(relationId: string, caller: string): Promis
   if (!authorized && relation.sourceId) {
     const sourceDoc = await entitiesCol().doc(relation.sourceId).get();
     const source = sourceDoc.exists ? (sourceDoc.data() as Entity) : null;
-    if (source?.creator?.toLowerCase() === callerLower) {
+    if (source && (await canManageEntity(source, caller))) {
       authorized = true;
     }
   }

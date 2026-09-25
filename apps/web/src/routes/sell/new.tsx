@@ -39,8 +39,31 @@ export const Route = createFileRoute('/sell/new')({
       throw redirect({ to: '/login', search: { redirect: '/sell/new' } });
     }
   },
+  // Prefill from a wiki entity ("List for Sale" on the entity page). All
+  // optional — the bare /sell/new flow is unchanged.
+  validateSearch: (search: Record<string, unknown>): NewListingSearch => {
+    const str = (k: string) =>
+      typeof search[k] === 'string' && search[k] ? (search[k] as string) : undefined;
+    return {
+      assetRef: str('assetRef'),
+      universeId: str('universeId'),
+      productType: str('productType'),
+      title: str('title'),
+      description: str('description'),
+      thumbnailUrl: str('thumbnailUrl'),
+    };
+  },
   component: CreateListingPage,
 });
+
+interface NewListingSearch {
+  assetRef?: string;
+  universeId?: string;
+  productType?: string;
+  title?: string;
+  description?: string;
+  thumbnailUrl?: string;
+}
 
 const PRODUCT_TYPES = [
   {
@@ -123,7 +146,11 @@ function CreateListingPage() {
   const isAutoConnecting = false; // Circle DCW session hydration is synchronous
   const v = useVocab();
   const create = useCreateListing();
-  const [step, setStep] = useState<Step>('type');
+  const prefill = Route.useSearch();
+  const prefillType = PRODUCT_TYPES.some((t) => t.value === prefill.productType)
+    ? (prefill.productType as string)
+    : '';
+  const [step, setStep] = useState<Step>(prefillType ? 'details' : 'type');
 
   useEffect(() => {
     if (!isAuthenticated && !isAuthenticating) {
@@ -132,17 +159,17 @@ function CreateListingPage() {
   }, [isAuthenticated, isAuthenticating, navigate]);
 
   const [form, setForm] = useState<FormData>({
-    productType: '',
-    title: '',
-    description: '',
+    productType: prefillType,
+    title: prefill.title ?? '',
+    description: (prefill.description ?? '').slice(0, 2000),
     price: '0',
     currency: 'ETH',
     supply: '0',
     rightsLane: 'original',
     royaltyBps: '500',
     mediaUrl: '',
-    thumbnailUrl: '',
-    universeId: '',
+    thumbnailUrl: prefill.thumbnailUrl ?? '',
+    universeId: prefill.universeId ?? '',
   });
 
   if (isAuthenticating || isAutoConnecting) {
@@ -199,7 +226,7 @@ function CreateListingPage() {
         mediaUrl: form.mediaUrl || null,
         thumbnailUrl: form.thumbnailUrl || null,
         universeId: form.universeId || null,
-        assetRef: null,
+        assetRef: prefill.assetRef ?? null,
         publishImmediately: immediately,
       });
       toast.success(immediately ? 'Listing published!' : 'Saved as draft');

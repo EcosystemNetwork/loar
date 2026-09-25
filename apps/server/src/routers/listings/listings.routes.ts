@@ -14,6 +14,7 @@ import { recordRevenueEvent } from '../../services/revenue-recorder';
 import { resolveActingUid } from '../../services/agentAuth';
 import { assertContentOperable, assertCanonReadyForMonetization } from '../../lib/content-status';
 import { verifyAndClaimTx } from '../../services/tx-verify';
+import { canManageEntity } from '../entities/entities.handlers';
 
 const ALLOWED_CHAIN_IDS: Set<number> = new Set([sepolia.id, mainnet.id]);
 
@@ -138,10 +139,21 @@ export const listingsRouter = router({
       const { onBehalfOfUid, ...listingInput } = input;
       const { actingUid } = await resolveActingUid(ctx.user.uid, onBehalfOfUid, 'listings');
 
-      // Block listing of moderated content
       if (listingInput.assetRef) {
-        await assertContentOperable(listingInput.assetRef);
-        await assertCanonReadyForMonetization(listingInput.assetRef);
+        // Wiki entities can be listed by whoever manages them — the creator or
+        // an admin of the entity's universe — and by nobody else. They aren't
+        // `content` docs, so the content-status guards below don't apply.
+        const entityDoc = await db.collection('entities').doc(listingInput.assetRef).get();
+        if (entityDoc.exists) {
+          const entity = entityDoc.data() as { creator?: string; universeAddress?: string | null };
+          if (!(await canManageEntity(entity, ctx.user.address))) {
+            throwApiError('FORBIDDEN', 'Only the entity creator or a universe manager can list it');
+          }
+        } else {
+          // Block listing of moderated content
+          await assertContentOperable(listingInput.assetRef);
+          await assertCanonReadyForMonetization(listingInput.assetRef);
+        }
       }
 
       const now = new Date();
