@@ -141,6 +141,20 @@ const FIELDS_BY_KIND: Record<EntityKind, FieldDef[]> = {
       type: 'input',
       metadataKey: true,
     },
+    {
+      key: 'personality',
+      label: 'Personality',
+      placeholder: 'Temperament, how they behave...',
+      type: 'textarea',
+      metadataKey: true,
+    },
+    {
+      key: 'backstory',
+      label: 'Backstory',
+      placeholder: 'What made them who they are?',
+      type: 'textarea',
+      metadataKey: true,
+    },
   ],
   place: [
     {

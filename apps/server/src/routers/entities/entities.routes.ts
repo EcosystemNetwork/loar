@@ -21,6 +21,14 @@ import {
 } from './entities.types';
 import { findMentions } from './entities.mentions';
 import {
+  CHARACTER_FIELDS,
+  CHARACTER_FIELD_KEYS,
+  buildCharacterProfile,
+  isFilled,
+  mergeGeneratedFields,
+} from './entities.character-profile';
+import { getAttachmentsByTarget } from '../media/media.handlers';
+import {
   createEntity,
   getEntity,
   getEntitiesByUniverse,
@@ -73,6 +81,73 @@ async function assertEntityVisible(entityId: string, viewerAddress?: string) {
     if (isUniverseExcluded(excluded, entity.universeAddress)) throw new Error('Entity not found');
   }
   return entity;
+}
+
+/** Per-hour AI profile-generation cap, shared by every profile-generating procedure. */
+const PROFILE_GENERATIONS_PER_HOUR = 20;
+
+function characterGenerationOptions(fields: string[] = CHARACTER_FIELD_KEYS) {
+  return {
+    fields,
+    fieldHints: Object.fromEntries(
+      CHARACTER_FIELDS.filter((f) => fields.includes(f.key)).map((f) => [f.key, f.hint])
+    ),
+  };
+}
+
+/**
+ * Rate-limit + audit wrapper for Gemini profile generation. The window lives
+ * in one per-user doc updated in a transaction, so parallel calls (the console
+ * fires several at once) can't all read the same count and slip past the cap.
+ * A failed generation gives its slot back.
+ */
+async function withProfileRateLimit<T>(
+  uid: string,
+  audit: { name: string; kind: string },
+  run: () => Promise<T>
+): Promise<T> {
+  const limitRef = db ? db.collection('profileGenerationLimits').doc(uid) : null;
+  const startedAt = Date.now();
+  if (db && limitRef) {
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(limitRef);
+      const cutoff = startedAt - 60 * 60 * 1000;
+      const recent = ((snap.data()?.timestamps as number[] | undefined) ?? []).filter(
+        (t) => t > cutoff
+      );
+      if (recent.length >= PROFILE_GENERATIONS_PER_HOUR) {
+        throw new Error(
+          `Rate limit exceeded: max ${PROFILE_GENERATIONS_PER_HOUR} AI profile generations per hour. Please wait before trying again.`
+        );
+      }
+      tx.set(limitRef, { timestamps: [...recent, startedAt] });
+    });
+  }
+  // Audit trail (also read by scripts/backfill-prompt-log.ts).
+  if (db) {
+    await db.collection('profileGenerations').add({
+      userId: uid,
+      name: audit.name,
+      kind: audit.kind,
+      createdAt: new Date(),
+    });
+  }
+  try {
+    return await run();
+  } catch (err) {
+    // A failed Gemini call shouldn't burn the user's quota — give the slot back.
+    if (db && limitRef) {
+      await db
+        .runTransaction(async (tx) => {
+          const snap = await tx.get(limitRef);
+          const ts = (snap.data()?.timestamps as number[] | undefined) ?? [];
+          const idx = ts.indexOf(startedAt);
+          if (idx !== -1) tx.set(limitRef, { timestamps: ts.filter((_, n) => n !== idx) });
+        })
+        .catch(() => undefined);
+    }
+    throw err;
+  }
 }
 
 export const entitiesRouter = router({
@@ -592,59 +667,83 @@ export const entitiesRouter = router({
         hint: z.string().max(1000).default(''),
       })
     )
-    .mutation(async ({ input, ctx }) => {
-      // Rate-limit: max 20 profile generations per user per hour. The window
-      // lives in one per-user doc updated in a transaction, so parallel calls
-      // (the console fires several at once) can't all read the same count and
-      // slip past the cap.
-      const limitRef = db ? db.collection('profileGenerationLimits').doc(ctx.user.uid) : null;
-      const startedAt = Date.now();
-      if (db && limitRef) {
-        await db.runTransaction(async (tx) => {
-          const snap = await tx.get(limitRef);
-          const cutoff = startedAt - 60 * 60 * 1000;
-          const recent = ((snap.data()?.timestamps as number[] | undefined) ?? []).filter(
-            (t) => t > cutoff
-          );
-          if (recent.length >= 20) {
-            throw new Error(
-              'Rate limit exceeded: max 20 AI profile generations per hour. Please wait before trying again.'
-            );
-          }
-          tx.set(limitRef, { timestamps: [...recent, startedAt] });
-        });
-      }
-      // Audit trail (also read by scripts/backfill-prompt-log.ts).
-      if (db) {
-        await db.collection('profileGenerations').add({
-          userId: ctx.user.uid,
-          name: input.name,
-          kind: input.kind,
-          createdAt: new Date(),
-        });
-      }
-
-      try {
-        return await geminiService.generateEntityProfile(
+    .mutation(async ({ input, ctx }) =>
+      withProfileRateLimit(ctx.user.uid, { name: input.name, kind: input.kind }, async () =>
+        geminiService.generateEntityProfile(
           input.name,
           input.kind,
           input.hint,
-          await resolveProviderKey(ctx.user.uid, 'google')
-        );
-      } catch (err) {
-        // A failed Gemini call shouldn't burn the user's quota — give the slot back.
-        if (db && limitRef) {
-          await db
-            .runTransaction(async (tx) => {
-              const snap = await tx.get(limitRef);
-              const ts = (snap.data()?.timestamps as number[] | undefined) ?? [];
-              const idx = ts.indexOf(startedAt);
-              if (idx !== -1) tx.set(limitRef, { timestamps: ts.filter((_, n) => n !== idx) });
-            })
-            .catch(() => undefined);
-        }
-        throw err;
+          await resolveProviderKey(ctx.user.uid, 'google'),
+          input.kind === 'person' ? characterGenerationOptions() : undefined
+        )
+      )
+    ),
+
+  /**
+   * The structured character dossier for a `person` entity: grouped fields,
+   * completeness, and an asset/connection checklist. Public read (same
+   * visibility rules as `get`).
+   */
+  characterProfile: publicProcedure
+    .input(z.object({ entityId: z.string().min(1) }))
+    .query(async ({ input, ctx }) => {
+      const entity = await assertEntityVisible(input.entityId, ctx.user?.address);
+      if (entity.kind !== 'person') throw new Error('Character profiles are for person entities');
+      const [relations, attachments, bundle] = await Promise.all([
+        getEntityRelations(entity.id, { limit: 200 }).catch(() => ({ relations: [] })),
+        getAttachmentsByTarget('entity', entity.id).catch(() => []),
+        resolveReferenceBundle(entity.id).catch(() => null),
+      ]);
+      return buildCharacterProfile(entity, {
+        relationCount: relations.relations.length,
+        mediaCount: attachments.length,
+        referenceCount: Object.values(bundle?.slots ?? {}).reduce(
+          (n, urls) => n + (urls?.length ?? 0),
+          0
+        ),
+      });
+    }),
+
+  /**
+   * Fill the still-empty fields of a character's profile with AI, using the
+   * entity's existing description and filled fields as canon. Never overwrites
+   * anything already written and leaves the description alone.
+   */
+  completeCharacterProfile: protectedProcedure
+    .use(requirePermission('entities.update'))
+    .input(z.object({ entityId: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const existing = await getEntity(input.entityId);
+      if (!existing) throw new Error('Entity not found');
+      if (existing.kind !== 'person') throw new Error('Character profiles are for person entities');
+      if (existing.creator?.toLowerCase() !== ctx.user.address?.toLowerCase()) {
+        throw new Error('Forbidden: only the entity creator can update it');
       }
+      const current = existing.metadata ?? {};
+      const missing = CHARACTER_FIELD_KEYS.filter((k) => !isFilled(current[k]));
+      if (missing.length === 0) return { added: [] as string[], entity: existing };
+
+      const known = CHARACTER_FIELDS.filter((f) => isFilled(current[f.key]))
+        .map((f) => `${f.label}: ${String(current[f.key]).trim()}`)
+        .join('\n');
+      const hint = [existing.description, known].filter(Boolean).join('\n\n');
+
+      const generated = await withProfileRateLimit(
+        ctx.user.uid,
+        { name: existing.name, kind: existing.kind },
+        async () =>
+          geminiService.generateEntityProfile(
+            existing.name,
+            existing.kind,
+            hint,
+            await resolveProviderKey(ctx.user.uid, 'google'),
+            characterGenerationOptions(missing)
+          )
+      );
+      const { metadata, added } = mergeGeneratedFields(current, generated.metadata);
+      if (added.length === 0) return { added, entity: existing };
+      const entity = await updateEntity(existing.id, { metadata });
+      return { added, entity };
     }),
 
   // ── Reference Bundles (Character Identity Lock + Multi-Reference Editing) ──

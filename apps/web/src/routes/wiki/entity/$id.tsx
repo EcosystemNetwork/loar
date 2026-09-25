@@ -55,6 +55,7 @@ import {
   Search,
 } from 'lucide-react';
 import { MediaGallery } from '@/components/MediaGallery';
+import { CharacterProfileCard } from '@/components/wiki/CharacterProfileCard';
 import { useMediaAttachments } from '@/hooks/useMediaAttachments';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
 import { MintContentDialog } from '@/components/MintContentDialog';
@@ -1176,7 +1177,15 @@ function EntityPage() {
                 )}
               </Card>
 
-              {metadataEntries.length > 0 && (
+              {entity.kind === 'person' && (
+                <CharacterProfileCard
+                  entityId={id}
+                  metadata={(entity.metadata ?? {}) as Record<string, unknown>}
+                  isOwner={isOwner}
+                />
+              )}
+
+              {entity.kind !== 'person' && metadataEntries.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">World Details</CardTitle>

@@ -666,21 +666,22 @@ export async function generateEntityProfile(
   entityName: string,
   entityKind: string,
   userHint: string,
-  apiKey?: string
+  apiKey?: string,
+  opts: { fields?: string[]; fieldHints?: Record<string, string> } = {}
 ): Promise<{ description: string; metadata: Record<string, string> }> {
   const { genAI } = await geminiClients(apiKey);
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-  const fields = METADATA_FIELDS_BY_KIND[entityKind] ?? [];
+  const fields = opts.fields ?? METADATA_FIELDS_BY_KIND[entityKind] ?? [];
 
   const fieldsInstruction =
     fields.length > 0
-      ? `\nFill in the following metadata fields (use short, punchy text — 1-3 sentences max per field):\n${fields.map((f) => `- "${f}"`).join('\n')}`
+      ? `\nFill in the following metadata fields (use short, punchy text — 1-3 sentences max per field):\n${fields.map((f) => `- "${f}"${opts.fieldHints?.[f] ? ` (${opts.fieldHints[f]})` : ''}`).join('\n')}`
       : '';
 
   const prompt = `You are a worldbuilding AI creating a detailed profile for a fictional ${entityKind}.
 
 ENTITY NAME: ${sanitizeForPrompt(entityName, 200)}
-USER HINT: ${sanitizeForPrompt(userHint || '(no additional context)', 1000)}
+USER HINT: ${sanitizeForPrompt(userHint || '(no additional context)', 3000)}
 
 YOUR TASK:
 1. Write a compelling 2–4 paragraph "description" for this ${entityKind}. Encyclopedic tone, no headers, no lists — flowing paragraphs only.
