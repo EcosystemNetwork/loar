@@ -128,6 +128,14 @@ describe('clipFilter', () => {
       'aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo'
     );
   });
+  it('duplicates a mono file to both channels at unity before anything else', () => {
+    const f = clipFilter({ ...base, channels: 1 });
+    expect(f.split(',')[0]).toBe('pan=stereo|c0=c0|c1=c0');
+    expect(f).toContain('aformat=');
+    // stereo / unknown keep the plain normalisation
+    expect(clipFilter({ ...base, channels: 2 })).toBe(clipFilter(base));
+  });
+
   it('adds level, fades and the timeline delay in that order', () => {
     const f = clipFilter({ ...base, gain: 0.5, fadeIn: 1, fadeOut: 2, start: 1.5 });
     expect(f.split(',').slice(1)).toEqual([
@@ -258,7 +266,11 @@ describe.skipIf(!hasFfmpeg)('mixdown with real ffmpeg', () => {
       outputPath: out,
       videoGain: spec.videoGain,
       masterGain: spec.masterGain,
-      clips: spec.clips.map((c, i) => ({ ...c, path: clips[i].path })),
+      clips: spec.clips.map((c, i) => ({
+        ...c,
+        path: clips[i].path,
+        channels: (clips[i] as any).channels,
+      })),
     });
     expect(args).not.toBeNull();
     execFileSync(
@@ -330,6 +342,31 @@ describe.skipIf(!hasFfmpeg)('mixdown with real ffmpeg', () => {
     expect(meanDb(out, 4.3, 5.9)).toBeLessThan(SILENT_DB); // after
     const probe = await probeVideo(out);
     expect(probe.durationSec).toBeCloseTo(6, 0);
+  });
+
+  it("a mono source is duplicated at unity (preview parity), not attenuated 3 dB by ffmpeg's upmix", async () => {
+    // The reference is what a browser plays for a mono file: the same signal in both channels.
+    const dual = join(dir, 'dual.wav');
+    execFileSync('ffmpeg', [
+      '-loglevel',
+      'error',
+      '-y',
+      '-i',
+      tone('a'),
+      '-af',
+      'pan=stereo|c0=c0|c1=c0',
+      dual,
+    ]);
+    const m = resolveMix(mix([track('t', [clip({ start: 0, length: 3 })])]));
+    const reference = join(dir, 'ref.mp4');
+    const mono = join(dir, 'mono.mp4');
+    const legacy = join(dir, 'monoLegacy.mp4');
+    await run(m, [{ path: dual, idx: 0, channels: 2 } as any], reference);
+    await run(m, [{ path: tone('a'), idx: 0, channels: 1 } as any], mono);
+    await run(m, [{ path: tone('a'), idx: 0 } as any], legacy); // channels unknown → ffmpeg's default upmix
+    expect(Math.abs(meanDb(mono, 0.5, 2.5) - meanDb(reference, 0.5, 2.5))).toBeLessThan(0.5);
+    // …and the default upmix really is the ~3 dB-quieter behaviour this fixes.
+    expect(meanDb(reference, 0.5, 2.5) - meanDb(legacy, 0.5, 2.5)).toBeGreaterThan(2);
   });
 
   it('applies gains: half the track fader is about 6 dB quieter', async () => {

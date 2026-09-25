@@ -142,6 +142,12 @@ const NORMALIZE = 'aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=s
 export interface MixdownClipInput extends ResolvedClip {
   /** Local path of the downloaded audio. */
   path: string;
+  /**
+   * Channel count of the file. Mono is duplicated to both channels at unity —
+   * what browsers do, so the preview and the export are equally loud. (ffmpeg's own
+   * mono→stereo upmix attenuates by 3 dB.) Unknown is treated as stereo.
+   */
+  channels?: number;
 }
 
 export interface MixdownSpec {
@@ -154,8 +160,8 @@ export interface MixdownSpec {
 }
 
 /** Filter chain for one clip: level, fades, then delay to its timeline position. */
-export function clipFilter(clip: ResolvedClip): string {
-  const parts = [NORMALIZE];
+export function clipFilter(clip: ResolvedClip & { channels?: number }): string {
+  const parts = clip.channels === 1 ? ['pan=stereo|c0=c0|c1=c0', NORMALIZE] : [NORMALIZE];
   if (Math.abs(clip.gain - 1) > 0.001) parts.push(`volume=${num(clip.gain)}`);
   if (clip.fadeIn > 0) parts.push(`afade=t=in:st=0:d=${num(clip.fadeIn)}`);
   if (clip.fadeOut > 0) {

@@ -14,7 +14,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { join } from 'path';
 import { writeFile, unlink, access } from 'fs/promises';
-import { probeHasAudio, probeVideo } from './probe';
+import { probeAudioChannels, probeHasAudio, probeVideo } from './probe';
 import { buildMixdownArgs, isNeutral, resolveMix, type StoredMix } from './audio-mix';
 import {
   FONT_CANDIDATES,
@@ -242,7 +242,7 @@ async function mixdownAudioTracks(
 
   const { safeFetch } = await import('../../lib/url-validator');
   // One download per distinct URL — the same music file can back several clips.
-  const files = new Map<string, string | null>();
+  const files = new Map<string, { path: string; channels: number } | null>();
   for (const clip of resolved.clips) {
     if (files.has(clip.url)) continue;
     const label =
@@ -256,8 +256,9 @@ async function mixdownAudioTracks(
       if (buf.length > MAX_MIX_AUDIO_BYTES) throw new Error('file is too large');
       const path = join(workDir, `mix-${files.size}.audio`);
       await writeFile(path, buf);
-      if (!(await probeHasAudio(path))) throw new Error('it has no audio track');
-      files.set(clip.url, path);
+      const channels = await probeAudioChannels(path);
+      if (channels === 0) throw new Error('it has no audio track');
+      files.set(clip.url, { path, channels });
     } catch (err) {
       files.set(clip.url, null);
       warnings.push(`Audio "${label}" was skipped: ${(err as Error).message}.`);
@@ -265,8 +266,8 @@ async function mixdownAudioTracks(
   }
 
   const clips = resolved.clips.flatMap((clip) => {
-    const path = files.get(clip.url);
-    return path ? [{ ...clip, path }] : [];
+    const file = files.get(clip.url);
+    return file ? [{ ...clip, path: file.path, channels: file.channels }] : [];
   });
   const outputPath = join(workDir, 'mixed.mp4');
   const args = buildMixdownArgs({

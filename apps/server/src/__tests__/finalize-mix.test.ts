@@ -144,6 +144,9 @@ describe.skipIf(!hasFfmpeg)('finalizeEpisode with a multi-track mix', () => {
     expect(r.warnings).toEqual([]);
     expect(meanDb(r.path, 0, 0.8)).toBeLessThan(SILENT_DB);
     expect(meanDb(r.path, 1.2, 2.8)).toBeGreaterThan(AUDIBLE_DB);
+    // The fixture tone is mono: finalizeEpisode probes that and duplicates it at unity (≈ −9 dB),
+    // matching what the browser preview plays — not ffmpeg's 3 dB-quieter default upmix (≈ −12 dB).
+    expect(meanDb(r.path, 1.2, 2.8)).toBeGreaterThan(-10.5);
     expect(meanDb(r.path, 3.3, 4.8)).toBeLessThan(SILENT_DB);
   });
 

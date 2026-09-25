@@ -129,3 +129,27 @@ export async function probeHasAudio(input: string, timeoutMs = 30_000): Promise<
   const { stdout } = await execFileAsync('ffprobe', args, { timeout: timeoutMs });
   return stdout.trim().length > 0;
 }
+
+/**
+ * Channel count of the first audio stream, or 0 when there is none. Mixdown
+ * needs it because a mono file must be duplicated to both channels at unity to
+ * match what browsers play — ffmpeg's default mono→stereo upmix is 3 dB quieter.
+ */
+export async function probeAudioChannels(input: string, timeoutMs = 30_000): Promise<number> {
+  const { remote } = assertProbeInput(input);
+  const args = [
+    '-v',
+    'error',
+    ...(remote ? ['-protocol_whitelist', REMOTE_PROTOCOLS] : []),
+    '-select_streams',
+    'a:0',
+    '-show_entries',
+    'stream=channels',
+    '-of',
+    'csv=p=0',
+    input,
+  ];
+  const { stdout } = await execFileAsync('ffprobe', args, { timeout: timeoutMs });
+  const n = Number.parseInt(stdout.trim(), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
