@@ -474,7 +474,6 @@ export function NleTimeline({
               <Film className="h-3.5 w-3.5 shrink-0 text-primary" />
               <span className="text-xs font-medium">Video</span>
             </div>
-            <span className="text-[10px] text-muted-foreground">{placed.length} clips</span>
           </HeaderShell>
           <div
             className="relative flex-1"

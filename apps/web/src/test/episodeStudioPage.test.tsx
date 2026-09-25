@@ -44,6 +44,7 @@ vi.mock('@tanstack/react-router', () => ({
 import { Route } from '@/routes/universe/$id/episode.$episodeId.studio';
 import { EMPTY_CUT, DEFAULT_EXPORT_SETTINGS } from '@/lib/episodeCut';
 import { saveDraft } from '@/lib/episodeDraft';
+import { EMPTY_MIX } from '@/lib/audioMix';
 
 const Page = (Route as unknown as { component: React.ComponentType }).component;
 
@@ -131,7 +132,7 @@ describe('Episode Studio page', () => {
       clips: [clip()],
       overlays: [],
       soundtrack: null,
-      audioMix: expect.anything(),
+      audioMix: EMPTY_MIX,
       exportSettings: DEFAULT_EXPORT_SETTINGS,
       versionKind: 'auto',
     });
