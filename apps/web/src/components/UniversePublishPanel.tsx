@@ -9,8 +9,10 @@
  *   - `fun`: universe starts private, owner launches it publicly via this
  *     panel. Canon lives in Firestore only (free, instant).
  *   - `monetized`: universe is public from the launchpad. Canon is on-chain
- *     (Universe.sol). Phase 2 will wire the setCanonForEpisode tx flow here;
- *     for now the server returns NOT_IMPLEMENTED and the button is disabled.
+ *     (Universe.sol): the creator signs `setCanonForEpisode(tipNodeId,
+ *     episodeHash)` with their wallet, then `episodes.publishAsCanon` verifies
+ *     the receipt (success + a matching `EpisodeCanonized` event) before
+ *     mirroring canon into Firestore.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';

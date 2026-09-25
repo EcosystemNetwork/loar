@@ -367,9 +367,9 @@ async function handleBubblegumMint(tx: HeliusTx) {
           mintedSig: tx.signature,
           mintedSlot: tx.slot,
           mintedAt: tx.timestamp,
-          // joinedEpisode is populated by a follow-up reconciliation worker
-          // that matches (leafOwner, mintedAt) → solanaEpisodes.creator —
-          // for now leave null and let downstream consumers do the lookup.
+          // No episode link is stored here on purpose: a cNFT mint doesn't say
+          // which episode it belongs to, and nothing reads such a field. Consumers
+          // that need it look up solanaEpisodes by leafOwner / mintedAt themselves.
         },
         { merge: true }
       );
