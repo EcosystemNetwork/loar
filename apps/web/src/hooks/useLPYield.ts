@@ -11,6 +11,7 @@ import { useWriteContract } from '@/hooks/useCircleWrite';
 import { loarLpLockerMultipleAbi, loarFeeLockerAbi } from '@loar/abis/generated';
 import { LoarLpLockerMultiple, LoarFeeLocker } from '@loar/abis/addresses';
 import { formatEther, type Address } from 'viem';
+import { parseTokenRewardInfo } from '@/lib/reward-info';
 
 /**
  * Read the reward configuration for a universe token from the LP locker.
@@ -34,14 +35,8 @@ export function useLPRewardConfig(tokenAddress: Address | undefined) {
     chainId,
   });
 
-  // Parse the reward info tuple
-  const parsed = rewardInfo
-    ? {
-        rewardAdmins: (rewardInfo as any)[0] as Address[],
-        rewardRecipients: (rewardInfo as any)[1] as Address[],
-        rewardBps: ((rewardInfo as any)[2] as bigint[]).map(Number),
-      }
-    : null;
+  // tokenRewards returns a struct (see lib/reward-info) — never index it like a tuple.
+  const parsed = parseTokenRewardInfo(rewardInfo);
 
   return { rewardConfig: parsed, isLoading, refetch };
 }
