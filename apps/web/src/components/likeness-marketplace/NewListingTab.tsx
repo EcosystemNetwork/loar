@@ -15,6 +15,7 @@
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   Camera,
   CheckCircle2,
@@ -232,6 +233,7 @@ function CharactersSection({ listedEntityIds, onListed }: NewListingTabProps) {
           persona={listing}
           onClose={() => setListing(null)}
           onSuccess={() => {
+            toast.success('Listing created — manage it below');
             setListing(null);
             onListed();
           }}
@@ -301,6 +303,7 @@ function VoicesSection({ onListed }: Pick<NewListingTabProps, 'onListed'>) {
           voice={listing}
           onClose={() => setListing(null)}
           onSuccess={() => {
+            toast.success('Listing created — manage it below');
             setListing(null);
             onListed();
           }}

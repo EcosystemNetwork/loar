@@ -14,6 +14,7 @@ vi.mock('@/utils/trpc', () => ({
     voiceLibrary: { myVoices: { query: mocks.myVoices } },
   },
 }));
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/lib/wallet-auth', () => ({ useWalletAuth: () => ({ address: '0xabc' }) }));
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,

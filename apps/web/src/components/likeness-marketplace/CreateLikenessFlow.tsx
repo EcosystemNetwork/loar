@@ -61,7 +61,10 @@ import { LIKENESS_ATTESTATION_TEXT_V1, type LikenessModality } from '@/hooks/use
 type Stage = 'upload' | 'render' | 'meta' | 'consent' | 'pricing' | 'submitting' | 'success';
 
 interface UploadedAsset {
+  /** Durable storage URL — this is what gets saved on the entity and sent to the server. */
   url: string;
+  /** Browser-local blob: URL, only for on-screen thumbnails; never persist it. */
+  previewUrl: string;
   contentHash: string;
   mimeType: string;
 }
@@ -567,13 +570,13 @@ function UploadGroup({
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
             {assets.map((a, i) => (
               <div
-                key={a.url}
+                key={a.previewUrl}
                 className="relative aspect-square rounded-md overflow-hidden bg-muted"
               >
                 {a.mimeType.startsWith('image/') ? (
-                  <img src={a.url} alt="" className="w-full h-full object-cover" />
+                  <img src={a.previewUrl} alt="" className="w-full h-full object-cover" />
                 ) : a.mimeType.startsWith('video/') ? (
-                  <video src={a.url} className="w-full h-full object-cover" muted />
+                  <video src={a.previewUrl} className="w-full h-full object-cover" muted />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <Box className="size-6 text-muted-foreground" />
@@ -600,7 +603,8 @@ function UploadGroup({
               setAssets([
                 ...assets,
                 {
-                  url: previewUrl,
+                  url: manifest.uploads[0]?.url || previewUrl,
+                  previewUrl,
                   contentHash: manifest.contentHash,
                   mimeType: manifest.mimeType,
                 },
