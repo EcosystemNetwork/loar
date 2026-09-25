@@ -1,3 +1,4 @@
+import { tokenDescription } from '@/lib/token-metadata';
 import type { EnrichedUniverse } from './types';
 /**
  * Home / Landing Page — Netflix × Webtoons hybrid
@@ -230,7 +231,9 @@ export function UniverseCard({ universe }: { universe: EnrichedUniverse }) {
         {universe.name || universe.tokenData?.name || `Universe ${universe.id.slice(0, 8)}`}
       </h3>
       <p className="text-xs text-muted-foreground truncate px-0.5">
-        {universe.description || universe.tokenData?.metadata || 'Explore this universe'}
+        {universe.description ||
+          tokenDescription(universe.tokenData?.metadata) ||
+          'Explore this universe'}
       </p>
     </div>
   );
@@ -273,7 +276,7 @@ function WideCard({ universe }: { universe: EnrichedUniverse }) {
             {universe.name || universe.tokenData?.name || `Universe ${universe.id.slice(0, 8)}`}
           </h3>
           <p className="text-xs text-white/70 line-clamp-2 leading-relaxed mb-2">
-            {universe.description || universe.tokenData?.metadata || ''}
+            {universe.description || tokenDescription(universe.tokenData?.metadata) || ''}
           </p>
           <div className="flex gap-2">
             {universe.nodeCount > 0 && (
@@ -479,7 +482,7 @@ export function HeroBillboard({
 
           {/* Description */}
           <p className="text-sm sm:text-base md:text-lg text-white/50 mb-4 md:mb-5 max-w-xl line-clamp-2 leading-relaxed font-light">
-            {current.description || current.tokenData?.metadata}
+            {current.description || tokenDescription(current.tokenData?.metadata)}
           </p>
 
           {/* Actions */}
@@ -1289,7 +1292,9 @@ export function SearchOverlay({
                           {u.name || u.tokenData?.name || `Universe ${u.id?.slice(0, 8) ?? ''}`}
                         </div>
                         <div className="text-xs text-muted-foreground line-clamp-1">
-                          {u.description || u.tokenData?.metadata || 'No description'}
+                          {u.description ||
+                            tokenDescription(u.tokenData?.metadata) ||
+                            'No description'}
                         </div>
                       </div>
                       <div className="flex gap-1.5 flex-shrink-0">

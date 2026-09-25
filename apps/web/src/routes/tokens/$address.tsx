@@ -38,6 +38,7 @@ import { TokenTransactionsTable } from '@/components/tokens/TokenTransactionsTab
 import { TokenGovernanceCard } from '@/components/tokens/TokenGovernanceCard';
 import { TokenAlertButton } from '@/components/tokens/TokenAlertButton';
 import { TokenComments } from '@/components/tokens/TokenComments';
+import { TokenSocialLinks } from '@/components/tokens/TokenSocialLinks';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -520,6 +521,9 @@ function TokenDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Description + social links (from on-chain metadata) */}
+        <TokenSocialLinks metadata={token.metadata} />
 
         {/* Safety Warnings */}
         {safetyWarnings.length > 0 && (

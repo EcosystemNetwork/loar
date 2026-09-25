@@ -30,6 +30,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Price } from '@/components/Price';
+import { DevBuyStep } from '@/components/tokens/DevBuyStep';
+import { encodeTokenMetadata, normalizeSocial, MAX_METADATA_LENGTH } from '@/lib/token-metadata';
 import {
   Rocket,
   ArrowLeft,
@@ -38,6 +40,8 @@ import {
   CheckCircle2,
   Sparkles,
   Zap,
+  Globe,
+  Send,
 } from 'lucide-react';
 
 export const Route = createFileRoute('/tokens/launch')({
@@ -45,6 +49,8 @@ export const Route = createFileRoute('/tokens/launch')({
 });
 
 const SYMBOL_REGEX = /^[A-Z0-9]{3,10}$/;
+const MAX_INITIAL_BUY_ETH = 10;
+const INITIAL_BUY_PRESETS = ['0.01', '0.05', '0.1', '0.5'];
 
 function LaunchTokenPage() {
   const navigate = useNavigate();
@@ -70,8 +76,15 @@ function LaunchTokenPage() {
   const [symbol, setSymbol] = useState('');
   const [imageURL, setImageURL] = useState('');
   const [description, setDescription] = useState('');
+  const [website, setWebsite] = useState('');
+  const [twitter, setTwitter] = useState('');
+  const [telegram, setTelegram] = useState('');
+  const [initialBuy, setInitialBuy] = useState('');
+  const [launchedAt, setLaunchedAt] = useState<number | null>(null);
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [localError, setLocalError] = useState<string | null>(null);
+
+  const initialBuyNum = initialBuy.trim() === '' ? 0 : Number(initialBuy);
 
   const validation = useMemo(() => {
     const issues: string[] = [];
@@ -90,8 +103,39 @@ function LaunchTokenPage() {
     // The Solana initialize ix seeds the PDA from a hash of name + description,
     // so the server requires a non-empty description on that path.
     if (isSolana && !description.trim()) issues.push('Description required on Solana');
+    // Social links + initial buy only apply to the EVM token launch.
+    if (!isSolana) {
+      if (website.trim() && !normalizeSocial('website', website))
+        issues.push('Website must be a valid https link');
+      if (twitter.trim() && !normalizeSocial('twitter', twitter))
+        issues.push('X / Twitter must be a handle or an x.com link');
+      if (telegram.trim() && !normalizeSocial('telegram', telegram))
+        issues.push('Telegram must be a handle or a t.me link');
+      if (initialBuy.trim() !== '') {
+        if (!Number.isFinite(initialBuyNum) || initialBuyNum <= 0)
+          issues.push('Initial buy must be a positive ETH amount');
+        else if (initialBuyNum > MAX_INITIAL_BUY_ETH)
+          issues.push(`Initial buy is capped at ${MAX_INITIAL_BUY_ETH} ETH`);
+      }
+      if (
+        encodeTokenMetadata({ description, socials: { website, twitter, telegram } }).length >
+        MAX_METADATA_LENGTH
+      )
+        issues.push('Description and links are too long to store on-chain');
+    }
     return issues;
-  }, [name, symbol, imageURL, description, isSolana]);
+  }, [
+    name,
+    symbol,
+    imageURL,
+    description,
+    isSolana,
+    website,
+    twitter,
+    telegram,
+    initialBuy,
+    initialBuyNum,
+  ]);
 
   const defaultsReady =
     defaults.defaultHook && defaults.defaultLocker && defaults.defaultPairedToken;
@@ -136,6 +180,7 @@ function LaunchTokenPage() {
     if (!defaultsReady) return;
     setLocalError(null);
     setStatus('submitting');
+    const startedAt = Math.floor(Date.now() / 1000);
 
     try {
       await createUniverseWithToken(
@@ -153,7 +198,8 @@ function LaunchTokenPage() {
             name: trimmedName,
             symbol: trimmedSymbol,
             imageURL,
-            metadata: '',
+            // Description + social links, stored in the token's on-chain metadata.
+            metadata: encodeTokenMetadata({ description, socials: { website, twitter, telegram } }),
             context: '',
           },
           poolConfig: {
@@ -176,6 +222,11 @@ function LaunchTokenPage() {
         }
       );
       setStatus('success');
+      if (initialBuyNum > 0) {
+        // Hand off to the dev-buy step — it needs the indexer to see the token.
+        setLaunchedAt(startedAt);
+        return;
+      }
       setTimeout(() => {
         navigate({ to: '/tokens' });
       }, 2500);
@@ -340,6 +391,87 @@ function LaunchTokenPage() {
               </p>
             </div>
 
+            {/* Social links + initial buy — EVM only */}
+            {!isSolana && (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    Links <span className="text-muted-foreground font-normal">(optional)</span>
+                  </Label>
+                  <div className="relative">
+                    <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      id="token-website"
+                      aria-label="Website"
+                      placeholder="Website (https://…)"
+                      value={website}
+                      onChange={(e) => setWebsite(e.target.value)}
+                      maxLength={200}
+                      className="pl-8"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      id="token-twitter"
+                      aria-label="X / Twitter"
+                      placeholder="X handle or link"
+                      value={twitter}
+                      onChange={(e) => setTwitter(e.target.value)}
+                      maxLength={200}
+                    />
+                    <div className="relative">
+                      <Send className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                      <Input
+                        id="token-telegram"
+                        aria-label="Telegram"
+                        placeholder="Telegram handle"
+                        value={telegram}
+                        onChange={(e) => setTelegram(e.target.value)}
+                        maxLength={200}
+                        className="pl-8"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="token-initial-buy" className="text-sm font-medium">
+                    Initial buy{' '}
+                    <span className="text-muted-foreground font-normal">(optional)</span>
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        id="token-initial-buy"
+                        inputMode="decimal"
+                        placeholder="0.0"
+                        value={initialBuy}
+                        onChange={(e) => setInitialBuy(e.target.value.replace(/[^0-9.]/g, ''))}
+                        className="pr-12 font-mono"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                        ETH
+                      </span>
+                    </div>
+                    {INITIAL_BUY_PRESETS.map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setInitialBuy(v)}
+                        className="px-2 py-1.5 text-[11px] rounded-md border hover:bg-muted"
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Be the first buyer. This is a second wallet confirmation right after your token
+                    deploys — you can skip it.
+                  </p>
+                </div>
+              </>
+            )}
+
             {/* Mint fee — EVM only */}
             {!isSolana && feeEth !== null && (
               <div className="flex items-center justify-between text-xs p-3 rounded-md bg-muted/40">
@@ -377,8 +509,20 @@ function LaunchTokenPage() {
             {status === 'success' && (
               <div className="p-3 rounded-md bg-green-500/10 border border-green-500/20 flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
                 <CheckCircle2 className="h-4 w-4" />
-                {isSolana ? 'Universe launched! Redirecting…' : 'Token launched! Redirecting…'}
+                {isSolana
+                  ? 'Universe launched! Redirecting…'
+                  : launchedAt
+                    ? 'Token launched!'
+                    : 'Token launched! Redirecting…'}
               </div>
+            )}
+            {status === 'success' && launchedAt && address && (
+              <DevBuyStep
+                deployer={address}
+                symbol={symbol.trim().toUpperCase()}
+                ethAmount={initialBuy.trim()}
+                sinceSec={launchedAt}
+              />
             )}
             {status === 'error' && (localError || error || solanaInit.error) && (
               <div className="p-3 rounded-md bg-red-500/10 border border-red-500/20 text-xs text-red-600 dark:text-red-400">
@@ -398,7 +542,7 @@ function LaunchTokenPage() {
             )}
 
             {/* Launch button */}
-            {!isConnected ? (
+            {launchedAt ? null : !isConnected ? (
               <Button className="w-full h-12 text-base font-bold" disabled>
                 Connect Wallet
               </Button>

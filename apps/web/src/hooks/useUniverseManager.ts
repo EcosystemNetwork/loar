@@ -225,7 +225,7 @@ export function useUniverseManager() {
       communityBps: 500,
     };
 
-    await writeContractAsync({
+    return writeContractAsync({
       address: contractAddress as `0x${string}`,
       abi: universeManagerAbi,
       functionName: 'createUniverseWithToken',
