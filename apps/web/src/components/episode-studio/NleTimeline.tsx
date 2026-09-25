@@ -334,7 +334,7 @@ export function NleTimeline({
 
     trackGesture(
       (ev) => {
-        let delta = (ev.clientX - downX) / pxPerSec;
+        const delta = (ev.clientX - downX) / pxPerSec;
         const at = (t: number) => (snapping ? snapTime(t, others, SNAP_PX / pxPerSec) : t);
         let next: TextOverlay;
         if (mode === 'move') {
