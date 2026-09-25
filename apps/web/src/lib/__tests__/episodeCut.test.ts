@@ -4,7 +4,10 @@ import { placeClips } from '@/lib/timelineEdit';
 import {
   activeOverlays,
   clipGain,
+  clipFromDragged,
   cutFromEpisode,
+  encodeClipDrag,
+  parseClipDrag,
   cutSignature,
   DEFAULT_EXPORT_SETTINGS,
   duplicateClip,
@@ -157,5 +160,32 @@ describe('formatSavedAt', () => {
     expect(formatSavedAt(now - 3_000, now)).toBe('just now');
     expect(formatSavedAt(now - 30_000, now)).toBe('30s ago');
     expect(formatSavedAt(now - 5 * 60_000, now)).toBe('5 min ago');
+  });
+});
+
+describe('clip drag payload', () => {
+  it('round-trips library clips', () => {
+    const payload = encodeClipDrag([{ id: 'x', label: 'Shot', videoUrl: 'https://v/x.mp4' }]);
+    expect(parseClipDrag(payload)).toEqual([
+      { id: 'x', label: 'Shot', videoUrl: 'https://v/x.mp4' },
+    ]);
+  });
+  it('rejects garbage, non-arrays and non-http urls', () => {
+    expect(parseClipDrag(null)).toEqual([]);
+    expect(parseClipDrag('nope')).toEqual([]);
+    expect(parseClipDrag('{"id":"x"}')).toEqual([]);
+    expect(
+      parseClipDrag(JSON.stringify([{ id: 'x', label: 'l', videoUrl: 'javascript:alert(1)' }]))
+    ).toEqual([]);
+    expect(parseClipDrag(JSON.stringify([{ id: 1, videoUrl: 'https://a/b.mp4' }]))).toEqual([]);
+  });
+  it('builds an untrimmed clip from a dragged asset', () => {
+    expect(clipFromDragged({ id: 'x', label: 'Shot', videoUrl: 'https://v/x.mp4' })).toEqual({
+      nodeId: 'clip:x',
+      label: 'Shot',
+      videoUrl: 'https://v/x.mp4',
+      trimStart: 0,
+      trimEnd: 0,
+    });
   });
 });

@@ -116,12 +116,17 @@ export function splitClipAt(
   if (t - hit.start < MIN_CLIP_SEC || hit.start + hit.length - t < MIN_CLIP_SEC) return null;
 
   const cutAt = round3(hit.srcStart + (t - hit.start));
-  const first: EpisodeClip = { ...hit.clip, trimEnd: cutAt };
+  // A fade belongs to the clip's outer edge: the in-fade stays with the first
+  // half and the out-fade with the second, so the cut itself is a clean join.
+  const { fadeIn: _fadeIn, fadeOut: _fadeOut, ...bare } = hit.clip;
+  const first: EpisodeClip = { ...bare, trimEnd: cutAt };
+  if (hit.clip.fadeIn) first.fadeIn = hit.clip.fadeIn;
   const second: EpisodeClip = {
-    ...hit.clip,
+    ...bare,
     nodeId: uniqueNodeId(clips, hit.clip.nodeId),
     trimStart: cutAt,
   };
+  if (hit.clip.fadeOut) second.fadeOut = hit.clip.fadeOut;
   const next = [...clips];
   next.splice(hit.index, 1, first, second);
   return { clips: next, index: hit.index };

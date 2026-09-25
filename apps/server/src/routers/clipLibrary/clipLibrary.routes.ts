@@ -54,6 +54,10 @@ const renderClipInputSchema = z.object({
   audioUrl: z.string().url().optional(),
   trimStart: z.number().min(0).default(0),
   trimEnd: z.number().min(0).default(0),
+  // Carried through so a merge keeps the same levels and fades the episode shows.
+  volume: z.number().min(0).max(2).optional(),
+  fadeIn: z.number().min(0).max(10).optional(),
+  fadeOut: z.number().min(0).max(10).optional(),
 });
 
 // ── Credit cost ─────────────────────────────────────────────────────────

@@ -67,6 +67,16 @@ describe('locate', () => {
   });
 });
 
+describe('splitClipAt fades and volume', () => {
+  it('keeps the in-fade on the first half and the out-fade on the second, volume on both', () => {
+    const out = splitClipAt([clip('a', { fadeIn: 1, fadeOut: 2, volume: 0.5 })], DUR, 4)!;
+    expect(out.clips[0]).toMatchObject({ fadeIn: 1, volume: 0.5 });
+    expect(out.clips[0].fadeOut).toBeUndefined();
+    expect(out.clips[1]).toMatchObject({ fadeOut: 2, volume: 0.5 });
+    expect(out.clips[1].fadeIn).toBeUndefined();
+  });
+});
+
 describe('splitClipAt', () => {
   it('cuts a full-length clip into two contiguous halves', () => {
     const out = splitClipAt([clip('a'), clip('b')], DUR, 4)!;

@@ -8,14 +8,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { hasSession } from '@/lib/wallet-auth';
-
-interface StorageManifest {
-  contentHash: string;
-  uploads: { provider: string; url: string; contentId: string; size: number }[];
-  mimeType: string;
-  size: number;
-  createdAt: number;
-}
+import { uploadFile as uploadToStorage, type StorageManifest } from '@/lib/upload-file';
 
 interface DirectUploadProps {
   onUploadComplete: (manifest: StorageManifest, previewUrl: string) => void;
@@ -133,66 +126,15 @@ export function DirectUpload({
       setFileName(file.name);
 
       try {
-        const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
-
-        // Pre-flight: verify session cookie is valid before uploading.
-        // Avoids cryptic HTTP/2 protocol errors when the server rejects
-        // auth mid-upload on Railway's edge proxy.
-        const meRes = await fetch(`${serverUrl}/auth/me`, { credentials: 'include' });
-        if (!meRes.ok || !(await meRes.json()).authenticated) {
-          toast.error('Session expired', { description: 'Please sign in again.' });
-          setIsUploading(false);
-          setProgress(0);
-          setFileName(null);
-          return;
-        }
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        // Use XMLHttpRequest for progress tracking
-        const result = await new Promise<{ manifest: StorageManifest }>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-
-          xhr.upload.addEventListener('progress', (event) => {
-            if (event.lengthComputable) {
-              const pct = Math.round((event.loaded / event.total) * 100);
-              setProgress(pct);
-            }
-          });
-
-          xhr.addEventListener('load', () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              try {
-                resolve(JSON.parse(xhr.responseText));
-              } catch {
-                reject(new Error('Invalid response'));
-              }
-            } else {
-              try {
-                const err = JSON.parse(xhr.responseText);
-                reject(new Error(err.error || `HTTP ${xhr.status}`));
-              } catch {
-                reject(new Error(`HTTP ${xhr.status}`));
-              }
-            }
-          });
-
-          xhr.addEventListener('error', () => reject(new Error('Network error')));
-          xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
-
-          xhr.open('POST', `${serverUrl}/api/upload`);
-          xhr.withCredentials = true; // send httpOnly session cookie
-          xhr.send(formData);
-        });
+        const manifest = await uploadToStorage(file, setProgress);
 
         const previewUrl = URL.createObjectURL(file);
         // Revoke after a delay to allow the parent to copy/use the URL
         setTimeout(() => URL.revokeObjectURL(previewUrl), 60000);
-        onUploadComplete(result.manifest, previewUrl);
+        onUploadComplete(manifest, previewUrl);
 
         toast.success('Upload complete!', {
-          description: `Stored on ${result.manifest.uploads.map((u) => u.provider).join(', ')}`,
+          description: `Stored on ${manifest.uploads.map((u) => u.provider).join(', ')}`,
           duration: 4000,
         });
       } catch (err) {

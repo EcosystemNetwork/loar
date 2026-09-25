@@ -52,6 +52,8 @@ export interface Cut {
 export const EMPTY_CUT: Cut = { clips: [], overlays: [], soundtrack: null };
 
 export const MAX_OVERLAYS = 50;
+/** Caption height as a fraction of frame height. Mirrors the server's export so the preview matches. */
+export const OVERLAY_FONT_FRACTION: Record<OverlaySize, number> = { sm: 0.04, md: 0.055, lg: 0.08 };
 export const MIN_OVERLAY_SEC = 0.5;
 export const MAX_FADE_SEC = 10;
 
@@ -123,6 +125,56 @@ export function insertIndexAtTime(placed: PlacedClip[], t: number): number {
     if (t < p.start + p.length / 2) return p.index;
   }
   return placed.length;
+}
+
+// ── Drag and drop ───────────────────────────────────────────────────────
+
+/** dataTransfer type for clips dragged out of the library onto the timeline. */
+export const CLIP_DRAG_MIME = 'application/x-loar-clip';
+
+export interface DraggedClip {
+  id: string;
+  label: string;
+  videoUrl: string;
+}
+
+export function encodeClipDrag(clips: DraggedClip[]): string {
+  return JSON.stringify(clips);
+}
+
+/** Parse a drag payload; returns [] for anything foreign or malformed. */
+export function parseClipDrag(raw: string | null | undefined): DraggedClip[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (c): c is DraggedClip =>
+          !!c &&
+          typeof c.id === 'string' &&
+          typeof c.videoUrl === 'string' &&
+          /^https?:/.test(c.videoUrl)
+      )
+      .map((c) => ({
+        id: c.id,
+        label: typeof c.label === 'string' ? c.label : 'Clip',
+        videoUrl: c.videoUrl,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/** A library asset as an (untrimmed) timeline clip; `nodeId` is made unique on insert. */
+export function clipFromDragged(d: DraggedClip): EpisodeClip {
+  return {
+    nodeId: `clip:${d.id}`,
+    label: d.label,
+    videoUrl: d.videoUrl,
+    trimStart: 0,
+    trimEnd: 0,
+  };
 }
 
 // ── Preview curves ──────────────────────────────────────────────────────

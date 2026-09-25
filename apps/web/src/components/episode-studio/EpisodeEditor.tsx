@@ -5,13 +5,20 @@
  * the episode's clip list. All state that persists (the clips) stays owned by
  * the Studio page; this component only owns the playhead, zoom and playback.
  *
- * Shortcuts (ignored while typing in a field):
+ * Shortcuts (ignored while typing in a field) — the full list is in
+ * `ShortcutsDialog` (press ?):
  *   Space play/pause · S split at playhead · Q / W trim in / out to playhead
- *   Delete ripple-delete selection · ←/→ step a frame (Shift = 1s)
- *   Home/End jump to start/end · ⌘/Ctrl+Z undo · ⇧⌘Z / Ctrl+Y redo · + / − zoom
+ *   Delete ripple-delete selection · ⌘D duplicate · C add caption
+ *   ←/→ step a frame (Shift = 1s) · Home/End jump to start/end
+ *   ⌘/Ctrl+Z undo · ⇧⌘Z / Ctrl+Y redo · + / − zoom
+ *
+ * Owns the playhead, zoom, playback and which caption is selected; the clips,
+ * captions and undo history belong to the Studio page.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Copy,
+  Keyboard,
   Loader2,
   Magnet,
   Maximize2,
@@ -24,6 +31,7 @@ import {
   StepBack,
   StepForward,
   Trash2,
+  Type,
   Undo2,
   ZoomIn,
   ZoomOut,
@@ -33,7 +41,17 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useClipDurations } from '@/hooks/useClipDurations';
 import {
+  duplicateClip,
+  newOverlay,
+  patchClip,
+  patchOverlay,
+  type DraggedClip,
+  type ExportSettings,
+  type TextOverlay,
+} from '@/lib/episodeCut';
+import {
   formatTimecode,
+  moveClip,
   placeClips,
   removeClips,
   splitClipAt,
@@ -41,8 +59,21 @@ import {
   trimEdgeToTime,
 } from '@/lib/timelineEdit';
 import type { EpisodeClip } from './EpisodeClipTimeline';
-import { MAX_PX_PER_SEC, MIN_PX_PER_SEC, NleTimeline } from './NleTimeline';
+import { CaptionPanel } from './CaptionPanel';
+import { ClipInspector } from './ClipInspector';
+import { MAX_PX_PER_SEC, MIN_PX_PER_SEC, NleTimeline, type ClipAction } from './NleTimeline';
 import { SequencePreview } from './SequencePreview';
+import { ShortcutsDialog } from './ShortcutsDialog';
+
+const HINT_KEY = 'loar:episode-studio-hint-dismissed';
+
+function readHintDismissed(): boolean {
+  try {
+    return localStorage.getItem(HINT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 const FPS = 30;
 const FRAME = 1 / FPS;
@@ -50,6 +81,15 @@ const FRAME = 1 / FPS;
 interface EpisodeEditorProps {
   clips: EpisodeClip[];
   onChange: (clips: EpisodeClip[]) => void;
+  overlays: TextOverlay[];
+  onOverlaysChange: (overlays: TextOverlay[]) => void;
+  aspect: ExportSettings['aspect'];
+  framing: ExportSettings['framing'];
+  /** Library clips dropped on the timeline. */
+  onDropClips: (clips: DraggedClip[], index: number) => void;
+  /** Video files dropped on the timeline. */
+  onDropFiles: (files: File[], index: number) => void;
+  onDownloadClip: (clip: EpisodeClip) => void;
   selectedIds: Set<string>;
   onSelectedIdsChange: (ids: Set<string>) => void;
   undo: () => void;
@@ -102,6 +142,13 @@ function ToolButton({
 export function EpisodeEditor({
   clips,
   onChange,
+  overlays,
+  onOverlaysChange,
+  aspect,
+  framing,
+  onDropClips,
+  onDropFiles,
+  onDownloadClip,
   selectedIds,
   onSelectedIdsChange,
   undo,
@@ -117,7 +164,21 @@ export function EpisodeEditor({
   const [playing, setPlaying] = useState(false);
   const [pxPerSec, setPxPerSec] = useState(30);
   const [snapping, setSnapping] = useState(true);
+  const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [hintDismissed, setHintDismissed] = useState(readHintDismissed);
+  /** Spoken by screen readers after each edit (there's no other feedback for them). */
+  const [announcement, setAnnouncement] = useState('');
   const editorRef = useRef<HTMLDivElement>(null);
+
+  const dismissHint = () => {
+    setHintDismissed(true);
+    try {
+      localStorage.setItem(HINT_KEY, '1');
+    } catch {
+      // storage unavailable — the hint just returns next visit
+    }
+  };
 
   // Keep the playhead on the timeline when edits shorten it.
   useEffect(() => {
@@ -159,21 +220,100 @@ export function EpisodeEditor({
     [canEdit, clips, durations, playhead]
   );
 
-  const split = () => {
-    if (splitResult) onChange(splitResult.clips);
+  const say = (message: string) => setAnnouncement(message);
+
+  const split = (at = playhead) => {
+    if (!canEdit) return;
+    const result = splitClipAt(clips, durations, at);
+    if (!result) return;
+    onChange(result.clips);
+    say(`Split clip at ${formatTimecode(at, FPS)}`);
   };
-  const deleteSelected = () => {
-    if (!selectedIds.size) return;
-    onChange(removeClips(clips, selectedIds));
+  const deleteIds = (ids: Set<string>) => {
+    if (!ids.size) return;
+    onChange(removeClips(clips, ids));
     onSelectedIdsChange(new Set());
+    say(ids.size === 1 ? 'Clip deleted' : `${ids.size} clips deleted`);
+  };
+  const deleteSelected = () => deleteIds(selectedIds);
+  const duplicateSelected = () => {
+    if (!selectedIds.size) return;
+    let next = clips;
+    for (const c of clips) if (selectedIds.has(c.nodeId)) next = duplicateClip(next, c.nodeId);
+    if (next !== clips) {
+      onChange(next);
+      say(selectedIds.size === 1 ? 'Clip duplicated' : `${selectedIds.size} clips duplicated`);
+    }
   };
   const trimTo = (edge: 'start' | 'end') => {
     if (!canEdit) return;
     const next = trimEdgeToTime(clips, durations, playhead, edge);
-    if (next) onChange(next);
+    if (next) {
+      onChange(next);
+      say(edge === 'start' ? 'Trimmed clip start' : 'Trimmed clip end');
+    }
   };
   const seekBy = (delta: number) =>
     onPlayhead(Math.min(Math.max(0, playhead + delta), total), { scrub: true });
+
+  const addCaption = (at = playhead) => {
+    if (total <= 0) return;
+    const overlay = newOverlay(at, total);
+    onOverlaysChange([...overlays, overlay]);
+    setSelectedOverlayId(overlay.id);
+    onSelectedIdsChange(new Set());
+    say('Caption added');
+  };
+  const deleteCaption = (id: string) => {
+    onOverlaysChange(overlays.filter((o) => o.id !== id));
+    setSelectedOverlayId(null);
+    say('Caption deleted');
+  };
+
+  const onClipAction = (action: ClipAction, nodeId: string, at: number) => {
+    const index = clips.findIndex((c) => c.nodeId === nodeId);
+    if (index === -1) return;
+    switch (action) {
+      case 'split':
+        split(at);
+        break;
+      case 'trim-in':
+        trimTo('start');
+        break;
+      case 'trim-out':
+        trimTo('end');
+        break;
+      case 'duplicate':
+        onChange(duplicateClip(clips, nodeId));
+        say('Clip duplicated');
+        break;
+      case 'delete':
+        deleteIds(new Set(selectedIds.has(nodeId) ? selectedIds : [nodeId]));
+        break;
+      case 'download':
+        onDownloadClip(clips[index]);
+        break;
+      case 'move-earlier':
+      case 'move-later': {
+        const to = index + (action === 'move-earlier' ? -1 : 1);
+        if (to < 0 || to >= clips.length) break;
+        onChange(moveClip(clips, index, to));
+        say(`Moved clip to position ${to + 1} of ${clips.length}`);
+        break;
+      }
+    }
+  };
+
+  const patchSelected = (patch: Partial<Pick<EpisodeClip, 'volume' | 'fadeIn' | 'fadeOut'>>) => {
+    let next = clips;
+    for (const id of selectedIds) next = patchClip(next, id, patch);
+    if (next !== clips) onChange(next);
+  };
+  const selectedClips = clips.filter((c) => selectedIds.has(c.nodeId));
+  const selectedMinLength = Math.min(
+    ...placed.filter((p) => selectedIds.has(p.clip.nodeId)).map((p) => p.length),
+    Infinity
+  );
 
   // ── Keyboard ───────────────────────────────────────────────────────────
   // The handler reads current values through a ref so the window listener is
@@ -198,6 +338,9 @@ export function EpisodeEditor({
       } else if (key === '-') {
         e.preventDefault();
         setZoom(pxPerSec / 1.25);
+      } else if (key === 'd') {
+        e.preventDefault();
+        duplicateSelected();
       }
       return;
     }
@@ -212,6 +355,14 @@ export function EpisodeEditor({
         e.preventDefault();
         split();
         break;
+      case 'c':
+        e.preventDefault();
+        addCaption();
+        break;
+      case '?':
+        e.preventDefault();
+        setHelpOpen(true);
+        break;
       case 'q':
         e.preventDefault();
         trimTo('start');
@@ -225,6 +376,9 @@ export function EpisodeEditor({
         if (selectedIds.size) {
           e.preventDefault();
           deleteSelected();
+        } else if (selectedOverlayId) {
+          e.preventDefault();
+          deleteCaption(selectedOverlayId);
         }
         break;
       case 'arrowleft':
@@ -261,6 +415,25 @@ export function EpisodeEditor({
   return (
     <div ref={editorRef}>
       <Card className="mb-4 gap-3 p-3">
+        {!hintDismissed && (
+          <div className="flex items-start justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+            <p>
+              <strong>New to the editor?</strong> Click the ruler to scrub, press <kbd>S</kbd> to
+              split, drag a clip’s edge to trim, right-click a clip for more, and press <kbd>?</kbd>{' '}
+              for every shortcut. Your work saves automatically.
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 shrink-0 px-2 text-xs"
+              onClick={dismissHint}
+            >
+              Got it
+            </Button>
+          </div>
+        )}
+
         {/* Program monitor */}
         <div className="mx-auto w-full max-w-2xl">
           <div className="relative">
@@ -268,6 +441,9 @@ export function EpisodeEditor({
               placed={placed}
               playhead={playhead}
               playing={playing}
+              overlays={overlays}
+              aspect={aspect}
+              framing={framing}
               onTick={setPlayhead}
               onEnded={() => {
                 setPlaying(false);
@@ -344,7 +520,7 @@ export function EpisodeEditor({
             className="h-8 gap-1.5"
             title="Split the clip at the playhead (S)"
             disabled={!splitResult}
-            onClick={split}
+            onClick={() => split()}
           >
             <Scissors className="h-3.5 w-3.5" />
             Split
@@ -372,6 +548,20 @@ export function EpisodeEditor({
             Trim out
           </Button>
           <ToolButton
+            title="Duplicate selected clips (⌘D)"
+            onClick={duplicateSelected}
+            disabled={!selectedIds.size}
+          >
+            <Copy />
+          </ToolButton>
+          <ToolButton
+            title="Add a caption at the playhead (C)"
+            onClick={() => addCaption()}
+            disabled={total <= 0}
+          >
+            <Type />
+          </ToolButton>
+          <ToolButton
             title="Delete selected clips — ripple (Delete)"
             onClick={deleteSelected}
             disabled={!selectedIds.size}
@@ -381,6 +571,9 @@ export function EpisodeEditor({
 
           <div className="flex-1" />
 
+          <ToolButton title="Keyboard shortcuts (?)" onClick={() => setHelpOpen(true)}>
+            <Keyboard />
+          </ToolButton>
           <ToolButton
             title="Snap to clip edges and the playhead"
             onClick={() => setSnapping((s) => !s)}
@@ -412,14 +605,48 @@ export function EpisodeEditor({
           onPlayhead={onPlayhead}
           onCommit={onChange}
           onPxPerSecChange={setZoom}
+          overlays={overlays}
+          selectedOverlayId={selectedOverlayId}
+          onSelectOverlay={setSelectedOverlayId}
+          onOverlaysCommit={onOverlaysChange}
+          onOverlayAdd={addCaption}
+          onDropClips={onDropClips}
+          onDropFiles={onDropFiles}
+          onClipAction={onClipAction}
         />
 
-        <p className={cn('text-[11px] text-muted-foreground')}>
+        {selectedClips.length > 0 && (
+          <ClipInspector
+            clips={selectedClips}
+            minLength={Number.isFinite(selectedMinLength) ? selectedMinLength : 1}
+            onPatch={patchSelected}
+          />
+        )}
+        <CaptionPanel
+          overlays={overlays}
+          selectedId={selectedOverlayId}
+          total={total}
+          onSelect={setSelectedOverlayId}
+          onAdd={() => addCaption()}
+          onPatch={(id, patch) => onOverlaysChange(patchOverlay(overlays, id, patch))}
+          onDelete={deleteCaption}
+        />
+
+        <p className="text-[11px] text-muted-foreground md:hidden">
+          Tip: tap a clip to select it, then use the toolbar above. Dragging clip edges works by
+          touch; a larger screen is easier for detailed cuts.
+        </p>
+        <p className={cn('hidden text-[11px] text-muted-foreground md:block')}>
           Click the ruler to scrub · <kbd>S</kbd> split · <kbd>Q</kbd>/<kbd>W</kbd> trim to playhead
           · drag a clip's edge to ripple-trim, its body to reorder · <kbd>⌘</kbd>/<kbd>Ctrl</kbd>
-          +scroll to zoom. Preview plays each clip's own audio; a linked audio track is mixed at
-          export.
+          +scroll to zoom · <kbd>?</kbd> all shortcuts. Preview plays each clip's own audio, volume
+          and fades exactly as exported.
         </p>
+
+        <div className="sr-only" role="status" aria-live="polite">
+          {announcement}
+        </div>
+        <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} />
       </Card>
     </div>
   );
