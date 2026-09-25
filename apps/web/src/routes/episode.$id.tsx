@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useWatchSession } from '@/hooks/useWatchSession';
 import { isSaved, offlineSupported, removeEpisode, saveEpisode } from '@/lib/offline-cache';
+import { isTrimmed, pastTrimEnd, resolveClipTrim, seekTarget, type ClipTrim } from '@/lib/clipTrim';
 import { toast } from 'sonner';
 
 export const Route = createFileRoute('/episode/$id')({
@@ -83,6 +84,34 @@ function EpisodePlayer() {
   const [activeIndex, setActiveIndex] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // The timeline editor keeps each scene's trim on its event (public read). Episodes built
+  // from timeline nodes used to store trimStart/trimEnd = 0, so a scene trimmed in the editor
+  // still played its whole file here. Fall back to the scene's own trim for any clip that
+  // has none of its own. Best-effort: if the events can't be loaded, clips just play as saved.
+  const { data: sceneEvents, isLoading: sceneEventsLoading } = useQuery({
+    queryKey: ['universeEvents', universeId],
+    queryFn: async () =>
+      (await trpcClient.universeEvents.get.query({ universeId: universeId! })).events as Record<
+        string,
+        { trimStart?: number; trimEnd?: number } | undefined
+      >,
+    enabled: !!universeId,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const clipTrims: ClipTrim[] = useMemo(
+    () => clips.map((c) => resolveClipTrim(c, c.nodeId ? sceneEvents?.[c.nodeId] : undefined)),
+    [clips, sceneEvents]
+  );
+  // A merged export rendered before those scene trims existed still contains the full clips.
+  const mergedIsStale = useMemo(
+    () => clips.some((c, i) => isTrimmed(clipTrims[i]) && !isTrimmed(resolveClipTrim(c, null))),
+    [clips, clipTrims]
+  );
+  const activeTrim = clipTrims[activeIndex] ?? { start: 0, end: 0 };
+  // Set once a clip has handed over, so the many `timeupdate`s past its out-point advance once.
+  const trimAdvanced = useRef(false);
+
   // When a merged export exists, that's the "cohesive episode" viewers
   // should see by default — a single continuous file instead of N separate
   // <video> elements auto-advancing into each other. Viewers can still jump
@@ -90,8 +119,8 @@ function EpisodePlayer() {
   const hasExport = !!episode?.exportUrl;
   const [viewMode, setViewMode] = useState<'merged' | 'clips'>('clips');
   useEffect(() => {
-    setViewMode(episode?.exportUrl ? 'merged' : 'clips');
-  }, [episode?.id, episode?.exportUrl]);
+    setViewMode(episode?.exportUrl && !mergedIsStale ? 'merged' : 'clips');
+  }, [episode?.id, episode?.exportUrl, mergedIsStale]);
 
   // Silent watch-session collector — accumulates data for Continue Watching
   // and For You rows. No UI surfaces here.
@@ -110,6 +139,7 @@ function EpisodePlayer() {
   // autoplay on a fresh <video> in some configurations, so we explicitly call
   // play() and swallow the rejection (e.g. iOS without user gesture).
   useEffect(() => {
+    trimAdvanced.current = false;
     if (viewMode !== 'clips') return;
     const v = videoRef.current;
     if (!v) return;
@@ -165,7 +195,27 @@ function EpisodePlayer() {
     }
   };
 
-  if (isLoading) {
+  // Play only the trimmed range: start at the in-point, and hand over (or stop) at the out-point.
+  const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const jump = seekTarget(e.currentTarget.currentTime, activeTrim);
+    if (jump !== null) e.currentTarget.currentTime = jump;
+  };
+  const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const v = e.currentTarget;
+    if (pastTrimEnd(v.currentTime, activeTrim)) {
+      if (trimAdvanced.current) return;
+      trimAdvanced.current = true;
+      if (activeIndex < clips.length - 1) setActiveIndex((i) => i + 1);
+      else v.pause();
+      return;
+    }
+    // A viewer dragging the scrub bar to before the in-point lands on the in-point instead.
+    const jump = seekTarget(v.currentTime, activeTrim);
+    if (jump !== null) v.currentTime = jump;
+  };
+
+  // Wait for the scene trims too, so playback never starts on the full file and then jumps.
+  if (isLoading || sceneEventsLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -240,6 +290,8 @@ function EpisodePlayer() {
                   controls
                   playsInline
                   onEnded={handleClipEnded}
+                  onLoadedMetadata={handleLoadedMetadata}
+                  onTimeUpdate={handleTimeUpdate}
                 />
               )}
             </div>

@@ -33,6 +33,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import type { Node } from 'reactflow';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { pastTrimEnd, sceneTrimToSeconds, seekTarget } from '@/lib/clipTrim';
 
 export interface EpisodeClip {
   nodeId: string;
@@ -65,8 +66,9 @@ export function EpisodeBuilder({ universeId, nodes, initialNodeIds, onClose }: E
           label: node.data.label || node.data.description || `Node ${id}`,
           videoUrl: node.data.videoUrl,
           audioUrl: undefined,
-          trimStart: 0,
-          trimEnd: 0,
+          // The scene's trim from the timeline editor (ms) → episode clip seconds.
+          trimStart: sceneTrimToSeconds(node.data).start,
+          trimEnd: sceneTrimToSeconds(node.data).end,
         };
       })
       .filter(Boolean) as EpisodeClip[];
@@ -165,8 +167,8 @@ export function EpisodeBuilder({ universeId, nodes, initialNodeIds, onClose }: E
         nodeId: node.data.eventId || node.id,
         label: node.data.label || node.data.description || `Node ${node.id}`,
         videoUrl: node.data.videoUrl!,
-        trimStart: 0,
-        trimEnd: 0,
+        trimStart: sceneTrimToSeconds(node.data).start,
+        trimEnd: sceneTrimToSeconds(node.data).end,
       },
     ]);
     setShowNodePicker(false);
@@ -222,6 +224,14 @@ export function EpisodeBuilder({ universeId, nodes, initialNodeIds, onClose }: E
       if (isPlaying) videoRef.current.play();
     }
   }, [previewIndex, isPlaying]);
+
+  // Preview only the trimmed range of the clip being previewed.
+  const previewClip = previewIndex !== null ? clips[previewIndex] : undefined;
+  const previewTrim = { start: previewClip?.trimStart ?? 0, end: previewClip?.trimEnd ?? 0 };
+  const advancedRef = useRef(false);
+  useEffect(() => {
+    advancedRef.current = false;
+  }, [previewIndex]);
 
   // Auto-advance preview
   const handleVideoEnded = useCallback(() => {
@@ -417,6 +427,19 @@ export function EpisodeBuilder({ universeId, nodes, initialNodeIds, onClose }: E
                   src={resolveIpfsUrlPreferred(clips[previewIndex].videoUrl)}
                   className="w-full aspect-video"
                   onEnded={handleVideoEnded}
+                  onLoadedMetadata={(e) => {
+                    const jump = seekTarget(e.currentTarget.currentTime, previewTrim);
+                    if (jump !== null) e.currentTarget.currentTime = jump;
+                  }}
+                  onTimeUpdate={(e) => {
+                    const v = e.currentTarget;
+                    if (pastTrimEnd(v.currentTime, previewTrim)) {
+                      if (advancedRef.current) return;
+                      advancedRef.current = true;
+                      v.pause();
+                      handleVideoEnded();
+                    }
+                  }}
                   playsInline
                 />
               ) : (
