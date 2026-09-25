@@ -110,3 +110,22 @@ export async function extractFramePng(
   if (!stdout.length) throw new Error(`no frame decoded at ${atSec}s`);
   return stdout;
 }
+
+/** Does the media file carry at least one audio stream? Local paths and https URLs. */
+export async function probeHasAudio(input: string, timeoutMs = 30_000): Promise<boolean> {
+  const { remote } = assertProbeInput(input);
+  const args = [
+    '-v',
+    'error',
+    ...(remote ? ['-protocol_whitelist', REMOTE_PROTOCOLS] : []),
+    '-select_streams',
+    'a:0',
+    '-show_entries',
+    'stream=codec_type',
+    '-of',
+    'csv=p=0',
+    input,
+  ];
+  const { stdout } = await execFileAsync('ffprobe', args, { timeout: timeoutMs });
+  return stdout.trim().length > 0;
+}

@@ -30,6 +30,7 @@ import { isUniverseCollaborator, isUniverseAdmin, getChainClient } from '../../l
 import { validateAgainstLaws } from '../physics/physics.handlers';
 import { runEpisodeCanonCheck, shouldBlockCanonPublish } from '../../services/canon-check';
 import { decodeEventLog, getAddress, keccak256, toBytes } from 'viem';
+import type { ExportSettings, Soundtrack, TextOverlay } from '../../services/ffmpeg/episode-render';
 
 /**
  * Minimal ABI for the EpisodeCanonized event so we can decode receipts
@@ -123,9 +124,51 @@ const clipSchema = z.object({
   trimStart: z.number().min(0).default(0),
   /** Trim end (seconds, 0 = full clip) */
   trimEnd: z.number().min(0).default(0),
+  /** Clip audio level, 0–2 (1 = unchanged) */
+  volume: z.number().min(0).max(2).optional(),
+  /** Fade in from black / silence (seconds) */
+  fadeIn: z.number().min(0).max(10).optional(),
+  /** Fade out to black / silence (seconds) */
+  fadeOut: z.number().min(0).max(10).optional(),
 });
 
 export type EpisodeClip = z.infer<typeof clipSchema>;
+
+/** A caption / title card burned into the export, in timeline seconds. */
+const overlaySchema = z
+  .object({
+    id: z.string().min(1).max(64),
+    text: z.string().min(1).max(300),
+    start: z.number().min(0),
+    end: z.number().min(0),
+    position: z.enum(['top', 'center', 'bottom']).default('bottom'),
+    size: z.enum(['sm', 'md', 'lg']).default('md'),
+  })
+  .refine((o) => o.end > o.start, { message: 'Overlay must end after it starts' });
+
+/** A music / voice-over bed mixed under the whole episode at export. */
+const soundtrackSchema = z.object({
+  url: z.string().url(),
+  label: z.string().max(200).optional(),
+  volume: z.number().min(0).max(1).default(0.5),
+});
+
+const exportSettingsSchema = z.object({
+  aspect: z.enum(['16:9', '9:16', '1:1']).default('16:9'),
+  resolution: z.enum(['720p', '1080p']).default('720p'),
+  framing: z.enum(['fit', 'fill']).default('fit'),
+});
+
+const MAX_OVERLAYS = 50;
+
+// ── Version history ─────────────────────────────────────────────────────
+
+/** Restore points kept per episode. */
+const VERSIONS_KEEP = 30;
+/** Autosaves only add a restore point this often; manual saves always do. */
+const AUTO_VERSION_MIN_MS = 10 * 60 * 1000;
+
+const versionsCol = (episodeId: string) => episodesCol().doc(episodeId).collection('versions');
 
 // ── Credit cost ─────────────────────────────────────────────────────────
 
@@ -152,17 +195,87 @@ async function refundCredits(_uid: string, _credits: number): Promise<void> {
   // Credits/points retired — nothing to refund.
 }
 
+// ── Version history helpers ─────────────────────────────────────────────
+
+/** JSON with sorted keys, so equal content compares equal regardless of key order. */
+function stableJson(value: unknown): string {
+  return JSON.stringify(value ?? null, (_k, v) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : 1)))
+      : v
+  );
+}
+
+async function assertEpisodeCreator(episodeId: string, uid: string): Promise<void> {
+  const doc = await episodesCol().doc(episodeId).get();
+  if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND' });
+  if (doc.data()?.creatorId !== uid) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Not the episode creator' });
+  }
+}
+
+async function recordVersion(
+  episodeId: string,
+  state: Record<string, any>,
+  kind: 'manual' | 'auto'
+): Promise<void> {
+  const content = {
+    title: state.title ?? '',
+    description: state.description ?? '',
+    clips: state.clips ?? [],
+    overlays: state.overlays ?? [],
+    soundtrack: state.soundtrack ?? null,
+  };
+  const hash = stableJson(content);
+
+  const latest = await versionsCol(episodeId).orderBy('createdAt', 'desc').limit(1).get();
+  const last = latest.docs[0]?.data();
+  if (last?.hash === hash) return;
+  if (kind === 'auto' && last && Date.now() - Date.parse(last.createdAt) < AUTO_VERSION_MIN_MS) {
+    return;
+  }
+
+  await versionsCol(episodeId)
+    .doc(randomUUID())
+    .set({
+      ...content,
+      clipCount: content.clips.length,
+      kind,
+      hash,
+      createdAt: new Date().toISOString(),
+    });
+
+  // Keep the newest VERSIONS_KEEP; drop the rest.
+  const stale = await versionsCol(episodeId)
+    .orderBy('createdAt', 'desc')
+    .offset(VERSIONS_KEEP)
+    .get();
+  await Promise.all(stale.docs.map((d) => d.ref.delete()));
+}
+
 // ── Background export ───────────────────────────────────────────────────
 
-async function runExport(jobId: string, clips: EpisodeClip[], episodeId: string, userId: string) {
+async function runExport(
+  jobId: string,
+  clips: EpisodeClip[],
+  episodeId: string,
+  userId: string,
+  render: {
+    settings?: Partial<ExportSettings>;
+    overlays?: TextOverlay[];
+    soundtrack?: Soundtrack | null;
+  } = {}
+) {
   const jobRef = exportJobsCol().doc(jobId);
 
   try {
     const { tmpdir } = await import('os');
     const { join } = await import('path');
     const { readFile, unlink, mkdir } = await import('fs/promises');
-    const { downloadAndNormalizeClip, concatNormalizedClips } =
+    const { downloadAndNormalizeClip, concatNormalizedClips, finalizeEpisode } =
       await import('../../services/ffmpeg/clip-pipeline');
+    const { exportTarget } = await import('../../services/ffmpeg/episode-render');
+    const target = exportTarget(render.settings);
 
     const workDir = join(tmpdir(), `episode-${jobId}`);
     await mkdir(workDir, { recursive: true });
@@ -173,7 +286,7 @@ async function runExport(jobId: string, clips: EpisodeClip[], episodeId: string,
     // with a fast stream-copy below.
     const localPaths: string[] = [];
     for (let i = 0; i < clips.length; i++) {
-      const processedPath = await downloadAndNormalizeClip(clips[i], workDir, i);
+      const processedPath = await downloadAndNormalizeClip(clips[i], workDir, i, target);
       localPaths.push(processedPath);
 
       const pct = Math.round(10 + (i / clips.length) * 60);
@@ -186,10 +299,25 @@ async function runExport(jobId: string, clips: EpisodeClip[], episodeId: string,
     const outputPath = join(workDir, `episode-${jobId}.mp4`);
     await concatNormalizedClips(localPaths, outputPath);
 
+    // 2b. Burn in captions and mix the soundtrack (skipped when there are none).
+    let finalPath = outputPath;
+    let warnings: string[] = [];
+    if (render.overlays?.length || render.soundtrack) {
+      await jobRef.update({ status: 'finishing', progress: 82 });
+      const finalized = await finalizeEpisode(
+        outputPath,
+        join(workDir, `episode-${jobId}-final.mp4`),
+        workDir,
+        { overlays: render.overlays, soundtrack: render.soundtrack, target }
+      );
+      finalPath = finalized.path;
+      warnings = finalized.warnings;
+    }
+
     await jobRef.update({ status: 'uploading', progress: 90 });
 
     // 3. Upload to Firebase Storage
-    const outputBuffer = await readFile(outputPath);
+    const outputBuffer = await readFile(finalPath);
     const storageKey = await firebaseStorageService.upload(
       outputBuffer,
       `episode-${episodeId}-${Date.now()}.mp4`
@@ -208,12 +336,14 @@ async function runExport(jobId: string, clips: EpisodeClip[], episodeId: string,
       progress: 100,
       outputUrl: publicUrl,
       storageKey,
+      warnings,
       completedAt: new Date().toISOString(),
     });
 
     // Cleanup temp files
     for (const p of localPaths) unlink(p).catch(() => {});
     unlink(outputPath).catch(() => {});
+    if (finalPath !== outputPath) unlink(finalPath).catch(() => {});
   } catch (err: any) {
     console.error(`[episode-export] Job ${jobId} failed:`, err);
     await jobRef.update({
@@ -784,7 +914,13 @@ export const episodesRouter = router({
       return { id: episodeId };
     }),
 
-  /** Update clip order, add/remove clips, or change metadata */
+  /**
+   * Update clip order, add/remove clips, or change metadata.
+   *
+   * `versionKind` records a restore point of the resulting state: `manual`
+   * (an explicit Save / export) always does, `auto` (background autosave) at
+   * most every 10 minutes. Identical consecutive states are never duplicated.
+   */
   update: protectedProcedure
     .input(
       z.object({
@@ -792,12 +928,17 @@ export const episodesRouter = router({
         title: z.string().min(1).max(200).optional(),
         description: z.string().max(2000).optional(),
         clips: z.array(clipSchema).min(1).max(200).optional(),
+        overlays: z.array(overlaySchema).max(MAX_OVERLAYS).optional(),
+        soundtrack: soundtrackSchema.nullable().optional(),
+        exportSettings: exportSettingsSchema.optional(),
+        versionKind: z.enum(['manual', 'auto']).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const doc = await episodesCol().doc(input.episodeId).get();
       if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND' });
-      if (doc.data()?.creatorId !== ctx.user.uid) {
+      const before = doc.data()!;
+      if (before.creatorId !== ctx.user.uid) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not the episode creator' });
       }
 
@@ -807,12 +948,72 @@ export const episodesRouter = router({
       if (input.clips) {
         updates.clips = input.clips;
         updates.clipCount = input.clips.length;
-        // Clear export since clip list changed
+      }
+      if (input.overlays) updates.overlays = input.overlays;
+      if (input.soundtrack !== undefined) updates.soundtrack = input.soundtrack;
+      if (input.exportSettings) updates.exportSettings = input.exportSettings;
+
+      // The export is only stale when something it renders actually changed —
+      // autosaving an identical cut must not throw away a finished export.
+      const changed = (key: 'clips' | 'overlays' | 'soundtrack' | 'exportSettings') =>
+        key in updates && stableJson(updates[key]) !== stableJson(before[key] ?? null);
+      if (
+        changed('clips') ||
+        changed('overlays') ||
+        changed('soundtrack') ||
+        changed('exportSettings')
+      ) {
         updates.exportUrl = null;
       }
 
       await episodesCol().doc(input.episodeId).update(updates);
+
+      if (input.versionKind) {
+        await recordVersion(input.episodeId, { ...before, ...updates }, input.versionKind).catch(
+          (err) => console.error('[episodes.update] version snapshot failed:', err)
+        );
+      }
       return { ok: true };
+    }),
+
+  /** Restore points for an episode, newest first. Creator-only, like `update`. */
+  listVersions: protectedProcedure
+    .input(z.object({ episodeId: z.string().min(1) }))
+    .query(async ({ input, ctx }) => {
+      await assertEpisodeCreator(input.episodeId, ctx.user.uid);
+      const snap = await versionsCol(input.episodeId)
+        .orderBy('createdAt', 'desc')
+        .limit(VERSIONS_KEEP)
+        .get();
+      return snap.docs.map((d) => {
+        const v = d.data();
+        return {
+          id: d.id,
+          createdAt: v.createdAt as string,
+          kind: v.kind as 'manual' | 'auto',
+          title: (v.title as string) ?? '',
+          clipCount: (v.clipCount as number) ?? 0,
+        };
+      });
+    }),
+
+  /** One restore point's full content; the client applies it (undoably) and saves. */
+  getVersion: protectedProcedure
+    .input(z.object({ episodeId: z.string().min(1), versionId: z.string().min(1) }))
+    .query(async ({ input, ctx }) => {
+      await assertEpisodeCreator(input.episodeId, ctx.user.uid);
+      const doc = await versionsCol(input.episodeId).doc(input.versionId).get();
+      if (!doc.exists) throw new TRPCError({ code: 'NOT_FOUND' });
+      const v = doc.data()!;
+      return {
+        id: doc.id,
+        createdAt: v.createdAt as string,
+        title: (v.title as string) ?? '',
+        description: (v.description as string) ?? '',
+        clips: (v.clips ?? []) as EpisodeClip[],
+        overlays: (v.overlays ?? []) as Array<z.infer<typeof overlaySchema>>,
+        soundtrack: (v.soundtrack ?? null) as z.infer<typeof soundtrackSchema> | null,
+      };
     }),
 
   /**
@@ -1680,7 +1881,11 @@ export const episodesRouter = router({
       });
 
       // Fire and forget
-      runExport(jobId, clips, input.episodeId, ctx.user.uid).catch((err) => {
+      runExport(jobId, clips, input.episodeId, ctx.user.uid, {
+        settings: episode.exportSettings,
+        overlays: episode.overlays,
+        soundtrack: episode.soundtrack,
+      }).catch((err) => {
         console.error(`[episode-export] Uncaught error in job ${jobId}:`, err);
       });
 
@@ -1704,6 +1909,7 @@ export const episodesRouter = router({
         progress: data.progress as number,
         outputUrl: data.outputUrl as string | undefined,
         error: data.error as string | undefined,
+        warnings: (data.warnings ?? []) as string[],
       };
     }),
 

@@ -50,10 +50,11 @@ RUN pnpm exec esbuild \
 # Production stage
 FROM node:20.18.1-alpine AS production
 
-# curl: healthcheck. ffmpeg: video thumbnail/frame extraction
+# curl: healthcheck. font-dejavu: caption font for episode export text overlays.
+# ffmpeg: video thumbnail/frame extraction
 # (services/video-thumbnail.ts) — without it every video publishes with no
 # poster, so gallery tiles can't render a cover and fall back to a placeholder.
-RUN apk add --no-cache curl ffmpeg
+RUN apk add --no-cache curl ffmpeg font-dejavu
 WORKDIR /app
 
 # Copy workspace root + every workspace member's package.json so pnpm's
