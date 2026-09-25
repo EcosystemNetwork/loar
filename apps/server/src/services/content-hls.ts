@@ -16,7 +16,7 @@
  * Used by:
  *   - lib/gallery-publish.ts (post-publish, fire-and-forget)
  *   - routers/content/content.routes.ts:create (post-create, fire-and-forget)
- *   - scripts/backfill-hls.ts (TODO: existing-content backfill)
+ *   - scripts/backfill-hls.ts (existing-content backfill; selection rule: `needsHls`)
  */
 
 import { db } from '../lib/firebase';
@@ -37,6 +37,32 @@ export interface EnsureContentHlsResult {
   vttThumbnailsUrl: string | null;
   renditionCount: number;
   source: 'transcoded' | 'skipped' | 'failed';
+}
+
+/** Loose shape of a `content` doc, as far as the HLS backfill cares. */
+export interface ContentDocForHls {
+  mediaUrl?: unknown;
+  mediaType?: unknown;
+  hlsUrl?: unknown;
+  aspectRatio?: unknown;
+}
+
+/**
+ * Should this existing content item get an HLS transcode? True for video that
+ * has an https source and no `hlsUrl` yet. Already-HLS sources (a `.m3u8`
+ * mediaUrl) and non-https URLs are left alone: ffmpeg is only ever pointed at
+ * https (see video-transcode.ts), so those would just fail.
+ */
+export function needsHls(c: ContentDocForHls): boolean {
+  if (c.mediaType !== 'video' && c.mediaType !== 'ai-video') return false;
+  if (typeof c.mediaUrl !== 'string' || !c.mediaUrl.startsWith('https://')) return false;
+  if (/\.m3u8(\?|$)/i.test(c.mediaUrl)) return false;
+  return !(typeof c.hlsUrl === 'string' && c.hlsUrl.length > 0);
+}
+
+/** Vertical clips skip the 1080p rendition (mirrors the publish-time `shortForm` flag). */
+export function isShortForm(c: ContentDocForHls): boolean {
+  return c.aspectRatio === '9:16';
 }
 
 const ENABLED = (process.env.HLS_TRANSCODE_ENABLED ?? 'true').toLowerCase() !== 'false';

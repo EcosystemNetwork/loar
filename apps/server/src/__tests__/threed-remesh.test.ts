@@ -36,6 +36,9 @@ vi.mock('../lib/rehost-ephemeral', async (orig) => ({
   }),
 }));
 
+// Unique per test: the emulator keeps data between runs, so a shared task id would let an
+// earlier run's gallery item satisfy (or break) a later test's assertions.
+let taskId = '';
 let seen: Array<{ method: string; url: string; body?: any }> = [];
 let taskScript: Array<Record<string, unknown>> = [];
 let server: Server;
@@ -48,10 +51,10 @@ beforeAll(async () => {
       seen.push({ method: req.method!, url: req.url!, body: raw ? JSON.parse(raw) : undefined });
       res.setHeader('content-type', 'application/json');
       if (req.method === 'POST' && req.url === '/openapi/v1/remesh') {
-        res.end(JSON.stringify({ result: 'task-remesh-1' }));
-      } else if (req.method === 'GET' && req.url === '/openapi/v1/remesh/task-remesh-1') {
+        res.end(JSON.stringify({ result: taskId }));
+      } else if (req.method === 'GET' && req.url === `/openapi/v1/remesh/${taskId}`) {
         const next = taskScript.length > 1 ? taskScript.shift()! : taskScript[0];
-        res.end(JSON.stringify({ id: 'task-remesh-1', progress: 100, ...next }));
+        res.end(JSON.stringify({ id: taskId, progress: 100, ...next }));
       } else {
         res.statusCode = 404;
         res.end('{}');
@@ -70,6 +73,7 @@ afterAll(async () => {
   await shutdownRedis?.();
 });
 beforeEach(() => {
+  taskId = `task-${randomUUID().slice(0, 8)}`;
   seen = [];
   taskScript = [
     {
@@ -130,7 +134,7 @@ describe('threed.remesh (live route)', () => {
       targetPolycount: 12_000,
       targetFormats: ['glb', 'obj'],
     });
-    expect(out).toMatchObject({ providerTaskId: 'task-remesh-1' });
+    expect(out).toMatchObject({ providerTaskId: taskId });
 
     // Meshy got exactly the documented request, with the source model URL.
     const post = seen.find((s) => s.method === 'POST')!;
@@ -148,7 +152,7 @@ describe('threed.remesh (live route)', () => {
     });
     expect(gen).toMatchObject({
       type: 'meshy_remesh',
-      meshyTaskId: 'task-remesh-1',
+      meshyTaskId: taskId,
       topology: 'quad',
       targetPolycount: 12_000,
       thumbnailUrl: 'https://permanent.example/thumb.png',
@@ -164,7 +168,7 @@ describe('threed.remesh (live route)', () => {
     const published = await waitFor(async () => {
       const snap = await db!
         .collection('content')
-        .where('generationId', '==', 'remesh:meshy:task-remesh-1')
+        .where('generationId', '==', `remesh:meshy:${taskId}`)
         .get();
       return snap.empty ? undefined : snap.docs[0].data();
     });
@@ -200,7 +204,7 @@ describe('threed.remesh (live route)', () => {
     expect(gen.creditsRefunded).toBe(true);
     const pub = await db!
       .collection('content')
-      .where('generationId', '==', 'remesh:meshy:task-remesh-1')
+      .where('generationId', '==', `remesh:meshy:${taskId}`)
       .get();
     expect(pub.empty).toBe(true);
   });
