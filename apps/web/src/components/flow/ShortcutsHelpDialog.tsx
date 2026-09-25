@@ -18,7 +18,7 @@ const SHORTCUTS = [
   ['V', 'Select tool (drag-select)'],
   // Navigation & View
   ['Ctrl+K', 'Search & filter nodes'],
-  ['F', 'Fit to view'],
+  ['F / 0', 'Fit to view (fits selection if any)'],
   ['1', 'Zoom to 100%'],
   ['+/-', 'Zoom in/out'],
   ['M', 'Toggle minimap'],

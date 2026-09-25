@@ -88,6 +88,12 @@ import ReactFlow, {
   type Connection,
   type OnSelectionChangeParams,
 } from 'reactflow';
+/** Live zoom % — subscribes to the viewport itself so panning/zooming only re-renders this label. */
+function ZoomPercent() {
+  const zoom = useStore((st) => st.transform[2]);
+  return <>{Math.round(zoom * 100)}%</>;
+}
+
 type MiniMapNodeProps = {
   id: string;
   x: number;
@@ -550,7 +556,28 @@ function UniverseTimelineEditorInner() {
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const { fitView, zoomIn, zoomOut, setCenter, getZoom } = useReactFlow();
+  const { fitView, zoomIn, zoomOut, setCenter, getZoom, getNodes, getViewport } = useReactFlow();
+
+  // Fit the selection when there is one (so you can zoom into a few nodes),
+  // otherwise the whole graph. Capped at 100% so a sparse graph doesn't blow up.
+  const fitSelectionOrAll = useCallback(() => {
+    const selected = getNodes().filter((n) => n.selected && n.data?.nodeType !== 'add');
+    fitView({
+      padding: 0.15,
+      duration: 300,
+      maxZoom: 1,
+      ...(selected.length > 0 ? { nodes: selected.map((n) => ({ id: n.id })) } : {}),
+    });
+  }, [fitView, getNodes]);
+
+  // Reset to 100% around what is currently on screen (not an arbitrary node).
+  const zoomToActualSize = useCallback(() => {
+    const { x, y, zoom } = getViewport();
+    const el = document.querySelector('.react-flow') as HTMLElement | null;
+    const w = el?.clientWidth ?? 0;
+    const h = el?.clientHeight ?? 0;
+    setCenter((w / 2 - x) / zoom, (h / 2 - y) / zoom, { zoom: 1, duration: 300 });
+  }, [getViewport, setCenter]);
 
   // Ref to track latest nodes without causing callback identity changes
   const nodesRef = useRef(nodes);
@@ -2223,21 +2250,14 @@ function UniverseTimelineEditorInner() {
       }
 
       // F — fit view
-      if (e.key === 'f' && !e.metaKey && !e.ctrlKey) {
-        fitView({ padding: 0.15, duration: 300, maxZoom: 1 });
+      if ((e.key === 'f' || e.key === '0') && !e.metaKey && !e.ctrlKey) {
+        fitSelectionOrAll();
         return;
       }
 
       // 1 — zoom to 100%
       if (e.key === '1' && !e.metaKey && !e.ctrlKey) {
-        const currentNodes = nodesRef.current;
-        if (currentNodes.length > 0) {
-          const centerNode = currentNodes[Math.floor(currentNodes.length / 2)];
-          setCenter(centerNode.position.x + 160, centerNode.position.y + 136, {
-            zoom: 1,
-            duration: 300,
-          });
-        }
+        zoomToActualSize();
         return;
       }
 
@@ -2310,10 +2330,10 @@ function UniverseTimelineEditorInner() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [
-    fitView,
+    fitSelectionOrAll,
+    zoomToActualSize,
     zoomIn,
     zoomOut,
-    setCenter,
     handleUndo,
     handleRedo,
     handleClearSelection,
@@ -3763,9 +3783,16 @@ function UniverseTimelineEditorInner() {
                       <ZoomOut className="h-4 w-4" />
                     </button>
                     <button
-                      onClick={() => fitView({ padding: 0.15, duration: 300, maxZoom: 1 })}
+                      onClick={zoomToActualSize}
+                      className="px-1.5 min-w-[3.25rem] text-xs tabular-nums hover:bg-zinc-700 transition-colors text-zinc-300 hover:text-white"
+                      title="Zoom level — click for 100% (1)"
+                    >
+                      <ZoomPercent />
+                    </button>
+                    <button
+                      onClick={fitSelectionOrAll}
                       className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white"
-                      title="Fit to view (F)"
+                      title="Fit to view — fits the selection if any (F)"
                     >
                       <Locate className="h-4 w-4" />
                     </button>
