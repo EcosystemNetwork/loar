@@ -18,45 +18,7 @@ import { z } from 'zod';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  Search,
-  Plus,
-  Users,
-  MapPin,
-  Package,
-  Swords,
-  Zap,
-  BookOpen,
-  Dna,
-  Layers,
-  Cpu,
-  Building2,
-  GitBranch,
-  Eye,
-  Box,
-  Hexagon,
-  Castle,
-  Crown,
-  ImageIcon,
-  Globe,
-  Lock,
-  UserCircle,
-  Images,
-  Palette,
-  Rotate3d,
-  Filter,
-  X,
-  Film,
-  Music,
-  Network,
-  CalendarDays,
-  Map as MapIcon,
-  ListOrdered,
-  Activity,
-  BarChart3,
-  Heart,
-  Sparkles,
-} from 'lucide-react';
+import { Search, Plus, Users, Box, UserCircle, Rotate3d, Music } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UserText } from '@/components/user-text';
 import {
@@ -87,7 +49,10 @@ import { useGalleryTrending } from '@/hooks/useGallery';
 import { TrendingUp } from 'lucide-react';
 import { SortMenu } from '@/components/wiki/SortMenu';
 import { sortEntities } from '@/components/wiki/sort';
-import { RandomEntityButton } from '@/components/wiki/RandomEntityButton';
+import { WikiHero, type ScopedUniverse } from '@/components/wiki/WikiHero';
+import type { SwitcherUniverse } from '@/components/wiki/UniverseSwitcher';
+import { WikiNav } from '@/components/wiki/WikiNav';
+import { buildWikiSearch, findWikiTab, resolveWikiTab } from '@/components/wiki/nav';
 import { EpisodesTab } from '@/components/wiki/EpisodesTab';
 import { AudioTab } from '@/components/wiki/AudioTab';
 import { RelationshipGraphTab } from '@/components/wiki/RelationshipGraphTab';
@@ -107,66 +72,6 @@ import {
   type WikiTab,
   type WikiSort,
 } from '@/components/wiki/types';
-
-const TABS: {
-  id: WikiTab;
-  label: string;
-  kind?: EntityKind;
-  icon: React.ComponentType<{ className?: string }>;
-  section: 'creator' | 'structural' | 'narrative' | 'discovery' | 'media' | 'personal';
-}[] = [
-  // Creator kinds
-  { id: 'person', label: 'People', kind: 'person', icon: Users, section: 'creator' },
-  { id: 'place', label: 'Places', kind: 'place', icon: MapPin, section: 'creator' },
-  { id: 'thing', label: 'Things', kind: 'thing', icon: Package, section: 'creator' },
-  { id: 'faction', label: 'Factions', kind: 'faction', icon: Swords, section: 'creator' },
-  { id: 'event', label: 'Events', kind: 'event', icon: Zap, section: 'creator' },
-  { id: 'lore', label: 'Lore', kind: 'lore', icon: BookOpen, section: 'creator' },
-  { id: 'species', label: 'Species', kind: 'species', icon: Dna, section: 'creator' },
-  { id: 'vehicle', label: 'Vehicles', kind: 'vehicle', icon: Layers, section: 'creator' },
-  { id: 'technology', label: 'Tech', kind: 'technology', icon: Cpu, section: 'creator' },
-  { id: 'organization', label: 'Orgs', kind: 'organization', icon: Building2, section: 'creator' },
-  {
-    id: 'moodboard',
-    label: 'Moodboards',
-    kind: 'moodboard',
-    icon: Images,
-    section: 'creator',
-  },
-  {
-    id: 'style_pack',
-    label: 'Style Packs',
-    kind: 'style_pack',
-    icon: Palette,
-    section: 'creator',
-  },
-  // Structural kinds
-  { id: 'timeline', label: 'Timelines', kind: 'timeline', icon: GitBranch, section: 'structural' },
-  { id: 'reality', label: 'Realities', kind: 'reality', icon: Eye, section: 'structural' },
-  { id: 'dimension', label: 'Dimensions', kind: 'dimension', icon: Box, section: 'structural' },
-  { id: 'plane', label: 'Planes', kind: 'plane', icon: Hexagon, section: 'structural' },
-  { id: 'realm', label: 'Realms', kind: 'realm', icon: Castle, section: 'structural' },
-  { id: 'domain', label: 'Domains', kind: 'domain', icon: Crown, section: 'structural' },
-  // Narrative content
-  { id: 'episodes', label: 'Episodes', icon: Film, section: 'narrative' },
-  { id: 'audio', label: 'Audio', icon: Music, section: 'narrative' },
-  // Discovery / wiki-native views
-  { id: 'ask', label: 'Ask', icon: Sparkles, section: 'discovery' },
-  { id: 'graph', label: 'Graph', icon: Network, section: 'discovery' },
-  { id: 'event-timeline', label: 'Timeline', icon: CalendarDays, section: 'discovery' },
-  { id: 'places-map', label: 'Map', icon: MapIcon, section: 'discovery' },
-  { id: 'az-index', label: 'A–Z', icon: ListOrdered, section: 'discovery' },
-  { id: 'activity', label: 'Activity', icon: Activity, section: 'discovery' },
-  { id: 'stats', label: 'Stats', icon: BarChart3, section: 'discovery' },
-  { id: 'creators', label: 'Creators', icon: UserCircle, section: 'discovery' },
-  // Media tabs
-  { id: 'character-profiles', label: 'Profiles', icon: UserCircle, section: 'media' },
-  { id: '3d-models', label: '3D Models', icon: Rotate3d, section: 'media' },
-  { id: 'gallery', label: 'Gallery', icon: ImageIcon, section: 'media' },
-  { id: 'collection', label: 'Collection', icon: Users, section: 'media' },
-  // Personal
-  { id: 'bookmarks', label: 'Bookmarks', icon: Heart, section: 'personal' },
-];
 
 // Wiki entity/gallery lists rarely change mid-session. Caching for 5 minutes
 // makes tab switches back to a previously-viewed tab instant (no refetch),
@@ -1406,10 +1311,11 @@ function WikiPage() {
   const { universe: universeAddress, tab: urlTab } = useSearch({ from: '/wiki/' });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<WikiTab>((urlTab as WikiTab) ?? 'gallery');
   const [globalSearch, setGlobalSearch] = useState('');
-  const [universePickerOpen, setUniversePickerOpen] = useState(false);
-  const [universePickerQuery, setUniversePickerQuery] = useState('');
+
+  // The URL is the single source of truth for the active view.
+  const activeTab = resolveWikiTab(urlTab);
+  const activeTabDef = findWikiTab(activeTab);
 
   // Prefetch a tab's primary query when the user hovers the tab button so the
   // click feels instant. We only prefetch tabs whose queries live in this file
@@ -1429,8 +1335,8 @@ function WikiPage() {
         staleTime: WIKI_LIST_STALE_TIME,
       });
 
-    const tabDef = TABS.find((t) => t.id === tab);
-    if (tabDef?.kind) {
+    const tabDef = findWikiTab(tab);
+    if (tabDef.kind) {
       const kind = tabDef.kind;
       if (universeAddress) {
         void runInfinite(['entities', 'list', universeAddress, kind], () =>
@@ -1484,28 +1390,12 @@ function WikiPage() {
     }
   };
 
-  // Keep component state in sync with the URL when the user navigates back/forward
-  // or when another surface (e.g. the /gallery redirect) changes ?tab=.
-  // Missing ?tab= means the default tab ('gallery') — the wiki's discovery surface.
-  const expectedTab = ((urlTab as WikiTab) ?? 'gallery') as WikiTab;
-  useEffect(() => {
-    if (expectedTab !== activeTab) {
-      setActiveTab(expectedTab);
-    }
-  }, [expectedTab, activeTab]);
-
-  // Build a /wiki search object. 'gallery' is the default, so it's omitted from
-  // the URL to keep the no-tab case clean.
-  const buildSearch = (tab: WikiTab, universe: string | undefined) => {
-    const s: { universe?: string; tab?: string } = {};
-    if (universe) s.universe = universe;
-    if (tab !== 'gallery') s.tab = tab;
-    return s;
+  const selectTab = (tab: WikiTab) => {
+    navigate({ to: '/wiki', search: buildWikiSearch(tab, universeAddress) });
   };
 
-  const selectTab = (tab: WikiTab) => {
-    setActiveTab(tab);
-    navigate({ to: '/wiki', search: buildSearch(tab, universeAddress) });
+  const selectUniverse = (universe: string | undefined) => {
+    navigate({ to: '/wiki', search: buildWikiSearch(activeTab, universe) });
   };
 
   const { data: universeResult } = useQuery({
@@ -1513,9 +1403,7 @@ function WikiPage() {
     queryFn: () => trpcClient.universes.get.query({ id: universeAddress! }),
     enabled: !!universeAddress,
   });
-  const universeInfo = universeResult?.data as
-    | { id: string; name?: string; image_url?: string; accessModel?: string }
-    | undefined;
+  const universeInfo = universeResult?.data as ScopedUniverse | undefined;
 
   const { data: allUniverses } = useQuery({
     queryKey: ['all-universes'],
@@ -1523,331 +1411,63 @@ function WikiPage() {
   });
   const universes = ((allUniverses as any)?.data ?? allUniverses ?? []) as any[];
 
-  const publicUniverses = Array.isArray(universes)
+  const publicUniverses: SwitcherUniverse[] = Array.isArray(universes)
     ? universes.filter((u: any) => u.accessModel !== 'private' && u.accessModel !== 'token_gate')
     : [];
 
-  // Cap the inline strip so the DOM (and IPFS image fetches) don't grow with
-  // the universe count. If the active filter scoped to a universe that lives
-  // past the cap, pin it to the visible slice so the user always sees their
-  // current selection highlighted.
-  const VISIBLE_UNIVERSE_LIMIT = 12;
-  const inlineUniverses = (() => {
-    if (publicUniverses.length <= VISIBLE_UNIVERSE_LIMIT) return publicUniverses;
-    const head = publicUniverses.slice(0, VISIBLE_UNIVERSE_LIMIT);
-    const activeIdx = publicUniverses.findIndex((u: any) => u.id === universeAddress);
-    if (activeIdx >= 0 && activeIdx >= VISIBLE_UNIVERSE_LIMIT) {
-      head[head.length - 1] = publicUniverses[activeIdx];
-    }
-    return head;
-  })();
-  const overflowCount = Math.max(0, publicUniverses.length - inlineUniverses.length);
-
-  const filteredPickerUniverses = (() => {
-    const q = universePickerQuery.trim().toLowerCase();
-    if (!q) return publicUniverses;
-    return publicUniverses.filter((u: any) => {
-      const name = String(u.name ?? '').toLowerCase();
-      const id = String(u.id ?? '').toLowerCase();
-      return name.includes(q) || id.includes(q);
-    });
-  })();
-
-  const sectionedTabs = useMemo(() => {
-    const sections: Array<{ section: string; tabs: typeof TABS }> = [
-      { section: 'creator', tabs: TABS.filter((t) => t.section === 'creator') },
-      { section: 'structural', tabs: TABS.filter((t) => t.section === 'structural') },
-      { section: 'narrative', tabs: TABS.filter((t) => t.section === 'narrative') },
-      { section: 'discovery', tabs: TABS.filter((t) => t.section === 'discovery') },
-      { section: 'media', tabs: TABS.filter((t) => t.section === 'media') },
-      { section: 'personal', tabs: TABS.filter((t) => t.section === 'personal') },
-    ];
-    return sections;
-  }, []);
-
-  const activeTabDef = TABS.find((t) => t.id === activeTab) ?? TABS[0];
-
   return (
     <div className="container mx-auto px-4 py-6 md:py-8 max-w-7xl pb-bottom-nav md:pb-12">
-      {/* Header */}
-      <div className="flex flex-col gap-4 mb-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">World Encyclopedia</h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1">
-            {universeInfo
-              ? `Everything in ${universeInfo.name ?? 'this universe'}.`
-              : 'Everything known across all public universes.'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative w-full sm:w-56">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={globalSearch}
-              onChange={(e) => setGlobalSearch(e.target.value)}
-              placeholder="Search all entities..."
-              className="pl-9 h-9 text-xs"
-            />
-          </div>
-          <RandomEntityButton universeAddress={universeAddress} />
-          <Button asChild size="sm">
-            <Link to="/create" search={universeAddress ? { universe: universeAddress } : undefined}>
-              <Plus className="h-4 w-4 mr-1" />
-              Create
-            </Link>
-          </Button>
-        </div>
-      </div>
+      <WikiHero
+        universeAddress={universeAddress}
+        universe={universeInfo}
+        universes={publicUniverses}
+        search={globalSearch}
+        onSearchChange={setGlobalSearch}
+        onUniverseChange={selectUniverse}
+      />
 
-      {/* Universe filter bar */}
-      <div className="mb-6 rounded-lg border bg-muted/30 p-3">
-        <div className="flex items-center gap-2 mb-2.5">
-          <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-          <span className="text-sm font-medium">Filter by Universe</span>
-          {universeAddress && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-xs ml-auto text-muted-foreground hover:text-foreground"
-              onClick={() => navigate({ to: '/wiki', search: buildSearch(activeTab, undefined) })}
-            >
-              <X className="h-3 w-3 mr-1" />
-              Clear filter
-            </Button>
-          )}
-        </div>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          <button
-            onClick={() => navigate({ to: '/wiki', search: buildSearch(activeTab, undefined) })}
-            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
-              !universeAddress
-                ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary/20'
-                : 'border-border bg-background hover:bg-muted hover:border-foreground/20 text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Globe className="h-4 w-4" />
-            All Universes
-          </button>
-          {inlineUniverses.map((u: any) => (
-            <button
-              key={u.id}
-              onClick={() => navigate({ to: '/wiki', search: buildSearch(activeTab, u.id) })}
-              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
-                universeAddress === u.id
-                  ? 'border-violet-500 bg-violet-500/10 text-violet-400 ring-1 ring-violet-500/20'
-                  : 'border-border bg-background hover:bg-muted hover:border-foreground/20 text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {u.image_url ? (
-                <SmartImage
-                  src={u.image_url}
-                  alt=""
-                  decoding="async"
-                  className="h-5 w-5 rounded object-cover flex-shrink-0"
-                />
-              ) : (
-                <div className="h-5 w-5 rounded bg-gradient-to-br from-violet-500/30 to-purple-500/30 flex items-center justify-center flex-shrink-0">
-                  <Globe className="h-3 w-3" />
-                </div>
-              )}
-              {u.name || u.id.slice(0, 10) + '...'}
-            </button>
-          ))}
-          {overflowCount > 0 && (
-            <button
-              onClick={() => {
-                setUniversePickerQuery('');
-                setUniversePickerOpen(true);
-              }}
-              className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 border-border bg-background hover:bg-muted hover:border-foreground/40 text-muted-foreground hover:text-foreground"
-            >
-              <Search className="h-4 w-4" />+{overflowCount} more
-            </button>
-          )}
-          {publicUniverses.length === 0 && (
-            <p className="text-xs text-muted-foreground py-1.5 px-2">No universes found.</p>
-          )}
-        </div>
-      </div>
-
-      <Dialog open={universePickerOpen} onOpenChange={setUniversePickerOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Filter by Universe</DialogTitle>
-            <DialogDescription>
-              {publicUniverses.length} public universe{publicUniverses.length !== 1 ? 's' : ''} —
-              search by name or address.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              autoFocus
-              value={universePickerQuery}
-              onChange={(e) => setUniversePickerQuery(e.target.value)}
-              placeholder="Search universes..."
-              className="pl-9"
-            />
-          </div>
-          <div className="max-h-[60vh] overflow-y-auto -mx-1 px-1">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {filteredPickerUniverses.slice(0, 200).map((u: any) => (
-                <button
-                  key={u.id}
-                  onClick={() => {
-                    navigate({ to: '/wiki', search: buildSearch(activeTab, u.id) });
-                    setUniversePickerOpen(false);
-                  }}
-                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium text-left transition-all ${
-                    universeAddress === u.id
-                      ? 'border-violet-500 bg-violet-500/10 text-violet-400'
-                      : 'border-border bg-background hover:bg-muted hover:border-foreground/20 text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {u.image_url ? (
-                    <SmartImage
-                      src={u.image_url}
-                      alt=""
-                      decoding="async"
-                      className="h-6 w-6 rounded object-cover flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="h-6 w-6 rounded bg-gradient-to-br from-violet-500/30 to-purple-500/30 flex items-center justify-center flex-shrink-0">
-                      <Globe className="h-3 w-3" />
-                    </div>
-                  )}
-                  <span className="truncate">{u.name || u.id.slice(0, 10) + '...'}</span>
-                </button>
-              ))}
-            </div>
-            {filteredPickerUniverses.length === 0 && (
-              <p className="text-xs text-muted-foreground py-6 text-center">No matches.</p>
-            )}
-            {filteredPickerUniverses.length > 200 && (
-              <p className="text-[11px] text-muted-foreground py-2 text-center">
-                Showing first 200 of {filteredPickerUniverses.length} — refine your search.
-              </p>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Universe banner when scoped */}
-      {universeInfo && (
-        <div className="mb-6 flex items-center gap-3 rounded-lg border border-violet-500/30 bg-gradient-to-r from-violet-500/10 to-purple-500/10 p-4">
-          {universeInfo.image_url && (
-            <SmartImage
-              src={universeInfo.image_url}
-              alt=""
-              decoding="async"
-              className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
-            />
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Viewing wiki for
-            </p>
-            <p className="text-lg font-bold truncate">{universeInfo.name}</p>
-          </div>
-          {universeInfo.accessModel && universeInfo.accessModel !== 'open' && (
-            <Badge variant="outline" className="text-xs gap-1">
-              <Lock className="h-3 w-3" />
-              {universeInfo.accessModel}
-            </Badge>
-          )}
-          <Button asChild size="sm" variant="outline" className="flex-shrink-0 gap-1.5">
-            <Link to="/universe/$id/watch" params={{ id: universeInfo.id }}>
-              <Globe className="h-3.5 w-3.5" />
-              Open universe
-            </Link>
-          </Button>
-        </div>
-      )}
-
-      {/* Tab bar — sectioned */}
-      <div className="flex gap-0.5 overflow-x-auto pb-1 mb-6 border-b">
-        {sectionedTabs.map((sec, idx) => (
-          <div key={sec.section} className="flex items-center gap-0.5">
-            {idx > 0 && <div className="w-px bg-border mx-1 self-stretch my-1" />}
-            {sec.tabs.map((tab) => (
-              <TabButton
-                key={tab.id}
-                tab={tab}
-                isActive={tab.id === activeTab}
-                onClick={() => selectTab(tab.id)}
-                onHover={() => prefetchTab(tab.id)}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
-
-      {/* Tab content — global search overrides tab view */}
+      {/* Global search replaces the browse views while a query is active. */}
       {globalSearch.trim().length >= 2 ? (
         <GlobalSearchResults query={globalSearch.trim()} universeAddress={universeAddress} />
-      ) : activeTabDef.kind ? (
-        <EntityTab kind={activeTabDef.kind} universeAddress={universeAddress} />
-      ) : activeTab === 'character-profiles' ? (
-        <CharacterProfilesTab universeAddress={universeAddress} />
-      ) : activeTab === '3d-models' ? (
-        <ThreeDModelsTab universeAddress={universeAddress} />
-      ) : activeTab === 'gallery' ? (
-        <GalleryTab universeAddress={universeAddress} />
-      ) : activeTab === 'collection' ? (
-        <CollectionTab />
-      ) : activeTab === 'episodes' ? (
-        <EpisodesTab universeAddress={universeAddress} />
-      ) : activeTab === 'audio' ? (
-        <AudioTab universeAddress={universeAddress} />
-      ) : activeTab === 'graph' ? (
-        <RelationshipGraphTab universeAddress={universeAddress} />
-      ) : activeTab === 'event-timeline' ? (
-        <EventTimelineTab universeAddress={universeAddress} />
-      ) : activeTab === 'places-map' ? (
-        <PlacesMapTab universeAddress={universeAddress} />
-      ) : activeTab === 'az-index' ? (
-        <AZIndexTab universeAddress={universeAddress} />
-      ) : activeTab === 'activity' ? (
-        <ActivityTab />
-      ) : activeTab === 'stats' ? (
-        <StatsTab universeAddress={universeAddress} />
-      ) : activeTab === 'creators' ? (
-        <CreatorsTab />
-      ) : activeTab === 'ask' ? (
-        <AskTab universeAddress={universeAddress} />
-      ) : activeTab === 'bookmarks' ? (
-        <BookmarksTab />
-      ) : null}
+      ) : (
+        <>
+          <WikiNav activeTab={activeTab} onSelect={selectTab} onPrefetch={prefetchTab} />
+          {activeTabDef.kind ? (
+            <EntityTab kind={activeTabDef.kind} universeAddress={universeAddress} />
+          ) : activeTab === 'character-profiles' ? (
+            <CharacterProfilesTab universeAddress={universeAddress} />
+          ) : activeTab === '3d-models' ? (
+            <ThreeDModelsTab universeAddress={universeAddress} />
+          ) : activeTab === 'gallery' ? (
+            <GalleryTab universeAddress={universeAddress} />
+          ) : activeTab === 'collection' ? (
+            <CollectionTab />
+          ) : activeTab === 'episodes' ? (
+            <EpisodesTab universeAddress={universeAddress} />
+          ) : activeTab === 'audio' ? (
+            <AudioTab universeAddress={universeAddress} />
+          ) : activeTab === 'graph' ? (
+            <RelationshipGraphTab universeAddress={universeAddress} />
+          ) : activeTab === 'event-timeline' ? (
+            <EventTimelineTab universeAddress={universeAddress} />
+          ) : activeTab === 'places-map' ? (
+            <PlacesMapTab universeAddress={universeAddress} />
+          ) : activeTab === 'az-index' ? (
+            <AZIndexTab universeAddress={universeAddress} />
+          ) : activeTab === 'activity' ? (
+            <ActivityTab />
+          ) : activeTab === 'stats' ? (
+            <StatsTab universeAddress={universeAddress} />
+          ) : activeTab === 'creators' ? (
+            <CreatorsTab />
+          ) : activeTab === 'ask' ? (
+            <AskTab universeAddress={universeAddress} />
+          ) : activeTab === 'bookmarks' ? (
+            <BookmarksTab />
+          ) : null}
+        </>
+      )}
     </div>
-  );
-}
-
-function TabButton({
-  tab,
-  isActive,
-  onClick,
-  onHover,
-}: {
-  tab: (typeof TABS)[number];
-  isActive: boolean;
-  onClick: () => void;
-  onHover?: () => void;
-}) {
-  const Icon = tab.icon;
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={onHover}
-      onFocus={onHover}
-      className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-t-md whitespace-nowrap transition-colors border-b-2 -mb-px ${
-        isActive
-          ? 'border-primary text-primary bg-primary/5'
-          : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
-      }`}
-    >
-      <Icon className="h-3.5 w-3.5" />
-      {tab.label}
-    </button>
   );
 }
 
