@@ -22,7 +22,6 @@ import {
   Sun,
   Eraser,
   Frame,
-  Loader2,
   Play,
   AlertCircle,
   X,
@@ -35,6 +34,7 @@ import { ModelSelector } from '@/components/ModelSelector';
 import { toast } from 'sonner';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import { SmartImage } from '@/components/SmartImage';
+import { GenerationProgress } from '@/components/sandbox/GenerationProgress';
 import {
   Select,
   SelectContent,
@@ -129,10 +129,7 @@ export function GenerationCard({
                 className="w-full h-full object-cover opacity-30"
               />
             )}
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <span className="text-xs text-muted-foreground">Generating {gen.kind}…</span>
-            </div>
+            <GenerationProgress gen={gen} />
           </>
         )}
         {gen.status === 'failed' && (

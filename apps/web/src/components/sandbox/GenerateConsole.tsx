@@ -65,6 +65,8 @@ import {
   isRetryableGen,
 } from '@/components/sandbox/utils';
 import { GenerationCard } from '@/components/sandbox/GenerationCard';
+import { VideoCostHint } from '@/components/sandbox/VideoCostHint';
+import { latencyKey, recordLatency } from '@/lib/generation-latency';
 import { DraftCard, inferDraftKind } from '@/components/sandbox/DraftCard';
 import {
   RANDOM_NAME_SEEDS,
@@ -102,7 +104,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Wand2,
   Video,
@@ -1424,6 +1426,20 @@ export function GenerateConsole({
   const activeCount = generations.filter((g) => g.status === 'generating').length;
   const hasDoneGens = generations.some((g) => g.status !== 'generating');
 
+  // Feed completed runs into the per-model latency history that drives the
+  // card progress bar. Only transitions seen this session count — persisted
+  // drafts that reload as 'done' carry stale createdAt values.
+  const prevGenStatusRef = useRef<Map<string, Generation['status']>>(new Map());
+  useEffect(() => {
+    const prev = prevGenStatusRef.current;
+    for (const g of generations) {
+      if (prev.get(g.id) === 'generating' && g.status === 'done') {
+        recordLatency(latencyKey(g), Date.now() - g.createdAt);
+      }
+      prev.set(g.id, g.status);
+    }
+  }, [generations]);
+
   // ⌘/Ctrl+Enter triggers the primary action of the active tab.
   const submitCurrent = useCallback(() => {
     if (worldKind) {
@@ -2293,6 +2309,14 @@ export function GenerateConsole({
                         {referenceImage?.mode === 'animate' ? 'Animate' : 'Generate Video'}
                       </Button>
                     </div>
+
+                    <VideoCostHint
+                      videoModel={videoModel}
+                      animate={referenceImage?.mode === 'animate'}
+                      durationSec={videoDuration}
+                      resolution={videoResolution}
+                      audio={videoAudioOn}
+                    />
 
                     <p className="text-[11px] text-muted-foreground -mt-1">
                       Up to {MAX_CONCURRENT_GENS} generations run in parallel. Each run auto-saves
