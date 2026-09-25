@@ -28,7 +28,11 @@ import {
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../../lib/firebase';
-import { meshyService } from '../../services/meshy';
+import {
+  MESHY_REMESH_MAX_POLYCOUNT,
+  MESHY_REMESH_MIN_POLYCOUNT,
+  meshyService,
+} from '../../services/meshy';
 import { tripo3dService, type TripoRigType, type TripoAnimation } from '../../services/tripo3d';
 import { trackQuests } from '../../services/quest-tracker';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -37,6 +41,7 @@ import { logFailedRefund } from '../../lib/refund-audit';
 import { publishToGallery } from '../../lib/gallery-publish';
 import { rehostModelBundle } from '../../lib/rehost-ephemeral';
 import { withReservation } from '../../services/credits';
+import { getThreedModelById } from '../../services/threed-models';
 import type { MeshyTaskOutput } from '../../services/meshy';
 
 // ── Pricing — loaded from platform config (admin-configurable) ────────
@@ -57,6 +62,9 @@ const clientTokenSchema = z
   .optional();
 
 const LOAR_TO_USD = 0.01;
+
+/** Remesh output formats we re-host to permanent storage (see threed.remesh). */
+const REMESH_OUTPUT_FORMATS = ['glb', 'fbx', 'obj', 'usdz'] as const;
 
 const COSTS = {
   text_preview: 0.05,
@@ -1255,6 +1263,129 @@ export const threedRouter = router({
         )
       );
     }),
+
+  /**
+   * Remesh (retopology / decimation) a previously generated 3D model — e.g. cut
+   * a 500k-tri sculpt to a game-ready 30k quad mesh. Pass `contentId` (the
+   * gallery item of a 3D model you own). Runs in the background like rig/animate;
+   * the result is published to the gallery as a new item.
+   *
+   * Only glb/fbx/obj/usdz are offered: those are the formats we re-host to
+   * permanent storage. Meshy's CDN URLs expire, so stl/3mf/blend would be
+   * stored as links that die within days.
+   */
+  remesh: expensiveProcedure
+    .use(requirePermission('generation.3d'))
+    .input(
+      z.object({
+        contentId: z.string().min(1),
+        topology: z.enum(['quad', 'triangle']).default('triangle'),
+        targetPolycount: z
+          .number()
+          .int()
+          .min(MESHY_REMESH_MIN_POLYCOUNT)
+          .max(MESHY_REMESH_MAX_POLYCOUNT)
+          .default(30_000),
+        targetFormats: z
+          .array(z.enum(REMESH_OUTPUT_FORMATS))
+          .min(1)
+          .max(REMESH_OUTPUT_FORMATS.length)
+          .default(['glb']),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      const contentDoc = await db.collection('content').doc(input.contentId).get();
+      if (!contentDoc.exists) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Content not found' });
+      }
+      const content = contentDoc.data()!;
+      if (content.mediaType !== '3d' || !content.mediaUrl) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Only 3D models with a media URL can be remeshed',
+        });
+      }
+      if (content.creatorUid && content.creatorUid !== ctx.user.uid) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the creator can remesh this model',
+        });
+      }
+
+      // Provider cost comes from the 3D model registry (single source of truth);
+      // the credit price applies the same platform margin as every other 3D task.
+      const cost = getThreedModelById('meshy-remesh')?.providerCostUsd ?? 0;
+      const { fiatMargin } = await getMargins();
+      const credits = toCredits(cost, fiatMargin);
+      const genId = randomUUID();
+      const sourceTitle = (content.title as string | undefined) ?? '3D model';
+      const sourceUrl = content.mediaUrl as string;
+      const universeId = (content.universeId as string | null | undefined) ?? null;
+      const parentGenerationId = (content.generationId as string | null | undefined) ?? null;
+      const hold = await reserveThreedBudget('meshy', cost);
+
+      return releaseHoldOnError(hold, () =>
+        withReservation(
+          {
+            userId: ctx.user.uid,
+            modelId: 'meshy-remesh',
+            provider: 'meshy',
+            estimatedCredits: credits,
+            byok: false,
+            meta: { genId, sourceContentId: input.contentId, kind: 'remesh' },
+          },
+          async () => {
+            const { resolveProviderKey } = await import('../../lib/byok');
+            const apiKey = await resolveProviderKey(ctx.user.uid, 'meshy');
+            const { taskId } = await meshyService.remesh({
+              modelUrl: sourceUrl,
+              targetFormats: input.targetFormats,
+              topology: input.topology,
+              targetPolycount: input.targetPolycount,
+              apiKey,
+            });
+            await threeDGenCol().doc(genId).set({
+              id: genId,
+              userId: ctx.user.uid,
+              type: 'meshy_remesh',
+              status: 'running',
+              meshyTaskId: taskId,
+              sourceContentId: input.contentId,
+              sourceMediaUrl: sourceUrl,
+              topology: input.topology,
+              targetPolycount: input.targetPolycount,
+              targetFormats: input.targetFormats,
+              providerCostUsd: cost,
+              creditsCharged: credits,
+              universeId,
+              parentGenerationId,
+              createdAt: new Date(),
+            });
+            settleThreedJob({
+              hold,
+              done: completeMeshyRemeshTask({
+                genId,
+                userId: ctx.user.uid,
+                meshyTaskId: taskId,
+                sourceTitle,
+                topology: input.topology,
+                targetPolycount: input.targetPolycount,
+                universeId,
+                parentGenerationId,
+                credits,
+              }),
+              provider: 'meshy',
+              model: 'meshy-remesh',
+              costUsd: cost,
+              readStatus: genStatus(genId),
+              extra: { generationId: genId },
+            });
+            return { result: { jobId: genId, providerTaskId: taskId }, actualCredits: credits };
+          }
+        )
+      );
+    }),
 });
 
 // ── Rigging/animation pricing + presets ─────────────────────────────────
@@ -1541,6 +1672,75 @@ async function completeMeshyRiggingTask(opts: {
       })
       .catch(() => {});
     console.error(`Meshy rigging ${opts.genId} failed:`, error);
+  }
+}
+
+async function completeMeshyRemeshTask(opts: {
+  genId: string;
+  userId: string;
+  meshyTaskId: string;
+  sourceTitle: string;
+  topology: 'quad' | 'triangle';
+  targetPolycount: number;
+  universeId: string | null;
+  parentGenerationId: string | null;
+  credits: number;
+}) {
+  try {
+    const { resolveProviderKey } = await import('../../lib/byok');
+    const apiKey = await resolveProviderKey(opts.userId, 'meshy');
+    const task = await meshyService.waitForRemesh(opts.meshyTaskId, 10 * 60 * 1000, 5000, apiKey);
+    const urls = task.modelUrls;
+    if (!urls || !REMESH_OUTPUT_FORMATS.some((f) => urls[f])) {
+      throw new Error('Meshy remesh completed without any model output');
+    }
+
+    // Meshy CDN URLs expire — rehost every requested format + the thumbnail first.
+    const perm = await rehostModelBundle(
+      {
+        modelUrls: { glb: urls.glb, fbx: urls.fbx, obj: urls.obj, usdz: urls.usdz },
+        thumbnailUrl: task.thumbnailUrl,
+      },
+      `${opts.sourceTitle}-remesh`,
+      opts.userId
+    );
+
+    await threeDGenCol().doc(opts.genId).update({
+      status: 'completed',
+      modelUrls: perm.modelUrls,
+      thumbnailUrl: perm.thumbnailUrl,
+      completedAt: new Date(),
+    });
+
+    // Gallery publish — GLB is the canonical mesh; skipped if only other formats were requested.
+    const glbUrl = perm.modelUrls.glb;
+    if (glbUrl) {
+      void publishToGallery({
+        creatorUid: opts.userId,
+        mediaUrl: glbUrl,
+        mediaType: '3d',
+        title: `${opts.sourceTitle} — remeshed (${opts.topology}, ${opts.targetPolycount.toLocaleString('en-US')} polys)`,
+        description: `Retopologized to ~${opts.targetPolycount.toLocaleString('en-US')} ${opts.topology === 'quad' ? 'quads' : 'triangles'}.`,
+        thumbnailUrl: perm.thumbnailUrl,
+        universeId: opts.universeId,
+        generationId: `remesh:meshy:${opts.meshyTaskId}`,
+        generationModel: 'meshy-remesh',
+        tags: ['3d', 'remesh', opts.topology],
+        parentGenerationId: opts.parentGenerationId,
+      });
+    }
+  } catch (error) {
+    await refundCreditsAfterReconcile(opts.userId, opts.credits, opts.genId);
+    await threeDGenCol()
+      .doc(opts.genId)
+      .update({
+        status: 'failed',
+        creditsRefunded: true,
+        failureReason: error instanceof Error ? error.message : 'Unknown error',
+        completedAt: new Date(),
+      })
+      .catch(() => {});
+    console.error(`Meshy remesh ${opts.genId} failed:`, error);
   }
 }
 
