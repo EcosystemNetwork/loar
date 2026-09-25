@@ -188,7 +188,9 @@ export function GenerateConsole({
 
   // Form state
   const [mode, setMode] = useState<SandboxMode>('image');
-  const [prompt, setPrompt] = useState('');
+  // Each create type (image, video, person, …) keeps its own prompt draft, so
+  // switching type never carries text across or clobbers what you'd typed.
+  const [prompts, setPrompts] = useState<Record<string, string>>({});
   const [negativePrompt, setNegativePrompt] = useState('');
   const [seed, setSeed] = useState<number | null>(null);
   const [stylePreset, setStylePreset] = useState<StylePresetId | null>(null);
@@ -344,6 +346,25 @@ export function GenerateConsole({
   // A non-null worldKind takes over from the media `mode`.
   const [worldKind, setWorldKind] = useState<WorldKind | null>(null);
   const [entityName, setEntityName] = useState('');
+
+  // The active workspace's prompt, backed by the per-type `prompts` map above.
+  // `setPromptFor` targets an explicit workspace so async callbacks and
+  // "reuse draft" (which switches type in the same batch) never write to the
+  // wrong one.
+  const promptKey: string = worldKind ?? mode;
+  const prompt = prompts[promptKey] ?? '';
+  const setPromptFor = useCallback((key: string, v: string | ((cur: string) => string)) => {
+    setPrompts((prev) => {
+      const next = typeof v === 'function' ? v(prev[key] ?? '') : v;
+      return prev[key] === next ? prev : { ...prev, [key]: next };
+    });
+  }, []);
+  const promptKeyRef = useRef(promptKey);
+  promptKeyRef.current = promptKey;
+  const setPrompt = useCallback(
+    (v: string | ((cur: string) => string)) => setPromptFor(promptKeyRef.current, v),
+    [setPromptFor]
+  );
   type EntityResult = {
     id: string;
     kind: WorldKind;
@@ -1232,7 +1253,7 @@ export function GenerateConsole({
         toast.success(`${KIND_LABELS[kind] ?? kind} created`);
         // Only clear fields the user hasn't already started overwriting with
         // a new prompt/name while this generation was in flight.
-        setPrompt((cur) => (cur === p ? '' : cur));
+        setPromptFor(kind, (cur) => (cur === p ? '' : cur));
         setEntityName((cur) => (cur === submittedEntityName ? '' : cur));
       } catch (err: any) {
         setEntityResults((prev) =>
@@ -1263,17 +1284,24 @@ export function GenerateConsole({
     ]
   );
 
-  const handleAnimate = useCallback((g: Generation) => {
-    if (!g.imageUrl) return;
-    setReferenceImage({ url: g.imageUrl, prompt: g.prompt, mode: 'animate' });
-    setPrompt(g.prompt);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    toast('Reference image loaded — pick a video model and hit Animate', { duration: 3000 });
-  }, []);
+  const handleAnimate = useCallback(
+    (g: Generation) => {
+      if (!g.imageUrl) return;
+      setReferenceImage({ url: g.imageUrl, prompt: g.prompt, mode: 'animate' });
+      setWorldKind(null);
+      setMode('video');
+      setPromptFor('video', g.prompt);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      toast('Reference image loaded — pick a video model and hit Animate', { duration: 3000 });
+    },
+    [setPromptFor]
+  );
 
   const handleUseAsStyleRef = useCallback((g: Generation) => {
     if (!g.imageUrl) return;
     setReferenceImage({ url: g.imageUrl, prompt: g.prompt, mode: 'style' });
+    setWorldKind(null);
+    setMode('image');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     toast('Style reference loaded — describe a new scene and hit Generate Image', {
       duration: 3000,
@@ -1375,9 +1403,14 @@ export function GenerateConsole({
     (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       const file = e.dataTransfer.files?.[0];
-      if (file) uploadAsset(file, referenceImage?.mode ?? 'style');
+      if (file) {
+        uploadAsset(
+          file,
+          referenceImage?.mode ?? (mode === 'video' || mode === 'talking' ? 'animate' : 'style')
+        );
+      }
     },
-    [referenceImage?.mode, uploadAsset]
+    [mode, referenceImage?.mode, uploadAsset]
   );
 
   // Prompt enhance — calls Gemini via tRPC. Falls back gracefully if Gemini
@@ -1619,6 +1652,31 @@ export function GenerateConsole({
     return items.sort((a, b) => b.ts - a.ts);
   }, [generations, entityResults, drafts, draftFilter]);
 
+  const workspaceTitle = worldKind
+    ? `New ${KIND_LABELS[worldKind] ?? worldKind}`
+    : (
+        {
+          image: 'Image',
+          video: 'Video',
+          voice: 'Voice & sound effects',
+          audio: 'Music',
+          '3d': '3D model',
+          talking: 'Talking scene',
+        } as Record<SandboxMode, string>
+      )[mode];
+  const workspaceHint = worldKind
+    ? `AI writes the ${(KIND_LABELS[worldKind] ?? worldKind).toLowerCase()} profile and paints a portrait, then adds it to the chosen wiki.`
+    : (
+        {
+          image: 'Text → image, or add a reference image to guide style and composition.',
+          video: 'Text → video, or add an image to animate as the first frame.',
+          voice: 'Speak a line with a chosen voice, or generate a sound effect.',
+          audio: 'Describe a track and get generated music.',
+          '3d': 'Text → 3D or image → 3D, exported as a GLB.',
+          talking: 'Image + dialogue + voice → a lip-synced clip.',
+        } as Record<SandboxMode, string>
+      )[mode];
+
   return (
     <div className="min-h-screen bg-background">
       {/* Hero band */}
@@ -1638,7 +1696,7 @@ export function GenerateConsole({
           </div>
           <p className="text-muted-foreground text-sm sm:text-base max-w-xl mx-auto">
             {isConsole
-              ? 'One prompt for images, video, voice, audio, 3D, and world entities. Pick a wiki to publish into, or keep it in drafts.'
+              ? "Pick what you're making — each type has its own workspace. Choose a wiki to publish into, or keep it in drafts."
               : 'Image, video, voice, audio, 3D, and lip-synced talking scenes — all queue in parallel and auto-save to your drafts.'}{' '}
             Press{' '}
             <kbd className="px-1 py-0.5 text-[10px] bg-muted rounded border border-border">⌘↵</kbd>{' '}
@@ -1668,46 +1726,70 @@ export function GenerateConsole({
                 className="rounded-2xl border border-border bg-card shadow-sm p-4 sm:p-5 flex flex-col gap-4"
               >
                 <div className="flex items-start justify-between gap-3 flex-wrap">
-                  {/* Mode pills */}
-                  <div className="flex flex-wrap gap-1 rounded-full border border-border p-1 bg-muted/20">
-                    {SANDBOX_TABS.map((t) => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => {
-                          setWorldKind(null);
-                          setMode(t.id);
-                        }}
-                        className={`text-[11px] px-3 py-1.5 rounded-full transition-colors ${
-                          !worldKind && mode === t.id
-                            ? 'bg-primary text-primary-foreground'
-                            : 'text-muted-foreground hover:bg-muted/60'
-                        }`}
-                        title={t.hint}
-                      >
-                        {t.label}
-                      </button>
-                    ))}
-                    {enableWorldKinds &&
-                      WORLD_KINDS.map((k) => (
-                        <button
-                          key={k}
-                          type="button"
-                          onClick={() => setWorldKind(k)}
-                          className={`text-[11px] px-3 py-1.5 rounded-full transition-colors ${
-                            worldKind === k
-                              ? 'bg-primary text-primary-foreground'
-                              : 'text-muted-foreground hover:bg-muted/60'
-                          }`}
-                        >
-                          {KIND_LABELS[k] ?? k}
-                        </button>
-                      ))}
+                  <div className="flex flex-col gap-2 min-w-0">
+                    {/* Media types */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {enableWorldKinds && (
+                        <span className="w-12 text-[10px] uppercase tracking-wider text-muted-foreground">
+                          Media
+                        </span>
+                      )}
+                      <div className="flex flex-wrap gap-1 rounded-full border border-border p-1 bg-muted/20">
+                        {SANDBOX_TABS.map((t) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => {
+                              setWorldKind(null);
+                              setMode(t.id);
+                              // Image tab = style reference, video tab = first frame.
+                              if (t.id === 'image' || t.id === 'video') {
+                                setReferenceImage((r) =>
+                                  r ? { ...r, mode: t.id === 'video' ? 'animate' : 'style' } : r
+                                );
+                              }
+                            }}
+                            className={`text-[11px] px-3 py-1.5 rounded-full transition-colors ${
+                              !worldKind && mode === t.id
+                                ? 'bg-primary text-primary-foreground'
+                                : 'text-muted-foreground hover:bg-muted/60'
+                            }`}
+                            title={t.hint}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {/* World-entity types */}
+                    {enableWorldKinds && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="w-12 text-[10px] uppercase tracking-wider text-muted-foreground">
+                          World
+                        </span>
+                        <div className="flex flex-wrap gap-1 rounded-full border border-border p-1 bg-muted/20">
+                          {WORLD_KINDS.map((k) => (
+                            <button
+                              key={k}
+                              type="button"
+                              onClick={() => setWorldKind(k)}
+                              className={`text-[11px] px-3 py-1.5 rounded-full transition-colors ${
+                                worldKind === k
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'text-muted-foreground hover:bg-muted/60'
+                              }`}
+                            >
+                              {KIND_LABELS[k] ?? k}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {isConsole && (
                       <button
                         type="button"
                         onClick={() => navigate({ to: '/cinematicUniverseCreate' })}
-                        className="text-[11px] px-3 py-1.5 rounded-full transition-colors text-primary border border-primary/30 bg-primary/5 hover:bg-primary/10"
+                        className="self-start text-[11px] px-3 py-1.5 rounded-full transition-colors text-primary border border-primary/30 bg-primary/5 hover:bg-primary/10"
                         title="Launch a new universe"
                       >
                         + Universe
@@ -1745,6 +1827,12 @@ export function GenerateConsole({
                     </Select>
                   )}
                 </div>
+
+                {/* Workspace header — each type is its own window */}
+                <div className="border-t border-border/60 pt-3 -mb-1">
+                  <h2 className="text-sm font-semibold">{workspaceTitle}</h2>
+                  <p className="text-[11px] text-muted-foreground">{workspaceHint}</p>
+                </div>
                 {isConsole && (
                   <p className="text-[10px] text-muted-foreground -mt-2">
                     {autoSendTarget === '__off__'
@@ -1756,23 +1844,6 @@ export function GenerateConsole({
                 {/* World-entity form */}
                 {worldKind && (
                   <div className="flex flex-col gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">
-                        Entity type
-                      </label>
-                      <Select value={worldKind} onValueChange={(v) => setWorldKind(v as WorldKind)}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {WORLD_KINDS.map((k) => (
-                            <SelectItem key={k} value={k}>
-                              {KIND_LABELS[k] ?? k}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
                     <Input
                       value={entityName}
                       onChange={(e) => setEntityName(e.target.value)}
@@ -1818,37 +1889,32 @@ export function GenerateConsole({
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center justify-between">
                         <label className="text-sm font-medium">Prompt</label>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 px-2 text-[11px]"
-                            disabled={isEnhancing || !prompt.trim()}
-                            onClick={() => enhancePrompt('image')}
-                            title="Use Gemini to expand into a detailed image prompt"
-                          >
-                            {isEnhancing ? (
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            ) : (
-                              <Sparkles className="h-3 w-3 mr-1" />
-                            )}
-                            Enhance for image
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 px-2 text-[11px]"
-                            disabled={isEnhancing || !prompt.trim()}
-                            onClick={() => enhancePrompt('video')}
-                            title="Use Gemini to expand into a cinematic video prompt"
-                          >
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-[11px]"
+                          disabled={isEnhancing || !prompt.trim()}
+                          onClick={() => enhancePrompt(mode === 'video' ? 'video' : 'image')}
+                          title={
+                            mode === 'video'
+                              ? 'Use Gemini to expand into a cinematic video prompt'
+                              : 'Use Gemini to expand into a detailed image prompt'
+                          }
+                        >
+                          {isEnhancing ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : (
                             <Sparkles className="h-3 w-3 mr-1" />
-                            Enhance for video
-                          </Button>
-                        </div>
+                          )}
+                          Enhance
+                        </Button>
                       </div>
                       <Textarea
-                        placeholder="Describe what you want to create… e.g. 'A lone samurai on a neon-lit rooftop in cyberpunk Tokyo'"
+                        placeholder={
+                          mode === 'video'
+                            ? "Describe the shot and its motion… e.g. 'Slow dolly through a neon-lit rooftop garden as rain begins to fall'"
+                            : "Describe the image… e.g. 'A lone samurai on a neon-lit rooftop in cyberpunk Tokyo'"
+                        }
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                         rows={3}
@@ -1922,66 +1988,72 @@ export function GenerateConsole({
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="min-w-[140px] flex-1">
-                        <ModelSelector
-                          type="image"
-                          value={imageModel}
-                          onChange={setImageModel}
-                          label="Image model"
-                          task="text_to_image"
-                          compact
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1.5 min-w-[120px] flex-1">
-                        <label className="text-xs font-medium text-muted-foreground">
-                          Video model
-                        </label>
-                        <Select
-                          value={videoModel}
-                          onValueChange={(v) => setVideoModel(v as VideoModel)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {VIDEO_MODELS.map((m) => (
-                              <SelectItem key={m.value} value={m.value}>
-                                <span className="flex items-center gap-1.5">
-                                  {m.label}
-                                  {m.badge && (
-                                    <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-medium">
-                                      {m.badge}
-                                    </span>
-                                  )}
-                                </span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex flex-col gap-1.5 min-w-[120px] flex-1">
-                        <label
-                          className="text-xs font-medium text-muted-foreground"
-                          title="Image only — fires N parallel generations from the same prompt"
-                        >
-                          Variations
-                        </label>
-                        <Select
-                          value={String(variations)}
-                          onValueChange={(v) => setVariations(Number(v))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {VARIATION_OPTIONS.map((n) => (
-                              <SelectItem key={n} value={String(n)}>
-                                {n}× {n === 1 ? 'image' : 'images'}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      {mode === 'image' && (
+                        <div className="min-w-[140px] flex-1">
+                          <ModelSelector
+                            type="image"
+                            value={imageModel}
+                            onChange={setImageModel}
+                            label="Image model"
+                            task="text_to_image"
+                            compact
+                          />
+                        </div>
+                      )}
+                      {mode === 'video' && (
+                        <div className="flex flex-col gap-1.5 min-w-[120px] flex-1">
+                          <label className="text-xs font-medium text-muted-foreground">
+                            Video model
+                          </label>
+                          <Select
+                            value={videoModel}
+                            onValueChange={(v) => setVideoModel(v as VideoModel)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {VIDEO_MODELS.map((m) => (
+                                <SelectItem key={m.value} value={m.value}>
+                                  <span className="flex items-center gap-1.5">
+                                    {m.label}
+                                    {m.badge && (
+                                      <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-medium">
+                                        {m.badge}
+                                      </span>
+                                    )}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      {mode === 'image' && (
+                        <div className="flex flex-col gap-1.5 min-w-[120px] flex-1">
+                          <label
+                            className="text-xs font-medium text-muted-foreground"
+                            title="Fires N parallel generations from the same prompt"
+                          >
+                            Variations
+                          </label>
+                          <Select
+                            value={String(variations)}
+                            onValueChange={(v) => setVariations(Number(v))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {VARIATION_OPTIONS.map((n) => (
+                                <SelectItem key={n} value={String(n)}>
+                                  {n}× {n === 1 ? 'image' : 'images'}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
 
                     {/* Reference image — dropzone when empty, preview when set */}
@@ -1993,43 +2065,13 @@ export function GenerateConsole({
                           className="h-12 w-12 rounded object-cover"
                         />
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-xs font-medium">Reference</p>
-                            <div className="flex gap-1">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setReferenceImage({ ...referenceImage, mode: 'style' })
-                                }
-                                className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
-                                  referenceImage.mode === 'style'
-                                    ? 'bg-primary text-primary-foreground border-primary'
-                                    : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
-                                }`}
-                                title="Use as style + composition reference for image generation"
-                              >
-                                Style
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setReferenceImage({ ...referenceImage, mode: 'animate' })
-                                }
-                                className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
-                                  referenceImage.mode === 'animate'
-                                    ? 'bg-primary text-primary-foreground border-primary'
-                                    : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
-                                }`}
-                                title="Animate this image into a video"
-                              >
-                                Animate
-                              </button>
-                            </div>
-                          </div>
+                          <p className="text-xs font-medium">
+                            {mode === 'video' ? 'First frame' : 'Style reference'}
+                          </p>
                           <p className="text-[10px] text-muted-foreground truncate">
-                            {referenceImage.mode === 'style'
-                              ? 'Image-to-image: prompt drives style + content, ref guides composition'
-                              : 'Image-to-video: ref becomes the first frame'}
+                            {mode === 'video'
+                              ? 'Image-to-video: ref becomes the first frame'
+                              : 'Image-to-image: prompt drives style + content, ref guides composition'}
                           </p>
                         </div>
                         <Button
@@ -2057,16 +2099,18 @@ export function GenerateConsole({
                         <span>
                           {isUploadingRef
                             ? 'Uploading…'
-                            : 'Drop or click to add an image (style/animate ref) or a video (import for restyle/extend/interpolate)'}
+                            : mode === 'video'
+                              ? 'Drop or click to add a first-frame image, or a video to import for restyle/extend/interpolate'
+                              : 'Drop or click to add a style reference image'}
                         </span>
                         <input
                           ref={refFileInputRef}
                           type="file"
-                          accept="image/*,video/*"
+                          accept={mode === 'video' ? 'image/*,video/*' : 'image/*'}
                           className="hidden"
                           onChange={(e) => {
                             const f = e.target.files?.[0];
-                            if (f) uploadAsset(f, 'style');
+                            if (f) uploadAsset(f, mode === 'video' ? 'animate' : 'style');
                             e.target.value = '';
                           }}
                         />
@@ -2101,47 +2145,49 @@ export function GenerateConsole({
                               className="resize-none text-xs"
                             />
                           </div>
-                          <div className="flex flex-col gap-1">
-                            <label
-                              className="text-[11px] font-medium text-muted-foreground"
-                              title="Same seed + same prompt + same model = reproducible result. Image only."
-                            >
-                              Seed (image only)
-                            </label>
-                            <div className="flex gap-1.5">
-                              <Input
-                                type="number"
-                                inputMode="numeric"
-                                placeholder="Random"
-                                value={seed ?? ''}
-                                onChange={(e) => {
-                                  const v = e.target.value.trim();
-                                  setSeed(v ? Number(v) : null);
-                                }}
-                                className="h-8 text-xs"
-                              />
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 px-2 text-xs"
-                                onClick={() => setSeed(randomSeed())}
-                                title="Roll a new random seed"
+                          {mode === 'image' && (
+                            <div className="flex flex-col gap-1">
+                              <label
+                                className="text-[11px] font-medium text-muted-foreground"
+                                title="Same seed + same prompt + same model = reproducible result. Image only."
                               >
-                                <Dices className="h-3 w-3 mr-1" />
-                                Random
-                              </Button>
-                              {seed !== null && (
+                                Seed
+                              </label>
+                              <div className="flex gap-1.5">
+                                <Input
+                                  type="number"
+                                  inputMode="numeric"
+                                  placeholder="Random"
+                                  value={seed ?? ''}
+                                  onChange={(e) => {
+                                    const v = e.target.value.trim();
+                                    setSeed(v ? Number(v) : null);
+                                  }}
+                                  className="h-8 text-xs"
+                                />
                                 <Button
                                   size="sm"
-                                  variant="ghost"
+                                  variant="outline"
                                   className="h-8 px-2 text-xs"
-                                  onClick={() => setSeed(null)}
+                                  onClick={() => setSeed(randomSeed())}
+                                  title="Roll a new random seed"
                                 >
-                                  Clear
+                                  <Dices className="h-3 w-3 mr-1" />
+                                  Random
                                 </Button>
-                              )}
+                                {seed !== null && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 px-2 text-xs"
+                                    onClick={() => setSeed(null)}
+                                  >
+                                    Clear
+                                  </Button>
+                                )}
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -2249,74 +2295,78 @@ export function GenerateConsole({
 
                     {/* Actions */}
                     <div className="flex gap-2 justify-end">
-                      <Button
-                        className="flex-1 sm:flex-none rounded-full px-5"
-                        disabled={!canGenerate}
-                        onClick={() => {
-                          const slots = checkConcurrency(variations);
-                          if (slots === 0) return;
-                          const finalPrompt = applyStylePreset(prompt, stylePreset);
-                          const isStyleRef = referenceImage?.mode === 'style';
-                          for (let i = 0; i < slots; i++) {
-                            runImageGen(finalPrompt, {
-                              imageSize,
-                              imageModel,
-                              negativePrompt: negativePrompt.trim() || undefined,
-                              // For variations we want each result distinct — only
-                              // fix the seed for the first one when N>1.
-                              seed: variations > 1 && i > 0 ? null : seed,
-                              styleRefImageUrl: isStyleRef ? referenceImage!.url : undefined,
-                              stylePresetId: stylePreset ?? null,
-                            });
+                      {mode === 'image' ? (
+                        <Button
+                          className="flex-1 sm:flex-none rounded-full px-5"
+                          disabled={!canGenerate}
+                          onClick={() => {
+                            const slots = checkConcurrency(variations);
+                            if (slots === 0) return;
+                            const finalPrompt = applyStylePreset(prompt, stylePreset);
+                            const isStyleRef = referenceImage?.mode === 'style';
+                            for (let i = 0; i < slots; i++) {
+                              runImageGen(finalPrompt, {
+                                imageSize,
+                                imageModel,
+                                negativePrompt: negativePrompt.trim() || undefined,
+                                // For variations we want each result distinct — only
+                                // fix the seed for the first one when N>1.
+                                seed: variations > 1 && i > 0 ? null : seed,
+                                styleRefImageUrl: isStyleRef ? referenceImage!.url : undefined,
+                                stylePresetId: stylePreset ?? null,
+                              });
+                            }
+                            if (isStyleRef) setReferenceImage(null);
+                            setPrompt('');
+                          }}
+                        >
+                          <ImageIcon className="h-4 w-4 mr-2" />
+                          {variations > 1 ? `Generate ${variations} Images` : 'Generate Image'}
+                        </Button>
+                      ) : (
+                        <Button
+                          className="flex-1 sm:flex-none rounded-full px-5"
+                          disabled={!canGenerate || videoNeedsImage}
+                          title={
+                            videoNeedsImage
+                              ? 'Pick Seedance, or set a reference image first'
+                              : undefined
                           }
-                          if (isStyleRef) setReferenceImage(null);
-                          setPrompt('');
-                        }}
-                      >
-                        <ImageIcon className="h-4 w-4 mr-2" />
-                        {variations > 1 ? `Generate ${variations} Images` : 'Generate Image'}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="flex-1 sm:flex-none rounded-full px-5"
-                        disabled={!canGenerate || videoNeedsImage}
-                        title={
-                          videoNeedsImage
-                            ? 'Pick Seedance, or set a reference image first'
-                            : undefined
-                        }
-                        onClick={() => {
-                          if (checkConcurrency(1) === 0) return;
-                          const finalPrompt = applyStylePreset(prompt, stylePreset);
-                          const useAnimate = referenceImage?.mode === 'animate';
-                          runVideoGen(finalPrompt, {
-                            videoModel,
-                            imageSize,
-                            sourceImageUrl: useAnimate ? referenceImage!.url : undefined,
-                            negativePrompt: negativePrompt.trim() || undefined,
-                            stylePresetId: stylePreset ?? null,
-                            durationSec: videoDuration,
-                            resolution: videoResolution,
-                            cameraPreset: cameraPreset || undefined,
-                            cameraIntensity: cameraPreset ? cameraIntensity : undefined,
-                            audioOn: videoAudioOn,
-                          });
-                          if (useAnimate) setReferenceImage(null);
-                          setPrompt('');
-                        }}
-                      >
-                        <Video className="h-4 w-4 mr-2" />
-                        {referenceImage?.mode === 'animate' ? 'Animate' : 'Generate Video'}
-                      </Button>
+                          onClick={() => {
+                            if (checkConcurrency(1) === 0) return;
+                            const finalPrompt = applyStylePreset(prompt, stylePreset);
+                            const useAnimate = referenceImage?.mode === 'animate';
+                            runVideoGen(finalPrompt, {
+                              videoModel,
+                              imageSize,
+                              sourceImageUrl: useAnimate ? referenceImage!.url : undefined,
+                              negativePrompt: negativePrompt.trim() || undefined,
+                              stylePresetId: stylePreset ?? null,
+                              durationSec: videoDuration,
+                              resolution: videoResolution,
+                              cameraPreset: cameraPreset || undefined,
+                              cameraIntensity: cameraPreset ? cameraIntensity : undefined,
+                              audioOn: videoAudioOn,
+                            });
+                            if (useAnimate) setReferenceImage(null);
+                            setPrompt('');
+                          }}
+                        >
+                          <Video className="h-4 w-4 mr-2" />
+                          {referenceImage?.mode === 'animate' ? 'Animate' : 'Generate Video'}
+                        </Button>
+                      )}
                     </div>
 
-                    <VideoCostHint
-                      videoModel={videoModel}
-                      animate={referenceImage?.mode === 'animate'}
-                      durationSec={videoDuration}
-                      resolution={videoResolution}
-                      audio={videoAudioOn}
-                    />
+                    {mode === 'video' && (
+                      <VideoCostHint
+                        videoModel={videoModel}
+                        animate={referenceImage?.mode === 'animate'}
+                        durationSec={videoDuration}
+                        resolution={videoResolution}
+                        audio={videoAudioOn}
+                      />
+                    )}
 
                     <p className="text-[11px] text-muted-foreground -mt-1">
                       Up to {MAX_CONCURRENT_GENS} generations run in parallel. Each run auto-saves
@@ -3001,12 +3051,18 @@ export function GenerateConsole({
                         // 'audio' GenKind (they share filtering); audioFlavor
                         // is what actually distinguishes the composer tab.
                         setWorldKind(null);
-                        if (kind === 'audio') {
-                          setMode(draft.audioFlavor === 'music' ? 'audio' : 'voice');
-                        } else if (kind === '3d-model') setMode('3d');
-                        else if (kind === 'video') setMode('video');
-                        else setMode('image');
-                        setPrompt(draft.prompt);
+                        const target: SandboxMode =
+                          kind === 'audio'
+                            ? draft.audioFlavor === 'music'
+                              ? 'audio'
+                              : 'voice'
+                            : kind === '3d-model'
+                              ? '3d'
+                              : kind === 'video'
+                                ? 'video'
+                                : 'image';
+                        setMode(target);
+                        setPromptFor(target, draft.prompt);
                         if (draft.model && VALID_VIDEO_MODELS.has(draft.model as VideoModel)) {
                           setVideoModel(draft.model as VideoModel);
                         }
