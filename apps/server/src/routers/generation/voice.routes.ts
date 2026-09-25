@@ -1075,7 +1075,14 @@ export const voiceRouter = router({
 
   listVoices: publicProcedure.query(async () => {
     if (!elevenLabsService.isConfigured()) return [];
-    return elevenLabsService.listVoices();
+    // Catalog browse is best-effort: a bad/expired platform key must not 500
+    // the create page — the picker just shows no voices until it's fixed.
+    try {
+      return await elevenLabsService.listVoices();
+    } catch (err) {
+      console.warn('[voice.listVoices] ElevenLabs catalog unavailable:', err);
+      return [];
+    }
   }),
 
   // ── Cost estimate ─────────────────────────────────────────────────────
