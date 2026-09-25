@@ -28,8 +28,12 @@ export type Provider =
   | 'deepgram'
   | 'groq';
 
+export type ProviderCategory = 'media' | 'llm' | 'voice' | '3d' | 'transcription';
+
 export interface ProviderMeta {
   label: string;
+  /** Which part of the studio this provider powers — used to group the keys page. */
+  category: ProviderCategory;
   blurb: string;
   docsUrl: string;
   placeholder: string;
@@ -39,6 +43,7 @@ export interface ProviderMeta {
 
 export const PROVIDER_META: Record<Provider, ProviderMeta> = {
   bytedance: {
+    category: 'media',
     label: 'ByteDance ModelArk',
     blurb:
       'Powers Seedance 2.0 (video), Seedream 5.0 (images), Seed 2.0 (planning), and OmniHuman talking-scenes.',
@@ -47,6 +52,7 @@ export const PROVIDER_META: Record<Provider, ProviderMeta> = {
     lockedNote: 'Add a key to unlock Seedance, Seedream, and OmniHuman generation.',
   },
   zai: {
+    category: 'llm',
     label: 'Z.AI (GLM)',
     blurb:
       'Powers GLM-4.6 / GLM-5.x reasoning, GLM-5V vision, CogView-4 image, CogVideoX-3 video, GLM-ASR transcription, and Web Search / Web Reader tools. Used by /lab/zai, the worldbuild planner, canon-consistency checks, and the governance agent.',
@@ -55,6 +61,7 @@ export const PROVIDER_META: Record<Provider, ProviderMeta> = {
     lockedNote: 'Add a key to unlock GLM chat, vision, image, video, and transcription.',
   },
   google: {
+    category: 'media',
     label: 'Google AI (Imagen + Gemini)',
     blurb:
       'Powers Imagen 4 / nano-banana-pro image generation, Veo video, Gemini wiki generation, entity lore & profiles, ad decomposition, character image analysis, and caption translation.',
@@ -63,6 +70,7 @@ export const PROVIDER_META: Record<Provider, ProviderMeta> = {
     lockedNote: 'Add a key to unlock Imagen, Veo, wiki generation, and caption translation.',
   },
   fal: {
+    category: 'media',
     label: 'fal.ai',
     blurb:
       "Powers FLUX, Veo3, Sora 2, Kling, Runway Gen-3, WAN, PixVerse, Stable Audio, MusicGen, LoRA training & inference, lip-sync, Whisper transcription & captions, video cutdowns, inpainting/outpainting, upscaling, frame interpolation, and background removal. The studio's broadest provider.",
@@ -71,6 +79,7 @@ export const PROVIDER_META: Record<Provider, ProviderMeta> = {
     lockedNote: 'Add a key to unlock most video, image, lip-sync, and editing models.',
   },
   elevenlabs: {
+    category: 'voice',
     label: 'ElevenLabs',
     blurb:
       'Powers text-to-speech, voice cloning, voice design, sound effects, and the talking-scene pipeline.',
@@ -79,6 +88,7 @@ export const PROVIDER_META: Record<Provider, ProviderMeta> = {
     lockedNote: 'Add a key to unlock TTS, voice cloning, and sound design.',
   },
   meshy: {
+    category: '3d',
     label: 'Meshy (3D)',
     blurb:
       'Powers text-to-3D, image-to-3D, multi-image-to-3D, rigging, and re-texturing in the character pipeline.',
@@ -87,6 +97,7 @@ export const PROVIDER_META: Record<Provider, ProviderMeta> = {
     lockedNote: 'Add a key to unlock the 3D character pipeline.',
   },
   openai: {
+    category: 'llm',
     label: 'OpenAI',
     blurb: 'Powers GPT-Image, embeddings, transcription, and select LLM fallback paths.',
     docsUrl: 'https://platform.openai.com/api-keys',
@@ -94,6 +105,7 @@ export const PROVIDER_META: Record<Provider, ProviderMeta> = {
     lockedNote: 'Add a key to unlock OpenAI-backed models.',
   },
   tripo: {
+    category: '3d',
     label: 'Tripo3D',
     blurb:
       'Powers Tripo text-to-3D and image-to-3D generation — an alternative 3D backend to Meshy.',
@@ -102,6 +114,7 @@ export const PROVIDER_META: Record<Provider, ProviderMeta> = {
     lockedNote: 'Add a key to unlock Tripo 3D generation.',
   },
   minimax: {
+    category: 'media',
     label: 'MiniMax (Hailuo)',
     blurb: 'Powers MiniMax Hailuo video generation — text-to-video and image-to-video.',
     docsUrl: 'https://platform.minimaxi.com/document/Fast%20access?key=66719005a427f0c8a5701643',
@@ -109,6 +122,7 @@ export const PROVIDER_META: Record<Provider, ProviderMeta> = {
     lockedNote: 'Add a key to unlock Hailuo video generation.',
   },
   assemblyai: {
+    category: 'transcription',
     label: 'AssemblyAI',
     blurb: 'Powers the Universal-2, SLAM-1, and Nano transcription models.',
     docsUrl: 'https://www.assemblyai.com/app/account',
@@ -116,6 +130,7 @@ export const PROVIDER_META: Record<Provider, ProviderMeta> = {
     lockedNote: 'Add a key to unlock AssemblyAI transcription models.',
   },
   deepgram: {
+    category: 'transcription',
     label: 'Deepgram',
     blurb: 'Powers Nova-3 (plus medical/multilingual variants), Nova-2, and Whisper Cloud.',
     docsUrl: 'https://console.deepgram.com/project',
@@ -123,6 +138,7 @@ export const PROVIDER_META: Record<Provider, ProviderMeta> = {
     lockedNote: 'Add a key to unlock Deepgram transcription models.',
   },
   groq: {
+    category: 'transcription',
     label: 'Groq',
     blurb: 'Powers Whisper Large v3 / Turbo and Distil-Whisper — the fastest transcription tier.',
     docsUrl: 'https://console.groq.com/keys',
@@ -130,6 +146,15 @@ export const PROVIDER_META: Record<Provider, ProviderMeta> = {
     lockedNote: 'Add a key to unlock Groq transcription models.',
   },
 };
+
+/** Display order + copy for the category groups on /settings/api-keys. */
+export const PROVIDER_CATEGORIES: { id: ProviderCategory; label: string; blurb: string }[] = [
+  { id: 'media', label: 'Video & image', blurb: 'Generation and editing models' },
+  { id: 'llm', label: 'Language models', blurb: 'Reasoning, planning, embeddings' },
+  { id: 'voice', label: 'Voice & sound', blurb: 'Speech, cloning, sound design' },
+  { id: '3d', label: '3D', blurb: 'Characters, props, rigging' },
+  { id: 'transcription', label: 'Transcription', blurb: 'Speech-to-text and captions' },
+];
 
 export function isKnownProviderMeta(id: string): id is Provider {
   return id in PROVIDER_META;
@@ -174,4 +199,53 @@ export function formatRelativeTime(
   const day = Math.floor(hr / 24);
   if (day <= 30) return `${day}d ago`;
   return new Date(t).toLocaleDateString();
+}
+
+/** Filter buckets for the provider list. `attention` = rejected or disabled. */
+export type KeyFilter = 'all' | 'active' | 'attention' | 'locked';
+
+export interface KeySummary {
+  total: number;
+  active: number;
+  disabled: number;
+  rejected: number;
+  locked: number;
+}
+
+/**
+ * Roll a `providers.listKeys` result up into per-status counts across every
+ * provider the client knows about. Stored keys for providers this build has
+ * no meta for are ignored so the counts always add up to `total`.
+ */
+export function summarizeKeys(
+  keys: readonly ({ provider: string } & StoredKeyState)[] | null | undefined
+): KeySummary {
+  const summary: KeySummary = {
+    total: Object.keys(PROVIDER_META).length,
+    active: 0,
+    disabled: 0,
+    rejected: 0,
+    locked: 0,
+  };
+  const seen = new Set<string>();
+  for (const k of keys ?? []) {
+    if (!isKnownProviderMeta(k.provider) || seen.has(k.provider)) continue;
+    seen.add(k.provider);
+    summary[keyStatus(k)] += 1;
+  }
+  summary.locked = summary.total - seen.size;
+  return summary;
+}
+
+/** Whether a provider (with `key` = its stored key, if any) belongs in the given filter bucket. */
+export function matchesKeyFilter(
+  key: StoredKeyState | null | undefined,
+  filter: KeyFilter
+): boolean {
+  if (filter === 'all') return true;
+  if (!key) return filter === 'locked';
+  const status = keyStatus(key);
+  if (filter === 'active') return status === 'active';
+  if (filter === 'attention') return status !== 'active';
+  return false;
 }

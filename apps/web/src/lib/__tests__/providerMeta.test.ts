@@ -4,11 +4,14 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  PROVIDER_CATEGORIES,
   PROVIDER_META,
   type Provider,
   formatRelativeTime,
   isKnownProviderMeta,
   keyStatus,
+  matchesKeyFilter,
+  summarizeKeys,
   providerLabel,
 } from '../providerMeta';
 
@@ -98,5 +101,80 @@ describe('formatRelativeTime', () => {
   it('clamps future timestamps and survives garbage', () => {
     expect(formatRelativeTime(now + 60_000, now)).toBe('just now');
     expect(formatRelativeTime('not-a-date', now)).toBe('unknown');
+  });
+});
+
+describe('provider categories', () => {
+  it('every provider belongs to a listed category, and no category is empty', () => {
+    const ids = new Set(PROVIDER_CATEGORIES.map((c) => c.id));
+    for (const [id, m] of Object.entries(PROVIDER_META)) {
+      expect(ids.has(m.category), `${id}.category`).toBe(true);
+    }
+    for (const c of PROVIDER_CATEGORIES) {
+      expect(
+        Object.values(PROVIDER_META).some((m) => m.category === c.id),
+        c.id
+      ).toBe(true);
+    }
+  });
+});
+
+describe('summarizeKeys', () => {
+  const total = Object.keys(PROVIDER_META).length;
+
+  it('treats no keys as everything locked', () => {
+    expect(summarizeKeys(undefined)).toEqual({
+      total,
+      active: 0,
+      disabled: 0,
+      rejected: 0,
+      locked: total,
+    });
+  });
+
+  it('buckets by status and counts the rest as locked', () => {
+    const s = summarizeKeys([
+      { provider: 'fal', enabled: true, lastCheckStatus: 'valid' },
+      { provider: 'openai', enabled: false, lastCheckStatus: null },
+      { provider: 'google', enabled: false, lastCheckStatus: 'invalid' },
+    ]);
+    expect(s).toMatchObject({ active: 1, disabled: 1, rejected: 1, locked: total - 3 });
+  });
+
+  it('ignores unknown providers and duplicates', () => {
+    const s = summarizeKeys([
+      { provider: 'fal', enabled: true },
+      { provider: 'fal', enabled: true },
+      { provider: 'not-a-provider', enabled: true },
+    ]);
+    expect(s.active).toBe(1);
+    expect(s.locked).toBe(total - 1);
+  });
+});
+
+describe('matchesKeyFilter', () => {
+  const active = { enabled: true, lastCheckStatus: 'valid' as const };
+  const disabled = { enabled: false };
+  const rejected = { enabled: true, lastCheckStatus: 'invalid' as const };
+
+  it('all matches everything', () => {
+    expect(matchesKeyFilter(null, 'all')).toBe(true);
+    expect(matchesKeyFilter(active, 'all')).toBe(true);
+  });
+  it('locked only matches providers with no key', () => {
+    expect(matchesKeyFilter(null, 'locked')).toBe(true);
+    expect(matchesKeyFilter(active, 'locked')).toBe(false);
+  });
+  it('active excludes disabled, rejected and missing keys', () => {
+    expect(matchesKeyFilter(active, 'active')).toBe(true);
+    expect(matchesKeyFilter(disabled, 'active')).toBe(false);
+    expect(matchesKeyFilter(rejected, 'active')).toBe(false);
+    expect(matchesKeyFilter(null, 'active')).toBe(false);
+  });
+  it('attention covers disabled and rejected but not missing keys', () => {
+    expect(matchesKeyFilter(disabled, 'attention')).toBe(true);
+    expect(matchesKeyFilter(rejected, 'attention')).toBe(true);
+    expect(matchesKeyFilter(active, 'attention')).toBe(false);
+    expect(matchesKeyFilter(null, 'attention')).toBe(false);
   });
 });
