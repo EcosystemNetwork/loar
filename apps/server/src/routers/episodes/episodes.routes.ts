@@ -31,6 +31,13 @@ import { validateAgainstLaws } from '../physics/physics.handlers';
 import { runEpisodeCanonCheck, shouldBlockCanonPublish } from '../../services/canon-check';
 import { decodeEventLog, getAddress, keccak256, toBytes } from 'viem';
 import type { ExportSettings, Soundtrack, TextOverlay } from '../../services/ffmpeg/episode-render';
+import {
+  isDefaultMix,
+  isNeutral,
+  resolveMix,
+  type StoredMix,
+} from '../../services/ffmpeg/audio-mix';
+import { audioMixSchema } from './audio-mix.schema';
 
 /**
  * Minimal ABI for the EpisodeCanonized event so we can decode receipts
@@ -153,6 +160,17 @@ const soundtrackSchema = z.object({
   volume: z.number().min(0).max(1).default(0.5),
 });
 
+/** The stored audio mix, re-validated at export time; a corrupt one is skipped rather than crashing the render. */
+function parseStoredMix(raw: unknown): StoredMix | null {
+  if (!raw) return null;
+  const parsed = audioMixSchema.safeParse(raw);
+  if (!parsed.success) {
+    console.error('[episode-export] ignoring invalid stored audioMix:', parsed.error.message);
+    return null;
+  }
+  return parsed.data as StoredMix;
+}
+
 const exportSettingsSchema = z.object({
   aspect: z.enum(['16:9', '9:16', '1:1']).default('16:9'),
   resolution: z.enum(['720p', '1080p']).default('720p'),
@@ -225,6 +243,7 @@ async function recordVersion(
     clips: state.clips ?? [],
     overlays: state.overlays ?? [],
     soundtrack: state.soundtrack ?? null,
+    audioMix: state.audioMix ?? null,
   };
   const hash = stableJson(content);
 
@@ -264,6 +283,7 @@ async function runExport(
     settings?: Partial<ExportSettings>;
     overlays?: TextOverlay[];
     soundtrack?: Soundtrack | null;
+    audioMix?: StoredMix | null;
   } = {}
 ) {
   const jobRef = exportJobsCol().doc(jobId);
@@ -302,13 +322,14 @@ async function runExport(
     // 2b. Burn in captions and mix the soundtrack (skipped when there are none).
     let finalPath = outputPath;
     let warnings: string[] = [];
-    if (render.overlays?.length || render.soundtrack) {
+    const mix = render.audioMix && !isNeutral(resolveMix(render.audioMix)) ? render.audioMix : null;
+    if (render.overlays?.length || render.soundtrack || mix) {
       await jobRef.update({ status: 'finishing', progress: 82 });
       const finalized = await finalizeEpisode(
         outputPath,
         join(workDir, `episode-${jobId}-final.mp4`),
         workDir,
-        { overlays: render.overlays, soundtrack: render.soundtrack, target }
+        { overlays: render.overlays, soundtrack: render.soundtrack, mix, target }
       );
       finalPath = finalized.path;
       warnings = finalized.warnings;
@@ -930,6 +951,7 @@ export const episodesRouter = router({
         clips: z.array(clipSchema).min(1).max(200).optional(),
         overlays: z.array(overlaySchema).max(MAX_OVERLAYS).optional(),
         soundtrack: soundtrackSchema.nullable().optional(),
+        audioMix: audioMixSchema.nullable().optional(),
         exportSettings: exportSettingsSchema.optional(),
         versionKind: z.enum(['manual', 'auto']).optional(),
       })
@@ -951,16 +973,22 @@ export const episodesRouter = router({
       }
       if (input.overlays) updates.overlays = input.overlays;
       if (input.soundtrack !== undefined) updates.soundtrack = input.soundtrack;
+      if (input.audioMix !== undefined) {
+        // The untouched default is stored as null (see isDefaultMix).
+        updates.audioMix =
+          input.audioMix && !isDefaultMix(input.audioMix as StoredMix) ? input.audioMix : null;
+      }
       if (input.exportSettings) updates.exportSettings = input.exportSettings;
 
       // The export is only stale when something it renders actually changed —
       // autosaving an identical cut must not throw away a finished export.
-      const changed = (key: 'clips' | 'overlays' | 'soundtrack' | 'exportSettings') =>
+      const changed = (key: 'clips' | 'overlays' | 'soundtrack' | 'audioMix' | 'exportSettings') =>
         key in updates && stableJson(updates[key]) !== stableJson(before[key] ?? null);
       if (
         changed('clips') ||
         changed('overlays') ||
         changed('soundtrack') ||
+        changed('audioMix') ||
         changed('exportSettings')
       ) {
         updates.exportUrl = null;
@@ -1013,6 +1041,7 @@ export const episodesRouter = router({
         clips: (v.clips ?? []) as EpisodeClip[],
         overlays: (v.overlays ?? []) as Array<z.infer<typeof overlaySchema>>,
         soundtrack: (v.soundtrack ?? null) as z.infer<typeof soundtrackSchema> | null,
+        audioMix: (v.audioMix ?? null) as z.infer<typeof audioMixSchema> | null,
       };
     }),
 
@@ -1885,6 +1914,7 @@ export const episodesRouter = router({
         settings: episode.exportSettings,
         overlays: episode.overlays,
         soundtrack: episode.soundtrack,
+        audioMix: parseStoredMix(episode.audioMix),
       }).catch((err) => {
         console.error(`[episode-export] Uncaught error in job ${jobId}:`, err);
       });

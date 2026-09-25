@@ -7,6 +7,7 @@ import {
   NEUTRAL_MIX,
   buildMixdownArgs,
   clipFilter,
+  isDefaultMix,
   isNeutral,
   resolveMix,
   type MixClip,
@@ -96,6 +97,17 @@ describe("resolveMix (must mirror the web app's lib/audioMix.ts rules)", () => {
       loop: true,
       trimStart: 0,
     });
+  });
+});
+
+describe('isDefaultMix', () => {
+  it('is true only for the untouched default (stored as null)', () => {
+    expect(isDefaultMix(NEUTRAL_MIX)).toBe(true);
+    expect(isDefaultMix(mix([]))).toBe(true);
+    // A track that exists — even an empty or muted one — is user data and must be kept.
+    expect(isDefaultMix(mix([track('t', [])]))).toBe(false);
+    expect(isDefaultMix(mix([], { master: 0.9 }))).toBe(false);
+    expect(isDefaultMix(mix([], { video: { volume: 1, muted: true, solo: false } }))).toBe(false);
   });
 });
 

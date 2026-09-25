@@ -118,6 +118,18 @@ export function resolveMix(mix: StoredMix): ResolvedMix {
   return { clips, videoGain, masterGain: clamp(mix.mixer.master, 0, MAX_GAIN) };
 }
 
+/**
+ * Is this the untouched default (no tracks, unity mixer)? Stored as null so an
+ * episode nobody has mixed stays byte-identical to one saved before this feature,
+ * and autosaving it doesn't look like an edit.
+ */
+export function isDefaultMix(mix: StoredMix): boolean {
+  const { video, master } = mix.mixer;
+  return (
+    mix.tracks.length === 0 && video.volume === 1 && !video.muted && !video.solo && master === 1
+  );
+}
+
 /** True when the mix wouldn't change the video's audio at all — the export can skip this pass. */
 export function isNeutral(resolved: ResolvedMix): boolean {
   return resolved.clips.length === 0 && resolved.videoGain === 1 && resolved.masterGain === 1;

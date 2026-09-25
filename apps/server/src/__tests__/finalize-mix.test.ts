@@ -10,7 +10,7 @@ vi.mock('../lib/url-validator', () => ({
   safeFetch: async (url: string) => {
     const file = served.get(url);
     if (!file) return new Response('nope', { status: 404 });
-    return new Response(readFileSync(file), { status: 200 });
+    return new Response(new Uint8Array(readFileSync(file)), { status: 200 });
   },
 }));
 
