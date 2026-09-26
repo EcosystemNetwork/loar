@@ -557,14 +557,27 @@ export const entitiesRouter = router({
     )
     .query(async ({ ctx, input }) => {
       if (!db) return { entities: [], total: 0 };
+      // Equality-only query (no orderBy) so it needs no composite index — the
+      // uid+targetType+createdAt index wasn't deployed in prod and 500'd the
+      // whole Bookmarks tab. A user's likes are small, so sort in memory.
       const likesSnap = await db
         .collection('likes')
         .where('uid', '==', ctx.user.uid)
         .where('targetType', '==', 'entity')
-        .orderBy('createdAt', 'desc')
-        .limit(input.limit)
+        .limit(1000)
         .get();
-      const ids = likesSnap.docs.map((d) => d.data().targetId as string);
+      const toMillis = (v: unknown): number => {
+        if (v && typeof (v as { toMillis?: unknown }).toMillis === 'function') {
+          return (v as { toMillis: () => number }).toMillis();
+        }
+        const t = new Date(v as string | number | Date).getTime();
+        return Number.isNaN(t) ? 0 : t;
+      };
+      const ids = likesSnap.docs
+        .map((d) => d.data())
+        .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt))
+        .slice(0, input.limit)
+        .map((d) => d.targetId as string);
       if (ids.length === 0) return { entities: [], total: 0 };
       const excluded = await getExcludedUniverseIds({ viewerAddress: ctx.user.address });
       const entities = (await Promise.all(ids.map((id) => getEntity(id).catch(() => null)))).filter(
