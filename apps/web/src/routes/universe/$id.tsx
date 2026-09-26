@@ -72,7 +72,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import ReactFlow, {
   Background,
-  Controls,
   MiniMap,
   useNodesState,
   useEdgesState,
@@ -3378,7 +3377,6 @@ function UniverseTimelineEditorInner() {
               <NodeArcOverlay nodes={nodes} arcs={nodeArcs.arcs} />
 
               <Background />
-              <Controls showInteractive={false} />
 
               {/* MiniMap — togglable with settings, auto-collapse, legend, stats */}
               {showMiniMap &&
@@ -3765,7 +3763,7 @@ function UniverseTimelineEditorInner() {
                   {/* Episodes — browse and export saved episodes */}
                   <button
                     onClick={() => setShowEpisodeList(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900/80 backdrop-blur-sm border border-zinc-700 rounded-lg text-zinc-300 hover:bg-emerald-500/10 hover:text-emerald-300 hover:border-emerald-500/30 transition-colors text-sm"
+                    className="flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-1.5 bg-zinc-900/80 backdrop-blur-sm border border-zinc-700 rounded-lg text-zinc-300 hover:bg-emerald-500/10 hover:text-emerald-300 hover:border-emerald-500/30 transition-colors text-sm"
                     title="Browse & export saved episodes"
                   >
                     <Film className="h-4 w-4" />

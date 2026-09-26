@@ -110,7 +110,7 @@ export function NodeCountChip({
         <button
           data-testid="node-count-chip"
           className={cn(
-            'flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900/80 backdrop-blur-sm border rounded-lg text-sm transition-colors',
+            'flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-1.5 bg-zinc-900/80 backdrop-blur-sm border rounded-lg text-sm transition-colors',
             justDropped
               ? 'border-red-500/50 text-red-300 animate-pulse'
               : catchingUp
