@@ -1047,6 +1047,20 @@
           "order": "ASCENDING"
         },
         {
+          "fieldPath": "viewedAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "episodeViews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "universeId",
+          "order": "ASCENDING"
+        },
+        {
           "fieldPath": "episodeId",
           "order": "ASCENDING"
         }

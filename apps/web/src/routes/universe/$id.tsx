@@ -3349,6 +3349,7 @@ function UniverseTimelineEditorInner() {
               multiSelectionKeyCode="Shift"
               deleteKeyCode={null}
               fitView
+              fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
               className="bg-gradient-to-br from-background via-background/95 to-muted/20"
               minZoom={0.1}
               maxZoom={2}
