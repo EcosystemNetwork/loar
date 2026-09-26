@@ -3746,19 +3746,22 @@ function UniverseTimelineEditorInner() {
                 </Panel>
               )}
 
-              <Panel position="top-right">
-                <div className="flex gap-2">
-                  {/* Add scene — the trailing dashed "+" node is easy to miss (and
-                      absent on an empty canvas), so surface it in the toolbar. */}
-                  <button
-                    onClick={handleAddSceneFromToolbar}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-zinc-950 font-medium rounded-lg hover:bg-amber-400 transition-colors text-sm shadow-lg"
-                    title="Add a new scene (N) — continues after the selected scene"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add scene
-                  </button>
+              {/* Add scene — its own top-left panel: the trailing dashed "+" node is
+                  easy to miss (and absent on an empty canvas), and the top-right
+                  toolbar is wide enough to clip off-screen. */}
+              <Panel position="top-left" className="z-40">
+                <button
+                  onClick={handleAddSceneFromToolbar}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-zinc-950 font-medium rounded-lg hover:bg-amber-400 transition-colors text-sm shadow-lg"
+                  title="Add a new scene (N) — continues after the selected scene"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add scene
+                </button>
+              </Panel>
 
+              <Panel position="top-right">
+                <div className="flex flex-wrap justify-end gap-2">
                   {/* Episodes — browse and export saved episodes */}
                   <button
                     onClick={() => setShowEpisodeList(true)}
