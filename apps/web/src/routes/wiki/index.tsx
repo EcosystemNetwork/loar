@@ -44,6 +44,7 @@ import { useResolvedIpfsUrl } from '@/hooks/useResolvedIpfsUrl';
 import { EntityCard } from '@/components/wiki/EntityCard';
 import { WikiGridSkeleton } from '@/components/wiki/WikiGridSkeleton';
 import { GalleryGrid } from '@/components/gallery/GalleryGrid';
+import { MediaLightbox } from '@/components/gallery/MediaLightbox';
 import { GalleryFilters } from '@/components/gallery/GalleryFilters';
 import { useGalleryTrending } from '@/hooks/useGallery';
 import { TrendingUp } from 'lucide-react';
@@ -249,7 +250,7 @@ function EntityTab({ kind, universeAddress }: { kind: EntityKind; universeAddres
  * video instance can own its load state (queue slot + fade-in) instead of
  * all of them firing their src at once and causing a flash of empty tiles.
  */
-function TrendingTile({ item }: { item: any }) {
+function TrendingTile({ item, onOpen }: { item: any; onOpen: (item: any) => void }) {
   const isVideo = item.mediaType === 'video' || item.mediaType === 'ai-video';
   const isAudio = item.mediaType === 'audio';
   const is3D = item.mediaType === '3d' || item.mediaType === 'ai-3d';
@@ -263,7 +264,12 @@ function TrendingTile({ item }: { item: any }) {
   const [loaded, setLoaded] = useState(false);
   const posterUrl = useResolvedIpfsUrl(item.thumbnailUrl || item.imageUrl);
   return (
-    <div className="relative aspect-video rounded-lg overflow-hidden group cursor-pointer bg-gradient-to-br from-zinc-900 via-zinc-900/95 to-zinc-800">
+    <button
+      type="button"
+      onClick={() => onOpen(item)}
+      aria-label={`Open ${item.title || 'trending item'}`}
+      className="relative aspect-video w-full rounded-lg overflow-hidden group cursor-pointer text-left bg-gradient-to-br from-zinc-900 via-zinc-900/95 to-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
       {isVideo && item.mediaUrl ? (
         <>
           <video
@@ -315,7 +321,7 @@ function TrendingTile({ item }: { item: any }) {
       <div className="absolute bottom-2 left-2 text-white text-xs font-medium truncate max-w-[90%]">
         {item.title || 'Untitled'}
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -328,6 +334,7 @@ function GalleryTab({ universeAddress }: { universeAddress?: string }) {
   const [mediaType, setMediaType] = useState<GalleryMediaType>('all');
   const [sortBy, setSortBy] = useState<GallerySort>('newest');
   const [originFilter, setOriginFilter] = useState<GalleryOrigin>('all');
+  const [trendingItem, setTrendingItem] = useState<any>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['wiki', 'gallery', universeAddress, mediaType, sortBy, originFilter],
@@ -365,12 +372,17 @@ function GalleryTab({ universeAddress }: { universeAddress?: string }) {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {trending.slice(0, 4).map((item: any) => (
-                <TrendingTile key={item.id} item={item} />
+                <TrendingTile key={item.id} item={item} onOpen={setTrendingItem} />
               ))}
             </div>
           </CardContent>
         </Card>
       )}
+      <MediaLightbox
+        content={trendingItem}
+        onClose={() => setTrendingItem(null)}
+        onNavigate={(item) => setTrendingItem(item)}
+      />
 
       {/* Shared filter bar: search + media pills + sort + origin */}
       <GalleryFilters
