@@ -110,6 +110,8 @@ export interface TimelineNodeData {
   timelineId?: string;
   universeId?: string;
   nodeType?: 'scene' | 'branch' | 'add';
+  /** Transient placeholder for a node that is about to be created (create panel open). */
+  isGhost?: boolean;
   isCanon?: boolean; // Whether this node is canonical
   isInCanonChain?: boolean; // Whether this node is part of the canonical chain
   isDraft?: boolean; // Generated but not yet saved on-chain — lives only in this browser
@@ -271,6 +273,26 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
     return () => videoElement.removeEventListener('timeupdate', onTimeUpdate);
   }, [videoElement, data.trimStart, data.trimEnd]);
 
+  // Placeholder for the node being created — same footprint as a real node.
+  if (data.nodeType === 'add' && data.isGhost) {
+    return (
+      <>
+        <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
+        <div
+          data-testid="ghost-node"
+          className="w-80 h-72 rounded-lg border-2 border-dashed border-amber-500/70 bg-amber-500/5 flex flex-col items-center justify-center gap-2 text-center animate-pulse"
+        >
+          <Plus className="h-8 w-8 text-amber-500" />
+          <p className="text-sm font-medium text-amber-400">New node</p>
+          <p className="text-xs text-muted-foreground px-6">
+            Describe it in the panel below and generate a video to fill this in.
+          </p>
+        </div>
+        <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
+      </>
+    );
+  }
+
   // Add Event Node - just a + button
   if (data.nodeType === 'add') {
     return (
@@ -288,7 +310,7 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
               e.stopPropagation();
               data.onAddScene?.('after', data.eventId);
             }}
-            title="Add new event"
+            title="Add new node"
           >
             <Plus className="h-6 w-6 text-primary" />
           </Button>

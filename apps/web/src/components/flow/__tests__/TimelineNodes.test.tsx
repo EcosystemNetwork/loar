@@ -62,9 +62,18 @@ afterEach(() => {
 });
 
 describe('TimelineEventNode — "add" placeholder', () => {
+  it('renders the ghost placeholder for a node being created, with no + button', () => {
+    renderNode({ nodeType: 'add', isGhost: true });
+    expect(screen.getByTestId('ghost-node')).toBeInTheDocument();
+    expect(screen.getByText('New node')).toBeInTheDocument();
+    expect(screen.queryByTitle('Add new node')).toBeNull();
+    expect(screen.getByTestId('handle-target')).toBeInTheDocument();
+    expect(screen.getByTestId('handle-source')).toBeInTheDocument();
+  });
+
   it('renders only a + button and both handles, no event card', () => {
     const { container } = renderNode({ nodeType: 'add' });
-    expect(screen.getByTitle('Add new event')).toBeInTheDocument();
+    expect(screen.getByTitle('Add new node')).toBeInTheDocument();
     expect(screen.getByTestId('handle-target')).toBeInTheDocument();
     expect(screen.getByTestId('handle-source')).toBeInTheDocument();
     expect(card(container)).toBeNull();
@@ -83,14 +92,14 @@ describe('TimelineEventNode — "add" placeholder', () => {
         />
       </div>
     );
-    await userEvent.click(screen.getByTitle('Add new event'));
+    await userEvent.click(screen.getByTitle('Add new node'));
     expect(onAddScene).toHaveBeenCalledExactlyOnceWith('after', '9');
     expect(bubbled).not.toHaveBeenCalled();
   });
 
   it('does not throw when onAddScene is missing', async () => {
     renderNode({ nodeType: 'add', onAddScene: undefined });
-    await userEvent.click(screen.getByTitle('Add new event'));
+    await userEvent.click(screen.getByTitle('Add new node'));
   });
 
   it('never renders a <video>, even if a videoUrl leaked into its data', async () => {

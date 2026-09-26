@@ -361,3 +361,41 @@ export function appendAddFinalNode({ nodes, edges }: SceneFlowGraph): SceneFlowG
     ],
   };
 }
+
+export const NEW_NODE_HORIZONTAL_SPACING = 420;
+export const NEW_NODE_VERTICAL_SPACING = 320;
+
+interface XY {
+  x: number;
+  y: number;
+}
+
+/**
+ * Where a newly added node — and the trailing "+" node after it — should sit.
+ * A branch stacks below the source's existing children; a linear addition goes
+ * one column right of the source (or of the last scene); an empty canvas starts
+ * at (100, 100). Pure; shared by the real create path and the placeholder shown
+ * while the create panel is open so the two never disagree.
+ */
+export function getNewNodePosition({
+  additionType,
+  source,
+  reference,
+  sourceChildCount,
+}: {
+  additionType: 'after' | 'branch';
+  source: { position: XY } | null;
+  reference: { position: XY } | null;
+  sourceChildCount: number;
+}): { event: XY; add: XY } {
+  const h = NEW_NODE_HORIZONTAL_SPACING;
+  if (additionType === 'branch' && source) {
+    const y = source.position.y + sourceChildCount * NEW_NODE_VERTICAL_SPACING;
+    return { event: { x: source.position.x + h, y }, add: { x: source.position.x + h * 2, y } };
+  }
+  if (reference) {
+    const { x, y } = reference.position;
+    return { event: { x: x + h, y }, add: { x: x + h * 2, y } };
+  }
+  return { event: { x: 100, y: 100 }, add: { x: 100 + h, y: 100 } };
+}

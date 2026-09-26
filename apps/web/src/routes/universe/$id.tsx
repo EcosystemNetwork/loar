@@ -129,6 +129,7 @@ import { nextSceneEventId } from '@/lib/sceneEventId';
 import {
   buildSceneFlowGraph,
   mergeDraftNodes,
+  getNewNodePosition,
   appendAddFinalNode,
   resolveArchivedNodeIds,
   TIMELINE_LAYOUT_CONFIG,
@@ -176,6 +177,9 @@ import {
 import { VideoTrimmer } from '@/components/segments/VideoTrimmer';
 import type { VideoSegment } from '@/types/segments';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
+
+/** Id of the transient placeholder node shown while the create panel is open. */
+const GHOST_NODE_ID = 'add-ghost';
 
 // Custom MiniMap node — shape varies by node type
 function MiniMapNode({
@@ -556,7 +560,8 @@ function UniverseTimelineEditorInner() {
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const { fitView, zoomIn, zoomOut, setCenter, getZoom, getNodes, getViewport } = useReactFlow();
+  const { fitView, zoomIn, zoomOut, setCenter, getZoom, getNodes, getEdges, getViewport } =
+    useReactFlow();
 
   // Fit the selection when there is one (so you can zoom into a few nodes),
   // otherwise the whole graph. Capped at 100% so a sparse graph doesn't blow up.
@@ -1550,7 +1555,7 @@ function UniverseTimelineEditorInner() {
     setShowVideoDialog(true);
   }, []);
 
-  // Toolbar / hotkey entry point for "add a scene". Continues after the single
+  // Toolbar / hotkey entry point for "add a node". Continues after the single
   // selected scene when there is one, otherwise after the last scene (or starts
   // the timeline on an empty canvas) — handleCreateEvent falls back to that.
   const handleAddSceneFromToolbar = useCallback(() => {
@@ -1560,6 +1565,91 @@ function UniverseTimelineEditorInner() {
     const source = selectedScenes.length === 1 ? selectedScenes[0] : null;
     handleAddEvent('after', (source?.data?.eventId ?? source?.id)?.toString());
   }, [handleAddEvent]);
+
+  // While the create panel is open, show a dashed placeholder where the new node
+  // will land (and hide the trailing "+" so they don't overlap), then centre the
+  // view on it. Without this, clicking "Add node" only raised a prompt bar at the
+  // bottom and nothing visibly happened on the canvas. Purely transient: closing
+  // the panel — cancelled or after the real node is created — removes it.
+  useEffect(() => {
+    const isGhost = (n: any) => n.id === GHOST_NODE_ID;
+    if (!showVideoDialog) {
+      setNodes((ns: any[]) =>
+        ns.some((n) => isGhost(n) || n.hidden)
+          ? ns
+              .filter((n) => !isGhost(n))
+              .map((n) => (n.data?.nodeType === 'add' && n.hidden ? { ...n, hidden: false } : n))
+          : ns
+      );
+      setEdges((es: any[]) =>
+        es.some((e) => e.target === GHOST_NODE_ID)
+          ? es.filter((e) => e.target !== GHOST_NODE_ID)
+          : es
+      );
+      return;
+    }
+
+    const current = nodesRef.current as any[];
+    const currentEdges = getEdges();
+    const sourceNode = sourceNodeId
+      ? current.find((n) => n.data?.eventId === sourceNodeId || n.id === sourceNodeId)
+      : null;
+    const lastScene = current.filter((n) => n.data?.nodeType === 'scene').pop();
+    const referenceNode = sourceNode || lastScene || null;
+    const sourceChildCount = sourceNode
+      ? current.filter(
+          (n) =>
+            n.data?.nodeType === 'scene' &&
+            currentEdges.some((e) => e.source === sourceNode.id && e.target === n.id)
+        ).length
+      : 0;
+    const { event } = getNewNodePosition({
+      additionType,
+      source: sourceNode ?? null,
+      reference: referenceNode,
+      sourceChildCount,
+    });
+
+    setNodes((ns: any[]) => [
+      ...ns
+        .filter((n) => !isGhost(n))
+        .map((n) => (n.data?.nodeType === 'add' ? { ...n, hidden: true } : n)),
+      {
+        id: GHOST_NODE_ID,
+        type: 'timelineEvent',
+        position: event,
+        draggable: false,
+        selectable: false,
+        data: { label: '', description: '', nodeType: 'add', isGhost: true },
+      },
+    ]);
+    setEdges((es: any[]) => [
+      ...es.filter((e) => e.target !== GHOST_NODE_ID),
+      ...(referenceNode
+        ? [
+            {
+              id: `edge-${referenceNode.id}-${GHOST_NODE_ID}`,
+              source: referenceNode.id,
+              target: GHOST_NODE_ID,
+              animated: true,
+              style: { stroke: '#f59e0b', strokeDasharray: '8,8' },
+            },
+          ]
+        : []),
+    ]);
+    // Aim a little below the node's centre so it clears the panel at the bottom.
+    const zoom = Math.max(getZoom(), 0.5);
+    setCenter(event.x + 160, event.y + 136 + 140 / zoom, { zoom, duration: 400 });
+  }, [
+    showVideoDialog,
+    additionType,
+    sourceNodeId,
+    getEdges,
+    getZoom,
+    setCenter,
+    setNodes,
+    setEdges,
+  ]);
 
   // Handle editing video on an existing node
   // Uses nodesRef to avoid depending on `nodes` — prevents infinite
@@ -2316,7 +2406,7 @@ function UniverseTimelineEditorInner() {
         return;
       }
 
-      // N — add a new scene
+      // N — add a new node
       if (e.key === 'n' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
         handleAddSceneFromToolbar();
@@ -2671,45 +2761,21 @@ function UniverseTimelineEditorInner() {
       });
       const newAddId = `add-${newEventId}`;
 
-      // Calculate position based on addition type and depth in tree
-      let newEventPosition;
-      let newAddPosition;
-
-      const horizontalSpacing = 420;
-      const verticalSpacing = 320; // Match blockchain node spacing
-
-      if (additionType === 'branch' && sourceNode) {
-        // Create branch: same X depth as if it were a linear continuation, but offset vertically
-        // Count how many children the source node already has to position this branch correctly
-        const sourceChildren = nodes.filter((n: any) => {
-          const parentMatch = edges.find((e) => e.source === sourceNode.id && e.target === n.id);
-          return parentMatch && n.data.nodeType === 'scene';
-        });
-
-        const branchIndex = sourceChildren.length; // 0-based index for this new branch
-        const branchY = sourceNode.position.y + branchIndex * verticalSpacing;
-
-        // Use same X as linear continuation would use
-        newEventPosition = { x: sourceNode.position.x + horizontalSpacing, y: branchY };
-        newAddPosition = { x: sourceNode.position.x + horizontalSpacing * 2, y: branchY };
-      } else {
-        // Linear addition to the right of the reference node (or source node)
-        if (referenceNode) {
-          // Place after the specific reference/source node at same depth
-          newEventPosition = {
-            x: referenceNode.position.x + horizontalSpacing,
-            y: referenceNode.position.y,
-          };
-          newAddPosition = {
-            x: referenceNode.position.x + horizontalSpacing * 2,
-            y: referenceNode.position.y,
-          };
-        } else {
-          // No reference node, start fresh
-          newEventPosition = { x: 100, y: 100 };
-          newAddPosition = { x: 100 + horizontalSpacing, y: 100 };
-        }
-      }
+      // Position: branches stack under the source's existing children (counted
+      // from the current edges), linear additions go one column right.
+      const sourceChildCount = sourceNode
+        ? nodes.filter(
+            (n: any) =>
+              n.data.nodeType === 'scene' &&
+              edges.some((e) => e.source === sourceNode.id && e.target === n.id)
+          ).length
+        : 0;
+      const { event: newEventPosition, add: newAddPosition } = getNewNodePosition({
+        additionType,
+        source: sourceNode ?? null,
+        reference: referenceNode ?? null,
+        sourceChildCount,
+      });
 
       // Generate user-friendly display name - Keep it simple for universe branch
       const displayName = newEventId;
@@ -3744,21 +3810,21 @@ function UniverseTimelineEditorInner() {
                 </Panel>
               )}
 
-              {/* Add scene — its own top-left panel: the trailing dashed "+" node is
+              {/* Add node — its own top-left panel: the trailing dashed "+" node is
                   easy to miss (and absent on an empty canvas), and the top-right
                   toolbar is wide enough to clip off-screen. */}
               <Panel position="top-left" className="z-40">
                 <button
                   onClick={handleAddSceneFromToolbar}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-zinc-950 font-medium rounded-lg hover:bg-amber-400 transition-colors text-sm shadow-lg"
-                  title="Add a new scene (N) — continues after the selected scene"
+                  title="Add a new node (N) — continues after the selected node"
                 >
                   <Plus className="h-4 w-4" />
-                  Add scene
+                  Add node
                 </button>
               </Panel>
 
-              <Panel position="top-right">
+              <Panel position="top-right" className="max-w-[calc(100%-9rem)]">
                 <div className="flex flex-wrap justify-end gap-2">
                   {/* Episodes — browse and export saved episodes */}
                   <button

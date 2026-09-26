@@ -14,6 +14,7 @@ import {
   TIMELINE_LAYOUT_CONFIG,
   TIMELINE_NODE_COLORS,
   appendAddFinalNode,
+  getNewNodePosition,
   buildSceneFlowGraph,
   buildTimelineFlowGraph,
   mergeDraftNodes,
@@ -729,5 +730,55 @@ describe('mergeDraftNodes — remove-video tombstone', () => {
       timelineId: 't',
     });
     expect(out.nodes).toHaveLength(0);
+  });
+});
+
+// ── getNewNodePosition ───────────────────────────────────────────────────
+
+describe('getNewNodePosition', () => {
+  const at = (x: number, y: number) => ({ position: { x, y } });
+
+  it('starts at (100, 100) on an empty canvas', () => {
+    const r = getNewNodePosition({
+      additionType: 'after',
+      source: null,
+      reference: null,
+      sourceChildCount: 0,
+    });
+    expect(r.event).toEqual({ x: 100, y: 100 });
+    expect(r.add).toEqual({ x: 520, y: 100 });
+  });
+
+  it('goes one column right of the reference on a linear addition', () => {
+    const r = getNewNodePosition({
+      additionType: 'after',
+      source: null,
+      reference: at(840, 320),
+      sourceChildCount: 0,
+    });
+    expect(r.event).toEqual({ x: 1260, y: 320 });
+    expect(r.add).toEqual({ x: 1680, y: 320 });
+  });
+
+  it('stacks a branch below the source’s existing children', () => {
+    const src = at(420, 100);
+    const r = getNewNodePosition({
+      additionType: 'branch',
+      source: src,
+      reference: src,
+      sourceChildCount: 2,
+    });
+    expect(r.event).toEqual({ x: 840, y: 100 + 2 * 320 });
+    expect(r.add).toEqual({ x: 1260, y: 100 + 2 * 320 });
+  });
+
+  it('falls back to linear placement for a branch with no source', () => {
+    const r = getNewNodePosition({
+      additionType: 'branch',
+      source: null,
+      reference: at(0, 0),
+      sourceChildCount: 0,
+    });
+    expect(r.event).toEqual({ x: 420, y: 0 });
   });
 });
