@@ -29,6 +29,7 @@ const SHORTCUTS = [
   ['Ctrl+A', 'Select all nodes'],
   ['Esc', 'Clear selection / close'],
   // Actions
+  ['N', 'Add new scene'],
   ['D', 'Duplicate selected'],
   ['C', 'Toggle canon status'],
   ['E', 'Edit selected node'],

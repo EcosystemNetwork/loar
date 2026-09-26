@@ -54,6 +54,7 @@ import {
   Pencil,
   ExternalLink,
   Mic,
+  Plus,
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
@@ -1550,6 +1551,17 @@ function UniverseTimelineEditorInner() {
     setShowVideoDialog(true);
   }, []);
 
+  // Toolbar / hotkey entry point for "add a scene". Continues after the single
+  // selected scene when there is one, otherwise after the last scene (or starts
+  // the timeline on an empty canvas) — handleCreateEvent falls back to that.
+  const handleAddSceneFromToolbar = useCallback(() => {
+    const selectedScenes = nodesRef.current.filter(
+      (n: any) => n.selected && n.data?.nodeType === 'scene'
+    );
+    const source = selectedScenes.length === 1 ? selectedScenes[0] : null;
+    handleAddEvent('after', (source?.data?.eventId ?? source?.id)?.toString());
+  }, [handleAddEvent]);
+
   // Handle editing video on an existing node
   // Uses nodesRef to avoid depending on `nodes` — prevents infinite
   // useEffect loop (setNodes → handleEditScene identity change → effect re-fires).
@@ -2305,6 +2317,13 @@ function UniverseTimelineEditorInner() {
         return;
       }
 
+      // N — add a new scene
+      if (e.key === 'n' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        handleAddSceneFromToolbar();
+        return;
+      }
+
       // H — hand (pan) tool
       if (e.key === 'h' && !e.metaKey && !e.ctrlKey) {
         setCanvasTool('hand');
@@ -2341,6 +2360,7 @@ function UniverseTimelineEditorInner() {
     handleDuplicateSelected,
     handleToggleCanon,
     handleEditScene,
+    handleAddSceneFromToolbar,
     handleDeleteSelected,
     selectedNodeIds,
     showSearch,
@@ -3728,6 +3748,17 @@ function UniverseTimelineEditorInner() {
 
               <Panel position="top-right">
                 <div className="flex gap-2">
+                  {/* Add scene — the trailing dashed "+" node is easy to miss (and
+                      absent on an empty canvas), so surface it in the toolbar. */}
+                  <button
+                    onClick={handleAddSceneFromToolbar}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-zinc-950 font-medium rounded-lg hover:bg-amber-400 transition-colors text-sm shadow-lg"
+                    title="Add a new scene (N) — continues after the selected scene"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add scene
+                  </button>
+
                   {/* Episodes — browse and export saved episodes */}
                   <button
                     onClick={() => setShowEpisodeList(true)}
