@@ -13,6 +13,11 @@ import { encodeFunctionData, type Abi } from 'viem';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 
+// Contract args routinely carry bigints (amounts, deadlines), which plain
+// JSON.stringify rejects. The server's viem encoder accepts decimal strings for
+// uint/int params, so serialize bigints as strings.
+const bigintReplacer = (_key: string, v: unknown) => (typeof v === 'bigint' ? v.toString() : v);
+
 // ─── useWriteContract replacement ────────────────────────────────────────────
 
 /**
@@ -44,14 +49,17 @@ export function useWriteContract() {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            address: params.address,
-            abi: params.abi,
-            functionName: params.functionName,
-            args: params.args ? Array.from(params.args) : [],
-            value: params.value?.toString(),
-            chainId: params.chainId ?? chainId,
-          }),
+          body: JSON.stringify(
+            {
+              address: params.address,
+              abi: params.abi,
+              functionName: params.functionName,
+              args: params.args ? Array.from(params.args) : [],
+              value: params.value?.toString(),
+              chainId: params.chainId ?? chainId,
+            },
+            bigintReplacer
+          ),
         });
 
         if (!res.ok) {
