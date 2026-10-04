@@ -241,6 +241,29 @@
   }
 }
 
+/* Landing hero slide timer — its animationend advances the billboard, so
+   pausing the animation (hover/focus) pauses the slideshow in lockstep. */
+@keyframes hero-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Landing hero copy — re-keyed per slide so each title rises in. */
+@keyframes hero-copy-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Route transition progress bar */
 @keyframes progress-indeterminate {
   0% {

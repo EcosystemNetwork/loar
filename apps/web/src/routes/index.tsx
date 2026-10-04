@@ -67,7 +67,15 @@ import {
   RecentEpisodes,
   CommunityCreations,
   CreateBanner,
+  HomePitch,
 } from '../components/home/HomeSections';
+
+/**
+ * Below this catalog size the secondary universe rails (New Arrivals,
+ * Token-Powered, Binge-Worthy) would just re-list the same handful of
+ * posters already shown in Top 10 and the browse grid.
+ */
+const SECONDARY_RAILS_MIN_UNIVERSES = 20;
 
 /* ──────────────────────────────────────────
  * Main Home Component
@@ -239,14 +247,6 @@ function HomeComponent() {
 
   return (
     <div className="min-h-[calc(100svh-3.5rem)] flex flex-col bg-background pb-bottom-nav md:pb-12">
-      {/* Ken Burns animation */}
-      <style>{`
-        @keyframes kenburns {
-          0% { transform: scale(1.05) translate(0, 0); }
-          100% { transform: scale(1.12) translate(-1%, -1%); }
-        }
-      `}</style>
-
       {ponderOnline && (
         <div className="shrink-0">
           <ActivityTicker featuredUniverseIds={featuredUniverseIds} />
@@ -302,17 +302,22 @@ function HomeComponent() {
       */}
       {!universesLoading && (
         <div className="flex flex-col">
+          <HomePitch universes={universes} />
           <ContinueWatchingRow />
-          <TrendingRow universes={universes} />
           <Top10Strip universes={universes} />
-          <ForYouRow />
-          <NewArrivalsRow universes={universes} />
-          <TokenPoweredRow universes={universes} />
-          <MostEpisodesRow universes={universes} />
           <RecentEpisodes />
+          <TrendingRow universes={universes} />
+          <ForYouRow />
+          {universes.length >= SECONDARY_RAILS_MIN_UNIVERSES && (
+            <>
+              <NewArrivalsRow universes={universes} />
+              <TokenPoweredRow universes={universes} />
+              <MostEpisodesRow universes={universes} />
+            </>
+          )}
           <CommunityCreations />
           <AllUniversesRow universes={universes} />
-          <CreateBanner />
+          <CreateBanner universes={universes} />
         </div>
       )}
     </div>

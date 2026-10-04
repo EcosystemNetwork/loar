@@ -104,15 +104,16 @@ function ScrollRow({
       {canScrollLeft && (
         <button
           onClick={() => scroll('left')}
+          aria-label="Scroll left"
           className="absolute left-0 top-0 bottom-0 z-10 w-12 bg-gradient-to-r from-background via-background/80 to-transparent flex items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity"
         >
-          <ChevronLeft className="h-8 w-8 text-white drop-shadow-lg" />
+          <ChevronLeft className="h-8 w-8 text-foreground drop-shadow-lg" />
         </button>
       )}
 
       <div
         ref={ref}
-        className={`flex gap-3 overflow-x-auto scrollbar-hide scroll-smooth px-4 md:px-12 ${className}`}
+        className={`flex gap-3 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-proximity scroll-px-4 md:scroll-px-12 px-4 md:px-12 pb-2 ${className}`}
       >
         {children}
       </div>
@@ -121,9 +122,10 @@ function ScrollRow({
       {canScrollRight && (
         <button
           onClick={() => scroll('right')}
+          aria-label="Scroll right"
           className="absolute right-0 top-0 bottom-0 z-10 w-12 bg-gradient-to-l from-background via-background/80 to-transparent flex items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity"
         >
-          <ChevronRight className="h-8 w-8 text-white drop-shadow-lg" />
+          <ChevronRight className="h-8 w-8 text-foreground drop-shadow-lg" />
         </button>
       )}
     </div>
@@ -145,14 +147,16 @@ export function SectionHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-end justify-between px-4 md:px-12 mb-5">
-      <div className="flex items-baseline gap-3">
-        <Icon className="h-5 w-5 text-primary self-center" />
-        <div>
-          <h2 className="text-xl md:text-2xl font-display italic text-foreground">{title}</h2>
-          {subtitle && (
-            <p className="text-xs text-muted-foreground font-light mt-0.5">{subtitle}</p>
-          )}
+    <div className="flex items-end justify-between gap-4 px-4 md:px-12 mb-4 md:mb-5">
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/20">
+          <Icon className="h-4 w-4 text-primary" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="font-lore text-xl md:text-2xl font-semibold tracking-tight text-foreground truncate">
+            {title}
+          </h2>
+          {subtitle && <p className="text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</p>}
         </div>
       </div>
       {action}
@@ -163,13 +167,19 @@ export function SectionHeader({
 /* ──────────────────────────────────────────
  * Universe Card — tall portrait (Webtoons feel)
  * ────────────────────────────────────────── */
-export function UniverseCard({ universe }: { universe: EnrichedUniverse }) {
-  const navigate = useNavigate();
-
+export function UniverseCard({
+  universe,
+  className = 'w-[160px] sm:w-[180px] md:w-[200px]',
+}: {
+  universe: EnrichedUniverse;
+  /** Width classes — rows use fixed poster widths, the browse grid passes `w-full`. */
+  className?: string;
+}) {
   return (
-    <div
-      onClick={() => navigate({ to: '/universe/$id/watch', params: { id: universe.id } })}
-      className="group flex-shrink-0 w-[180px] md:w-[200px] cursor-pointer"
+    <Link
+      to="/universe/$id/watch"
+      params={{ id: universe.id }}
+      className={`group block flex-shrink-0 snap-start rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${className}`}
     >
       {/* Tall poster image — prefer dedicated portrait crop */}
       <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted mb-2 ring-1 ring-white/5 group-hover:ring-primary/60 transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-xl group-hover:shadow-primary/20">
@@ -216,19 +226,10 @@ export function UniverseCard({ universe }: { universe: EnrichedUniverse }) {
             )}
           </div>
         </div>
-
-        {/* Top-right rank/new badge */}
-        {universe._rank !== undefined && universe._rank < 3 && (
-          <div className="absolute top-2 left-2">
-            <span className="text-3xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-              {universe._rank + 1}
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Title below card */}
-      <h3 className="font-semibold text-sm text-white truncate group-hover:text-primary transition-colors px-0.5">
+      <h3 className="font-semibold text-sm text-foreground truncate group-hover:text-primary transition-colors px-0.5">
         {universe.name || universe.tokenData?.name || `Universe ${universe.id.slice(0, 8)}`}
       </h3>
       <p className="text-xs text-muted-foreground truncate px-0.5">
@@ -236,7 +237,7 @@ export function UniverseCard({ universe }: { universe: EnrichedUniverse }) {
           tokenDescription(universe.tokenData?.metadata) ||
           'Explore this universe'}
       </p>
-    </div>
+    </Link>
   );
 }
 
@@ -302,23 +303,46 @@ function WideCard({ universe }: { universe: EnrichedUniverse }) {
  * ────────────────────────────────────────── */
 export function HeroSkeleton() {
   return (
-    <div className="relative h-[46vh] min-h-[400px] max-h-[460px] md:max-h-[520px] lg:max-h-[600px] bg-gradient-to-b from-primary/5 via-background to-background flex items-end">
-      <div className="w-full px-4 md:px-12 pb-8 md:pb-10 max-w-3xl space-y-4 animate-pulse">
-        <div className="h-4 w-24 rounded bg-white/10" />
-        <div className="h-12 sm:h-14 w-3/4 max-w-80 rounded bg-white/10" />
-        <div className="h-4 w-full max-w-96 rounded bg-white/10" />
-        <div className="h-4 w-2/3 max-w-72 rounded bg-white/10" />
+    <div className="relative h-[72svh] min-h-[480px] md:h-[min(80svh,780px)] md:min-h-[560px] bg-gradient-to-b from-primary/5 via-background to-background flex items-end">
+      <div className="w-full px-4 md:px-12 pb-10 md:pb-14 max-w-3xl space-y-4 animate-pulse">
+        <div className="h-3 w-32 rounded bg-foreground/10" />
+        <div className="h-14 sm:h-20 w-3/4 max-w-[28rem] rounded bg-foreground/10" />
+        <div className="h-4 w-full max-w-96 rounded bg-foreground/10" />
+        <div className="h-4 w-2/3 max-w-72 rounded bg-foreground/10" />
         <div className="flex gap-3 pt-2">
-          <div className="h-11 w-32 rounded-full bg-white/10" />
-          <div className="h-11 w-28 rounded-full bg-white/10" />
+          <div className="h-12 w-36 rounded-full bg-foreground/10" />
+          <div className="h-12 w-32 rounded-full bg-foreground/10" />
         </div>
       </div>
     </div>
   );
 }
 
+/** How long each featured universe holds the billboard. */
+const HERO_SLIDE_MS = 8000;
+
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+  );
+  useEffect(() => {
+    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    if (!mq) return;
+    const onChange = () => setReduced(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return reduced;
+}
+
 /* ──────────────────────────────────────────
- * Hero Billboard (Netflix-style)
+ * Hero Billboard — full-bleed cinematic slideshow
+ *
+ * The active slide's progress bar is the timer: its `animationend` advances
+ * to the next universe, so hover/focus pauses (animation-play-state) stop the
+ * bar and the slideshow together and resume exactly where they left off.
  * ────────────────────────────────────────── */
 export function HeroBillboard({
   universes,
@@ -329,8 +353,8 @@ export function HeroBillboard({
   featuredUniverseIds?: string[];
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const navigate = useNavigate();
-  const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
+  const [paused, setPaused] = useState(false);
+  const reducedMotion = usePrefersReducedMotion();
   const { mintingEnabled } = useFeatureFlags();
 
   const featured = useMemo(() => {
@@ -364,182 +388,244 @@ export function HeroBillboard({
     return sorted.slice(0, 5);
   }, [universes, featuredUniverseIds]);
 
-  // Auto-advance every 8 seconds
-  useEffect(() => {
-    if (featured.length <= 1) return;
-    intervalRef.current = setInterval(() => {
-      setCurrentIndex((i) => (i + 1) % featured.length);
-    }, 8000);
-    return () => clearInterval(intervalRef.current);
-  }, [featured.length]);
-
-  const goTo = (i: number) => {
-    setCurrentIndex(i);
-    clearInterval(intervalRef.current);
-    intervalRef.current = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % featured.length);
-    }, 8000);
-  };
+  const autoplay = featured.length > 1 && !reducedMotion;
+  const advance = () => setCurrentIndex((i) => (i + 1) % featured.length);
 
   if (featured.length === 0) {
     return (
-      <div className="relative h-[40vh] min-h-[240px] max-h-[420px] flex items-center justify-center bg-gradient-to-b from-primary/10 via-background to-background">
+      <div className="relative h-[52svh] min-h-[360px] max-h-[560px] flex items-center justify-center overflow-hidden bg-gradient-to-b from-primary/15 via-background to-background">
         <div className="text-center px-4">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-display italic text-white mb-4 tracking-tight">
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-primary mb-4">
+            LOAR
+          </p>
+          <h1 className="font-lore text-4xl sm:text-5xl md:text-7xl font-semibold text-foreground mb-4 tracking-tight text-balance">
             Your universe awaits
           </h1>
-          <p className="text-base sm:text-lg md:text-xl text-white/60 mb-8 max-w-lg mx-auto px-4 font-light">
-            Create, own, and trade narrative universes on-chain
+          <p className="text-base sm:text-lg md:text-xl text-muted-foreground mb-8 max-w-lg mx-auto">
+            Imagine, generate and own story universes with AI.
           </p>
-          {mintingEnabled ? (
-            <Button
-              size="lg"
-              className="rounded-full px-8 text-base"
-              onClick={() => navigate({ to: '/cinematicUniverseCreate' })}
-            >
+          <Button size="lg" className="rounded-full px-8 text-base" asChild>
+            <Link to={mintingEnabled ? '/cinematicUniverseCreate' : '/create'}>
               <Plus className="h-5 w-5 mr-2" />
-              Create Your First Universe
-            </Button>
-          ) : (
-            <Badge variant="outline" className="text-sm px-4 py-1.5">
-              Universe creation coming soon
-            </Badge>
-          )}
+              {mintingEnabled ? 'Create your first universe' : 'Start creating'}
+            </Link>
+          </Button>
         </div>
       </div>
     );
   }
 
-  const current = featured[currentIndex];
-  if (!current) return null;
+  // `featured` can shrink under us (data refresh) — never index past the end.
+  const activeIndex = currentIndex % featured.length;
+  const current = featured[activeIndex];
+  const title = current.name || current.tokenData?.name || 'Untitled universe';
+  const description = current.description || tokenDescription(current.tokenData?.metadata);
+  const symbol = current.tokenData?.symbol;
+
+  const progressStyle = (i: number): React.CSSProperties =>
+    i !== activeIndex
+      ? { transform: 'scaleX(0)' }
+      : autoplay
+        ? {
+            animation: `hero-progress ${HERO_SLIDE_MS}ms linear forwards`,
+            animationPlayState: paused ? 'paused' : 'running',
+          }
+        : { transform: 'scaleX(1)' };
 
   return (
-    <div
-      // min-h is a hard floor, not just a small-screen fallback: on any
-      // viewport short enough that 46vh undercuts it (common once browser
-      // chrome eats into window height — e.g. a 1366x768 laptop), this is
-      // what keeps the bottom-anchored badge/title block from crowding the
-      // ActivityTicker sitting directly above (items-end docks content to
-      // this container's true bottom, so the only way to guarantee
-      // clearance from the top is to keep the container itself tall enough).
-      className="relative isolate h-[46vh] min-h-[400px] max-h-[460px] md:max-h-[520px] lg:max-h-[600px] overflow-hidden"
+    <section
+      aria-roledescription="carousel"
+      aria-label="Featured universes"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={() => setPaused(false)}
+      className="relative isolate h-[72svh] min-h-[480px] md:h-[min(80svh,780px)] md:min-h-[560px] overflow-hidden bg-black"
     >
-      {/* Background image with Ken Burns effect */}
+      {/* Backdrops — crossfade, Ken Burns on the active one */}
       {featured.map((u, i) => (
         <div
           key={u.id}
+          aria-hidden
           className="absolute inset-0 transition-opacity duration-1000"
-          style={{ opacity: i === currentIndex ? 1 : 0 }}
+          style={{ opacity: i === activeIndex ? 1 : 0 }}
         >
           {u.imageURL || u.tokenData?.imageURL ? (
             <SmartImage
               src={u.imageURL || u.tokenData?.imageURL}
               alt=""
               sizes="100vw"
-              priority={i === currentIndex}
+              priority={i === activeIndex}
               className="w-full h-full"
               style={{
                 transform: 'scale(1.05)',
                 animation:
-                  i === currentIndex ? 'kenburns 12s ease-in-out infinite alternate' : 'none',
+                  i === activeIndex && !reducedMotion
+                    ? 'kenburns 14s ease-in-out infinite alternate'
+                    : 'none',
               }}
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-amber-950 via-stone-950 to-stone-950" />
+            <div className="w-full h-full bg-gradient-to-br from-amber-950 via-stone-950 to-black" />
           )}
         </div>
       ))}
 
-      {/* Vignette overlays */}
-      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-background/30" />
-      <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-transparent" />
+      {/* Scrims — always dark so the white type reads in either theme */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-black/10" />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/35 to-transparent" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_20%_100%,color-mix(in_oklch,var(--primary)_22%,transparent),transparent_60%)]" />
+      {/* Bottom fade into the page — decorative, painted under the content */}
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-background to-transparent" />
 
       {/* Content */}
-      <div className="absolute inset-0 flex items-end">
-        <div className="w-full px-4 md:px-12 pb-6 md:pb-10 max-w-3xl">
-          {/* Badges */}
-          <div className="flex items-center gap-2 mb-2 md:mb-3 flex-wrap">
-            <Badge className="bg-primary text-white border-0 text-xs">
-              <Sparkles className="h-3 w-3 mr-1" />
-              Featured
-            </Badge>
-            {current.nodeCount > 0 && (
-              <Badge className="bg-white/15 text-white border-0 backdrop-blur-sm text-xs">
-                {current.nodeCount} Episodes
-              </Badge>
+      <div className="absolute inset-0 flex flex-col justify-end px-4 md:px-12 pb-8 md:pb-12">
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 lg:gap-10">
+          <div
+            key={current.id}
+            className="max-w-2xl motion-safe:animate-[hero-copy-in_700ms_cubic-bezier(0.16,1,0.3,1)_both]"
+          >
+            <div className="flex items-center gap-2.5 mb-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_12px_var(--primary)]" />
+              <span className="text-primary">Featured universe</span>
+              {current.nodeCount > 0 && (
+                <>
+                  <span className="text-white/30">/</span>
+                  <span>{current.nodeCount} episodes</span>
+                </>
+              )}
+              {current.holderCount > 0 && (
+                <>
+                  <span className="text-white/30">/</span>
+                  <span>{current.holderCount} holders</span>
+                </>
+              )}
+            </div>
+
+            <h1 className="font-lore text-[2.6rem] sm:text-6xl lg:text-7xl font-semibold text-white leading-[0.98] tracking-tight text-balance mb-4 drop-shadow-[0_2px_24px_rgba(0,0,0,0.5)]">
+              {title}
+            </h1>
+
+            {description && (
+              <p className="text-[15px] sm:text-base md:text-lg text-white/75 mb-6 max-w-xl line-clamp-2 md:line-clamp-3 leading-relaxed">
+                {description}
+              </p>
             )}
-            {current.holderCount > 0 && (
-              <Badge className="bg-white/15 text-white border-0 backdrop-blur-sm text-xs">
-                <Users className="h-3 w-3 mr-1" />
-                {current.holderCount} Holders
-              </Badge>
-            )}
+
+            <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+              <Button
+                size="lg"
+                className="h-12 rounded-full px-6 sm:px-7 text-[15px] font-semibold shadow-lg shadow-primary/30"
+                asChild
+              >
+                <Link to="/universe/$id/watch" params={{ id: current.id }}>
+                  <Play className="h-4 w-4 mr-2 fill-current" />
+                  Watch now
+                </Link>
+              </Button>
+              <Button
+                size="lg"
+                variant="ghost"
+                className="h-12 rounded-full px-5 sm:px-6 text-[15px] font-medium text-white bg-white/10 hover:bg-white/20 hover:text-white backdrop-blur-md ring-1 ring-white/15"
+                asChild
+              >
+                <Link to="/wiki" search={{ universe: current.id }}>
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  Read the wiki
+                </Link>
+              </Button>
+              {symbol && (
+                <span className="hidden sm:inline-flex h-12 items-center gap-2 rounded-full px-4 bg-black/30 backdrop-blur-md ring-1 ring-white/10 text-sm">
+                  <Zap className="h-4 w-4 text-primary" />
+                  <span className="font-semibold text-white">${symbol}</span>
+                  {current.swapVolume > 0 && (
+                    <span className="text-white/50">
+                      Vol {(current.swapVolume / 1e18).toFixed(2)}
+                    </span>
+                  )}
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* Title */}
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-display italic text-white mb-2 md:mb-3 leading-[1.1]">
-            {current.name || current.tokenData?.name}
-          </h1>
-
-          {/* Description */}
-          <p className="text-sm sm:text-base md:text-lg text-white/50 mb-4 md:mb-5 max-w-xl line-clamp-2 leading-relaxed font-light">
-            {current.description || tokenDescription(current.tokenData?.metadata)}
-          </p>
-
-          {/* Actions */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-            <Button
-              size="lg"
-              className="px-5 sm:px-6 bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
-              onClick={() => navigate({ to: '/universe/$id/watch', params: { id: current.id } })}
-            >
-              <Play className="h-4 w-4 mr-2 fill-current" />
-              Explore
-            </Button>
-            <Button
-              size="lg"
-              variant="ghost"
-              className="px-5 sm:px-6 text-white/80 hover:text-white hover:bg-white/10 font-medium"
-              onClick={() => navigate({ to: '/universe/$id/watch', params: { id: current.id } })}
-            >
-              <BookOpen className="h-4 w-4 mr-2" />
-              Details
-            </Button>
-            {current.tokenData && (
-              <div className="hidden sm:flex items-center gap-2 ml-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/10">
-                <Zap className="h-4 w-4 text-primary" />
-                <span className="text-white font-bold">${current.tokenData.symbol}</span>
-                {current.swapVolume > 0 && (
-                  <span className="text-white/50 text-sm">
-                    Vol ${(current.swapVolume / 1e18).toFixed(2)}
-                  </span>
-                )}
+          {/* Slide picker — thumbnails on desktop, story-style bars on mobile */}
+          {featured.length > 1 && (
+            <>
+              <div
+                className="hidden lg:flex gap-3 shrink-0"
+                role="tablist"
+                aria-label="Choose a featured universe"
+              >
+                {featured.map((u, i) => (
+                  <button
+                    key={u.id}
+                    role="tab"
+                    aria-selected={i === activeIndex}
+                    aria-label={u.name || `Featured universe ${i + 1}`}
+                    onClick={() => setCurrentIndex(i)}
+                    className={`group/thumb w-[132px] xl:w-[156px] text-left transition-opacity focus-visible:outline-none ${
+                      i === activeIndex ? 'opacity-100' : 'opacity-55 hover:opacity-90'
+                    }`}
+                  >
+                    <div
+                      className={`relative aspect-video overflow-hidden rounded-lg bg-white/5 ring-1 transition-all group-focus-visible/thumb:ring-2 group-focus-visible/thumb:ring-primary ${
+                        i === activeIndex ? 'ring-white/60' : 'ring-white/10'
+                      }`}
+                    >
+                      {(u.imageURL || u.tokenData?.imageURL) && (
+                        <SmartImage
+                          src={u.imageURL || u.tokenData?.imageURL}
+                          alt=""
+                          sizes="160px"
+                          className="w-full h-full"
+                        />
+                      )}
+                    </div>
+                    <div className="mt-2 h-0.5 w-full overflow-hidden rounded-full bg-white/15">
+                      <div
+                        className="h-full w-full origin-left bg-white"
+                        style={progressStyle(i)}
+                        onAnimationEnd={i === activeIndex ? advance : undefined}
+                      />
+                    </div>
+                    <p className="mt-1.5 truncate text-xs font-medium text-white/85">
+                      {u.name || u.tokenData?.name}
+                    </p>
+                  </button>
+                ))}
               </div>
-            )}
-          </div>
+
+              <div
+                className="flex lg:hidden gap-1.5"
+                role="tablist"
+                aria-label="Choose a featured universe"
+              >
+                {featured.map((u, i) => (
+                  <button
+                    key={u.id}
+                    role="tab"
+                    aria-selected={i === activeIndex}
+                    aria-label={u.name || `Featured universe ${i + 1}`}
+                    onClick={() => setCurrentIndex(i)}
+                    className="flex-1 py-3 -my-3"
+                  >
+                    <span className="block h-[3px] w-full overflow-hidden rounded-full bg-white/20">
+                      <span
+                        className="block h-full w-full origin-left bg-white"
+                        style={progressStyle(i)}
+                        // The other picker is display:none at this breakpoint,
+                        // so its animation never runs — no double advance.
+                        onAnimationEnd={i === activeIndex ? advance : undefined}
+                      />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
-
-      {/* Dot indicators — sit above the mobile bottom nav */}
-      {featured.length > 1 && (
-        <div className="absolute bottom-20 md:bottom-8 left-4 md:left-12 flex gap-2 z-10">
-          {featured.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => goTo(i)}
-              aria-label={`Show featured universe ${i + 1}`}
-              className={`h-1 rounded-full transition-all duration-500 ${
-                i === currentIndex ? 'bg-white w-8' : 'bg-white/30 w-4 hover:bg-white/60'
-              }`}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Bottom fade into content — purely decorative, must not eat clicks on
-          the Explore/Details buttons it overlaps at the bottom of the hero */}
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
-    </div>
+    </section>
   );
 }
 
@@ -716,7 +802,7 @@ export function ActivityTicker({
             className="flex items-center gap-2 text-sm flex-shrink-0 hover:text-primary transition-colors"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            <span className="font-medium text-white/80">{a.universeName}</span>
+            <span className="font-medium text-foreground/80">{a.universeName}</span>
             <span className="text-muted-foreground">{a.action}</span>
           </Link>
         ))}
@@ -818,7 +904,7 @@ export function RecentEpisodes() {
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex-shrink-0 mt-0.5" />
                 )}
                 <div className="min-w-0">
-                  <h4 className="text-sm font-semibold text-white truncate group-hover:text-primary transition-colors">
+                  <h4 className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
                     {ep.title}
                   </h4>
                   <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
@@ -835,7 +921,7 @@ export function RecentEpisodes() {
 }
 
 /* ──────────────────────────────────────────
- * Top 10 Strip — numbered cards (Netflix Top 10)
+ * Top 10 — ranked posters with outlined serif numerals (Netflix Top 10)
  * ────────────────────────────────────────── */
 export function Top10Strip({ universes }: { universes: EnrichedUniverse[] }) {
   const sorted = useMemo(() => {
@@ -846,7 +932,7 @@ export function Top10Strip({ universes }: { universes: EnrichedUniverse[] }) {
     const pinned = universes.filter(isPinned);
     const rest = universes.filter((u) => !isPinned(u)).sort((a, b) => score(b) - score(a));
 
-    return [...pinned, ...rest].slice(0, 10).map((u, i) => ({ ...u, _rank: i }));
+    return [...pinned, ...rest].slice(0, 10);
   }, [universes]);
 
   if (sorted.length === 0) return null;
@@ -854,27 +940,26 @@ export function Top10Strip({ universes }: { universes: EnrichedUniverse[] }) {
   return (
     <section className="py-6">
       <SectionHeader icon={Flame} title="Top 10 Universes" subtitle="Most active this week" />
-      {/* Static grid — all 10 cards visible at once, no scroll container */}
-      <div className="flex flex-wrap gap-3 px-4 md:px-12">
-        {sorted.map((u) => (
+      <ScrollRow>
+        {sorted.map((u, i) => (
           <div
             key={u.id}
-            className="flex-shrink-0 relative flex items-end pt-4 pl-[60px] md:pl-[75px]"
+            className="relative flex shrink-0 snap-start items-end pl-[52px] md:pl-[68px]"
           >
-            {/* Large rank number — absolutely positioned so digit width doesn't shift the card */}
+            {/* Rank — absolutely positioned so digit width doesn't shift the card */}
             <span
-              className="absolute left-0 bottom-0 text-[100px] md:text-[120px] font-black leading-[0.85] select-none pointer-events-none whitespace-nowrap"
+              aria-hidden
+              className="absolute left-0 bottom-9 font-lore text-[96px] md:text-[128px] font-semibold leading-[0.8] tracking-tighter select-none pointer-events-none whitespace-nowrap text-transparent"
               style={{
-                WebkitTextStroke: '2px rgba(255,255,255,0.3)',
-                color: 'transparent',
+                WebkitTextStroke: '2px color-mix(in oklch, var(--foreground) 38%, transparent)',
               }}
             >
-              {u._rank + 1}
+              {i + 1}
             </span>
-            <UniverseCard universe={u} />
+            <UniverseCard universe={u} className="relative w-[140px] sm:w-[160px] md:w-[180px]" />
           </div>
         ))}
-      </div>
+      </ScrollRow>
     </section>
   );
 }
@@ -1002,7 +1087,7 @@ export function MostEpisodesRow({ universes }: { universes: EnrichedUniverse[] }
 }
 
 /* ──────────────────────────────────────────
- * All Universes — every universe, newest first
+ * Browse grid — every universe, newest first
  * ────────────────────────────────────────── */
 export function AllUniversesRow({ universes }: { universes: EnrichedUniverse[] }) {
   const sorted = useMemo(
@@ -1013,17 +1098,17 @@ export function AllUniversesRow({ universes }: { universes: EnrichedUniverse[] }
   if (sorted.length === 0) return null;
 
   return (
-    <section className="py-6">
+    <section id="browse" className="py-8 scroll-mt-20">
       <SectionHeader
         icon={BookOpen}
-        title="All Universes"
-        subtitle={`Browse every universe (${sorted.length})`}
+        title="Browse every universe"
+        subtitle={`${sorted.length} ${sorted.length === 1 ? 'world' : 'worlds'} and counting`}
       />
-      <ScrollRow>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-3 gap-y-6 px-4 md:px-12">
         {sorted.map((u) => (
-          <UniverseCard key={u.id} universe={u} />
+          <UniverseCard key={u.id} universe={u} className="w-full" />
         ))}
-      </ScrollRow>
+      </div>
     </section>
   );
 }
@@ -1149,7 +1234,7 @@ export function ContentCard({ item }: { item: any }) {
         </div>
       </div>
 
-      <h3 className="font-semibold text-sm text-white truncate group-hover:text-primary transition-colors px-0.5">
+      <h3 className="font-semibold text-sm text-foreground truncate group-hover:text-primary transition-colors px-0.5">
         {item.title}
       </h3>
       <p className="text-xs text-muted-foreground truncate px-0.5">
@@ -1160,39 +1245,186 @@ export function ContentCard({ item }: { item: any }) {
 }
 
 /* ──────────────────────────────────────────
- * CTA Banner
+ * Pitch — what LOAR is, for visitors who aren't signed in
  * ────────────────────────────────────────── */
-export function CreateBanner() {
-  const navigate = useNavigate();
+const PITCH_STEPS = [
+  {
+    icon: Sparkles,
+    title: 'Imagine',
+    body: 'Describe a world. LOAR drafts its characters, factions, places and lore into a living canon wiki.',
+  },
+  {
+    icon: Tv,
+    title: 'Generate',
+    body: 'Turn scenes into video episodes with frontier AI models, and branch the story wherever it wants to go.',
+  },
+  {
+    icon: Users,
+    title: 'Own it together',
+    body: 'Launch a universe token so fans can back the story and vote on what becomes canon.',
+  },
+] as const;
+
+export function HomePitch({ universes }: { universes: EnrichedUniverse[] }) {
+  const { isAuthenticated, sessionReady } = useWalletAuth();
   const { mintingEnabled } = useFeatureFlags();
+
+  const stats = useMemo(() => {
+    const episodes = universes.reduce((n, u) => n + (u.nodeCount || 0), 0);
+    const creators = new Set(universes.map((u) => u.creator?.toLowerCase()).filter(Boolean)).size;
+    return [
+      { label: 'universes', value: universes.length },
+      { label: 'episodes', value: episodes },
+      // A handful of creators undersells the platform — only brag once it's real.
+      { label: 'creators', value: creators >= 5 ? creators : 0 },
+    ].filter((s) => s.value > 0);
+  }, [universes]);
+
+  // Signed-in users already know the pitch — go straight to the content.
+  if (!sessionReady || isAuthenticated) return null;
+
+  return (
+    <section className="px-4 md:px-12 py-10 md:py-16">
+      <div className="grid gap-8 lg:gap-14 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.3fr)] lg:items-center">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-primary mb-3">
+            What is LOAR
+          </p>
+          <h2 className="font-lore text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-foreground leading-[1.05] text-balance">
+            An AI studio for story universes you can own.
+          </h2>
+          <p className="mt-4 text-base md:text-lg text-muted-foreground max-w-lg leading-relaxed">
+            Prompt a world into existence, generate its episodes, keep its canon in one place — and
+            let the people who love it have a stake in what happens next.
+          </p>
+
+          {stats.length > 0 && (
+            <dl className="mt-6 flex flex-wrap gap-x-8 gap-y-3">
+              {stats.map((s) => (
+                <div key={s.label}>
+                  <dt className="sr-only">{s.label}</dt>
+                  <dd className="font-lore text-3xl font-semibold text-foreground tabular-nums">
+                    {s.value.toLocaleString()}
+                    <span className="ml-1.5 font-sans text-sm font-normal text-muted-foreground">
+                      {s.label}
+                    </span>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Button size="lg" className="h-12 rounded-full px-7 font-semibold" asChild>
+              <Link to={mintingEnabled ? '/cinematicUniverseCreate' : '/create'}>
+                <Plus className="h-4 w-4 mr-2" />
+                Start your universe
+              </Link>
+            </Button>
+            <Button size="lg" variant="outline" className="h-12 rounded-full px-6" asChild>
+              <a href="#browse">Browse universes</a>
+            </Button>
+          </div>
+        </div>
+
+        <ol className="grid gap-3 sm:grid-cols-3">
+          {PITCH_STEPS.map((step, i) => (
+            <li
+              key={step.title}
+              className="flex gap-4 sm:flex-col sm:gap-0 rounded-2xl border border-border bg-card/60 p-4 sm:p-5 md:p-6"
+            >
+              <div className="flex shrink-0 items-start justify-between sm:mb-8 md:mb-10">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/25">
+                  <step.icon className="h-5 w-5 text-primary" />
+                </span>
+                <span className="hidden sm:inline font-lore text-sm text-muted-foreground tabular-nums">
+                  0{i + 1}
+                </span>
+              </div>
+              <div>
+                <h3 className="font-lore text-lg sm:text-xl font-semibold text-foreground mb-1 sm:mb-2">
+                  {step.title}
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{step.body}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  );
+}
+
+/* ──────────────────────────────────────────
+ * Closing CTA — poster collage behind a create prompt
+ * ────────────────────────────────────────── */
+export function CreateBanner({ universes = [] }: { universes?: EnrichedUniverse[] }) {
+  const { mintingEnabled } = useFeatureFlags();
+
+  const posters = useMemo(
+    () =>
+      universes
+        .map((u) => u.portraitImageURL || u.imageURL || u.tokenData?.imageURL)
+        .filter((src): src is string => !!src)
+        .slice(0, 8),
+    [universes]
+  );
 
   return (
     <section className="px-4 md:px-12 py-12">
-      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-primary/20 via-purple-500/20 to-pink-500/20 border border-white/5">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(var(--primary),0.15),transparent_70%)]" />
-        <div className="relative px-6 md:px-8 py-10 md:py-16 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
-          <div>
-            <h2 className="text-2xl md:text-3xl lg:text-4xl font-black text-white mb-2">
-              Start Your Universe
-            </h2>
-            <p className="text-white/60 text-base md:text-lg max-w-md">
-              Create AI-powered narrative worlds. Launch tokens. Build community.
-            </p>
+      <div className="relative isolate overflow-hidden rounded-3xl bg-black ring-1 ring-white/10">
+        {/* Tilted poster wall */}
+        {posters.length >= 4 && (
+          <div
+            aria-hidden
+            className="absolute -right-24 -top-24 md:-right-10 grid w-[720px] grid-cols-4 gap-3 opacity-60 rotate-[-8deg]"
+          >
+            {posters.map((src, i) => (
+              <div
+                key={i}
+                className={`aspect-[3/4] overflow-hidden rounded-xl ring-1 ring-white/10 ${i % 2 ? 'translate-y-10' : ''}`}
+              >
+                <SmartImage src={src} alt="" sizes="180px" className="h-full w-full" />
+              </div>
+            ))}
           </div>
-          {mintingEnabled ? (
+        )}
+        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-black/20" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_0%_100%,color-mix(in_oklch,var(--primary)_30%,transparent),transparent_55%)]" />
+
+        <div className="relative px-6 py-14 md:px-12 md:py-20 max-w-xl">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-primary mb-3">
+            Start creating
+          </p>
+          <h2 className="font-lore text-3xl md:text-5xl font-semibold tracking-tight text-white leading-[1.05] text-balance">
+            Your universe is one prompt away.
+          </h2>
+          <p className="mt-4 text-white/65 text-base md:text-lg max-w-md">
+            Build an AI-powered narrative world, publish episodes, and grow a community around it.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
             <Button
               size="lg"
-              className="rounded-full px-8 text-base font-bold"
-              onClick={() => navigate({ to: '/cinematicUniverseCreate' })}
+              className="h-12 rounded-full px-7 font-semibold shadow-lg shadow-primary/30"
+              asChild
             >
-              <Plus className="h-5 w-5 mr-2" />
-              Create Universe
+              <Link to={mintingEnabled ? '/cinematicUniverseCreate' : '/create'}>
+                <Plus className="h-4 w-4 mr-2" />
+                {mintingEnabled ? 'Create a universe' : 'Start creating'}
+              </Link>
             </Button>
-          ) : (
-            <Badge variant="outline" className="text-sm px-4 py-1.5">
-              Coming soon
-            </Badge>
-          )}
+            <Button
+              size="lg"
+              variant="ghost"
+              className="h-12 rounded-full px-6 text-white bg-white/10 hover:bg-white/20 hover:text-white ring-1 ring-white/15"
+              asChild
+            >
+              <Link to="/wiki">
+                <BookOpen className="h-4 w-4 mr-2" />
+                Explore the wiki
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
     </section>
@@ -1465,7 +1697,7 @@ export function ContinueWatchingRow() {
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex-shrink-0 mt-0.5" />
                 )}
                 <div className="min-w-0">
-                  <h4 className="text-sm font-semibold text-white truncate group-hover:text-primary transition-colors">
+                  <h4 className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
                     {ep.title}
                   </h4>
                   <p className="text-xs text-muted-foreground line-clamp-1 leading-relaxed">
@@ -1534,7 +1766,7 @@ export function ForYouRow() {
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex-shrink-0 mt-0.5" />
               )}
               <div className="min-w-0">
-                <h4 className="text-sm font-semibold text-white truncate group-hover:text-primary transition-colors">
+                <h4 className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
                   {ep.title}
                 </h4>
                 <p className="text-xs text-muted-foreground line-clamp-1 leading-relaxed">
