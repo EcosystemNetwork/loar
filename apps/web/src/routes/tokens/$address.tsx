@@ -26,7 +26,13 @@ import {
   stageFromBondingCurve,
   type TokenStage,
 } from '@/hooks/useTokens';
-import { useSwapExecution } from '@/hooks/useSwapExecution';
+import { useSwapExecution, usePoolQuote } from '@/hooks/useSwapExecution';
+import {
+  useCurveState,
+  useBondingCurveActions,
+  usePreviewBuy,
+  usePreviewSell,
+} from '@/hooks/useBondingCurve';
 import {
   usePriceSeries,
   useBondingCurveTradesForCurve,
@@ -631,6 +637,8 @@ function TokenDetailPage() {
                   tokenIsCurrency0={tokenIsCurrency0}
                   latestSqrtPriceX96={swaps?.[0]?.sqrtPriceX96 ?? pool?.sqrtPriceX96 ?? null}
                   latestLiquidity={swaps?.[0]?.liquidity ?? null}
+                  bondingCurveAddress={bondingCurve?.id ?? null}
+                  curveActive={stage === 'bonding' || stage === 'graduating'}
                   initialAmount={initialBuyAmount}
                 />
               </div>
@@ -981,6 +989,8 @@ function SwapInterface({
   tokenIsCurrency0,
   latestSqrtPriceX96,
   latestLiquidity,
+  bondingCurveAddress,
+  curveActive,
   initialAmount,
 }: {
   tokenAddress: string;
@@ -997,39 +1007,103 @@ function SwapInterface({
   tokenIsCurrency0: boolean;
   latestSqrtPriceX96: string | null;
   latestLiquidity: string | null;
+  bondingCurveAddress?: string | null;
+  curveActive: boolean;
   initialAmount?: string;
 }) {
   const [mode, setMode] = useState<'buy' | 'sell'>('buy');
   const [amount, setAmount] = useState(initialAmount ?? '');
   const { address } = useAccount();
   const { data: ethBalance } = useBalance({ address });
-  const { executeSwap, status, txHash, error, isNativeSwapAvailable, reset } = useSwapExecution();
+  const swapExec = useSwapExecution();
+  const { isNativeSwapAvailable } = swapExec;
 
-  // Real Uniswap v4 single-tick simulation against the latest pool snapshot.
-  // Returns null if we have no liquidity to simulate against — the swap button
-  // refuses to enable in that case so we never ship an unbounded slippage tx.
-  const expectedOutWei = useMemo(() => {
+  // Pre-graduation tokens trade on their bonding curve — the v4 pool has no
+  // liquidity until graduation, so quoting/swapping it would always fail.
+  const curveAddr =
+    curveActive && bondingCurveAddress ? (bondingCurveAddress as `0x${string}`) : undefined;
+  const { state: curveState } = useCurveState(curveAddr);
+  const inCurve = !!curveAddr && !curveState?.graduated;
+  const curve = useBondingCurveActions(inCurve ? curveAddr : undefined);
+  const { tokensOut: curveBuyOut } = usePreviewBuy(
+    inCurve && mode === 'buy' ? curveAddr : undefined,
+    amount
+  );
+  const { ethOut: curveSellOut } = usePreviewSell(
+    inCurve && mode === 'sell' ? curveAddr : undefined,
+    amount
+  );
+
+  const status = inCurve ? curve.status : swapExec.status;
+  const error = inCurve ? curve.error : swapExec.error;
+  const txHash = inCurve ? curve.txHash : swapExec.txHash;
+  const reset = () => {
+    swapExec.reset();
+    curve.reset();
+  };
+
+  const amountInWei = useMemo(() => {
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) return null;
-    if (!latestSqrtPriceX96 || !latestLiquidity) return null;
-
-    let amountInWei: bigint;
     try {
-      amountInWei = parseUnits(Number(amount).toFixed(18), 18);
+      return parseUnits(Number(amount).toFixed(18), 18);
     } catch {
       return null;
     }
+  }, [amount]);
 
-    // zeroForOne:
-    //  - buy:  input is WETH → zeroForOne iff WETH is currency0 (token is currency1)
-    //  - sell: input is the token → zeroForOne iff the token is currency0
-    const zeroForOne = mode === 'buy' ? !tokenIsCurrency0 : tokenIsCurrency0;
+  // zeroForOne:
+  //  - buy:  input is WETH → zeroForOne iff WETH is currency0 (token is currency1)
+  //  - sell: input is the token → zeroForOne iff the token is currency0
+  const zeroForOne = mode === 'buy' ? !tokenIsCurrency0 : tokenIsCurrency0;
+
+  const poolKey = useMemo(
+    () =>
+      poolData
+        ? {
+            currency0: poolData.currency0 as `0x${string}`,
+            currency1: poolData.currency1 as `0x${string}`,
+            fee: poolData.fee,
+            tickSpacing: poolData.tickSpacing,
+            hooks: poolData.hooks as `0x${string}`,
+          }
+        : null,
+    [poolData]
+  );
+
+  // On-chain v4 quote — simulates the real swap (hook fee included), so it
+  // works for a freshly graduated pool the indexer has no trades for yet.
+  const poolQuote = usePoolQuote({
+    poolKey: inCurve ? null : poolKey,
+    zeroForOne,
+    amountInWei,
+  });
+
+  // Fallback for chains without a quoter: single-tick simulation against the
+  // latest indexed snapshot.
+  const snapshotOutWei = useMemo(() => {
+    if (poolQuote.isAvailable || !amountInWei) return null;
+    if (!latestSqrtPriceX96 || !latestLiquidity) return null;
     return computeAmountOut({
       sqrtPriceX96: latestSqrtPriceX96,
       liquidity: latestLiquidity,
       amountInWei,
       zeroForOne,
     });
-  }, [amount, mode, tokenIsCurrency0, latestSqrtPriceX96, latestLiquidity]);
+  }, [poolQuote.isAvailable, amountInWei, zeroForOne, latestSqrtPriceX96, latestLiquidity]);
+
+  // Returns null when nothing can be quoted — the swap button refuses to
+  // enable in that case so we never ship an unbounded slippage tx.
+  const expectedOutWei: bigint | null = useMemo(() => {
+    if (!amountInWei) return null;
+    if (inCurve) {
+      const out = mode === 'buy' ? curveBuyOut : curveSellOut;
+      return out > 0n ? out : null;
+    }
+    const out = poolQuote.amountOut ?? snapshotOutWei;
+    return out != null && out > 0n ? out : null;
+  }, [amountInWei, inCurve, mode, curveBuyOut, curveSellOut, poolQuote.amountOut, snapshotOutWei]);
+
+  const quoteLoading = !inCurve && poolQuote.isLoading;
 
   const estimatedOutput = useMemo(() => {
     if (expectedOutWei == null) return null;
@@ -1037,27 +1111,26 @@ function SwapInterface({
   }, [expectedOutWei]);
 
   const handleSwap = async () => {
-    const poolKey = poolData
-      ? {
-          currency0: poolData.currency0 as `0x${string}`,
-          currency1: poolData.currency1 as `0x${string}`,
-          fee: poolData.fee,
-          tickSpacing: poolData.tickSpacing,
-          hooks: poolData.hooks as `0x${string}`,
-        }
-      : null;
+    let hash: string | undefined;
+    if (inCurve) {
+      hash =
+        mode === 'buy'
+          ? await curve.buy(amount)
+          : await curve.sell(parseUnits(Number(amount).toFixed(18), 18));
+    } else {
+      const result = await swapExec.executeSwap({
+        tokenAddress,
+        tokenSymbol,
+        poolKey,
+        mode,
+        amount,
+        slippageBps: 100, // 1% default for inline widget
+        expectedOutWei: expectedOutWei ?? undefined,
+      });
+      if (result && !result.fallback && result.txHash) hash = result.txHash;
+    }
 
-    const result = await executeSwap({
-      tokenAddress,
-      tokenSymbol,
-      poolKey,
-      mode,
-      amount,
-      slippageBps: 100, // 1% default for inline widget
-      expectedOutWei: expectedOutWei ?? undefined,
-    });
-
-    if (result && !result.fallback && result.txHash) {
+    if (hash) {
       // Record trade for PnL tracking
       try {
         const ethAmt = Number(amount);
@@ -1071,7 +1144,7 @@ function SwapInterface({
             ethAmount: ethAmt,
             tokenAmount: mode === 'buy' ? tokenAmt : ethAmt,
             pricePerToken: price,
-            txHash: result.txHash,
+            txHash: hash,
           });
         }
       } catch {
@@ -1093,10 +1166,10 @@ function SwapInterface({
           <ArrowUpDown className="h-4 w-4 text-primary" aria-hidden />
           Trade ${tokenSymbol}
         </h2>
-        {isNativeSwapAvailable && (
+        {(inCurve || isNativeSwapAvailable) && (
           <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
             <Zap className="h-3 w-3 text-primary" aria-hidden />
-            In-app swap
+            {inCurve ? 'Bonding curve' : 'In-app swap'}
           </span>
         )}
       </div>
@@ -1215,16 +1288,17 @@ function SwapInterface({
         </dl>
       )}
 
-      {amount &&
-        Number(amount) > 0 &&
-        isNativeSwapAvailable &&
-        expectedOutWei === null &&
-        !latestSqrtPriceX96 && (
-          <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-200">
-            This pool has no recent trades, so it can&apos;t be quoted on-chain yet. Wait for the
-            indexer or try a smaller test trade.
-          </p>
-        )}
+      {amountInWei !== null && expectedOutWei === null && (inCurve || isNativeSwapAvailable) && (
+        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-200">
+          {quoteLoading
+            ? 'Fetching on-chain quote…'
+            : inCurve
+              ? mode === 'sell'
+                ? 'Amount exceeds what the bonding curve can buy back.'
+                : 'The bonding curve returned no tokens for this amount — it may be full or halted.'
+              : 'This pool has no liquidity to quote against yet, so the trade can’t be priced.'}
+        </p>
+      )}
 
       {/* Tx status */}
       <div aria-live="polite">
@@ -1262,23 +1336,25 @@ function SwapInterface({
           !amount ||
           !Number.isFinite(Number(amount)) ||
           Number(amount) <= 0 ||
-          // No fresh pool snapshot → can't enforce slippage; refuse to swap
-          // rather than fall through to an unbounded execution.
-          (isNativeSwapAvailable && expectedOutWei === null) ||
+          // No quote → can't enforce slippage; refuse to swap rather than
+          // fall through to an unbounded execution.
+          ((inCurve || isNativeSwapAvailable) && expectedOutWei === null) ||
           busy
         }
       >
         {busy && <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden />}
         {mode === 'buy' ? `Buy $${tokenSymbol}` : `Sell $${tokenSymbol}`}
-        {!isNativeSwapAvailable && (
+        {!inCurve && !isNativeSwapAvailable && (
           <ExternalLink className="ml-2 h-3.5 w-3.5 opacity-70" aria-hidden />
         )}
       </Button>
 
       <p className="text-center text-[11px] text-muted-foreground">
-        {isNativeSwapAvailable
-          ? 'Executes on-chain via LoarSwapRouter.'
-          : 'Opens Uniswap v4 to complete the swap.'}{' '}
+        {inCurve
+          ? 'Trades on the bonding curve until it graduates to Uniswap v4.'
+          : isNativeSwapAvailable
+            ? 'Executes on-chain via LoarSwapRouter.'
+            : 'Opens Uniswap v4 to complete the swap.'}{' '}
         LP is locked forever.
       </p>
     </div>

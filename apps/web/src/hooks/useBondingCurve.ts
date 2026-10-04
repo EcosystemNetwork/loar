@@ -108,11 +108,43 @@ const BONDING_CURVE_ABI = [
     outputs: [{ name: '', type: 'uint256' }],
   },
   {
+    name: 'token',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
     name: 'MAX_BUY_AMOUNT',
     type: 'function',
     stateMutability: 'view',
     inputs: [],
     outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const;
+
+// Minimal ERC20 subset — sell() pulls tokens via transferFrom, so the curve
+// needs an allowance first.
+const ERC20_ALLOWANCE_ABI = [
+  {
+    name: 'allowance',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' },
+    ],
+    outputs: [{ type: 'uint256' }],
+  },
+  {
+    name: 'approve',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ type: 'bool' }],
   },
 ] as const;
 
@@ -193,6 +225,28 @@ export function usePreviewBuy(bondingCurveAddress: Address | undefined, ethAmoun
   return { tokensOut: data ?? 0n, isLoading };
 }
 
+export function usePreviewSell(bondingCurveAddress: Address | undefined, tokenAmount: string) {
+  let parsedAmount = 0n;
+  try {
+    parsedAmount = tokenAmount && !isNaN(Number(tokenAmount)) ? parseEther(tokenAmount) : 0n;
+  } catch {
+    parsedAmount = 0n;
+  }
+
+  // Net of the 1% sell fee (the contract's getEthForTokens subtracts it).
+  const { data, isLoading } = useReadContract({
+    address: bondingCurveAddress,
+    abi: BONDING_CURVE_ABI,
+    functionName: 'getEthForTokens',
+    args: [parsedAmount],
+    query: {
+      enabled: !!bondingCurveAddress && parsedAmount > 0n,
+    },
+  });
+
+  return { ethOut: data ?? 0n, isLoading };
+}
+
 // ── Write hooks ──────────────────────────────────────────────────────
 
 type BuyOpts = { slippageBps?: number; minTokensOut?: bigint };
@@ -210,13 +264,13 @@ function chainNameFor(id: number | undefined): string {
 }
 
 export function useBondingCurveActions(bondingCurveAddress: Address | undefined) {
-  const { isConnected } = useWalletAccount();
+  const { isConnected, address } = useWalletAccount();
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
   const chainId = useChainId();
-  const [status, setStatus] = useState<'idle' | 'confirming' | 'pending' | 'success' | 'error'>(
-    'idle'
-  );
+  const [status, setStatus] = useState<
+    'idle' | 'approving' | 'confirming' | 'pending' | 'success' | 'error'
+  >('idle');
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
 
@@ -388,6 +442,38 @@ export function useBondingCurveActions(bondingCurveAddress: Address | undefined)
           minEthOut = applySlippage(expected, slippageBps);
         }
 
+        // sell() pulls tokens with transferFrom — without an allowance the tx
+        // reverts, so approve the exact amount first when needed.
+        if (publicClient && address) {
+          const tokenAddress = (await publicClient.readContract({
+            address: bondingCurveAddress,
+            abi: BONDING_CURVE_ABI,
+            functionName: 'token',
+          })) as Address;
+          const allowance = (await publicClient.readContract({
+            address: tokenAddress,
+            abi: ERC20_ALLOWANCE_ABI,
+            functionName: 'allowance',
+            args: [address as Address, bondingCurveAddress],
+          })) as bigint;
+          if (allowance < tokenAmount) {
+            setStatus('approving');
+            const approveHash = (await writeContractAsync({
+              address: tokenAddress,
+              abi: ERC20_ALLOWANCE_ABI,
+              functionName: 'approve',
+              args: [bondingCurveAddress, tokenAmount],
+            })) as `0x${string}`;
+            const approvedOk = await awaitReceipt(approveHash);
+            if (!approvedOk) {
+              setError('Token approval did not confirm — you can retry');
+              setStatus('error');
+              return;
+            }
+            setStatus('confirming');
+          }
+        }
+
         const deadline = BigInt(Math.floor(Date.now() / 1000) + 300);
 
         const approved = await confirmTx({
@@ -436,7 +522,7 @@ export function useBondingCurveActions(bondingCurveAddress: Address | undefined)
         setStatus('error');
       }
     },
-    [bondingCurveAddress, isConnected, writeContractAsync, publicClient, awaitReceipt]
+    [bondingCurveAddress, isConnected, address, writeContractAsync, publicClient, awaitReceipt]
   );
 
   const reset = useCallback(() => {

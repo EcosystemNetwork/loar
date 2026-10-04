@@ -6,6 +6,7 @@
  */
 import { useState, useCallback } from 'react';
 import { useChainId, usePublicClient } from 'wagmi';
+import { useQuery } from '@tanstack/react-query';
 import { useWriteContract } from '@/hooks/useCircleWrite';
 import { useWalletAccount } from '@/hooks/useWalletAccount';
 import { parseEther, formatEther, type Address, maxUint256 } from 'viem';
@@ -81,6 +82,110 @@ const SWAP_ROUTER_ADDRESSES: Record<number, Address | null> = {
   11155111: '0x7E156f3Ddd56539aB941DeEfEd1342ae5C9C09a5', // Sepolia
   1: null, // Ethereum mainnet — deploy before mainnet launch
 };
+
+// Uniswap v4 V4Quoter per chain. Quotes by simulating the real swap through
+// the PoolManager (hooks + dynamic fees included), so it works for pools the
+// indexer has never seen a trade on.
+const V4_QUOTER_ADDRESSES: Record<number, Address | null> = {
+  11155111: '0x61b3f2011a92d183c7dbadbda940a7555ccf9227', // Sepolia
+  1: '0x52f0e24d1c21c8a0cb1e5a5dd6198556bd9e1203', // Ethereum mainnet
+};
+
+const V4_QUOTER_ABI = [
+  {
+    name: 'quoteExactInputSingle',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      {
+        name: 'params',
+        type: 'tuple',
+        components: [
+          {
+            name: 'poolKey',
+            type: 'tuple',
+            components: [
+              { name: 'currency0', type: 'address' },
+              { name: 'currency1', type: 'address' },
+              { name: 'fee', type: 'uint24' },
+              { name: 'tickSpacing', type: 'int24' },
+              { name: 'hooks', type: 'address' },
+            ],
+          },
+          { name: 'zeroForOne', type: 'bool' },
+          { name: 'exactAmount', type: 'uint128' },
+          { name: 'hookData', type: 'bytes' },
+        ],
+      },
+    ],
+    outputs: [
+      { name: 'amountOut', type: 'uint256' },
+      { name: 'gasEstimate', type: 'uint256' },
+    ],
+  },
+] as const;
+
+export interface PoolKey {
+  currency0: Address;
+  currency1: Address;
+  fee: number;
+  tickSpacing: number;
+  hooks: Address;
+}
+
+/**
+ * On-chain exact-input quote from the v4 quoter. Returns `amountOut` in wei,
+ * `null` while there's nothing to quote, or `isError` when the quoter reverts
+ * (e.g. the pool has no liquidity).
+ */
+export function usePoolQuote({
+  poolKey,
+  zeroForOne,
+  amountInWei,
+}: {
+  poolKey: PoolKey | null;
+  zeroForOne: boolean;
+  amountInWei: bigint | null;
+}) {
+  const chainId = useChainId();
+  const publicClient = usePublicClient();
+  const quoter = V4_QUOTER_ADDRESSES[chainId] ?? null;
+  const enabled = !!quoter && !!publicClient && !!poolKey && !!amountInWei && amountInWei > 0n;
+
+  const query = useQuery({
+    queryKey: [
+      'v4-quote',
+      chainId,
+      poolKey?.currency0,
+      poolKey?.currency1,
+      poolKey?.fee,
+      poolKey?.tickSpacing,
+      poolKey?.hooks,
+      zeroForOne,
+      amountInWei?.toString(),
+    ],
+    queryFn: async () => {
+      const { result } = await publicClient!.simulateContract({
+        address: quoter!,
+        abi: V4_QUOTER_ABI,
+        functionName: 'quoteExactInputSingle',
+        args: [{ poolKey: poolKey!, zeroForOne, exactAmount: amountInWei!, hookData: '0x' }],
+      });
+      return result[0];
+    },
+    enabled,
+    staleTime: 10_000,
+    refetchInterval: 15_000,
+    retry: 1,
+  });
+
+  return {
+    amountOut: enabled ? (query.data ?? null) : null,
+    isLoading: enabled && query.isLoading,
+    isError: enabled && query.isError,
+    isAvailable: !!quoter,
+  };
+}
 
 export interface SwapConfig {
   tokenAddress: string;
