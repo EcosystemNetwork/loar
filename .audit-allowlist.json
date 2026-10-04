@@ -1,0 +1,9 @@
+{
+  "GHSA-3gc7-fjrx-p6mg": "bigint-buffer via @solana/web3.js 1.x — no patched release exists; browser builds use the pure-JS fallback, and toBigIntLE only sees fixed-width on-chain buffers",
+  "GHSA-vfj7-8cjw-p6xm": "braces via chokidar/micromatch — no patched release; only expands glob patterns from our own build/dev config",
+  "GHSA-86w9-cpqp-85rv": "node-forge via @expo/cli + selfsigned — no patched release; mobile dev tooling only, never in a server or web bundle",
+  "GHSA-5p2g-fcmc-qvqq": "image-size@1 via metro — fix only in 2.x; metro reads our own bundled assets at build time",
+  "GHSA-w3rx-r6r6-pgpr": "image-size@1 via metro — fix only in 2.x; metro reads our own bundled assets at build time",
+  "GHSA-82x6-q7mm-w9cf": "toml@3 via @coral-xyz/anchor — fix only in 4.x; anchor parses our own Anchor.toml, not untrusted input",
+  "GHSA-v5mp-jgw5-2x6j": "toml@3 via @coral-xyz/anchor — fix only in 4.x; anchor parses our own Anchor.toml, not untrusted input"
+}

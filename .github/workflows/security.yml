@@ -8,7 +8,9 @@ on:
 # - Blocking on: any push, or PRs targeting main/release/* (the launch gate)
 # - Informational on: PRs targeting feature branches (allows WIP audit fixes)
 #
-# pnpm audit is ALWAYS blocking (no condition) — dependency vulns are cheap to check.
+# Dependency audit is ALWAYS blocking (no condition) — dependency vulns are cheap to check.
+# It runs scripts/audit-deps.mjs, not `pnpm audit`, which OOMs on this lockfile;
+# accepted advisories live in .audit-allowlist.json with a reason each.
 #
 # Known contract patterns that may produce Slither warnings:
 #   arbitrary-send-eth: pull-payment claim() functions send to msg.sender — intentional.
@@ -253,7 +255,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Audit dependencies (high severity)
-        run: pnpm audit --audit-level=high
+        run: node scripts/audit-deps.mjs --audit-level=high
 
   # INF-7: gitleaks — scan every push and PR for accidentally-committed
   # secrets (API keys, JWT signing keys, private keys, wallet mnemonics).
