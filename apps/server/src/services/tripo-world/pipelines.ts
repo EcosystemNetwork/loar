@@ -399,7 +399,7 @@ export function characterPuppetPipeline(args: CharacterPuppetArgs) {
     );
 
     // 5. Motion library — one GLB per preset.
-    let animations: Array<{ preset: string; name: string; url: string; webUrl: string | null }> =
+    const animations: Array<{ preset: string; name: string; url: string; webUrl: string | null }> =
       [];
     if (args.animations.length) {
       const anim = await ctx.step('Animations', () =>
