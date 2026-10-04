@@ -322,3 +322,45 @@ function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; va
     </div>
   );
 }
+
+/** Shown on the wiki 3D World tab when no universe is selected yet. */
+export function WorldUniversePicker({
+  universes,
+  onSelect,
+}: {
+  universes: Array<{ id: string; name?: string; image_url?: string }>;
+  onSelect: (universeId: string) => void;
+}) {
+  const named = universes.filter((u) => !!u.name);
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold">Pick a universe to open its 3D world</h2>
+        <p className="text-sm text-muted-foreground">
+          See its characters, props and places in 3D, build sets, and walk through them.
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {named.map((u) => (
+          <button
+            key={u.id}
+            type="button"
+            onClick={() => onSelect(u.id)}
+            className="group overflow-hidden rounded-lg border text-left hover:border-primary/50"
+          >
+            <div className="aspect-video bg-muted/30">
+              {u.image_url && (
+                <SmartImage
+                  src={u.image_url}
+                  alt={u.name ?? ''}
+                  className="h-full w-full object-cover transition group-hover:scale-[1.02]"
+                />
+              )}
+            </div>
+            <div className="truncate p-2 text-sm font-medium">{u.name}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

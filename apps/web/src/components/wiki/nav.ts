@@ -81,6 +81,7 @@ export const WIKI_GROUPS: WikiGroupDef[] = [
     icon: Compass,
     tabs: [
       { id: 'home', label: 'Front page', icon: Newspaper },
+      { id: 'world', label: '3D World', icon: Globe2 },
       { id: 'gallery', label: 'Gallery', icon: ImageIcon },
       { id: 'ask', label: 'Ask', icon: Sparkles },
       { id: 'az-index', label: 'A–Z', icon: ListOrdered },
@@ -122,7 +123,6 @@ export const WIKI_GROUPS: WikiGroupDef[] = [
       { id: 'audio', label: 'Audio', icon: Music },
       { id: 'character-profiles', label: 'Profiles', icon: UserCircle },
       { id: '3d-models', label: '3D Models', icon: Rotate3d },
-      { id: 'world', label: 'World', icon: Globe2 },
       { id: 'collection', label: 'Collection', icon: Users },
     ],
   },
