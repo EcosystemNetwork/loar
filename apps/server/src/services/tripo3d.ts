@@ -204,19 +204,32 @@ class Tripo3dService {
    * single Meshy mesh.
    */
   async uploadRemoteGlb(modelUrl: string, apiKey?: string): Promise<string> {
-    const key = this.resolveKey(apiKey);
+    return this.uploadRemoteFile(
+      modelUrl,
+      this.resolveKey(apiKey),
+      'model.glb',
+      'model/gltf-binary'
+    );
+  }
+
+  private async uploadRemoteFile(
+    url: string,
+    key: string,
+    fallbackName: string,
+    fallbackType: string
+  ): Promise<string> {
     // Stored URLs carry no gateway credentials — the dedicated gateway 401s
     // without its token, which broke every restyle/stylize/parts/export job.
-    const fetched = await fetch(authorizedMediaUrl(modelUrl));
+    const fetched = await fetch(authorizedMediaUrl(url));
     if (!fetched.ok) {
-      throw new Error(`Failed to fetch source GLB for Tripo upload: ${fetched.status}`);
+      throw new Error(`Failed to fetch source file for Tripo upload: ${fetched.status}`);
     }
     const blob = await fetched.blob();
 
     const form = new FormData();
     form.append(
       'file',
-      new File([blob], inferFilename(modelUrl), { type: blob.type || 'model/gltf-binary' })
+      new File([blob], inferFilename(url, fallbackName), { type: blob.type || fallbackType })
     );
 
     const res = await fetch(`${BASE_URL}/files`, {
@@ -291,6 +304,13 @@ class Tripo3dService {
     const key = this.resolveKey(apiKey);
     // Drop undefined fields so Tripo applies its own defaults.
     const clean = Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined));
+    // Tripo fetches URL inputs itself, and our dedicated gateway 401s without
+    // its token (code 1004 "input image URL is not accessible") — which failed
+    // every entity cover → 3D job. Upload those through /files instead of
+    // handing the gateway token to a third party.
+    if (typeof clean.input === 'string' && needsGatewayAuth(clean.input)) {
+      clean.input = await this.uploadRemoteFile(clean.input, key, 'image.png', 'image/png');
+    }
     const json = await this.post<CreateTaskResponse>(path, clean, key);
     if (!json.data?.task_id) throw new Error(`Tripo3D ${path} returned no task id`);
     return { taskId: json.data.task_id };
@@ -594,7 +614,7 @@ export function tripoMultiviewUrls(task: TripoTask): {
   };
 }
 
-function inferFilename(url: string): string {
+function inferFilename(url: string, fallback = 'model.glb'): string {
   try {
     const u = new URL(url);
     const last = u.pathname.split('/').pop();
@@ -602,7 +622,12 @@ function inferFilename(url: string): string {
   } catch {
     // fallthrough
   }
-  return 'model.glb';
+  return fallback;
+}
+
+/** True for URLs on our token-gated IPFS gateway, which Tripo can't fetch. */
+function needsGatewayAuth(input: string): boolean {
+  return /^https?:\/\//i.test(input) && authorizedMediaUrl(input) !== input;
 }
 
 export const tripo3dService = new Tripo3dService();

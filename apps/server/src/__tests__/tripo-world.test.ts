@@ -134,6 +134,43 @@ describe('Tripo3D v3 request bodies', () => {
     }
   });
 
+  it('uploads token-gated gateway images instead of passing a URL Tripo cannot fetch', async () => {
+    vi.stubEnv('PINATA_GATEWAY_URL', 'https://media.loar.test');
+    vi.stubEnv('PINATA_GATEWAY_TOKEN', 'gw-secret');
+    const calls: Array<{ url: string; body: unknown }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        calls.push({ url, body: init?.body });
+        if (url.startsWith('https://media.loar.test/')) {
+          return new Response(new Uint8Array([1, 2, 3]), {
+            status: 200,
+            headers: { 'content-type': 'image/png' },
+          });
+        }
+        if (url.endsWith('/files')) {
+          return new Response(JSON.stringify({ code: 0, data: { file_token: 'ft-1' } }));
+        }
+        return new Response(JSON.stringify({ code: 0, data: { task_id: 'task-1' } }));
+      })
+    );
+    try {
+      await tripo3dService.imageToModel({
+        input: 'https://media.loar.test/ipfs/bafycover/cover.png',
+        apiKey: 'k',
+      });
+      expect(calls[0].url).toBe(
+        'https://media.loar.test/ipfs/bafycover/cover.png?pinataGatewayToken=gw-secret'
+      );
+      expect(calls[1].url).toBe('https://openapi.tripo3d.ai/v3/files');
+      const submit = JSON.parse(String(calls[2].body));
+      expect(submit.input).toBe('ft-1');
+      expect(String(calls[2].body)).not.toContain('gw-secret');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('still fails on a non-429 error without retrying', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('bad input', { status: 400 }));
     vi.stubGlobal('fetch', fetchMock);
