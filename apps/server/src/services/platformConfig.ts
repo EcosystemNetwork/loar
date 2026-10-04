@@ -93,6 +93,18 @@ export interface PlatformConfig {
    */
   featuredUniverseIds: string[];
 
+  // ── Per-page featured slots ───────────────────────────────────────
+  // Same contract as `featuredUniverseIds`: public via `getPublicFeatured`,
+  // empty = the page keeps its automatic pick.
+  /** Content doc ids pinned, in order, to the front of /discover's trending row. */
+  featuredDiscoverContentIds: string[];
+  /** Content doc ids shown, in order, in the "Featured" row atop /videos. */
+  featuredVideoContentIds: string[];
+  /** Entity id that replaces the wiki front page's daily-rotating featured entry. '' = rotate. */
+  featuredWikiEntityId: string;
+  /** Launchpad token address that replaces /tokens' King of the Hill. '' = highest market cap. */
+  featuredTokenAddress: string;
+
   // ── Metadata ─────────────────────────────────────────────────────
   updatedAt?: Date;
   updatedBy?: string;
@@ -135,6 +147,10 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
   dailySpendCapCredits: 500,
 
   featuredUniverseIds: [],
+  featuredDiscoverContentIds: [],
+  featuredVideoContentIds: [],
+  featuredWikiEntityId: '',
+  featuredTokenAddress: '',
 };
 
 // ── Simple in-process cache (TTL: 60 s) ──────────────────────────────────
@@ -230,6 +246,27 @@ export async function getPublicFeatureFlags(): Promise<
     mintingEnabled: cfg.mintingEnabled,
     purchaseEnabled: cfg.purchaseEnabled,
     registrationEnabled: cfg.registrationEnabled,
+  };
+}
+
+export type PublicFeatured = Pick<
+  PlatformConfig,
+  | 'featuredUniverseIds'
+  | 'featuredDiscoverContentIds'
+  | 'featuredVideoContentIds'
+  | 'featuredWikiEntityId'
+  | 'featuredTokenAddress'
+>;
+
+/** Admin-curated featured slots for every page — the only curation fields safe to expose publicly. */
+export async function getPublicFeatured(): Promise<PublicFeatured> {
+  const cfg = await getPlatformConfig();
+  return {
+    featuredUniverseIds: cfg.featuredUniverseIds ?? [],
+    featuredDiscoverContentIds: cfg.featuredDiscoverContentIds ?? [],
+    featuredVideoContentIds: cfg.featuredVideoContentIds ?? [],
+    featuredWikiEntityId: cfg.featuredWikiEntityId ?? '',
+    featuredTokenAddress: cfg.featuredTokenAddress ?? '',
   };
 }
 

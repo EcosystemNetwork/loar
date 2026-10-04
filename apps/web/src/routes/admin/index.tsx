@@ -31,6 +31,7 @@ import {
   ArrowRight,
   Users,
   Database,
+  Star,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -184,9 +185,15 @@ function AdminHub() {
     {
       to: '/admin/ops',
       title: 'Ops',
-      description: 'Feature kill switches, spend caps, abuse flags, featured homepage content.',
+      description: 'Feature kill switches, spend caps, abuse flags.',
       icon: Power,
       badge: () => <OpsBadge enabled={gated} />,
+    },
+    {
+      to: '/admin/featured',
+      title: 'Featured',
+      description: 'What each page spotlights: home, discover, videos, wiki, tokens.',
+      icon: Star,
     },
     {
       to: '/admin/moderation',

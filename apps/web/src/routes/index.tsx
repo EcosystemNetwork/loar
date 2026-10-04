@@ -44,6 +44,7 @@ import {
 } from '@/utils/ponder-api';
 import type { FirestoreUniverse } from '@/types/firestore';
 import type { EnrichedUniverse } from '@/components/home/types';
+import { useFeaturedConfig } from '@/hooks/useFeaturedConfig';
 import { trpc, trpcClient } from '@/utils/trpc';
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 
@@ -150,12 +151,7 @@ function HomeComponent() {
   const ponderOnline = !!ponderUniverses;
 
   // ─── Admin-curated featured universes (hero billboard + activity ticker) ───
-  const { data: featuredConfig } = useQuery({
-    queryKey: ['universes', 'featured-config'],
-    queryFn: () => trpcClient.universes.getFeatured.query(),
-    staleTime: 60_000,
-  });
-  const featuredUniverseIds = featuredConfig?.featuredUniverseIds;
+  const { featuredUniverseIds } = useFeaturedConfig();
 
   // ─── Merge: Firestore base + optional Ponder enrichment ───
   const universes = useMemo(() => {

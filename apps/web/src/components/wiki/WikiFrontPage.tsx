@@ -4,7 +4,7 @@
  * kind, instead of opening on a raw media feed.
  */
 import { Link } from '@tanstack/react-router';
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import {
   ArrowRight,
   CalendarDays,
@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
+import { useFeaturedConfig } from '@/hooks/useFeaturedConfig';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SmartImage } from '@/components/SmartImage';
@@ -56,14 +57,32 @@ export function WikiFrontPage({
     })),
   });
 
-  const isLoading = results.some((r) => r.isLoading);
+  // Admin pin (`/admin/featured`) overrides the daily rotation — but only on
+  // the global front page or the pinned entry's own universe.
+  const { featuredWikiEntityId, isLoading: featuredConfigLoading } = useFeaturedConfig();
+  const pinnedQuery = useQuery({
+    queryKey: ['wiki', 'front', 'pinned', featuredWikiEntityId],
+    queryFn: () => trpcClient.entities.get.query({ entityId: featuredWikiEntityId! }),
+    enabled: !!featuredWikiEntityId,
+    staleTime: FRONT_STALE_TIME,
+    retry: false,
+  });
+  const pinned = pinnedQuery.data as WikiEntity | undefined;
+  const pinnedApplies =
+    !!pinned &&
+    (!universeAddress || pinned.universeAddress?.toLowerCase() === universeAddress.toLowerCase());
+
+  const isLoading =
+    results.some((r) => r.isLoading) ||
+    featuredConfigLoading ||
+    (!!featuredWikiEntityId && pinnedQuery.isLoading);
   // ~70 entities at most — cheap enough to derive on every render.
   const byKind: Partial<Record<EntityKind, WikiEntity[]>> = {};
   FRONT_KINDS.forEach((kind, i) => {
     byKind[kind] = (results[i]?.data?.entities ?? []) as WikiEntity[];
   });
   const pool = FRONT_KINDS.flatMap((k) => byKind[k] ?? []);
-  const featured = pickFeatured(pool, localDayNumber());
+  const featured = pinnedApplies ? pinned : pickFeatured(pool, localDayNumber());
   const recent = recentlyAdded(pool, 6, featured?.id);
 
   if (isLoading) return <FrontPageSkeleton />;

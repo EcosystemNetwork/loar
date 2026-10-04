@@ -29,7 +29,7 @@ import { isEvmAddress, normalizeUniverseId } from '../../lib/universe-id';
 import { getUserSolanaWallet } from '../../lib/circle-solana';
 import { db } from '../../lib/firebase';
 import { generateNonce, consumeNonce } from '../../lib/siwe';
-import { getPlatformConfig } from '../../services/platformConfig';
+import { getPublicFeatured } from '../../services/platformConfig';
 import { assertFeatureEnabledOrForbidden } from '../../lib/feature-guards';
 import { awardUniverseCreationPoints } from '../../services/points';
 
@@ -158,15 +158,12 @@ export const universesRouter = router({
   }),
 
   /**
-   * Admin-curated universe addresses (in order) pinned to the front of the
-   * homepage hero billboard and scrolling activity ticker. Public — this is
-   * the only slice of `platformConfig` safe to expose to unauthenticated
-   * visitors; everything else in that doc stays behind `admin.getConfig`.
+   * Admin-curated featured slots for every page (homepage hero/ticker
+   * universes, discover/videos content, wiki entry, launchpad token). Public —
+   * these are the only slices of `platformConfig` safe to expose to
+   * unauthenticated visitors; everything else stays behind `admin.getConfig`.
    */
-  getFeatured: publicProcedure.query(async () => {
-    const cfg = await getPlatformConfig();
-    return { featuredUniverseIds: cfg.featuredUniverseIds ?? [] };
-  }),
+  getFeatured: publicProcedure.query(() => getPublicFeatured()),
 
   /** Discover universes with search, sorting, and pagination. */
   discover: publicProcedure

@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/select';
 import { TokenTable } from '@/components/tokens/TokenTable';
 import { KingOfTheHill } from '@/components/tokens/KingOfTheHill';
+import { useFeaturedConfig } from '@/hooks/useFeaturedConfig';
 import { TokenScreenerControls } from '@/components/tokens/TokenScreenerControls';
 import { LaunchpadNav } from '@/components/tokens/launchpad/LaunchpadNav';
 import { TokenCard } from '@/components/tokens/launchpad/TokenCard';
@@ -149,7 +150,16 @@ function TokenLaunchpad() {
     totalMarketCap,
   } = useTokenListData();
 
-  const king = useMemo(() => pickKingOfTheHill(tokens), [tokens]);
+  // Admin pin (`/admin/featured`) replaces the market-cap pick when it's listed.
+  const { featuredTokenAddress } = useFeaturedConfig();
+  const pinnedToken = useMemo(
+    () =>
+      featuredTokenAddress
+        ? (tokens.find((t) => t.id.toLowerCase() === featuredTokenAddress.toLowerCase()) ?? null)
+        : null,
+    [tokens, featuredTokenAddress]
+  );
+  const king = useMemo(() => pinnedToken ?? pickKingOfTheHill(tokens), [pinnedToken, tokens]);
 
   const applyPreset = (id: string | null) => {
     if (!id) {
@@ -317,7 +327,9 @@ function TokenLaunchpad() {
         </header>
 
         {/* King of the Hill — top market cap still on the curve */}
-        {king && search.tab === 'all' && <KingOfTheHill token={king} />}
+        {king && search.tab === 'all' && (
+          <KingOfTheHill token={king} featured={king === pinnedToken} />
+        )}
 
         {/* Recently viewed */}
         {recentTokens.length > 0 && search.tab === 'all' && (

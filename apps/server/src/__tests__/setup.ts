@@ -201,5 +201,13 @@ vi.mock('../services/platformConfig', () => ({
     purchaseEnabled: true,
     registrationEnabled: true,
   }),
+  // No admin curation by default — every featured slot falls back to automatic.
+  getPublicFeatured: vi.fn().mockResolvedValue({
+    featuredUniverseIds: [],
+    featuredDiscoverContentIds: [],
+    featuredVideoContentIds: [],
+    featuredWikiEntityId: '',
+    featuredTokenAddress: '',
+  }),
   FeatureDisabledError: MockFeatureDisabledError,
 }));

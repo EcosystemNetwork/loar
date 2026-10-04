@@ -120,6 +120,7 @@ import { Route as AdminOpsRouteImport } from './routes/admin/ops'
 import { Route as AdminModerationRouteImport } from './routes/admin/moderation'
 import { Route as AdminMcpUsageRouteImport } from './routes/admin/mcp-usage'
 import { Route as AdminMainnetRouteImport } from './routes/admin/mainnet'
+import { Route as AdminFeaturedRouteImport } from './routes/admin/featured'
 import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
 import { Route as AdminCostRouteImport } from './routes/admin/cost'
 import { Route as AdminByokCodesRouteImport } from './routes/admin/byok-codes'
@@ -708,6 +709,11 @@ const AdminMainnetRoute = AdminMainnetRouteImport.update({
   path: '/admin/mainnet',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminFeaturedRoute = AdminFeaturedRouteImport.update({
+  id: '/admin/featured',
+  path: '/admin/featured',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminDashboardRoute = AdminDashboardRouteImport.update({
   id: '/admin/dashboard',
   path: '/admin/dashboard',
@@ -921,6 +927,7 @@ export interface FileRoutesByFullPath {
   '/admin/byok-codes': typeof AdminByokCodesRoute
   '/admin/cost': typeof AdminCostRoute
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/featured': typeof AdminFeaturedRoute
   '/admin/mainnet': typeof AdminMainnetRoute
   '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
@@ -1066,6 +1073,7 @@ export interface FileRoutesByTo {
   '/admin/byok-codes': typeof AdminByokCodesRoute
   '/admin/cost': typeof AdminCostRoute
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/featured': typeof AdminFeaturedRoute
   '/admin/mainnet': typeof AdminMainnetRoute
   '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
@@ -1212,6 +1220,7 @@ export interface FileRoutesById {
   '/admin/byok-codes': typeof AdminByokCodesRoute
   '/admin/cost': typeof AdminCostRoute
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/featured': typeof AdminFeaturedRoute
   '/admin/mainnet': typeof AdminMainnetRoute
   '/admin/mcp-usage': typeof AdminMcpUsageRoute
   '/admin/moderation': typeof AdminModerationRoute
@@ -1359,6 +1368,7 @@ export interface FileRouteTypes {
     | '/admin/byok-codes'
     | '/admin/cost'
     | '/admin/dashboard'
+    | '/admin/featured'
     | '/admin/mainnet'
     | '/admin/mcp-usage'
     | '/admin/moderation'
@@ -1504,6 +1514,7 @@ export interface FileRouteTypes {
     | '/admin/byok-codes'
     | '/admin/cost'
     | '/admin/dashboard'
+    | '/admin/featured'
     | '/admin/mainnet'
     | '/admin/mcp-usage'
     | '/admin/moderation'
@@ -1649,6 +1660,7 @@ export interface FileRouteTypes {
     | '/admin/byok-codes'
     | '/admin/cost'
     | '/admin/dashboard'
+    | '/admin/featured'
     | '/admin/mainnet'
     | '/admin/mcp-usage'
     | '/admin/moderation'
@@ -1795,6 +1807,7 @@ export interface RootRouteChildren {
   AdminByokCodesRoute: typeof AdminByokCodesRoute
   AdminCostRoute: typeof AdminCostRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
+  AdminFeaturedRoute: typeof AdminFeaturedRoute
   AdminMainnetRoute: typeof AdminMainnetRoute
   AdminMcpUsageRoute: typeof AdminMcpUsageRoute
   AdminModerationRoute: typeof AdminModerationRoute
@@ -2664,6 +2677,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminMainnetRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/featured': {
+      id: '/admin/featured'
+      path: '/admin/featured'
+      fullPath: '/admin/featured'
+      preLoaderRoute: typeof AdminFeaturedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/dashboard': {
       id: '/admin/dashboard'
       path: '/admin/dashboard'
@@ -2967,6 +2987,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminByokCodesRoute: AdminByokCodesRoute,
   AdminCostRoute: AdminCostRoute,
   AdminDashboardRoute: AdminDashboardRoute,
+  AdminFeaturedRoute: AdminFeaturedRoute,
   AdminMainnetRoute: AdminMainnetRoute,
   AdminMcpUsageRoute: AdminMcpUsageRoute,
   AdminModerationRoute: AdminModerationRoute,

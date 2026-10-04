@@ -5,7 +5,7 @@
  * Filters by mediaType video/ai-video, with format distinction.
  */
 import { createFileRoute } from '@tanstack/react-router';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { trpcClient } from '@/utils/trpc';
 import { ContentLaneBadge } from '@/components/ContentLaneBadge';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,7 @@ import {
   VolumeX,
   ChevronLeft,
   ChevronRight,
+  Star,
 } from 'lucide-react';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import { SmartImage } from '@/components/SmartImage';
@@ -109,6 +110,14 @@ function VideosPage() {
     getNextPageParam: (last: any) => last.nextCursor ?? undefined,
   });
 
+  // Admin-curated row (`/admin/featured`) — hidden when empty or while searching.
+  const { data: featuredData } = useQuery({
+    queryKey: ['videos-featured'],
+    queryFn: () => trpcClient.feed.getFeaturedVideos.query(),
+    staleTime: 60_000,
+  });
+  const featuredItems = debouncedSearch ? [] : (featuredData?.items ?? []);
+
   const shortItems = shortQuery.data?.pages.flatMap((p: any) => p.items) ?? [];
   const longItems = longQuery.data?.pages.flatMap((p: any) => p.items) ?? [];
   const aiVideoItems = aiVideoQuery.data?.pages.flatMap((p: any) => p.items) ?? [];
@@ -181,6 +190,25 @@ function VideosPage() {
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-12 sm:space-y-16 pb-bottom-nav md:pb-12">
+        {featuredItems.length > 0 && (
+          <section>
+            <SectionHeader
+              icon={<Star className="h-5 w-5 fill-amber-400 text-amber-400" />}
+              label="Featured"
+              sublabel="Picked by the LOAR team"
+              accentClass="text-amber-400"
+              count={featuredItems.length}
+            />
+            <HorizontalScrollRow>
+              {featuredItems.map((item: any) => (
+                <div key={item.id} className="w-72 shrink-0 snap-start sm:w-96">
+                  <LongCard item={item} />
+                </div>
+              ))}
+            </HorizontalScrollRow>
+          </section>
+        )}
+
         {/* Short-Form Section */}
         <section>
           <SectionHeader

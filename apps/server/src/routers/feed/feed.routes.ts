@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import { protectedProcedure, publicProcedure, adminProcedure, router } from '../../lib/trpc';
 import { db } from '../../lib/firebase';
+import { getPublicFeatured } from '../../services/platformConfig';
 
 const preferencesCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -62,6 +63,21 @@ async function enrichWithContent(signals: any[]): Promise<any[]> {
     });
   }
   return enriched;
+}
+
+/**
+ * Resolve admin-pinned content ids (see `featuredDiscoverContentIds` /
+ * `featuredVideoContentIds`) into renderable items, in pinned order, tagged
+ * `pinned: true`. Private / moderated / deleted ids drop out silently.
+ */
+async function loadPinnedContent(ids: string[]): Promise<any[]> {
+  return enrichWithContent(ids.map((id) => ({ id, contentId: id, pinned: true })));
+}
+
+/** Pinned items first, then `rest` minus duplicates, capped at `limit`. */
+export function withPinned(pinned: any[], rest: any[], limit: number): any[] {
+  const seen = new Set(pinned.map((p) => p.contentId || p.id));
+  return [...pinned, ...rest.filter((r) => !seen.has(r.contentId || r.id))].slice(0, limit);
 }
 
 export const feedRouter = router({
@@ -149,6 +165,11 @@ export const feedRouter = router({
       })
     )
     .query(async ({ input }) => {
+      // Admin pins lead the first page only — later pages stay pure ranking.
+      const pinned = input.cursor
+        ? []
+        : await loadPinnedContent((await getPublicFeatured()).featuredDiscoverContentIds);
+
       let query = signalsCol().orderBy('trendingScore', 'desc').limit(input.limit);
 
       if (input.cursor) {
@@ -191,17 +212,32 @@ export const feedRouter = router({
             totalViews: d.views ?? 0,
           }));
 
-        return { items, nextCursor: undefined };
+        return { items: withPinned(pinned, items, input.limit), nextCursor: undefined };
       }
 
       return {
-        items,
+        items: withPinned(pinned, items, input.limit),
         nextCursor:
           snapshot.docs.length === input.limit
             ? snapshot.docs[snapshot.docs.length - 1]?.id
             : undefined,
       };
     }),
+
+  /**
+   * Admin featured-slot editor (`/admin/featured`): resolve arbitrary content
+   * ids the same way the public slots will. An id missing from the result is
+   * one the public pages would silently drop (private, moderated, deleted).
+   */
+  previewPinned: adminProcedure
+    .input(z.object({ ids: z.array(z.string().min(1).max(128)).max(12) }))
+    .query(async ({ input }) => ({ items: await loadPinnedContent(input.ids) })),
+
+  /** Admin-curated "Featured" row atop /videos, in pinned order (empty = row hidden). */
+  getFeaturedVideos: publicProcedure.query(async () => {
+    const { featuredVideoContentIds } = await getPublicFeatured();
+    return { items: await loadPinnedContent(featuredVideoContentIds) };
+  }),
 
   /** Record user interaction for preference learning */
   recordInteraction: protectedProcedure

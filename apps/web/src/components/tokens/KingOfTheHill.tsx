@@ -1,11 +1,15 @@
-/** Featured hero for the launchpad's King of the Hill token (see pickKingOfTheHill). */
+/**
+ * Featured hero for the launchpad's King of the Hill token (see pickKingOfTheHill),
+ * or the admin-pinned token when `featured` is set.
+ */
 import { Link } from '@tanstack/react-router';
 import { ArrowRight, Crown } from 'lucide-react';
 import { formatCompactEth, weiToNumber, type EnrichedToken } from '@/hooks/useTokens';
 import { Change, GraduationBar, TokenAvatar } from './launchpad/primitives';
 import { formatPrice } from './launchpad/format';
 
-export function KingOfTheHill({ token }: { token: EnrichedToken }) {
+export function KingOfTheHill({ token, featured }: { token: EnrichedToken; featured?: boolean }) {
+  const label = featured ? 'Featured' : 'King of the Hill';
   const pct = Math.max(0, Math.min(100, token.graduationPct));
   const curve = token.bondingCurve;
   const raised = curve ? weiToNumber(curve.ethRaised, 18) : 0;
@@ -15,7 +19,7 @@ export function KingOfTheHill({ token }: { token: EnrichedToken }) {
     <Link
       to="/tokens/$address"
       params={{ address: token.id }}
-      aria-label={`King of the Hill: ${token.name}`}
+      aria-label={`${label}: ${token.name}`}
       className="group relative block overflow-hidden rounded-2xl border border-primary/30 bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       {/* Blurred token art as ambient backdrop */}
@@ -44,9 +48,7 @@ export function KingOfTheHill({ token }: { token: EnrichedToken }) {
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-primary">
-            King of the Hill
-          </p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-primary">{label}</p>
           <h2 className="mt-1 truncate text-2xl font-bold tracking-tight sm:text-3xl">
             {token.name}{' '}
             <span className="font-mono text-base font-medium text-muted-foreground">

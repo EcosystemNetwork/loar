@@ -49,6 +49,7 @@ import {
   Globe,
   TrendingUp,
   Flame,
+  Star,
   Eye,
   Lock,
   Crown,
@@ -146,7 +147,12 @@ function DiscoverPage() {
             {trendingItems.length > 0 && (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 {trendingItems.map((item: any, i: number) => (
-                  <TrendingCard key={item.id || item.contentId || i} item={item} rank={i} />
+                  <TrendingCard
+                    key={item.id || item.contentId || i}
+                    item={item}
+                    // Admin-pinned items lead the row; rank the rest from #1.
+                    rank={i - trendingItems.filter((t: any) => t.pinned).length}
+                  />
                 ))}
               </div>
             )}
@@ -1357,10 +1363,19 @@ function TrendingCard({ item, rank }: { item: any; rank: number }) {
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
       <div className="absolute bottom-0 inset-x-0 p-2.5">
-        <div className="flex items-center gap-1 mb-1">
-          <span className="text-[10px] font-bold text-orange-400">#{rank + 1}</span>
-          <Flame className="h-3 w-3 text-orange-400" />
-        </div>
+        {item.pinned ? (
+          <div className="flex items-center gap-1 mb-1">
+            <Star className="h-3 w-3 fill-amber-300 text-amber-300" />
+            <span className="text-[10px] font-bold uppercase tracking-wide text-amber-300">
+              Featured
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 mb-1">
+            <span className="text-[10px] font-bold text-orange-400">#{rank + 1}</span>
+            <Flame className="h-3 w-3 text-orange-400" />
+          </div>
+        )}
         <p className="text-white text-xs font-medium line-clamp-2 leading-tight">
           {item.title || 'Untitled'}
         </p>

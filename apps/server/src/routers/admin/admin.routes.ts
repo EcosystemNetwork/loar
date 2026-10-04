@@ -41,6 +41,9 @@ const configAuditCol = () => {
   return db.collection('platformConfigAudit');
 };
 
+/** Firestore document id (content / entity) — no slashes, bounded length. */
+const docIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/, 'Invalid id');
+
 // ── Config update schema — every field optional so admins can patch ───────
 
 const configPatchSchema = z.object({
@@ -77,6 +80,14 @@ const configPatchSchema = z.object({
   featuredUniverseIds: z
     .array(z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid universe address'))
     .max(10)
+    .optional(),
+
+  // Per-page featured slots — see PlatformConfig. Empty / '' = automatic pick.
+  featuredDiscoverContentIds: z.array(docIdSchema).max(6).optional(),
+  featuredVideoContentIds: z.array(docIdSchema).max(12).optional(),
+  featuredWikiEntityId: z.union([docIdSchema, z.literal('')]).optional(),
+  featuredTokenAddress: z
+    .union([z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid token address'), z.literal('')])
     .optional(),
 });
 
