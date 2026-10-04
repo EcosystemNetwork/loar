@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -40,8 +40,27 @@ function Section({
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const ref = useRef<HTMLElement>(null);
+
+  // Side-nav links are plain #hash anchors; sections start collapsed, so open
+  // the targeted one and scroll to it once its body has rendered.
+  useEffect(() => {
+    const openIfTargeted = () => {
+      if (window.location.hash.slice(1) !== id) return;
+      setOpen(true);
+      requestAnimationFrame(() => ref.current?.scrollIntoView({ block: 'start' }));
+    };
+    openIfTargeted();
+    window.addEventListener('hashchange', openIfTargeted);
+    return () => window.removeEventListener('hashchange', openIfTargeted);
+  }, [id]);
+
   return (
-    <section id={id} className="border border-border rounded-lg overflow-hidden">
+    <section
+      ref={ref}
+      id={id}
+      className="border border-border rounded-lg overflow-hidden scroll-mt-20"
+    >
       <button
         onClick={() => setOpen(!open)}
         className="w-full flex items-center gap-3 px-6 py-4 bg-card hover:bg-card/80 transition-colors text-left"
@@ -153,6 +172,13 @@ function DocsPage() {
               <a
                 key={item.id}
                 href={`#${item.id}`}
+                onClick={() => {
+                  // Re-clicking the current hash fires no hashchange; re-dispatch so
+                  // the section still opens and scrolls into view.
+                  if (window.location.hash === `#${item.id}`) {
+                    window.dispatchEvent(new HashChangeEvent('hashchange'));
+                  }
+                }}
                 className="block px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
               >
                 {item.label}

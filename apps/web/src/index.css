@@ -193,9 +193,12 @@
     padding-right: env(safe-area-inset-right);
   }
 
-  /* Prevent horizontal overflow on mobile */
+  /* Prevent horizontal overflow on mobile. `clip` (not `hidden`) so #app is
+     not a scroll container — `hidden` broke every position:sticky element
+     (header, docs side nav). `hidden` stays as the fallback for old browsers. */
   #app {
     overflow-x: hidden;
+    overflow-x: clip;
     width: 100%;
   }
 
