@@ -21,6 +21,7 @@ import {
   Paintbrush,
   PersonStanding,
   Puzzle,
+  RotateCcw,
   Sparkles,
 } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
@@ -68,8 +69,12 @@ interface Puppet {
   turnaround?: Partial<Record<'front' | 'left' | 'back' | 'right', string>>;
   riggedModelUrl?: string;
   modelUrl?: string;
+  /** Web-optimised copies (meshopt, ~20x smaller) — what the viewer loads. */
+  webModelUrl?: string | null;
+  webRiggedModelUrl?: string | null;
+  thumbnailUrl?: string | null;
   rigType?: string;
-  animations?: Array<{ preset: string; name: string; url: string }>;
+  animations?: Array<{ preset: string; name: string; url: string; webUrl?: string | null }>;
 }
 
 interface EntityLike {
@@ -89,6 +94,13 @@ export function Entity3DStudio({ entity, isOwner }: { entity: EntityLike; isOwne
   const environment = (meta.environment ?? null) as { splatUrl?: string; format?: string } | null;
   const modelUrl: string | null =
     puppet?.modelUrl ?? meta.model3d?.glbUrl ?? (meta.modelUrl as string | undefined) ?? null;
+  // What the viewer loads: the web copy of the same model when there is one.
+  const displayModelUrl: string | null = puppet?.modelUrl
+    ? (puppet.webModelUrl ?? puppet.modelUrl)
+    : meta.model3d?.glbUrl
+      ? (meta.model3d.webGlbUrl ?? meta.model3d.glbUrl)
+      : modelUrl;
+  const posterUrl: string | null = puppet?.thumbnailUrl ?? meta.model3d?.thumbnailUrl ?? null;
   const usdzUrl = (meta.usdzUrl as string | undefined) ?? null;
 
   const modelable = MODELABLE_KINDS.includes(entity.kind);
@@ -97,7 +109,7 @@ export function Entity3DStudio({ entity, isOwner }: { entity: EntityLike; isOwne
 
   const jobsQuery = useEntityTripoJobs(entity.id, isOwner);
   const jobs = jobsQuery.data ?? [];
-  const running = jobs.filter((j) => j.status === 'running');
+  const running = jobs.filter((j) => j.status === 'running' || j.status === 'queued');
   const busy = (kind: string) => running.some((j) => j.kind === kind);
 
   const [rigType, setRigType] = useState<RigType>(entity.kind === 'person' ? 'biped' : 'quadruped');
@@ -190,7 +202,7 @@ export function Entity3DStudio({ entity, isOwner }: { entity: EntityLike; isOwne
   if (!modelable && !isPlace) return null;
 
   const activeClip = puppet?.animations?.find((a) => a.name === clip) ?? null;
-  const viewerSrc = activeClip?.url ?? modelUrl;
+  const viewerSrc = activeClip ? (activeClip.webUrl ?? activeClip.url) : displayModelUrl;
   const finishedExports = jobs.filter((j) => j.kind === 'convert' && j.status === 'completed');
   const partsKits = jobs.filter((j) => j.kind === 'segment' && j.status === 'completed');
   const noArt = !entity.imageUrl;
@@ -216,6 +228,7 @@ export function Entity3DStudio({ entity, isOwner }: { entity: EntityLike; isOwne
             <ModelViewer
               key={viewerSrc}
               src={url(viewerSrc)}
+              poster={activeClip ? undefined : url(posterUrl) || undefined}
               alt={`${entity.name} 3D model`}
               iosSrc={activeClip ? null : url(usdzUrl) || null}
               autoplay={!!activeClip}
@@ -481,7 +494,7 @@ export function Entity3DStudio({ entity, isOwner }: { entity: EntityLike; isOwne
               </div>
             )}
 
-            {jobs.length > 0 && <JobList jobs={jobs} />}
+            {jobs.length > 0 && <JobList jobs={jobs} onRetried={refresh} />}
 
             {entity.universeAddress && (
               <Button asChild size="sm" variant="ghost" className="px-0 text-xs">
@@ -521,33 +534,80 @@ function ActionRow({
   );
 }
 
-export function JobList({ jobs }: { jobs: TripoJob[] }) {
+export function JobList({
+  jobs,
+  onRetried,
+  entityNames,
+}: {
+  jobs: TripoJob[];
+  onRetried?: () => void;
+  /** entityId → name, for lists spanning several entities (World tab). */
+  entityNames?: Record<string, string>;
+}) {
+  const retry = useMutation({
+    mutationFn: (jobId: string) => trpcClient.tripo.retryJob.mutate({ jobId }),
+    onSuccess: () => {
+      toast.success('Retrying', {
+        description: 'Steps that already finished are reused — not paid for again.',
+      });
+      onRetried?.();
+    },
+    onError: (err: unknown) => {
+      const e = err as { data?: { byokRequired?: boolean }; message?: string };
+      if (!e?.data?.byokRequired) toast.error(e?.message ?? 'Could not retry');
+    },
+  });
   return (
     <div className="space-y-1.5 rounded-md border p-2">
       {jobs.slice(0, 6).map((j) => {
         const pct = jobProgress(j);
         const current = j.steps.find((s) => s.status === 'running');
+        const active = j.status === 'running' || j.status === 'queued';
         return (
           <div key={j.id} className="space-y-1 text-xs">
             <div className="flex items-center justify-between gap-2">
-              <span className="font-medium">{JOB_LABELS[j.kind] ?? j.kind}</span>
-              <span
-                className={
-                  j.status === 'failed'
-                    ? 'text-destructive'
-                    : j.status === 'completed'
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : 'text-muted-foreground'
-                }
-              >
-                {j.status === 'running'
-                  ? `${current?.name ?? 'Starting'} · ${pct}%`
-                  : j.status === 'failed'
-                    ? 'Failed'
-                    : 'Done'}
+              <span className="truncate font-medium">
+                {JOB_LABELS[j.kind] ?? j.kind}
+                {j.entityId && entityNames?.[j.entityId] && (
+                  <span className="font-normal text-muted-foreground">
+                    {' '}
+                    — {entityNames[j.entityId]}
+                  </span>
+                )}
+              </span>
+              <span className="flex items-center gap-2">
+                <span
+                  className={
+                    j.status === 'failed'
+                      ? 'text-destructive'
+                      : j.status === 'completed'
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-muted-foreground'
+                  }
+                >
+                  {j.status === 'queued'
+                    ? 'Queued'
+                    : j.status === 'running'
+                      ? `${current?.name ?? 'Starting'} · ${pct}%`
+                      : j.status === 'failed'
+                        ? 'Failed'
+                        : 'Done'}
+                </span>
+                {j.retryable && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[11px]"
+                    disabled={retry.isPending}
+                    onClick={() => retry.mutate(j.id)}
+                  >
+                    <RotateCcw className="mr-1 h-3 w-3" />
+                    Retry
+                  </Button>
+                )}
               </span>
             </div>
-            {j.status === 'running' && (
+            {active && (
               <div className="h-1 overflow-hidden rounded bg-muted">
                 <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
               </div>

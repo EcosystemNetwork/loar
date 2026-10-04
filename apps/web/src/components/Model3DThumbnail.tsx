@@ -15,6 +15,7 @@
  * Only use this where <model-viewer> is already on the page's bundle
  * (Discover, Wiki); importing it elsewhere pulls in ~1MB of viewer code.
  */
+import '@/lib/model-viewer-config';
 import '@google/model-viewer';
 import { useEffect, useState } from 'react';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';

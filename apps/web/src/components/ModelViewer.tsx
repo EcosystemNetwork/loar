@@ -12,6 +12,7 @@
  * 3D-models dialog so creators can preview baked animations, tweak exposure,
  * and toggle auto-rotate without leaving the page.
  */
+import '@/lib/model-viewer-config';
 import '@google/model-viewer';
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { Box, Loader2, Maximize2, Minimize2, Palette, Play, Pause, RotateCcw } from 'lucide-react';

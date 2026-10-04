@@ -130,11 +130,14 @@ function isGlb(item: MediaAttachment): boolean {
  * only, the `refine` stage adds the texture. Both get attached to the entity
  * (subCategory `preview` / `high_poly`, see autoAttach3DModel), so ranking must
  * put the untextured preview last — otherwise `glbs[0]` can be the preview.
+ * A `web` copy (Tripo pipeline's meshopt-compressed display GLB) beats all.
  */
 export function findBestGlb(items: MediaAttachment[]): MediaAttachment | null {
   const glbs = items.filter(isGlb);
   const rank = (g: MediaAttachment): number => {
     const label = g.label?.toLowerCase() ?? '';
+    // Web-optimised copy of a generated model (~20x smaller than the original).
+    if (g.subCategory === 'web') return -1;
     if (g.subCategory === 'preview' || label.includes('preview')) return 3;
     if (label.includes('textured') || g.subCategory === 'high_poly') return 0;
     if (g.subCategory === 'game_ready') return 1;

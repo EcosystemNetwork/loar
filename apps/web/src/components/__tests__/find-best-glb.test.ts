@@ -26,6 +26,14 @@ describe('findBestGlb', () => {
     expect(findBestGlb([preview, gameReady])?.id).toBe('b');
   });
 
+  it('prefers the web-optimised copy of a generated model over its full-detail original', () => {
+    const original = glb('a', '3D model (high detail) — GLB (full detail)', 'game_ready');
+    // Label says "preview" — the subCategory must win over the label heuristic.
+    const web = glb('b', '3D model (high detail) — web preview', 'web');
+    expect(findBestGlb([original, web])?.id).toBe('b');
+    expect(findBestGlb([web, original])?.id).toBe('b');
+  });
+
   it('falls back to the preview when it is the only GLB', () => {
     const preview = glb('a', 'text preview — GLB', 'preview');
     expect(findBestGlb([preview])?.id).toBe('a');

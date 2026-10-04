@@ -12,6 +12,9 @@ export type WorldOverviewRow = Awaited<
   ReturnType<typeof trpcClient.tripo.worldOverview.query>
 >[number];
 
+/** Queued (waiting for a slot) or running. */
+export const isActive = (status: string | undefined) => status === 'running' || status === 'queued';
+
 export const worldOverviewKey = (universeId: string) => ['tripo', 'worldOverview', universeId];
 export const entityJobsKey = (entityId: string) => ['tripo', 'jobs', 'entity', entityId];
 
@@ -22,8 +25,7 @@ export function useEntityTripoJobs(entityId: string, enabled = true) {
     queryKey: entityJobsKey(entityId),
     queryFn: () => trpcClient.tripo.listJobs.query({ entityId, limit: 10 }),
     enabled,
-    refetchInterval: (q) =>
-      (q.state.data ?? []).some((j) => j.status === 'running') ? 3000 : false,
+    refetchInterval: (q) => ((q.state.data ?? []).some((j) => isActive(j.status)) ? 3000 : false),
   });
 
   // When a job finishes, the entity, its media gallery and the world
@@ -31,7 +33,7 @@ export function useEntityTripoJobs(entityId: string, enabled = true) {
   const seenRunning = useRef(new Set<string>());
   useEffect(() => {
     for (const job of query.data ?? []) {
-      if (job.status === 'running') {
+      if (isActive(job.status)) {
         seenRunning.current.add(job.id);
       } else if (seenRunning.current.delete(job.id)) {
         void qc.invalidateQueries({ queryKey: ['mediaAttachments', 'entity', entityId] });
@@ -50,7 +52,7 @@ export function useTripoJob(jobId: string | null) {
     queryKey: ['tripo', 'job', jobId],
     queryFn: () => trpcClient.tripo.getJob.query({ jobId: jobId! }),
     enabled: !!jobId,
-    refetchInterval: (q) => (q.state.data?.status === 'running' ? 3000 : false),
+    refetchInterval: (q) => (isActive(q.state.data?.status) ? 3000 : false),
   });
 }
 

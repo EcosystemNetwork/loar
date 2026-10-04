@@ -1,10 +1,10 @@
 /**
  * WorldHub — a universe's 3D world at a glance: which canon entities exist
- * in 3D, the sets built from them, and bulk actions (generate missing
- * models, download the asset pack). Rendered on the wiki World tab and at
- * /universe/$id/world.
+ * in 3D, the sets built from them, and bulk actions (build every missing
+ * model + environment, retry failures, web-optimise older models, download
+ * the asset pack). Rendered on the wiki World tab and at /universe/$id/world.
  */
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -16,7 +16,9 @@ import {
   Loader2,
   Map as MapIcon,
   Plus,
+  RotateCcw,
   Sparkles,
+  Zap,
 } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
 import { Button } from '@/components/ui/button';
@@ -26,9 +28,13 @@ import { Input } from '@/components/ui/input';
 import { SmartImage } from '@/components/SmartImage';
 import { Model3DThumbnail } from '@/components/Model3DThumbnailLazy';
 import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
-import { ENVIRONMENT_KINDS, MODELABLE_KINDS } from './Entity3DStudio';
+import { ENVIRONMENT_KINDS, JobList, MODELABLE_KINDS } from './Entity3DStudio';
 import { buildAssetPack } from './assetPack';
-import { useWorldOverview, worldOverviewKey } from './useTripoJob';
+import { isActive, useWorldOverview, worldOverviewKey, type TripoJob } from './useTripoJob';
+
+/** Tripo cost estimates (USD) — mirror TRIPO_JOB_COST_USD on the server. */
+const MODEL_COST_USD = 0.4;
+const ENVIRONMENT_COST_USD = 0.3;
 
 export function WorldHub({
   universeId,
@@ -51,23 +57,108 @@ export function WorldHub({
   const modelable = rows.filter((r) => MODELABLE_KINDS.includes(r.kind));
   const places = rows.filter((r) => ENVIRONMENT_KINDS.includes(r.kind));
   const withModel = modelable.filter((r) => r.modelUrl);
-  const missing = modelable.filter((r) => !r.modelUrl && r.imageUrl);
   const puppets = rows.filter((r) => r.puppet);
   const environments = places.filter((r) => r.environment);
+  const needWeb = rows.filter((r) => r.needsWebCopy);
+
+  // Universe job activity (managers only — jobs are private to their owner).
+  const jobsQuery = useQuery({
+    queryKey: ['tripo', 'jobs', 'universe', universeId],
+    queryFn: () => trpcClient.tripo.listJobs.query({ universeId, limit: 50 }),
+    enabled: isManager,
+    refetchInterval: (q) => ((q.state.data ?? []).some((j) => isActive(j.status)) ? 4000 : false),
+  });
+  const jobs = useMemo(() => jobsQuery.data ?? [], [jobsQuery.data]);
+  const activeJobs = jobs.filter((j) => isActive(j.status));
+  // Entities with work in flight don't count as "missing" (no double-spend).
+  const inFlight = new Set(activeJobs.map((j) => `${j.kind}:${j.entityId}`));
+  const missing = modelable.filter(
+    (r) => !r.modelUrl && r.imageUrl && !inFlight.has(`entity_model:${r.id}`)
+  );
+  const missingEnvs = places.filter(
+    (r) => !r.environment && r.imageUrl && !inFlight.has(`place_splat:${r.id}`)
+  );
+  const buildCost = missing.length * MODEL_COST_USD + missingEnvs.length * ENVIRONMENT_COST_USD;
+
+  // Newest job per entity+kind that failed, retryable, and whose output is still missing.
+  const retryableFailures = useMemo(() => {
+    const seen = new Set<string>();
+    const out: TripoJob[] = [];
+    for (const j of jobs) {
+      const key = `${j.kind}:${j.entityId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (!j.retryable) continue;
+      const row = rows.find((r) => r.id === j.entityId);
+      if (j.kind === 'entity_model' && row?.modelUrl) continue;
+      if (j.kind === 'place_splat' && row?.environment) continue;
+      out.push(j);
+    }
+    return out;
+  }, [jobs, rows]);
+
+  // Refresh the coverage grid whenever a job lands.
+  const lastActive = useRef(0);
+  useEffect(() => {
+    if (activeJobs.length < lastActive.current) {
+      void qc.invalidateQueries({ queryKey: worldOverviewKey(universeId) });
+    }
+    lastActive.current = activeJobs.length;
+  }, [activeJobs.length, qc, universeId]);
+
+  const byokAware = (fallback: string) => (err: any) => {
+    if (!err?.data?.byokRequired) toast.error(err?.message ?? fallback);
+  };
 
   const batch = useMutation({
-    mutationFn: () => trpcClient.tripo.batchEntityTo3D.mutate({ universeId, limit: 5 }),
+    mutationFn: () =>
+      trpcClient.tripo.batchEntityTo3D.mutate({ universeId, includeEnvironments: true }),
     onSuccess: (r) => {
-      toast.success(`Generating ${r.jobs.length} models`, {
-        description: r.remaining
-          ? `${r.remaining} more still need models — run again after these finish.`
-          : 'Each takes a few minutes; they appear here as they land.',
+      const models = r.jobs.filter((j) => j.kind === 'entity_model').length;
+      const envs = r.jobs.length - models;
+      toast.success(
+        `Queued ${models} model${models === 1 ? '' : 's'}` +
+          (envs ? ` and ${envs} environment${envs === 1 ? '' : 's'}` : ''),
+        {
+          description: r.remaining
+            ? `${r.remaining} more still to go — run again after these finish.`
+            : 'They build a few at a time and appear here as they land.',
+        }
+      );
+      void jobsQuery.refetch();
+    },
+    onError: byokAware('Could not start generation'),
+  });
+
+  const retryFailed = useMutation({
+    mutationFn: async (list: TripoJob[]) => {
+      for (const j of list) await trpcClient.tripo.retryJob.mutate({ jobId: j.id });
+      return list.length;
+    },
+    onSuccess: (n) => {
+      toast.success(`Retrying ${n} job${n === 1 ? '' : 's'}`, {
+        description: 'Steps that already finished are reused — not paid for again.',
       });
-      setTimeout(() => qc.invalidateQueries({ queryKey: worldOverviewKey(universeId) }), 60_000);
+      void jobsQuery.refetch();
     },
     onError: (err: any) => {
-      if (!err?.data?.byokRequired) toast.error(err?.message ?? 'Could not start generation');
+      void jobsQuery.refetch();
+      byokAware('Could not retry')(err);
     },
+  });
+
+  const optimize = useMutation({
+    mutationFn: () => trpcClient.tripo.optimizeWebModels.mutate({ universeId }),
+    onSuccess: (r) => {
+      toast.success(
+        r.alreadyRunning
+          ? 'Already optimising this universe'
+          : `Optimising ${r.queued} model${r.queued === 1 ? '' : 's'} for the web`,
+        { description: 'No Tripo cost. Views get faster as each one finishes.' }
+      );
+      setTimeout(() => qc.invalidateQueries({ queryKey: worldOverviewKey(universeId) }), 20_000);
+    },
+    onError: byokAware('Could not optimise models'),
   });
 
   const createSet = useMutation({
@@ -139,15 +230,44 @@ export function WorldHub({
         />
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {isManager && missing.length > 0 && (
+      <div className="flex flex-wrap items-center gap-2">
+        {isManager && missing.length + missingEnvs.length > 0 && (
           <Button size="sm" onClick={() => batch.mutate()} disabled={batch.isPending}>
             {batch.isPending ? (
               <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
             ) : (
               <Sparkles className="mr-1 h-3.5 w-3.5" />
             )}
-            Generate missing models ({missing.length})
+            Build missing 3D ({missing.length} models
+            {missingEnvs.length ? `, ${missingEnvs.length} environments` : ''}) · ≈$
+            {buildCost.toFixed(2)}
+          </Button>
+        )}
+        {isManager && retryableFailures.length > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => retryFailed.mutate(retryableFailures)}
+            disabled={retryFailed.isPending}
+          >
+            {retryFailed.isPending ? (
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RotateCcw className="mr-1 h-3.5 w-3.5" />
+            )}
+            Retry failed ({retryableFailures.length})
+          </Button>
+        )}
+        {isManager && needWeb.length > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => optimize.mutate()}
+            disabled={optimize.isPending}
+            title="Make web copies of older models — about 20x smaller, so they load fast"
+          >
+            <Zap className="mr-1 h-3.5 w-3.5" />
+            Optimise {needWeb.length} for web
           </Button>
         )}
         <Button
@@ -164,6 +284,29 @@ export function WorldHub({
           {packProgress ?? 'Download asset pack'}
         </Button>
       </div>
+
+      {isManager && (activeJobs.length > 0 || retryableFailures.length > 0) && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              {activeJobs.length > 0 && <Loader2 className="h-4 w-4 animate-spin" />}
+              Building
+              <span className="text-sm font-normal text-muted-foreground">
+                {activeJobs.filter((j) => j.status === 'running').length} running ·{' '}
+                {activeJobs.filter((j) => j.status === 'queued').length} queued
+                {retryableFailures.length ? ` · ${retryableFailures.length} failed` : ''}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <JobList
+              jobs={[...activeJobs, ...retryableFailures]}
+              onRetried={() => void jobsQuery.refetch()}
+              entityNames={Object.fromEntries(rows.map((r) => [r.id, r.name]))}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Sets */}
       <Card>
@@ -261,7 +404,7 @@ export function WorldHub({
                     />
                   ) : r.modelUrl ? (
                     <Model3DThumbnail
-                      src={r.modelUrl}
+                      src={r.webModelUrl ?? r.modelUrl}
                       alt={r.name}
                       className="h-full w-full"
                       fallback={<Box className="m-auto h-8 w-8 text-muted-foreground" />}

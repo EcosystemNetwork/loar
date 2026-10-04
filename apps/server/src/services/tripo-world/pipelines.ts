@@ -9,10 +9,20 @@
  * Inputs a pipeline hands Tripo are always permanent URLs we host, or a
  * fresh Tripo task id from an earlier step of the same job — never a
  * stored Tripo task id, since Tripo garbage-collects old tasks.
+ *
+ * Pipelines are built from JSON-serialisable args (stored on the job doc)
+ * via TRIPO_PIPELINES, so the runner can resume or retry them. A re-run
+ * replays finished Tripo steps, so every write here is idempotent:
+ * attachments dedupe on their contentHash, gallery posts on generationId,
+ * entity fields are plain overwrites.
+ *
+ * Every GLB output gets a web-delivery copy (`ctx.optimize`, ~20× smaller).
+ * Viewers use the copy; the original stays the source for edits, exports
+ * and asset packs.
  */
 import { db } from '../../lib/firebase';
-import { publishToGallery } from '../../lib/gallery-publish';
-import { createAttachment } from '../../routers/media/media.handlers';
+import { publishToGallery, type PublishGalleryInput } from '../../lib/gallery-publish';
+import { createAttachment, getAttachmentsByTarget } from '../../routers/media/media.handlers';
 import {
   tripo3dService,
   tripoMultiviewUrls,
@@ -26,7 +36,12 @@ import {
 import { setReferenceBundle } from '../../routers/entities/entities.reference-bundle';
 import { MAX_REFS_PER_SLOT, type ReferenceBundle } from '../../routers/entities/entities.types';
 import { fetchGlbJson, listPartNames } from './glb';
-import { urlExt, type TripoJobContext } from './runner';
+import {
+  urlExt,
+  type TripoJobContext,
+  type TripoJobKind,
+  type TripoPipelineFactory,
+} from './runner';
 
 export interface EntityRef {
   id: string;
@@ -37,7 +52,7 @@ export interface EntityRef {
 }
 
 export interface ModelSource {
-  /** Permanent GLB URL. */
+  /** Permanent GLB URL (full-fidelity original). */
   url: string;
   title: string;
   universeId: string | null;
@@ -59,6 +74,15 @@ function modelUrlOf(task: TripoTask): string {
   return url;
 }
 
+/** Keep a Tripo GLB and make its web copy. */
+async function keepModel(ctx: TripoJobContext, raw: string, filename: string) {
+  const url = await ctx.keep(raw, filename);
+  if (!url) throw new Error(`Could not store ${filename}`);
+  // Same URL back = already web-sized; null = optimisation failed.
+  const webUrl = (await ctx.optimize(url, filename)) ?? null;
+  return { url, webUrl };
+}
+
 async function attach(
   userId: string,
   entity: EntityRef,
@@ -73,9 +97,13 @@ async function attach(
     generationId: string;
   }
 ) {
+  const contentHash = `tripo:${a.generationId}:${a.key}`;
   try {
+    // Idempotent: a resumed/retried job replays the same task ids.
+    const existing = await getAttachmentsByTarget('entity', entity.id);
+    if (existing.some((x) => x.contentHash === contentHash)) return;
     await createAttachment(userId, {
-      contentHash: `tripo:${a.generationId}:${a.key}`,
+      contentHash,
       originalFilename: a.filename,
       mimeType: a.mimeType,
       size: 0,
@@ -90,6 +118,61 @@ async function attach(
     } as Parameters<typeof createAttachment>[1]);
   } catch (err) {
     console.error(`[tripo-world] attach ${a.key} to entity ${entity.id} failed:`, err);
+  }
+}
+
+/** The display + original pair for a model attachment. */
+async function attachModel(
+  userId: string,
+  entity: EntityRef,
+  m: {
+    url: string;
+    webUrl: string | null;
+    subCategory: string;
+    label: string;
+    filename: string;
+    generationId: string;
+    key?: string;
+  }
+) {
+  const key = m.key ?? 'glb';
+  await attach(userId, entity, {
+    key,
+    url: m.url,
+    category: '3d',
+    subCategory: m.subCategory,
+    label: `${m.label} — GLB (full detail)`,
+    mimeType: 'model/gltf-binary',
+    filename: m.filename,
+    generationId: m.generationId,
+  });
+  if (m.webUrl && m.webUrl !== m.url) {
+    // MediaGallery's hero viewer prefers subCategory 'web' (findBestGlb).
+    await attach(userId, entity, {
+      key: `${key}-web`,
+      url: m.webUrl,
+      category: '3d',
+      subCategory: 'web',
+      label: `${m.label} — web preview`,
+      mimeType: 'model/gltf-binary',
+      filename: m.filename.replace(/\.glb$/i, '-web.glb'),
+      generationId: m.generationId,
+    });
+  }
+}
+
+/** publishToGallery, at most once per generationId (re-runs replay task ids). */
+async function publishOnce(input: PublishGalleryInput) {
+  try {
+    const dup = await db
+      .collection('content')
+      .where('generationId', '==', input.generationId)
+      .limit(1)
+      .get();
+    if (!dup.empty) return;
+    await publishToGallery(input);
+  } catch (err) {
+    console.error(`[tripo-world] gallery publish ${input.generationId} failed:`, err);
   }
 }
 
@@ -128,11 +211,13 @@ async function mergeTurnaroundIntoBundle(entityId: string, urls: string[]) {
 
 // ── #1 Entity → 3D model ─────────────────────────────────────────────────
 
-export function entityModelPipeline(args: {
+export interface EntityModelArgs {
   entity: EntityRef;
   imageUrl: string;
   quality: TripoQuality;
-}) {
+}
+
+export function entityModelPipeline(args: EntityModelArgs) {
   return async (ctx: TripoJobContext) => {
     const { entity } = args;
     const task = await ctx.step('Generate 3D model', () =>
@@ -144,8 +229,8 @@ export function entityModelPipeline(args: {
       })
     );
     const base = slug(entity.name);
-    const [glbUrl, thumbnailUrl, videoUrl] = await Promise.all([
-      ctx.keep(modelUrlOf(task), `${base}.glb`),
+    const [{ url: glbUrl, webUrl: webGlbUrl }, thumbnailUrl, videoUrl] = await Promise.all([
+      keepModel(ctx, modelUrlOf(task), `${base}.glb`),
       ctx.keep(task.output?.rendered_image_url, `${base}-preview.png`),
       ctx.keep(task.output?.rendered_video_url, `${base}-turntable.mp4`),
     ]);
@@ -155,6 +240,7 @@ export function entityModelPipeline(args: {
       modelUrl: glbUrl,
       model3d: {
         glbUrl,
+        webGlbUrl,
         thumbnailUrl,
         videoUrl,
         quality: args.quality,
@@ -163,16 +249,26 @@ export function entityModelPipeline(args: {
         generatedAt: new Date(),
       },
     });
-    await attach(ctx.userId, entity, {
-      key: 'glb',
-      url: glbUrl!,
-      category: '3d',
+    await attachModel(ctx.userId, entity, {
+      url: glbUrl,
+      webUrl: webGlbUrl,
       subCategory: 'game_ready',
-      label: `3D model (${args.quality === 'game' ? 'game-ready' : 'high detail'}) — GLB`,
-      mimeType: 'model/gltf-binary',
+      label: `3D model (${args.quality === 'game' ? 'game-ready' : 'high detail'})`,
       filename: `${base}.glb`,
       generationId,
     });
+    if (thumbnailUrl) {
+      await attach(ctx.userId, entity, {
+        key: 'thumbnail',
+        url: thumbnailUrl,
+        category: 'image',
+        subCategory: 'concept_art',
+        label: '3D model thumbnail',
+        mimeType: 'image/png',
+        filename: `${base}-preview.png`,
+        generationId,
+      });
+    }
     if (videoUrl) {
       await attach(ctx.userId, entity, {
         key: 'turntable',
@@ -185,9 +281,10 @@ export function entityModelPipeline(args: {
         generationId,
       });
     }
-    void publishToGallery({
+    await publishOnce({
       creatorUid: ctx.userId,
-      mediaUrl: glbUrl!,
+      mediaUrl: webGlbUrl ?? glbUrl,
+      sourceMediaUrl: webGlbUrl && webGlbUrl !== glbUrl ? glbUrl : null,
       mediaType: '3d',
       title: entity.name,
       description: `3D model of ${entity.name}, generated from its wiki art with Tripo.`,
@@ -198,7 +295,7 @@ export function entityModelPipeline(args: {
       tags: ['3d', entity.kind, 'world'],
       sourceImageUrl: args.imageUrl,
     });
-    return { glbUrl, thumbnailUrl, videoUrl, entityId: entity.id };
+    return { glbUrl, webGlbUrl, thumbnailUrl, videoUrl, entityId: entity.id };
   };
 }
 
@@ -211,14 +308,16 @@ export const PUPPET_DEFAULT_ANIMATIONS: TripoAnimation[] = [
   'preset:turn',
 ];
 
-export function characterPuppetPipeline(args: {
+export interface CharacterPuppetArgs {
   entity: EntityRef;
   imageUrl: string;
   rigType: TripoRigType;
   animations: TripoAnimation[];
   /** Normalise the art into a T-pose first (bipeds only). */
   tPose: boolean;
-}) {
+}
+
+export function characterPuppetPipeline(args: CharacterPuppetArgs) {
   return async (ctx: TripoJobContext) => {
     const { entity } = args;
     const base = slug(entity.name);
@@ -284,8 +383,8 @@ export function characterPuppetPipeline(args: {
         apiKey: ctx.apiKey,
       })
     );
-    const [modelUrl, thumbnailUrl] = await Promise.all([
-      ctx.keep(modelUrlOf(body), `${base}.glb`),
+    const [{ url: modelUrl, webUrl: webModelUrl }, thumbnailUrl] = await Promise.all([
+      keepModel(ctx, modelUrlOf(body), `${base}.glb`),
       ctx.keep(body.output?.rendered_image_url, `${base}-preview.png`),
     ]);
 
@@ -293,10 +392,15 @@ export function characterPuppetPipeline(args: {
     const rig = await ctx.step('Rig skeleton', () =>
       tripo3dService.rigModel({ input: body.task_id, rigType: args.rigType, apiKey: ctx.apiKey })
     );
-    const riggedUrl = await ctx.keep(modelUrlOf(rig), `${base}-rigged.glb`);
+    const { url: riggedUrl, webUrl: webRiggedUrl } = await keepModel(
+      ctx,
+      modelUrlOf(rig),
+      `${base}-rigged.glb`
+    );
 
     // 5. Motion library — one GLB per preset.
-    let animations: Array<{ preset: string; name: string; url: string }> = [];
+    let animations: Array<{ preset: string; name: string; url: string; webUrl: string | null }> =
+      [];
     if (args.animations.length) {
       const anim = await ctx.step('Animations', () =>
         tripo3dService.retargetAnimations({
@@ -310,21 +414,22 @@ export function characterPuppetPipeline(args: {
         : anim.output?.model_url
           ? [anim.output.model_url]
           : [];
-      animations = (
-        await Promise.all(
-          args.animations.map(async (preset: string, i) => {
-            const name = preset.split(':').pop()!;
-            const url = await ctx.keep(urls[i], `${base}-${name}.glb`);
-            return url ? { preset, name, url } : null;
-          })
-        )
-      ).filter((a): a is { preset: string; name: string; url: string } => !!a);
+      // Sequential: each clip is a full mesh + motion and optimisation is
+      // queued process-wide anyway.
+      for (const [i, preset] of (args.animations as string[]).entries()) {
+        const name = preset.split(':').pop()!;
+        if (!urls[i]) continue;
+        const { url, webUrl } = await keepModel(ctx, urls[i], `${base}-${name}.glb`);
+        animations.push({ preset, name, url, webUrl });
+      }
     }
 
     const puppet = {
       turnaround,
       modelUrl,
+      webModelUrl,
       riggedModelUrl: riggedUrl,
+      webRiggedModelUrl: webRiggedUrl,
       thumbnailUrl,
       rigType: args.rigType,
       animations,
@@ -333,21 +438,21 @@ export function characterPuppetPipeline(args: {
       generatedAt: new Date(),
     };
     await patchEntityMetadata(entity.id, { puppet, modelUrl });
-    await attach(ctx.userId, entity, {
+    await attachModel(ctx.userId, entity, {
       key: 'rigged',
-      url: riggedUrl!,
-      category: '3d',
+      url: riggedUrl,
+      webUrl: webRiggedUrl,
       subCategory: 'rigged',
-      label: `Rigged ${args.rigType} — GLB`,
-      mimeType: 'model/gltf-binary',
+      label: `Rigged ${args.rigType}`,
       filename: `${base}-rigged.glb`,
       generationId: `rig:tripo:${rig.task_id}`,
     });
     // `rig:tripo:<taskId>` is the id threed.animate decodes, so the rigged
     // model also works with the existing per-model animation testbench.
-    void publishToGallery({
+    await publishOnce({
       creatorUid: ctx.userId,
-      mediaUrl: riggedUrl!,
+      mediaUrl: webRiggedUrl ?? riggedUrl,
+      sourceMediaUrl: webRiggedUrl && webRiggedUrl !== riggedUrl ? riggedUrl : null,
       mediaType: '3d',
       title: `${entity.name} — rigged`,
       description: `Rigged ${args.rigType} puppet of ${entity.name}.`,
@@ -365,10 +470,12 @@ export function characterPuppetPipeline(args: {
 
 // ── #3 Parts library ─────────────────────────────────────────────────────
 
-export function segmentPipeline(args: {
+export interface SegmentArgs {
   source: ModelSource;
   granularity: 'simple' | 'balanced' | 'detailed';
-}) {
+}
+
+export function segmentPipeline(args: SegmentArgs) {
   return async (ctx: TripoJobContext) => {
     const base = slug(args.source.title);
     const token = await tripo3dService.uploadRemoteGlb(args.source.url, ctx.apiKey);
@@ -384,14 +491,19 @@ export function segmentPipeline(args: {
     );
     const rawUrl =
       done.output?.model_url ?? done.output?.seg_model_url ?? seg.output?.seg_model_url;
-    const partsModelUrl = await ctx.keep(rawUrl ?? modelUrlOf(done), `${base}-parts.glb`);
-    const parts = listPartNames(await fetchGlbJson(partsModelUrl!));
+    const { url: partsModelUrl, webUrl: webPartsModelUrl } = await keepModel(
+      ctx,
+      rawUrl ?? modelUrlOf(done),
+      `${base}-parts.glb`
+    );
+    const parts = listPartNames(await fetchGlbJson(partsModelUrl));
     if (!parts.length) throw new Error('Segmentation produced no named parts');
 
     const generationId = `tripo:segment:${seg.task_id}`;
-    void publishToGallery({
+    await publishOnce({
       creatorUid: ctx.userId,
-      mediaUrl: partsModelUrl!,
+      mediaUrl: webPartsModelUrl ?? partsModelUrl,
+      sourceMediaUrl: webPartsModelUrl && webPartsModelUrl !== partsModelUrl ? partsModelUrl : null,
       mediaType: '3d',
       title: `${args.source.title} — parts kit`,
       description: `${parts.length} remixable parts: ${parts.slice(0, 12).join(', ')}`,
@@ -401,18 +513,26 @@ export function segmentPipeline(args: {
       tags: ['3d', 'parts', 'kitbash'],
       parentGenerationId: args.source.parentGenerationId,
     });
-    return { partsModelUrl, parts, generationId, sourceUrl: args.source.url };
+    return {
+      partsModelUrl,
+      webPartsModelUrl,
+      parts,
+      generationId,
+      sourceUrl: args.source.url,
+    };
   };
 }
 
 // ── #6 Universe look: restyle / stylize ──────────────────────────────────
 
-export function restylePipeline(args: {
+export interface RestyleArgs {
   source: ModelSource;
   text?: string;
   styleImageUrl?: string;
   label: string;
-}) {
+}
+
+export function restylePipeline(args: RestyleArgs) {
   return async (ctx: TripoJobContext) => {
     const base = slug(`${args.source.title}-${args.label}`);
     const token = await tripo3dService.uploadRemoteGlb(args.source.url, ctx.apiKey);
@@ -434,7 +554,12 @@ export function restylePipeline(args: {
   };
 }
 
-export function stylizePipeline(args: { source: ModelSource; style: TripoStylizeStyle }) {
+export interface StylizeArgs {
+  source: ModelSource;
+  style: TripoStylizeStyle;
+}
+
+export function stylizePipeline(args: StylizeArgs) {
   return async (ctx: TripoJobContext) => {
     const base = slug(`${args.source.title}-${args.style}`);
     const token = await tripo3dService.uploadRemoteGlb(args.source.url, ctx.apiKey);
@@ -457,15 +582,17 @@ async function publishDerivative(
   base: string,
   meta: { title: string; description: string; model: string; tag: string }
 ) {
-  const [glbUrl, thumbnailUrl] = await Promise.all([
-    ctx.keep(modelUrlOf(task), `${base}.glb`),
+  const [{ url: glbUrl, webUrl: webGlbUrl }, thumbnailUrl] = await Promise.all([
+    keepModel(ctx, modelUrlOf(task), `${base}.glb`),
     ctx.keep(task.output?.rendered_image_url, `${base}-preview.png`),
   ]);
   const generationId = `${meta.model}:${task.task_id}`;
   if (source.entity) {
+    // Original only: a second 'web' attachment would take over the entity's
+    // hero viewer from its canonical model.
     await attach(ctx.userId, source.entity, {
       key: 'glb',
-      url: glbUrl!,
+      url: glbUrl,
       category: '3d',
       subCategory: meta.tag,
       label: `${meta.title} — GLB`,
@@ -474,9 +601,10 @@ async function publishDerivative(
       generationId,
     });
   }
-  void publishToGallery({
+  await publishOnce({
     creatorUid: ctx.userId,
-    mediaUrl: glbUrl!,
+    mediaUrl: webGlbUrl ?? glbUrl,
+    sourceMediaUrl: webGlbUrl && webGlbUrl !== glbUrl ? glbUrl : null,
     mediaType: '3d',
     title: meta.title.slice(0, 100),
     description: meta.description,
@@ -487,18 +615,20 @@ async function publishDerivative(
     tags: ['3d', meta.tag],
     parentGenerationId: source.parentGenerationId,
   });
-  return { glbUrl, thumbnailUrl, generationId };
+  return { glbUrl, webGlbUrl, thumbnailUrl, generationId };
 }
 
 // ── #5 Export / AR ───────────────────────────────────────────────────────
 
-export function convertPipeline(args: {
+export interface ConvertArgs {
   source: ModelSource;
   format: TripoConvertFormat;
   quad: boolean;
   faceLimit?: number;
   fbxPreset?: 'blender' | '3dsmax' | 'mixamo';
-}) {
+}
+
+export function convertPipeline(args: ConvertArgs) {
   return async (ctx: TripoJobContext) => {
     const base = slug(args.source.title);
     const token = await tripo3dService.uploadRemoteGlb(args.source.url, ctx.apiKey);
@@ -526,7 +656,12 @@ export function convertPipeline(args: {
 
 // ── #4 / #7 Place → explorable environment ───────────────────────────────
 
-export function placeSplatPipeline(args: { entity: EntityRef; imageUrl: string }) {
+export interface PlaceSplatArgs {
+  entity: EntityRef;
+  imageUrl: string;
+}
+
+export function placeSplatPipeline(args: PlaceSplatArgs) {
   return async (ctx: TripoJobContext) => {
     const task = await ctx.step('Build environment', () =>
       tripo3dService.imageToSplat({ input: args.imageUrl, apiKey: ctx.apiKey })
@@ -547,4 +682,117 @@ export function placeSplatPipeline(args: { entity: EntityRef; imageUrl: string }
     });
     return { splatUrl, format: ext, entityId: args.entity.id };
   };
+}
+
+// ── Registry (resume / retry rebuild pipelines from stored args) ─────────
+
+export const TRIPO_PIPELINES: Partial<Record<TripoJobKind, TripoPipelineFactory>> = {
+  entity_model: entityModelPipeline,
+  character_puppet: characterPuppetPipeline,
+  segment: segmentPipeline,
+  restyle: restylePipeline,
+  stylize: stylizePipeline,
+  convert: convertPipeline,
+  place_splat: placeSplatPipeline,
+};
+
+// ── Web copies for models generated before optimisation existed ──────────
+
+/**
+ * Add web copies to an entity's existing models (no Tripo calls — CPU
+ * only). Returns how many copies it created. Idempotent: skips anything
+ * that already has one.
+ */
+export async function backfillEntityWebModels(
+  entityId: string,
+  userId: string,
+  optimize: (url: string, filename: string) => Promise<string | null>
+): Promise<number> {
+  const snap = await db.collection('entities').doc(entityId).get();
+  const e = snap.data();
+  if (!e) return 0;
+  const m = (e.metadata ?? {}) as Record<string, any>;
+  const entity: EntityRef = {
+    id: entityId,
+    name: e.name ?? 'model',
+    kind: e.kind ?? 'thing',
+    universeId: e.universeAddress ?? null,
+  };
+  const base = slug(entity.name);
+  const update: Record<string, unknown> = {};
+  let made = 0;
+
+  if (m.model3d?.glbUrl && !m.model3d.webGlbUrl) {
+    const web = await optimize(m.model3d.glbUrl, `${base}.glb`);
+    if (web) {
+      update['metadata.model3d.webGlbUrl'] = web;
+      made++;
+      const generationId =
+        web !== m.model3d.glbUrl ? await modelGenerationId(entityId, m.model3d.glbUrl) : null;
+      if (generationId) {
+        await attach(userId, entity, {
+          key: 'glb-web',
+          url: web,
+          category: '3d',
+          subCategory: 'web',
+          label: '3D model — web preview',
+          mimeType: 'model/gltf-binary',
+          filename: `${base}-web.glb`,
+          generationId,
+        });
+        await pointGalleryAtWebCopy(generationId, m.model3d.glbUrl, web);
+      }
+    }
+  }
+  if (m.puppet?.modelUrl && !m.puppet.webModelUrl) {
+    const web = await optimize(m.puppet.modelUrl, `${base}.glb`);
+    if (web) {
+      update['metadata.puppet.webModelUrl'] = web;
+      made++;
+    }
+  }
+  if (m.puppet?.riggedModelUrl && !m.puppet.webRiggedModelUrl) {
+    const web = await optimize(m.puppet.riggedModelUrl, `${base}-rigged.glb`);
+    if (web) {
+      update['metadata.puppet.webRiggedModelUrl'] = web;
+      made++;
+    }
+  }
+  if (Array.isArray(m.puppet?.animations) && m.puppet.animations.some((a: any) => !a.webUrl)) {
+    const clips = [];
+    for (const clip of m.puppet.animations as Array<Record<string, any>>) {
+      if (clip.webUrl || !clip.url) {
+        clips.push(clip);
+        continue;
+      }
+      const web = await optimize(clip.url, `${base}-${clip.name}.glb`);
+      if (web) made++;
+      clips.push({ ...clip, webUrl: web ?? null });
+    }
+    update['metadata.puppet.animations'] = clips;
+  }
+  if (Object.keys(update).length) {
+    update.updatedAt = new Date();
+    await db.collection('entities').doc(entityId).update(update);
+  }
+  return made;
+}
+
+/** The generationId of the attachment holding `glbUrl` (to pair the web copy with it). */
+async function modelGenerationId(entityId: string, glbUrl: string): Promise<string | null> {
+  const rows = await getAttachmentsByTarget('entity', entityId);
+  return rows.find((r) => r.url === glbUrl && r.generationId)?.generationId ?? null;
+}
+
+async function pointGalleryAtWebCopy(generationId: string, original: string, web: string) {
+  const snap = await db
+    .collection('content')
+    .where('generationId', '==', generationId)
+    .limit(5)
+    .get();
+  await Promise.all(
+    snap.docs
+      .filter((d) => d.data().mediaUrl === original)
+      .map((d) => d.ref.update({ mediaUrl: web, sourceMediaUrl: original, updatedAt: new Date() }))
+  );
 }

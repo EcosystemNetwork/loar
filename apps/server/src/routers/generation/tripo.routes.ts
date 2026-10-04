@@ -12,6 +12,8 @@
  *   tripo.convert           FBX / USDZ / OBJ / STL export (game engines, AR)
  *   tripo.placeEnvironment  place art → Gaussian-splat environment for sets
  *   tripo.getJob / listJobs poll + history
+ *   tripo.retryJob          re-run a failed job (finished steps are replayed, not re-billed)
+ *   tripo.optimizeWebModels web copies for models made before optimisation (CPU only)
  *   tripo.worldOverview     public: a universe's 3D coverage for the World tab
  *
  * BYOK only — every dispatch spends the caller's own Tripo key (resolved up
@@ -35,19 +37,27 @@ import { isUniverseAdmin } from '../../lib/safe-admin';
 import { NoKeyAvailableError } from '../../services/provider-keys/types';
 import { canManageEntity, getEntitiesByUniverse, getEntity } from '../entities/entities.handlers';
 import type { Entity } from '../entities/entities.types';
-import { startTripoJob, threeDGenCol, type TripoJobKind } from '../../services/tripo-world/runner';
+import {
+  retryTripoJob,
+  startTripoJob,
+  threeDGenCol,
+  type TripoJobKind,
+  type TripoJobStatus,
+} from '../../services/tripo-world/runner';
 import {
   PUPPET_DEFAULT_ANIMATIONS,
-  characterPuppetPipeline,
-  convertPipeline,
-  entityModelPipeline,
-  placeSplatPipeline,
-  restylePipeline,
-  segmentPipeline,
-  stylizePipeline,
+  backfillEntityWebModels,
+  type CharacterPuppetArgs,
+  type ConvertArgs,
+  type EntityModelArgs,
   type EntityRef,
   type ModelSource,
+  type PlaceSplatArgs,
+  type RestyleArgs,
+  type SegmentArgs,
+  type StylizeArgs,
 } from '../../services/tripo-world/pipelines';
+import { webOptimizeUrl } from '../../services/tripo-world/optimize';
 import type { TripoAnimation, TripoRigType } from '../../services/tripo3d';
 
 /** Kinds that read as a physical object/creature and make a sensible mesh. */
@@ -86,7 +96,7 @@ const PUPPET_ANIMATIONS = [
   'preset:aquatic:march',
 ] as const satisfies readonly TripoAnimation[];
 
-const BATCH_MAX = 10;
+const BATCH_MAX = 50;
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -141,6 +151,32 @@ export function entityModelUrl(e: Pick<Entity, 'metadata'>): string | null {
   return m.puppet?.modelUrl ?? m.model3d?.glbUrl ?? m.modelUrl ?? null;
 }
 
+/** Web-delivery copy of `entityModelUrl` (same precedence), when one exists. */
+export function entityWebModelUrl(e: Pick<Entity, 'metadata'>): string | null {
+  const m = (e.metadata ?? {}) as Record<string, any>;
+  if (m.puppet?.modelUrl) return m.puppet.webModelUrl ?? null;
+  if (m.model3d?.glbUrl) return m.model3d.webGlbUrl ?? null;
+  return null;
+}
+
+/** Entity ids with a queued/running Tripo job of `kind` for this user. */
+async function entitiesWithActiveJobs(uid: string, kind: TripoJobKind): Promise<Set<string>> {
+  const snaps = await Promise.all(
+    (['queued', 'running'] as const).map((status) =>
+      threeDGenCol().where('userId', '==', uid).where('status', '==', status).limit(300).get()
+    )
+  );
+  const ids = new Set<string>();
+  for (const doc of snaps.flatMap((s) => s.docs)) {
+    const d = doc.data();
+    if (d.provider === 'tripo' && d.kind === kind && d.entityId) ids.add(d.entityId);
+  }
+  return ids;
+}
+
+/** Universes with a web-copy backfill in flight (per process). */
+const optimizingUniverses = new Set<string>();
+
 const sourceSchema = z
   .object({ contentId: z.string().min(1).optional(), entityId: z.string().min(1).optional() })
   .refine((s) => !!s.contentId !== !!s.entityId, 'Pass exactly one of contentId / entityId');
@@ -176,7 +212,8 @@ async function resolveModelSource(
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Only the creator can modify this model' });
   }
   return {
-    url: c.mediaUrl as string,
+    // Web copies are meshopt-compressed — Tripo edits start from the original.
+    url: (c.sourceMediaUrl ?? c.mediaUrl) as string,
     title: (c.title as string | undefined) ?? '3D model',
     universeId: (c.universeId as string | null | undefined) ?? null,
     parentGenerationId: (c.generationId as string | null | undefined) ?? null,
@@ -205,7 +242,8 @@ function startJob(
   kind: TripoJobKind,
   uid: string,
   apiKey: string,
-  run: Parameters<typeof startTripoJob>[0]['run'],
+  /** Serialisable pipeline args — stored on the job so it can resume/retry. */
+  args: object,
   extra: {
     universeId?: string | null;
     entityId?: string | null;
@@ -213,7 +251,13 @@ function startJob(
     meta?: Record<string, unknown>;
   } = {}
 ) {
-  return startTripoJob({ kind, userId: uid, apiKey, run, ...extra });
+  return startTripoJob({
+    kind,
+    userId: uid,
+    apiKey,
+    args: args as Record<string, unknown>,
+    ...extra,
+  });
 }
 
 const gen = expensiveProcedure.use(requirePermission('generation.3d'));
@@ -239,7 +283,7 @@ export const tripoRouter = router({
         'entity_model',
         ctx.user.uid,
         apiKey,
-        entityModelPipeline({ entity: toRef(entity), imageUrl, quality: input.quality }),
+        { entity: toRef(entity), imageUrl, quality: input.quality } satisfies EntityModelArgs,
         {
           entityId: entity.id,
           universeId: entity.universeAddress,
@@ -249,15 +293,19 @@ export const tripoRouter = router({
     }),
 
   /**
-   * #1 at universe scale — queue entityTo3D for modelable entities that have
-   * cover art but no model yet. Universe managers only; capped per call.
+   * #1 at universe scale — queue entityTo3D for every modelable entity with
+   * cover art but no model (and, with includeEnvironments, a splat for every
+   * place without one). Entities that already have a job in flight are
+   * skipped, so pressing it twice never double-spends. Jobs queue and run
+   * MAX_ACTIVE_PER_USER at a time. Universe managers only.
    */
   batchEntityTo3D: gen
     .input(
       z.object({
         universeId: z.string().min(1),
         quality: z.enum(['hifi', 'game']).default('hifi'),
-        limit: z.number().int().min(1).max(BATCH_MAX).default(5),
+        limit: z.number().int().min(1).max(BATCH_MAX).default(BATCH_MAX),
+        includeEnvironments: z.boolean().default(false),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -266,34 +314,72 @@ export const tripoRouter = router({
       }
       const apiKey = await requireTripoKey(ctx.user.uid);
       const { entities } = await getEntitiesByUniverse(input.universeId, undefined, 500);
-      const pending = entities.filter(
+      const [busyModels, busyEnvs] = await Promise.all([
+        entitiesWithActiveJobs(ctx.user.uid, 'entity_model'),
+        input.includeEnvironments
+          ? entitiesWithActiveJobs(ctx.user.uid, 'place_splat')
+          : Promise.resolve(new Set<string>()),
+      ]);
+      const pendingModels = entities.filter(
         (e) =>
           (MODELABLE_KINDS as readonly string[]).includes(e.kind) &&
           !!e.imageUrl &&
-          !entityModelUrl(e)
+          !entityModelUrl(e) &&
+          !busyModels.has(e.id)
       );
-      const jobs: Array<{ entityId: string; jobId: string }> = [];
-      for (const e of pending.slice(0, input.limit)) {
+      const pendingEnvs = input.includeEnvironments
+        ? entities.filter(
+            (e) =>
+              (ENVIRONMENT_KINDS as readonly string[]).includes(e.kind) &&
+              !!e.imageUrl &&
+              !meta(e).environment?.splatUrl &&
+              !busyEnvs.has(e.id)
+          )
+        : [];
+      const pending = [
+        ...pendingModels.map((e) => ({ e, kind: 'entity_model' as const })),
+        ...pendingEnvs.map((e) => ({ e, kind: 'place_splat' as const })),
+      ];
+
+      const jobs: Array<{ entityId: string; jobId: string; kind: TripoJobKind }> = [];
+      for (const { e, kind } of pending.slice(0, input.limit)) {
         let imageUrl: string;
         try {
           imageUrl = safeUrl(e.imageUrl!);
         } catch {
           continue;
         }
-        const { jobId } = await startJob(
-          'entity_model',
-          ctx.user.uid,
-          apiKey,
-          entityModelPipeline({ entity: toRef(e), imageUrl, quality: input.quality }),
-          {
-            entityId: e.id,
-            universeId: e.universeAddress,
-            meta: { quality: input.quality, batch: true },
-          }
-        );
-        jobs.push({ entityId: e.id, jobId });
+        const { jobId } =
+          kind === 'entity_model'
+            ? await startJob(
+                kind,
+                ctx.user.uid,
+                apiKey,
+                {
+                  entity: toRef(e),
+                  imageUrl,
+                  quality: input.quality,
+                } satisfies EntityModelArgs,
+                {
+                  entityId: e.id,
+                  universeId: e.universeAddress,
+                  meta: { quality: input.quality, batch: true },
+                }
+              )
+            : await startJob(
+                kind,
+                ctx.user.uid,
+                apiKey,
+                { entity: toRef(e), imageUrl } satisfies PlaceSplatArgs,
+                { entityId: e.id, universeId: e.universeAddress, meta: { batch: true } }
+              );
+        jobs.push({ entityId: e.id, jobId, kind });
       }
-      return { jobs, remaining: Math.max(0, pending.length - jobs.length) };
+      return {
+        jobs,
+        remaining: Math.max(0, pending.length - jobs.length),
+        skippedInFlight: busyModels.size + busyEnvs.size,
+      };
     }),
 
   /** #2 — character puppet: turnaround refs + rigged, animated body. */
@@ -325,13 +411,13 @@ export const tripoRouter = router({
         'character_puppet',
         ctx.user.uid,
         apiKey,
-        characterPuppetPipeline({
+        {
           entity: toRef(entity),
           imageUrl,
           rigType: input.rigType as TripoRigType,
           animations,
           tPose: input.rigType === 'biped',
-        }),
+        } satisfies CharacterPuppetArgs,
         {
           entityId: entity.id,
           universeId: entity.universeAddress,
@@ -355,7 +441,7 @@ export const tripoRouter = router({
         'segment',
         ctx.user.uid,
         apiKey,
-        segmentPipeline({ source, granularity: input.granularity }),
+        { source, granularity: input.granularity } satisfies SegmentArgs,
         {
           entityId: source.entity?.id,
           universeId: source.universeId,
@@ -395,7 +481,7 @@ export const tripoRouter = router({
         });
       }
       const apiKey = await requireTripoKey(ctx.user.uid);
-      return startJob('restyle', ctx.user.uid, apiKey, restylePipeline({ source, ...style }), {
+      return startJob('restyle', ctx.user.uid, apiKey, { source, ...style } satisfies RestyleArgs, {
         entityId: source.entity?.id,
         universeId: source.universeId,
         sourceContentId: input.source.contentId,
@@ -414,7 +500,7 @@ export const tripoRouter = router({
         'stylize',
         ctx.user.uid,
         apiKey,
-        stylizePipeline({ source, style: input.style }),
+        { source, style: input.style } satisfies StylizeArgs,
         {
           entityId: source.entity?.id,
           universeId: source.universeId,
@@ -441,13 +527,13 @@ export const tripoRouter = router({
         'convert',
         ctx.user.uid,
         apiKey,
-        convertPipeline({
+        {
           source,
           format: input.format,
           quad: input.quad,
           faceLimit: input.faceLimit,
           fbxPreset: input.fbxPreset,
-        }),
+        } satisfies ConvertArgs,
         {
           entityId: source.entity?.id,
           universeId: source.universeId,
@@ -471,12 +557,68 @@ export const tripoRouter = router({
         'place_splat',
         ctx.user.uid,
         apiKey,
-        placeSplatPipeline({ entity: toRef(entity), imageUrl }),
+        { entity: toRef(entity), imageUrl } satisfies PlaceSplatArgs,
         {
           entityId: entity.id,
           universeId: entity.universeAddress,
         }
       );
+    }),
+
+  /** Re-run a failed job; Tripo steps it already finished are replayed, not re-billed. */
+  retryJob: gen.input(z.object({ jobId: z.string().min(1) })).mutation(async ({ input, ctx }) => {
+    const doc = await threeDGenCol().doc(input.jobId).get();
+    const d = doc.data();
+    if (!d || d.userId !== ctx.user.uid || d.provider !== 'tripo') {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Job not found' });
+    }
+    if (d.status !== 'failed') {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Only failed jobs can be retried' });
+    }
+    if (!d.pipelineArgs) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'This job predates retries — start it again from the entity page',
+      });
+    }
+    const apiKey = await requireTripoKey(ctx.user.uid);
+    await retryTripoJob(input.jobId, ctx.user.uid, apiKey);
+    return { jobId: input.jobId };
+  }),
+
+  /**
+   * Web-delivery copies for a universe's existing models (generated before
+   * optimisation existed). CPU only — no Tripo calls, no key needed. Runs
+   * in the background; the World tab refreshes as copies land.
+   */
+  optimizeWebModels: protectedProcedure
+    .input(z.object({ universeId: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      if (!(await isUniverseAdmin(input.universeId, ctx.user.address ?? ''))) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Universe managers only' });
+      }
+      const key = normalizeUniverseId(input.universeId);
+      if (optimizingUniverses.has(key)) return { queued: 0, alreadyRunning: true };
+      const { entities } = await getEntitiesByUniverse(input.universeId, undefined, 500);
+      const todo = entities.filter((e) => needsWebCopy(e));
+      if (!todo.length) return { queued: 0, alreadyRunning: false };
+      optimizingUniverses.add(key);
+      const uid = ctx.user.uid;
+      void (async () => {
+        let made = 0;
+        for (const e of todo) {
+          made += await backfillEntityWebModels(e.id, uid, (url, filename) =>
+            webOptimizeUrl(url, filename, uid)
+          ).catch((err) => {
+            console.error(`[tripo-world] web backfill for ${e.id} failed:`, err);
+            return 0;
+          });
+        }
+        console.log(
+          `[tripo-world] web backfill ${key}: ${made} copies for ${todo.length} entities`
+        );
+      })().finally(() => optimizingUniverses.delete(key));
+      return { queued: todo.length, alreadyRunning: false };
     }),
 
   getJob: protectedProcedure
@@ -542,6 +684,7 @@ export const tripoRouter = router({
             kind: e.kind,
             imageUrl: e.imageUrl ?? null,
             modelUrl: entityModelUrl(e),
+            webModelUrl: entityWebModelUrl(e),
             thumbnailUrl: (m.model3d?.thumbnailUrl ?? m.puppet?.thumbnailUrl ?? null) as
               | string
               | null,
@@ -549,15 +692,18 @@ export const tripoRouter = router({
             puppet: m.puppet?.riggedModelUrl
               ? {
                   riggedModelUrl: m.puppet.riggedModelUrl as string,
+                  webRiggedModelUrl: (m.puppet.webRiggedModelUrl ?? null) as string | null,
                   rigType: m.puppet.rigType as string,
                   animations: (m.puppet.animations ?? []) as Array<{
                     preset: string;
                     name: string;
                     url: string;
+                    webUrl?: string | null;
                   }>,
                   turnaround: (m.puppet.turnaround ?? {}) as Record<string, string>,
                 }
               : null,
+            needsWebCopy: needsWebCopy(e),
             environment: m.environment?.splatUrl
               ? {
                   splatUrl: m.environment.splatUrl as string,
@@ -568,6 +714,17 @@ export const tripoRouter = router({
         });
     }),
 });
+
+/** Has a model (or puppet clip) but no web-delivery copy of it yet. */
+function needsWebCopy(e: Pick<Entity, 'metadata'>): boolean {
+  const m = (e.metadata ?? {}) as Record<string, any>;
+  if (m.model3d?.glbUrl && !m.model3d.webGlbUrl) return true;
+  const p = m.puppet;
+  if (!p) return false;
+  if (p.modelUrl && !p.webModelUrl) return true;
+  if (p.riggedModelUrl && !p.webRiggedModelUrl) return true;
+  return Array.isArray(p.animations) && p.animations.some((a: any) => a?.url && !a.webUrl);
+}
 
 function defaultGait(rig: (typeof RIG_TYPES)[number]): TripoAnimation {
   switch (rig) {
@@ -592,8 +749,15 @@ function serializeJob(id: string, d: FirebaseFirestore.DocumentData) {
   return {
     id,
     kind: d.kind as TripoJobKind,
-    status: d.status as 'running' | 'completed' | 'failed',
-    steps: (d.steps ?? []) as Array<{ name: string; status: string; progress?: number }>,
+    status: d.status as TripoJobStatus,
+    steps: (d.steps ?? []) as Array<{
+      name: string;
+      status: string;
+      progress?: number;
+      reused?: boolean;
+    }>,
+    retryable: d.status === 'failed' && !!d.pipelineArgs,
+    retryCount: (d.retryCount ?? 0) as number,
     entityId: (d.entityId ?? null) as string | null,
     universeId: (d.universeId ?? null) as string | null,
     partial: (d.partial ?? null) as Record<string, unknown> | null,

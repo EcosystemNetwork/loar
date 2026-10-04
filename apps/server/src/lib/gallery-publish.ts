@@ -34,6 +34,11 @@ export interface PublishGalleryInput {
   sourceImageUrl?: string | null;
   sourceVideoGenerationId?: string | null;
   sourceAudioGenerationId?: string | null;
+  /**
+   * Full-fidelity original when `mediaUrl` is a web-optimised copy (3D:
+   * meshopt-compressed GLB). Edits/exports must start from this.
+   */
+  sourceMediaUrl?: string | null;
 }
 
 // Ephemeral-host detection lives in ./rehost-ephemeral so entities and other
@@ -112,6 +117,7 @@ export function buildGalleryDoc(
     ...(input.sourceAudioGenerationId
       ? { sourceAudioGenerationId: input.sourceAudioGenerationId }
       : {}),
+    ...(input.sourceMediaUrl ? { sourceMediaUrl: input.sourceMediaUrl } : {}),
     ...(extra?.contentHash ? { storageContentHash: extra.contentHash } : {}),
   };
 }

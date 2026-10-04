@@ -3,18 +3,32 @@
  *
  * Every world-building feature (entity → 3D, character puppet, parts
  * library, restyle, export, place → splat) is a short chain of Tripo tasks.
- * This module gives them one lifecycle:
+ * This module gives them one durable lifecycle:
  *
- *   createJob()   — writes a `threeDGenerations` doc (provider: 'tripo',
- *                   type: `tripo_<kind>`) the client polls via `tripo.getJob`
- *   runJob()      — fire-and-forget: runs the pipeline body with a `ctx`
- *                   whose `step()` submits a Tripo task, polls it, and
- *                   records per-step progress on the doc; marks the doc
- *                   `completed` / `failed`; settles the 3D spend hold.
+ *   startTripoJob()  — writes a `threeDGenerations` doc (provider: 'tripo',
+ *                      type: `tripo_<kind>`, status `queued`) holding the
+ *                      pipeline's serialisable `pipelineArgs`, then runs it
+ *                      in the background once the user has a free slot
+ *                      (MAX_ACTIVE_PER_USER — Tripo 429s accounts with too
+ *                      many tasks in flight).
+ *   runTripoJob()    — runs the pipeline body with a `ctx` whose `step()`
+ *                      submits a Tripo task, polls it, and records per-step
+ *                      progress + task id on the doc; marks the doc
+ *                      `completed` / `failed`.
+ *   resumeStaleTripoJobs() — jobs live in process memory, so a redeploy or
+ *                      crash used to strand them as `running` forever. A
+ *                      sweep (boot + every few minutes) re-runs any job whose
+ *                      heartbeat went stale.
+ *   retryTripoJob()  — re-run a failed job.
+ *
+ * Resume and retry re-run the pipeline from the top, but `step()` replays
+ * steps that already have a Tripo task id (polls the existing task instead
+ * of submitting a new one), so finished work is never paid for twice — a
+ * puppet that failed at the rig step re-uses its turnaround and body.
+ * Pipelines make their persistence idempotent for the same reason.
  *
  * BYOK only (see provider-keys/dispatcher.ts) — the caller resolves the
- * user's Tripo key before anything is written. Generation credits are
- * retired, so there is no refund path; a failure only flips the doc.
+ * user's Tripo key before anything is written; resume re-resolves it.
  *
  * Tripo output URLs are signed and expire — `ctx.keep()` rehosts a URL to
  * permanent storage and must wrap every URL that gets persisted.
@@ -25,6 +39,7 @@ import { rehostEphemeralUrl } from '../../lib/rehost-ephemeral';
 import { releaseHoldOnError, reserveThreedBudget, settleThreedJob } from '../../lib/threed-budget';
 import { withReservation } from '../credits';
 import { tripo3dService, type TripoTask } from '../tripo3d';
+import { webOptimizeUrl } from './optimize';
 
 export type TripoJobKind =
   | 'entity_model'
@@ -35,6 +50,8 @@ export type TripoJobKind =
   | 'stylize'
   | 'convert'
   | 'place_splat';
+
+export type TripoJobStatus = 'queued' | 'running' | 'completed' | 'failed';
 
 /** Provider cost estimates (USD) per job kind — Tripo bills $0.01/credit. */
 export const TRIPO_JOB_COST_USD: Record<TripoJobKind, number> = {
@@ -56,6 +73,8 @@ export interface TripoJobStep {
   taskId?: string;
   status: 'running' | 'success' | 'failed';
   progress?: number;
+  /** Replayed from an earlier run (resume/retry) — not re-billed. */
+  reused?: boolean;
 }
 
 export const threeDGenCol = () => {
@@ -67,28 +86,80 @@ export interface TripoJobContext {
   genId: string;
   userId: string;
   apiKey: string;
-  /** Submit a Tripo task, poll it to success, record it as a named step. */
+  /** Submit a Tripo task (or replay an earlier run's), poll it to success, record it. */
   step(name: string, submit: () => Promise<{ taskId: string }>): Promise<TripoTask>;
   /** Rehost a signed Tripo URL to permanent storage (pass-through for others). */
   keep(url: string | undefined | null, filename: string): Promise<string | null>;
+  /** Web-delivery copy of a permanent GLB (see optimize.ts); null = use the original. */
+  optimize(url: string | undefined | null, filename: string): Promise<string | null>;
   /** Merge fields onto the job doc (partial results the UI can show early). */
   patch(fields: Record<string, unknown>): Promise<void>;
 }
+
+export type TripoPipelineRun = (ctx: TripoJobContext) => Promise<Record<string, unknown>>;
+/** kind → factory from the job's stored `pipelineArgs` (see pipelines.ts TRIPO_PIPELINES). */
+export type TripoPipelineFactory = (args: any) => TripoPipelineRun;
 
 export interface CreateTripoJobInput {
   kind: TripoJobKind;
   userId: string;
   apiKey: string;
+  /** JSON-serialisable pipeline input — persisted so the job can resume/retry. */
+  args: Record<string, unknown>;
   universeId?: string | null;
   entityId?: string | null;
   sourceContentId?: string | null;
   /** Extra fields recorded on the doc at creation (inputs, labels…). */
   meta?: Record<string, unknown>;
-  /** The pipeline. Its return value is merged onto the doc as `result`. */
-  run: (ctx: TripoJobContext) => Promise<Record<string, unknown>>;
 }
 
 const STEP_TIMEOUT_MS = 15 * 60 * 1000;
+const POLL_MS = 4000;
+export const MAX_ACTIVE_PER_USER = 3;
+const HEARTBEAT_MS = 30 * 1000;
+/** A running/queued job whose heartbeat is older than this is presumed orphaned. */
+export const STALE_AFTER_MS = 3 * 60 * 1000;
+const MAX_RESUMES = 3;
+
+/** Test seam: shrink poll/heartbeat intervals. */
+export const runnerTiming = { pollMs: POLL_MS, heartbeatMs: HEARTBEAT_MS };
+
+async function loadPipelines(): Promise<Partial<Record<TripoJobKind, TripoPipelineFactory>>> {
+  // Dynamic import: pipelines.ts imports this module's types/helpers.
+  const { TRIPO_PIPELINES } = await import('./pipelines');
+  return TRIPO_PIPELINES;
+}
+
+// ── Per-user concurrency ─────────────────────────────────────────────────
+
+const activeByUser = new Map<string, number>();
+const waitingByUser = new Map<string, Array<() => void>>();
+/** Jobs executing in this process — the resume sweep never touches them. */
+const localJobs = new Set<string>();
+
+async function withUserSlot<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+  if ((activeByUser.get(userId) ?? 0) >= MAX_ACTIVE_PER_USER) {
+    await new Promise<void>((resolve) => {
+      const q = waitingByUser.get(userId) ?? [];
+      q.push(resolve);
+      waitingByUser.set(userId, q);
+    });
+  }
+  activeByUser.set(userId, (activeByUser.get(userId) ?? 0) + 1);
+  try {
+    return await fn();
+  } finally {
+    const left = (activeByUser.get(userId) ?? 1) - 1;
+    if (left > 0) activeByUser.set(userId, left);
+    else activeByUser.delete(userId);
+    const q = waitingByUser.get(userId);
+    const next = q?.shift();
+    if (q && !q.length) waitingByUser.delete(userId);
+    next?.();
+  }
+}
+
+// ── Start / retry ────────────────────────────────────────────────────────
 
 /**
  * Create the job doc, then run the pipeline in the background. Returns as
@@ -111,6 +182,7 @@ export async function startTripoJob(input: CreateTripoJobInput): Promise<{ jobId
         meta: { genId, kind: input.kind },
       },
       async () => {
+        const now = new Date();
         await threeDGenCol()
           .doc(genId)
           .set({
@@ -119,19 +191,21 @@ export async function startTripoJob(input: CreateTripoJobInput): Promise<{ jobId
             provider: 'tripo',
             type: `tripo_${input.kind}`,
             kind: input.kind,
-            status: 'running',
+            status: 'queued' satisfies TripoJobStatus,
             steps: [],
+            pipelineArgs: input.args,
             entityId: input.entityId ?? null,
             universeId: input.universeId ?? null,
             sourceContentId: input.sourceContentId ?? null,
             providerCostUsd: costUsd,
-            createdAt: new Date(),
+            createdAt: now,
+            heartbeatAt: now,
             ...(input.meta ?? {}),
           });
 
         settleThreedJob({
           hold,
-          done: runTripoJob(genId, input),
+          done: runTripoJob(genId, input.kind, input.userId, input.apiKey, input.args),
           provider: 'tripo',
           model: `tripo-${input.kind}`,
           costUsd,
@@ -145,31 +219,109 @@ export async function startTripoJob(input: CreateTripoJobInput): Promise<{ jobId
   );
 }
 
-async function runTripoJob(genId: string, input: CreateTripoJobInput): Promise<void> {
+/**
+ * Re-run a failed job. Steps that already produced a Tripo task are
+ * replayed, so only the failed step (and what follows) is billed again.
+ */
+export async function retryTripoJob(genId: string, userId: string, apiKey: string): Promise<void> {
   const ref = threeDGenCol().doc(genId);
+  const snap = await ref.get();
+  const d = snap.data();
+  if (!d || d.userId !== userId || d.provider !== 'tripo') throw new Error('Job not found');
+  if (d.status !== 'failed') throw new Error('Only failed jobs can be retried');
+  if (!d.pipelineArgs) throw new Error('This job predates retries — start it again instead');
+
+  const kind = d.kind as TripoJobKind;
+  const costUsd = TRIPO_JOB_COST_USD[kind];
+  const hold = await reserveThreedBudget('tripo', costUsd);
+  await releaseHoldOnError(hold, async () => {
+    const now = new Date();
+    await ref.update({
+      status: 'queued' satisfies TripoJobStatus,
+      failureReason: null,
+      completedAt: null,
+      retryCount: (d.retryCount ?? 0) + 1,
+      heartbeatAt: now,
+      updatedAt: now,
+    });
+    settleThreedJob({
+      hold,
+      done: runTripoJob(genId, kind, userId, apiKey, d.pipelineArgs),
+      provider: 'tripo',
+      model: `tripo-${kind}`,
+      costUsd,
+      readStatus: async () => (await ref.get()).data()?.status as string | undefined,
+      extra: { generationId: genId, retry: true },
+    });
+  });
+}
+
+// ── Execution ────────────────────────────────────────────────────────────
+
+/** Never rejects — failures are recorded on the job doc. */
+export function runTripoJob(
+  genId: string,
+  kind: TripoJobKind,
+  userId: string,
+  apiKey: string,
+  args: Record<string, unknown>
+): Promise<void> {
+  localJobs.add(genId);
+  return withUserSlot(userId, () => executeJob(genId, kind, userId, apiKey, args))
+    .catch((err) => console.error(`[tripo-world] job ${genId} crashed:`, err))
+    .finally(() => localJobs.delete(genId));
+}
+
+async function executeJob(
+  genId: string,
+  kind: TripoJobKind,
+  userId: string,
+  apiKey: string,
+  args: Record<string, unknown>
+): Promise<void> {
+  const ref = threeDGenCol().doc(genId);
+  const prior = ((await ref.get()).data()?.steps ?? []) as TripoJobStep[];
   const steps: TripoJobStep[] = [];
-  const saveSteps = () => ref.update({ steps, updatedAt: new Date() }).catch(() => undefined);
+  const saveSteps = () =>
+    ref.update({ steps, updatedAt: new Date(), heartbeatAt: new Date() }).catch(() => undefined);
+
+  const startedAt = new Date();
+  await ref.update({ status: 'running', startedAt, heartbeatAt: startedAt, updatedAt: startedAt });
+  const heartbeat = setInterval(() => {
+    void ref.update({ heartbeatAt: new Date() }).catch(() => undefined);
+  }, runnerTiming.heartbeatMs);
+  heartbeat.unref?.();
 
   const ctx: TripoJobContext = {
     genId,
-    userId: input.userId,
-    apiKey: input.apiKey,
+    userId,
+    apiKey,
     async step(name, submit) {
+      const idx = steps.length;
+      const earlier = prior[idx];
       const entry: TripoJobStep = { name, status: 'running', progress: 0 };
       steps.push(entry);
+      // Replay: same step, already has a task that didn't fail → poll it.
+      if (earlier?.name === name && earlier.taskId && earlier.status !== 'failed') {
+        entry.taskId = earlier.taskId;
+        entry.reused = true;
+        await saveSteps();
+        try {
+          return await finishStep(entry, apiKey, saveSteps);
+        } catch (err) {
+          // Tripo garbage-collects old tasks; fall through to a fresh submit.
+          console.warn(`[tripo-world] job ${genId}: replay of ${name} failed, resubmitting:`, err);
+          entry.reused = false;
+          entry.status = 'running';
+          entry.progress = 0;
+        }
+      }
       await saveSteps();
       try {
         const { taskId } = await submit();
         entry.taskId = taskId;
         await saveSteps();
-        const task = await waitWithProgress(taskId, input.apiKey, async (p) => {
-          entry.progress = p;
-          await saveSteps();
-        });
-        entry.status = 'success';
-        entry.progress = 100;
-        await saveSteps();
-        return task;
+        return await finishStep(entry, apiKey, saveSteps);
       } catch (err) {
         entry.status = 'failed';
         await saveSteps();
@@ -178,8 +330,11 @@ async function runTripoJob(genId: string, input: CreateTripoJobInput): Promise<v
     },
     async keep(url, filename) {
       if (!url) return null;
-      const { url: permanent } = await rehostEphemeralUrl(url, filename, input.userId);
+      const { url: permanent } = await rehostEphemeralUrl(url, filename, userId);
       return permanent;
+    },
+    optimize(url, filename) {
+      return webOptimizeUrl(url, filename, userId);
     },
     async patch(fields) {
       await ref.update({ ...fields, updatedAt: new Date() });
@@ -187,15 +342,34 @@ async function runTripoJob(genId: string, input: CreateTripoJobInput): Promise<v
   };
 
   try {
-    const result = await input.run(ctx);
+    const factory = (await loadPipelines())[kind];
+    if (!factory) throw new Error(`No pipeline registered for ${kind}`);
+    const result = await factory(args)(ctx);
     await ref.update({ status: 'completed', result, completedAt: new Date() });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error(`[tripo-world] job ${genId} (${input.kind}) failed:`, err);
+    console.error(`[tripo-world] job ${genId} (${kind}) failed:`, err);
     await ref
       .update({ status: 'failed', failureReason: message.slice(0, 500), completedAt: new Date() })
       .catch(() => undefined);
+  } finally {
+    clearInterval(heartbeat);
   }
+}
+
+async function finishStep(
+  entry: TripoJobStep,
+  apiKey: string,
+  saveSteps: () => Promise<unknown>
+): Promise<TripoTask> {
+  const task = await waitWithProgress(entry.taskId!, apiKey, async (p) => {
+    entry.progress = p;
+    await saveSteps();
+  });
+  entry.status = 'success';
+  entry.progress = 100;
+  await saveSteps();
+  return task;
 }
 
 /** Poll a task, reporting progress changes; same failure semantics as waitForTask. */
@@ -219,9 +393,96 @@ async function waitWithProgress(
       last = p;
       await onProgress(p);
     }
-    await new Promise((r) => setTimeout(r, 4000));
+    await new Promise((r) => setTimeout(r, runnerTiming.pollMs));
   }
   throw new Error(`Tripo3D task ${taskId} timed out after ${STEP_TIMEOUT_MS / 1000}s`);
+}
+
+// ── Resume orphaned jobs ─────────────────────────────────────────────────
+
+const toMillis = (v: any): number =>
+  v?.toMillis ? v.toMillis() : v instanceof Date ? v.getTime() : typeof v === 'number' ? v : 0;
+
+/**
+ * Pick up queued/running jobs nobody is executing (server restarted
+ * mid-job, or a crash). Claims each in a transaction so concurrent replicas
+ * never double-run a job. Returns how many it resumed / failed.
+ */
+export async function resumeStaleTripoJobs(
+  resolveKey: (userId: string) => Promise<string | undefined | null> = defaultResolveKey
+): Promise<{ resumed: number; failed: number }> {
+  const out = { resumed: 0, failed: 0 };
+  const col = threeDGenCol();
+  const snaps = await Promise.all(
+    (['queued', 'running'] as const).map((s) =>
+      col.where('provider', '==', 'tripo').where('status', '==', s).limit(200).get()
+    )
+  );
+  const cutoff = Date.now() - STALE_AFTER_MS;
+  for (const doc of snaps.flatMap((s) => s.docs)) {
+    if (localJobs.has(doc.id)) continue;
+    const d = doc.data();
+    const lastBeat = toMillis(d.heartbeatAt) || toMillis(d.updatedAt) || toMillis(d.createdAt);
+    if (lastBeat > cutoff) continue;
+
+    // Claim: re-check staleness inside a transaction and bump the heartbeat.
+    const claimed = await db
+      .runTransaction(async (tx) => {
+        const fresh = await tx.get(doc.ref);
+        const f = fresh.data();
+        if (!f || (f.status !== 'queued' && f.status !== 'running')) return null;
+        const beat = toMillis(f.heartbeatAt) || toMillis(f.updatedAt) || toMillis(f.createdAt);
+        if (beat > cutoff) return null;
+        tx.update(doc.ref, { heartbeatAt: new Date(), resumeCount: (f.resumeCount ?? 0) + 1 });
+        return f;
+      })
+      .catch(() => null);
+    if (!claimed) continue;
+
+    const fail = async (reason: string) => {
+      await doc.ref
+        .update({ status: 'failed', failureReason: reason, completedAt: new Date() })
+        .catch(() => undefined);
+      out.failed++;
+    };
+    if (!claimed.pipelineArgs) {
+      await fail('Interrupted by a server restart — run it again.');
+      continue;
+    }
+    if ((claimed.resumeCount ?? 0) >= MAX_RESUMES) {
+      await fail('Interrupted repeatedly — retry it.');
+      continue;
+    }
+    const apiKey = await resolveKey(claimed.userId).catch(() => null);
+    if (!apiKey) {
+      await fail('Interrupted, and your Tripo key is no longer available — re-add it and retry.');
+      continue;
+    }
+    console.log(`[tripo-world] resuming orphaned job ${doc.id} (${claimed.kind})`);
+    void runTripoJob(doc.id, claimed.kind, claimed.userId, apiKey, claimed.pipelineArgs);
+    out.resumed++;
+  }
+  return out;
+}
+
+async function defaultResolveKey(userId: string) {
+  const { resolveProviderKey } = await import('../../lib/byok');
+  return resolveProviderKey(userId, 'tripo');
+}
+
+let sweepTimer: ReturnType<typeof setInterval> | null = null;
+/** Boot hook: sweep shortly after start (lets a draining old replica finish), then periodically. */
+export function startTripoResumeJob(): void {
+  if (sweepTimer || process.env.TRIPO_RESUME_OFF === '1' || !db) return;
+  const sweep = () =>
+    resumeStaleTripoJobs()
+      .then((r) => {
+        if (r.resumed || r.failed) console.log('[tripo-world] resume sweep:', r);
+      })
+      .catch((err) => console.warn('[tripo-world] resume sweep failed:', err));
+  setTimeout(sweep, 45_000).unref?.();
+  sweepTimer = setInterval(sweep, STALE_AFTER_MS);
+  sweepTimer.unref?.();
 }
 
 /** Extension of a URL's path (`glb`, `spz`, `ply`…), or the fallback. */

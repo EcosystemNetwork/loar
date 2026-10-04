@@ -30,7 +30,25 @@ vi.mock('../lib/gallery-publish', async (orig) => ({
   ...(await orig<typeof import('../lib/gallery-publish')>()),
   publishToGallery: async (input: any) => {
     published.push(input);
+    // Like the real one, leave a content doc (pipelines dedupe on it).
+    const { db } = await import('../lib/firebase');
+    await db!
+      .collection('content')
+      .add({ generationId: input.generationId, mediaUrl: input.mediaUrl });
   },
+}));
+// GLB optimisation itself is covered by tripo-optimize.test.ts; here it's a
+// deterministic stand-in so the web-copy plumbing is exercised end to end.
+vi.mock('../services/tripo-world/optimize', async (orig) => ({
+  ...(await orig<typeof import('../services/tripo-world/optimize')>()),
+  webOptimizeUrl: async (url: string | null | undefined) =>
+    url ? url.replace(/\.glb$/, '-web.glb') : null,
+}));
+// Universe-manager checks: Alice manages every universe in this suite.
+vi.mock('../lib/safe-admin', async (orig) => ({
+  ...(await orig<typeof import('../lib/safe-admin')>()),
+  isUniverseAdmin: async (_universeId: string, address: string) =>
+    address.toLowerCase() === '0x1111111111111111111111111111111111111111',
 }));
 
 /** A GLB whose JSON chunk names two mesh parts. */
@@ -195,7 +213,7 @@ async function waitJob(jobId: string, ms = 15000) {
   const end = Date.now() + ms;
   while (Date.now() < end) {
     const d = (await db!.collection('threeDGenerations').doc(jobId).get()).data();
-    if (d && d.status !== 'running') return d;
+    if (d && (d.status === 'completed' || d.status === 'failed')) return d;
     await new Promise((r) => setTimeout(r, 100));
   }
   throw new Error('job did not finish');
@@ -231,17 +249,22 @@ describe('tripo.entityTo3D', () => {
     const e = await entityDoc(entityId);
     expect(e.metadata.modelUrl).toMatch(/\/model\.glb$/);
     expect(e.metadata.model3d).toMatchObject({ quality: 'hifi', provider: 'tripo', jobId });
+    // Web-delivery copy alongside the full-detail original.
+    expect(e.metadata.model3d.webGlbUrl).toMatch(/\/model-web\.glb$/);
 
     const { db } = await import('../lib/firebase');
     const atts = await db!.collection('mediaAttachments').where('targetId', '==', entityId).get();
     const cats = atts.docs.map((d) => `${d.data().category}/${d.data().subCategory}`).sort();
-    expect(cats).toEqual(['3d/game_ready', 'video/turntable']);
+    expect(cats).toEqual(['3d/game_ready', '3d/web', 'image/concept_art', 'video/turntable']);
 
     expect(published).toHaveLength(1);
     expect(published[0]).toMatchObject({
       mediaType: '3d',
       universeId: UNIVERSE,
       title: 'Captain Vex',
+      // Gallery viewers get the light copy; edits start from the original.
+      mediaUrl: expect.stringMatching(/model-web\.glb$/),
+      sourceMediaUrl: expect.stringMatching(/\/model\.glb$/),
     });
   });
 
@@ -404,10 +427,175 @@ describe('tripo.worldOverview / getJob', () => {
 
     const overview = await t.worldOverview({ universeId: UNIVERSE });
     const row = overview.find((r) => r.id === entityId)!;
-    expect(row.modelUrl).toMatch(/model\.glb$/);
+    expect(row.modelUrl).toMatch(/\/model\.glb$/);
+    expect(row.webModelUrl).toMatch(/model-web\.glb$/);
+    expect(row.needsWebCopy).toBe(false);
 
     expect((await t.getJob({ jobId }))?.status).toBe('completed');
     const bob = await caller(BOB);
     await expect(bob.getJob({ jobId })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+});
+
+describe('durable jobs — resume, retry, batch', () => {
+  async function jobRef(jobId: string) {
+    const { db } = await import('../lib/firebase');
+    return db!.collection('threeDGenerations').doc(jobId);
+  }
+
+  it('resumes a job orphaned by a restart by replaying its Tripo task — no re-submit, no duplicates', async () => {
+    const t = await caller();
+    const entityId = await seedEntity();
+    const { jobId } = await t.entityTo3D({ entityId });
+    await waitJob(jobId);
+    const { db } = await import('../lib/firebase');
+    const attsBefore = (
+      await db!.collection('mediaAttachments').where('targetId', '==', entityId).get()
+    ).size;
+
+    // Simulate the process dying mid-job: still "running", heartbeat long gone.
+    const ref = await jobRef(jobId);
+    await ref.update({ status: 'running', heartbeatAt: new Date(Date.now() - 60 * 60 * 1000) });
+    seen = [];
+    published.length = 0;
+
+    const { resumeStaleTripoJobs } = await import('../services/tripo-world/runner');
+    const r = await resumeStaleTripoJobs(async () => 'tripo-test-key');
+    expect(r.resumed).toBeGreaterThanOrEqual(1);
+    const job = await waitJob(jobId);
+    expect(job.status).toBe('completed');
+    expect(job.resumeCount).toBe(1);
+    expect(job.steps[0]).toMatchObject({ reused: true, status: 'success' });
+    expect(posts()).not.toContain('/v3/generation/image-to-model');
+    expect(published).toHaveLength(0);
+    const attsAfter = (
+      await db!.collection('mediaAttachments').where('targetId', '==', entityId).get()
+    ).size;
+    expect(attsAfter).toBe(attsBefore);
+  });
+
+  it('fails orphaned jobs that predate resumable args instead of leaving them spinning', async () => {
+    const ref = await jobRef(`legacy-${randomUUID().slice(0, 8)}`);
+    await ref.set({
+      provider: 'tripo',
+      kind: 'entity_model',
+      status: 'running',
+      userId: ALICE.uid,
+      steps: [],
+      heartbeatAt: new Date(Date.now() - 60 * 60 * 1000),
+      createdAt: new Date(Date.now() - 60 * 60 * 1000),
+    });
+    const { resumeStaleTripoJobs } = await import('../services/tripo-world/runner');
+    await resumeStaleTripoJobs(async () => 'tripo-test-key');
+    const d = (await ref.get()).data()!;
+    expect(d.status).toBe('failed');
+    expect(d.failureReason).toMatch(/run it again/);
+  });
+
+  it('leaves jobs with a fresh heartbeat alone', async () => {
+    const ref = await jobRef(`fresh-${randomUUID().slice(0, 8)}`);
+    await ref.set({
+      provider: 'tripo',
+      kind: 'entity_model',
+      status: 'running',
+      userId: ALICE.uid,
+      steps: [],
+      pipelineArgs: {},
+      heartbeatAt: new Date(),
+      createdAt: new Date(),
+    });
+    const { resumeStaleTripoJobs } = await import('../services/tripo-world/runner');
+    await resumeStaleTripoJobs(async () => 'tripo-test-key');
+    expect((await ref.get()).data()!.status).toBe('running');
+    await ref.delete();
+  });
+
+  it('retrying a failed puppet re-bills only the failed step onward', async () => {
+    const t = await caller();
+    const entityId = await seedEntity();
+    failPath = '/v3/animations/rig';
+    const { jobId } = await t.characterPuppet({ entityId, rigType: 'biped' });
+    const failed = await waitJob(jobId);
+    expect(failed.status).toBe('failed');
+    expect((await t.getJob({ jobId }))?.retryable).toBe(true);
+
+    failPath = null;
+    seen = [];
+    await t.retryJob({ jobId });
+    const job = await waitJob(jobId);
+    expect(job.status).toBe('completed');
+    expect(job.retryCount).toBe(1);
+    // Pose, turnaround and body were replayed; rig + motion were submitted.
+    expect(posts()).toEqual(['/v3/animations/rig', '/v3/animations/retarget']);
+    const e = await entityDoc(entityId);
+    expect(e.metadata.puppet.webRiggedModelUrl).toMatch(/rigged-web\.glb$/);
+    expect(e.metadata.puppet.animations[0].webUrl).toMatch(/-web\.glb$/);
+  });
+
+  it('refuses to retry a job that has not failed', async () => {
+    const t = await caller();
+    const { jobId } = await t.entityTo3D({ entityId: await seedEntity() });
+    await waitJob(jobId);
+    await expect(t.retryJob({ jobId })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('batch queues every missing model and environment, skipping entities already in flight', async () => {
+    const t = await caller();
+    const universe = `0x${randomUUID().replace(/-/g, '').slice(0, 40)}`;
+    const a = await seedEntity({ universeAddress: universe, name: 'Prop A', kind: 'thing' });
+    const busy = await seedEntity({ universeAddress: universe, name: 'Prop B', kind: 'thing' });
+    const place = await seedEntity({ universeAddress: universe, name: 'Dock', kind: 'place' });
+    await seedEntity({ universeAddress: universe, name: 'No art', kind: 'thing', imageUrl: null });
+    const ref = await jobRef(`busy-${randomUUID().slice(0, 8)}`);
+    await ref.set({
+      provider: 'tripo',
+      kind: 'entity_model',
+      status: 'running',
+      userId: ALICE.uid,
+      entityId: busy,
+      steps: [],
+      heartbeatAt: new Date(),
+      createdAt: new Date(),
+    });
+
+    const r = await t.batchEntityTo3D({ universeId: universe, includeEnvironments: true });
+    expect(r.jobs.map((j) => [j.entityId, j.kind]).sort()).toEqual(
+      [
+        [a, 'entity_model'],
+        [place, 'place_splat'],
+      ].sort()
+    );
+    // Sequential: concurrent first-time dynamic imports of a mocked module
+    // race in Vitest and can hand back the unmocked lib/firebase.
+    for (const j of r.jobs) expect((await waitJob(j.jobId)).status).toBe('completed');
+    await ref.delete();
+  });
+
+  it('batch is universe-manager only', async () => {
+    const bob = await caller(BOB);
+    await expect(bob.batchEntityTo3D({ universeId: UNIVERSE })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
+
+  it('optimizeWebModels backfills web copies for models made before optimisation', async () => {
+    const t = await caller();
+    const universe = `0x${randomUUID().replace(/-/g, '').slice(0, 40)}`;
+    const id = await seedEntity({
+      universeAddress: universe,
+      metadata: {
+        modelUrl: `${HOST}/old/model.glb`,
+        model3d: { glbUrl: `${HOST}/old/model.glb`, provider: 'tripo' },
+      },
+    });
+    expect((await t.worldOverview({ universeId: universe }))[0].needsWebCopy).toBe(true);
+    const r = await t.optimizeWebModels({ universeId: universe });
+    expect(r.queued).toBe(1);
+    const end = Date.now() + 5000;
+    while (Date.now() < end && !(await entityDoc(id)).metadata.model3d.webGlbUrl) {
+      await new Promise((res) => setTimeout(res, 100));
+    }
+    expect((await entityDoc(id)).metadata.model3d.webGlbUrl).toBe(`${HOST}/old/model-web.glb`);
+    expect((await t.worldOverview({ universeId: universe }))[0].needsWebCopy).toBe(false);
   });
 });

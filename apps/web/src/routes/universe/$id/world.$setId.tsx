@@ -774,8 +774,14 @@ function AssetShelf({
               onAdd({
                 label: r.name,
                 entityId: r.id,
-                url: r.puppet?.riggedModelUrl ?? r.modelUrl!,
-                animations: r.puppet?.animations.map((a) => ({ name: a.name, url: a.url })),
+                // Web copies (meshopt, ~20x smaller) keep sets with many props fast.
+                url: r.puppet
+                  ? (r.puppet.webRiggedModelUrl ?? r.puppet.riggedModelUrl)
+                  : (r.webModelUrl ?? r.modelUrl!),
+                animations: r.puppet?.animations.map((a) => ({
+                  name: a.name,
+                  url: a.webUrl ?? a.url,
+                })),
                 link: { kind: 'entity', target: r.id, label: r.name },
               })
             }
@@ -793,7 +799,7 @@ function AssetShelf({
                   onAdd({
                     label: part,
                     entityId: k.entityId,
-                    url: k.result!.partsModelUrl as string,
+                    url: (k.result!.webPartsModelUrl ?? k.result!.partsModelUrl) as string,
                     partName: part,
                   })
                 }

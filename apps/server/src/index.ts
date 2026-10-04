@@ -1511,6 +1511,13 @@ import('./jobs/cost-alerts')
   .then(({ startCostAlertJob }) => startCostAlertJob())
   .catch((err) => console.warn('[cost-alerts] failed to start:', err));
 
+// Tripo world-building jobs run in-process; resume any a redeploy/crash left
+// orphaned (stale heartbeat). Claims are transactional, so it's replica-safe.
+// Disable with TRIPO_RESUME_OFF=1. See services/tripo-world/runner.ts.
+import('./services/tripo-world/runner')
+  .then(({ startTripoResumeJob }) => startTripoResumeJob())
+  .catch((err) => console.warn('[tripo-world] resume job failed to start:', err));
+
 // Keep the `users` collection (what /admin/dashboard counts) in sync with
 // `userAccounts`. Runs by default — cheap, idempotent, count-guarded. Disable
 // with USER_RECONCILE_OFF=1. See apps/server/src/jobs/reconcile-users.ts.

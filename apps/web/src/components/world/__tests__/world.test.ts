@@ -8,6 +8,8 @@ const row = (over: Partial<WorldOverviewRow>): WorldOverviewRow => ({
   kind: 'person',
   imageUrl: null,
   modelUrl: null,
+  webModelUrl: null,
+  needsWebCopy: false,
   thumbnailUrl: null,
   usdzUrl: null,
   puppet: null,
@@ -23,6 +25,7 @@ describe('planAssetPack', () => {
         usdzUrl: 'https://m/vex.usdz',
         puppet: {
           riggedModelUrl: 'https://m/vex-rig.glb',
+          webRiggedModelUrl: 'https://m/vex-rig-web.glb',
           rigType: 'biped',
           animations: [{ preset: 'preset:walk', name: 'walk', url: 'https://m/walk.glb' }],
           turnaround: { front: 'https://m/front.png' },

@@ -6,6 +6,7 @@
  * GLB layout: 12-byte header (magic 'glTF', version, length), then chunks
  * of [u32 length][u32 type][payload]; the first chunk is JSON (type 0x4E4F534A).
  */
+import { authorizedMediaUrl } from '../ffmpeg/clip-pipeline';
 
 const GLB_MAGIC = 0x46546c67; // 'glTF'
 const CHUNK_JSON = 0x4e4f534a; // 'JSON'
@@ -51,7 +52,7 @@ export function listAnimationNames(gltf: GltfJson): string[] {
 }
 
 export async function fetchGlbJson(url: string): Promise<GltfJson> {
-  const res = await fetch(url);
+  const res = await fetch(authorizedMediaUrl(url));
   if (!res.ok) throw new Error(`Failed to fetch GLB (${res.status})`);
   return readGlbJson(new Uint8Array(await res.arrayBuffer()));
 }

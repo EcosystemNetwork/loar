@@ -22,6 +22,7 @@
  * Required env var: TRIPO_API_KEY (or BYOK via provider-keys store).
  */
 
+import { authorizedMediaUrl } from './ffmpeg/clip-pipeline';
 import { NoKeyAvailableError } from './provider-keys/types';
 
 // `TRIPO_API_HOST` lets tests point the service at a local fake of the v3 API.
@@ -204,7 +205,9 @@ class Tripo3dService {
    */
   async uploadRemoteGlb(modelUrl: string, apiKey?: string): Promise<string> {
     const key = this.resolveKey(apiKey);
-    const fetched = await fetch(modelUrl);
+    // Stored URLs carry no gateway credentials — the dedicated gateway 401s
+    // without its token, which broke every restyle/stylize/parts/export job.
+    const fetched = await fetch(authorizedMediaUrl(modelUrl));
     if (!fetched.ok) {
       throw new Error(`Failed to fetch source GLB for Tripo upload: ${fetched.status}`);
     }

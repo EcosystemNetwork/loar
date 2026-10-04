@@ -34,13 +34,15 @@ COPY apps/server/tsconfig.json ./apps/server/
 
 # Bundle app code only — all node_modules stay external (firebase-admin needs fs paths)
 # esbuild is in root devDependencies, installed by pnpm install above
-# Bundle the main server, worker, backup scheduler, and health probes
+# Bundle the main server, worker, backup scheduler, health probes, and the
+# GLB-optimisation worker thread (loaded by path from dist/index.js)
 RUN pnpm exec esbuild \
   apps/server/src/index.ts \
   apps/server/src/workers/generation.worker.ts \
   apps/server/src/scripts/firestore-backup.ts \
   apps/server/src/scripts/backup-cron.ts \
   apps/server/src/scripts/worker-healthcheck.ts \
+  apps/server/src/services/tripo-world/optimize.worker.ts \
   --bundle \
   --platform=node \
   --format=esm \
