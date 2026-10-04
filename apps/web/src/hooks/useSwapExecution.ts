@@ -207,6 +207,31 @@ export interface SwapConfig {
 
 const NATIVE_ETH: Address = '0x0000000000000000000000000000000000000000';
 
+// Graduated bonding-curve pools pair the token with WETH (LoarHook rejects
+// native-ETH pools), so in-app trades wrap/unwrap around the swap.
+const WETH_ADDRESSES: Record<number, Address> = {
+  11155111: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
+  1: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+};
+
+const WETH_ABI = [
+  { name: 'deposit', type: 'function', stateMutability: 'payable', inputs: [], outputs: [] },
+  {
+    name: 'withdraw',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'wad', type: 'uint256' }],
+    outputs: [],
+  },
+  {
+    name: 'balanceOf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'owner', type: 'address' }],
+    outputs: [{ type: 'uint256' }],
+  },
+] as const;
+
 export type SwapStatus =
   | 'idle'
   | 'approving'
@@ -271,16 +296,24 @@ export function useSwapExecution() {
           // zeroForOne: true if input currency sorts lower (i.e. is currency0).
           // For native-ETH pools, Currency.wrap(address(0)) sorts lowest so ETH is
           // always currency0 — but we check explicitly to support any ordering.
-          const inputIsCurrency0 =
-            config.poolKey.currency0.toLowerCase() === NATIVE_ETH.toLowerCase();
-          const inputIsCurrency1 =
-            config.poolKey.currency1.toLowerCase() === NATIVE_ETH.toLowerCase();
-          if (!inputIsCurrency0 && !inputIsCurrency1) {
-            setError('Pool does not include native ETH — use wrapped ETH router');
+          const weth = WETH_ADDRESSES[chainId];
+          const isCurrency = (c: Address, want: Address | undefined) =>
+            !!want && c.toLowerCase() === want.toLowerCase();
+          const nativeInput =
+            isCurrency(config.poolKey.currency0, NATIVE_ETH) ||
+            isCurrency(config.poolKey.currency1, NATIVE_ETH);
+          const wethInput =
+            !nativeInput &&
+            (isCurrency(config.poolKey.currency0, weth) ||
+              isCurrency(config.poolKey.currency1, weth));
+          if (!nativeInput && !wethInput) {
+            setError('Pool is not paired with ETH or WETH');
             setStatus('error');
-            return { fallback: false, error: 'Pool missing native ETH' };
+            return { fallback: false, error: 'Pool missing ETH pairing' };
           }
-          const zeroForOne = inputIsCurrency0;
+          const zeroForOne =
+            isCurrency(config.poolKey.currency0, NATIVE_ETH) ||
+            (wethInput && isCurrency(config.poolKey.currency0, weth));
 
           // Enforce slippage on-chain. Without expectedOutWei we cannot compute a
           // safe min-out, so we refuse to swap rather than accept 0.
@@ -310,6 +343,40 @@ export function useSwapExecution() {
             return { fallback: false, error: undefined };
           }
 
+          // WETH pool: wrap the ETH and let the router pull it.
+          if (wethInput) {
+            if (!publicClient) throw new Error('RPC client unavailable');
+            const wrapHash = await writeContractAsync({
+              address: weth,
+              abi: WETH_ABI,
+              functionName: 'deposit',
+              value: amountIn,
+              chainId,
+            });
+            await publicClient.waitForTransactionReceipt({ hash: wrapHash as `0x${string}` });
+            const wethAllowance = (await publicClient.readContract({
+              address: weth,
+              abi: ERC20_ABI,
+              functionName: 'allowance',
+              args: [address, routerAddress],
+            })) as bigint;
+            if (wethAllowance < amountIn) {
+              setStatus('approving');
+              const approveHash = await writeContractAsync({
+                address: weth,
+                abi: ERC20_ABI,
+                functionName: 'approve',
+                args: [routerAddress, maxUint256],
+                chainId,
+              });
+              setStatus('approval-pending');
+              await publicClient.waitForTransactionReceipt({
+                hash: approveHash as `0x${string}`,
+              });
+            }
+            setStatus('confirming');
+          }
+
           const hash = await writeContractAsync({
             address: routerAddress,
             abi: SWAP_ROUTER_ABI,
@@ -322,7 +389,7 @@ export function useSwapExecution() {
               deadline,
               '0x', // hookData
             ],
-            value: amountIn,
+            value: wethInput ? 0n : amountIn,
             chainId,
           });
 
@@ -421,6 +488,17 @@ export function useSwapExecution() {
             return { fallback: false, error: undefined };
           }
           setStatus('confirming');
+          const weth = WETH_ADDRESSES[chainId];
+          const outputCurrency = zeroForOne ? config.poolKey.currency1 : config.poolKey.currency0;
+          const wethOutput = !!weth && outputCurrency.toLowerCase() === weth.toLowerCase();
+          const wethBefore = wethOutput
+            ? ((await publicClient.readContract({
+                address: weth,
+                abi: WETH_ABI,
+                functionName: 'balanceOf',
+                args: [address],
+              })) as bigint)
+            : 0n;
           const hash = await writeContractAsync({
             address: routerAddress,
             abi: SWAP_ROUTER_ABI,
@@ -438,6 +516,27 @@ export function useSwapExecution() {
 
           setTxHash(hash);
           setStatus('pending');
+
+          // WETH pool: unwrap what the swap paid out so the seller gets ETH.
+          if (wethOutput) {
+            await publicClient.waitForTransactionReceipt({ hash: hash as `0x${string}` });
+            const wethAfter = (await publicClient.readContract({
+              address: weth,
+              abi: WETH_ABI,
+              functionName: 'balanceOf',
+              args: [address],
+            })) as bigint;
+            const received = wethAfter - wethBefore;
+            if (received > 0n) {
+              await writeContractAsync({
+                address: weth,
+                abi: WETH_ABI,
+                functionName: 'withdraw',
+                args: [received],
+                chainId,
+              });
+            }
+          }
           return { fallback: false, txHash: hash };
         }
       } catch (err: any) {
@@ -457,7 +556,7 @@ export function useSwapExecution() {
         return { fallback: false, error: msg };
       }
     },
-    [routerAddress, chainId, address, writeContractAsync]
+    [routerAddress, chainId, address, writeContractAsync, publicClient]
   );
 
   const reset = useCallback(() => {

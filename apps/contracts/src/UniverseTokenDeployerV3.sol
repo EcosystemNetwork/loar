@@ -126,6 +126,9 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
     // Bonding curve defaults
     uint256 public constant DEFAULT_GRADUATION_ETH = 4 ether;
     uint16 public constant DEFAULT_MAX_BUY_BPS = 200; // 2% of curve supply per tx
+    // 2/3 of the LP allocation sells on the curve, 1/3 seeds the v4 pool.
+    uint256 public constant CURVE_SALE_NUMERATOR = 2;
+    uint256 public constant CURVE_SALE_DENOMINATOR = 3;
 
     ITokenFactory public tokenFactory;
     IGovernorFactory public governorFactory;
@@ -159,6 +162,11 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
     uint64 public vestingCliff = 30 days;
     uint64 public vestingDuration = 180 days;
 
+    /// @notice ETH a new bonding curve must raise before it graduates to a
+    ///         Uniswap v4 pool. Applies to curves deployed after it changes;
+    ///         existing curves keep the value they were created with.
+    uint256 public graduationEth = DEFAULT_GRADUATION_ETH;
+
     error InvalidAllocation();
     error AllocationSupplyMismatch();
     error OnlyUniverseManager();
@@ -172,6 +180,7 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
     // SC-7: the community allocation recipient is user-supplied and may be a
     // contract that can't receive ERC-20 transfers. Surface that explicitly.
     error InvalidCommunityRecipient();
+    error InvalidGraduationEth();
 
     event TokenDeployed(
         uint256 indexed universeId,
@@ -194,6 +203,7 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
         uint256 amount
     );
     event VestingConfigUpdated(address vestingContract, uint64 cliff, uint64 duration);
+    event GraduationEthUpdated(uint256 graduationEth);
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert OnlyOwner();
@@ -234,6 +244,17 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
     ///         the legacy shared `timelock` fallback is bypassed.
     function setTimelockFactory(address _factory) external onlyOwner {
         timelockFactory = ITimelockFactory(_factory);
+    }
+
+    /// @notice Set the graduation threshold for curves deployed from now on.
+    ///         Bounded to [0.01, 1000] ETH so the curve slope can't round to
+    ///         zero (BondingCurve reverts SlopeIsZero) or become absurd.
+    function setGraduationEth(uint256 _graduationEth) external onlyOwner {
+        if (_graduationEth < 0.01 ether || _graduationEth > 1000 ether) {
+            revert InvalidGraduationEth();
+        }
+        graduationEth = _graduationEth;
+        emit GraduationEthUpdated(_graduationEth);
     }
 
     function setPerUniverseTimelockDelay(uint256 delay) external onlyOwner {
@@ -336,17 +357,23 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
             revert AllocationSupplyMismatch();
         }
 
-        // Deploy bonding curve via factory
+        // Deploy bonding curve via factory. Only CURVE_SALE_NUMERATOR /
+        // CURVE_SALE_DENOMINATOR of the LP allocation is sold on the curve;
+        // the rest stays in the curve as the graduation LP reserve. With a
+        // linear curve, a reserve of exactly half the sale makes the pool's
+        // opening price (graduationEth / reserve) equal the curve's final price.
+        uint256 curveSaleAmount = (lpAmount * CURVE_SALE_NUMERATOR) / CURVE_SALE_DENOMINATOR;
         bondingCurveAddress = bondingCurveFactory.deployBondingCurve(
             tokenAddress,
             universeManager,
             universeId,
-            lpAmount,
-            DEFAULT_GRADUATION_ETH,
+            curveSaleAmount,
+            graduationEth,
             DEFAULT_MAX_BUY_BPS
         );
 
-        // LP (curve) tokens → BondingCurve contract for sale
+        // Whole LP allocation (sale + reserve) → BondingCurve; it hands the
+        // unsold remainder + reserve to the LP at graduation.
         IERC20(tokenAddress).safeTransfer(bondingCurveAddress, lpAmount);
 
         // Creator allocation → vesting contract (if configured) or direct transfer

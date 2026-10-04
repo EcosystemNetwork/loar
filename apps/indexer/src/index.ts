@@ -244,6 +244,31 @@ ponder.on('UniverseManager:TokenGraduated', async ({ event, context }) => {
   } catch (err) {
     console.error('Failed to update bonding curve graduation:', err);
   }
+
+  // The v4 pool only exists from graduation on — token.poolId was recorded as
+  // zero at launch. The pool's Initialize log lands earlier in this same tx, so
+  // link it now. Same block + an enabled LOAR hook keeps a third party's
+  // permissionless pool for the same token from being picked up instead.
+  try {
+    const tokenAddr = getAddress(event.args.token);
+    const pools = await context.db.sql.execute(sql`
+      SELECT "poolId" FROM pool
+      WHERE (LOWER(currency0) = ${tokenAddr.toLowerCase()}
+          OR LOWER(currency1) = ${tokenAddr.toLowerCase()})
+        AND "creationBlock" = ${Number(event.block.number)}
+        AND LOWER(hooks) IN (
+          SELECT LOWER(hook_address) FROM hook_event WHERE enabled = true
+        )
+      LIMIT 1
+    `);
+    if (pools.rows.length > 0) {
+      await context.db
+        .update(token, { id: tokenAddr })
+        .set({ poolId: pools.rows[0]!.poolId as `0x${string}` });
+    }
+  } catch (err) {
+    console.error('Failed to link graduated pool to token:', err);
+  }
 });
 
 /// Shared helper: recompute curve aggregates on each trade so read paths don't

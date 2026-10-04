@@ -25,6 +25,15 @@ export interface TokenWithUniverse extends Token {
   latestPrice?: string;
 }
 
+// Hooks whose tokens can never graduate (bound to a previous UniverseManager,
+// so graduateFromBondingCurve reverts OnlyFactory). Their tokens are retired
+// from the launchpad listings; their pages still resolve by direct link.
+const RETIRED_POOL_HOOKS = new Set(['0xf5b2676e0fbc7551ae3e38f25d87c941c5a968cc']);
+
+export function isRetiredToken(t: Pick<Token, 'poolHook'>): boolean {
+  return !!t.poolHook && RETIRED_POOL_HOOKS.has(t.poolHook.toLowerCase());
+}
+
 function useAllTokens() {
   return useQuery({
     queryKey: ['all-tokens'],
@@ -54,7 +63,7 @@ function useAllTokens() {
           }
         }`
       );
-      return data.tokens.items;
+      return data.tokens.items.filter((t) => !isRetiredToken(t));
     },
     ...ponderQueryDefaults,
   });

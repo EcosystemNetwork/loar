@@ -270,8 +270,9 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
         uint256 newPrice = _getCurrentPrice();
         emit TokensPurchased(msg.sender, actualCost, tokensBought, newPrice);
 
-        // Auto-graduate if threshold reached
-        if (ethRaised >= GRADUATION_ETH) {
+        // Auto-graduate if threshold reached (or the curve sold out — the
+        // integral rounds down, so a full sell-out can land a few wei short)
+        if (_graduationReady()) {
             _graduate();
         }
     }
@@ -318,15 +319,25 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
     /// @inheritdoc IBondingCurve
     function graduate() external nonReentrant {
         if (graduated) revert CurveGraduated();
-        if (ethRaised < GRADUATION_ETH) revert NotGraduationReady();
+        if (!_graduationReady()) revert NotGraduationReady();
         _graduate();
+    }
+
+    /// @dev True once the ETH target is met or every curve token is sold.
+    ///      Without the sell-out arm, slope rounding (slopeScaled is floored)
+    ///      leaves ethRaised a few wei under GRADUATION_ETH after the last
+    ///      token sells, and the curve can never graduate.
+    function _graduationReady() internal view returns (bool) {
+        return ethRaised >= GRADUATION_ETH || tokensSold == TOTAL_CURVE_SUPPLY;
     }
 
     function _graduate() internal {
         tradingHalted = true;
         emit TradingHalted(universeId);
 
-        uint256 unsoldTokens = TOTAL_CURVE_SUPPLY - tokensSold;
+        // Unsold curve tokens plus any LP reserve the deployer parked here
+        // (the curve may hold more than TOTAL_CURVE_SUPPLY).
+        uint256 unsoldTokens = IERC20(token).balanceOf(address(this));
         // Exclude pending refunds from LP ETH — those belong to refund claimants, not LP
         uint256 ethForLp = address(this).balance - totalPendingRefunds;
 
@@ -393,7 +404,7 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
     {
         raised = ethRaised;
         target = GRADUATION_ETH;
-        percentBps = ethRaised >= GRADUATION_ETH ? BPS : (ethRaised * BPS) / GRADUATION_ETH;
+        percentBps = _graduationReady() ? BPS : (ethRaised * BPS) / GRADUATION_ETH;
     }
 
     /// @inheritdoc IBondingCurve

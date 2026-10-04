@@ -157,6 +157,27 @@ contract BondingCurveTest is Test {
         assertGt(alice.balance, 4 ether, "Should have received refund");
     }
 
+    /// @dev Regression: the cost integral rounds down, so selling the entire
+    ///      curve can leave ethRaised a few wei under GRADUATION_ETH. Selling
+    ///      out must still graduate, and graduation must hand the LP reserve
+    ///      parked in the curve (not just the unsold remainder) to the manager.
+    function test_graduation_soldOut_withLpReserve() public {
+        uint256 lpAlloc = 800_000_000e18;
+        uint256 sale = (lpAlloc * 2) / 3; // UniverseTokenDeployerV3 split
+        MockToken t = new MockToken("Reserve", "RSV", 1_000_000_000e18, address(this));
+        BondingCurve c = new BondingCurve(address(t), address(manager), 7, sale, 1 ether, 10_000);
+        t.transfer(address(c), lpAlloc);
+
+        vm.deal(alice, 2 ether);
+        vm.prank(alice);
+        c.buy{value: 2 ether}(0, block.timestamp + 1 hours);
+
+        assertEq(c.tokensSold(), sale, "curve sold out");
+        assertTrue(c.graduated(), "sold-out curve graduates even if a few wei short");
+        assertEq(manager.lastTokenAmount(), lpAlloc - sale, "LP gets the parked reserve");
+        assertEq(manager.lastEthAmount(), c.ethRaised(), "LP gets the raised ETH");
+    }
+
     function test_emergencyHalt_onlyManager() public {
         // Only the manager can fire emergencyHalt
         vm.prank(alice);

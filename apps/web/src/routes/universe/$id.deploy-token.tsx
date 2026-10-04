@@ -201,6 +201,7 @@ function DeployTokenPage() {
     }
 
     setDeploying(true);
+    const gradTicks = defaultConfig.graduationTicks(8000);
     try {
       await deployUniverseToken(
         {
@@ -215,19 +216,25 @@ function DeployTokenPage() {
           poolConfig: {
             hook: defaultConfig.defaultHook,
             pairedToken: defaultConfig.defaultPairedToken,
-            tickIfToken0IsLoar: defaultConfig.defaultTickIfToken0IsLoar,
+            tickIfToken0IsLoar:
+              gradTicks?.tickIfToken0IsLoar ?? defaultConfig.defaultTickIfToken0IsLoar,
             tickSpacing: defaultConfig.defaultTickSpacing,
             poolData: defaultConfig.defaultPoolData as `0x${string}`,
           },
-          lockerConfig: buildLockerConfig(
-            defaultConfig.defaultLocker,
-            address as `0x${string}`,
-            defaultConfig.defaultTickIfToken0IsLoar,
-            showAdvanced && feeRecipient2.match(/^0x[0-9a-fA-F]{40}$/)
-              ? (feeRecipient2 as `0x${string}`)
-              : undefined,
-            feeSplit
-          ),
+          lockerConfig: {
+            ...buildLockerConfig(
+              defaultConfig.defaultLocker,
+              address as `0x${string}`,
+              defaultConfig.defaultTickIfToken0IsLoar,
+              showAdvanced && feeRecipient2.match(/^0x[0-9a-fA-F]{40}$/)
+                ? (feeRecipient2 as `0x${string}`)
+                : undefined,
+              feeSplit
+            ),
+            ...(gradTicks
+              ? { tickLower: gradTicks.tickLower, tickUpper: gradTicks.tickUpper }
+              : {}),
+          },
           allocationConfig: {
             curveBps: 8000,
             creatorBps: 1000,

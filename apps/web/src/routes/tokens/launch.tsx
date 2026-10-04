@@ -190,6 +190,7 @@ function LaunchTokenPage() {
     setStatus('submitting');
     const startedAt = Math.floor(Date.now() / 1000);
 
+    const gradTicks = defaults.graduationTicks();
     try {
       await createUniverseWithToken(
         {
@@ -213,7 +214,7 @@ function LaunchTokenPage() {
           poolConfig: {
             hook: defaults.defaultHook!,
             pairedToken: defaults.defaultPairedToken!,
-            tickIfToken0IsLoar: defaults.defaultTickIfToken0IsLoar,
+            tickIfToken0IsLoar: gradTicks?.tickIfToken0IsLoar ?? defaults.defaultTickIfToken0IsLoar,
             tickSpacing: defaults.defaultTickSpacing,
             poolData: defaults.defaultPoolData,
           },
@@ -222,8 +223,8 @@ function LaunchTokenPage() {
             rewardAdmins: [address],
             rewardRecipients: [address],
             rewardBps: [10_000],
-            tickLower: [-230400],
-            tickUpper: [230400],
+            tickLower: gradTicks?.tickLower ?? [-230400],
+            tickUpper: gradTicks?.tickUpper ?? [230400],
             positionBps: [10_000],
             lockerData: '0x',
           },

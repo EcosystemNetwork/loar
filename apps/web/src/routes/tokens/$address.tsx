@@ -25,6 +25,7 @@ import {
   weiToNumber,
   stageFromBondingCurve,
   type TokenStage,
+  isRetiredToken,
 } from '@/hooks/useTokens';
 import { useSwapExecution, usePoolQuote } from '@/hooks/useSwapExecution';
 import {
@@ -365,6 +366,11 @@ function TokenDetailPage() {
   // Safety checks
   const safetyWarnings = useMemo(() => {
     const warnings: string[] = [];
+    if (token && isRetiredToken(token)) {
+      warnings.push(
+        'Retired launch: this token was deployed with an outdated pool hook and can never graduate to Uniswap. It may be relaunched.'
+      );
+    }
     if (holderStats.topHolderPct > 50) {
       warnings.push(`Top holder owns ${holderStats.topHolderPct.toFixed(1)}% of supply`);
     }

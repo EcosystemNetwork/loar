@@ -772,6 +772,9 @@ function CinematicUniverseCreate() {
           return;
         }
 
+        // On the pump.fun-style deployer the opening price is set by the
+        // curve, so the manual starting tick only applies to legacy launches.
+        const gradTicks = defaultConfig.graduationTicks(curveBps);
         await createUniverseWithToken(
           {
             name: universeName,
@@ -794,7 +797,7 @@ function CinematicUniverseCreate() {
             poolConfig: {
               hook: defaultConfig.defaultHook,
               pairedToken: defaultConfig.defaultPairedToken,
-              tickIfToken0IsLoar: startingTick,
+              tickIfToken0IsLoar: gradTicks?.tickIfToken0IsLoar ?? startingTick,
               tickSpacing: defaultConfig.defaultTickSpacing,
               poolData: defaultConfig.defaultPoolData as `0x${string}`,
             },
@@ -803,8 +806,8 @@ function CinematicUniverseCreate() {
               rewardAdmins: [address as `0x${string}`],
               rewardRecipients: [address as `0x${string}`],
               rewardBps: [10000],
-              tickLower: [startingTick],
-              tickUpper: [0],
+              tickLower: gradTicks?.tickLower ?? [startingTick],
+              tickUpper: gradTicks?.tickUpper ?? [0],
               positionBps: [10000],
               lockerData: '0x' as `0x${string}`,
             },

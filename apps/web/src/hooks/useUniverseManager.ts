@@ -282,9 +282,69 @@ export function useUniverseManager() {
  * Hook to get default deployment config for simplified token deployment
  * Uses the deployed hook, locker, and paired token addresses from packages/abis/addresses
  */
+const GRADUATION_ETH_ABI = [
+  {
+    name: 'graduationEth',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'uint256' }],
+  },
+] as const;
+
+const TOKEN_SUPPLY = 1_000_000_000; // whole tokens, matches UniverseTokenDeployerV3
+const FULL_RANGE_TICK = 887_200; // largest multiple of 200 within v4's MAX_TICK
+// UniverseTokenDeployerV3 sells 2/3 of the curve allocation and parks 1/3 as
+// the graduation LP reserve.
+const CURVE_SALE_FRACTION = 2 / 3;
+
+export interface GraduationTicks {
+  tickIfToken0IsLoar: number;
+  tickLower: number[];
+  tickUpper: number[];
+}
+
+/**
+ * Pool ticks for a bonding-curve token on the pump.fun-style deployer: the
+ * pool opens at the curve's final price (graduationEth / LP reserve) with one
+ * full-range position holding the reserve + raised ETH. Pure, for testing.
+ */
+export function computeGraduationTicks(
+  graduationEthWei: bigint,
+  curveBps: number,
+  tickSpacing: number
+): GraduationTicks {
+  const lpTokens = (TOKEN_SUPPLY * curveBps) / 10_000;
+  const reserve = lpTokens - lpTokens * CURVE_SALE_FRACTION;
+  const price = Number(graduationEthWei) / 1e18 / reserve; // WETH per token
+  const rawTick = Math.log(price) / Math.log(1.0001);
+  const tick = Math.round(rawTick / tickSpacing) * tickSpacing;
+  const range = Math.floor(FULL_RANGE_TICK / tickSpacing) * tickSpacing;
+  return { tickIfToken0IsLoar: tick, tickLower: [-range], tickUpper: [range] };
+}
+
 export function useDefaultDeploymentConfig() {
   const chainId = useChainId();
   const chainKey = String(chainId);
+  const managerAddress = UniverseManager[chainKey as keyof typeof UniverseManager] as
+    | `0x${string}`
+    | undefined;
+
+  // The pump.fun-style deployer exposes graduationEth(); the legacy one
+  // doesn't (the call reverts) and its old locker rejects ranges below the
+  // start tick — so only switch to graduation ticks when it's live.
+  const { data: tokenDeployer } = useReadContract({
+    address: managerAddress,
+    abi: universeManagerAbi,
+    functionName: 'tokenDeployer',
+    query: { enabled: !!managerAddress },
+  });
+  const { data: graduationEth } = useReadContract({
+    address: tokenDeployer as `0x${string}` | undefined,
+    abi: GRADUATION_ETH_ABI,
+    functionName: 'graduationEth',
+    query: { enabled: !!tokenDeployer, retry: false },
+  });
 
   // Encode pool fee config: loarFee=3000 (0.3%), pairedFee=3000 (0.3%)
   const defaultPoolData = encodeAbiParameters(
@@ -310,5 +370,8 @@ export function useDefaultDeploymentConfig() {
     defaultTickSpacing: 200,
     defaultTickIfToken0IsLoar: -230400, // Standard starting tick
     defaultPoolData,
+    /** Graduation pool ticks for the live deployer, or null on the legacy one. */
+    graduationTicks: (curveBps = 8000): GraduationTicks | null =>
+      graduationEth ? computeGraduationTicks(graduationEth, curveBps, 200) : null,
   };
 }

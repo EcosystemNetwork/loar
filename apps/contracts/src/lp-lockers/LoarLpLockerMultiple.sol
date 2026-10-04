@@ -232,7 +232,10 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
             ) {
                 revert TicksNotMultipleOfTickSpacing();
             }
-            if (lockerConfig.tickLower[i] < poolConfig.tickIfToken0IsLoar) {
+            // Token-only (one-sided) launches must sit at/above the start
+            // price. With paired liquidity (bonding-curve graduation) a range
+            // straddling the start price is what puts the raised ETH to work.
+            if (pairedAmount == 0 && lockerConfig.tickLower[i] < poolConfig.tickIfToken0IsLoar) {
                 revert TickRangeLowerThanStartingTick();
             }
 
