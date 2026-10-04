@@ -12,6 +12,7 @@ import { PinataProvider } from './ipfs';
 import { LighthouseProvider } from './lighthouse';
 import { FirebaseAdapter } from './firebase-adapter';
 import { getCostLedger } from './cost-ledger';
+import { authorizedMediaUrl } from '../ffmpeg/clip-pipeline';
 
 const MANIFESTS_COLLECTION = 'storageManifests';
 
@@ -272,7 +273,13 @@ export class StorageManager {
     userId?: string,
     opts?: { googleApiKey?: string }
   ): Promise<StorageManifest> {
-    const { buffer, contentType } = await fetchToBuffer(url, undefined, undefined, opts);
+    // Our own dedicated IPFS gateway is token-gated; an unauthenticated fetch 401s.
+    const { buffer, contentType } = await fetchToBuffer(
+      authorizedMediaUrl(url),
+      undefined,
+      undefined,
+      opts
+    );
     const resolvedFilename =
       filename || url.split('/').pop()?.split('?')[0] || `file-${Date.now()}`;
     return this.upload(buffer, resolvedFilename, contentType, userId);
