@@ -34,6 +34,9 @@ import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/
 import { TRPCError } from '@trpc/server';
 import { withReservation } from '../../services/credits';
 import { exists as hasProviderKey, NoKeyAvailableError } from '../../services/provider-keys';
+import { tripo3dService } from '../../services/tripo3d';
+import type { MeshyTaskOutput } from '../../services/meshy';
+import { tripoTaskModelUrl } from '../../lib/threed-provider';
 
 // ── Collections ──────────────────────────────────────────────────────
 
@@ -155,10 +158,13 @@ async function executePipeline(opts: {
   try {
     // BYOK keys for the whole pipeline (user-supplied → env fallback)
     const { resolveProviderKey } = await import('../../lib/byok');
-    const [googleKey, meshyKey] = await Promise.all([
+    const [googleKey, meshyKey, tripoKey] = await Promise.all([
       resolveProviderKey(userId, 'google'),
       resolveProviderKey(userId, 'meshy'),
+      resolveProviderKey(userId, 'tripo'),
     ]);
+    // Tripo3D runs steps 2–3 when the user has a Tripo key; Meshy otherwise.
+    const use3d: 'tripo' | 'meshy' = tripoKey ? 'tripo' : 'meshy';
 
     // ── Step 1: Generate 2D character art via Google Imagen ──────────
     console.log(`[pipeline ${pipelineId}] Step 1: Generating 2D art with Google Imagen...`);
@@ -225,38 +231,71 @@ async function executePipeline(opts: {
 
     console.log(`[pipeline ${pipelineId}] Step 1 complete: ${imageUrl}`);
 
-    // ── Step 2: Convert 2D to 3D via Meshy image-to-3D ──────────────
-    console.log(`[pipeline ${pipelineId}] Step 2: Converting to 3D with Meshy...`);
+    // ── Step 2: Convert 2D to 3D (Tripo3D image-to-model or Meshy image-to-3D)
+    const providerLabel = use3d === 'tripo' ? 'Tripo3D' : 'Meshy';
+    console.log(`[pipeline ${pipelineId}] Step 2: Converting to 3D with ${providerLabel}...`);
     await updatePipeline(pipelineId, {
       currentStep: 'meshy_3d',
-      stepProgress: 'Converting 2D art to 3D model with Meshy...',
+      provider3d: use3d,
+      stepProgress: `Converting 2D art to 3D model with ${providerLabel}...`,
     });
 
-    const { taskId: meshyTaskId } = await meshyService.imageTo3D({
-      imageUrl,
-      enablePbr: false,
-      aiModel: 'meshy-6',
-      topology: 'triangle',
-      targetPolycount: 15000,
-      apiKey: meshyKey,
-    });
+    let meshyTask: {
+      modelUrls: MeshyTaskOutput;
+      thumbnailUrl?: string | null;
+      videoUrl?: string | null;
+    };
+    /** Source for the texture step: a raw model URL (Meshy) or a task id (Tripo). */
+    let glbUrl: string;
+    if (use3d === 'tripo') {
+      const { taskId } = await tripo3dService.imageToModel({
+        input: imageUrl,
+        quality: 'game',
+        faceLimit: 15000,
+        renderVideo: true,
+        apiKey: tripoKey,
+      });
+      await updatePipeline(pipelineId, {
+        tripo3dTaskId: taskId,
+        stepProgress: `3D conversion in progress (task: ${taskId})...`,
+      });
+      const task = await tripo3dService.waitForTask(taskId, 25 * 60 * 1000, 5000, tripoKey);
+      const url = tripoTaskModelUrl(task);
+      if (!url) throw new Error('Tripo3D conversion did not return a GLB model');
+      meshyTask = {
+        modelUrls: { glb: url } as MeshyTaskOutput,
+        thumbnailUrl: task.output?.rendered_image_url,
+        videoUrl: task.output?.rendered_video_url,
+      };
+      // Tripo resolves a task id as input, so the texture step skips a re-upload.
+      glbUrl = taskId;
+    } else {
+      const { taskId: meshyTaskId } = await meshyService.imageTo3D({
+        imageUrl,
+        enablePbr: false,
+        aiModel: 'meshy-6',
+        topology: 'triangle',
+        targetPolycount: 15000,
+        apiKey: meshyKey,
+      });
 
-    await updatePipeline(pipelineId, {
-      meshy3dTaskId: meshyTaskId,
-      stepProgress: `3D conversion in progress (task: ${meshyTaskId})...`,
-    });
+      await updatePipeline(pipelineId, {
+        meshy3dTaskId: meshyTaskId,
+        stepProgress: `3D conversion in progress (task: ${meshyTaskId})...`,
+      });
 
-    // Wait for 3D model to complete (up to 25 min)
-    const meshyTask = await meshyService.waitForTask(
-      meshyTaskId,
-      'image-to-3d',
-      25 * 60 * 1000,
-      undefined,
-      meshyKey
-    );
-
-    const glbUrl = meshyTask.modelUrls?.glb;
-    if (!glbUrl) throw new Error('Meshy 3D conversion did not return a GLB model');
+      // Wait for 3D model to complete (up to 25 min)
+      meshyTask = await meshyService.waitForTask(
+        meshyTaskId,
+        'image-to-3d',
+        25 * 60 * 1000,
+        undefined,
+        meshyKey
+      );
+      const url = meshyTask.modelUrls?.glb;
+      if (!url) throw new Error('Meshy 3D conversion did not return a GLB model');
+      glbUrl = url;
+    }
 
     // Meshy's CDN URLs expire within days — rehost every format + thumbnail to
     // permanent storage before persisting them anywhere. `glbUrl` above stays
@@ -329,8 +368,8 @@ async function executePipeline(opts: {
 
     console.log(`[pipeline ${pipelineId}] Step 2 complete: GLB at ${glbUrl}`);
 
-    // ── Step 3: Apply textures via Meshy text-to-texture ────────────
-    console.log(`[pipeline ${pipelineId}] Step 3: Texturing with Meshy...`);
+    // ── Step 3: Apply textures (Tripo3D /models/texture or Meshy text-to-texture)
+    console.log(`[pipeline ${pipelineId}] Step 3: Texturing with ${providerLabel}...`);
     await updatePipeline(pipelineId, {
       currentStep: 'meshy_texture',
       stepProgress: 'Applying AI textures to 3D model...',
@@ -342,27 +381,55 @@ async function executePipeline(opts: {
     // Meshy retexture caps text_style_prompt at 800 chars
     if (fullTexturePrompt.length > 800) fullTexturePrompt = fullTexturePrompt.slice(0, 797) + '...';
 
-    const { taskId: textureTaskId } = await meshyService.textToTexture({
-      modelUrl: glbUrl,
-      prompt: fullTexturePrompt,
-      artStyle: (artStyle as any) || 'realistic',
-      enablePbr: true,
-      resolution: 2048,
-      apiKey: meshyKey,
-    });
+    let textureTask: {
+      modelUrls: MeshyTaskOutput;
+      thumbnailUrl?: string | null;
+      videoUrl?: string | null;
+    };
+    if (use3d === 'tripo') {
+      const { taskId: textureTaskId } = await tripo3dService.textureModel({
+        input: glbUrl,
+        text: fullTexturePrompt,
+        quality: 'detailed',
+        pbr: true,
+        apiKey: tripoKey,
+      });
+      await updatePipeline(pipelineId, {
+        tripoTextureTaskId: textureTaskId,
+        stepProgress: `Texturing in progress (task: ${textureTaskId})...`,
+      });
+      const task = await tripo3dService.waitForTask(textureTaskId, 20 * 60 * 1000, 5000, tripoKey);
+      const url = tripoTaskModelUrl(task);
+      if (!url) throw new Error('Tripo3D texturing did not return a GLB model');
+      textureTask = {
+        modelUrls: { glb: url } as MeshyTaskOutput,
+        // Texture tasks may not render a preview — fall back to step 2's.
+        thumbnailUrl: task.output?.rendered_image_url ?? meshyTask.thumbnailUrl,
+        videoUrl: task.output?.rendered_video_url ?? meshyTask.videoUrl,
+      };
+    } else {
+      const { taskId: textureTaskId } = await meshyService.textToTexture({
+        modelUrl: glbUrl,
+        prompt: fullTexturePrompt,
+        artStyle: (artStyle as any) || 'realistic',
+        enablePbr: true,
+        resolution: 2048,
+        apiKey: meshyKey,
+      });
 
-    await updatePipeline(pipelineId, {
-      meshyTextureTaskId: textureTaskId,
-      stepProgress: `Texturing in progress (task: ${textureTaskId})...`,
-    });
+      await updatePipeline(pipelineId, {
+        meshyTextureTaskId: textureTaskId,
+        stepProgress: `Texturing in progress (task: ${textureTaskId})...`,
+      });
 
-    // Wait for texture task to complete (up to 20 min)
-    const textureTask = await meshyService.waitForTextureTask(
-      textureTaskId,
-      20 * 60 * 1000,
-      undefined,
-      meshyKey
-    );
+      // Wait for texture task to complete (up to 20 min)
+      textureTask = await meshyService.waitForTextureTask(
+        textureTaskId,
+        20 * 60 * 1000,
+        undefined,
+        meshyKey
+      );
+    }
 
     // Rehost the textured result off Meshy's expiring CDN before it lands in
     // attachments, the gallery, or the pipeline record.
@@ -430,7 +497,7 @@ async function executePipeline(opts: {
         description: entityDescription,
         universeId: universeAddress || null,
         generationId: `${pipelineId}:textured`,
-        generationModel: 'meshy-text-to-texture',
+        generationModel: use3d === 'tripo' ? 'tripo-texture' : 'meshy-text-to-texture',
         tags: ['character', '3d', 'textured', artStyle],
         parentGenerationId: `${pipelineId}:2d`,
         sourceImageUrl: imageUrl,
@@ -449,7 +516,7 @@ async function executePipeline(opts: {
         description: `Rotating preview of ${entityName}'s 3D model.`,
         universeId: universeAddress || null,
         generationId: `${pipelineId}:turntable`,
-        generationModel: 'meshy-text-to-texture',
+        generationModel: use3d === 'tripo' ? 'tripo-texture' : 'meshy-text-to-texture',
         tags: ['character', '3d', 'turntable', artStyle],
         parentGenerationId: `${pipelineId}:textured`,
       });
@@ -565,9 +632,10 @@ export const characterPipelineRouter = router({
       // *user's own* keys synchronously before enqueueing — failing fast
       // here (and letting the client pop the "add key" modal) beats
       // discovering a missing key deep inside the async job.
-      const [hasGoogleKey, hasMeshyKey] = await Promise.all([
+      const [hasGoogleKey, hasMeshyKey, hasTripoKey] = await Promise.all([
         hasProviderKey(ctx.user.uid, 'google'),
         hasProviderKey(ctx.user.uid, 'meshy'),
+        hasProviderKey(ctx.user.uid, 'tripo'),
       ]);
       if (!hasGoogleKey) {
         throw new TRPCError({
@@ -576,11 +644,12 @@ export const characterPipelineRouter = router({
           cause: new NoKeyAvailableError('google'),
         });
       }
-      if (!hasMeshyKey) {
+      // Either 3D provider works — Tripo3D is used when both are on file.
+      if (!hasMeshyKey && !hasTripoKey) {
         throw new TRPCError({
           code: 'FORBIDDEN',
-          message: 'Add a Meshy API key in Settings to run the character pipeline.',
-          cause: new NoKeyAvailableError('meshy'),
+          message: 'Add a Tripo3D or Meshy API key in Settings to run the character pipeline.',
+          cause: new NoKeyAvailableError('tripo'),
         });
       }
 

@@ -46,6 +46,8 @@ import { db } from '../../lib/firebase';
 import { falService } from '../../services/fal';
 import { elevenLabsService } from '../../services/elevenlabs';
 import { meshyService } from '../../services/meshy';
+import { tripo3dService } from '../../services/tripo3d';
+import { tripoTaskModelUrl } from '../../lib/threed-provider';
 import { geminiService } from '../../services/gemini';
 import { routeImageModel, getImageModelById } from '../../services/image-models';
 import {
@@ -309,16 +311,34 @@ async function runVoiceTask(
   }
 }
 
+/**
+ * Tripo3D when the user has a Tripo key (one task, finished textured mesh),
+ * otherwise Meshy. Both are BYOK.
+ */
 async function run3DTask(
   capability: Capability,
   imageUrl: string | undefined,
   prompt: string | undefined,
-  apiKey?: string
+  apiKey?: string,
+  tripoApiKey?: string
 ): Promise<TaskResult> {
   const modality = '3d';
   const creditsUsed = toCredits(CAPABILITY_COST_USD[capability]);
 
   try {
+    if (tripoApiKey) {
+      if (!imageUrl && !prompt) {
+        throw new Error('3D generation requires either an imageUrl or a prompt');
+      }
+      const { taskId } = imageUrl
+        ? await tripo3dService.imageToModel({ input: imageUrl, apiKey: tripoApiKey })
+        : await tripo3dService.textToModel({ prompt: prompt!, apiKey: tripoApiKey });
+      const task = await tripo3dService.waitForTask(taskId, 15 * 60 * 1000, 5000, tripoApiKey);
+      const glb = tripoTaskModelUrl(task);
+      if (!glb) throw new Error('Tripo3D finished without a model');
+      return { capability, status: 'completed', modality, urls: [glb], creditsUsed };
+    }
+
     let taskId: string;
     if (imageUrl) {
       const result = await meshyService.imageTo3D({ imageUrl, enablePbr: true, apiKey });
@@ -621,11 +641,12 @@ async function runPackJob(
 
   // Resolve BYOK keys once for the whole job (user-supplied only — no platform fallback)
   const { resolveProviderKey } = await import('../../lib/byok');
-  const [falKey, elevenKey, meshyKey, googleKey] = await Promise.all([
+  const [falKey, elevenKey, meshyKey, googleKey, tripoKey] = await Promise.all([
     resolveProviderKey(userId, 'fal'),
     resolveProviderKey(userId, 'elevenlabs'),
     resolveProviderKey(userId, 'meshy'),
     resolveProviderKey(userId, 'google'),
+    resolveProviderKey(userId, 'tripo'),
   ]);
 
   // Image prompt used across image/video/3d tasks
@@ -686,7 +707,7 @@ async function runPackJob(
       }
 
       case '3d_model':
-        result = await run3DTask(capability, firstImageUrl, imagePrompt, meshyKey);
+        result = await run3DTask(capability, firstImageUrl, imagePrompt, meshyKey, tripoKey);
         break;
 
       case 'lore_card':

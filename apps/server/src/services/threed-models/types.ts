@@ -22,7 +22,7 @@ export type SpeedTier = 'fast' | 'medium' | 'slow';
 
 export interface ThreedModelConfig {
   id: string;
-  provider: 'meshy' | 'fal';
+  provider: 'meshy' | 'tripo' | 'fal';
   displayName: string;
   shortDescription: string;
 

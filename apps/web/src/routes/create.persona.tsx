@@ -470,8 +470,8 @@ function CreatePersonaPage() {
                   <Label>3D model (optional)</Label>
                 </div>
                 <p className="mb-3 text-sm text-muted-foreground">
-                  Generate a 3D model via Meshy — from text, or from a reference image (e.g., your
-                  linked likeness portrait).
+                  Generate a 3D model with Tripo3D or Meshy — from text, or from a reference image
+                  (e.g., your linked likeness portrait).
                 </p>
                 {threeDAssetUrl ? (
                   <div className="space-y-2 rounded-md border bg-muted/40 p-3">

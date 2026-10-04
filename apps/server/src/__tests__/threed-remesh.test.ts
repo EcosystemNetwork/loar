@@ -20,7 +20,9 @@ const PORT = vi.hoisted(() => {
 
 vi.mock('../lib/byok', async (orig) => ({
   ...(await orig<typeof import('../lib/byok')>()),
-  resolveProviderKey: async () => 'meshy-test-key',
+  // Meshy only — with a Tripo key, provider 'auto' would route to Tripo3D.
+  resolveProviderKey: async (_uid: string, provider: string) =>
+    provider === 'meshy' ? 'meshy-test-key' : undefined,
 }));
 // Storage boundary: pretend every requested format was re-hosted permanently.
 vi.mock('../lib/rehost-ephemeral', async (orig) => ({

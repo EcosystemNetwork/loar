@@ -33,7 +33,12 @@ import {
   MESHY_REMESH_MIN_POLYCOUNT,
   meshyService,
 } from '../../services/meshy';
-import { tripo3dService, type TripoRigType, type TripoAnimation } from '../../services/tripo3d';
+import {
+  tripo3dService,
+  type TripoAnimation,
+  type TripoConvertFormat,
+  type TripoRigType,
+} from '../../services/tripo3d';
 import { trackQuests } from '../../services/quest-tracker';
 import { FieldValue } from 'firebase-admin/firestore';
 import { createAttachment } from '../media/media.handlers';
@@ -53,6 +58,13 @@ import { fireJobWebhook, validateWebhookUrl, webhookUrlSchema } from '../../lib/
 import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 import { TRPCError } from '@trpc/server';
 import { releaseHoldOnError, reserveThreedBudget, settleThreedJob } from '../../lib/threed-budget';
+import {
+  detectTripoRigType,
+  pickThreedProvider,
+  requireTripoApiKey,
+  threedProviderSchema,
+  tripoTaskModelUrl,
+} from '../../lib/threed-provider';
 
 const clientTokenSchema = z
   .string()
@@ -71,6 +83,14 @@ const COSTS = {
   text_refine: 0.2,
   image_to_3d: 0.15,
 };
+
+/**
+ * Tripo3D generation cost (USD, $0.01/Tripo credit). One Tripo task gives a
+ * finished textured mesh — there is no separate refine step — so it costs
+ * more than a Meshy preview but less than preview + refine.
+ */
+const TRIPO_GEN_COSTS = { hifi: 0.4, game: 0.25 } as const;
+const tripoQualitySchema = z.enum(['hifi', 'game']).default('hifi');
 
 async function getMargins() {
   const cfg = await getPlatformConfig();
@@ -229,8 +249,11 @@ async function completeThreeDTask(opts: {
   genId: string;
   userId: string;
   entityId: string | null;
-  meshyTaskId: string;
-  meshyTaskType: 'text-to-3d' | 'image-to-3d';
+  provider: 'meshy' | 'tripo';
+  /** Provider task id (Meshy or Tripo). */
+  taskId: string;
+  /** Meshy only — which Meshy endpoint to poll. */
+  meshyTaskType?: 'text-to-3d' | 'image-to-3d';
   generationType: string;
   credits: number;
   timeoutMs: number;
@@ -245,33 +268,55 @@ async function completeThreeDTask(opts: {
 }) {
   try {
     const { resolveProviderKey } = await import('../../lib/byok');
-    const apiKey = await resolveProviderKey(opts.userId, 'meshy');
-    const task = await meshyService.waitForTask(
-      opts.meshyTaskId,
-      opts.meshyTaskType,
-      opts.timeoutMs,
-      undefined,
-      apiKey
-    );
+    const apiKey = await resolveProviderKey(opts.userId, opts.provider);
+    let output: {
+      modelUrls?: MeshyTaskOutput;
+      thumbnailUrl?: string | null;
+      videoUrl?: string | null;
+    };
+    if (opts.provider === 'tripo') {
+      const task = await tripo3dService.waitForTask(opts.taskId, opts.timeoutMs, 5000, apiKey);
+      const glb = tripoTaskModelUrl(task);
+      if (!glb) throw new Error('Tripo3D finished without a model');
+      output = {
+        modelUrls: { glb } as MeshyTaskOutput,
+        thumbnailUrl: task.output?.rendered_image_url ?? null,
+        videoUrl: task.output?.rendered_video_url ?? null,
+      };
+    } else {
+      const task = await meshyService.waitForTask(
+        opts.taskId,
+        opts.meshyTaskType ?? 'text-to-3d',
+        opts.timeoutMs,
+        undefined,
+        apiKey
+      );
+      output = {
+        modelUrls: task.modelUrls,
+        thumbnailUrl: task.thumbnailUrl,
+        videoUrl: task.videoUrl,
+      };
+    }
 
     trackQuests(opts.userId, [{ questId: 'first_3d_generation' }]);
 
-    // Meshy's CDN URLs are CloudFront-signed and expire within days — rehost
-    // every format + thumbnail/video to permanent storage before persisting.
-    const perm = await rehostModelBundle(
-      { modelUrls: task.modelUrls, thumbnailUrl: task.thumbnailUrl, videoUrl: task.videoUrl },
-      opts.prompt || opts.genId,
-      opts.userId
-    );
+    // Meshy's CDN URLs are CloudFront-signed and Tripo's are signed too — both
+    // expire within days, so rehost every format + thumbnail/video to
+    // permanent storage before persisting.
+    const perm = await rehostModelBundle(output, opts.prompt || opts.genId, opts.userId);
 
-    await threeDGenCol().doc(opts.genId).update({
-      status: 'completed',
-      meshyTaskId: opts.meshyTaskId,
-      modelUrls: perm.modelUrls,
-      thumbnailUrl: perm.thumbnailUrl,
-      videoUrl: perm.videoUrl,
-      completedAt: new Date(),
-    });
+    await threeDGenCol()
+      .doc(opts.genId)
+      .update({
+        status: 'completed',
+        ...(opts.provider === 'tripo'
+          ? { tripoTaskId: opts.taskId }
+          : { meshyTaskId: opts.taskId }),
+        modelUrls: perm.modelUrls,
+        thumbnailUrl: perm.thumbnailUrl,
+        videoUrl: perm.videoUrl,
+        completedAt: new Date(),
+      });
 
     await autoAttach3DModel({
       creator: opts.userId,
@@ -296,7 +341,7 @@ async function completeThreeDTask(opts: {
         thumbnailUrl: perm.thumbnailUrl,
         universeId: opts.universeId ?? null,
         generationId: opts.genId,
-        generationModel: `meshy:${opts.generationType}`,
+        generationModel: `${opts.provider}:${opts.generationType}`,
         parentGenerationId: opts.parentGenerationId ?? null,
         sourceImageUrl: opts.sourceImageUrl ?? null,
       });
@@ -366,6 +411,10 @@ export const threedRouter = router({
         universeId: z.string().optional(),
         clientToken: clientTokenSchema,
         webhookUrl: webhookUrlSchema.optional(),
+        /** `auto` = Tripo3D when the user has a Tripo key, else Meshy. */
+        provider: threedProviderSchema,
+        /** Tripo only: `hifi` (H3.1) or `game` (P1 clean low-poly topology). */
+        quality: tripoQualitySchema,
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -397,6 +446,7 @@ export const threedRouter = router({
           return {
             generationId: reservation.existing.jobId,
             status: (d.status ?? 'queued') as 'queued' | 'running' | 'completed' | 'failed',
+            provider: (d.provider ?? 'meshy') as 'meshy' | 'tripo',
             meshyTaskId: (d.meshyTaskId ?? null) as string | null,
             creditsCharged: (d.creditsCharged ?? 0) as number,
             fiatPriceUsd: (d.fiatPriceUsd ?? 0) as number,
@@ -405,12 +455,17 @@ export const threedRouter = router({
         }
       }
 
+      // Resolved before any charge so a missing Tripo key is a clean FORBIDDEN.
+      const picked = await pickThreedProvider(ctx.user.uid, input.provider);
+      const { provider } = picked;
+      const modelId =
+        provider === 'tripo' ? `tripo-text-to-3d-${input.quality}` : 'meshy-text-to-3d-preview';
       const { fiatMargin, loarMargin } = await getMargins();
-      const cost = COSTS.text_preview;
+      const cost = provider === 'tripo' ? TRIPO_GEN_COSTS[input.quality] : COSTS.text_preview;
       const credits = toCredits(cost, fiatMargin);
       // Kill-switch + HARD daily-cap reservation, BEFORE any doc/credit charge so a
       // denial needs no refund. Released by settleThreedJob when the job ends.
-      const hold = await reserveThreedBudget('meshy', cost);
+      const hold = await reserveThreedBudget(provider, cost);
 
       await threeDGenCol()
         .doc(genId)
@@ -420,6 +475,8 @@ export const threedRouter = router({
           entityId: input.entityId || null,
           universeId: input.universeId || null,
           type: 'text_preview',
+          provider,
+          ...(provider === 'tripo' ? { quality: input.quality } : {}),
           prompt: input.prompt,
           artStyle: input.artStyle || 'realistic',
           providerCostUsd: cost,
@@ -436,8 +493,8 @@ export const threedRouter = router({
         return await withReservation(
           {
             userId: ctx.user.uid,
-            modelId: 'meshy-text-to-3d-preview',
-            provider: 'meshy',
+            modelId,
+            provider,
             estimatedCredits: credits,
             byok: false,
             meta: {
@@ -449,18 +506,34 @@ export const threedRouter = router({
           async () => {
             await threeDGenCol().doc(genId).update({ status: 'running' });
 
-            const { resolveProviderKey } = await import('../../lib/byok');
-            const apiKey = await resolveProviderKey(ctx.user.uid, 'meshy');
-            const { taskId } = await meshyService.textTo3DPreview({
-              prompt: input.prompt,
-              negativePrompt: input.negativePrompt,
-              artStyle: input.artStyle,
-              seed: input.seed,
-              targetPolycount: input.targetPolycount,
-              apiKey,
-            });
-
-            await threeDGenCol().doc(genId).update({ meshyTaskId: taskId });
+            let taskId: string;
+            if (picked.provider === 'tripo') {
+              const styleHint =
+                input.artStyle && input.artStyle !== 'realistic' && input.artStyle !== 'pbr'
+                  ? `, ${input.artStyle} style`
+                  : '';
+              ({ taskId } = await tripo3dService.textToModel({
+                prompt: `${input.prompt}${styleHint}`,
+                negativePrompt: input.negativePrompt,
+                quality: input.quality,
+                faceLimit: input.targetPolycount,
+                renderVideo: true,
+                apiKey: picked.tripoApiKey,
+              }));
+              await threeDGenCol().doc(genId).update({ tripoTaskId: taskId });
+            } else {
+              const { resolveProviderKey } = await import('../../lib/byok');
+              const apiKey = await resolveProviderKey(ctx.user.uid, 'meshy');
+              ({ taskId } = await meshyService.textTo3DPreview({
+                prompt: input.prompt,
+                negativePrompt: input.negativePrompt,
+                artStyle: input.artStyle,
+                seed: input.seed,
+                targetPolycount: input.targetPolycount,
+                apiKey,
+              }));
+              await threeDGenCol().doc(genId).update({ meshyTaskId: taskId });
+            }
 
             // Fire-and-forget: complete in background, client polls via getTask.
             // Webhook fires from completeThreeDTask on terminal state.
@@ -473,7 +546,8 @@ export const threedRouter = router({
                 genId,
                 userId: ctx.user.uid,
                 entityId: input.entityId || null,
-                meshyTaskId: taskId,
+                provider,
+                taskId,
                 meshyTaskType: 'text-to-3d',
                 generationType: 'text_preview',
                 credits,
@@ -483,8 +557,8 @@ export const threedRouter = router({
                 prompt: input.prompt,
                 universeId: input.universeId || null,
               }).catch((err) => console.error(`Background 3D preview ${genId} error:`, err)),
-              provider: 'meshy',
-              model: 'meshy-text-to-3d-preview',
+              provider,
+              model: modelId,
               costUsd: cost,
               readStatus: genStatus(genId),
               extra: { generationId: genId },
@@ -494,7 +568,8 @@ export const threedRouter = router({
               result: {
                 generationId: genId,
                 status: 'running' as const,
-                meshyTaskId: taskId as string | null,
+                provider,
+                meshyTaskId: (provider === 'meshy' ? taskId : null) as string | null,
                 creditsCharged: credits,
                 fiatPriceUsd: withFiat(cost, fiatMargin),
                 idempotentReplay: false as const,
@@ -548,6 +623,12 @@ export const threedRouter = router({
       if (!previewDoc.exists) throw new Error('Preview generation not found');
       const previewData = previewDoc.data()!;
       if (previewData.userId !== ctx.user.uid) throw new Error('Not authorized');
+      if (previewData.provider === 'tripo') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Tripo3D models are already full quality — there is nothing to refine.',
+        });
+      }
       if (previewData.status !== 'completed' || !previewData.meshyTaskId) {
         throw new Error('Preview generation must be completed before refining');
       }
@@ -607,7 +688,8 @@ export const threedRouter = router({
                 genId,
                 userId: ctx.user.uid,
                 entityId: input.entityId || previewData.entityId || null,
-                meshyTaskId: taskId,
+                provider: 'meshy',
+                taskId,
                 meshyTaskType: 'text-to-3d',
                 generationType: 'text_refine',
                 credits,
@@ -654,6 +736,7 @@ export const threedRouter = router({
   imageTo3D: expensiveProcedure
     .input(
       z.object({
+        /** With Tripo3D, 2–4 images are read as front, left, back, right views. */
         imageUrls: z.array(z.string().url()).min(1).max(4),
         enablePbr: z.boolean().optional().default(true),
         targetPolycount: z.number().optional(),
@@ -661,6 +744,10 @@ export const threedRouter = router({
         universeId: z.string().optional(),
         clientToken: clientTokenSchema,
         webhookUrl: webhookUrlSchema.optional(),
+        /** `auto` = Tripo3D when the user has a Tripo key, else Meshy. */
+        provider: threedProviderSchema,
+        /** Tripo only: `hifi` (H3.1) or `game` (P1 clean low-poly topology). */
+        quality: tripoQualitySchema,
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -703,6 +790,7 @@ export const threedRouter = router({
           return {
             generationId: reservation.existing.jobId,
             status: (d.status ?? 'queued') as 'queued' | 'running' | 'completed' | 'failed',
+            provider: (d.provider ?? 'meshy') as 'meshy' | 'tripo',
             meshyTaskId: (d.meshyTaskId ?? null) as string | null,
             creditsCharged: (d.creditsCharged ?? 0) as number,
             fiatPriceUsd: (d.fiatPriceUsd ?? 0) as number,
@@ -711,11 +799,19 @@ export const threedRouter = router({
         }
       }
 
-      const { fiatMargin, loarMargin } = await getMargins();
-      const cost = COSTS.image_to_3d;
-      const credits = toCredits(cost, fiatMargin);
-      const hold = await reserveThreedBudget('meshy', cost);
+      const picked = await pickThreedProvider(ctx.user.uid, input.provider);
+      const { provider } = picked;
       const isMulti = input.imageUrls.length > 1;
+      const modelId =
+        provider === 'tripo'
+          ? `tripo-${isMulti ? 'multiview' : 'image'}-to-3d-${input.quality}`
+          : isMulti
+            ? 'meshy-multi-image-to-3d'
+            : 'meshy-image-to-3d';
+      const { fiatMargin, loarMargin } = await getMargins();
+      const cost = provider === 'tripo' ? TRIPO_GEN_COSTS[input.quality] : COSTS.image_to_3d;
+      const credits = toCredits(cost, fiatMargin);
+      const hold = await reserveThreedBudget(provider, cost);
 
       await threeDGenCol()
         .doc(genId)
@@ -725,6 +821,8 @@ export const threedRouter = router({
           entityId: input.entityId || null,
           universeId: input.universeId || null,
           type: isMulti ? 'multi_image_to_3d' : 'image_to_3d',
+          provider,
+          ...(provider === 'tripo' ? { quality: input.quality } : {}),
           imageUrls: input.imageUrls,
           providerCostUsd: cost,
           fiatPriceUsd: withFiat(cost, fiatMargin),
@@ -740,8 +838,8 @@ export const threedRouter = router({
         return await withReservation(
           {
             userId: ctx.user.uid,
-            modelId: isMulti ? 'meshy-multi-image-to-3d' : 'meshy-image-to-3d',
-            provider: 'meshy',
+            modelId,
+            provider,
             estimatedCredits: credits,
             byok: false,
             meta: {
@@ -753,10 +851,25 @@ export const threedRouter = router({
           async () => {
             await threeDGenCol().doc(genId).update({ status: 'running' });
 
-            const { resolveProviderKey } = await import('../../lib/byok');
-            const apiKey = await resolveProviderKey(ctx.user.uid, 'meshy');
             let taskId: string;
-            if (isMulti) {
+            if (picked.provider === 'tripo') {
+              const common = {
+                quality: input.quality,
+                faceLimit: input.targetPolycount,
+                renderVideo: true,
+                apiKey: picked.tripoApiKey,
+              };
+              const [front, left, back, right] = input.imageUrls;
+              ({ taskId } = isMulti
+                ? await tripo3dService.multiviewToModel({
+                    views: { front, left, back, right },
+                    ...common,
+                  })
+                : await tripo3dService.imageToModel({ input: front, ...common }));
+              await threeDGenCol().doc(genId).update({ tripoTaskId: taskId });
+            } else if (isMulti) {
+              const { resolveProviderKey } = await import('../../lib/byok');
+              const apiKey = await resolveProviderKey(ctx.user.uid, 'meshy');
               const result = await meshyService.multiImageTo3D({
                 imageUrls: input.imageUrls,
                 enablePbr: input.enablePbr,
@@ -765,6 +878,8 @@ export const threedRouter = router({
               });
               taskId = result.taskId;
             } else {
+              const { resolveProviderKey } = await import('../../lib/byok');
+              const apiKey = await resolveProviderKey(ctx.user.uid, 'meshy');
               const result = await meshyService.imageTo3D({
                 imageUrl: input.imageUrls[0],
                 enablePbr: input.enablePbr,
@@ -773,8 +888,9 @@ export const threedRouter = router({
               });
               taskId = result.taskId;
             }
-
-            await threeDGenCol().doc(genId).update({ meshyTaskId: taskId });
+            if (provider === 'meshy') {
+              await threeDGenCol().doc(genId).update({ meshyTaskId: taskId });
+            }
 
             // Fire-and-forget: complete in background, client polls via getTask
             settleThreedJob({
@@ -783,7 +899,8 @@ export const threedRouter = router({
                 genId,
                 userId: ctx.user.uid,
                 entityId: input.entityId || null,
-                meshyTaskId: taskId,
+                provider,
+                taskId,
                 meshyTaskType: 'image-to-3d',
                 generationType: isMulti ? 'multi_image_to_3d' : 'image_to_3d',
                 credits,
@@ -793,8 +910,8 @@ export const threedRouter = router({
                 universeId: input.universeId || null,
                 sourceImageUrl: input.imageUrls[0] ?? null,
               }).catch((err) => console.error(`Background 3D image-to-3d ${genId} error:`, err)),
-              provider: 'meshy',
-              model: 'meshy-image-to-3d',
+              provider,
+              model: modelId,
               costUsd: cost,
               readStatus: genStatus(genId),
               extra: { generationId: genId },
@@ -804,7 +921,8 @@ export const threedRouter = router({
               result: {
                 generationId: genId,
                 status: 'running' as const,
-                meshyTaskId: taskId as string | null,
+                provider,
+                meshyTaskId: (provider === 'meshy' ? taskId : null) as string | null,
                 creditsCharged: credits,
                 fiatPriceUsd: withFiat(cost, fiatMargin),
                 idempotentReplay: false as const,
@@ -907,10 +1025,14 @@ export const threedRouter = router({
   /**
    * Rig a textured static GLB so it can accept library animations.
    *
-   * `rigType` chooses the provider:
-   *   - `biped`                                                 → Meshy auto-rig
+   * `rigType`:
+   *   - `auto` → Tripo3D rig-check reads the mesh and picks the skeleton
+   *              (humanoid, beast, spider, snake, bird, fish…). Tripo only.
+   *   - `biped` → humanoids and two-legged monsters. Tripo3D when `provider`
+   *              resolves to it (default when the user has a Tripo key),
+   *              otherwise Meshy auto-rig.
    *   - `quadruped | hexapod | octopod | avian | serpentine | aquatic | others`
-   *                                                              → Tripo3D
+   *              → Tripo3D (Meshy only rigs humanoids).
    *
    * "Others" is the catch-all for vehicles (planes, cars, boats) and
    * mechanical/abstract meshes — Tripo applies a generic rig.
@@ -934,8 +1056,11 @@ export const threedRouter = router({
             'serpentine',
             'aquatic',
             'others',
+            'auto',
           ])
           .default('biped'),
+        /** Biped only — Meshy or Tripo3D. Every other rig type is Tripo3D. */
+        provider: threedProviderSchema,
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -958,22 +1083,30 @@ export const threedRouter = router({
         });
       }
 
-      const provider: 'meshy' | 'tripo' = input.rigType === 'biped' ? 'meshy' : 'tripo';
-
-      // BYOK is mandatory for Tripo3D (non-biped rigs) — there is no server
-      // key pool (dispatcher.ts resolves BYOK only). Resolve the caller's own
-      // key up front so a missing key fails as a clean FORBIDDEN *before* any
-      // credit reservation, the same way every other BYOK-gated route behaves.
+      // BYOK is mandatory for both providers — there is no server key pool
+      // (dispatcher.ts resolves BYOK only). Resolve the caller's Tripo key up
+      // front so a missing key fails as a clean FORBIDDEN *before* any credit
+      // reservation, the same way every other BYOK-gated route behaves.
+      let provider: 'meshy' | 'tripo';
       let tripoApiKey: string | undefined;
-      if (provider === 'tripo') {
-        const { resolveProviderKey } = await import('../../lib/byok');
-        tripoApiKey = await resolveProviderKey(ctx.user.uid, 'tripo');
-        if (!tripoApiKey) {
+      if (input.rigType === 'biped') {
+        const picked = await pickThreedProvider(ctx.user.uid, input.provider);
+        provider = picked.provider;
+        tripoApiKey = picked.tripoApiKey;
+      } else {
+        if (input.provider === 'meshy') {
           throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Add your Tripo3D API key at /settings/api-keys to rig non-humanoid models.',
+            code: 'BAD_REQUEST',
+            message: 'Meshy only rigs humanoids — use Tripo3D for this rig type.',
           });
         }
+        provider = 'tripo';
+        tripoApiKey = await requireTripoApiKey(
+          ctx.user.uid,
+          input.rigType === 'auto'
+            ? 'Add your Tripo3D API key at /settings/api-keys to auto-detect and rig models.'
+            : 'Add your Tripo3D API key at /settings/api-keys to rig non-humanoid models.'
+        );
       }
 
       const { fiatMargin } = await getMargins();
@@ -1036,33 +1169,48 @@ export const threedRouter = router({
                 readStatus: genStatus(genId),
                 extra: { generationId: genId },
               });
-              return { result: { jobId: genId, providerTaskId: taskId }, actualCredits: credits };
+              return {
+                result: {
+                  jobId: genId,
+                  providerTaskId: taskId,
+                  provider: 'meshy' as 'meshy' | 'tripo',
+                  rigType: 'biped' as TripoRigType,
+                },
+                actualCredits: credits,
+              };
             }
 
             // Tripo3D path — upload the GLB, then rig (animate is a separate
             // request). v3's rig endpoint takes the file_token directly, so the
             // old import_model task + inline poll are gone.
             // Key was resolved and non-null-checked before the reservation above.
-            const apiKey = tripoApiKey;
+            const apiKey = tripoApiKey!;
             const fileToken = await tripo3dService.uploadRemoteGlb(sourceUrl, apiKey);
+            const rigType: TripoRigType =
+              input.rigType === 'auto'
+                ? await detectTripoRigType(fileToken, apiKey)
+                : input.rigType;
             const { taskId } = await tripo3dService.rigModel({
               input: fileToken,
-              rigType: input.rigType as TripoRigType,
+              rigType,
               apiKey,
             });
-            await threeDGenCol().doc(genId).set({
-              id: genId,
-              userId: ctx.user.uid,
-              type: 'tripo_rigging',
-              status: 'running',
-              tripoRigTaskId: taskId,
-              sourceContentId: input.contentId,
-              sourceMediaUrl: sourceUrl,
-              rigType: input.rigType,
-              universeId,
-              parentGenerationId,
-              createdAt: new Date(),
-            });
+            await threeDGenCol()
+              .doc(genId)
+              .set({
+                id: genId,
+                userId: ctx.user.uid,
+                type: 'tripo_rigging',
+                status: 'running',
+                tripoRigTaskId: taskId,
+                sourceContentId: input.contentId,
+                sourceMediaUrl: sourceUrl,
+                rigType,
+                ...(input.rigType === 'auto' ? { rigTypeDetected: true } : {}),
+                universeId,
+                parentGenerationId,
+                createdAt: new Date(),
+              });
             settleThreedJob({
               hold,
               done: completeTripoRiggingTask({
@@ -1070,7 +1218,7 @@ export const threedRouter = router({
                 userId: ctx.user.uid,
                 tripoRigTaskId: taskId,
                 sourceTitle,
-                rigType: input.rigType as TripoRigType,
+                rigType,
                 universeId,
                 parentGenerationId,
                 credits,
@@ -1081,7 +1229,15 @@ export const threedRouter = router({
               readStatus: genStatus(genId),
               extra: { generationId: genId },
             });
-            return { result: { jobId: genId, providerTaskId: taskId }, actualCredits: credits };
+            return {
+              result: {
+                jobId: genId,
+                providerTaskId: taskId,
+                provider: 'tripo' as 'meshy' | 'tripo',
+                rigType,
+              },
+              actualCredits: credits,
+            };
           }
         )
       );
@@ -1291,6 +1447,8 @@ export const threedRouter = router({
           .min(1)
           .max(REMESH_OUTPUT_FORMATS.length)
           .default(['glb']),
+        /** `auto` = Tripo3D convert when the user has a Tripo key, else Meshy remesh. */
+        provider: threedProviderSchema,
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -1313,9 +1471,14 @@ export const threedRouter = router({
         });
       }
 
+      const picked = await pickThreedProvider(ctx.user.uid, input.provider);
       // Provider cost comes from the 3D model registry (single source of truth);
       // the credit price applies the same platform margin as every other 3D task.
-      const cost = getThreedModelById('meshy-remesh')?.providerCostUsd ?? 0;
+      // Tripo converts one format per task, so it is billed per format.
+      const cost =
+        picked.provider === 'tripo'
+          ? (getThreedModelById('tripo-remesh')?.providerCostUsd ?? 0) * input.targetFormats.length
+          : (getThreedModelById('meshy-remesh')?.providerCostUsd ?? 0);
       const { fiatMargin } = await getMargins();
       const credits = toCredits(cost, fiatMargin);
       const genId = randomUUID();
@@ -1323,7 +1486,74 @@ export const threedRouter = router({
       const sourceUrl = content.mediaUrl as string;
       const universeId = (content.universeId as string | null | undefined) ?? null;
       const parentGenerationId = (content.generationId as string | null | undefined) ?? null;
-      const hold = await reserveThreedBudget('meshy', cost);
+      const hold = await reserveThreedBudget(picked.provider, cost);
+
+      if (picked.provider === 'tripo') {
+        const apiKey = picked.tripoApiKey;
+        return releaseHoldOnError(hold, () =>
+          withReservation(
+            {
+              userId: ctx.user.uid,
+              modelId: 'tripo-remesh',
+              provider: 'tripo',
+              estimatedCredits: credits,
+              byok: false,
+              meta: { genId, sourceContentId: input.contentId, kind: 'remesh' },
+            },
+            async () => {
+              // Upload once; every format's convert task reads the same token.
+              const fileToken = await tripo3dService.uploadRemoteGlb(sourceUrl, apiKey);
+              const [first, ...rest] = input.targetFormats;
+              const { taskId } = await tripo3dService.convertModel(
+                tripoRemeshArgs(fileToken, first, input.topology, input.targetPolycount, apiKey)
+              );
+              await threeDGenCol()
+                .doc(genId)
+                .set({
+                  id: genId,
+                  userId: ctx.user.uid,
+                  type: 'tripo_remesh',
+                  provider: 'tripo',
+                  status: 'running',
+                  tripoTaskIds: { [first]: taskId },
+                  sourceContentId: input.contentId,
+                  sourceMediaUrl: sourceUrl,
+                  topology: input.topology,
+                  targetPolycount: input.targetPolycount,
+                  targetFormats: input.targetFormats,
+                  providerCostUsd: cost,
+                  creditsCharged: credits,
+                  universeId,
+                  parentGenerationId,
+                  createdAt: new Date(),
+                });
+              settleThreedJob({
+                hold,
+                done: completeTripoRemeshTask({
+                  genId,
+                  userId: ctx.user.uid,
+                  apiKey,
+                  fileToken,
+                  firstTask: { format: first, taskId },
+                  remainingFormats: rest,
+                  sourceTitle,
+                  topology: input.topology,
+                  targetPolycount: input.targetPolycount,
+                  universeId,
+                  parentGenerationId,
+                  credits,
+                }),
+                provider: 'tripo',
+                model: 'tripo-remesh',
+                costUsd: cost,
+                readStatus: genStatus(genId),
+                extra: { generationId: genId },
+              });
+              return { result: { jobId: genId, providerTaskId: taskId }, actualCredits: credits };
+            }
+          )
+        );
+      }
 
       return releaseHoldOnError(hold, () =>
         withReservation(
@@ -1942,6 +2172,114 @@ async function completeTripoAnimationTask(opts: {
       })
       .catch(() => {});
     console.error(`Tripo animation ${opts.genId} failed:`, error);
+  }
+}
+
+const TRIPO_CONVERT_FORMAT: Record<(typeof REMESH_OUTPUT_FORMATS)[number], TripoConvertFormat> = {
+  glb: 'GLTF',
+  fbx: 'FBX',
+  obj: 'OBJ',
+  usdz: 'USDZ',
+};
+
+function tripoRemeshArgs(
+  fileToken: string,
+  format: (typeof REMESH_OUTPUT_FORMATS)[number],
+  topology: 'quad' | 'triangle',
+  targetPolycount: number,
+  apiKey: string
+) {
+  return {
+    input: fileToken,
+    format: TRIPO_CONVERT_FORMAT[format],
+    quad: topology === 'quad',
+    faceLimit: targetPolycount,
+    apiKey,
+  };
+}
+
+/**
+ * Tripo remesh = one `/models/convert` task per requested format. The first
+ * was submitted by the procedure; the rest run here one at a time (Tripo
+ * 429s accounts with many tasks in flight).
+ */
+async function completeTripoRemeshTask(opts: {
+  genId: string;
+  userId: string;
+  apiKey: string;
+  fileToken: string;
+  firstTask: { format: (typeof REMESH_OUTPUT_FORMATS)[number]; taskId: string };
+  remainingFormats: Array<(typeof REMESH_OUTPUT_FORMATS)[number]>;
+  sourceTitle: string;
+  topology: 'quad' | 'triangle';
+  targetPolycount: number;
+  universeId: string | null;
+  parentGenerationId: string | null;
+  credits: number;
+}) {
+  try {
+    const raw: Partial<Record<(typeof REMESH_OUTPUT_FORMATS)[number], string>> = {};
+    const taskIds: Record<string, string> = { [opts.firstTask.format]: opts.firstTask.taskId };
+    let thumbnailUrl: string | undefined;
+    const collect = async (format: (typeof REMESH_OUTPUT_FORMATS)[number], taskId: string) => {
+      const task = await tripo3dService.waitForTask(taskId, 10 * 60 * 1000, 5000, opts.apiKey);
+      const url = tripoTaskModelUrl(task);
+      if (!url) throw new Error(`Tripo3D convert (${format}) finished without a model`);
+      raw[format] = url;
+      thumbnailUrl ??= task.output?.rendered_image_url;
+    };
+    await collect(opts.firstTask.format, opts.firstTask.taskId);
+    for (const format of opts.remainingFormats) {
+      const { taskId } = await tripo3dService.convertModel(
+        tripoRemeshArgs(opts.fileToken, format, opts.topology, opts.targetPolycount, opts.apiKey)
+      );
+      taskIds[format] = taskId;
+      await threeDGenCol().doc(opts.genId).update({ tripoTaskIds: taskIds });
+      await collect(format, taskId);
+    }
+
+    // Tripo output URLs are signed and expire — rehost every format first.
+    const perm = await rehostModelBundle(
+      { modelUrls: raw, thumbnailUrl },
+      `${opts.sourceTitle}-remesh`,
+      opts.userId
+    );
+
+    await threeDGenCol().doc(opts.genId).update({
+      status: 'completed',
+      modelUrls: perm.modelUrls,
+      thumbnailUrl: perm.thumbnailUrl,
+      completedAt: new Date(),
+    });
+
+    const glbUrl = perm.modelUrls.glb;
+    if (glbUrl) {
+      void publishToGallery({
+        creatorUid: opts.userId,
+        mediaUrl: glbUrl,
+        mediaType: '3d',
+        title: `${opts.sourceTitle} — remeshed (${opts.topology}, ${opts.targetPolycount.toLocaleString('en-US')} polys)`,
+        description: `Retopologized to ~${opts.targetPolycount.toLocaleString('en-US')} ${opts.topology === 'quad' ? 'quads' : 'triangles'} with Tripo3D.`,
+        thumbnailUrl: perm.thumbnailUrl,
+        universeId: opts.universeId,
+        generationId: `remesh:tripo:${opts.firstTask.taskId}`,
+        generationModel: 'tripo-remesh',
+        tags: ['3d', 'remesh', opts.topology],
+        parentGenerationId: opts.parentGenerationId,
+      });
+    }
+  } catch (error) {
+    await refundCreditsAfterReconcile(opts.userId, opts.credits, opts.genId);
+    await threeDGenCol()
+      .doc(opts.genId)
+      .update({
+        status: 'failed',
+        creditsRefunded: true,
+        failureReason: error instanceof Error ? error.message : 'Unknown error',
+        completedAt: new Date(),
+      })
+      .catch(() => {});
+    console.error(`Tripo remesh ${opts.genId} failed:`, error);
   }
 }
 

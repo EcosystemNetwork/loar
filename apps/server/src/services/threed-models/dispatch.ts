@@ -15,6 +15,7 @@ import {
   type MeshyRemeshFormat,
 } from '../meshy';
 import { resolveProviderKey } from '../../lib/byok';
+import type { TripoConvertFormat } from '../tripo3d';
 import { withProviderRateLimit } from '../../lib/rate-limit';
 import {
   recordProviderCost,
@@ -29,6 +30,8 @@ function threedCostProviderFor(p: ThreedModelConfig['provider']): CostProvider {
   switch (p) {
     case 'meshy':
       return 'meshy';
+    case 'tripo':
+      return 'tripo';
     case 'fal':
       return 'fal';
   }
@@ -360,6 +363,125 @@ async function dispatchThreedInner(
       throw new TRPCError({
         code: 'BAD_GATEWAY',
         message: err instanceof Error ? err.message : 'Meshy task failed',
+      });
+    }
+  }
+
+  // ── Tripo3D ────────────────────────────────────────────────────────
+  if (model.provider === 'tripo') {
+    const apiKey = await resolveProviderKey(input.userId ?? null, 'tripo');
+    if (!apiKey) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Tripo3D key missing — add one at /settings/api-keys',
+      });
+    }
+    const { tripo3dService } = await import('../tripo3d');
+    const { detectTripoRigType, tripoTaskModelUrl } = await import('../../lib/threed-provider');
+    const waitMs = input.maxWaitMs ?? 10 * 60 * 1000;
+    const quality = model.id.endsWith('-game') ? ('game' as const) : ('hifi' as const);
+    const sourceInput = async () =>
+      input.inputTaskId ??
+      tripo3dService.uploadRemoteGlb(need(input.modelUrl, 'modelUrl', model.task), apiKey);
+
+    try {
+      let taskId: string;
+      switch (model.task) {
+        case 'text_to_3d_preview':
+        case 'text_to_3d_refine':
+          ({ taskId } = await tripo3dService.textToModel({
+            prompt: need(input.prompt, 'prompt', model.task),
+            quality,
+            faceLimit: input.targetPolycount,
+            renderVideo: true,
+            apiKey,
+          }));
+          break;
+        case 'image_to_3d':
+          ({ taskId } = await tripo3dService.imageToModel({
+            input: need(input.imageUrl, 'imageUrl', model.task),
+            quality,
+            faceLimit: input.targetPolycount,
+            renderVideo: true,
+            apiKey,
+          }));
+          break;
+        case 'multi_image_to_3d': {
+          const [front, left, back, right] = need(input.imageUrls, 'imageUrls', model.task);
+          ({ taskId } = await tripo3dService.multiviewToModel({
+            views: { front, left, back, right },
+            quality,
+            faceLimit: input.targetPolycount,
+            renderVideo: true,
+            apiKey,
+          }));
+          break;
+        }
+        case 'retexture':
+          ({ taskId } = await tripo3dService.textureModel({
+            input: await sourceInput(),
+            text: input.prompt,
+            styleImageUrl: input.imageUrl,
+            apiKey,
+          }));
+          break;
+        case 'remesh': {
+          const format = input.targetFormats?.[0] ?? 'glb';
+          if (format === 'blend') {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Tripo3D cannot export .blend — use glb, fbx, obj, usdz, stl or 3mf',
+            });
+          }
+          ({ taskId } = await tripo3dService.convertModel({
+            input: await sourceInput(),
+            format: format === 'glb' ? 'GLTF' : (format.toUpperCase() as TripoConvertFormat),
+            quad: input.topology === 'quad',
+            faceLimit: input.targetPolycount,
+            apiKey,
+          }));
+          break;
+        }
+        case 'rigging': {
+          const src = await sourceInput();
+          ({ taskId } = await tripo3dService.rigModel({
+            input: src,
+            rigType: await detectTripoRigType(src, apiKey),
+            apiKey,
+          }));
+          break;
+        }
+        case 'animation':
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Tripo animation takes a preset name — use threed.animate',
+          });
+        default: {
+          const _exhaustive: never = model.task;
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Unhandled 3D task: ${String(_exhaustive)}`,
+          });
+        }
+      }
+      const task = await tripo3dService.waitForTask(taskId, waitMs, 5000, apiKey);
+      const glb = tripoTaskModelUrl(task);
+      return {
+        modelId: model.id,
+        task: model.task,
+        provider: model.provider,
+        taskId,
+        status: 'completed',
+        modelUrl: glb,
+        modelUrls: glb ? { glb } : undefined,
+        thumbnailUrl: task.output?.rendered_image_url,
+        videoUrl: task.output?.rendered_video_url,
+      };
+    } catch (err) {
+      if (err instanceof TRPCError) throw err;
+      throw new TRPCError({
+        code: 'BAD_GATEWAY',
+        message: err instanceof Error ? err.message : 'Tripo3D task failed',
       });
     }
   }

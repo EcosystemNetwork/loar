@@ -191,6 +191,24 @@ const WORLD_KINDS: WorldKind[] = [
 ];
 
 /** Filter chips for the unified feed (queue + world entities + drafts). */
+/** 3D engine — `auto` lets the server use Tripo3D when the user has a Tripo key, else Meshy. */
+type ThreedEngine = 'auto' | 'tripo-hifi' | 'tripo-game' | 'meshy';
+const THREED_ENGINE_LABELS: Record<ThreedEngine, string> = {
+  auto: 'Engine: Auto',
+  'tripo-hifi': 'Tripo3D · High detail',
+  'tripo-game': 'Tripo3D · Game-ready',
+  meshy: 'Meshy',
+};
+const THREED_ENGINE_INPUT: Record<
+  ThreedEngine,
+  { provider: 'auto' | 'tripo' | 'meshy'; quality?: 'hifi' | 'game' }
+> = {
+  auto: { provider: 'auto' },
+  'tripo-hifi': { provider: 'tripo', quality: 'hifi' },
+  'tripo-game': { provider: 'tripo', quality: 'game' },
+  meshy: { provider: 'meshy' },
+};
+
 const FEED_FILTERS: Array<{ id: 'all' | GenKind | 'entity'; label: string }> = [
   { id: 'all', label: 'All' },
   { id: 'image', label: 'Image' },
@@ -493,6 +511,7 @@ export function GenerateConsole({
   const [threedArtStyle, setThreedArtStyle] = useState<
     'realistic' | 'cartoon' | 'low-poly' | 'sculpture' | 'pbr'
   >('realistic');
+  const [threedEngine, setThreedEngine] = useState<ThreedEngine>('auto');
   const [talkingDialogue, setTalkingDialogue] = useState<string>('');
   const [talkingMotion, setTalkingMotion] = useState<string>('');
   const [talkingDuration, setTalkingDuration] = useState<number>(6);
@@ -1068,7 +1087,7 @@ export function GenerateConsole({
     [autoSaveDraft, updateGen, generationEnabled]
   );
 
-  // ── 3D (async via Meshy) ──────────────────────────────────────────────
+  // ── 3D (async via Tripo3D or Meshy) ───────────────────────────────────
   const run3DGen = useCallback(
     async (
       p: string,
@@ -1076,6 +1095,7 @@ export function GenerateConsole({
         threedMode: 'text' | 'image';
         artStyle: 'realistic' | 'cartoon' | 'low-poly' | 'sculpture' | 'pbr';
         imageUrl?: string;
+        engine: ThreedEngine;
       }
     ) => {
       if (!generationEnabled) {
@@ -1106,12 +1126,14 @@ export function GenerateConsole({
           const r: any = await trpcClient.threed.imageTo3D.mutate({
             imageUrls: [opts.imageUrl],
             enablePbr: opts.artStyle === 'pbr' || opts.artStyle === 'realistic',
+            ...THREED_ENGINE_INPUT[opts.engine],
           });
           pollId = r?.generationId;
         } else {
           const r: any = await trpcClient.threed.textTo3DPreview.mutate({
             prompt: p,
             artStyle: opts.artStyle,
+            ...THREED_ENGINE_INPUT[opts.engine],
           });
           pollId = r?.generationId;
         }
@@ -1888,6 +1910,7 @@ export function GenerateConsole({
       run3DGen(prompt, {
         threedMode,
         artStyle: threedArtStyle,
+        engine: threedEngine,
         ...(threedMode === 'image' && sourceImg ? { imageUrl: sourceImg } : {}),
       });
       if (threedMode === 'image') setReferenceImage(null);
@@ -3107,6 +3130,24 @@ export function GenerateConsole({
                                 ))}
                               </SelectContent>
                             </Select>
+                            <Select
+                              value={threedEngine}
+                              onValueChange={(v) => setThreedEngine(v as ThreedEngine)}
+                            >
+                              <SelectTrigger
+                                className="h-8 w-auto min-w-[150px] rounded-full text-xs"
+                                title="3D engine"
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {(Object.keys(THREED_ENGINE_LABELS) as ThreedEngine[]).map((e) => (
+                                  <SelectItem key={e} value={e}>
+                                    {THREED_ENGINE_LABELS[e]}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </>
                         }
                         action={
@@ -3123,6 +3164,7 @@ export function GenerateConsole({
                               run3DGen(prompt, {
                                 threedMode,
                                 artStyle: threedArtStyle,
+                                engine: threedEngine,
                                 ...(threedMode === 'image' && sourceImg
                                   ? { imageUrl: sourceImg }
                                   : {}),
@@ -3148,8 +3190,8 @@ export function GenerateConsole({
                         />
                       </PromptSurface>
                       <p className="text-[11px] text-muted-foreground">
-                        3D generation runs async — the queue card stays "generating" while Meshy
-                        works (1-3 min typical). You can keep using other tabs.
+                        3D generation runs async — the queue card stays "generating" while the 3D
+                        engine works (1-3 min typical). You can keep using other tabs.
                       </p>
                     </div>
                   )}

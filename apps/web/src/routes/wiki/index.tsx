@@ -846,8 +846,10 @@ function ThreeDModelsTab({ universeAddress }: { universeAddress?: string }) {
 
 /**
  * Rig types exposed in the 3D testbench. Mirror the server enum
- * (apps/server/src/routers/generation/threed.routes.ts). `biped` routes to
- * Meshy auto-rig; everything else routes to Tripo3D.
+ * (apps/server/src/routers/generation/threed.routes.ts). Tripo3D rigs every
+ * type, humanoids and monsters included; `biped` falls back to Meshy auto-rig
+ * only when the user has no Tripo key. `auto` (picker only — never a tag on
+ * a rigged item) lets Tripo's rig-check pick the skeleton.
  */
 type RigTypeId =
   | 'biped'
@@ -881,8 +883,17 @@ const RIG_TYPE_LABELS: Record<RigTypeId, string> = {
   others: 'Vehicle / other',
 };
 
-const RIG_TYPE_HINTS: Record<RigTypeId, string> = {
-  biped: 'People, humanoid monsters — uses Meshy auto-rig',
+type RigChoice = RigTypeId | 'auto';
+const RIG_CHOICES: RigChoice[] = ['auto', ...RIG_TYPES];
+
+const RIG_CHOICE_LABELS: Record<RigChoice, string> = {
+  auto: 'Auto-detect',
+  ...RIG_TYPE_LABELS,
+};
+
+const RIG_TYPE_HINTS: Record<RigChoice, string> = {
+  auto: 'Tripo3D inspects the mesh and picks the skeleton — humanoid, monster, beast, bug, bird…',
+  biped: 'People, orcs, demons, two-legged monsters — Tripo3D (Meshy if you only have a Meshy key)',
   quadruped: 'Dogs, horses, lions, dinosaurs — uses Tripo3D',
   hexapod: 'Insects, beetles, ants — uses Tripo3D',
   octopod: 'Spiders, crabs — uses Tripo3D',
@@ -911,7 +922,7 @@ function Model3DTestbenchDialog({
   const [pendingRig, setPendingRig] = useState(false);
   const [pendingActionRef, setPendingActionRef] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [chosenRigType, setChosenRigType] = useState<RigTypeId>('biped');
+  const [chosenRigType, setChosenRigType] = useState<RigChoice>('auto');
 
   const isCreator =
     !!address &&
@@ -987,7 +998,7 @@ function Model3DTestbenchDialog({
     setPendingRig(false);
     setPendingActionRef(null);
     setActionError(null);
-    setChosenRigType('biped');
+    setChosenRigType('auto');
   }, [item?.id]);
 
   const sourceImageUrl = item?.sourceImageUrl
@@ -997,7 +1008,7 @@ function Model3DTestbenchDialog({
       : null;
 
   const rigMutation = useMutation({
-    mutationFn: ({ contentId, rigType }: { contentId: string; rigType: RigTypeId }) =>
+    mutationFn: ({ contentId, rigType }: { contentId: string; rigType: RigChoice }) =>
       trpcClient.threed.rig.mutate({ contentId, rigType }),
     onMutate: () => {
       setActionError(null);
@@ -1115,8 +1126,8 @@ function Model3DTestbenchDialog({
                   {!riggedItem ? (
                     <>
                       <p className="text-[11px] text-muted-foreground leading-relaxed">
-                        Rig this mesh once (~1–5 min) to unlock the animation library. Humanoid uses
-                        Meshy auto-rig; everything else uses Tripo3D.
+                        Rig this mesh once (~1–5 min) to unlock the animation library. Tripo3D rigs
+                        humanoids, monsters and creatures; Auto-detect picks the skeleton for you.
                       </p>
                       <div className="space-y-1.5">
                         <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -1124,15 +1135,15 @@ function Model3DTestbenchDialog({
                         </label>
                         <Select
                           value={chosenRigType}
-                          onValueChange={(v) => setChosenRigType(v as RigTypeId)}
+                          onValueChange={(v) => setChosenRigType(v as RigChoice)}
                         >
                           <SelectTrigger className="h-8 text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {RIG_TYPES.map((t) => (
+                            {RIG_CHOICES.map((t) => (
                               <SelectItem key={t} value={t} className="text-xs">
-                                {RIG_TYPE_LABELS[t]}
+                                {RIG_CHOICE_LABELS[t]}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -1151,7 +1162,9 @@ function Model3DTestbenchDialog({
                       >
                         {pendingRig || rigMutation.isPending
                           ? 'Rigging…'
-                          : `Rig as ${RIG_TYPE_LABELS[chosenRigType].toLowerCase()}`}
+                          : chosenRigType === 'auto'
+                            ? 'Detect skeleton & rig'
+                            : `Rig as ${RIG_TYPE_LABELS[chosenRigType].toLowerCase()}`}
                       </Button>
                     </>
                   ) : (

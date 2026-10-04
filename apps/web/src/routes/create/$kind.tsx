@@ -316,7 +316,7 @@ function EntityCreateForm() {
         setCharacterGens((prev) =>
           prev.map((g) => (g.id === localId ? { ...g, generationId } : g))
         );
-        toast.success('3D job queued — Meshy will work on it for ~5 min.');
+        toast.success('3D job queued — it takes a few minutes.');
       }
     } catch (err: any) {
       const msg = err?.message ?? 'Generation failed';
@@ -771,8 +771,8 @@ function EntityCreateForm() {
                 Character Generation
               </CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
-                Don't know what you want yet? Generate a 2D portrait or a 3D Meshy model for
-                inspiration, then add outfits or alternate versions to the same character.
+                Don't know what you want yet? Generate a 2D portrait or a 3D model for inspiration,
+                then add outfits or alternate versions to the same character.
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -799,7 +799,7 @@ function EntityCreateForm() {
                   }`}
                 >
                   <Box className="w-4 h-4" />
-                  3D Model (Meshy)
+                  3D Model
                 </button>
               </div>
 
@@ -854,7 +854,8 @@ function EntityCreateForm() {
                     <option value="pbr">PBR</option>
                   </select>
                   <p className="text-[11px] text-muted-foreground">
-                    Meshy preview takes ~5 minutes. You can keep filling out the form while it runs.
+                    3D generation takes a few minutes. You can keep filling out the form while it
+                    runs.
                   </p>
                 </div>
               )}
@@ -892,7 +893,7 @@ function EntityCreateForm() {
                               <div className="flex flex-col items-center gap-2 text-muted-foreground">
                                 <Loader2 className="w-6 h-6 animate-spin" />
                                 <span className="text-[10px]">
-                                  {g.type === '3d' ? 'Meshy working...' : 'Generating...'}
+                                  {g.type === '3d' ? 'Building 3D...' : 'Generating...'}
                                 </span>
                               </div>
                             ) : g.status === 'failed' ? (

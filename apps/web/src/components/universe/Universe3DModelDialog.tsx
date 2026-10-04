@@ -312,8 +312,8 @@ export function Universe3DModelDialog({
 
           {isBusy && (
             <p className="text-xs text-muted-foreground">
-              Meshy is working on it. You can close this dialog — the model keeps generating and
-              appears in Wiki → 3D Models when done.
+              The 3D engine is working on it. You can close this dialog — the model keeps generating
+              and appears in Wiki → 3D Models when done.
             </p>
           )}
 

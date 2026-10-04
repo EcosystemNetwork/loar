@@ -1,7 +1,8 @@
 /**
  * 3D model registry.
  *
- * Meshy is the primary provider (rig + animate pipeline). Selected FAL
+ * Meshy and Tripo3D are the direct providers (both BYOK); `auto` routing in
+ * threed.routes prefers Tripo when the user has a Tripo key. Selected FAL
  * passthroughs cover text-to-3d and multi-image-to-3d. Provider credits
  * are converted to USD at Meshy's Pro-tier rate (~$0.020/credit) — verify
  * during integration. The user's BYOK key can route directly to Meshy.
@@ -37,6 +38,22 @@ function meshyEntry(args: {
     fiatPriceUsd: withFiatMargin(providerUsd),
     loarPriceUsd: withLoarMargin(providerUsd),
     creditCost: usdToCredits(withFiatMargin(providerUsd)),
+  };
+}
+
+/** Tripo bills $0.01 per Tripo credit; costs are entered in USD. */
+function tripoEntry(args: {
+  providerUsd: number;
+}): Pick<
+  ThreedModelConfig,
+  'providerCreditCost' | 'providerCostUsd' | 'fiatPriceUsd' | 'loarPriceUsd' | 'creditCost'
+> {
+  return {
+    providerCreditCost: Math.round(args.providerUsd * 100),
+    providerCostUsd: args.providerUsd,
+    fiatPriceUsd: withFiatMargin(args.providerUsd),
+    loarPriceUsd: withLoarMargin(args.providerUsd),
+    creditCost: usdToCredits(withFiatMargin(args.providerUsd)),
   };
 }
 
@@ -231,6 +248,144 @@ export const THREED_MODELS: ThreedModelConfig[] = [
     tags: ['3d', 'meshy', 'animation', 'rig-required'],
     bestFor: 'Applying canned animation clips (walk, run, idle, dance, fight)',
   },
+
+  // ── Tripo3D (OpenAPI v3, BYOK) ───────────────────────────────────────
+  ...(
+    [
+      [
+        'tripo-text-to-3d-hifi',
+        'text_to_3d_preview',
+        'Tripo3D Text-to-3D (H3.1)',
+        'High-detail textured PBR mesh from a prompt — no refine step',
+        '/v3/generation/text-to-model',
+        'premium',
+        0.4,
+        'Finished, high-detail models straight from a prompt',
+      ],
+      [
+        'tripo-text-to-3d-game',
+        'text_to_3d_preview',
+        'Tripo3D Text-to-3D (P1 game-ready)',
+        'Clean low-poly topology from a prompt',
+        '/v3/generation/text-to-model',
+        'standard',
+        0.25,
+        'Game-engine props and characters with clean topology',
+      ],
+      [
+        'tripo-image-to-3d-hifi',
+        'image_to_3d',
+        'Tripo3D Image-to-3D (H3.1)',
+        'High-detail textured PBR mesh from one image',
+        '/v3/generation/image-to-model',
+        'premium',
+        0.4,
+        'Turning concept art into a faithful model',
+      ],
+      [
+        'tripo-image-to-3d-game',
+        'image_to_3d',
+        'Tripo3D Image-to-3D (P1 game-ready)',
+        'Clean low-poly topology from one image',
+        '/v3/generation/image-to-model',
+        'standard',
+        0.25,
+        'Game-ready assets from concept art',
+      ],
+      [
+        'tripo-multiview-to-3d-hifi',
+        'multi_image_to_3d',
+        'Tripo3D Multiview-to-3D (H3.1)',
+        'Front/left/back/right views to a high-detail mesh',
+        '/v3/generation/multiview-to-model',
+        'premium',
+        0.4,
+        'Character turnarounds',
+      ],
+      [
+        'tripo-multiview-to-3d-game',
+        'multi_image_to_3d',
+        'Tripo3D Multiview-to-3D (P1 game-ready)',
+        'Front/left/back/right views to clean low-poly topology',
+        '/v3/generation/multiview-to-model',
+        'standard',
+        0.25,
+        'Game-ready characters from a turnaround',
+      ],
+      [
+        'tripo-retexture',
+        'retexture',
+        'Tripo3D Retexture',
+        'Re-texture a mesh from a text or style-image prompt',
+        '/v3/models/texture',
+        'standard',
+        0.3,
+        'Restyling a model to match a universe look',
+      ],
+      [
+        'tripo-remesh',
+        'remesh',
+        'Tripo3D Convert / Remesh',
+        'Quad retopology + polygon budget, GLB/FBX/OBJ/USDZ',
+        '/v3/models/convert',
+        'standard',
+        0.1,
+        'Engine-ready quad meshes at a target polycount',
+      ],
+      [
+        'tripo-rigging',
+        'rigging',
+        'Tripo3D Auto-Rigging',
+        'Humanoids, monsters, beasts, insects, spiders, birds, snakes, fish',
+        '/v3/animations/rig',
+        'standard',
+        0.3,
+        'Rigging anything — auto-detects the skeleton',
+      ],
+      [
+        'tripo-animation',
+        'animation',
+        'Tripo3D Animation Retarget',
+        'Preset motions for every rig type',
+        '/v3/animations/retarget',
+        'standard',
+        0.1,
+        'Walk / run / attack / slither / swim clips on any rig',
+      ],
+    ] as const
+  ).map(
+    ([
+      id,
+      task,
+      displayName,
+      shortDescription,
+      providerEndpoint,
+      qualityTier,
+      usd,
+      bestFor,
+    ]): ThreedModelConfig => ({
+      id,
+      provider: 'tripo',
+      displayName,
+      shortDescription,
+      providerEndpoint,
+      task,
+      outputFormats: task === 'remesh' ? ['glb', 'fbx', 'obj', 'usdz', 'stl', '3mf'] : ['glb'],
+      producesPbr: task !== 'remesh' && task !== 'rigging' && task !== 'animation',
+      producesTexture4k: false,
+      qualityTier,
+      speedTier: 'medium',
+      ...tripoEntry({ providerUsd: usd }),
+      lastVerified: '2026-10-04',
+      isEnabled: true,
+      isVisibleToUsers: true,
+      allowedPlans: [],
+      // BYOK only — no platform Tripo key.
+      serverPoolAvailable: false,
+      tags: ['3d', 'tripo', task.replace(/_/g, '-')],
+      bestFor,
+    })
+  ),
 
   // ── FAL 3D passthroughs ──────────────────────────────────────────────
   {
