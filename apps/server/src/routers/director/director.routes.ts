@@ -12,6 +12,7 @@ import { protectedProcedure, router } from '../../lib/trpc';
 import { assertSafeExternalUrl } from '../../lib/safe-fetch-url';
 import { isUniverseCollaborator } from '../../lib/safe-admin';
 import { buildDirectorContext } from '../../services/director-context';
+import { assertUniverseReadable } from '../../lib/universe-access';
 import { mintVoiceSessionToken } from '../../services/voice-session';
 import {
   classifyDirectorIntent,
@@ -212,7 +213,19 @@ export const directorRouter = router({
         perspective: z.enum(['director', 'character']).default('director'),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
+      // Director perspective exposes every node's plot + the wiki generation
+      // context, so it is collaborator-only — mirroring createVoiceSession.
+      // Character perspective follows the universe's public visibility.
+      // (audit R4-3: this used to answer for any universe, private included.)
+      if (input.perspective === 'director') {
+        const caller = ctx.user.address ?? ctx.user.uid;
+        if (!(await isUniverseCollaborator(input.universeId, caller))) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Universe or character not found' });
+        }
+      } else {
+        await assertUniverseReadable(input.universeId, ctx.user);
+      }
       const ctxData = await buildDirectorContext(input);
       if (!ctxData) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Universe or character not found' });

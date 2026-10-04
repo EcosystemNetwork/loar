@@ -100,9 +100,33 @@ async function uploadAudio(buffer: Buffer, filename: string): Promise<string> {
 // ── ffmpeg helpers ───────────────────────────────────────────────────
 
 /**
+ * Download a user-influenced URL to a local file through `safeFetch` (SSRF
+ * validation + IP pinning, no redirects) with a hard size cap. ffmpeg must
+ * only ever read local paths here — handing it an http(s) URL let it reach
+ * internal hosts (audit R4-4).
+ */
+async function downloadToFile(url: string, path: string, maxBytes: number): Promise<void> {
+  const { safeFetch } = await import('../../lib/url-validator');
+  const { writeFile } = await import('fs/promises');
+  const res = await safeFetch(url, {
+    redirect: 'error',
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!res.ok) throw new Error(`Media download failed (${res.status})`);
+  const declared = Number(res.headers.get('content-length') ?? 0);
+  if (declared > maxBytes) throw new Error('Media file too large');
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.byteLength > maxBytes) throw new Error('Media file too large');
+  await writeFile(path, buf);
+}
+
+const MAX_DUB_VIDEO_BYTES = 500 * 1024 * 1024;
+const MAX_DUB_AUDIO_BYTES = 50 * 1024 * 1024;
+
+/**
  * Replace the audio track of a video with a given audio URL using ffmpeg.
- * Uses the same `-protocol_whitelist https,tls,tcp` defense as
- * services/video-thumbnail.ts to block SSRF via file://, concat://, etc.
+ * Both inputs are downloaded via `downloadToFile` first, so ffmpeg runs with
+ * `-protocol_whitelist file` and never opens a network connection.
  */
 async function muxAudioOntoVideo(videoUrl: string, audioUrl: string): Promise<Buffer> {
   const { execFile } = await import('child_process');
@@ -112,16 +136,16 @@ async function muxAudioOntoVideo(videoUrl: string, audioUrl: string): Promise<Bu
   const { readFile, unlink } = await import('fs/promises');
   const execFileAsync = promisify(execFile);
 
-  for (const u of [videoUrl, audioUrl]) {
-    let parsed: URL;
-    try {
-      parsed = new URL(u);
-    } catch {
-      throw new Error('Invalid URL passed to ffmpeg mux');
-    }
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-      throw new Error('Only http/https URLs allowed for ffmpeg mux');
-    }
+  const id = randomUUID();
+  const videoPath = join(tmpdir(), `dub-${id}-in.mp4`);
+  const audioPath = join(tmpdir(), `dub-${id}-in.mp3`);
+  try {
+    await downloadToFile(videoUrl, videoPath, MAX_DUB_VIDEO_BYTES);
+    await downloadToFile(audioUrl, audioPath, MAX_DUB_AUDIO_BYTES);
+  } catch (err) {
+    unlink(videoPath).catch(() => {});
+    unlink(audioPath).catch(() => {});
+    throw err;
   }
 
   const outPath = join(tmpdir(), `dub-${randomUUID()}.mp4`);
@@ -130,11 +154,11 @@ async function muxAudioOntoVideo(videoUrl: string, audioUrl: string): Promise<Bu
     [
       '-y',
       '-protocol_whitelist',
-      'https,http,tls,tcp',
+      'file',
       '-i',
-      videoUrl,
+      videoPath,
       '-i',
-      audioUrl,
+      audioPath,
       '-c:v',
       'copy',
       '-map',
@@ -148,7 +172,7 @@ async function muxAudioOntoVideo(videoUrl: string, audioUrl: string): Promise<Bu
   );
 
   const out = await readFile(outPath);
-  unlink(outPath).catch(() => {});
+  for (const f of [outPath, videoPath, audioPath]) unlink(f).catch(() => {});
   return out;
 }
 
@@ -207,10 +231,7 @@ async function concatLinesToMp3(lines: ScriptLine[]): Promise<Buffer> {
 
     // Download line audio to local file
     const linePath = join(workdir, `line-${i}.mp3`);
-    const res = await fetch(line.audioUrl);
-    if (!res.ok) throw new Error(`Failed to fetch line audio ${line.audioUrl}`);
-    const lineBuf = Buffer.from(await res.arrayBuffer());
-    await writeFile(linePath, lineBuf);
+    await downloadToFile(line.audioUrl, linePath, MAX_DUB_AUDIO_BYTES);
     inputList.push(`file '${linePath}'`);
 
     prevEnd = targetStart + (line.audioDurationSec ?? 0);
@@ -478,7 +499,12 @@ export const dubbingRouter = router({
       z.object({
         jobId: z.string(),
         lineId: z.string(),
-        patch: scriptLineSchema.partial().omit({ id: true }),
+        // audioUrl / status / duration / error are server-written by
+        // generateLine only — letting the client set audioUrl + status:'ready'
+        // fed an arbitrary URL into composite's downloader (audit R4-4).
+        patch: scriptLineSchema
+          .partial()
+          .omit({ id: true, audioUrl: true, audioDurationSec: true, status: true, error: true }),
       })
     )
     .mutation(async ({ input, ctx }) => {

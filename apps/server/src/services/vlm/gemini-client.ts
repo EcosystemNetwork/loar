@@ -54,7 +54,40 @@ function stripFences(text: string): string {
   return t;
 }
 
-async function downloadToBuffer(url: string): Promise<Buffer> {
+/**
+ * Per-asset download ceilings. The body used to be buffered with no limit, so
+ * a multi-GB "reference image" URL could exhaust server memory (audit R4-7).
+ */
+const MAX_DOWNLOAD_BYTES: Record<'video' | 'image' | 'audio', number> = {
+  image: 25 * 1024 * 1024,
+  audio: 200 * 1024 * 1024,
+  video: 1024 * 1024 * 1024,
+};
+
+async function readCapped(res: Response, maxBytes: number): Promise<Buffer> {
+  const declared = Number(res.headers.get('content-length') ?? 0);
+  if (declared > maxBytes) throw new Error(`Media exceeds ${maxBytes} byte limit`);
+  if (!res.body) return Buffer.from(new Uint8Array(await res.arrayBuffer()));
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const reader = res.body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      throw new Error(`Media exceeds ${maxBytes} byte limit`);
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks);
+}
+
+async function downloadToBuffer(
+  url: string,
+  maxBytes: number = MAX_DOWNLOAD_BYTES.image
+): Promise<Buffer> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
   try {
@@ -64,8 +97,7 @@ async function downloadToBuffer(url: string): Promise<Buffer> {
     if (!res.ok) {
       throw new Error(`Failed to fetch media: ${res.status} ${res.statusText}`);
     }
-    const ab = await res.arrayBuffer();
-    return Buffer.from(new Uint8Array(ab));
+    return await readCapped(res, maxBytes);
   } finally {
     clearTimeout(timeout);
   }
@@ -266,12 +298,12 @@ export async function mediaPartFromUrl(
 ): Promise<MediaPart> {
   const mime = guessMimeType(assetType, mimeType);
   if (assetType === 'image') {
-    const buf = await downloadToBuffer(url);
+    const buf = await downloadToBuffer(url, MAX_DOWNLOAD_BYTES.image);
     return {
       inlineData: { mimeType: mime, data: buf.toString('base64') },
     };
   }
-  const buf = await downloadToBuffer(url);
+  const buf = await downloadToBuffer(url, MAX_DOWNLOAD_BYTES[assetType]);
   const displayName = `vlm-${Date.now()}-${assetType}`;
   return uploadFileAndWait(buf, mime, displayName);
 }

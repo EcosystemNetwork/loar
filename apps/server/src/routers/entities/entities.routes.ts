@@ -224,13 +224,16 @@ export const entitiesRouter = router({
       const skipCover =
         input.kind === 'voice' || input.kind === 'likeness' || input.kind === 'persona';
       if (!input.imageUrl && result.id && !skipCover) {
-        triggerCoverImageGenerationAsync({
-          id: result.id,
-          name: input.name,
-          description: input.description,
-          kind: input.kind,
-          metadata: (input.metadata || {}) as Record<string, unknown>,
-        });
+        triggerCoverImageGenerationAsync(
+          {
+            id: result.id,
+            name: input.name,
+            description: input.description,
+            kind: input.kind,
+            metadata: (input.metadata || {}) as Record<string, unknown>,
+          },
+          ctx.user.uid
+        );
       }
 
       return { success: true, ...result };

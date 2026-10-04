@@ -3,16 +3,22 @@
  */
 import { z } from 'zod';
 
+/** http(s) only — z.string().url() alone accepts `javascript:` URIs (audit R4-9). */
+const httpUrl = z
+  .string()
+  .url()
+  .refine((u) => /^https?:\/\//i.test(u), { message: 'URL must start with http:// or https://' });
+
 export const talentAgentProfileSchema = z.object({
   agencyName: z.string().min(1).max(100),
   displayName: z.string().min(1).max(50),
   bio: z.string().max(1000).default(''),
-  avatarUrl: z.string().url().optional(),
-  website: z.string().url().optional(),
+  avatarUrl: httpUrl.optional(),
+  website: httpUrl.optional(),
   socialLinks: z
     .object({
-      twitter: z.string().url().optional(),
-      linkedin: z.string().url().optional(),
+      twitter: httpUrl.optional(),
+      linkedin: httpUrl.optional(),
       discord: z.string().optional(),
       telegram: z.string().optional(),
       farcaster: z.string().optional(),

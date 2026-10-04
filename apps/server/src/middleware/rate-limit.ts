@@ -262,99 +262,147 @@ function trpcRateLimitBody(c: Context): unknown {
   return procedureCount > 1 ? Array(procedureCount).fill(envelope) : envelope;
 }
 
+/** One AI rate-limit tier: a tRPC router prefix (`generation.`) or exact procedure. */
+export interface AiRateTier {
+  match: string;
+  windowMs: number;
+  max: number;
+}
+
+/** Batches larger than this are rejected outright (audit R4-2). */
+export const MAX_TRPC_BATCH = 64;
+const WALLET_LIMIT_PER_MIN = 60;
+const WALLET_DAILY_LIMIT = 200;
+
+/** Procedure names in a tRPC request path (`/trpc/a.b,c.d` → `['a.b','c.d']`). */
+export function trpcProcedures(path: string): string[] {
+  let raw = path.startsWith('/trpc/') ? path.slice('/trpc/'.length) : path;
+  try {
+    raw = decodeURIComponent(raw);
+  } catch {
+    // malformed escape — fall back to the raw path
+  }
+  return raw.split(',').filter(Boolean);
+}
+
+/** The tier a procedure falls under: an exact match wins, then the longest prefix. */
+export function matchAiTier(procedure: string, tiers: AiRateTier[]): AiRateTier | undefined {
+  let best: AiRateTier | undefined;
+  for (const t of tiers) {
+    if (t.match === procedure) return t;
+    if (t.match.endsWith('.') && procedure.startsWith(t.match)) {
+      if (!best || t.match.length > best.match.length) best = t;
+    }
+  }
+  return best;
+}
+
+function aiLimitResponse(c: Context, message: string, retryAfterSec: number) {
+  c.header('Retry-After', String(retryAfterSec));
+  const envelope = {
+    error: { message, code: -32029, data: { code: 'TOO_MANY_REQUESTS', httpStatus: 429 } },
+  };
+  const n = trpcProcedures(c.req.path).length || 1;
+  return c.json(n > 1 ? Array(n).fill(envelope) : envelope, 429);
+}
+
 /**
- * Stricter rate limiter for expensive endpoints (AI generation).
- * Uses a composite key of IP + tRPC procedure path for per-endpoint limits.
- * Also enforces per-wallet limits when a user is authenticated.
+ * Stricter rate limiter for expensive endpoints (AI generation). Mounted ONCE
+ * on `/trpc/*` with a tier table rather than per router glob: tRPC batches
+ * several procedures into one path (`/trpc/credits.getBalance,generation.x`),
+ * so a per-prefix Hono mount only ever saw the first procedure and a batch
+ * led by any cheap call skipped every AI limit (audit R4-2).
+ *
+ * Every AI mutation in a batch draws its own token from the per-IP
+ * (per-procedure), per-wallet (60/min) and daily (200/24h) buckets. Queries
+ * (GET) are left to the blanket limiter: provider spend happens in
+ * mutations, and status polls must not share the tiny per-route budgets.
+ * Batches over MAX_TRPC_BATCH are rejected for every method.
  */
-export function aiRateLimiter(opts: { windowMs: number; max: number }) {
+export function aiRateLimiter(tiers: AiRateTier[]) {
   return async (c: Context, next: Next) => {
-    const ip = getClientKey(c);
-    // Extract tRPC procedure name from the URL path (e.g. /trpc/generation.generate)
-    const procedurePath = c.req.path.replace('/trpc/', '');
-
-    // Per-IP rate limit
-    const ipKey = `ai:${ip}:${procedurePath}`;
-    const ipResult = await getStore().consume(ipKey, opts.windowMs, opts.max);
-
-    c.header('X-RateLimit-Limit', String(opts.max));
-    c.header('X-RateLimit-Remaining', String(ipResult.remaining));
-
-    if (ipResult.blocked) {
-      c.header('Retry-After', String(Math.ceil(opts.windowMs / 1000)));
+    if (c.req.method === 'OPTIONS') return next();
+    const procedures = trpcProcedures(c.req.path);
+    if (procedures.length > MAX_TRPC_BATCH) {
       return c.json(
         {
           error: {
-            message: 'AI generation rate limit exceeded. Please wait before trying again.',
-            code: -32029,
-            data: { code: 'TOO_MANY_REQUESTS', httpStatus: 429 },
+            message: `tRPC batch too large (max ${MAX_TRPC_BATCH} procedures)`,
+            code: -32600,
+            data: { code: 'BAD_REQUEST', httpStatus: 400 },
           },
         },
-        429
+        400
       );
     }
+    if (c.req.method !== 'POST') return next();
 
-    // Per-wallet rate limit — fixed at 60 req/min per wallet across ALL AI
-    // endpoints. Must NOT use opts.max: that field is per-route (2..30) and the
-    // wallet bucket is shared, so the first AI route a wallet hits in a window
-    // would otherwise cap their wallet bucket at that route's tiny limit (e.g.
-    // 2 from `episodes.generateFromScript`), 429ing every subsequent AI call —
-    // and any tRPC error toast persists in the React Query cache, which is why
-    // it can surface on later page loads with unrelated errors. The per-route
-    // bucket above already enforces route-specific budgets.
-    const WALLET_LIMIT_PER_MIN = 60;
+    const hits: Array<{ procedure: string; tier: AiRateTier }> = [];
+    for (const procedure of procedures) {
+      const tier = matchAiTier(procedure, tiers);
+      if (tier) hits.push({ procedure, tier });
+    }
+    if (hits.length === 0) return next();
+
+    const ip = getClientKey(c);
+    for (const { procedure, tier } of hits) {
+      const ipResult = await getStore().consume(`ai:${ip}:${procedure}`, tier.windowMs, tier.max);
+      c.header('X-RateLimit-Limit', String(tier.max));
+      c.header('X-RateLimit-Remaining', String(ipResult.remaining));
+      if (ipResult.blocked) {
+        return aiLimitResponse(
+          c,
+          'AI generation rate limit exceeded. Please wait before trying again.',
+          Math.ceil(tier.windowMs / 1000)
+        );
+      }
+    }
+
+    // Per-wallet limits — shared across ALL AI procedures, so they use fixed
+    // values, never a tier's `max` (a 2/min tier would otherwise cap the
+    // wallet bucket for every other AI route in that window).
     const authHeader = c.req.header('authorization');
     const { getCookie } = await import('hono/cookie');
-    const cookieToken = getCookie(c, 'siwe-session');
     const tokenSource = authHeader
       ? authHeader.replace('Bearer ', '')
-      : cookieToken
-        ? cookieToken
-        : null;
+      : (getCookie(c, 'siwe-session') ?? null);
     if (tokenSource) {
-      // Extract wallet address from JWT via cryptographic verification.
-      // Using verifySessionToken ensures attackers cannot forge wallet addresses
-      // to bypass per-wallet rate limits.
+      let wallet = '';
       try {
+        // Cryptographic verification so a forged token can't pick its wallet bucket.
         const { verifySessionToken } = await import('../lib/siwe');
         const payload = await verifySessionToken(tokenSource);
-        const wallet = (payload?.sub || '').toLowerCase();
-        if (wallet) {
-          const walletKey = `ai-wallet:${wallet}`;
-          const walletResult = await getStore().consume(walletKey, 60_000, WALLET_LIMIT_PER_MIN);
+        wallet = (payload?.sub || '').toLowerCase();
+      } catch {
+        // JWT parse failed — skip wallet rate limiting, IP limit still applies
+      }
+      if (wallet) {
+        for (let i = 0; i < hits.length; i++) {
+          const walletResult = await getStore().consume(
+            `ai-wallet:${wallet}`,
+            60_000,
+            WALLET_LIMIT_PER_MIN
+          );
           if (walletResult.blocked) {
-            c.header('Retry-After', String(Math.ceil(opts.windowMs / 1000)));
-            return c.json(
-              {
-                error: {
-                  message:
-                    'Per-wallet AI generation rate limit exceeded. Please wait before trying again.',
-                  code: -32029,
-                  data: { code: 'TOO_MANY_REQUESTS', httpStatus: 429 },
-                },
-              },
-              429
+            return aiLimitResponse(
+              c,
+              'Per-wallet AI generation rate limit exceeded. Please wait before trying again.',
+              60
             );
           }
-
-          // Daily cost ceiling: 200 generations per wallet per 24h
-          const dailyKey = `ai-daily:${wallet}`;
-          const dailyResult = await getStore().consume(dailyKey, 86_400_000, 200);
+          const dailyResult = await getStore().consume(
+            `ai-daily:${wallet}`,
+            86_400_000,
+            WALLET_DAILY_LIMIT
+          );
           if (dailyResult.blocked) {
-            return c.json(
-              {
-                error: {
-                  message: 'Daily generation limit reached (200/day). Try again tomorrow.',
-                  code: -32029,
-                  data: { code: 'TOO_MANY_REQUESTS', httpStatus: 429 },
-                },
-              },
-              429
+            return aiLimitResponse(
+              c,
+              `Daily generation limit reached (${WALLET_DAILY_LIMIT}/day). Try again tomorrow.`,
+              3600
             );
           }
         }
-      } catch {
-        // JWT parse failed — skip wallet rate limiting, IP limit still applies
       }
     }
 

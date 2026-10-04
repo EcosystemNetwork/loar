@@ -28,8 +28,19 @@ describe('Top-level procedures', () => {
     expect(result.user).toHaveProperty('address');
   });
 
-  it('trackWalletLogin accepts valid input', async () => {
+  it('trackWalletLogin requires auth (audit R4-6)', async () => {
     const caller = createPublicCaller();
+    await expect(
+      caller.trackWalletLogin({
+        address: '0x1234567890abcdef1234567890abcdef12345678',
+        chainId: 11155111,
+        connector: 'injected',
+      })
+    ).rejects.toThrow();
+  });
+
+  it('trackWalletLogin records the session address, not the input', async () => {
+    const caller = createAuthCaller();
     const result = await caller.trackWalletLogin({
       address: '0x1234567890abcdef1234567890abcdef12345678',
       chainId: 11155111,

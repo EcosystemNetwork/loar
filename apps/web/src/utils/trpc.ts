@@ -25,6 +25,8 @@ export { queryClient, SERVER_URL };
 export const trpcClient = createTRPCClient<AppRouter>({
   links: [
     httpBatchLink({
+      // Server rejects batches over 64 procedures (MAX_TRPC_BATCH, audit R4-2).
+      maxItems: 32,
       url: `${SERVER_URL}/trpc`,
       // httpOnly cookie is sent automatically via credentials: 'include'
       fetch(url, options) {

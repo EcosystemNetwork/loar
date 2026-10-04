@@ -23,8 +23,13 @@ export interface VideoProbe {
   durationSec: number;
 }
 
-/** True for a local absolute path; false for a URL. Throws on anything but https URLs. */
-function assertProbeInput(input: string): { remote: boolean } {
+/**
+ * True for a local absolute path; false for a URL. Throws on anything but
+ * https URLs, and on https URLs that resolve to private/internal addresses
+ * (audit R4-10) — the protocol pin alone still let ffprobe reach an https
+ * service on an internal or link-local IP.
+ */
+async function assertProbeInput(input: string): Promise<{ remote: boolean }> {
   if (input.startsWith('/')) return { remote: false };
   let parsed: URL;
   try {
@@ -35,6 +40,8 @@ function assertProbeInput(input: string): { remote: boolean } {
   if (parsed.protocol !== 'https:') {
     throw new Error('probe input must be an https URL');
   }
+  const { validateUploadUrl } = await import('../../lib/url-validator');
+  await validateUploadUrl(input);
   return { remote: true };
 }
 
@@ -59,7 +66,7 @@ export function parseProbeOutput(stdout: string): VideoProbe {
 }
 
 export async function probeVideo(input: string, timeoutMs = 30_000): Promise<VideoProbe> {
-  const { remote } = assertProbeInput(input);
+  const { remote } = await assertProbeInput(input);
   const args = [
     '-v',
     'error',
@@ -85,7 +92,7 @@ export async function extractFramePng(
   atSec: number,
   timeoutMs = 30_000
 ): Promise<Buffer> {
-  const { remote } = assertProbeInput(input);
+  const { remote } = await assertProbeInput(input);
   const args = [
     '-v',
     'error',
@@ -113,7 +120,7 @@ export async function extractFramePng(
 
 /** Does the media file carry at least one audio stream? Local paths and https URLs. */
 export async function probeHasAudio(input: string, timeoutMs = 30_000): Promise<boolean> {
-  const { remote } = assertProbeInput(input);
+  const { remote } = await assertProbeInput(input);
   const args = [
     '-v',
     'error',
@@ -136,7 +143,7 @@ export async function probeHasAudio(input: string, timeoutMs = 30_000): Promise<
  * match what browsers play — ffmpeg's default mono→stereo upmix is 3 dB quieter.
  */
 export async function probeAudioChannels(input: string, timeoutMs = 30_000): Promise<number> {
-  const { remote } = assertProbeInput(input);
+  const { remote } = await assertProbeInput(input);
   const args = [
     '-v',
     'error',

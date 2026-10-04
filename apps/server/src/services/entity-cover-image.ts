@@ -12,6 +12,16 @@
 import { db } from '../lib/firebase';
 import { googleImagenService } from './google-imagen';
 import { getStorageManager } from './storage';
+import { recordProviderCost, withSpendHold } from './cost-tracker';
+import { consumeRateLimit } from '../middleware/rate-limit';
+
+/** Modeled Nano Banana Pro cost per image (matches the image-model registry). */
+const COVER_PROVIDER_COST_USD = 0.15;
+/** Platform-funded cover backfills allowed per user per rolling 24h. */
+const COVER_BACKFILL_DAILY_PER_USER = Math.max(
+  0,
+  Number(process.env.COVER_BACKFILL_DAILY_PER_USER ?? 20) || 0
+);
 
 type EntityKind =
   | 'person'
@@ -265,15 +275,28 @@ async function generateEntityCoverImage(entity: EntityForCover): Promise<string>
   if (!platformKey) {
     throw new Error('GOOGLE_API_KEY is not configured — cover image backfill unavailable');
   }
-  const result = await googleImagenService.generate({
-    prompt,
+  // Platform-funded, so it must count against the platform daily cap and
+  // land in the admin cost ledger like every other metered call (audit R4-1).
+  const result = await withSpendHold(
+    { provider: 'gemini', estimatedUsd: COVER_PROVIDER_COST_USD },
+    () =>
+      googleImagenService.generate({
+        prompt,
+        model: 'nano-banana-pro-preview',
+        negativePrompt: config.negativePrompt,
+        numberOfImages: 1,
+        aspectRatio: config.aspectRatio,
+        personGeneration: config.personGeneration,
+        apiKey: platformKey,
+      })
+  );
+  void recordProviderCost({
+    provider: 'gemini',
     model: 'nano-banana-pro-preview',
-    negativePrompt: config.negativePrompt,
-    numberOfImages: 1,
-    aspectRatio: config.aspectRatio,
-    personGeneration: config.personGeneration,
-    apiKey: platformKey,
-  });
+    kind: 'image_gen',
+    costUsd: COVER_PROVIDER_COST_USD,
+    extra: { entityId: entity.id, purpose: 'entity_cover_backfill' },
+  }).catch(() => {});
 
   if (!result.images.length) {
     throw new Error('Image generation returned no images (safety filter?)');
@@ -291,10 +314,27 @@ async function generateEntityCoverImage(entity: EntityForCover): Promise<string>
 /**
  * Fire-and-forget cover image generation — logs errors but doesn't throw.
  * Use this from create routes where you don't want to block the response.
+ *
+ * `requesterUid` is required: each backfill spends the platform's Google key,
+ * so it's capped per user per day (audit R4-1). Over the cap the entity is
+ * simply left without a generated cover — creation itself never fails.
  */
-export function triggerCoverImageGenerationAsync(entity: EntityForCover): void {
-  generateEntityCoverImage(entity)
+export function triggerCoverImageGenerationAsync(
+  entity: EntityForCover,
+  requesterUid: string
+): void {
+  consumeRateLimit(`cover-backfill:${requesterUid}`, 86_400_000, COVER_BACKFILL_DAILY_PER_USER)
+    .then(({ blocked }) => {
+      if (blocked) {
+        console.warn(
+          `[entity-cover] Daily cover backfill cap (${COVER_BACKFILL_DAILY_PER_USER}) reached for ${requesterUid}; skipping ${entity.id}`
+        );
+        return null;
+      }
+      return generateEntityCoverImage(entity);
+    })
     .then((url) => {
+      if (!url) return;
       console.log(`[entity-cover] Generated cover for ${entity.name} (${entity.id}): ${url}`);
     })
     .catch((err) => {

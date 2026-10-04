@@ -207,6 +207,14 @@ export const splitsRouter = router({
       // Resolve the SplitRouter the setSplits TX must target for this chain.
       const chainKey = String(input.chainId ?? sepolia.id) as SplitRouterChainId;
       const expectedTo = SplitRouter[chainKey] as string | undefined;
+      // Without a deployment on this chain, expectedTo would be undefined and
+      // verifyAndClaimTx would skip the recipient check entirely (audit R4-5).
+      if (!expectedTo) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'SplitRouter is not deployed on this chain',
+        });
+      }
 
       // Verify the TX: sender must be the authenticated caller and recipient
       // must be the SplitRouter. verifyAndClaimTx also atomically claims the

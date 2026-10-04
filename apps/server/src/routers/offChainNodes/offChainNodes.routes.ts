@@ -31,6 +31,7 @@ import { randomUUID } from 'crypto';
 import { keccak256, toBytes } from 'viem';
 import { FieldValue } from 'firebase-admin/firestore';
 import { normalizeUniverseId } from '../../lib/universe-id';
+import { assertUniverseReadable } from '../../lib/universe-access';
 
 const nodesCol = () => {
   if (!db) throw new Error('Firebase not configured');
@@ -172,19 +173,24 @@ export const offChainNodesRouter = router({
   }),
 
   /** List all off-chain nodes for a universe. */
-  list: publicProcedure.input(z.object({ universeId: z.string() })).query(async ({ input }) => {
-    const snap = await nodesCol()
-      .where('universeId', '==', normalizeUniverseId(input.universeId))
-      .orderBy('nodeId', 'asc')
-      .get();
-    const nodes = snap.docs.map((d) => d.data());
-    return { nodes, total: nodes.length };
-  }),
+  list: publicProcedure
+    .input(z.object({ universeId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      // Private/hidden universes: owner + collaborators only (audit R4-3).
+      await assertUniverseReadable(input.universeId, ctx.user);
+      const snap = await nodesCol()
+        .where('universeId', '==', normalizeUniverseId(input.universeId))
+        .orderBy('nodeId', 'asc')
+        .get();
+      const nodes = snap.docs.map((d) => d.data());
+      return { nodes, total: nodes.length };
+    }),
 
   /** Get a single off-chain node. */
   get: publicProcedure
     .input(z.object({ universeId: z.string(), nodeId: z.number().int() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
+      await assertUniverseReadable(input.universeId, ctx.user);
       const doc = await findNode(normalizeUniverseId(input.universeId), input.nodeId);
       return doc ? doc.data() : null;
     }),

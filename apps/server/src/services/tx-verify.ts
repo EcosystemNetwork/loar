@@ -136,6 +136,57 @@ export interface VerifyTxBinding {
    * VERIFY_TX_MIN_CONFIRMATIONS (3). Set to 0 to disable (non-value paths only).
    */
   minConfirmations?: number;
+  /**
+   * Extra receipt/tx check run after the from/to/value bindings and BEFORE the
+   * hash is claimed (so a rejected tx isn't burned). Throw to reject.
+   */
+  assertReceipt?: (receipt: any, tx: any) => void;
+}
+
+const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+const TRANSFER_SINGLE_TOPIC = '0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62';
+const ZERO_TOPIC = '0x' + '0'.repeat(64);
+
+function topicToAddress(topic: string | undefined): string {
+  return topic ? ('0x' + topic.slice(-40)).toLowerCase() : '';
+}
+
+/**
+ * True when the receipt contains an NFT mint (ERC-721 `Transfer` or ERC-1155
+ * `TransferSingle` from the zero address) to `to`, optionally emitted by
+ * `contract` and for `tokenId`. Binds a "record my purchase" call to an actual
+ * mint instead of any successful tx from the caller (audit R4-5).
+ */
+export function receiptHasMintTo(
+  receipt: any,
+  to: string,
+  opts: { contract?: string; tokenId?: bigint | number } = {}
+): boolean {
+  const want = to.toLowerCase();
+  const contract = opts.contract?.toLowerCase();
+  const tokenId = opts.tokenId === undefined ? undefined : BigInt(opts.tokenId);
+  for (const log of (receipt?.logs ?? []) as Array<{
+    address?: string;
+    topics?: string[];
+    data?: string;
+  }>) {
+    if (contract && (log.address ?? '').toLowerCase() !== contract) continue;
+    const t = log.topics ?? [];
+    if (t[0] === TRANSFER_TOPIC && t.length === 4) {
+      if (t[1] !== ZERO_TOPIC || topicToAddress(t[2]) !== want) continue;
+      if (tokenId !== undefined && BigInt(t[3]) !== tokenId) continue;
+      return true;
+    }
+    if (t[0] === TRANSFER_SINGLE_TOPIC && t.length === 4) {
+      if (t[2] !== ZERO_TOPIC || topicToAddress(t[3]) !== want) continue;
+      if (tokenId !== undefined) {
+        const data = (log.data ?? '0x').slice(2);
+        if (data.length < 64 || BigInt('0x' + data.slice(0, 64)) !== tokenId) continue;
+      }
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -254,6 +305,8 @@ export async function verifyAndClaimTx(
       throw new Error('Transaction value is below the required amount.');
     }
   }
+
+  if (binding.assertReceipt) binding.assertReceipt(receipt, tx);
 
   // 4. Atomically claim the txHash (cross-flow dedup authority).
   await claimTxHash({ txHash, purpose, callerUid, chainId });

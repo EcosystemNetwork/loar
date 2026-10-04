@@ -21,5 +21,9 @@ RUN pip install -r requirements.txt
 
 COPY apps/voice-pipeline/*.py ./
 
+# Drop root (audit R4-11) — matches the appuser convention of the Node images.
+RUN useradd --system --uid 10001 --create-home appuser
+USER appuser
+
 # Railway injects PORT; default for local runs.
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"]

@@ -13,6 +13,7 @@ import { resolveActingUid } from '../../services/agentAuth';
 import { assertContentOperable, assertCanonReadyForMonetization } from '../../lib/content-status';
 import { getChainVotingPower } from '../../lib/chain-verify';
 import type { Address } from 'viem';
+import { CanonMarketplace } from '@loar/abis/addresses';
 
 const submissionsCol = () => {
   if (!db) throw new Error('Firebase is not configured');
@@ -233,7 +234,7 @@ export const marketplaceRouter = router({
         txHash: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const ref = submissionsCol().doc(input.submissionId);
       const doc = await ref.get();
       if (!doc.exists) throw new Error('Submission not found');
@@ -245,10 +246,33 @@ export const marketplaceRouter = router({
       const accepted = (sub.votesFor || 0) > (sub.votesAgainst || 0);
       const now = new Date();
 
+      // finalizeTxHash is an audit field — only store a hash that really is
+      // the caller's successful call to CanonMarketplace (audit R4-8). An
+      // unverifiable hash is dropped rather than failing the finalize.
+      let finalizeTxHash: string | null = null;
+      if (input.txHash && ctx.user.address) {
+        try {
+          const { verifyAndClaimTx } = await import('../../services/tx-verify');
+          await verifyAndClaimTx(
+            input.txHash,
+            `canon-finalize:${input.submissionId}`,
+            ctx.user.uid,
+            {
+              expectedFrom: ctx.user.address,
+              expectedTo: CanonMarketplace['11155111'],
+              minConfirmations: 0,
+            }
+          );
+          finalizeTxHash = input.txHash;
+        } catch (err) {
+          console.warn('[marketplace.finalize] txHash not recorded:', (err as Error).message);
+        }
+      }
+
       await ref.update({
         status: accepted ? 'ACCEPTED' : 'REJECTED',
         finalizedAt: now,
-        finalizeTxHash: input.txHash || null,
+        finalizeTxHash,
         updatedAt: now,
       });
 

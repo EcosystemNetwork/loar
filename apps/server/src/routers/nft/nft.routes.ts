@@ -22,7 +22,7 @@ import { getStorageManager } from '../../services/storage';
 import { throwApiError } from '../../lib/errors';
 import { recordRevenueEvent } from '../../services/revenue-recorder';
 import { resolveActingUid } from '../../services/agentAuth';
-import { verifyAndClaimTx } from '../../services/tx-verify';
+import { verifyAndClaimTx, receiptHasMintTo } from '../../services/tx-verify';
 import {
   EpisodeEditionCollection,
   CharacterNFT,
@@ -321,14 +321,22 @@ export const nftRouter = router({
       if (!ep.creatorAddress) {
         throw new Error('Episode is missing creator address');
       }
-      const { verifyAndClaimTx } = await import('../../services/tx-verify');
+      const buyer = ctx.user.address;
       const { receipt } = await verifyAndClaimTx(
         input.txHash,
         `episode-mint:${input.episodeId}:${input.tokenId}`,
         ctx.user.uid,
         {
-          expectedFrom: ctx.user.address,
+          expectedFrom: buyer,
           minValueWei: ep.mintPrice || '0',
+          // The tx must actually mint `tokenId` to the caller — otherwise any
+          // unrelated tx (free on Sepolia when mintPrice is 0) bumps `minted`
+          // toward maxSupply (audit R4-5).
+          assertReceipt: (r) => {
+            if (!receiptHasMintTo(r, buyer, { tokenId: input.tokenId })) {
+              throw new Error('Transaction did not mint this token to your wallet.');
+            }
+          },
         }
       );
 
@@ -519,6 +527,10 @@ export const nftRouter = router({
       // Resolve the on-chain edition collection that the mint must target.
       const chainKey = String(input.chainId ?? sepolia.id) as EpisodeEditionCollectionChainId;
       const expectedTo = EpisodeEditionCollection[chainKey] as string | undefined;
+      // No deployment on the requested chain → no recipient to bind against.
+      // Passing expectedTo: undefined would silently skip the check (R4-5).
+      if (!expectedTo)
+        throwApiError('BAD_REQUEST', 'Episode editions are not deployed on this chain');
 
       // Bind the tx: sender must be the authenticated buyer, recipient must be
       // the episode edition collection, and value must cover the mint price.
@@ -611,11 +623,14 @@ export const nftRouter = router({
       // Resolve the on-chain CharacterNFT collection the mint must target.
       const chainKey = String(input.chainId ?? sepolia.id) as CharacterNFTChainId;
       const expectedTo = CharacterNFT[chainKey] as string | undefined;
+      if (!expectedTo)
+        throwApiError('BAD_REQUEST', 'Character NFTs are not deployed on this chain');
+      const buyer = ctx.user.address;
 
       // Bind the tx: sender must be the authenticated buyer, recipient must be
       // the CharacterNFT collection, and value must cover the quoted price.
       // verifyAndClaimTx also atomically claims the txHash (replay protection).
-      const { receipt } = await verifyAndClaimTx(
+      const { receipt, tx } = await verifyAndClaimTx(
         input.txHash,
         `nft:character:${input.characterId}`,
         ctx.user.uid,
@@ -624,8 +639,17 @@ export const nftRouter = router({
           expectedTo,
           minValueWei: input.price || '0',
           chainId: input.chainId,
+          // `price` is client-supplied, so value alone proves nothing: require
+          // an actual mint from the CharacterNFT contract to the buyer (R4-5).
+          assertReceipt: (r) => {
+            if (!receiptHasMintTo(r, buyer, { contract: expectedTo })) {
+              throw new Error('Transaction did not mint a character NFT to your wallet.');
+            }
+          },
         }
       );
+      // Record what was actually paid, never the client's claimed price.
+      const paidWei = BigInt(tx?.value ?? 0).toString();
 
       // Atomic: record the mint. Dedup is owned by verifyAndClaimTx.
       const purchaseRef = nftMintsCol().doc(input.txHash);
@@ -641,7 +665,7 @@ export const nftRouter = router({
         const mintData = {
           characterId: input.characterId,
           txHash: input.txHash,
-          price: input.price,
+          price: paidWei,
           buyerUid: ctx.user.uid,
           buyerAddress: ctx.user.address || null,
           mintedAt: now,
@@ -658,7 +682,7 @@ export const nftRouter = router({
         creatorUid: result.character.creatorUid,
         creatorAddress: result.character.creatorAddress,
         source: 'nft_sales',
-        amountWei: input.price,
+        amountWei: paidWei,
         universeId: result.character.universeId,
         metadata: { characterId: input.characterId, txHash: input.txHash },
       }).catch(() => {});

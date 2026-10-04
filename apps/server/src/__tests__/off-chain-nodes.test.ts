@@ -354,3 +354,35 @@ describe('offChainNodes.delete', () => {
     expect(n.nodeId).toBe(3);
   });
 });
+
+describe('offChainNodes read privacy (audit R4-3)', () => {
+  async function makePrivateUniverseWithNode() {
+    const { db } = await import('../lib/firebase');
+    await db
+      .collection('cinematicUniverses')
+      .doc(universeId)
+      .set({ creator: ALICE, name: 'Secret' });
+    await (await alice()).create({ universeId, plot: 'Hidden plot', title: 'Ep 1' });
+    const { setUniversePrivate } = await import('../routers/universes/universes.handlers');
+    await setUniversePrivate(universeId, true);
+  }
+
+  it('hides a private universe from anonymous and non-member callers', async () => {
+    await makePrivateUniverseWithNode();
+    await expectCode((await anon()).list({ universeId }), 'NOT_FOUND');
+    await expectCode((await bob()).list({ universeId }), 'NOT_FOUND');
+    await expectCode((await anon()).get({ universeId, nodeId: 1 }), 'NOT_FOUND');
+  });
+
+  it('still serves the owner', async () => {
+    await makePrivateUniverseWithNode();
+    const res = await (await alice()).list({ universeId });
+    expect(res.total).toBe(1);
+  });
+
+  it('serves public universes to anyone', async () => {
+    await (await alice()).create({ universeId, plot: 'Public plot', title: 'Ep 1' });
+    const res = await (await anon()).list({ universeId });
+    expect(res.total).toBe(1);
+  });
+});

@@ -13,6 +13,7 @@ import { useState } from 'react';
 import { Briefcase, Star, Shield, Globe, ArrowLeft, Handshake, ExternalLink } from 'lucide-react';
 import { AgentContractModal } from '@/components/agents/AgentContractModal';
 import { SmartImage } from '@/components/SmartImage';
+import { safeHref } from '@/lib/safe-href';
 
 export const Route = createFileRoute('/agents/$uid')({
   component: AgentProfilePage,
@@ -78,7 +79,7 @@ function AgentProfilePage() {
 
             {(agent as any).website && (
               <a
-                href={(agent as any).website}
+                href={safeHref((agent as any).website)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-1 inline-flex items-center gap-1 text-sm text-violet-400 hover:underline"
@@ -157,7 +158,7 @@ function AgentProfilePage() {
                   .map(([platform, url]) => (
                     <a
                       key={platform}
-                      href={url as string}
+                      href={safeHref(url as string)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-sm text-violet-400 hover:underline capitalize"

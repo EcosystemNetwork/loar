@@ -157,7 +157,11 @@ export const appRouter = router({
   // server-side in the auth handlers (apps/server/src/routes/circle-auth.ts)
   // via the same `recordLogin` helper, so a swallowed failure here no longer
   // drops a user from the `/admin/dashboard` counts.
-  trackWalletLogin: publicProcedure
+  //
+  // Authenticated, and records the SESSION's address — never the input's. As a
+  // public procedure it minted `users` docs (and signup grants) for arbitrary
+  // addresses, inflating the admin dashboard counts (audit R4-6).
+  trackWalletLogin: protectedProcedure
     .input(
       z.object({
         address: z.string().regex(/^0x[0-9a-fA-F]{40}$/, 'Invalid Ethereum address'),
@@ -165,7 +169,13 @@ export const appRouter = router({
         connector: z.string().optional(),
       })
     )
-    .mutation(({ input }) => recordLogin(input)),
+    .mutation(({ input, ctx }) => {
+      const address = ctx.user.address;
+      if (!address || !/^0x[0-9a-fA-F]{40}$/.test(address)) {
+        return { ok: true, newUser: false, creditsGranted: 0 };
+      }
+      return recordLogin({ ...input, address });
+    }),
 
   // ── Indexer reads (replaces Ponder GraphQL) ─────────────────────────
   indexer: indexerRouter,

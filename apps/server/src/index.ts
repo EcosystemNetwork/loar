@@ -1086,29 +1086,37 @@ app.get('/api/takedown/:id/status', async (c) => {
 //    cutdown, characterPipeline) were previously UNLIMITED beyond the global
 //    100/min IP — a hole in the abuse surface. Adding starter limits here;
 //    tune after observing real usage on the Board 2 Grafana panel.
-app.use('/trpc/generation.*', aiRateLimiter({ windowMs: 60_000, max: 3 })); // video ~$0.25, 2–5 min
-app.use('/trpc/studio.*', aiRateLimiter({ windowMs: 60_000, max: 2 })); // orchestrator — fans out
-app.use('/trpc/characterPipeline.*', aiRateLimiter({ windowMs: 60_000, max: 2 })); // full pipeline ~$0.34
-// Only the heavy script→clips generator burns AI budget. Read-only routes
-// (`feed`, `get`, `list`, `topUniverses`) and status polls must not share this
-// bucket — the home page rail polls `episodes.feed` and the previous
-// `episodes.*` glob bricked it after two page loads per wallet.
-app.use('/trpc/episodes.generateFromScript', aiRateLimiter({ windowMs: 60_000, max: 2 }));
-app.use('/trpc/cutdown.*', aiRateLimiter({ windowMs: 60_000, max: 5 })); // video reframe, medium-heavy
-app.use('/trpc/threed.*', aiRateLimiter({ windowMs: 60_000, max: 5 })); // Meshy polling, ~$0.15
-app.use('/trpc/lipsync.*', aiRateLimiter({ windowMs: 60_000, max: 10 })); // medium
-app.use('/trpc/editing.*', aiRateLimiter({ windowMs: 60_000, max: 15 })); // inpaint/upscale, varies
-app.use('/trpc/sceneAudio.*', aiRateLimiter({ windowMs: 60_000, max: 10 })); // medium
-app.use('/trpc/audio.*', aiRateLimiter({ windowMs: 60_000, max: 20 })); // music gen ~15s
-app.use('/trpc/voice.*', aiRateLimiter({ windowMs: 60_000, max: 30 })); // TTS, short + cheap
-app.use('/trpc/image.*', aiRateLimiter({ windowMs: 60_000, max: 30 })); // image gen ~$0.04, fast
-// Was UNLIMITED beyond the global 100/min IP cap until the Lab feature audit
-// (2026-08-23) flagged it — the zai.* router carries 8 expensiveProcedure
-// mutations including Veo video generation, with none of the per-route/
-// per-wallet/daily budgets every sibling AI router gets. Tiered like
-// generation.* since startVideo/generateVideo/talkingScene are full video
-// generations; chat/image/transcribe calls are cheaper but share the bucket.
-app.use('/trpc/zai.*', aiRateLimiter({ windowMs: 60_000, max: 5 }));
+// One mount on /trpc/* with a tier table — NOT one Hono glob per router:
+// a batched call (`/trpc/credits.getBalance,generation.x`) only matches the
+// glob of its FIRST procedure, so per-router mounts were skipped by any batch
+// led by a cheap call (audit R4-2). `aiRateLimiter` splits the batch and
+// charges every AI mutation in it. Entries ending in '.' are router prefixes.
+app.use(
+  '/trpc/*',
+  aiRateLimiter([
+    { match: 'generation.', windowMs: 60_000, max: 3 }, // video ~$0.25, 2–5 min
+    { match: 'studio.', windowMs: 60_000, max: 2 }, // orchestrator — fans out
+    { match: 'characterPipeline.', windowMs: 60_000, max: 2 }, // full pipeline ~$0.34
+    // Only the heavy script→clips generator burns AI budget. Read-only routes
+    // (`feed`, `get`, `list`, `topUniverses`) and status polls must not share
+    // this bucket — the home page rail polls `episodes.feed`.
+    { match: 'episodes.generateFromScript', windowMs: 60_000, max: 2 },
+    { match: 'cutdown.', windowMs: 60_000, max: 5 }, // video reframe, medium-heavy
+    { match: 'threed.', windowMs: 60_000, max: 5 }, // Meshy polling, ~$0.15
+    { match: 'lipsync.', windowMs: 60_000, max: 10 }, // medium
+    { match: 'editing.', windowMs: 60_000, max: 15 }, // inpaint/upscale, varies
+    { match: 'sceneAudio.', windowMs: 60_000, max: 10 }, // medium
+    { match: 'audio.', windowMs: 60_000, max: 20 }, // music gen ~15s
+    { match: 'voice.', windowMs: 60_000, max: 30 }, // TTS, short + cheap
+    { match: 'image.', windowMs: 60_000, max: 30 }, // image gen ~$0.04, fast
+    // Was UNLIMITED beyond the global IP cap until the Lab feature audit
+    // (2026-08-23) — zai.* carries 8 expensiveProcedure mutations including
+    // Veo video generation. Tiered like generation.*.
+    { match: 'zai.', windowMs: 60_000, max: 5 },
+    // VLM runs on the platform Google key (not BYOK) — audit R4-7.
+    { match: 'vlm.', windowMs: 60_000, max: 20 },
+  ])
+);
 
 // ── Job status SSE (real-time generation progress) ───────────────────
 const { jobStatusRouter } = await import('./routes/job-status');
