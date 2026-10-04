@@ -131,6 +131,8 @@ import {
   mergeDraftNodes,
   getNewNodePosition,
   appendAddFinalNode,
+  reanchorAddFinalNode,
+  ADD_FINAL_NODE_ID,
   resolveArchivedNodeIds,
   TIMELINE_LAYOUT_CONFIG,
 } from '@/lib/timelineFlowGraph';
@@ -538,6 +540,13 @@ function UniverseTimelineEditorInner() {
   // object every render) as a dependency — that would rebuild the graph.
   const pruneArcNodesRef = useRef<(ids: string[]) => void>(() => {});
   pruneArcNodesRef.current = nodeArcs.pruneNodes;
+  // Delete handlers are declared above useUndoRedo; reach pushUndoState via a
+  // ref (assigned once the hook runs) so a delete records an undo entry.
+  const pushUndoStateRef = useRef<() => void>(() => {});
+  // What each delete took out of the local archive list / event cache, keyed
+  // by eventId. An undo snapshot only restores the canvas nodes; without
+  // putting these back, the restored node would vanish on the next rebuild.
+  const deletedEventsRef = useRef<Record<string, { stored: unknown; isBlockchain: boolean }>>({});
   const nodeFilter = useNodeFilter(nodes, nodeArcs.arcs);
 
   // Canvas UI state
@@ -587,6 +596,8 @@ function UniverseTimelineEditorInner() {
   // Ref to track latest nodes without causing callback identity changes
   const nodesRef = useRef(nodes);
   nodesRef.current = nodes;
+  const edgesRef = useRef(edges);
+  edgesRef.current = edges;
   const createNodeFromGeneratedVideoRef = useRef<(videoUrl: string) => void>(() => {});
 
   // Contract hooks - we'll use the write contract directly for universe-specific contracts
@@ -1158,6 +1169,7 @@ function UniverseTimelineEditorInner() {
         });
         return;
       }
+      pushUndoStateRef.current();
       pruneArcNodesRef.current([nodeFlowId]);
 
       if (isBlockchain) {
@@ -1169,14 +1181,19 @@ function UniverseTimelineEditorInner() {
 
       // Remove from localStorage events
       const eventsData = getStoredEvents();
+      deletedEventsRef.current[eventId] = { stored: eventsData[eventId], isBlockchain };
       delete eventsData[eventId];
       setStoredEvents(eventsData);
 
-      // Remove node and its connected edges from the flow
-      setNodes((nds: any) => nds.filter((n: any) => n.id !== nodeFlowId));
-      setEdges((eds: any) =>
-        eds.filter((e: any) => e.source !== nodeFlowId && e.target !== nodeFlowId)
+      // Remove node and its connected edges from the flow, then re-hang the
+      // trailing "+" off whatever is now the last node.
+      const remainingNodes = nodesRef.current.filter((n) => n.id !== nodeFlowId);
+      const remainingEdges = edgesRef.current.filter(
+        (e) => e.source !== nodeFlowId && e.target !== nodeFlowId
       );
+      const next = reanchorAddFinalNode({ nodes: remainingNodes, edges: remainingEdges });
+      setNodes(next.nodes as any);
+      setEdges(next.edges);
 
       // Clear selection if deleted node was selected
       setSelectedNode((prev) => (prev?.id === nodeFlowId ? null : prev));
@@ -1219,6 +1236,7 @@ function UniverseTimelineEditorInner() {
       return;
     }
 
+    pushUndoStateRef.current();
     const archived = getArchivedNodeIds();
     const eventsData = getStoredEvents();
 
@@ -1235,6 +1253,7 @@ function UniverseTimelineEditorInner() {
         archived.add(eventId);
       }
 
+      deletedEventsRef.current[eventId] = { stored: eventsData[eventId], isBlockchain };
       delete eventsData[eventId];
     }
 
@@ -1243,10 +1262,14 @@ function UniverseTimelineEditorInner() {
     pruneArcNodesRef.current([...selectedNodeIds]);
 
     // Remove all selected nodes and their edges from the flow
-    setNodes((nds: any) => nds.filter((n: any) => !selectedNodeIds.has(n.id)));
-    setEdges((eds: any) =>
-      eds.filter((e: any) => !selectedNodeIds.has(e.source) && !selectedNodeIds.has(e.target))
-    );
+    const next = reanchorAddFinalNode({
+      nodes: nodesRef.current.filter((n) => !selectedNodeIds.has(n.id)),
+      edges: edgesRef.current.filter(
+        (e) => !selectedNodeIds.has(e.source) && !selectedNodeIds.has(e.target)
+      ),
+    });
+    setNodes(next.nodes as any);
+    setEdges(next.edges);
 
     setSelectedNode(null);
     setSelectedNodeIds(new Set());
@@ -1430,6 +1453,7 @@ function UniverseTimelineEditorInner() {
     useUndoRedo<TimelineNodeData>(nodes, edges, setNodes as any, setEdges, 50, (ns) =>
       restoreNodesRef.current(ns)
     );
+  pushUndoStateRef.current = pushUndoState;
   // One undo entry per drag, snapshotted at drag *start* — at drag end the
   // moved position is already in state, so undo restored the same place.
   const dragUndoPushedRef = useRef(false);
@@ -1499,7 +1523,7 @@ function UniverseTimelineEditorInner() {
               const sourcePos = layout.nodePositions.get(layoutKeyByFlowId[sourceNode.id] ?? -1);
               if (sourcePos) {
                 const pos = { x: sourcePos.x + 420, y: sourcePos.y };
-                savePosition(n.id, pos);
+                if (n.id !== ADD_FINAL_NODE_ID) savePosition(n.id, pos);
                 return { ...n, position: pos };
               }
             }
@@ -2243,8 +2267,28 @@ function UniverseTimelineEditorInner() {
   );
 
   // ── Keyboard Shortcuts ────────────────────────────────────────────
-  restoreNodesRef.current = (ns) =>
-    ns.map((n) => {
+  restoreNodesRef.current = (ns) => {
+    // Bring the archive list + event cache in line with the restored graph
+    // for every node a delete in this session touched: back on the canvas →
+    // un-archive and restore its cached event (undo); gone again → re-archive
+    // and drop it (redo). Otherwise the next graph rebuild re-hides it.
+    if (Object.keys(deletedEventsRef.current).length > 0) {
+      const present = new Set(ns.map((n) => n.data.eventId).filter(Boolean));
+      const archived = getArchivedNodeIds();
+      const eventsData = getStoredEvents();
+      for (const [eventId, { stored, isBlockchain }] of Object.entries(deletedEventsRef.current)) {
+        if (present.has(eventId)) {
+          archived.delete(eventId);
+          if (stored !== undefined) eventsData[eventId] = stored;
+        } else {
+          if (isBlockchain) archived.add(eventId);
+          delete eventsData[eventId];
+        }
+      }
+      saveArchivedNodeIds(archived);
+      setStoredEvents(eventsData);
+    }
+    return ns.map((n) => {
       if (n.data.nodeType !== 'add') savePosition(n.id, n.position);
       n.data.onAddScene = handleAddEvent;
       if (n.data.nodeType !== 'add') {
@@ -2255,6 +2299,7 @@ function UniverseTimelineEditorInner() {
       }
       return n;
     });
+  };
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -3031,7 +3076,14 @@ function UniverseTimelineEditorInner() {
       universeId: finalUniverse?.id || id,
       timelineId: `timeline-${id}`,
     });
-    const withAddNode = appendAddFinalNode(withDrafts);
+    // Overlay saved positions BEFORE appending the trailing "+" so it anchors
+    // to where the last scene actually sits. Placing it from the computed
+    // layout (or a stale saved spot of its own) left it thousands of px away
+    // behind a long, undeletable dashed edge once scenes had been moved.
+    const withAddNode = appendAddFinalNode({
+      nodes: applySavedPositions(withDrafts.nodes),
+      edges: withDrafts.edges,
+    });
 
     // Attach the live per-node action callbacks the pure builders leave off.
     // Scene/draft nodes get the full set; the trailing "add" node only adds.
@@ -3051,7 +3103,7 @@ function UniverseTimelineEditorInner() {
     // Re-inject the in-flight "Generating…" placeholder, if any — this effect
     // rebuilds `nodes` wholesale from graphData/localStorage and would
     // otherwise drop it (e.g. on a graphData refetch mid-generation).
-    const nextNodes = applySavedPositions(blockchainNodes) as Node<TimelineNodeData>[];
+    const nextNodes = blockchainNodes;
     const pending = pendingVideoNodeRef.current;
     const finalNodes =
       pending && !nextNodes.some((n) => n.id === pending.id) ? [...nextNodes, pending] : nextNodes;
@@ -3409,7 +3461,12 @@ function UniverseTimelineEditorInner() {
                   }
                 }
                 for (const change of changes) {
-                  if (change.type === 'position' && change.position && !change.dragging) {
+                  if (
+                    change.type === 'position' &&
+                    change.position &&
+                    !change.dragging &&
+                    change.id !== ADD_FINAL_NODE_ID
+                  ) {
                     savePosition(change.id, change.position);
                   }
                 }

@@ -14,6 +14,7 @@ import {
   TIMELINE_LAYOUT_CONFIG,
   TIMELINE_NODE_COLORS,
   appendAddFinalNode,
+  reanchorAddFinalNode,
   getNewNodePosition,
   buildSceneFlowGraph,
   buildTimelineFlowGraph,
@@ -432,6 +433,60 @@ describe('mergeDraftNodes', () => {
     });
     expect(nodes).toHaveLength(1);
     expect(edges).toHaveLength(0);
+  });
+});
+
+// ── reanchorAddFinalNode ─────────────────────────────────────────────────
+
+describe('reanchorAddFinalNode', () => {
+  it('moves a stale "+" back next to the current last node (no long dashed tail)', () => {
+    // Fogline repro: saved layout pinned add-final at x=26140 while the last
+    // scene had been moved to a second row near x=9000.
+    const stale = appendAddFinalNode({
+      nodes: [sceneNode('blockchain-node-1', 100, 100), sceneNode('blockchain-node-2', 520, 100)],
+      edges: [],
+    });
+    const addFinal = stale.nodes.find((n) => n.id === 'add-final')!;
+    addFinal.position = { x: 26140, y: 100 };
+    stale.nodes[1].position = { x: 8984, y: 840 };
+
+    const { nodes, edges } = reanchorAddFinalNode(stale);
+    const add = nodes.filter((n) => n.id === 'add-final');
+    expect(add).toHaveLength(1);
+    expect(add[0].position).toEqual({ x: 8984 + 420, y: 840 });
+    expect(edges.filter((e) => e.target === 'add-final')).toEqual([
+      expect.objectContaining({ source: 'blockchain-node-2' }),
+    ]);
+  });
+
+  it('re-hangs the "+" off the new tail after the last scene is deleted', () => {
+    const g = appendAddFinalNode({
+      nodes: [sceneNode('blockchain-node-1', 100, 100), sceneNode('blockchain-node-2', 520, 100)],
+      edges: [],
+    });
+    const { nodes, edges } = reanchorAddFinalNode({
+      nodes: g.nodes.filter((n) => n.id !== 'blockchain-node-2'),
+      edges: g.edges.filter((e) => e.source !== 'blockchain-node-2'),
+    });
+    expect(nodes.find((n) => n.id === 'add-final')!.position).toEqual({ x: 520, y: 100 });
+    expect(edges).toEqual([
+      expect.objectContaining({ source: 'blockchain-node-1', target: 'add-final' }),
+    ]);
+  });
+
+  it('leaves branch "+" nodes alone', () => {
+    const branchAdd: Node<TimelineNodeData> = {
+      id: 'add-branch-7',
+      type: 'timelineEvent',
+      position: { x: 900, y: 500 },
+      data: { label: '', description: '', nodeType: 'add' } as TimelineNodeData,
+    };
+    const { nodes } = reanchorAddFinalNode({
+      nodes: [sceneNode('blockchain-node-1'), branchAdd],
+      edges: [],
+    });
+    expect(nodes.map((n) => n.id)).toEqual(['blockchain-node-1', 'add-branch-7', 'add-final']);
+    expect(nodes.find((n) => n.id === 'add-final')!.position).toEqual({ x: 520, y: 100 });
   });
 });
 

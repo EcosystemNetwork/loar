@@ -333,11 +333,13 @@ export function mergeDraftNodes({
  * Append the trailing dashed "add a scene" node (+ its connector) after the
  * last node in the graph. No-op on an empty graph. Pure.
  */
+export const ADD_FINAL_NODE_ID = 'add-final';
+
 export function appendAddFinalNode({ nodes, edges }: SceneFlowGraph): SceneFlowGraph {
   if (nodes.length === 0) return { nodes: [...nodes], edges: [...edges] };
 
   const lastNode = nodes[nodes.length - 1];
-  const addNodeId = 'add-final';
+  const addNodeId = ADD_FINAL_NODE_ID;
 
   return {
     nodes: [
@@ -360,6 +362,24 @@ export function appendAddFinalNode({ nodes, edges }: SceneFlowGraph): SceneFlowG
       },
     ],
   };
+}
+
+/**
+ * Drop any existing "add" node (+ its connector) and re-append it after the
+ * current last node. The "+" must always hang one slot off the chain's tail:
+ * a stale position (e.g. a saved layout from before nodes were moved or
+ * deleted) leaves a long, undeletable dashed edge across the canvas. Pure.
+ */
+export function reanchorAddFinalNode({ nodes, edges }: SceneFlowGraph): SceneFlowGraph {
+  const rest = nodes.filter((n) => n.id !== ADD_FINAL_NODE_ID);
+  const restEdges = edges.filter(
+    (e) => e.source !== ADD_FINAL_NODE_ID && e.target !== ADD_FINAL_NODE_ID
+  );
+  // Anchor to the last real node, never to another (branch) "+" node.
+  const tail = rest.findLast((n) => n.data?.nodeType !== 'add');
+  if (!tail) return { nodes: rest, edges: restEdges };
+  const anchored = appendAddFinalNode({ nodes: [tail], edges: [] });
+  return { nodes: [...rest, ...anchored.nodes.slice(1)], edges: [...restEdges, ...anchored.edges] };
 }
 
 export const NEW_NODE_HORIZONTAL_SPACING = 420;
