@@ -2,15 +2,15 @@
  * Cross-token holder leaderboard — ranks addresses by the total ETH value of
  * every universe-token position they hold, joined against live prices.
  */
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import { useMemo } from 'react';
 import { useTokenListData, formatCompactEth, weiToNumber } from '@/hooks/useTokens';
 import { useAllTokenHolders } from '@/hooks/useTokenAnalytics';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 import { QueryState } from '@/components/QueryState';
-import { ArrowLeft, Crown, Trophy } from 'lucide-react';
+import { Crown } from 'lucide-react';
+import { LaunchpadNav } from '@/components/tokens/launchpad/LaunchpadNav';
 
 export const Route = createFileRoute('/tokens/holders')({
   component: HolderLeaderboardPage,
@@ -69,20 +69,12 @@ function HolderLeaderboardPage() {
   const totalTracked = rows.reduce((s, r) => s + r.valueEth, 0);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-3xl px-4 py-6">
+    <div className="min-h-screen bg-background pb-bottom-nav md:pb-12">
+      <LaunchpadNav />
+      <div className="mx-auto max-w-3xl px-4 py-8">
         <div className="mb-6 flex items-center gap-4">
-          <Link to="/tokens">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              Launchpad
-            </Button>
-          </Link>
           <div>
-            <h1 className="flex items-center gap-2 text-2xl font-bold">
-              <Trophy className="h-6 w-6 text-primary" />
-              Top Holders
-            </h1>
+            <h1 className="text-3xl font-bold tracking-tight">Top holders</h1>
             <p className="text-sm text-muted-foreground">
               Biggest positions across every universe token, by live ETH value.
             </p>

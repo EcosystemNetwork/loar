@@ -6,35 +6,12 @@ import { Link } from '@tanstack/react-router';
 import { memo } from 'react';
 import { Sparkline } from './Sparkline';
 import { QuickBuyButton } from './QuickBuyButton';
-import { formatCompactEth, type EnrichedToken, type TokenStage } from '@/hooks/useTokens';
+import { formatCompactEth, type EnrichedToken } from '@/hooks/useTokens';
 import { ArrowDown, MessageCircle, Star } from 'lucide-react';
 import type { SortMode } from '@/lib/token-screener';
-
-function compactAge(createdAt: number): string {
-  const s = Math.floor(Date.now() / 1000) - createdAt;
-  if (s < 3600) return `${Math.max(1, Math.floor(s / 60))}m`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  if (s < 2592000) return `${Math.floor(s / 86400)}d`;
-  return `${Math.floor(s / 2592000)}mo`;
-}
-
-function pct(v: number | null): { text: string; cls: string } {
-  if (v == null) return { text: '--', cls: 'text-muted-foreground' };
-  const cls = v >= 0 ? 'text-green-500' : 'text-red-500';
-  return { text: `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`, cls };
-}
-
-function priceText(p: number | null): string {
-  if (p == null) return '--';
-  return p < 0.001 ? p.toExponential(2) : p.toFixed(6);
-}
-
-const STAGE_DOT: Record<TokenStage, string> = {
-  bonding: 'bg-primary',
-  graduating: 'bg-amber-500',
-  graduated: 'bg-green-500',
-  halted: 'bg-red-500',
-};
+import { cn } from '@/lib/utils';
+import { Change, StagePill, TokenAvatar } from './launchpad/primitives';
+import { compactAge, formatPrice } from './launchpad/format';
 
 interface HeaderCol {
   key: string;
@@ -44,7 +21,7 @@ interface HeaderCol {
 }
 
 const COLS: HeaderCol[] = [
-  { key: 'token', label: 'Token', className: 'text-left' },
+  { key: 'token', label: 'Token', className: 'text-left sticky left-0 z-10 bg-muted' },
   { key: 'price', label: 'Price', className: 'text-right' },
   { key: 'h1', label: '1h', className: 'text-right' },
   { key: 'h24', label: '24h', sort: 'gainers', className: 'text-right' },
@@ -53,9 +30,11 @@ const COLS: HeaderCol[] = [
   { key: 'mcap', label: 'MCap', sort: 'mcap', className: 'text-right' },
   { key: 'holders', label: 'Holders', sort: 'holders', className: 'text-right' },
   { key: 'age', label: 'Age', sort: 'newest', className: 'text-right' },
-  { key: 'chart', label: '', className: 'text-right' },
+  { key: 'chart', label: 'Trend', className: 'text-right' },
   { key: 'actions', label: '', className: 'text-right' },
 ];
+
+const num = (v: number) => (v >= 0.001 ? formatCompactEth(v) : '--');
 
 export const TokenTable = memo(function TokenTable({
   tokens,
@@ -73,140 +52,140 @@ export const TokenTable = memo(function TokenTable({
   commentCountFor?: (addr: string) => number;
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border">
-      <table className="w-full text-xs">
+    <div className="overflow-x-auto rounded-xl border border-border bg-card">
+      <table className="w-full whitespace-nowrap text-sm">
         <thead>
-          <tr className="border-b bg-muted/40 text-[10px] uppercase text-muted-foreground">
-            {COLS.map((c) => (
-              <th
-                key={c.key}
-                className={`px-2.5 py-2 font-semibold whitespace-nowrap ${c.className ?? ''} ${
-                  c.sort ? 'cursor-pointer select-none hover:text-foreground' : ''
-                }`}
-                onClick={c.sort ? () => onSort(c.sort!) : undefined}
-              >
-                <span className="inline-flex items-center gap-1">
-                  {c.label}
-                  {c.sort && sortMode === c.sort && <ArrowDown className="h-2.5 w-2.5" />}
-                </span>
-              </th>
-            ))}
+          <tr className="border-b border-border bg-muted text-[11px] uppercase tracking-wide text-muted-foreground">
+            {COLS.map((c) => {
+              const active = c.sort && sortMode === c.sort;
+              return (
+                <th
+                  key={c.key}
+                  scope="col"
+                  aria-sort={active ? 'descending' : undefined}
+                  className={cn('whitespace-nowrap px-3 py-2.5 font-medium', c.className)}
+                >
+                  {c.sort ? (
+                    <button
+                      type="button"
+                      onClick={() => onSort(c.sort!)}
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded uppercase tracking-wide transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        active && 'text-foreground'
+                      )}
+                    >
+                      {c.label}
+                      <ArrowDown
+                        className={cn('h-3 w-3', active ? 'opacity-100' : 'opacity-0')}
+                        aria-hidden
+                      />
+                    </button>
+                  ) : (
+                    c.label
+                  )}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
           {tokens.map((t, i) => {
-            const h1 = pct(t.priceChange1h);
-            const h24 = pct(t.priceChange24h);
-            const buyShare =
-              t.buyCount24h + t.sellCount24h > 0
-                ? t.buyCount24h / (t.buyCount24h + t.sellCount24h)
-                : null;
+            const total = t.buyCount24h + t.sellCount24h;
+            const buyShare = total > 0 ? t.buyCount24h / total : null;
+            const watched = isWatched(t.id);
+            const comments = commentCountFor?.(t.id) ?? 0;
             return (
-              <tr key={t.id} className="group border-b last:border-0 hover:bg-muted/40">
-                {/* Token */}
-                <td className="px-2.5 py-2">
+              <tr
+                key={t.id}
+                className="group border-b border-border transition-colors last:border-0 hover:bg-muted/50"
+              >
+                <td className="sticky left-0 z-10 bg-card px-3 py-2.5 transition-colors group-hover:bg-muted">
                   <Link
                     to="/tokens/$address"
                     params={{ address: t.id }}
-                    className="flex items-center gap-2 min-w-0"
+                    className="flex min-w-0 items-center gap-2.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <span className="w-4 text-right text-[10px] text-muted-foreground tabular-nums">
+                    <span className="w-5 text-right text-[11px] text-muted-foreground tabular-nums">
                       {i + 1}
                     </span>
-                    {t.imageURL ? (
-                      <img
-                        src={t.imageURL}
-                        alt={t.symbol}
-                        className="h-6 w-6 rounded-full object-cover flex-shrink-0"
-                      />
-                    ) : (
-                      <span className="h-6 w-6 rounded-full bg-primary/15 flex items-center justify-center text-[9px] font-bold text-primary flex-shrink-0">
-                        {t.symbol.slice(0, 3)}
-                      </span>
-                    )}
+                    <TokenAvatar
+                      imageURL={t.imageURL}
+                      symbol={t.symbol}
+                      size="sm"
+                      className="h-8 w-8"
+                    />
                     <span className="min-w-0">
-                      <span className="flex items-center gap-1.5">
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${STAGE_DOT[t.stage]}`}
-                          title={t.stage}
-                        />
-                        <span className="font-semibold truncate">${t.symbol}</span>
+                      <span className="flex items-center gap-2">
+                        <span className="truncate font-semibold">${t.symbol}</span>
+                        {t.stage !== 'bonding' && <StagePill stage={t.stage} className="py-0" />}
                       </span>
-                      <span className="block text-[10px] text-muted-foreground truncate max-w-[140px]">
+                      <span className="block max-w-[160px] truncate text-xs text-muted-foreground">
                         {t.name}
                       </span>
                     </span>
                   </Link>
                 </td>
-                {/* Price */}
-                <td className="px-2.5 py-2 text-right font-mono tabular-nums">
-                  {priceText(t.price)}
+                <td className="px-3 py-2.5 text-right font-mono tabular-nums">
+                  {formatPrice(t.price)}
                 </td>
-                {/* 1h */}
-                <td className={`px-2.5 py-2 text-right font-mono tabular-nums ${h1.cls}`}>
-                  {h1.text}
+                <td className="px-3 py-2.5 text-right">
+                  <Change value={t.priceChange1h} />
                 </td>
-                {/* 24h */}
-                <td className={`px-2.5 py-2 text-right font-mono tabular-nums ${h24.cls}`}>
-                  {h24.text}
+                <td className="px-3 py-2.5 text-right">
+                  <Change value={t.priceChange24h} />
                 </td>
-                {/* Vol 24h */}
-                <td className="px-2.5 py-2 text-right font-mono tabular-nums">
-                  {t.volume24h >= 0.001 ? formatCompactEth(t.volume24h) : '--'}
+                <td className="px-3 py-2.5 text-right font-mono tabular-nums">
+                  {num(t.volume24h)}
                 </td>
-                {/* Liquidity */}
-                <td className="px-2.5 py-2 text-right font-mono tabular-nums">
-                  {t.liquidityEth >= 0.001 ? formatCompactEth(t.liquidityEth) : '--'}
+                <td className="px-3 py-2.5 text-right font-mono tabular-nums">
+                  {num(t.liquidityEth)}
                 </td>
-                {/* MCap */}
-                <td className="px-2.5 py-2 text-right font-mono tabular-nums">
+                <td className="px-3 py-2.5 text-right font-mono font-medium tabular-nums">
                   {t.marketCap != null && t.marketCap > 0 ? formatCompactEth(t.marketCap) : '--'}
                 </td>
-                {/* Holders + buy pressure bar */}
-                <td className="px-2.5 py-2 text-right">
+                <td className="px-3 py-2.5 text-right">
                   <span className="font-mono tabular-nums">{t.holderCount}</span>
                   {buyShare != null && (
-                    <span className="mt-0.5 flex h-1 w-14 ml-auto overflow-hidden rounded-full bg-red-500/40">
+                    <span
+                      className="ml-auto mt-1 flex h-1 w-14 overflow-hidden rounded-full bg-red-500/40"
+                      title={`${t.buyCount24h} buys / ${t.sellCount24h} sells (24h)`}
+                    >
                       <span
-                        className="h-full bg-green-500"
+                        className="h-full bg-emerald-500"
                         style={{ width: `${Math.round(buyShare * 100)}%` }}
                       />
                     </span>
                   )}
                 </td>
-                {/* Age */}
-                <td className="px-2.5 py-2 text-right text-muted-foreground tabular-nums">
+                <td className="px-3 py-2.5 text-right text-muted-foreground tabular-nums">
                   {compactAge(t.createdAt)}
                 </td>
-                {/* Sparkline */}
-                <td className="px-2.5 py-2 text-right">
+                <td className="px-3 py-2.5 text-right">
                   <span className="inline-block align-middle">
-                    <Sparkline data={t.sparkline} width={64} height={22} />
+                    <Sparkline data={t.sparkline} width={72} height={24} />
                   </span>
                 </td>
-                {/* Actions */}
-                <td className="px-2.5 py-2">
+                <td className="px-3 py-2.5">
                   <div className="flex items-center justify-end gap-1">
-                    {commentCountFor && commentCountFor(t.id) > 0 && (
-                      <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                        <MessageCircle className="h-3 w-3" />
-                        {commentCountFor(t.id)}
+                    {comments > 0 && (
+                      <span className="mr-1 flex items-center gap-0.5 text-xs text-muted-foreground">
+                        <MessageCircle className="h-3 w-3" aria-hidden />
+                        {comments}
                       </span>
                     )}
                     <QuickBuyButton tokenId={t.id} compact />
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onToggleWatch(t.id, t.symbol);
-                      }}
-                      className="p-1 text-muted-foreground hover:text-yellow-500"
-                      title={isWatched(t.id) ? 'Unwatch' : 'Watch'}
+                      type="button"
+                      onClick={() => onToggleWatch(t.id, t.symbol)}
+                      aria-pressed={watched}
+                      aria-label={
+                        watched ? `Remove ${t.symbol} from watchlist` : `Watch ${t.symbol}`
+                      }
+                      className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <Star
-                        className={`h-3.5 w-3.5 ${
-                          isWatched(t.id) ? 'fill-yellow-500 text-yellow-500' : ''
-                        }`}
+                        className={cn('h-4 w-4', watched && 'fill-primary text-primary')}
+                        aria-hidden
                       />
                     </button>
                   </div>
@@ -216,11 +195,6 @@ export const TokenTable = memo(function TokenTable({
           })}
         </tbody>
       </table>
-      {tokens.length === 0 && (
-        <p className="py-10 text-center text-xs text-muted-foreground">
-          No tokens match your filters
-        </p>
-      )}
     </div>
   );
 });

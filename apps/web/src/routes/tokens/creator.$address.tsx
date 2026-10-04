@@ -6,10 +6,8 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { useMemo } from 'react';
 import { useTokenListData, timeAgo } from '@/hooks/useTokens';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  ArrowLeft,
   Copy,
   CheckCircle2,
   ExternalLink,
@@ -23,6 +21,7 @@ import { getExplorerAddressUrl } from '@/configs/chains';
 import { AddressDisplay } from '@/components/tokens/AddressDisplay';
 import { CreatorFollow } from '@/components/tokens/CreatorFollow';
 import { CreatorEarnings } from '@/components/tokens/CreatorEarnings';
+import { LaunchpadNav } from '@/components/tokens/launchpad/LaunchpadNav';
 
 export const Route = createFileRoute('/tokens/creator/$address')({
   component: CreatorProfilePage,
@@ -80,21 +79,12 @@ function CreatorProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-5xl mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <Link to="/tokens">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Launchpad
-            </Button>
-          </Link>
-        </div>
-
+    <div className="min-h-screen bg-background pb-bottom-nav md:pb-12">
+      <LaunchpadNav />
+      <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Creator Info */}
         <div className="flex flex-wrap items-center gap-4 mb-6">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/30 flex items-center justify-center">
+          <div className="w-16 h-16 rounded-full bg-primary/15 flex items-center justify-center">
             <Rocket className="h-8 w-8 text-primary/60" />
           </div>
           <div className="flex-1 min-w-0">

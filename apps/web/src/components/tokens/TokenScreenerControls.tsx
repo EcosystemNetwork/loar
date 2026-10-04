@@ -58,10 +58,10 @@ export function TokenScreenerControls({
             key={p.id}
             onClick={() => onPreset(activePreset === p.id ? null : p.id)}
             title={p.description}
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+            className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               activePreset === p.id
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-border bg-background hover:bg-muted'
+                ? 'border-primary/50 bg-primary/10 text-primary'
+                : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
             }`}
           >
             {p.label}
@@ -70,7 +70,7 @@ export function TokenScreenerControls({
         <Button
           variant={open || count > 0 ? 'default' : 'outline'}
           size="sm"
-          className="h-7 gap-1.5 px-2.5 text-[11px]"
+          className="h-8 gap-1.5 rounded-full px-3 text-xs"
           onClick={() => setOpen((o) => !o)}
         >
           <SlidersHorizontal className="h-3 w-3" />
@@ -87,7 +87,7 @@ export function TokenScreenerControls({
               onFiltersChange(EMPTY_FILTERS);
               onPreset(null);
             }}
-            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+            className="inline-flex items-center gap-1 px-1 text-xs text-muted-foreground hover:text-foreground"
           >
             <X className="h-3 w-3" />
             Clear
@@ -97,7 +97,7 @@ export function TokenScreenerControls({
 
       {/* Advanced panel */}
       {open && (
-        <div className="grid grid-cols-2 gap-2 rounded-lg border bg-muted/30 p-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-card p-4 sm:grid-cols-3">
           {NUM_FIELDS.map((f) => (
             <label key={f.key} className="flex flex-col gap-1 text-[10px] text-muted-foreground">
               {f.label}

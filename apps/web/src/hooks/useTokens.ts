@@ -284,7 +284,7 @@ export function useBondingCurveForToken(tokenAddress: string | undefined) {
 
 export type TokenStage = 'bonding' | 'graduating' | 'graduated' | 'halted';
 
-function stageFromBondingCurve(curve: BondingCurveData | null | undefined): TokenStage {
+export function stageFromBondingCurve(curve: BondingCurveData | null | undefined): TokenStage {
   if (!curve) return 'graduated'; // pools without bonding curve are post-graduation
   if (curve.tradingStatus === 'halted') return 'halted';
   if (curve.graduated || curve.tradingStatus === 'graduated') return 'graduated';

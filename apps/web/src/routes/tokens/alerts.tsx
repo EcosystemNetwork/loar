@@ -10,7 +10,8 @@ import { useWalletAuth } from '@/lib/wallet-auth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Bell, Trash2, Play, Pause, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Bell, Trash2, Play, Pause, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { LaunchpadNav } from '@/components/tokens/launchpad/LaunchpadNav';
 
 export const Route = createFileRoute('/tokens/alerts')({
   component: AlertsPage,
@@ -40,20 +41,12 @@ function AlertsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-2xl px-4 py-6">
+    <div className="min-h-screen bg-background pb-bottom-nav md:pb-12">
+      <LaunchpadNav />
+      <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="mb-6 flex items-center gap-4">
-          <Link to="/tokens">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              Launchpad
-            </Button>
-          </Link>
           <div>
-            <h1 className="flex items-center gap-2 text-2xl font-bold">
-              <Bell className="h-6 w-6 text-primary" />
-              Price Alerts
-            </h1>
+            <h1 className="text-3xl font-bold tracking-tight">Price alerts</h1>
             <p className="text-sm text-muted-foreground">
               Get a push when a token crosses your target price.
             </p>

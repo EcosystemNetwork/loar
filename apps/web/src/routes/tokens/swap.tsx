@@ -27,7 +27,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   ArrowUpDown,
-  ArrowLeft,
   ChevronDown,
   Loader2,
   AlertTriangle,
@@ -44,6 +43,7 @@ import { useWalletAccount as useAccount } from '@/hooks/useWalletAccount';
 import { getExplorerTxUrl } from '@/configs/chains';
 import { formatEther, parseUnits, type Address } from 'viem';
 import { trpcClient } from '@/utils/trpc';
+import { LaunchpadNav } from '@/components/tokens/launchpad/LaunchpadNav';
 
 export const Route = createFileRoute('/tokens/swap')({
   component: SwapPage,
@@ -288,19 +288,14 @@ function SwapPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-lg mx-auto px-4 py-6">
+    <div className="min-h-screen bg-background pb-bottom-nav md:pb-12">
+      <LaunchpadNav />
+      <div className="max-w-lg mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Link to="/tokens">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back
-              </Button>
-            </Link>
             <div>
-              <h1 className="text-2xl font-bold">Swap</h1>
+              <h1 className="text-3xl font-bold tracking-tight">Swap</h1>
               <p className="text-sm text-muted-foreground">Trade universe governance tokens</p>
             </div>
           </div>

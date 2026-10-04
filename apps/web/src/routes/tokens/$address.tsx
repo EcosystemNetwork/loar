@@ -1,9 +1,14 @@
 /**
  * Token Detail Page — Full analytics, native swap, comments, holders,
  * candlestick chart, watchlist, share, creator link, maturity progress.
+ *
+ * Layout: identity + price header, a divided stat strip, then the chart and a
+ * tabbed activity area (trades / holders / traders / discussion) beside a
+ * trade-first sidebar. On mobile the trade panel sits between the chart and
+ * the tabs.
  */
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, type ReactNode } from 'react';
 import {
   useTokenDetail,
   useSwapHistory,
@@ -18,6 +23,8 @@ import {
   timeAgo,
   computeAmountOut,
   weiToNumber,
+  stageFromBondingCurve,
+  type TokenStage,
 } from '@/hooks/useTokens';
 import { useSwapExecution } from '@/hooks/useSwapExecution';
 import {
@@ -41,11 +48,21 @@ import { TokenComments } from '@/components/tokens/TokenComments';
 import { TokenSocialLinks } from '@/components/tokens/TokenSocialLinks';
 import { HolderBubbleMap } from '@/components/tokens/HolderBubbleMap';
 import { LiveStream } from '@/components/tokens/LiveStream';
-import { Card, CardContent } from '@/components/ui/card';
+import { LaunchpadNav } from '@/components/tokens/launchpad/LaunchpadNav';
+import {
+  Change,
+  GraduationBar,
+  Panel,
+  StagePill,
+  Stat,
+  TokenAvatar,
+} from '@/components/tokens/launchpad/primitives';
+import { formatPrice } from '@/components/tokens/launchpad/format';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ArrowLeft,
   ArrowUpDown,
@@ -54,19 +71,13 @@ import {
   CheckCircle2,
   ExternalLink,
   Loader2,
-  PieChart,
-  Users,
-  Zap,
-  ArrowUpRight,
-  ArrowDownRight,
-  Target,
+  Lock,
   Share2,
   Star,
-  StarOff,
   AlertTriangle,
-  Clock,
-  Bookmark,
+  Clapperboard,
   User,
+  Zap,
 } from 'lucide-react';
 import { useChainId, useBalance, useBytecode } from 'wagmi';
 import { parseUnits, formatEther } from 'viem';
@@ -79,6 +90,7 @@ import { UniverseStakePanel } from '@/components/UniverseStakePanel';
 import { LPYieldManager } from '@/components/LPYieldManager';
 import { pushRecentToken } from '@/hooks/useRecentTokens';
 import { SERVER_URL } from '@/utils/query-client';
+import { cn } from '@/lib/utils';
 
 export const Route = createFileRoute('/tokens/$address')({
   validateSearch: (search: Record<string, unknown>): { buy?: string } => ({
@@ -356,10 +368,27 @@ function TokenDetailPage() {
     return warnings;
   }, [holderStats, token, totalSwaps]);
 
+  // Same classification the launchpad list uses.
+  const stage: TokenStage = stageFromBondingCurve(bondingCurve);
+
   if (tokenLoading || (!token && bytecodeLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="min-h-screen bg-background">
+        <LaunchpadNav />
+        <div className="mx-auto max-w-7xl space-y-6 px-4 py-6" aria-busy="true">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-20 w-20 rounded-2xl" />
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-56" />
+              <Skeleton className="h-4 w-40" />
+            </div>
+          </div>
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+            <Skeleton className="h-[420px] rounded-xl" />
+            <Skeleton className="h-[420px] rounded-xl" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -367,424 +396,233 @@ function TokenDetailPage() {
   if (!token) {
     const indexing = isHexAddress && hasContract;
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardContent className="text-center py-12">
-            {indexing ? (
-              <>
-                <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto mb-3" />
-                <h2 className="text-xl font-bold mb-2">Indexing in progress</h2>
-                <p className="text-muted-foreground mb-1">
-                  This token is deployed on-chain but the indexer hasn't caught up yet.
-                </p>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Auto-refreshing every 5s. New deploys typically appear within ~30s.
-                </p>
-                <div className="flex items-center justify-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => refetchToken()}>
-                    Refresh now
-                  </Button>
+      <div className="min-h-screen bg-background">
+        <LaunchpadNav />
+        <div className="mx-auto flex max-w-md flex-col items-center px-4 py-24 text-center">
+          {indexing ? (
+            <>
+              <Loader2 className="mb-4 h-8 w-8 animate-spin text-primary" aria-hidden />
+              <h1 className="text-xl font-bold">Indexing in progress</h1>
+              <p className="mt-2 text-muted-foreground">
+                This token is deployed on-chain but the indexer hasn&apos;t caught up yet.
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Refreshing every 5s. New deploys usually appear within ~30s.
+              </p>
+              <div className="mt-6 flex gap-2">
+                <Button variant="outline" onClick={() => refetchToken()}>
+                  Refresh now
+                </Button>
+                <Button variant="ghost" asChild>
                   <Link to="/tokens">
-                    <Button variant="ghost" size="sm">
-                      <ArrowLeft className="h-4 w-4 mr-2" />
-                      Back to Launchpad
-                    </Button>
+                    <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
+                    Back to launchpad
                   </Link>
-                </div>
-              </>
-            ) : (
-              <>
-                <h2 className="text-xl font-bold mb-2">Token Not Found</h2>
-                <p className="text-muted-foreground mb-1">
-                  No contract is deployed at this address on the connected chain.
-                </p>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Double-check the address and that your wallet is on the right network.
-                </p>
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h1 className="text-xl font-bold">Token not found</h1>
+              <p className="mt-2 text-muted-foreground">
+                No contract is deployed at this address on the connected chain.
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Check the address and that your wallet is on the right network.
+              </p>
+              <Button variant="outline" className="mt-6" asChild>
                 <Link to="/tokens">
-                  <Button variant="outline">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Launchpad
-                  </Button>
+                  <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
+                  Back to launchpad
                 </Link>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              </Button>
+            </>
+          )}
+        </div>
       </div>
     );
   }
 
+  const isCreator =
+    !!userAddress &&
+    [token.deployer, token.tokenAdmin].some((a) => a.toLowerCase() === userAddress.toLowerCase());
+  const isTokenAdmin =
+    !!userAddress &&
+    !!token.tokenAdmin &&
+    token.tokenAdmin.toLowerCase() === userAddress.toLowerCase();
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 py-6 pb-bottom-nav md:pb-12">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-6">
-          <Link to="/tokens">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Back
-            </Button>
-          </Link>
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            {token.imageURL && (
-              <img
-                src={token.imageURL}
-                alt={token.name}
-                className="w-10 h-10 rounded-full object-cover"
-              />
-            )}
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold">{token.name}</h1>
-                <Badge variant="outline">${token.symbol}</Badge>
-                {priceChange !== null && (
-                  <Badge variant={priceChange >= 0 ? 'default' : 'destructive'} className="text-xs">
-                    {priceChange >= 0 ? (
-                      <ArrowUpRight className="h-3 w-3 mr-0.5" />
-                    ) : (
-                      <ArrowDownRight className="h-3 w-3 mr-0.5" />
-                    )}
-                    {Math.abs(priceChange).toFixed(2)}%
-                  </Badge>
-                )}
+    <div className="min-h-screen bg-background pb-bottom-nav md:pb-12">
+      <LaunchpadNav />
+
+      <div className="mx-auto max-w-7xl space-y-6 px-4 py-6">
+        {/* ── Identity + price ─────────────────────────────────────────── */}
+        <header className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 gap-4">
+            <TokenAvatar imageURL={token.imageURL} symbol={token.symbol} size="xl" />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="truncate text-2xl font-bold tracking-tight sm:text-3xl">
+                  {token.name}
+                </h1>
+                <span className="font-mono text-lg text-muted-foreground">${token.symbol}</span>
+                <StagePill stage={stage} />
               </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="font-mono">
-                  {token.id.slice(0, 10)}...{token.id.slice(-8)}
-                </span>
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 <button
+                  type="button"
                   onClick={() => copyAddress(token.id)}
-                  className="hover:text-foreground transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded font-mono transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label="Copy contract address"
                 >
+                  {token.id.slice(0, 6)}…{token.id.slice(-4)}
                   {copiedAddress === token.id ? (
-                    <CheckCircle2 className="h-3 w-3 text-green-500" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" aria-hidden />
                   ) : (
-                    <Copy className="h-3 w-3" />
+                    <Copy className="h-3.5 w-3.5" aria-hidden />
                   )}
                 </button>
                 <a
                   href={getExplorerAddressUrl(chainId, token.id)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-foreground transition-colors"
+                  className="inline-flex items-center gap-1 rounded transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <ExternalLink className="h-3 w-3" />
+                  Explorer <ExternalLink className="h-3 w-3" aria-hidden />
                 </a>
+                <span>
+                  by{' '}
+                  <Link
+                    to="/tokens/creator/$address"
+                    params={{ address: token.deployer }}
+                    className="rounded text-foreground/80 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <AddressDisplay address={token.deployer} />
+                  </Link>
+                </span>
+                <span>launched {timeAgo(token.createdAt)}</span>
+              </div>
+              <div className="mt-3 [&>div]:mb-0">
+                <TokenSocialLinks metadata={token.metadata} />
               </div>
             </div>
           </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Watchlist */}
-            {userAddress && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => watchMutation.mutate()}
-                disabled={watchMutation.isPending}
-              >
-                {isWatching ? (
-                  <Star className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500" />
-                ) : (
-                  <StarOff className="h-3.5 w-3.5" />
-                )}
-                {isWatching ? 'Watching' : 'Watch'}
-              </Button>
-            )}
-
-            {/* Price alert */}
-            <TokenAlertButton
-              tokenAddress={token.id}
-              tokenSymbol={token.symbol}
-              currentPrice={currentPrice}
-            />
-
-            {/* Share */}
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={shareToken}>
-              <Share2 className="h-3.5 w-3.5" />
-              {shareToast ? 'Copied!' : 'Share'}
-            </Button>
-
-            {/* Portfolio */}
-            <Link to="/tokens/portfolio">
-              <Button variant="outline" size="sm" className="gap-1.5">
-                <Bookmark className="h-3.5 w-3.5" />
-                Portfolio
-              </Button>
-            </Link>
-
-            {/* Universe */}
-            {universe && (
-              <Link to="/universe/$id/watch" params={{ id: token.universeAddress }}>
-                <Button variant="outline" size="sm" className="gap-1.5">
-                  View Universe
-                  <ExternalLink className="h-3 w-3" />
+          <div className="flex flex-shrink-0 flex-col gap-3 lg:items-end">
+            <div className="lg:text-right">
+              <p className="text-3xl font-bold tabular-nums">
+                {formatPrice(currentPrice, 8)}
+                <span className="ml-1.5 text-sm font-medium text-muted-foreground">ETH</span>
+              </p>
+              <Change value={priceChange} suffix="24h" className="text-sm font-semibold" />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {userAddress && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => watchMutation.mutate()}
+                  disabled={watchMutation.isPending}
+                  aria-pressed={!!isWatching}
+                >
+                  <Star
+                    className={cn('h-3.5 w-3.5', isWatching && 'fill-primary text-primary')}
+                    aria-hidden
+                  />
+                  {isWatching ? 'Watching' : 'Watch'}
                 </Button>
-              </Link>
-            )}
-          </div>
-        </div>
-
-        {/* Description + social links (from on-chain metadata) */}
-        <TokenSocialLinks metadata={token.metadata} />
-
-        {/* Safety Warnings */}
-        {safetyWarnings.length > 0 && (
-          <div className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
-              <div className="space-y-1">
-                {safetyWarnings.map((w, i) => (
-                  <p key={i} className="text-xs text-amber-700 dark:text-amber-300">
-                    {w}
-                  </p>
-                ))}
-              </div>
+              )}
+              <TokenAlertButton
+                tokenAddress={token.id}
+                tokenSymbol={token.symbol}
+                currentPrice={currentPrice}
+              />
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={shareToken}>
+                <Share2 className="h-3.5 w-3.5" aria-hidden />
+                <span aria-live="polite">{shareToast ? 'Link copied' : 'Share'}</span>
+              </Button>
+              {universe && (
+                <Button variant="outline" size="sm" className="gap-1.5" asChild>
+                  <Link to="/universe/$id/watch" params={{ id: token.universeAddress }}>
+                    <Clapperboard className="h-3.5 w-3.5" aria-hidden />
+                    Watch universe
+                  </Link>
+                </Button>
+              )}
             </div>
+          </div>
+        </header>
+
+        {/* ── Safety ───────────────────────────────────────────────────── */}
+        {safetyWarnings.length > 0 && (
+          <div
+            role="note"
+            className="flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3"
+          >
+            <AlertTriangle
+              className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600 dark:text-amber-400"
+              aria-hidden
+            />
+            <ul className="space-y-0.5 text-sm text-amber-800 dark:text-amber-200">
+              {safetyWarnings.map((w) => (
+                <li key={w}>{w}</li>
+              ))}
+            </ul>
           </div>
         )}
 
-        {/* Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
-          <Card>
-            <CardContent className="p-3 text-center">
-              <p className="text-xs text-muted-foreground">Price</p>
-              <p className="text-lg font-bold tabular-nums">
-                {currentPrice
-                  ? currentPrice < 0.001
-                    ? currentPrice.toExponential(2)
-                    : currentPrice.toFixed(6)
-                  : '--'}
-              </p>
-              <p className="text-[10px] text-muted-foreground">ETH</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-3 text-center">
-              <p className="text-xs text-muted-foreground">Market Cap</p>
-              <p className="text-lg font-bold tabular-nums">
-                {marketCap != null && marketCap > 0 ? formatCompactEth(marketCap) : '--'}
-              </p>
-              <p className="text-[10px] text-muted-foreground">
-                ETH
-                {fdv != null && fdv > 0 && bondingCurve && !bondingCurve.graduated && (
-                  <span className="ml-1 opacity-70">· FDV {formatCompactEth(fdv)}</span>
-                )}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-3 text-center">
-              <p className="text-xs text-muted-foreground">Holders</p>
-              <p className="text-lg font-bold">{holderStats.total}</p>
-              <p className="text-[10px] text-muted-foreground">addresses</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-3 text-center">
-              <p className="text-xs text-muted-foreground">Swaps</p>
-              <p className="text-lg font-bold">{totalSwaps}</p>
-              <p className="text-[10px] text-muted-foreground">total trades</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-3 text-center">
-              <p className="text-xs text-muted-foreground">Supply</p>
-              <p className="text-lg font-bold">1B</p>
-              <p className="text-[10px] text-muted-foreground">fixed</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-3 text-center">
-              <p className="text-xs text-muted-foreground">Launched</p>
-              <p className="text-lg font-bold">{timeAgo(token.createdAt)}</p>
-              <p className="text-[10px] text-muted-foreground">
-                {new Date(token.createdAt * 1000).toLocaleDateString()}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        {/* ── Stat strip ───────────────────────────────────────────────── */}
+        <dl className="grid grid-cols-2 divide-border overflow-hidden rounded-xl border border-border bg-card sm:grid-cols-3 lg:grid-cols-6 lg:divide-x [&>div]:border-border max-lg:[&>div]:border-b">
+          <Stat
+            label="Market cap"
+            value={marketCap != null && marketCap > 0 ? `${formatCompactEth(marketCap)} ETH` : '--'}
+            sub={
+              fdv != null && fdv > 0 && bondingCurve && !bondingCurve.graduated
+                ? `FDV ${formatCompactEth(fdv)} ETH`
+                : 'circulating'
+            }
+          />
+          <Stat label="Holders" value={holderStats.total} sub="addresses" />
+          <Stat label="Trades" value={totalSwaps} sub={`${uniqueTraders} traders`} />
+          <Stat
+            label="24h volume"
+            value={`${formatCompactEth(pressure24h.buyVol + pressure24h.sellVol)}`}
+            sub={`${pressure24h.buys} buys · ${pressure24h.sells} sells`}
+          />
+          <Stat label="Supply" value="1B" sub="fixed" />
+          <Stat
+            label="Top holder"
+            value={holderStats.total ? `${holderStats.topHolderPct.toFixed(1)}%` : '--'}
+            sub="of circulating"
+          />
+        </dl>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: Chart + Trades + Comments */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Live stream — creator announces YouTube/Twitch/Kick, everyone can watch */}
-            <LiveStream
-              tokenAddress={token.id}
-              isCreator={
-                !!userAddress &&
-                [token.deployer, token.tokenAdmin].some(
-                  (a) => a.toLowerCase() === userAddress.toLowerCase()
-                )
+        {/* ── Main grid ────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[auto_1fr]">
+          {/* Chart block — col 1, row 1 */}
+          <div className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
+            <LiveStream tokenAddress={token.id} isCreator={isCreator} />
+            <Panel
+              title="Price"
+              icon={<BarChart3 className="h-4 w-4 text-primary" aria-hidden />}
+              action={
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                  {formatPrice(currentPrice, 8)} ETH
+                </span>
               }
-            />
-
-            {/* Candlestick Chart */}
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4 text-primary" />
-                    <h3 className="font-semibold">Price History</h3>
-                  </div>
-                  {currentPrice && (
-                    <span className="text-sm font-mono tabular-nums">
-                      {currentPrice < 0.001
-                        ? currentPrice.toExponential(3)
-                        : currentPrice.toFixed(8)}{' '}
-                      ETH
-                    </span>
-                  )}
-                </div>
-                <CandlestickChart data={seriesForChart} />
-              </CardContent>
-            </Card>
-
-            {/* All-time price stats */}
+              bodyClassName="p-2 sm:p-4"
+            >
+              <CandlestickChart data={seriesForChart} />
+            </Panel>
             <TokenStatStrip stats={priceStats} uniqueTraders={uniqueTraders} />
-
-            {/* Buy / sell pressure */}
-            <BuySellPressure
-              buys={pressure24h.buys}
-              sells={pressure24h.sells}
-              buyVol={pressure24h.buyVol}
-              sellVol={pressure24h.sellVol}
-            />
-
-            {/* Transactions */}
-            <Card>
-              <CardContent className="p-4">
-                {swapsLoading && curveTrades.length === 0 ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  </div>
-                ) : (
-                  <TokenTransactionsTable
-                    swaps={swaps ?? []}
-                    bondingTrades={curveTrades}
-                    tokenIsCurrency0={tokenIsCurrency0}
-                    chainId={chainId}
-                  />
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Trader leaderboard */}
-            <TraderLeaderboardCard rows={traderRows} />
-
-            {/* Comments */}
-            <Card>
-              <CardContent className="p-4">
-                <TokenComments tokenAddress={tokenAddress} />
-              </CardContent>
-            </Card>
           </div>
 
-          {/* Right: Swap + Info + Holders */}
-          <div className="space-y-6">
-            {/* Graduation Progress */}
-            {bondingCurve && (
-              <Card
-                className={
-                  bondingCurve.tradingStatus === 'halted'
-                    ? 'border-red-500/40'
-                    : bondingCurve.graduated
-                      ? 'border-green-500/40'
-                      : 'border-amber-500/30'
-                }
-              >
-                <CardContent className="p-4 space-y-3">
-                  {(() => {
-                    const raised = weiToNumber(bondingCurve.ethRaised, 18);
-                    const target = weiToNumber(bondingCurve.graduationEth, 18);
-                    const pct = target > 0 ? Math.min((raised / target) * 100, 100) : 0;
-                    const isHalted = bondingCurve.tradingStatus === 'halted';
-                    const isGraduated = bondingCurve.graduated;
-                    const isGraduating = !isGraduated && !isHalted && pct >= 75;
-
-                    return (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <Zap className="h-4 w-4 text-primary" />
-                          <h3 className="font-semibold text-sm">
-                            {isHalted
-                              ? 'Trading Halted'
-                              : isGraduated
-                                ? 'Graduated to Uniswap'
-                                : isGraduating
-                                  ? 'Graduating Soon'
-                                  : 'Bonding Curve'}
-                          </h3>
-                          <Badge
-                            variant={isHalted ? 'destructive' : isGraduated ? 'default' : 'outline'}
-                            className="text-[10px] ml-auto"
-                          >
-                            {pct.toFixed(1)}%
-                          </Badge>
-                        </div>
-
-                        <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${
-                              isHalted
-                                ? 'bg-red-500'
-                                : isGraduated
-                                  ? 'bg-gradient-to-r from-green-500 to-emerald-500'
-                                  : isGraduating
-                                    ? 'bg-gradient-to-r from-amber-500 to-orange-500'
-                                    : 'bg-gradient-to-r from-primary to-purple-500'
-                            }`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">Raised</span>
-                          <span className="font-mono tabular-nums">
-                            {raised.toFixed(4)} / {target.toFixed(2)} ETH
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">Trades</span>
-                          <span className="font-mono tabular-nums">{bondingCurve.tradeCount}</span>
-                        </div>
-
-                        {isHalted && (
-                          <p className="text-[11px] text-red-600 dark:text-red-400 leading-relaxed">
-                            Trading on this bonding curve is currently halted by governance. It will
-                            resume after the 48-hour timelock unless otherwise directed.
-                          </p>
-                        )}
-                        {isGraduating && (
-                          <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
-                            Approaching graduation. Once ETH raised hits the target, unsold tokens
-                            and raised ETH seed a permanent Uniswap v4 pool.
-                          </p>
-                        )}
-                        {isGraduated && (
-                          <p className="text-[11px] text-muted-foreground leading-relaxed">
-                            This token graduated and now trades on Uniswap v4 with permanently
-                            locked liquidity.
-                          </p>
-                        )}
-                      </>
-                    );
-                  })()}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Swap Card */}
-            <Card className="border-primary/30">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <ArrowUpDown className="h-4 w-4 text-primary" />
-                  <h3 className="font-semibold">Trade ${token.symbol}</h3>
-                </div>
+          {/* Sidebar — col 2, spans both rows; between chart and tabs on mobile */}
+          <aside className="min-w-0 space-y-4 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+            <section className="overflow-hidden rounded-xl border border-primary/30 bg-card shadow-sm">
+              {bondingCurve && <CurveProgress curve={bondingCurve} stage={stage} />}
+              <div className="p-4">
                 <SwapInterface
                   tokenAddress={token.id}
                   tokenSymbol={token.symbol}
@@ -795,10 +633,9 @@ function TokenDetailPage() {
                   latestLiquidity={swaps?.[0]?.liquidity ?? null}
                   initialAmount={initialBuyAmount}
                 />
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
-            {/* Universe Staking — earn yield */}
             {universe?.universeId != null && (
               <UniverseStakePanel
                 universeId={Number(universe.universeId)}
@@ -806,262 +643,330 @@ function TokenDetailPage() {
               />
             )}
 
-            {/* LP Yield & Fee Management — creator only */}
-            {userAddress &&
-              token.tokenAdmin &&
-              token.tokenAdmin.toLowerCase() === userAddress.toLowerCase() && (
-                <LPYieldManager
-                  tokenAddress={token.id as `0x${string}`}
-                  universeName={universe?.name || token.name}
-                  onChainUniverseId={
-                    universe?.universeId != null ? Number(universe.universeId) : undefined
-                  }
-                />
-              )}
+            {isTokenAdmin && (
+              <LPYieldManager
+                tokenAddress={token.id as `0x${string}`}
+                universeName={universe?.name || token.name}
+                onChainUniverseId={
+                  universe?.universeId != null ? Number(universe.universeId) : undefined
+                }
+              />
+            )}
 
-            {/* Governance — voting power + inline proposal voting */}
             {token.universeAddress && (
               <TokenGovernanceCard universeId={token.universeAddress} tokenSymbol={token.symbol} />
             )}
 
-            {/* Token Maturity */}
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Target className="h-4 w-4 text-primary" />
-                  <h3 className="font-semibold text-sm">Token Maturity</h3>
-                  <Badge variant="outline" className="text-[10px] ml-auto">
-                    {milestonesCompleted}/{milestones.length}
-                  </Badge>
-                </div>
-                <div className="h-2 bg-secondary rounded-full overflow-hidden mb-3">
-                  <div
-                    className="h-full rounded-full transition-all bg-gradient-to-r from-amber-500 via-green-500 to-emerald-500"
-                    style={{ width: `${(milestonesCompleted / milestones.length) * 100}%` }}
-                  />
-                </div>
-                <div className="space-y-2">
-                  {milestones.map((m, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs">
-                      <div
-                        className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
-                          m.met ? 'bg-green-500 text-white' : 'bg-secondary text-muted-foreground'
-                        }`}
-                      >
-                        {m.met ? (
-                          <CheckCircle2 className="h-3 w-3" />
-                        ) : (
-                          <span className="text-[9px]">{i + 1}</span>
-                        )}
-                      </div>
-                      <span className={m.met ? 'text-foreground' : 'text-muted-foreground'}>
-                        {m.label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Creator Info */}
-            <Card>
-              <CardContent className="p-4 space-y-3">
-                <h3 className="font-semibold text-sm flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  Creator
-                </h3>
-                <Link to="/tokens/creator/$address" params={{ address: token.deployer }}>
-                  <div className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center">
-                      <User className="h-4 w-4 text-primary/60" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <AddressDisplay
-                        address={token.deployer}
-                        className="text-xs"
-                        truncate={false}
+            {/* About */}
+            <Panel title="About" icon={<Zap className="h-4 w-4 text-primary" aria-hidden />}>
+              <div className="space-y-4">
+                {universe && (
+                  <Link
+                    to="/universe/$id/watch"
+                    params={{ id: token.universeAddress }}
+                    className="flex items-center gap-3 rounded-lg border border-border p-2.5 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {universe.imageURL ? (
+                      <img
+                        src={universe.imageURL}
+                        alt=""
+                        className="h-11 w-11 rounded-md object-cover"
                       />
-                      <p className="text-[10px] text-muted-foreground">View all tokens</p>
+                    ) : (
+                      <span className="flex h-11 w-11 items-center justify-center rounded-md bg-muted">
+                        <Clapperboard className="h-5 w-5 text-muted-foreground" aria-hidden />
+                      </span>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{universe.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Universe · {universe.nodeCount} events
+                      </p>
                     </div>
-                    <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                    <ExternalLink className="h-4 w-4 text-muted-foreground" aria-hidden />
+                  </Link>
+                )}
+
+                <Link
+                  to="/tokens/creator/$address"
+                  params={{ address: token.deployer }}
+                  className="flex items-center gap-3 rounded-lg border border-border p-2.5 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span className="flex h-11 w-11 items-center justify-center rounded-md bg-primary/10">
+                    <User className="h-5 w-5 text-primary" aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <AddressDisplay address={token.deployer} className="text-sm font-medium" />
+                    <p className="text-xs text-muted-foreground">Creator · view all tokens</p>
                   </div>
                 </Link>
-              </CardContent>
-            </Card>
 
-            {/* Token Info */}
-            <Card>
-              <CardContent className="p-4 space-y-3">
-                <h3 className="font-semibold text-sm flex items-center gap-2">
-                  <Zap className="h-4 w-4" />
-                  Token Info
-                </h3>
-                <div className="space-y-2 text-xs">
+                <dl className="space-y-2 text-xs">
                   <InfoRow
                     label="Contract"
                     value={token.id}
-                    copyable
                     onCopy={copyAddress}
                     copied={copiedAddress}
                   />
                   <InfoRow
                     label="Pool"
                     value={token.poolId}
-                    copyable
                     onCopy={copyAddress}
                     copied={copiedAddress}
                   />
                   <InfoRow
                     label="Deployer"
                     value={token.deployer}
-                    copyable
                     onCopy={copyAddress}
                     copied={copiedAddress}
                   />
                   <InfoRow
-                    label="Creator"
+                    label="Admin"
                     value={token.tokenAdmin}
-                    copyable
                     onCopy={copyAddress}
                     copied={copiedAddress}
                   />
                   <InfoRow
                     label="Locker"
                     value={token.locker}
-                    copyable
                     onCopy={copyAddress}
                     copied={copiedAddress}
                   />
-                </div>
-                <div className="flex flex-wrap gap-1.5 pt-2">
-                  <Badge variant="secondary" className="text-[10px] gap-1">
-                    <Zap className="h-2.5 w-2.5" /> LP Locked Forever
-                  </Badge>
-                  <Badge variant="secondary" className="text-[10px] gap-1">
-                    <Users className="h-2.5 w-2.5" /> Governance Token
-                  </Badge>
-                  <Badge variant="secondary" className="text-[10px] gap-1">
-                    <Clock className="h-2.5 w-2.5" /> Creator Vested
-                  </Badge>
-                </div>
+                </dl>
 
-                {/* LP Lock Permanence Disclosure */}
-                <div className="mt-3 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
-                  <div className="flex items-start gap-2">
-                    <Zap className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                        Permanent Liquidity Lock
-                      </p>
-                      <p className="text-[10px] text-muted-foreground leading-relaxed">
-                        This token's liquidity pool is{' '}
-                        <span className="font-semibold">permanently locked on-chain</span> and
-                        cannot be withdrawn by anyone — including the token creator and the LOAR
-                        platform. This is enforced by the LoarLpLocker smart contract and is{' '}
-                        <span className="font-semibold">irreversible</span>. There is no admin key,
-                        timelock, or governance mechanism that can unlock it.
-                      </p>
-                    </div>
+                {/* Maturity */}
+                <div>
+                  <div className="mb-2 flex items-center justify-between text-xs">
+                    <span className="font-medium">Maturity</span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {milestonesCompleted}/{milestones.length}
+                    </span>
                   </div>
+                  <ol className="flex gap-1" aria-label="Maturity milestones">
+                    {milestones.map((m) => (
+                      <li
+                        key={m.label}
+                        title={m.label}
+                        className={cn(
+                          'h-1.5 flex-1 rounded-full',
+                          m.met ? 'bg-emerald-500' : 'bg-muted'
+                        )}
+                      >
+                        <span className="sr-only">
+                          {m.label}: {m.met ? 'done' : 'not yet'}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                  {milestones.find((m) => !m.met) && (
+                    <p className="mt-1.5 text-[11px] text-muted-foreground">
+                      Next: {milestones.find((m) => !m.met)!.label}
+                    </p>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Holder analytics — concentration donut, holder history, whale flow */}
-            <HolderInsights
-              holders={visibleHolders}
-              transfers={transfers}
-              circulatingSupplyWei={circulatingSupplyWei}
-            />
-
-            {/* Holder map — bubble map + early sniper / bundle detection */}
-            <HolderBubbleMap
-              holders={holders}
-              transfers={transfers}
-              creators={[token.deployer, token.tokenAdmin]}
-              contracts={[bondingCurve?.id, token.locker].filter((a): a is string => !!a)}
-              circulatingSupplyWei={circulatingSupplyWei}
-            />
-
-            {/* Holder Distribution */}
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <PieChart className="h-4 w-4 text-primary" />
-                  <h3 className="font-semibold text-sm">Top Holders</h3>
-                  <Badge variant="outline" className="text-[10px] ml-auto">
-                    {holderStats.total}
-                  </Badge>
-                </div>
-                {visibleHolders.length === 0 ? (
-                  <p className="text-center py-4 text-xs text-muted-foreground">
-                    No holders indexed yet
+                <details className="group rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs">
+                  <summary className="flex cursor-pointer list-none items-center gap-2 font-medium [&::-webkit-details-marker]:hidden">
+                    <Lock className="h-3.5 w-3.5 text-primary" aria-hidden />
+                    Liquidity locked forever
+                    <span className="ml-auto text-muted-foreground group-open:hidden">Why?</span>
+                  </summary>
+                  <p className="mt-2 leading-relaxed text-muted-foreground">
+                    This token&apos;s liquidity pool is permanently locked on-chain by the
+                    LoarLpLocker contract. No one can withdraw it — not the creator, not LOAR. There
+                    is no admin key, timelock, or governance path that unlocks it. Creator tokens
+                    are vested.
                   </p>
-                ) : (
-                  <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
-                    {visibleHolders.slice(0, 20).map((holder, i) => {
-                      const pct =
-                        circulatingSupplyWei === 0n
-                          ? 0
-                          : Number((BigInt(holder.balance) * 10000n) / circulatingSupplyWei) / 100;
-                      const isHighConcentration = pct > 30;
-                      return (
-                        <div key={holder.id} className="flex items-center gap-2 text-xs">
-                          <span className="w-5 text-muted-foreground text-right">#{i + 1}</span>
-                          <AddressDisplay
-                            address={holder.holderAddress}
-                            className="flex-1 truncate text-[10px]"
-                          />
-                          <div className="w-16 h-1.5 bg-secondary rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full ${
-                                isHighConcentration ? 'bg-amber-500' : 'bg-primary'
-                              }`}
-                              style={{ width: `${Math.min(pct, 100)}%` }}
-                            />
-                          </div>
-                          <span
-                            className={`w-14 text-right tabular-nums font-medium ${
-                              isHighConcentration ? 'text-amber-500' : ''
-                            }`}
-                          >
-                            {pct.toFixed(1)}%
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </details>
+              </div>
+            </Panel>
+          </aside>
 
-            {/* Universe Card */}
-            {universe && (
-              <Card>
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-sm mb-3">Universe</h3>
-                  <Link to="/universe/$id/watch" params={{ id: token.universeAddress }}>
-                    <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
-                      {universe.imageURL && (
-                        <img
-                          src={universe.imageURL}
-                          alt={universe.name}
-                          className="w-12 h-12 rounded-lg object-cover"
-                        />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{universe.name}</p>
-                        <p className="text-xs text-muted-foreground">{universe.nodeCount} events</p>
-                      </div>
-                      <ExternalLink className="h-4 w-4 text-muted-foreground" />
+          {/* Activity tabs — col 1, row 2 */}
+          <div className="min-w-0 lg:col-start-1 lg:row-start-2">
+            <Tabs defaultValue="trades">
+              <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 [scrollbar-width:none]">
+                <TabTrigger value="trades" label="Trades" count={totalSwaps} />
+                <TabTrigger value="holders" label="Holders" count={holderStats.total} />
+                <TabTrigger value="traders" label="Top traders" count={uniqueTraders} />
+                <TabTrigger value="thread" label="Discussion" />
+              </TabsList>
+
+              <TabsContent value="trades" className="mt-4 space-y-4">
+                <BuySellPressure
+                  buys={pressure24h.buys}
+                  sells={pressure24h.sells}
+                  buyVol={pressure24h.buyVol}
+                  sellVol={pressure24h.sellVol}
+                />
+                <Panel bodyClassName="p-0 sm:p-4">
+                  {swapsLoading && curveTrades.length === 0 ? (
+                    <div className="space-y-2 p-4" aria-busy="true">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <Skeleton key={i} className="h-8 w-full" />
+                      ))}
                     </div>
-                  </Link>
-                </CardContent>
-              </Card>
-            )}
+                  ) : (
+                    <TokenTransactionsTable
+                      swaps={swaps ?? []}
+                      bondingTrades={curveTrades}
+                      tokenIsCurrency0={tokenIsCurrency0}
+                      chainId={chainId}
+                    />
+                  )}
+                </Panel>
+              </TabsContent>
+
+              <TabsContent value="holders" className="mt-4 space-y-4">
+                <Panel
+                  title="Top holders"
+                  action={
+                    <span className="text-xs tabular-nums text-muted-foreground">
+                      % of circulating
+                    </span>
+                  }
+                >
+                  {visibleHolders.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">
+                      No holders indexed yet
+                    </p>
+                  ) : (
+                    <ol className="space-y-2">
+                      {visibleHolders.slice(0, 20).map((holder, i) => {
+                        const pct =
+                          circulatingSupplyWei === 0n
+                            ? 0
+                            : Number((BigInt(holder.balance) * 10000n) / circulatingSupplyWei) /
+                              100;
+                        const heavy = pct > 30;
+                        return (
+                          <li key={holder.id} className="flex items-center gap-3 text-sm">
+                            <span className="w-6 text-right text-xs tabular-nums text-muted-foreground">
+                              {i + 1}
+                            </span>
+                            <AddressDisplay
+                              address={holder.holderAddress}
+                              className="min-w-0 flex-1 text-xs"
+                            />
+                            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+                              <div
+                                className={cn(
+                                  'h-full rounded-full',
+                                  heavy ? 'bg-amber-500' : 'bg-primary'
+                                )}
+                                style={{ width: `${Math.min(pct, 100)}%` }}
+                              />
+                            </div>
+                            <span
+                              className={cn(
+                                'w-14 text-right font-mono text-xs font-medium tabular-nums',
+                                heavy && 'text-amber-600 dark:text-amber-400'
+                              )}
+                            >
+                              {pct.toFixed(1)}%
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  )}
+                </Panel>
+                <HolderInsights
+                  holders={visibleHolders}
+                  transfers={transfers}
+                  circulatingSupplyWei={circulatingSupplyWei}
+                />
+                <HolderBubbleMap
+                  holders={holders}
+                  transfers={transfers}
+                  creators={[token.deployer, token.tokenAdmin]}
+                  contracts={[bondingCurve?.id, token.locker].filter((a): a is string => !!a)}
+                  circulatingSupplyWei={circulatingSupplyWei}
+                />
+              </TabsContent>
+
+              <TabsContent value="traders" className="mt-4">
+                <TraderLeaderboardCard rows={traderRows} />
+              </TabsContent>
+
+              <TabsContent value="thread" className="mt-4">
+                <Panel>
+                  <TokenComments tokenAddress={tokenAddress} />
+                </Panel>
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Page pieces ──────────────────────────────────────────────────────
+
+function TabTrigger({ value, label, count }: { value: string; label: string; count?: number }) {
+  return (
+    <TabsTrigger
+      value={value}
+      className="h-9 flex-shrink-0 gap-1.5 rounded-lg px-3.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
+    >
+      {label}
+      {count != null && count > 0 && (
+        <span className="rounded-full bg-muted px-1.5 text-[10px] tabular-nums text-muted-foreground">
+          {count}
+        </span>
+      )}
+    </TabsTrigger>
+  );
+}
+
+function CurveProgress({
+  curve,
+  stage,
+}: {
+  curve: {
+    ethRaised: string;
+    graduationEth: string;
+    tradeCount: number;
+    graduated: boolean;
+    tradingStatus: string;
+  };
+  stage: TokenStage;
+}) {
+  const raised = weiToNumber(curve.ethRaised, 18);
+  const target = weiToNumber(curve.graduationEth, 18);
+  const pct = curve.graduated ? 100 : target > 0 ? Math.min((raised / target) * 100, 100) : 0;
+  const title =
+    stage === 'halted'
+      ? 'Trading halted'
+      : stage === 'graduated'
+        ? 'Graduated to Uniswap'
+        : stage === 'graduating'
+          ? 'Graduating soon'
+          : 'Bonding curve';
+  const note =
+    stage === 'halted'
+      ? 'Halted by governance. Trading resumes after the 48-hour timelock unless directed otherwise.'
+      : stage === 'graduated'
+        ? 'Now trading on Uniswap v4 with permanently locked liquidity.'
+        : stage === 'graduating'
+          ? 'Almost there. At the target, raised ETH and unsold tokens seed a permanent Uniswap v4 pool.'
+          : 'Price rises as people buy. At the target the token graduates to Uniswap v4.';
+
+  return (
+    <div className="border-b border-border bg-muted/40 px-4 py-3.5">
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold">{title}</h2>
+        <span className="font-mono text-sm font-semibold tabular-nums">{pct.toFixed(1)}%</span>
+      </div>
+      <GraduationBar pct={pct} stage={stage} className="h-2" />
+      <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+        <span className="font-mono tabular-nums">
+          {raised.toFixed(4)} / {target.toFixed(2)} ETH
+        </span>
+        <span className="tabular-nums">{curve.tradeCount} trades</span>
+      </div>
+      <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{note}</p>
     </div>
   );
 }
@@ -1175,174 +1080,206 @@ function SwapInterface({
     }
   };
 
+  const busy =
+    status === 'confirming' ||
+    status === 'pending' ||
+    status === 'approving' ||
+    status === 'approval-pending';
+
   return (
     <div className="space-y-4">
-      {/* Native swap badge */}
-      {isNativeSwapAvailable && (
-        <div className="flex items-center gap-1.5 text-[10px] text-green-600 dark:text-green-400">
-          <Zap className="h-2.5 w-2.5" />
-          Native swap — trades execute in-app
-        </div>
-      )}
-
-      {/* Buy/Sell Toggle */}
-      <div className="grid grid-cols-2 gap-1 p-1 bg-muted rounded-lg">
-        <button
-          onClick={() => {
-            setMode('buy');
-            reset();
-          }}
-          className={`py-2 text-sm font-semibold rounded-md transition-all ${
-            mode === 'buy'
-              ? 'bg-green-500 text-white shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Buy
-        </button>
-        <button
-          onClick={() => {
-            setMode('sell');
-            reset();
-          }}
-          className={`py-2 text-sm font-semibold rounded-md transition-all ${
-            mode === 'sell'
-              ? 'bg-red-500 text-white shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Sell
-        </button>
+      <div className="flex items-center justify-between">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
+          <ArrowUpDown className="h-4 w-4 text-primary" aria-hidden />
+          Trade ${tokenSymbol}
+        </h2>
+        {isNativeSwapAvailable && (
+          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+            <Zap className="h-3 w-3 text-primary" aria-hidden />
+            In-app swap
+          </span>
+        )}
       </div>
 
-      {/* Input */}
-      <div className="space-y-2">
+      {/* Buy / Sell */}
+      <div
+        role="tablist"
+        aria-label="Trade side"
+        className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1"
+      >
+        {(['buy', 'sell'] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            role="tab"
+            aria-selected={mode === m}
+            onClick={() => {
+              setMode(m);
+              reset();
+            }}
+            className={cn(
+              'h-9 rounded-md text-sm font-semibold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              mode === m
+                ? m === 'buy'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-red-600 text-white shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {m}
+          </button>
+        ))}
+      </div>
+
+      {/* Amount */}
+      <div className="rounded-lg border border-border bg-background p-3 focus-within:ring-2 focus-within:ring-ring">
         <div className="flex items-center justify-between text-xs">
-          <Label className="text-xs font-medium">{mode === 'buy' ? 'You pay' : 'You sell'}</Label>
+          <Label htmlFor="swap-amount" className="text-xs font-medium text-muted-foreground">
+            {mode === 'buy' ? 'You pay' : 'You sell'}
+          </Label>
           {mode === 'buy' && ethBalance && (
             <button
+              type="button"
               onClick={() => setAmount(ethBalance.formatted)}
-              className="text-muted-foreground hover:text-foreground text-[10px]"
+              className="rounded text-[11px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              Balance: {Number(ethBalance.formatted).toFixed(4)} ETH
+              Balance {Number(ethBalance.formatted).toFixed(4)} · Max
             </button>
           )}
         </div>
-        <div className="relative">
+        <div className="mt-1 flex items-center gap-2">
           <Input
-            type="number"
+            id="swap-amount"
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
             placeholder="0.0"
             value={amount}
             onChange={(e) => {
-              setAmount(e.target.value);
+              setAmount(e.target.value.replace(/[^0-9.]/g, ''));
               reset();
             }}
-            className="h-12 text-lg font-mono pr-16"
+            className="h-auto border-0 bg-transparent p-0 text-2xl font-semibold tabular-nums shadow-none focus-visible:ring-0 dark:bg-transparent"
           />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
+          <span className="flex-shrink-0 rounded-md bg-muted px-2 py-1 text-xs font-semibold">
             {mode === 'buy' ? 'ETH' : `$${tokenSymbol}`}
           </span>
         </div>
       </div>
 
-      {/* Estimated Output */}
-      {expectedOutWei !== null && expectedOutWei > 0n && (
-        <div className="p-3 bg-muted/50 rounded-lg space-y-1">
-          <p className="text-xs text-muted-foreground">
-            Estimated {mode === 'buy' ? 'tokens' : 'ETH'} received
-          </p>
-          <p className="text-sm font-bold font-mono">
-            {mode === 'buy'
-              ? formatTokenAmount(expectedOutWei.toString())
-              : `${(estimatedOutput ?? 0).toFixed(6)} ETH`}
-          </p>
-          {currentPrice && (
-            <p className="text-[10px] text-muted-foreground">
-              1 ${tokenSymbol} ={' '}
-              {currentPrice < 0.001 ? currentPrice.toExponential(3) : currentPrice.toFixed(8)} ETH
-            </p>
-          )}
-        </div>
-      )}
-      {/* Liquidity warning when we can't simulate the swap */}
-      {amount &&
-        Number(amount) > 0 &&
-        isNativeSwapAvailable &&
-        expectedOutWei === null &&
-        !!latestSqrtPriceX96 === false && (
-          <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-[11px] text-amber-700 dark:text-amber-300">
-            Pool has no recent trades — cannot quote on-chain. Wait for indexer or use a smaller
-            test trade.
-          </div>
-        )}
-
-      {/* Quick amounts */}
       {mode === 'buy' && (
-        <div className="flex gap-2">
+        <div className="grid grid-cols-4 gap-1.5">
           {['0.01', '0.05', '0.1', '0.5'].map((val) => (
-            <Button
+            <button
               key={val}
-              variant="outline"
-              size="sm"
-              className="flex-1 text-xs h-8"
-              onClick={() => setAmount(val)}
+              type="button"
+              onClick={() => {
+                setAmount(val);
+                reset();
+              }}
+              aria-pressed={amount === val}
+              className={cn(
+                'h-8 rounded-md border text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                amount === val
+                  ? 'border-primary/50 bg-primary/10 text-primary'
+                  : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}
             >
-              {val} ETH
-            </Button>
+              {val}
+            </button>
           ))}
         </div>
       )}
 
-      {/* Tx status */}
-      {(status === 'approving' || status === 'approval-pending') && (
-        <div className="p-2 bg-blue-500/10 rounded-lg text-xs text-blue-600 dark:text-blue-400 flex items-center gap-2">
-          <Loader2 className="h-3 w-3 animate-spin" />
-          {status === 'approving' ? `Approve $${tokenSymbol} in wallet…` : 'Waiting for approval…'}
-        </div>
-      )}
-      {status === 'pending' && txHash && (
-        <div className="p-2 bg-blue-500/10 rounded-lg text-xs text-blue-600 dark:text-blue-400 flex items-center gap-2">
-          <Loader2 className="h-3 w-3 animate-spin" />
-          Transaction pending...
-        </div>
-      )}
-      {status === 'error' && error && (
-        <div className="p-2 bg-red-500/10 rounded-lg text-xs text-red-600 dark:text-red-400">
-          {error}
-        </div>
+      {/* Quote */}
+      {expectedOutWei !== null && expectedOutWei > 0n && (
+        <dl className="space-y-1.5 rounded-lg bg-muted/60 p-3 text-xs">
+          <div className="flex justify-between">
+            <dt className="text-muted-foreground">You receive (est.)</dt>
+            <dd className="font-mono font-semibold tabular-nums">
+              {mode === 'buy'
+                ? `${formatTokenAmount(expectedOutWei.toString())} $${tokenSymbol}`
+                : `${(estimatedOutput ?? 0).toFixed(6)} ETH`}
+            </dd>
+          </div>
+          {currentPrice && (
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Price</dt>
+              <dd className="font-mono tabular-nums">{formatPrice(currentPrice, 8)} ETH</dd>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <dt className="text-muted-foreground">Max slippage</dt>
+            <dd className="font-mono tabular-nums">1%</dd>
+          </div>
+        </dl>
       )}
 
-      {/* Swap Button */}
+      {amount &&
+        Number(amount) > 0 &&
+        isNativeSwapAvailable &&
+        expectedOutWei === null &&
+        !latestSqrtPriceX96 && (
+          <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-200">
+            This pool has no recent trades, so it can&apos;t be quoted on-chain yet. Wait for the
+            indexer or try a smaller test trade.
+          </p>
+        )}
+
+      {/* Tx status */}
+      <div aria-live="polite">
+        {(status === 'approving' || status === 'approval-pending') && (
+          <p className="flex items-center gap-2 rounded-lg bg-muted p-2.5 text-xs">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            {status === 'approving'
+              ? `Approve $${tokenSymbol} in your wallet…`
+              : 'Waiting for approval…'}
+          </p>
+        )}
+        {status === 'pending' && txHash && (
+          <p className="flex items-center gap-2 rounded-lg bg-muted p-2.5 text-xs">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            Transaction pending…
+          </p>
+        )}
+        {status === 'error' && error && (
+          <p
+            role="alert"
+            className="rounded-lg border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-700 dark:text-red-300"
+          >
+            {error}
+          </p>
+        )}
+      </div>
+
       <Button
-        className={`w-full h-12 text-base font-bold ${
-          mode === 'buy' ? 'bg-green-600 hover:bg-green-500' : 'bg-red-600 hover:bg-red-500'
-        }`}
+        className={cn(
+          'h-12 w-full text-base font-bold text-white transition-transform active:scale-[0.98] motion-reduce:active:scale-100',
+          mode === 'buy' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500'
+        )}
         onClick={handleSwap}
         disabled={
           !amount ||
+          !Number.isFinite(Number(amount)) ||
           Number(amount) <= 0 ||
           // No fresh pool snapshot → can't enforce slippage; refuse to swap
           // rather than fall through to an unbounded execution.
           (isNativeSwapAvailable && expectedOutWei === null) ||
-          status === 'confirming' ||
-          status === 'pending' ||
-          status === 'approving' ||
-          status === 'approval-pending'
+          busy
         }
       >
-        {status === 'confirming' || status === 'approving' || status === 'approval-pending' ? (
-          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-        ) : (
-          <ArrowUpDown className="h-5 w-5 mr-2" />
-        )}
+        {busy && <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden />}
         {mode === 'buy' ? `Buy $${tokenSymbol}` : `Sell $${tokenSymbol}`}
-        {!isNativeSwapAvailable && <ExternalLink className="h-3 w-3 ml-2 opacity-50" />}
+        {!isNativeSwapAvailable && (
+          <ExternalLink className="ml-2 h-3.5 w-3.5 opacity-70" aria-hidden />
+        )}
       </Button>
 
-      <p className="text-[10px] text-center text-muted-foreground">
+      <p className="text-center text-[11px] text-muted-foreground">
         {isNativeSwapAvailable
-          ? 'Swaps execute on-chain via LoarSwapRouter. LP is permanently locked.'
-          : 'Swaps execute on Uniswap v4. LP is permanently locked.'}
+          ? 'Executes on-chain via LoarSwapRouter.'
+          : 'Opens Uniswap v4 to complete the swap.'}{' '}
+        LP is locked forever.
       </p>
     </div>
   );
@@ -1353,33 +1290,33 @@ function SwapInterface({
 function InfoRow({
   label,
   value,
-  copyable,
   onCopy,
   copied,
 }: {
   label: string;
   value: string;
-  copyable?: boolean;
-  onCopy?: (addr: string) => void;
+  onCopy: (addr: string) => void;
   copied?: string | null;
-}) {
+}): ReactNode {
+  if (!value) return null;
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-muted-foreground">{label}</span>
-      <div className="flex items-center gap-1">
-        <span className="font-mono text-[10px]">
-          {value.slice(0, 8)}...{value.slice(-6)}
-        </span>
-        {copyable && onCopy && (
-          <button onClick={() => onCopy(value)} className="hover:text-foreground transition-colors">
-            {copied === value ? (
-              <CheckCircle2 className="h-3 w-3 text-green-500" />
-            ) : (
-              <Copy className="h-3 w-3" />
-            )}
-          </button>
-        )}
-      </div>
+    <div className="flex items-center justify-between gap-2">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd>
+        <button
+          type="button"
+          onClick={() => onCopy(value)}
+          aria-label={`Copy ${label.toLowerCase()} address`}
+          className="inline-flex items-center gap-1.5 rounded font-mono text-[11px] transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {value.slice(0, 6)}…{value.slice(-4)}
+          {copied === value ? (
+            <CheckCircle2 className="h-3 w-3 text-emerald-500" aria-hidden />
+          ) : (
+            <Copy className="h-3 w-3 text-muted-foreground" aria-hidden />
+          )}
+        </button>
+      </dd>
     </div>
   );
 }

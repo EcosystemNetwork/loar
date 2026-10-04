@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { getExplorerTxUrl } from '@/configs/chains';
 import { useChainId } from 'wagmi';
+import { LaunchpadNav } from '@/components/tokens/launchpad/LaunchpadNav';
 
 export const Route = createFileRoute('/tokens/portfolio')({
   component: PortfolioPage,
@@ -62,18 +63,13 @@ function PortfolioPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-5xl mx-auto px-4 py-6">
+    <div className="min-h-screen bg-background pb-bottom-nav md:pb-12">
+      <LaunchpadNav />
+      <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
-          <Link to="/tokens">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Launchpad
-            </Button>
-          </Link>
           <div>
-            <h1 className="text-2xl font-bold">Portfolio</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Portfolio</h1>
             <p className="text-sm text-muted-foreground">Track your token trades and PnL</p>
           </div>
         </div>
