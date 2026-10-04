@@ -71,6 +71,7 @@ function serializeGalleryItem(
     contentHash: data.contentHash || null,
     generationId: data.generationId || null,
     generationModel: data.generationModel || null,
+    entityId: data.entityId || null,
     views: data.views || 0,
     likes: data.likes || 0,
     visibility: data.visibility || 'public',
@@ -264,6 +265,28 @@ export const galleryRouter = router({
     }),
 
   /** Get trending content (most viewed in recent period) */
+  /**
+   * Resolve the wiki entity a gallery item was generated for. Newer docs carry
+   * `entityId`; older ones are matched through the entity media attachment
+   * written with the same generationId.
+   */
+  wikiEntity: publicProcedure
+    .input(z.object({ contentId: z.string().min(1).max(200) }))
+    .query(async ({ input }) => {
+      const doc = await contentCol().doc(input.contentId).get();
+      const data = doc.data();
+      if (!doc.exists || !data || !isVisible(data.contentStatus)) return { entityId: null };
+      if (typeof data.entityId === 'string' && data.entityId) return { entityId: data.entityId };
+      if (!data.generationId) return { entityId: null };
+      const snap = await db!
+        .collection('mediaAttachments')
+        .where('generationId', '==', data.generationId)
+        .limit(5)
+        .get();
+      const hit = snap.docs.find((d) => d.data().targetType === 'entity' && d.data().targetId);
+      return { entityId: (hit?.data().targetId as string | undefined) ?? null };
+    }),
+
   trending: publicProcedure
     .input(
       z.object({

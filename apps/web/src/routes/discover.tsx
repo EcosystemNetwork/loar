@@ -54,6 +54,7 @@ import {
   Crown,
   Box,
   Rotate3d,
+  BookOpen,
 } from 'lucide-react';
 
 export const Route = createFileRoute('/discover')({
@@ -1566,6 +1567,15 @@ function DiscoverItemViewerDialog({
   const isAudio = type === 'audio' || type === 'ai-audio';
   const is3D = type === '3d';
 
+  // Link back to the wiki page of the entity this asset was generated for.
+  const { data: wikiEntity } = useQuery({
+    queryKey: ['discover-wiki-entity', item?.id],
+    queryFn: () => trpcClient.gallery.wikiEntity.query({ contentId: item.id }),
+    enabled: !!item?.id && !item?.entityId,
+    staleTime: Infinity,
+  });
+  const entityId: string | null = item?.entityId ?? wikiEntity?.entityId ?? null;
+
   let body: React.ReactNode;
   if (!item) {
     body = null;
@@ -1628,15 +1638,29 @@ function DiscoverItemViewerDialog({
         </DialogHeader>
         <div className="space-y-3">
           {body}
-          {item?.universeId && (
-            <Link
-              to="/universe/$id/watch"
-              params={{ id: item.universeId }}
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <Globe className="h-3 w-3" />
-              {item.universeName ? `Open ${item.universeName}` : 'Open universe'}
-            </Link>
+          {(item?.universeId || entityId) && (
+            <div className="flex flex-wrap items-center gap-4">
+              {entityId && (
+                <Link
+                  to="/wiki/entity/$id"
+                  params={{ id: entityId }}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <BookOpen className="h-3 w-3" />
+                  Open in wiki
+                </Link>
+              )}
+              {item?.universeId && (
+                <Link
+                  to="/universe/$id/watch"
+                  params={{ id: item.universeId }}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <Globe className="h-3 w-3" />
+                  {item.universeName ? `Open ${item.universeName}` : 'Open universe'}
+                </Link>
+              )}
+            </div>
           )}
         </div>
       </DialogContent>

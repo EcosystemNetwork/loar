@@ -39,6 +39,8 @@ export interface PublishGalleryInput {
    * meshopt-compressed GLB). Edits/exports must start from this.
    */
   sourceMediaUrl?: string | null;
+  /** Wiki entity this asset was generated for — lets viewers link back to its page. */
+  entityId?: string | null;
 }
 
 // Ephemeral-host detection lives in ./rehost-ephemeral so entities and other
@@ -118,6 +120,7 @@ export function buildGalleryDoc(
       ? { sourceAudioGenerationId: input.sourceAudioGenerationId }
       : {}),
     ...(input.sourceMediaUrl ? { sourceMediaUrl: input.sourceMediaUrl } : {}),
+    ...(input.entityId ? { entityId: input.entityId } : {}),
     ...(extra?.contentHash ? { storageContentHash: extra.contentHash } : {}),
   };
 }
