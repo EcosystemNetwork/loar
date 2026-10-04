@@ -259,9 +259,19 @@ Five layers, five failure modes: entry never tracked (boot), prices fluctuated a
 | `meshy-animation` | meshy | standard |  | $0.0600 | $0.0800 | $0.0800 | 8 | ✅ live |
 | `meshy-remesh` | meshy | standard |  | $0.1000 | $0.1400 | $0.1300 | 15 | ✅ live |
 | `meshy-rigging` | meshy | standard |  | $0.1000 | $0.1400 | $0.1300 | 15 | ✅ live |
+| `tripo-remesh` | tripo | standard |  | $0.1000 | $0.1400 | $0.1300 | 15 | ✅ live |
+| `tripo-animation` | tripo | standard |  | $0.1000 | $0.1400 | $0.1300 | 15 | ✅ live |
 | `meshy-text-to-3d-preview` | meshy | standard |  | $0.2000 | $0.2700 | $0.2500 | 27 | ✅ live |
 | `meshy-text-to-3d-refine` | meshy | premium |  | $0.2000 | $0.2700 | $0.2500 | 27 | ✅ live |
 | `meshy-retexture` | meshy | standard |  | $0.2000 | $0.2700 | $0.2500 | 27 | ✅ live |
+| `tripo-text-to-3d-game` | tripo | standard |  | $0.2500 | $0.3400 | $0.3100 | 34 | ✅ live |
+| `tripo-image-to-3d-game` | tripo | standard |  | $0.2500 | $0.3400 | $0.3100 | 34 | ✅ live |
+| `tripo-multiview-to-3d-game` | tripo | standard |  | $0.2500 | $0.3400 | $0.3100 | 34 | ✅ live |
+| `tripo-retexture` | tripo | standard |  | $0.3000 | $0.4100 | $0.3800 | 41 | ✅ live |
+| `tripo-rigging` | tripo | standard |  | $0.3000 | $0.4100 | $0.3800 | 41 | ✅ live |
+| `tripo-text-to-3d-hifi` | tripo | premium |  | $0.4000 | $0.5400 | $0.5000 | 54 | ✅ live |
+| `tripo-image-to-3d-hifi` | tripo | premium |  | $0.4000 | $0.5400 | $0.5000 | 54 | ✅ live |
+| `tripo-multiview-to-3d-hifi` | tripo | premium |  | $0.4000 | $0.5400 | $0.5000 | 54 | ✅ live |
 | `pixal-3d-fal` | fal | standard |  | $0.4000 | $0.5400 | $0.5000 | 54 | ✅ live |
 | `hunyuan-3d-text-fal` | fal | standard |  | $0.5000 | $0.6800 | $0.6300 | 68 | ✅ live |
 | `meshy-image-to-3d` | meshy | premium |  | $0.6000 | $0.8100 | $0.7500 | 81 | ✅ live |
@@ -350,9 +360,9 @@ Five layers, five failure modes: entry never tracked (boot), prices fluctuated a
 | Video | 61 | 55 |
 | TTS | 17 | 17 |
 | Transcription | 21 | 20 |
-| 3D | 11 | 11 |
+| 3D | 21 | 21 |
 | Audio | 20 | 20 |
 | Editing | 37 | 37 |
-| **TOTAL** | **242** | **224** |
+| **TOTAL** | **252** | **234** |
 
 _End of generated document._
