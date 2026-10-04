@@ -1,5 +1,7 @@
 /**
- * Tripo3D Service — non-humanoid rigging + animation library (OpenAPI v3).
+ * Tripo3D Service — OpenAPI v3: generation (image/text/multiview → mesh,
+ * image → splat), processing (texture, stylize, convert, segment, complete)
+ * and non-humanoid rigging + animation.
  *
  * Covers what Meshy can't: quadrupeds, birds, snakes, fish, insects, spiders,
  * mechanical creatures, vehicles. Tripo's rig types are
@@ -22,7 +24,8 @@
 
 import { NoKeyAvailableError } from './provider-keys/types';
 
-const BASE_URL = 'https://openapi.tripo3d.ai/v3';
+// `TRIPO_API_HOST` lets tests point the service at a local fake of the v3 API.
+const BASE_URL = `${process.env.TRIPO_API_HOST?.replace(/\/+$/, '') || 'https://openapi.tripo3d.ai'}/v3`;
 
 /** Rig model versions. v2.5 covers every non-humanoid rig type; v1.0 is biped-only. */
 const RIG_MODEL_NONHUMANOID = 'v2.5-20260210';
@@ -78,7 +81,29 @@ export interface TripoTask {
     model_urls?: string[];
     rendered_video_url?: string;
     rendered_image_url?: string;
+    generated_image_url?: string;
+    image_urls?: string[];
+    front_view_url?: string;
+    left_view_url?: string;
+    back_view_url?: string;
+    right_view_url?: string;
+    generate_multiview_image?: {
+      front_view_url?: string;
+      left_view_url?: string;
+      back_view_url?: string;
+      right_view_url?: string;
+    };
+    /** Gaussian splat file (image-to-splat). */
+    splat_url?: string;
+    /** Segmented GLB (mesh/segment). */
+    seg_model_url?: string;
+    /** Generated prompt, or comma-separated part labels for segmentation. */
+    prompt?: string;
+    /** rig-check verdict. */
+    riggable?: boolean;
+    rig_type?: string;
   };
+  credits_consumed?: number;
   /** Present when status is `failed`. */
   error_code?: number;
   /** Present when status is `failed`. */
@@ -228,6 +253,230 @@ class Tripo3dService {
     return { taskId: json.data.task_id };
   }
 
+  // ── Generation + processing (world-building pipeline) ──────────────────
+  //
+  // Every method below submits one task and returns its id; completion is
+  // polled with `waitForTask`. `input` fields accept a public URL, a
+  // `file_token`, or a prior task_id — v3 resolves all three — so chained
+  // steps pass the upstream task_id and skip a re-upload.
+
+  private async createTask(
+    path: string,
+    body: Record<string, unknown>,
+    apiKey?: string
+  ): Promise<{ taskId: string }> {
+    const key = this.resolveKey(apiKey);
+    // Drop undefined fields so Tripo applies its own defaults.
+    const clean = Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined));
+    const json = await this.post<CreateTaskResponse>(path, clean, key);
+    if (!json.data?.task_id) throw new Error(`Tripo3D ${path} returned no task id`);
+    return { taskId: json.data.task_id };
+  }
+
+  /** Single image → textured mesh. `input` is a public image URL or file token. */
+  imageToModel(args: TripoGenerateOptions & { input: string; apiKey?: string }) {
+    const { input, apiKey, ...opts } = args;
+    return this.createTask(
+      '/generation/image-to-model',
+      { input, ...generateBody(opts), enable_image_autofix: true },
+      apiKey
+    );
+  }
+
+  /** Text prompt → textured mesh. */
+  textToModel(
+    args: TripoGenerateOptions & { prompt: string; negativePrompt?: string; apiKey?: string }
+  ) {
+    const { prompt, negativePrompt, apiKey, ...opts } = args;
+    return this.createTask(
+      '/generation/text-to-model',
+      { prompt: prompt.slice(0, 1024), negative_prompt: negativePrompt, ...generateBody(opts) },
+      apiKey
+    );
+  }
+
+  /**
+   * Four orthographic-ish views → mesh. Pass a prior `imageToMultiview`
+   * task id (preferred — keeps the views Tripo itself generated) or four URLs.
+   */
+  multiviewToModel(
+    args: TripoGenerateOptions & {
+      multiviewTaskId?: string;
+      views?: { front: string; left?: string; back?: string; right?: string };
+      apiKey?: string;
+    }
+  ) {
+    const { multiviewTaskId, views, apiKey, ...opts } = args;
+    if (!multiviewTaskId && !views) throw new Error('multiviewToModel needs a task id or views');
+    return this.createTask(
+      '/generation/multiview-to-model',
+      {
+        ...(multiviewTaskId
+          ? { original_model_task_id: multiviewTaskId }
+          : {
+              inputs: [
+                Object.fromEntries(
+                  Object.entries(views!)
+                    .filter(([, url]) => !!url)
+                    .map(([view, url]) => [view, { type: imageExt(url!), url }])
+                ),
+              ],
+            }),
+        ...generateBody(opts),
+      },
+      apiKey
+    );
+  }
+
+  /** One image → front/left/back/right character sheet (turnaround). */
+  imageToMultiview(args: { input: string; apiKey?: string }) {
+    return this.createTask('/generation/image-to-multiview', { input: args.input }, args.apiKey);
+  }
+
+  /**
+   * Image edit with a Tripo template — `t_pose` normalises a character
+   * cover into a clean A/T-pose full-body render that rigs far better than
+   * an action shot; `asset_extraction` isolates a prop from a busy scene.
+   */
+  imageToImage(args: {
+    input: string;
+    template?: 't_pose' | 'asset_extraction' | 'character_completion';
+    prompt?: string;
+    apiKey?: string;
+  }) {
+    return this.createTask(
+      '/generation/image-to-image',
+      { input: args.input, template: args.template, prompt: args.prompt },
+      args.apiKey
+    );
+  }
+
+  /** One image → Gaussian splat environment (places / sets). */
+  imageToSplat(args: { input: string; apiKey?: string }) {
+    return this.createTask('/generation/image-to-splat', { input: args.input }, args.apiKey);
+  }
+
+  /** Re-texture an existing mesh from a text and/or style-image prompt. */
+  textureModel(args: {
+    input: string;
+    text?: string;
+    styleImageUrl?: string;
+    quality?: 'standard' | 'detailed';
+    pbr?: boolean;
+    apiKey?: string;
+  }) {
+    return this.createTask(
+      '/models/texture',
+      {
+        input: args.input,
+        texture: true,
+        pbr: args.pbr ?? true,
+        texture_quality: args.quality ?? 'standard',
+        texture_prompt: {
+          ...(args.text ? { text: args.text.slice(0, 1024) } : {}),
+          ...(args.styleImageUrl
+            ? { style_image: { type: imageExt(args.styleImageUrl), url: args.styleImageUrl } }
+            : {}),
+        },
+      },
+      args.apiKey
+    );
+  }
+
+  /** Fun stylisations — lego, voxel, minecraft… */
+  stylizeModel(args: { input: string; style: TripoStylizeStyle; apiKey?: string }) {
+    return this.createTask(
+      '/models/stylize',
+      { input: args.input, style: args.style, render_image: true },
+      args.apiKey
+    );
+  }
+
+  /** Format conversion + game-engine prep (quad retopo, poly budget, FBX presets). */
+  convertModel(args: {
+    input: string;
+    format: TripoConvertFormat;
+    quad?: boolean;
+    faceLimit?: number;
+    fbxPreset?: 'blender' | '3dsmax' | 'mixamo';
+    pivotToCenterBottom?: boolean;
+    withAnimation?: boolean;
+    partNames?: string[];
+    apiKey?: string;
+  }) {
+    return this.createTask(
+      '/models/convert',
+      {
+        input: args.input,
+        format: args.format,
+        quad: args.quad,
+        face_limit: args.faceLimit,
+        fbx_preset: args.format === 'FBX' ? args.fbxPreset : undefined,
+        pivot_to_center_bottom: args.pivotToCenterBottom ?? true,
+        with_animation: args.withAnimation,
+        part_names: args.partNames,
+        bake: true,
+        pack_uv: true,
+      },
+      args.apiKey
+    );
+  }
+
+  /** Split a mesh into named parts (v2 segmentation). */
+  segmentMesh(args: {
+    input: string;
+    granularity?: 'simple' | 'balanced' | 'detailed';
+    apiKey?: string;
+  }) {
+    return this.createTask(
+      '/mesh/segment',
+      {
+        input: args.input,
+        model: SEGMENT_MODEL,
+        segmentation_granularity: args.granularity ?? 'balanced',
+      },
+      args.apiKey
+    );
+  }
+
+  /** Fill the open faces left by segmentation so each part is a closed solid. */
+  completeMesh(args: { segmentTaskId: string; partNames?: string[]; apiKey?: string }) {
+    return this.createTask(
+      '/mesh/complete',
+      {
+        input: args.segmentTaskId,
+        part_names: args.partNames,
+        completion_mode: 'ai_completion',
+      },
+      args.apiKey
+    );
+  }
+
+  /** Is this mesh riggable, and as what? */
+  rigCheck(args: { input: string; apiKey?: string }) {
+    return this.createTask('/animations/rig-check', { input: args.input }, args.apiKey);
+  }
+
+  /** Retarget several presets in one task (one output per animation). */
+  retargetAnimations(args: {
+    input: string;
+    animations: TripoAnimation[];
+    inPlace?: boolean;
+    apiKey?: string;
+  }) {
+    return this.createTask(
+      '/animations/retarget',
+      {
+        input: args.input,
+        animations: args.animations,
+        out_format: 'glb',
+        bake_animation: true,
+        animate_in_place: args.inPlace ?? true,
+      },
+      args.apiKey
+    );
+  }
+
   async getTask(taskId: string, apiKey?: string): Promise<TripoTask> {
     const key = this.resolveKey(apiKey);
     const json = await this.get<GetTaskResponse>(`/tasks/${taskId}`, key);
@@ -255,6 +504,71 @@ class Tripo3dService {
     }
     throw new Error(`Tripo3D task ${taskId} timed out after ${maxWaitMs / 1000}s`);
   }
+}
+
+/** Geometry models: H3.1 maximises fidelity, P1 gives clean engine-ready topology. */
+export const TRIPO_MODEL_HIFI = 'v3.1-20260211';
+export const TRIPO_MODEL_GAME = 'P1-20260311';
+const SEGMENT_MODEL = 'v2.0-20260430';
+
+export type TripoQuality = 'hifi' | 'game';
+export type TripoStylizeStyle = 'lego' | 'voxel' | 'voronoi' | 'minecraft';
+export type TripoConvertFormat = 'GLTF' | 'USDZ' | 'FBX' | 'OBJ' | 'STL' | '3MF';
+
+export interface TripoGenerateOptions {
+  /** `hifi` (H3.1, default) or `game` (P1, low-poly clean topology). */
+  quality?: TripoQuality;
+  faceLimit?: number;
+  /** Return the generated front/left/back/right views alongside the mesh. */
+  returnMultiview?: boolean;
+  /** Generate segmented, editable parts during generation. */
+  generateParts?: boolean;
+  /** Render a turntable preview video. */
+  renderVideo?: boolean;
+}
+
+function generateBody(o: TripoGenerateOptions): Record<string, unknown> {
+  const game = o.quality === 'game';
+  return {
+    model: game ? TRIPO_MODEL_GAME : TRIPO_MODEL_HIFI,
+    texture: true,
+    pbr: true,
+    texture_quality: game ? 'standard' : 'detailed',
+    geometry_quality: game ? 'standard' : 'detailed',
+    // Real-world metres: props and characters drop into a set at sane scale.
+    auto_size: true,
+    face_limit: o.faceLimit,
+    smart_low_poly: game ? true : undefined,
+    return_multiview: o.returnMultiview,
+    generate_parts: o.generateParts,
+    render_video: o.renderVideo,
+  };
+}
+
+function imageExt(url: string): string {
+  const m = /\.(png|jpe?g|webp)(?:$|\?)/i.exec(url);
+  return m ? m[1].toLowerCase().replace('jpg', 'jpeg') : 'png';
+}
+
+/**
+ * Collect the four turnaround views from whichever field a task reports
+ * them in (image-to-multiview uses top-level `*_view_url`, generation tasks
+ * with `return_multiview` nest them under `generate_multiview_image`).
+ */
+export function tripoMultiviewUrls(task: TripoTask): {
+  front?: string;
+  left?: string;
+  back?: string;
+  right?: string;
+} {
+  const o = task.output ?? {};
+  const n = o.generate_multiview_image ?? {};
+  return {
+    front: o.front_view_url ?? n.front_view_url,
+    left: o.left_view_url ?? n.left_view_url,
+    back: o.back_view_url ?? n.back_view_url,
+    right: o.right_view_url ?? n.right_view_url,
+  };
 }
 
 function inferFilename(url: string): string {
