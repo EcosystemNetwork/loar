@@ -3,11 +3,15 @@
  * Spark. One SparkRenderer per scene; the SplatMesh is a plain Object3D.
  *
  * Our stored URLs are IPFS gateway links without a file extension, so the
- * file type is passed explicitly from the job's recorded format.
+ * file type is passed explicitly from the job's recorded format. They point at
+ * our token-gated dedicated gateway, and Spark fetches inside a worker that
+ * the global IPFS fallback can't reach — so resolve to an authenticated URL
+ * before handing it over, or the worker gets a 401.
  */
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useThree } from '@react-three/fiber';
 import { SparkRenderer, SplatMesh, SplatFileType } from '@sparkjsdev/spark';
+import { primeIpfsGatewayConfig, resolveIpfsUrlAsync } from '@/utils/ipfs-url';
 import type { Vec3 } from './types';
 
 const FILE_TYPES: Record<string, SplatFileType> = {
@@ -45,12 +49,35 @@ export function SplatEnvironment({
     };
   }, [gl, scene]);
 
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setResolvedUrl(null);
+    // The dedicated host is only recognised once the gateway config is primed.
+    void primeIpfsGatewayConfig()
+      .then(() => resolveIpfsUrlAsync(url))
+      .then((u) => {
+        if (!cancelled) setResolvedUrl(u || url);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+
   const mesh = useMemo(
     () =>
-      new SplatMesh({ url, fileType: splatFileType(format), fileName: `env.${format ?? 'ply'}` }),
-    [url, format]
+      resolvedUrl
+        ? new SplatMesh({
+            url: resolvedUrl,
+            fileType: splatFileType(format),
+            fileName: `env.${format ?? 'ply'}`,
+          })
+        : null,
+    [resolvedUrl, format]
   );
-  useEffect(() => () => mesh.dispose(), [mesh]);
+  useEffect(() => () => mesh?.dispose(), [mesh]);
+
+  if (!mesh) return null;
 
   // 3DGS captures are conventionally Y-down; flip about X so the scene stands upright.
   return (
