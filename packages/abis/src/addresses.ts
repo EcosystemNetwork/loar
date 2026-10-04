@@ -188,5 +188,13 @@ export type UniverseTokenDeployerChainId = keyof typeof UniverseTokenDeployer;
 export const StoryBounties: Record<string, `0x${string}`> = {};
 export type StoryBountiesChainId = keyof typeof StoryBounties;
 
-export const LoarHookStaticFee: Record<string, `0x${string}`> = {};
+// Sepolia: the only deployed hook. Its factory() is the OLD UniverseManager
+// (0xb82d…5f00), so tokens launched with it can trade on their bonding curve
+// but graduateFromBondingCurve reverts OnlyFactory. Replace with a hook whose
+// factory is the live UniverseManager (script/DeployHook.s.sol + a new
+// LoarLpLockerMultiple via script/DeployLocker.s.sol — the locker is bound to
+// the old manager too).
+export const LoarHookStaticFee: Record<string, `0x${string}`> = {
+  '11155111': '0xF5b2676E0fbc7551ae3E38f25D87C941C5a968CC',
+};
 export type LoarHookStaticFeeChainId = keyof typeof LoarHookStaticFee;
