@@ -1,6 +1,7 @@
 /**
- * Token detail (read-only). Trading happens on web — mobile has no EVM stack —
- * so the primary action hands off to loar.fun/tokens/:address.
+ * Token detail. Bonding-curve tokens trade in-app (TradePanel — server-quoted,
+ * Circle-signed); graduated tokens trade on Uniswap, which still hands off to
+ * loar.fun/tokens/:address.
  */
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
@@ -8,6 +9,8 @@ import React from 'react';
 import { Linking, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TokenAvatar, type LaunchpadToken } from '../../src/components/launchpad/TokenRow';
+import { TradePanel } from '../../src/components/launchpad/TradePanel';
+import { useAuth } from '../../src/contexts/AuthContext';
 import { Badge } from '../../src/components/ui/Badge';
 import { Button } from '../../src/components/ui/Button';
 import { EmptyState } from '../../src/components/ui/EmptyState';
@@ -30,6 +33,7 @@ export default function TokenDetailScreen() {
     trpc.launchpad.get.queryOptions({ address: address ?? '' }, { enabled: !!address })
   );
   const token = query.data as LaunchpadToken | undefined;
+  const { address: account } = useAuth();
 
   if (query.isLoading) return <LoadingSpinner message="Loading token…" />;
   if (!token) {
@@ -43,6 +47,11 @@ export default function TokenDetailScreen() {
       </SafeAreaView>
     );
   }
+
+  // In-app trading signs with the account's Circle wallet (an EVM address);
+  // only the bonding-curve phase is quoted server-side.
+  const canTradeInApp =
+    token.stage === 'bonding' && !!account && /^0x[0-9a-fA-F]{40}$/.test(account);
 
   const socials = (Object.keys(SOCIAL_LABEL) as (keyof typeof SOCIAL_LABEL)[]).filter(
     (k) => token.socials[k]
@@ -105,9 +114,13 @@ export default function TokenDetailScreen() {
           </View>
         )}
 
-        <Button onPress={() => void Linking.openURL(webTokenUrl(token.id))}>
-          Trade on loar.fun
-        </Button>
+        {canTradeInApp ? (
+          <TradePanel token={token.id} symbol={token.symbol} />
+        ) : (
+          <Button onPress={() => void Linking.openURL(webTokenUrl(token.id))}>
+            Trade on loar.fun
+          </Button>
+        )}
         <Button
           variant="secondary"
           onPress={() =>
@@ -119,9 +132,15 @@ export default function TokenDetailScreen() {
         >
           Share
         </Button>
-        <Text className="text-text-tertiary text-xs text-center">
-          Trading opens in your browser — the LOAR app is read-only for launchpad tokens.
-        </Text>
+        {!canTradeInApp && (
+          <Text className="text-text-tertiary text-xs text-center">
+            {token.stage === 'graduated'
+              ? 'Graduated tokens trade on Uniswap — this opens in your browser.'
+              : token.stage === 'halted'
+                ? 'Trading is halted for this token.'
+                : 'Sign in with your LOAR account to trade in the app.'}
+          </Text>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

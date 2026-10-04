@@ -14,7 +14,9 @@
  * testnet-only ad-hoc contracts.
  */
 import * as addresses from '@loar/abis/addresses';
+import { getAddress } from 'viem';
 import { db, firebaseAvailable } from './firebase';
+import { ponderQuery } from './ponder';
 
 const LOWER = (a: string) => a.toLowerCase();
 
@@ -102,9 +104,25 @@ async function lookupDynamic(chainId: number, address: string): Promise<boolean>
     .limit(1)
     .get();
 
-  const allowed = !snap.empty;
+  const allowed = !snap.empty || (await isIndexedLaunchpadContract(chainId, address));
   setDynamicCache(key, { allowed, expiresAt: Date.now() + DYNAMIC_TTL_MS });
   return allowed;
+}
+
+// Launchpad tokens and their per-token BondingCurve contracts are deployed by
+// UniverseManager and recorded by the indexer from its own events, but a curve
+// never lands in Firestore — without this, every curve buy/sell (and the
+// token `approve` a sell needs) was rejected by /api/tx/write.
+const INDEXER_CHAIN_ID = Number(process.env.PONDER_CHAIN_ID ?? 11155111);
+
+async function isIndexedLaunchpadContract(chainId: number, address: string): Promise<boolean> {
+  if (chainId !== INDEXER_CHAIN_ID || !/^0x[0-9a-fA-F]{40}$/.test(address)) return false;
+  const id = getAddress(address);
+  const data = await ponderQuery<{
+    bondingCurve: { id: string } | null;
+    token: { id: string } | null;
+  }>(`query ($id: String!) { bondingCurve(id: $id) { id } token(id: $id) { id } }`, { id });
+  return !!(data?.bondingCurve || data?.token);
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────

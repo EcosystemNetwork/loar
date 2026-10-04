@@ -9,6 +9,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { isContractAllowed, _staticAllowlistSize } from '../lib/contract-allowlist';
 import * as addresses from '@loar/abis/addresses';
 import { db } from '../lib/firebase';
+import { ponderQuery } from '../lib/ponder';
+import { getAddress } from 'viem';
+
+vi.mock('../lib/ponder', () => ({ ponderQuery: vi.fn().mockResolvedValue(null) }));
 
 const ETH_SEPOLIA = 11155111;
 const ETH_MAINNET = 1;
@@ -76,5 +80,55 @@ describe('contract-allowlist (dynamic — universes.tokenAddress)', () => {
 
     await expect(isContractAllowed(ETH_SEPOLIA, dynamicAddr)).resolves.toBe(true);
     expect(whereMock).toHaveBeenCalledWith('tokenAddress', '==', dynamicAddr);
+  });
+});
+
+describe('contract-allowlist (dynamic — indexed launchpad contracts)', () => {
+  const emptyFirestore = () => {
+    const snap = { empty: true, docs: [] };
+    (db as any).collection = vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        limit: vi.fn().mockReturnValue({ get: vi.fn().mockResolvedValue(snap) }),
+      }),
+    });
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    emptyFirestore();
+  });
+
+  it('allows a bonding curve the indexer recorded', async () => {
+    const curve = '0xbbbb000000000000000000000000000000000002';
+    vi.mocked(ponderQuery).mockResolvedValueOnce({ bondingCurve: { id: curve }, token: null });
+    await expect(isContractAllowed(ETH_SEPOLIA, curve)).resolves.toBe(true);
+    // The indexer stores checksummed ids, so the lookup must checksum too.
+    expect(vi.mocked(ponderQuery).mock.calls[0][1]).toEqual({
+      id: getAddress(curve),
+    });
+  });
+
+  it('allows a launchpad token the indexer recorded (needed for sell approvals)', async () => {
+    const token = '0xbbbb000000000000000000000000000000000003';
+    vi.mocked(ponderQuery).mockResolvedValueOnce({ bondingCurve: null, token: { id: token } });
+    await expect(isContractAllowed(ETH_SEPOLIA, token)).resolves.toBe(true);
+  });
+
+  it('rejects when the indexer knows neither, or is unreachable', async () => {
+    vi.mocked(ponderQuery).mockResolvedValueOnce({ bondingCurve: null, token: null });
+    await expect(
+      isContractAllowed(ETH_SEPOLIA, '0xbbbb000000000000000000000000000000000004')
+    ).resolves.toBe(false);
+    vi.mocked(ponderQuery).mockResolvedValueOnce(null);
+    await expect(
+      isContractAllowed(ETH_SEPOLIA, '0xbbbb000000000000000000000000000000000005')
+    ).resolves.toBe(false);
+  });
+
+  it('does not consult the indexer for another chain', async () => {
+    await expect(
+      isContractAllowed(ETH_MAINNET, '0xbbbb000000000000000000000000000000000006')
+    ).resolves.toBe(false);
+    expect(ponderQuery).not.toHaveBeenCalled();
   });
 });

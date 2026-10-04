@@ -10,7 +10,7 @@
  * Authentication: Uses the existing siwe-session JWT cookie.
  * The JWT sub (wallet address) is mapped to the Circle wallet ID.
  */
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { verifySessionToken } from '../lib/siwe';
 import { executeTransaction, getTransactionStatus } from '../lib/circle-wallets';
@@ -22,6 +22,18 @@ import { encodeFunctionData, type Abi } from 'viem';
 export const txProxyRoutes = new Hono();
 
 const COOKIE_NAME = 'siwe-session';
+
+/**
+ * Session JWT from the web's httpOnly cookie, or from `Authorization: Bearer`
+ * for the mobile app (SecureStore token, no cookie jar). Same token, same
+ * verification either way.
+ */
+function sessionToken(c: Context): string | undefined {
+  const cookie = getCookie(c, COOKIE_NAME);
+  if (cookie) return cookie;
+  const auth = c.req.header('Authorization');
+  return auth?.startsWith('Bearer ') ? auth.slice(7).trim() || undefined : undefined;
+}
 
 /**
  * F8: optional per-selector allowlist. The contract allowlist gates *which
@@ -90,7 +102,7 @@ async function resolveWallet(
  */
 txProxyRoutes.post('/write', async (c) => {
   // Auth check
-  const token = getCookie(c, COOKIE_NAME);
+  const token = sessionToken(c);
   if (!token) {
     return c.json({ error: 'Not authenticated' }, 401);
   }
@@ -283,7 +295,7 @@ txProxyRoutes.post('/write', async (c) => {
  * other users' tx ids.
  */
 txProxyRoutes.get('/status/:txId', async (c) => {
-  const token = getCookie(c, COOKIE_NAME);
+  const token = sessionToken(c);
   if (!token) {
     return c.json({ error: 'Not authenticated' }, 401);
   }

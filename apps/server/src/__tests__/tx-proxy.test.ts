@@ -22,6 +22,10 @@ vi.mock('../lib/circle-wallets', () => ({
   getUserWallet: vi.fn(),
 }));
 
+// The allowlist falls back to the indexer for launchpad contracts; keep tests
+// off the network and treat every address as unindexed.
+vi.mock('../lib/ponder', () => ({ ponderQuery: vi.fn().mockResolvedValue(null) }));
+
 const SESSION_ADDR = '0x1234567890abcdef1234567890abcdef12345678';
 
 async function makeSessionCookie(sub: string): Promise<string> {
@@ -110,6 +114,40 @@ describe('/api/tx/write', () => {
       })
     );
     expect(res.status).toBe(401);
+  });
+
+  it("accepts the mobile app's session JWT as a Bearer token", async () => {
+    const app = await loadApp();
+    stubUserWalletLookup('w-1', SESSION_ADDR);
+    const bearer = (await makeSessionCookie(SESSION_ADDR)).replace('siwe-session=', '');
+    const allowed = (addresses as any).PaymentRouter['11155111'];
+    const res = await app.fetch(
+      new Request('http://x/api/tx/write', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}` },
+        body: JSON.stringify({ address: allowed, data: '0x12345678', chainId: 11155111 }),
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(executeMock.mock.calls[0][0].walletId).toBe('w-1');
+  });
+
+  it('rejects an API key presented as a Bearer token (keys cannot sign txs)', async () => {
+    const app = await loadApp();
+    stubUserWalletLookup('w-1', SESSION_ADDR);
+    const res = await app.fetch(
+      new Request('http://x/api/tx/write', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer loar_abc123' },
+        body: JSON.stringify({
+          address: (addresses as any).PaymentRouter['11155111'],
+          data: '0x12345678',
+          chainId: 11155111,
+        }),
+      })
+    );
+    expect(res.status).toBe(401);
+    expect(executeMock).not.toHaveBeenCalled();
   });
 
   it('rejects an address not in the allowlist', async () => {
