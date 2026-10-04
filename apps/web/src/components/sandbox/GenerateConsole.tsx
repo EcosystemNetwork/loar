@@ -150,6 +150,7 @@ import {
   Paperclip,
   Settings2,
   type LucideIcon,
+  Globe2,
 } from 'lucide-react';
 import { ModelSelector } from '@/components/ModelSelector';
 import { VoiceModifyPanel } from '@/components/editing/VoiceModifyPanel';
@@ -2332,6 +2333,13 @@ export function GenerateConsole({
                     </span>
                   );
                 })}
+                <Link
+                  to="/world"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20"
+                >
+                  <Globe2 className="h-3.5 w-3.5" />
+                  3D World →
+                </Link>
               </div>
               <WalletConnectButton />
             </div>
@@ -2340,6 +2348,22 @@ export function GenerateConsole({
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[212px_minmax(0,1fr)] lg:gap-8">
             {/* Type rail — horizontal chip rows on mobile, sticky sidebar on desktop */}
             <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-20 lg:self-start">
+              {/* 3D World lives on its own pages (sets, puppets, explore) — link out prominently. */}
+              <Link
+                to={initialUniverse ? '/universe/$id/world' : '/world'}
+                params={initialUniverse ? { id: initialUniverse } : undefined}
+                className="group flex items-center gap-2.5 rounded-xl border border-primary/30 bg-gradient-to-br from-primary/15 to-transparent p-2.5 text-sm transition hover:border-primary/60"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                  <Globe2 className="h-4 w-4" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-semibold">3D World</span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    Models, puppets, sets &amp; walkthroughs
+                  </span>
+                </span>
+              </Link>
               <div className="flex flex-col gap-1.5">
                 <span className="px-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   Media

@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WorldRouteImport } from './routes/world'
 import { Route as ViralityRouteImport } from './routes/virality'
 import { Route as VideosRouteImport } from './routes/videos'
 import { Route as UploadRouteImport } from './routes/upload'
@@ -152,6 +153,11 @@ import { Route as LabZaiVideoJobIdRouteImport } from './routes/lab.zai.video.$jo
 import { Route as DashboardPersonasPersonaIdEditRouteImport } from './routes/dashboard.personas.$personaId.edit'
 import { Route as UniverseIdEpisodeEpisodeIdStudioRouteImport } from './routes/universe/$id/episode.$episodeId.studio'
 
+const WorldRoute = WorldRouteImport.update({
+  id: '/world',
+  path: '/world',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ViralityRoute = ViralityRouteImport.update({
   id: '/virality',
   path: '/virality',
@@ -911,6 +917,7 @@ export interface FileRoutesByFullPath {
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
   '/virality': typeof ViralityRoute
+  '/world': typeof WorldRoute
   '/admin/byok-codes': typeof AdminByokCodesRoute
   '/admin/cost': typeof AdminCostRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -1055,6 +1062,7 @@ export interface FileRoutesByTo {
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
   '/virality': typeof ViralityRoute
+  '/world': typeof WorldRoute
   '/admin/byok-codes': typeof AdminByokCodesRoute
   '/admin/cost': typeof AdminCostRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -1200,6 +1208,7 @@ export interface FileRoutesById {
   '/upload': typeof UploadRoute
   '/videos': typeof VideosRoute
   '/virality': typeof ViralityRoute
+  '/world': typeof WorldRoute
   '/admin/byok-codes': typeof AdminByokCodesRoute
   '/admin/cost': typeof AdminCostRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -1346,6 +1355,7 @@ export interface FileRouteTypes {
     | '/upload'
     | '/videos'
     | '/virality'
+    | '/world'
     | '/admin/byok-codes'
     | '/admin/cost'
     | '/admin/dashboard'
@@ -1490,6 +1500,7 @@ export interface FileRouteTypes {
     | '/upload'
     | '/videos'
     | '/virality'
+    | '/world'
     | '/admin/byok-codes'
     | '/admin/cost'
     | '/admin/dashboard'
@@ -1634,6 +1645,7 @@ export interface FileRouteTypes {
     | '/upload'
     | '/videos'
     | '/virality'
+    | '/world'
     | '/admin/byok-codes'
     | '/admin/cost'
     | '/admin/dashboard'
@@ -1779,6 +1791,7 @@ export interface RootRouteChildren {
   UploadRoute: typeof UploadRoute
   VideosRoute: typeof VideosRoute
   ViralityRoute: typeof ViralityRoute
+  WorldRoute: typeof WorldRoute
   AdminByokCodesRoute: typeof AdminByokCodesRoute
   AdminCostRoute: typeof AdminCostRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
@@ -1874,6 +1887,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/world': {
+      id: '/world'
+      path: '/world'
+      fullPath: '/world'
+      preLoaderRoute: typeof WorldRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/virality': {
       id: '/virality'
       path: '/virality'
@@ -2943,6 +2963,7 @@ const rootRouteChildren: RootRouteChildren = {
   UploadRoute: UploadRoute,
   VideosRoute: VideosRoute,
   ViralityRoute: ViralityRoute,
+  WorldRoute: WorldRoute,
   AdminByokCodesRoute: AdminByokCodesRoute,
   AdminCostRoute: AdminCostRoute,
   AdminDashboardRoute: AdminDashboardRoute,
