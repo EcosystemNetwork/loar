@@ -48,7 +48,14 @@ describe('buildCharacterProfile', () => {
 
   it('keeps unknown metadata keys visible but hides structured blobs', () => {
     const p = buildCharacterProfile(
-      person({ catchphrase: 'Again.', modelUrl: 'https://x/y.glb', characterVariants: [] })
+      person({
+        catchphrase: 'Again.',
+        modelUrl: 'https://x/y.glb',
+        characterVariants: [],
+        model3d: { glbUrl: 'https://x/y.glb', provider: 'tripo' },
+        usdzUrl: 'https://x/y.usdz',
+        somethingNested: { a: 1 },
+      })
     );
     expect(p.extra).toEqual([{ key: 'Catchphrase', value: 'Again.' }]);
   });

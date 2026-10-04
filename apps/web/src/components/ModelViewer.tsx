@@ -31,7 +31,13 @@ import { getIpfsUrlCandidatesPreferred, raceIpfsGateways } from '@/utils/ipfs-ur
 // the viewer spinning forever with no recovery — same failure mode
 // MediaLightbox already guards against for video/audio. Race the stall timer
 // against a real `load` event and advance to the next gateway either way.
-const STALL_MS = 10000;
+//
+// The timer measures *no progress*, not total load time: it re-arms on every
+// `progress` event of an unfinished load (with loading="lazy" that starts when
+// the viewer scrolls into view, not at mount). A fixed from-mount timer
+// skipped every gateway for below-the-fold viewers before they started, and
+// cut off large Tripo GLBs (60 MB+) mid-download.
+const STALL_MS = 15000;
 
 /** Neutral clay material used by the "Geometry" view. */
 const GEOMETRY_BASE_COLOR: [number, number, number, number] = [0.85, 0.85, 0.85, 1];
@@ -187,7 +193,18 @@ export function ModelViewer({
     el.style.height = '100%';
     el.style.minHeight = '300px';
 
+    let stallTimer: ReturnType<typeof setTimeout> | undefined;
+    let loaded = false;
+    el.addEventListener('progress', (e: CustomEvent<{ totalProgress?: number }>) => {
+      clearTimeout(stallTimer);
+      // totalProgress hits 1 when activity settles (load or error follows) —
+      // and an offscreen lazy viewer emits a 0→1 blip at mount without
+      // fetching anything — so only an unfinished load arms the timer.
+      if (loaded || (e.detail?.totalProgress ?? 0) >= 1) return;
+      stallTimer = setTimeout(handleLoadError, STALL_MS);
+    });
     el.addEventListener('load', () => {
+      loaded = true;
       clearTimeout(stallTimer);
       setLoading(false);
       // A fresh model always starts in its authored (textured) look.
@@ -220,8 +237,6 @@ export function ModelViewer({
     viewerRef.current.innerHTML = '';
     viewerRef.current.appendChild(el);
     modelElRef.current = el;
-
-    const stallTimer = setTimeout(handleLoadError, STALL_MS);
 
     return () => {
       clearTimeout(stallTimer);

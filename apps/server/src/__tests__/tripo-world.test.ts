@@ -107,6 +107,42 @@ describe('Tripo3D v3 request bodies', () => {
     expect(calls[1].body.smart_low_poly).toBe(true);
   });
 
+  it('retries a 429 (too many tasks in flight) and submits once a slot frees up', async () => {
+    const limited = JSON.stringify({
+      code: 2000,
+      message: 'You have exceeded the limit of generation',
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(limited, { status: 429 }))
+      .mockResolvedValueOnce(new Response(limited, { status: 429 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: 0, data: { task_id: 'task-ok' } }), { status: 200 })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const prev = tripo3dService.rateLimitBackoffMs;
+    tripo3dService.rateLimitBackoffMs = 1;
+    try {
+      const { taskId } = await tripo3dService.imageToModel({
+        input: 'https://x/a.png',
+        apiKey: 'k',
+      });
+      expect(taskId).toBe('task-ok');
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      tripo3dService.rateLimitBackoffMs = prev;
+    }
+  });
+
+  it('still fails on a non-429 error without retrying', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('bad input', { status: 400 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(
+      tripo3dService.imageToModel({ input: 'https://x/a.png', apiKey: 'k' })
+    ).rejects.toThrow('Tripo3D API error 400');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('multiview-to-model chains from a multiview task id', async () => {
     const calls = captureFetch();
     const { taskId } = await tripo3dService.multiviewToModel({

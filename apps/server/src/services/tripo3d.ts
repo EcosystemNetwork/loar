@@ -143,16 +143,36 @@ class Tripo3dService {
     return key;
   }
 
+  /** Base backoff for 429 retries; tests shrink it. */
+  rateLimitBackoffMs = 5000;
+
+  /**
+   * Tripo answers 429 (code 2000, "exceeded the limit of generation") when an
+   * account has too many tasks in flight — e.g. tripo.batchEntityTo3D starting
+   * five jobs at once on a low-tier key. The submit was rejected, so retrying
+   * is safe: wait (Retry-After, else exponential, capped at 60s) and resubmit
+   * instead of failing the job.
+   */
   private async post<T>(path: string, body: Record<string, unknown>, apiKey: string): Promise<T> {
-    const res = await fetch(`${BASE_URL}${path}`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    return this.parse<T>(res);
+    const MAX_ATTEMPTS = 8;
+    for (let attempt = 1; ; attempt++) {
+      const res = await fetch(`${BASE_URL}${path}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      if (res.status !== 429 || attempt >= MAX_ATTEMPTS) return this.parse<T>(res);
+      const retryAfter = Number(res.headers.get('retry-after'));
+      const waitMs =
+        Number.isFinite(retryAfter) && retryAfter > 0
+          ? Math.min(retryAfter * 1000, 60_000)
+          : Math.min(this.rateLimitBackoffMs * 2 ** (attempt - 1), 60_000);
+      await res.body?.cancel().catch(() => undefined);
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
   }
 
   private async get<T>(path: string, apiKey: string): Promise<T> {

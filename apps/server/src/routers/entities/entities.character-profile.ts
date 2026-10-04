@@ -207,8 +207,15 @@ export interface CharacterProfile {
   appearances: EpisodeAppearance[];
 }
 
-/** Metadata keys that hold structured blobs, not display text. */
-const NON_DISPLAY_KEYS = new Set(['characterVariants', 'modelUrl']);
+/** Metadata keys that hold structured blobs, not display text (3D/world data is Entity3DStudio's). */
+const NON_DISPLAY_KEYS = new Set([
+  'characterVariants',
+  'modelUrl',
+  'model3d',
+  'puppet',
+  'environment',
+  'usdzUrl',
+]);
 
 function hasModel(entity: Pick<Entity, 'metadata'>): boolean {
   const md = entity.metadata ?? {};
@@ -242,7 +249,14 @@ export function buildCharacterProfile(
   const hasDescription = (entity.description ?? '').trim().length >= 40;
 
   const extra = Object.entries(md)
-    .filter(([k, v]) => !spec.has(k) && !NON_DISPLAY_KEYS.has(k) && isFilled(v))
+    .filter(
+      ([k, v]) =>
+        !spec.has(k) &&
+        !NON_DISPLAY_KEYS.has(k) &&
+        // Nested objects stringify to "[object Object]" — never display text.
+        !(v !== null && typeof v === 'object' && !Array.isArray(v)) &&
+        isFilled(v)
+    )
     .map(([key, v]) => ({ key: humanizeKey(key), value: String(v) }));
 
   const relationCount = signals.relationCount ?? 0;
