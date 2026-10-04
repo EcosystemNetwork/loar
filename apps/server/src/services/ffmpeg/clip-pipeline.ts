@@ -45,6 +45,56 @@ export interface ClipTrimSpec {
   fadeOut?: number;
 }
 
+// Public, unauthenticated gateways — anything else configured as
+// PINATA_GATEWAY_URL (a `.mypinata.cloud` subdomain or a custom domain like
+// media.loar.fun) is a dedicated gateway that 401s without the token.
+const PUBLIC_GATEWAY_HOSTS = new Set<string>([
+  'gateway.pinata.cloud',
+  'w3s.link',
+  'ipfs.io',
+  'dweb.link',
+  '4everland.io',
+  'nftstorage.link',
+]);
+
+/**
+ * Stored clip URLs point at gateways without credentials (tokens are never
+ * persisted), so a server-side fetch of a dedicated-gateway URL gets HTTP 401.
+ * Re-point any IPFS URL at the configured dedicated gateway with its token,
+ * mirroring img-resize.ts's upstreamFetchUrl. Non-IPFS URLs pass through.
+ */
+export function authorizedMediaUrl(raw: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return raw;
+  }
+  let cidPath: string | null = null;
+  const sub = parsed.host.match(/^([^.]+)\.ipfs\./);
+  if (sub) {
+    const rest = parsed.pathname.replace(/^\//, '');
+    cidPath = rest ? `${sub[1]}/${rest}` : sub[1];
+  } else {
+    const path = parsed.pathname.match(/^\/ipfs\/(.+)$/);
+    if (path) cidPath = path[1];
+  }
+  if (!cidPath) return raw;
+
+  const base = (process.env.PINATA_GATEWAY_URL || '').trim().replace(/\/$/, '');
+  const token = (process.env.PINATA_GATEWAY_TOKEN || '').trim();
+  if (!base || !token) return raw;
+  let url: URL;
+  try {
+    url = new URL(`${base}/ipfs/${cidPath}`);
+  } catch {
+    return raw;
+  }
+  if (PUBLIC_GATEWAY_HOSTS.has(url.host)) return raw;
+  url.searchParams.set('pinataGatewayToken', token);
+  return url.toString();
+}
+
 /**
  * Downloads one clip (SSRF-validated via `safeFetch`), applies the trim, fades,
  * volume and audio overlay, and re-encodes it to the export frame size
@@ -71,7 +121,10 @@ export async function downloadAndNormalizeClip(
   const timeout = setTimeout(() => controller.abort(), 60_000);
   let res: Response;
   try {
-    res = await safeFetch(spec.videoUrl, { signal: controller.signal, redirect: 'error' });
+    res = await safeFetch(authorizedMediaUrl(spec.videoUrl), {
+      signal: controller.signal,
+      redirect: 'error',
+    });
   } finally {
     clearTimeout(timeout);
   }
@@ -81,7 +134,7 @@ export async function downloadAndNormalizeClip(
   let audioPath: string | undefined;
   if (spec.audioUrl) {
     const candidate = join(workDir, `audio-${padded}.mp3`);
-    const audioRes = await safeFetch(spec.audioUrl, { redirect: 'error' });
+    const audioRes = await safeFetch(authorizedMediaUrl(spec.audioUrl), { redirect: 'error' });
     if (audioRes.ok) {
       await writeFile(candidate, Buffer.from(await audioRes.arrayBuffer()));
       audioPath = candidate;
