@@ -20,7 +20,9 @@ const ENDPOINT = 'https://registry.npmjs.org/-/npm/v1/security/advisories/bulk';
 const CHUNK = 400;
 
 const args = process.argv.slice(2);
-const level = (args.find((a) => a.startsWith('--audit-level='))?.split('=')[1] ?? 'high').toLowerCase();
+const level = (
+  args.find((a) => a.startsWith('--audit-level='))?.split('=')[1] ?? 'high'
+).toLowerCase();
 const asJson = args.includes('--json');
 if (!LEVELS.includes(level)) {
   console.error(`Unknown --audit-level=${level}`);
@@ -83,7 +85,9 @@ for (const [name, list] of Object.entries(advisories)) {
     });
   }
 }
-findings.sort((a, b) => LEVELS.indexOf(b.severity) - LEVELS.indexOf(a.severity) || a.name.localeCompare(b.name));
+findings.sort(
+  (a, b) => LEVELS.indexOf(b.severity) - LEVELS.indexOf(a.severity) || a.name.localeCompare(b.name)
+);
 const blocking = findings.filter((f) => !f.allowed);
 
 if (asJson) {
@@ -92,8 +96,12 @@ if (asJson) {
   console.log(`Audited ${versions.size} packages (level ≥ ${level}).`);
   for (const f of findings) {
     const tag = f.allowed ? ` [allowlisted: ${f.allowed}]` : '';
-    console.log(`${f.severity.padEnd(8)} ${f.name}@${f.installed}  vulnerable ${f.vulnerable}  ${f.id}  ${f.title}${tag}`);
+    console.log(
+      `${f.severity.padEnd(8)} ${f.name}@${f.installed}  vulnerable ${f.vulnerable}  ${f.id}  ${f.title}${tag}`
+    );
   }
-  console.log(blocking.length ? `\n${blocking.length} blocking advisories.` : '\nNo blocking advisories.');
+  console.log(
+    blocking.length ? `\n${blocking.length} blocking advisories.` : '\nNo blocking advisories.'
+  );
 }
 process.exit(blocking.length ? 1 : 0);
