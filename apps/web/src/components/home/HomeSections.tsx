@@ -49,6 +49,7 @@ import {
   type TokenHolder,
 } from '@/utils/ponder-api';
 import { trpc, trpcClient } from '@/utils/trpc';
+import type { FirestoreUniverse } from '@/types/firestore';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
@@ -584,9 +585,27 @@ export function ActivityTicker({
     ...ponderQueryDefaults,
   });
 
+  // The app's own universe records. Ticker entries link to /universe/$id/watch,
+  // which resolves ids against these — the indexer also holds test universes
+  // and stale addresses from older contract deployments that 404 there.
+  // Shares the homepage's cache entry.
+  const { data: appUniverses } = useQuery({
+    queryKey: ['universes', 'all'],
+    queryFn: () => trpcClient.universes.getAll.query().then((r) => r.data as FirestoreUniverse[]),
+    staleTime: 30_000,
+  });
+
   const activities = useMemo(() => {
-    if (!nodesData || !nodeContentData || !universesData) {
+    if (!nodesData || !nodeContentData || !universesData || !appUniverses) {
       return [];
+    }
+
+    // Only list universes the app can open, under the app's name for them.
+    const appUniverseById = new Map<string, FirestoreUniverse>();
+    for (const u of appUniverses) {
+      const access = (u as { accessModel?: string }).accessModel;
+      if (access === 'private' || access === 'token_gate') continue;
+      appUniverseById.set(u.id.toLowerCase(), u);
     }
 
     const contentMap = new Map<string, NodeContent>();
@@ -614,7 +633,7 @@ export function ActivityTicker({
       );
     }
     const rest = universesData.filter((u) => !isPinned(u)).sort((a, b) => score(b) - score(a));
-    const ranked = [...pinned, ...rest];
+    const ranked = [...pinned, ...rest].filter((u) => appUniverseById.has(u.id.toLowerCase()));
 
     // Latest node per universe — drives the action label so each entry reads
     // with its most recent activity instead of a generic "trending".
@@ -627,7 +646,7 @@ export function ActivityTicker({
       }
     }
 
-    return ranked.map((u) => {
+    const fromIndexer = ranked.map((u) => {
       const key = u.id.toLowerCase();
       const recentNode = latestNodeByUniverse.get(key);
       let action: string;
@@ -641,13 +660,33 @@ export function ActivityTicker({
       }
       return {
         id: u.id,
-        universeName: u.name || `Universe ${u.id.slice(0, 8)}`,
+        universeName: appUniverseById.get(key)?.name || u.name || `Universe ${u.id.slice(0, 8)}`,
         action,
-        universeId: u.id,
+        universeId: appUniverseById.get(key)!.id,
         createdAt: recentNode?.createdAt || u.createdAt,
       };
     });
-  }, [nodesData, nodeContentData, universesData, featuredUniverseIds]);
+
+    // App universes the indexer doesn't know (off-chain, Solana, or indexed
+    // under an older address) still belong in the ticker; featured ones first.
+    const listed = new Set(fromIndexer.map((a) => a.universeId.toLowerCase()));
+    const unlisted = [...appUniverseById.values()]
+      .filter((u) => !listed.has(u.id.toLowerCase()))
+      .sort(
+        (a, b) =>
+          (pinnedOrder.get(a.id.toLowerCase()) ?? Infinity) -
+          (pinnedOrder.get(b.id.toLowerCase()) ?? Infinity)
+      )
+      .map((u) => ({
+        id: u.id,
+        universeName: u.name || `Universe ${u.id.slice(0, 8)}`,
+        action: 'now streaming',
+        universeId: u.id,
+        createdAt: '',
+      }));
+
+    return [...fromIndexer, ...unlisted];
+  }, [nodesData, nodeContentData, universesData, appUniverses, featuredUniverseIds]);
 
   // Marquee math: the `ticker` keyframe translates from 0 to -50%, so the
   // rendered list must be exactly 2 identical halves — when the first half
