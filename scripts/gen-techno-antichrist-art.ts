@@ -203,12 +203,12 @@ async function main() {
   // ── hero ──────────────────────────────────────────────────────────────────
   if (phases.hero) {
     const landscape =
-      'Key art for "TECHNO ANTICHRIST": a lean, sleep-starved South Asian American man in dark plain tech-founder clothes at a lectern in a rented hall, ' +
+      'Key art for "TECHNO ANTICHRIST": a lean, composed South Asian American man in dark plain tech-founder clothes at a lectern in a rented hall, ' +
       'lit by one follow-spot through heavy haze, a gilt Bitcoin-rune slab on the podium; behind and above him a fluorescent conference-room ceiling dissolves into an orbital weapons platform over a night city; ' +
       'a faint branching node-graph of gods projected across the back wall. Cinematic poster composition, wide. ' +
       STYLE;
     const portrait =
-      'Vertical key art for "TECHNO ANTICHRIST": close on the same man, three-day stubble, a hairline nosebleed he is ignoring, amber follow-spot on one side of his face and cold fluorescent on the other, ' +
+      'Vertical key art for "TECHNO ANTICHRIST": close on the same man, three-day stubble, clear warm natural eyes, composed and magnetic, amber follow-spot on one side of his face and cold fluorescent on the other, ' +
       'a gilt rune inscription out of focus behind him, a single strip of aluminium foil catching light at frame edge. Portrait poster composition. ' +
       STYLE;
 

@@ -122,7 +122,7 @@ const MOTION_CLAUSE =
 
 // ── Trailer shot list (text-to-video) ───────────────────────────────────────
 const TRAILER: string[] = [
-  'Black. A single follow-spot punches on through heavy haze in a rented Masonic hall; a lean sleep-starved South Asian American man steps into it at a lectern, a gilt Bitcoin-rune slab on the podium.',
+  'Black. A single follow-spot punches on through heavy haze in a rented Masonic hall; a lean, composed South Asian American man steps into it at a lectern, a gilt Bitcoin-rune slab on the podium.',
   'Close on his hands minting a rune on a laptop; a holder counter ticks up past 5,000 like a market cap.',
   'A packed ballroom of ordinary Bay Area people in hoodies and work badges, all turned toward the light, some weeping, phones up.',
   'A man at 3 a.m. taping printed declassified documents into a family tree that connects to every mythology; redaction bars everywhere.',
@@ -146,7 +146,7 @@ const EPISODE_SHOTS: Record<string, string[]> = {
     'A flawless "Briefing" at full tilt: follow-spot, haze, packed rented hall, a screen reading 5,000-something holders.',
     'Backstage load-out at 1 a.m., road cases and an unpaid invoice taped to one; a woman moves money between cards on a laptop.',
     'A sharp stealth-startup pitch in a glass room, then the same man paying cash at a small sequencing lab.',
-    'At a hackathon under flat white light, one person across the room stares at camera holding a laptop like an instrument; the man wipes a hairline nosebleed.',
+    'At a hackathon under flat white light, one person across the room stares at camera holding a laptop like an instrument; the man presses two fingers to his temple.',
   ],
   'Ep 2 — Bloodlines': [
     'A man threading his own genealogy through printed declassified files, connecting himself to every mythology, one lamp.',

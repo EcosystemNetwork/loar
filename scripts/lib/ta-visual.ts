@@ -14,7 +14,7 @@ export const STYLE =
 
 export const KIND_FRAMING: Record<string, string> = {
   person:
-    'cinematic environmental portrait on 35mm, chest-up to three-quarter, subject lit like a keynote speaker under a single follow-spot against institutional haze, tired eyes, shallow depth of field',
+    'cinematic environmental portrait on 35mm, chest-up to three-quarter, subject lit like a keynote speaker under a single follow-spot against institutional haze, expressive natural eyes, shallow depth of field',
   place:
     'wide establishing shot, real architecture, natural or practical light, anamorphic, no people or one small distant figure for scale',
   faction:
@@ -28,7 +28,7 @@ export const KIND_FRAMING: Record<string, string> = {
 
 export const VISUAL: Record<string, string> = {
   'Rex Duce':
-    'Rex Duce: a South Asian American man, 33, lean and sleep-starved, three-day stubble, expensive-plain tech-founder clothes (dark merino, one good watch), a hairline nosebleed he is ignoring. Standing at a lectern in a rented Masonic hall, one follow-spot, haze, a gilt rune slab on the podium.',
+    'Rex Duce: a South Asian American man, 33, lean and sharp, three-day stubble, expensive-plain tech-founder clothes (dark merino, one good watch), clear warm natural eyes, composed and charismatic — a visionary, not a villain. Standing at a lectern in a rented Masonic hall, one follow-spot, haze, a gilt rune slab on the podium. No blood, no injuries, no red or glowing eyes.',
   'Hana Duce':
     'Hana Duce: a Korean American woman, early 30s, precise and exhausted, holding a sleeping infant on her hip in a half-packed condo, aluminium foil taped over the window behind her, moving boxes, a rent notice on the counter.',
   'Mercy "Merx" Osei':
@@ -72,7 +72,7 @@ export const VISUAL: Record<string, string> = {
   'The Interference':
     'Handheld, grainier frame: a man on a night freeway seen from the passenger seat, dashboard glow, his eyes half-closing, headlights smearing — and in the same shot a perfectly ordinary Wi-Fi router on a shelf.',
   'The Tuning':
-    'A crowded hackathon hall under flat white light; in the middle distance one person stares directly at camera holding a laptop like an instrument; foreground man wipes a nosebleed.',
+    'A crowded hackathon hall under flat white light; in the middle distance one person stares directly at camera holding a laptop like an instrument; foreground man presses two fingers to his temple.',
   'Laser Acid':
     'A tiled bathroom, a man sitting in a running shower fully lit by cold light, soap suds on his forearms, visibly relieved; a phone on the sink shows a meme thread; foil-edged window.',
   'Multidimensional Hopping':
@@ -107,7 +107,7 @@ export const VISUAL: Record<string, string> = {
 
 export const EPISODE_VISUAL: Record<string, string> = {
   'Ep 1 — The Commission':
-    'A flawless "Briefing" at full tilt — follow-spot, haze, packed rented hall, a holder counter reading 5,000-something on a screen — intercut feel with a load-out and an unpaid invoice; at the edge of frame a nosebleed.',
+    'A flawless "Briefing" at full tilt — follow-spot, haze, packed rented hall, a holder counter reading 5,000-something on a screen — intercut feel with a load-out and an unpaid invoice; at the edge of frame the speaker, composed, in the light.',
   'Ep 2 — Bloodlines':
     'A man at 3 a.m. surrounded by printed declassified documents taped into a family tree that connects to every mythology; redaction bars everywhere; one lamp.',
   'Ep 3 — New Jerusalem':
