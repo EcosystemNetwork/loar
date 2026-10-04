@@ -44,6 +44,7 @@ import { webOptimizeUrl } from './optimize';
 export type TripoJobKind =
   | 'entity_model'
   | 'character_puppet'
+  | 'rig_model'
   | 'segment'
   | 'extract_part'
   | 'restyle'
@@ -59,6 +60,8 @@ export const TRIPO_JOB_COST_USD: Record<TripoJobKind, number> = {
   entity_model: 0.4,
   // t-pose image + multiview + multiview→model + rig + 4 retargets
   character_puppet: 1.2,
+  // rig-check + rig + retargets on an existing mesh (no body generation)
+  rig_model: 0.6,
   // segment + AI completion
   segment: 0.5,
   extract_part: 0.1,

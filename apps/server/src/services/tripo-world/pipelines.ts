@@ -33,6 +33,7 @@ import {
   type TripoStylizeStyle,
   type TripoTask,
 } from '../tripo3d';
+import { normalizeTripoRigType } from '../../lib/threed-provider';
 import { setReferenceBundle } from '../../routers/entities/entities.reference-bundle';
 import { MAX_REFS_PER_SLOT, type ReferenceBundle } from '../../routers/entities/entities.types';
 import { fetchGlbJson, listPartNames } from './glb';
@@ -468,6 +469,144 @@ export function characterPuppetPipeline(args: CharacterPuppetArgs) {
   };
 }
 
+// ── #2b Rig an existing model ────────────────────────────────────────────
+
+export interface RigModelArgs {
+  entity: EntityRef;
+  /** Permanent full-fidelity GLB to rig (never the meshopt web copy). */
+  modelUrl: string;
+  /** `auto` asks Tripo's rig-check which skeleton the mesh needs. */
+  rigType: TripoRigType | 'auto';
+  /** Omitted = idle + the rig's default gait (full set for bipeds). */
+  animations?: TripoAnimation[];
+}
+
+/** Default motion set for a skeleton type. */
+export function defaultPuppetAnimations(rigType: TripoRigType): TripoAnimation[] {
+  switch (rigType) {
+    case 'biped':
+      return PUPPET_DEFAULT_ANIMATIONS;
+    case 'quadruped':
+      return ['preset:idle', 'preset:quadruped:walk'];
+    case 'hexapod':
+      return ['preset:idle', 'preset:hexapod:walk'];
+    case 'octopod':
+      return ['preset:idle', 'preset:octopod:walk'];
+    case 'serpentine':
+      return ['preset:idle', 'preset:serpentine:march'];
+    case 'aquatic':
+      return ['preset:idle', 'preset:aquatic:march'];
+    default:
+      return ['preset:idle'];
+  }
+}
+
+/**
+ * Skeleton + motion clips for the model the entity already has, so you don't
+ * rebuild the body from the cover art the way the full puppet pipeline does.
+ * Writes the same `metadata.puppet` fields the puppet does. It never touches
+ * the puppet's turnaround or body, so a later full puppet still works.
+ */
+export function rigModelPipeline(args: RigModelArgs) {
+  return async (ctx: TripoJobContext) => {
+    const { entity } = args;
+    const base = slug(entity.name);
+    // Re-uploaded on resume too: tokens are cheap, and replayed steps poll
+    // their stored task instead of using this input.
+    const fileToken = await tripo3dService.uploadRemoteGlb(args.modelUrl, ctx.apiKey);
+
+    let rigType: TripoRigType;
+    if (args.rigType === 'auto') {
+      const check = await ctx.step('Detect skeleton', () =>
+        tripo3dService.rigCheck({ input: fileToken, apiKey: ctx.apiKey })
+      );
+      if (check.output?.riggable === false) {
+        throw new Error(
+          'Tripo says this model cannot be rigged — try a cleaner single-object mesh'
+        );
+      }
+      rigType = normalizeTripoRigType(check.output?.rig_type);
+      await ctx.patch({ partial: { rigType } });
+    } else {
+      rigType = args.rigType;
+    }
+
+    const rig = await ctx.step('Rig skeleton', () =>
+      tripo3dService.rigModel({ input: fileToken, rigType, apiKey: ctx.apiKey })
+    );
+    const { url: riggedUrl, webUrl: webRiggedUrl } = await keepModel(
+      ctx,
+      modelUrlOf(rig),
+      `${base}-rigged.glb`
+    );
+
+    const presets = args.animations ?? defaultPuppetAnimations(rigType);
+    const animations: Array<{ preset: string; name: string; url: string; webUrl: string | null }> =
+      [];
+    if (presets.length) {
+      const anim = await ctx.step('Animations', () =>
+        tripo3dService.retargetAnimations({
+          input: rig.task_id,
+          animations: presets,
+          apiKey: ctx.apiKey,
+        })
+      );
+      const urls = anim.output?.model_urls?.length
+        ? anim.output.model_urls
+        : anim.output?.model_url
+          ? [anim.output.model_url]
+          : [];
+      for (const [i, preset] of (presets as string[]).entries()) {
+        const name = preset.split(':').pop()!;
+        if (!urls[i]) continue;
+        const { url, webUrl } = await keepModel(ctx, urls[i], `${base}-${name}.glb`);
+        animations.push({ preset, name, url, webUrl });
+      }
+    }
+
+    await patchEntityMetadata(entity.id, {
+      'puppet.riggedModelUrl': riggedUrl,
+      'puppet.webRiggedModelUrl': webRiggedUrl,
+      'puppet.rigType': rigType,
+      'puppet.animations': animations,
+      'puppet.jobId': ctx.genId,
+      'puppet.provider': 'tripo',
+      'puppet.riggedFrom': args.modelUrl,
+      'puppet.generatedAt': new Date(),
+    });
+    await attachModel(ctx.userId, entity, {
+      key: 'rigged',
+      url: riggedUrl,
+      webUrl: webRiggedUrl,
+      subCategory: 'rigged',
+      label: `Rigged ${rigType}`,
+      filename: `${base}-rigged.glb`,
+      generationId: `rig:tripo:${rig.task_id}`,
+    });
+    await publishOnce({
+      creatorUid: ctx.userId,
+      mediaUrl: webRiggedUrl ?? riggedUrl,
+      sourceMediaUrl: webRiggedUrl && webRiggedUrl !== riggedUrl ? riggedUrl : null,
+      mediaType: '3d',
+      title: `${entity.name} — rigged`,
+      description: `Rigged ${rigType} model of ${entity.name}.`,
+      thumbnailUrl: null,
+      universeId: entity.universeId,
+      generationId: `rig:tripo:${rig.task_id}`,
+      generationModel: `tripo-rigging:${rigType}`,
+      tags: ['3d', entity.kind, 'rigged'],
+      sourceImageUrl: null,
+    });
+    return {
+      riggedModelUrl: riggedUrl,
+      webRiggedModelUrl: webRiggedUrl,
+      rigType,
+      animations,
+      entityId: entity.id,
+    };
+  };
+}
+
 // ── #3 Parts library ─────────────────────────────────────────────────────
 
 export interface SegmentArgs {
@@ -689,6 +828,7 @@ export function placeSplatPipeline(args: PlaceSplatArgs) {
 export const TRIPO_PIPELINES: Partial<Record<TripoJobKind, TripoPipelineFactory>> = {
   entity_model: entityModelPipeline,
   character_puppet: characterPuppetPipeline,
+  rig_model: rigModelPipeline,
   segment: segmentPipeline,
   restyle: restylePipeline,
   stylize: stylizePipeline,

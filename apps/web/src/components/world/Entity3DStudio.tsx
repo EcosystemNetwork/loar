@@ -11,6 +11,7 @@ import { Link } from '@tanstack/react-router';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
+  Bone,
   Box,
   Boxes,
   Clapperboard,
@@ -113,6 +114,7 @@ export function Entity3DStudio({ entity, isOwner }: { entity: EntityLike; isOwne
   const busy = (kind: string) => running.some((j) => j.kind === kind);
 
   const [rigType, setRigType] = useState<RigType>(entity.kind === 'person' ? 'biped' : 'quadruped');
+  const [rigExistingType, setRigExistingType] = useState<RigType | 'auto'>('auto');
   const [clip, setClip] = useState<string | null>(null);
   const [exportFormat, setExportFormat] = useState<ExportFormat>('USDZ');
   const [restylePrompt, setRestylePrompt] = useState('');
@@ -139,6 +141,15 @@ export function Entity3DStudio({ entity, isOwner }: { entity: EntityLike; isOwne
     mutationFn: () => trpcClient.tripo.characterPuppet.mutate({ entityId: entity.id, rigType }),
     onSuccess: () => {
       onStarted('Puppet')();
+      refresh();
+    },
+    onError,
+  });
+  const rigModel = useMutation({
+    mutationFn: () =>
+      trpcClient.tripo.rigEntityModel.mutate({ entityId: entity.id, rigType: rigExistingType }),
+    onSuccess: () => {
+      onStarted('Rig')();
       refresh();
     },
     onError,
@@ -340,6 +351,40 @@ export function Entity3DStudio({ entity, isOwner }: { entity: EntityLike; isOwne
                   onClick={() => generate.mutate('game')}
                 >
                   Game-ready
+                </Button>
+              </ActionRow>
+            )}
+
+            {puppetable && modelUrl && (
+              <ActionRow
+                icon={<Bone className="h-4 w-4" />}
+                title={puppet?.riggedModelUrl ? 'Re-rig this model' : 'Rig this model'}
+                hint="Skeleton + idle/walk clips on the 3D model above, with no new body. Auto-detect lets Tripo pick humanoid, quadruped, spider, snake, and so on."
+              >
+                <Select
+                  value={rigExistingType}
+                  onValueChange={(v) => setRigExistingType(v as RigType | 'auto')}
+                >
+                  <SelectTrigger className="h-8 w-[170px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto" className="text-xs">
+                      Auto-detect
+                    </SelectItem>
+                    {RIG_TYPES.map((r) => (
+                      <SelectItem key={r.id} value={r.id} className="text-xs">
+                        {r.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  disabled={busy('rig_model') || busy('character_puppet') || rigModel.isPending}
+                  onClick={() => rigModel.mutate()}
+                >
+                  Rig
                 </Button>
               </ActionRow>
             )}

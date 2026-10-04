@@ -77,6 +77,8 @@ let seen: Array<{ method: string; url: string; body?: any }> = [];
 const outputs = new Map<string, Record<string, unknown>>();
 /** POST path → output factory for the task it creates. */
 let failPath: string | null = null;
+/** What the fake rig-check reports. */
+let rigCheck: Record<string, unknown> = { riggable: true, rig_type: 'quadruped' };
 let server: Server;
 
 function outputFor(path: string, id: string): Record<string, unknown> {
@@ -98,6 +100,8 @@ function outputFor(path: string, id: string): Record<string, unknown> {
         back_view_url: f('back.png'),
         right_view_url: f('right.png'),
       };
+    case '/v3/animations/rig-check':
+      return rigCheck;
     case '/v3/animations/rig':
       return { model_url: f('rigged.glb') };
     case '/v3/animations/retarget':
@@ -167,6 +171,7 @@ afterAll(async () => {
 beforeEach(() => {
   seen = [];
   failPath = null;
+  rigCheck = { riggable: true, rig_type: 'quadruped' };
   published.length = 0;
 });
 
@@ -376,6 +381,96 @@ describe('tripo.characterPuppet', () => {
       'preset:idle',
       'preset:quadruped:walk',
     ]);
+  });
+});
+
+describe('tripo.rigEntityModel / batchRigModels', () => {
+  it('rigs the existing model with an auto-detected skeleton, with no new body, and keeps the turnaround', async () => {
+    const t = await caller();
+    const turnaround = { front: 'https://img.example/front.png' };
+    const entityId = await seedEntity({
+      kind: 'species',
+      metadata: { model3d: { glbUrl: `${HOST}/source.glb` }, puppet: { turnaround } },
+    });
+    const job = await waitJob((await t.rigEntityModel({ entityId })).jobId);
+    expect(job.status).toBe('completed');
+    expect(job.steps.map((s: any) => s.name)).toEqual([
+      'Detect skeleton',
+      'Rig skeleton',
+      'Animations',
+    ]);
+    expect(posts()).toEqual([
+      '/v3/files',
+      '/v3/animations/rig-check',
+      '/v3/animations/rig',
+      '/v3/animations/retarget',
+    ]);
+    const body = (url: string) => seen.find((s) => s.url === url)!.body;
+    expect(body('/v3/animations/rig')).toMatchObject({ input: 'ft-1', rig_type: 'quadruped' });
+    expect(body('/v3/animations/retarget').animations).toEqual([
+      'preset:idle',
+      'preset:quadruped:walk',
+    ]);
+
+    const p = (await entityDoc(entityId)).metadata.puppet;
+    expect(p.rigType).toBe('quadruped');
+    expect(p.riggedModelUrl).toMatch(/rigged\.glb$/);
+    expect(p.animations.map((a: any) => a.name)).toEqual(['idle', 'walk']);
+    expect(p.turnaround).toEqual(turnaround);
+    expect(p.riggedFrom).toBe(`${HOST}/source.glb`);
+    expect(published.some((x) => String(x.generationId).startsWith('rig:tripo:'))).toBe(true);
+  });
+
+  it('an explicit rig type skips rig-check', async () => {
+    const t = await caller();
+    const entityId = await seedEntity({ metadata: { modelUrl: `${HOST}/source.glb` } });
+    await waitJob((await t.rigEntityModel({ entityId, rigType: 'biped' })).jobId);
+    expect(posts()).not.toContain('/v3/animations/rig-check');
+    expect(seen.find((s) => s.url === '/v3/animations/retarget')!.body.animations).toHaveLength(4);
+  });
+
+  it('an unriggable mesh fails before the rig is billed and leaves the entity alone', async () => {
+    const t = await caller();
+    rigCheck = { riggable: false };
+    const entityId = await seedEntity({ metadata: { modelUrl: `${HOST}/source.glb` } });
+    const job = await waitJob((await t.rigEntityModel({ entityId })).jobId);
+    expect(job.status).toBe('failed');
+    expect(job.failureReason).toContain('cannot be rigged');
+    expect(posts()).not.toContain('/v3/animations/rig');
+    expect((await entityDoc(entityId)).metadata.puppet).toBeUndefined();
+  });
+
+  it('refuses entities with no model, and kinds that cannot be rigged', async () => {
+    const t = await caller();
+    await expect(t.rigEntityModel({ entityId: await seedEntity() })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    const prop = await seedEntity({ kind: 'thing', metadata: { modelUrl: `${HOST}/source.glb` } });
+    await expect(t.rigEntityModel({ entityId: prop })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+  });
+
+  it('batch rigs every riggable model that has no rig yet', async () => {
+    const t = await caller();
+    const universe = `0x${randomUUID().replace(/-/g, '').slice(0, 40)}`;
+    const model = { modelUrl: `${HOST}/source.glb` };
+    const hero = await seedEntity({ universeAddress: universe, metadata: model });
+    await seedEntity({ universeAddress: universe, name: 'Prop', kind: 'thing', metadata: model });
+    await seedEntity({ universeAddress: universe, name: 'No model' });
+    await seedEntity({
+      universeAddress: universe,
+      name: 'Done',
+      metadata: { ...model, puppet: { riggedModelUrl: `${HOST}/r.glb` } },
+    });
+    const r = await t.batchRigModels({ universeId: universe });
+    expect(r.jobs.map((j) => j.entityId)).toEqual([hero]);
+    expect((await waitJob(r.jobs[0].jobId)).status).toBe('completed');
+
+    const bob = await caller(BOB);
+    await expect(bob.batchRigModels({ universeId: universe })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
   });
 });
 

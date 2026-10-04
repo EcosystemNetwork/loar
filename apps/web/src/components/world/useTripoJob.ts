@@ -79,6 +79,7 @@ export function jobProgress(job: Pick<TripoJob, 'status' | 'steps' | 'kind'>): n
 const EXPECTED_STEPS: Record<string, number> = {
   entity_model: 1,
   character_puppet: 5,
+  rig_model: 3,
   segment: 2,
   restyle: 1,
   stylize: 1,
@@ -89,6 +90,7 @@ const EXPECTED_STEPS: Record<string, number> = {
 export const JOB_LABELS: Record<string, string> = {
   entity_model: '3D model',
   character_puppet: 'Character puppet',
+  rig_model: 'Rig',
   segment: 'Parts kit',
   restyle: 'Restyle',
   stylize: 'Stylize',

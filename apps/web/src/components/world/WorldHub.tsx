@@ -9,6 +9,7 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
+  Bone,
   Box,
   Clapperboard,
   Download,
@@ -28,13 +29,14 @@ import { Input } from '@/components/ui/input';
 import { SmartImage } from '@/components/SmartImage';
 import { Model3DThumbnail } from '@/components/Model3DThumbnailLazy';
 import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
-import { ENVIRONMENT_KINDS, JobList, MODELABLE_KINDS } from './Entity3DStudio';
+import { ENVIRONMENT_KINDS, JobList, MODELABLE_KINDS, PUPPET_KINDS } from './Entity3DStudio';
 import { buildAssetPack } from './assetPack';
 import { isActive, useWorldOverview, worldOverviewKey, type TripoJob } from './useTripoJob';
 
 /** Tripo cost estimates (USD) — mirror TRIPO_JOB_COST_USD on the server. */
 const MODEL_COST_USD = 0.4;
 const ENVIRONMENT_COST_USD = 0.3;
+const RIG_COST_USD = 0.6;
 
 export function WorldHub({
   universeId,
@@ -78,6 +80,14 @@ export function WorldHub({
   const missingEnvs = places.filter(
     (r) => !r.environment && r.imageUrl && !inFlight.has(`place_splat:${r.id}`)
   );
+  const unrigged = rows.filter(
+    (r) =>
+      PUPPET_KINDS.includes(r.kind) &&
+      r.modelUrl &&
+      !r.puppet &&
+      !inFlight.has(`rig_model:${r.id}`) &&
+      !inFlight.has(`character_puppet:${r.id}`)
+  );
   const buildCost = missing.length * MODEL_COST_USD + missingEnvs.length * ENVIRONMENT_COST_USD;
 
   // Newest job per entity+kind that failed, retryable, and whose output is still missing.
@@ -92,6 +102,7 @@ export function WorldHub({
       const row = rows.find((r) => r.id === j.entityId);
       if (j.kind === 'entity_model' && row?.modelUrl) continue;
       if (j.kind === 'place_splat' && row?.environment) continue;
+      if ((j.kind === 'rig_model' || j.kind === 'character_puppet') && row?.puppet) continue;
       out.push(j);
     }
     return out;
@@ -128,6 +139,19 @@ export function WorldHub({
       void jobsQuery.refetch();
     },
     onError: byokAware('Could not start generation'),
+  });
+
+  const batchRig = useMutation({
+    mutationFn: () => trpcClient.tripo.batchRigModels.mutate({ universeId }),
+    onSuccess: (r) => {
+      toast.success(`Rigging ${r.jobs.length} model${r.jobs.length === 1 ? '' : 's'}`, {
+        description: r.remaining
+          ? `${r.remaining} more still to go — run again after these finish.`
+          : 'Tripo picks each skeleton automatically. Clips appear as they land.',
+      });
+      void jobsQuery.refetch();
+    },
+    onError: byokAware('Could not start rigging'),
   });
 
   const retryFailed = useMutation({
@@ -241,6 +265,23 @@ export function WorldHub({
             Build missing 3D ({missing.length} models
             {missingEnvs.length ? `, ${missingEnvs.length} environments` : ''}) · ≈$
             {buildCost.toFixed(2)}
+          </Button>
+        )}
+        {isManager && unrigged.length > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => batchRig.mutate()}
+            disabled={batchRig.isPending}
+            title="Auto-detected skeleton + idle/walk clips on each character, creature and vehicle model"
+          >
+            {batchRig.isPending ? (
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Bone className="mr-1 h-3.5 w-3.5" />
+            )}
+            Rig {unrigged.length} model{unrigged.length === 1 ? '' : 's'} · ≈$
+            {(unrigged.length * RIG_COST_USD).toFixed(2)}
           </Button>
         )}
         {isManager && retryableFailures.length > 0 && (

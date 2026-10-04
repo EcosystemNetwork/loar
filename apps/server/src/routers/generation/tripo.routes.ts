@@ -3,6 +3,8 @@
  *
  *   tripo.entityTo3D        entity cover art → textured 3D model on the wiki
  *   tripo.batchEntityTo3D   same, for every modelable entity still missing one
+ *   tripo.rigEntityModel    skeleton + motion clips on the model an entity already has
+ *   tripo.batchRigModels    same, for every riggable entity with a model but no rig
  *   tripo.characterPuppet   character → T-pose → turnaround → body → rig →
  *                           motion library; turnaround feeds the entity's
  *                           reference bundle so video generation stays on-model
@@ -53,6 +55,7 @@ import {
   type EntityRef,
   type ModelSource,
   type PlaceSplatArgs,
+  type RigModelArgs,
   type RestyleArgs,
   type SegmentArgs,
   type StylizeArgs,
@@ -394,12 +397,7 @@ export const tripoRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const entity = await loadManagedEntity(input.entityId, ctx.user.address);
-      if (!(PUPPET_KINDS as readonly string[]).includes(entity.kind)) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Puppets can be built for characters, species and vehicles',
-        });
-      }
+      assertPuppetKind(entity.kind);
       const imageUrl = safeUrl(input.imageUrl ?? entity.imageUrl ?? '');
       const apiKey = await requireTripoKey(ctx.user.uid);
       const animations =
@@ -424,6 +422,103 @@ export const tripoRouter = router({
           meta: { rigType: input.rigType },
         }
       );
+    }),
+
+  /**
+   * #2b — rig the model the entity already has (no body regeneration, unlike
+   * characterPuppet). `auto` lets Tripo's rig-check pick the skeleton.
+   */
+  rigEntityModel: gen
+    .input(
+      z.object({
+        entityId: z.string().min(1),
+        rigType: z.enum(['auto', ...RIG_TYPES]).default('auto'),
+        animations: z.array(z.enum(PUPPET_ANIMATIONS)).max(8).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const entity = await loadManagedEntity(input.entityId, ctx.user.address);
+      assertPuppetKind(entity.kind);
+      const modelUrl = entityModelUrl(entity);
+      if (!modelUrl) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This entity has no 3D model yet — generate one first',
+        });
+      }
+      const apiKey = await requireTripoKey(ctx.user.uid);
+      return startJob(
+        'rig_model',
+        ctx.user.uid,
+        apiKey,
+        {
+          entity: toRef(entity),
+          modelUrl,
+          rigType: input.rigType,
+          animations: input.animations,
+        } satisfies RigModelArgs,
+        {
+          entityId: entity.id,
+          universeId: entity.universeAddress,
+          meta: { rigType: input.rigType },
+        }
+      );
+    }),
+
+  /**
+   * #2b at universe scale — rig every character/species/vehicle that has a
+   * model but no rig yet. Same in-flight skip + queueing as batchEntityTo3D.
+   */
+  batchRigModels: gen
+    .input(
+      z.object({
+        universeId: z.string().min(1),
+        rigType: z.enum(['auto', ...RIG_TYPES]).default('auto'),
+        limit: z.number().int().min(1).max(BATCH_MAX).default(BATCH_MAX),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      if (!(await isUniverseAdmin(input.universeId, ctx.user.address ?? ''))) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Universe managers only' });
+      }
+      const apiKey = await requireTripoKey(ctx.user.uid);
+      const { entities } = await getEntitiesByUniverse(input.universeId, undefined, 500);
+      const [busyRigs, busyPuppets] = await Promise.all([
+        entitiesWithActiveJobs(ctx.user.uid, 'rig_model'),
+        entitiesWithActiveJobs(ctx.user.uid, 'character_puppet'),
+      ]);
+      const pending = entities.filter(
+        (e) =>
+          (PUPPET_KINDS as readonly string[]).includes(e.kind) &&
+          !!entityModelUrl(e) &&
+          !meta(e).puppet?.riggedModelUrl &&
+          !busyRigs.has(e.id) &&
+          !busyPuppets.has(e.id)
+      );
+      const jobs: Array<{ entityId: string; jobId: string }> = [];
+      for (const e of pending.slice(0, input.limit)) {
+        const { jobId } = await startJob(
+          'rig_model',
+          ctx.user.uid,
+          apiKey,
+          {
+            entity: toRef(e),
+            modelUrl: entityModelUrl(e)!,
+            rigType: input.rigType,
+          } satisfies RigModelArgs,
+          {
+            entityId: e.id,
+            universeId: e.universeAddress,
+            meta: { rigType: input.rigType, batch: true },
+          }
+        );
+        jobs.push({ entityId: e.id, jobId });
+      }
+      return {
+        jobs,
+        remaining: Math.max(0, pending.length - jobs.length),
+        skippedInFlight: busyRigs.size + busyPuppets.size,
+      };
     }),
 
   /** #3 — split a model into a named-parts kit. */
@@ -724,6 +819,15 @@ function needsWebCopy(e: Pick<Entity, 'metadata'>): boolean {
   if (p.modelUrl && !p.webModelUrl) return true;
   if (p.riggedModelUrl && !p.webRiggedModelUrl) return true;
   return Array.isArray(p.animations) && p.animations.some((a: any) => a?.url && !a.webUrl);
+}
+
+function assertPuppetKind(kind: string) {
+  if (!(PUPPET_KINDS as readonly string[]).includes(kind)) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Rigs can be built for characters, species and vehicles',
+    });
+  }
 }
 
 function defaultGait(rig: (typeof RIG_TYPES)[number]): TripoAnimation {
