@@ -1873,7 +1873,7 @@
       ]
     },
     {
-      "collectionGroup": "adSeeds",
+      "collectionGroup": "adSeedPlacements",
       "queryScope": "COLLECTION",
       "fields": [
         {
@@ -1887,7 +1887,7 @@
       ]
     },
     {
-      "collectionGroup": "adPlacements",
+      "collectionGroup": "adSeedPlacements",
       "queryScope": "COLLECTION",
       "fields": [
         {
