@@ -343,7 +343,7 @@ contract BondingCurve is IBondingCurve, ReentrancyGuard {
 
         // Approve unsold tokens for UniverseManager
         if (unsoldTokens > 0) {
-            IERC20(token).approve(universeManager, unsoldTokens);
+            IERC20(token).forceApprove(universeManager, unsoldTokens);
         }
 
         // Send ETH + unsold tokens to UniverseManager for LP creation

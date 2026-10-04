@@ -384,7 +384,7 @@ contract UniverseTokenDeployerV3 is ReentrancyGuard {
         );
         if (creator != address(0) && creatorAmount > 0) {
             if (vestingContract != address(0)) {
-                IERC20(tokenAddress).approve(vestingContract, creatorAmount);
+                IERC20(tokenAddress).forceApprove(vestingContract, creatorAmount);
                 uint256 vestingId = ITokenVesting(vestingContract)
                     .createVesting(
                         tokenAddress, creator, uint128(creatorAmount), vestingCliff, vestingDuration

@@ -302,7 +302,7 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
 
         // approvals for universe token
         {
-            IERC20(token).approve(address(permit2), poolSupply);
+            IERC20(token).forceApprove(address(permit2), poolSupply);
             permit2.approve(
                 // forge-lint: disable-next-line(unsafe-typecast)
                 token,
@@ -315,7 +315,7 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         // approvals for paired token (WETH) if seeding two-sided liquidity
         if (pairedAmount > 0) {
             address pairedToken = poolConfig.pairedToken;
-            IERC20(pairedToken).approve(address(permit2), pairedAmount);
+            IERC20(pairedToken).forceApprove(address(permit2), pairedAmount);
             permit2.approve(
                 pairedToken,
                 address(positionManager),

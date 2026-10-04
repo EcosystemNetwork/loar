@@ -436,12 +436,12 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
 
         // Interactions.
         if (tokenAmount > 0) {
-            IERC20(_token).transferFrom(msg.sender, address(this), tokenAmount);
+            SafeERC20.safeTransferFrom(IERC20(_token), msg.sender, address(this), tokenAmount);
         }
 
         if (msg.value > 0) {
             IWETH(weth).deposit{value: msg.value}();
-            IERC20(weth).approve(address(config.lockerConfig.locker), msg.value);
+            SafeERC20.forceApprove(IERC20(weth), address(config.lockerConfig.locker), msg.value);
         }
 
         PoolKey memory poolkey = ILoarHook(config.poolConfig.hook)
@@ -459,7 +459,7 @@ contract UniverseManager is IUniverseManager, ERC721, ReentrancyGuard, Ownable, 
         data.hook = poolkey.hooks;
 
         if (tokenAmount > 0) {
-            IERC20(_token).approve(address(config.lockerConfig.locker), tokenAmount);
+            SafeERC20.forceApprove(IERC20(_token), address(config.lockerConfig.locker), tokenAmount);
         }
         ILoarLpLocker(config.lockerConfig.locker)
             .placeLiquidity(
