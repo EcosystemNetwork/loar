@@ -52,6 +52,9 @@ export function WorldScene(props: WorldSceneProps) {
         intensity={1.6}
         castShadow
         shadow-mapSize={[2048, 2048]}
+        // Bias out self-shadowing acne on meshes that both cast and receive.
+        shadow-bias={-0.0005}
+        shadow-normalBias={0.03}
         shadow-camera-left={-20}
         shadow-camera-right={20}
         shadow-camera-top={20}
@@ -91,12 +94,14 @@ function EditLayer({
     <>
       <OrbitControls makeDefault enableDamping target={[0, 0.8, 0]} />
       <Grid
+        // Just above the shadow-catcher plane so they don't z-fight.
+        position={[0, 0.002, 0]}
         infiniteGrid
         cellSize={0.5}
         sectionSize={5}
         fadeDistance={60}
-        cellColor="#2b3140"
-        sectionColor="#3d4660"
+        cellColor="#3a4256"
+        sectionColor="#5b6890"
       />
       {objects.map((o) => {
         const node = (
@@ -271,7 +276,7 @@ function ExploreLayer({ objects, spawn, onLink }: WorldSceneProps) {
               <SetObjectModel url={idle ?? o.url} partName={o.partName} playing={!!idle} />
             </Suspense>
             {o.link && (
-              <Html position={[0, 2.2 / Math.max(o.scale, 0.01), 0]} center distanceFactor={8}>
+              <Html position={[0, 2.2 / Math.max(o.scale, 0.01), 0]} center zIndexRange={[20, 0]}>
                 <button
                   type="button"
                   onClick={() => onLink?.(o.link!)}

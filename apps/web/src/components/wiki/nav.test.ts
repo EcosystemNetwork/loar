@@ -12,8 +12,8 @@ describe('wiki nav model', () => {
   it('lists every view exactly once', () => {
     const ids = WIKI_TABS.map((t) => t.id);
     expect(new Set(ids).size).toBe(ids.length);
-    // 12 creator kinds + 6 structural kinds + 15 synthesised/media views
-    expect(ids).toHaveLength(33);
+    // 12 creator kinds + 6 structural kinds + 16 synthesised/media views
+    expect(ids).toHaveLength(34);
   });
 
   it('keeps every group small enough to scan', () => {
