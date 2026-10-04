@@ -18,6 +18,7 @@ import { createFileRoute, Link, useParams } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import {
   BookOpen,
+  Globe2,
   Eye,
   EyeOff,
   Film,
@@ -270,6 +271,17 @@ function UniverseProfilePage() {
               <Link to="/wiki" search={{ universe: idLower }}>
                 <BookOpen className="mr-2 h-4 w-4" />
                 Wiki
+              </Link>
+            </Button>
+            <Button
+              asChild
+              variant="secondary"
+              size="lg"
+              className="rounded-full bg-white/10 text-white hover:bg-white/20"
+            >
+              <Link to="/universe/$id/world" params={{ id: idLower }}>
+                <Globe2 className="mr-2 h-4 w-4" />
+                World
               </Link>
             </Button>
             <Button

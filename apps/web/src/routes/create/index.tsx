@@ -17,7 +17,12 @@ import { useWalletAuth } from '@/lib/wallet-auth';
 import { RandomUniverseBuilder } from '@/components/RandomUniverseBuilder';
 
 function CreateHub() {
-  const { universe: universeAddress } = useSearch({ from: '/create/' });
+  const {
+    universe: universeAddress,
+    mode: initialMode,
+    image: initialImageUrl,
+    prompt: initialPrompt,
+  } = useSearch({ from: '/create/' });
   const { address } = useWalletAuth();
 
   const { data: universeResult } = useQuery({
@@ -35,6 +40,9 @@ function CreateHub() {
         variant="console"
         enableWorldKinds
         initialUniverse={universeAddress}
+        initialMode={initialMode}
+        initialImageUrl={initialImageUrl}
+        initialPrompt={initialPrompt}
       />
       {universeAddress && (
         <div className="container mx-auto px-4 pb-bottom-nav md:pb-12 max-w-6xl">
@@ -50,6 +58,10 @@ function CreateHub() {
 
 const createHubSearchSchema = z.object({
   universe: z.string().optional(),
+  /** Deep links from the set builder: open video mode with a shot as the start frame. */
+  mode: z.enum(['image', 'video']).optional(),
+  image: z.string().url().optional(),
+  prompt: z.string().max(2000).optional(),
 });
 
 export const Route = createFileRoute('/create/')({

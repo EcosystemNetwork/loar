@@ -36,6 +36,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { ModelViewer } from '@/components/ModelViewerLazy';
+import { WorldHub } from '@/components/world/WorldHub';
 import { resolveIpfsUrl, resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import { SmartImage } from '@/components/SmartImage';
 import { useResolvedIpfsUrl } from '@/hooks/useResolvedIpfsUrl';
@@ -1450,6 +1451,14 @@ function WikiPage() {
             <CharacterProfilesTab universeAddress={universeAddress} />
           ) : activeTab === '3d-models' ? (
             <ThreeDModelsTab universeAddress={universeAddress} />
+          ) : activeTab === 'world' ? (
+            universeAddress ? (
+              <WorldHub universeId={universeAddress} />
+            ) : (
+              <p className="py-12 text-center text-sm text-muted-foreground">
+                Pick a universe to see its world in 3D.
+              </p>
+            )
           ) : activeTab === 'gallery' ? (
             <GalleryTab universeAddress={universeAddress} />
           ) : activeTab === 'collection' ? (

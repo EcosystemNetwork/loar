@@ -146,6 +146,8 @@ import { Route as LabZaiDiagnosticRouteImport } from './routes/lab.zai.diagnosti
 import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
 import { Route as AdplacementsSeedsNewRouteImport } from './routes/adplacements/seeds/new'
 import { Route as AdplacementsSeedsSeedIdRouteImport } from './routes/adplacements/seeds/$seedId'
+import { Route as UniverseIdWorldIndexRouteImport } from './routes/universe/$id/world.index'
+import { Route as UniverseIdWorldSetIdRouteImport } from './routes/universe/$id/world.$setId'
 import { Route as LabZaiVideoJobIdRouteImport } from './routes/lab.zai.video.$jobId'
 import { Route as DashboardPersonasPersonaIdEditRouteImport } from './routes/dashboard.personas.$personaId.edit'
 import { Route as UniverseIdEpisodeEpisodeIdStudioRouteImport } from './routes/universe/$id/episode.$episodeId.studio'
@@ -839,6 +841,16 @@ const AdplacementsSeedsSeedIdRoute = AdplacementsSeedsSeedIdRouteImport.update({
   path: '/adplacements/seeds/$seedId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UniverseIdWorldIndexRoute = UniverseIdWorldIndexRouteImport.update({
+  id: '/world/',
+  path: '/world/',
+  getParentRoute: () => UniverseIdRoute,
+} as any)
+const UniverseIdWorldSetIdRoute = UniverseIdWorldSetIdRouteImport.update({
+  id: '/world/$setId',
+  path: '/world/$setId',
+  getParentRoute: () => UniverseIdRoute,
+} as any)
 const LabZaiVideoJobIdRoute = LabZaiVideoJobIdRouteImport.update({
   id: '/lab/zai/video/$jobId',
   path: '/lab/zai/video/$jobId',
@@ -997,6 +1009,8 @@ export interface FileRoutesByFullPath {
   '/marketplace/likeness/': typeof MarketplaceLikenessIndexRoute
   '/dashboard/personas/$personaId/edit': typeof DashboardPersonasPersonaIdEditRoute
   '/lab/zai/video/$jobId': typeof LabZaiVideoJobIdRoute
+  '/universe/$id/world/$setId': typeof UniverseIdWorldSetIdRoute
+  '/universe/$id/world/': typeof UniverseIdWorldIndexRoute
   '/universe/$id/episode/$episodeId/studio': typeof UniverseIdEpisodeEpisodeIdStudioRoute
 }
 export interface FileRoutesByTo {
@@ -1139,6 +1153,8 @@ export interface FileRoutesByTo {
   '/marketplace/likeness': typeof MarketplaceLikenessIndexRoute
   '/dashboard/personas/$personaId/edit': typeof DashboardPersonasPersonaIdEditRoute
   '/lab/zai/video/$jobId': typeof LabZaiVideoJobIdRoute
+  '/universe/$id/world/$setId': typeof UniverseIdWorldSetIdRoute
+  '/universe/$id/world': typeof UniverseIdWorldIndexRoute
   '/universe/$id/episode/$episodeId/studio': typeof UniverseIdEpisodeEpisodeIdStudioRoute
 }
 export interface FileRoutesById {
@@ -1282,6 +1298,8 @@ export interface FileRoutesById {
   '/marketplace/likeness/': typeof MarketplaceLikenessIndexRoute
   '/dashboard/personas/$personaId/edit': typeof DashboardPersonasPersonaIdEditRoute
   '/lab/zai/video/$jobId': typeof LabZaiVideoJobIdRoute
+  '/universe/$id/world/$setId': typeof UniverseIdWorldSetIdRoute
+  '/universe/$id/world/': typeof UniverseIdWorldIndexRoute
   '/universe/$id/episode/$episodeId/studio': typeof UniverseIdEpisodeEpisodeIdStudioRoute
 }
 export interface FileRouteTypes {
@@ -1426,6 +1444,8 @@ export interface FileRouteTypes {
     | '/marketplace/likeness/'
     | '/dashboard/personas/$personaId/edit'
     | '/lab/zai/video/$jobId'
+    | '/universe/$id/world/$setId'
+    | '/universe/$id/world/'
     | '/universe/$id/episode/$episodeId/studio'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -1568,6 +1588,8 @@ export interface FileRouteTypes {
     | '/marketplace/likeness'
     | '/dashboard/personas/$personaId/edit'
     | '/lab/zai/video/$jobId'
+    | '/universe/$id/world/$setId'
+    | '/universe/$id/world'
     | '/universe/$id/episode/$episodeId/studio'
   id:
     | '__root__'
@@ -1710,6 +1732,8 @@ export interface FileRouteTypes {
     | '/marketplace/likeness/'
     | '/dashboard/personas/$personaId/edit'
     | '/lab/zai/video/$jobId'
+    | '/universe/$id/world/$setId'
+    | '/universe/$id/world/'
     | '/universe/$id/episode/$episodeId/studio'
   fileRoutesById: FileRoutesById
 }
@@ -2809,6 +2833,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdplacementsSeedsSeedIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/universe/$id/world/': {
+      id: '/universe/$id/world/'
+      path: '/world'
+      fullPath: '/universe/$id/world/'
+      preLoaderRoute: typeof UniverseIdWorldIndexRouteImport
+      parentRoute: typeof UniverseIdRoute
+    }
+    '/universe/$id/world/$setId': {
+      id: '/universe/$id/world/$setId'
+      path: '/world/$setId'
+      fullPath: '/universe/$id/world/$setId'
+      preLoaderRoute: typeof UniverseIdWorldSetIdRouteImport
+      parentRoute: typeof UniverseIdRoute
+    }
     '/lab/zai/video/$jobId': {
       id: '/lab/zai/video/$jobId'
       path: '/lab/zai/video/$jobId'
@@ -2841,6 +2879,8 @@ interface UniverseIdRouteChildren {
   UniverseIdProfileRoute: typeof UniverseIdProfileRoute
   UniverseIdStyleRoute: typeof UniverseIdStyleRoute
   UniverseIdWatchRoute: typeof UniverseIdWatchRoute
+  UniverseIdWorldSetIdRoute: typeof UniverseIdWorldSetIdRoute
+  UniverseIdWorldIndexRoute: typeof UniverseIdWorldIndexRoute
   UniverseIdEpisodeEpisodeIdStudioRoute: typeof UniverseIdEpisodeEpisodeIdStudioRoute
 }
 
@@ -2852,6 +2892,8 @@ const UniverseIdRouteChildren: UniverseIdRouteChildren = {
   UniverseIdProfileRoute: UniverseIdProfileRoute,
   UniverseIdStyleRoute: UniverseIdStyleRoute,
   UniverseIdWatchRoute: UniverseIdWatchRoute,
+  UniverseIdWorldSetIdRoute: UniverseIdWorldSetIdRoute,
+  UniverseIdWorldIndexRoute: UniverseIdWorldIndexRoute,
   UniverseIdEpisodeEpisodeIdStudioRoute: UniverseIdEpisodeEpisodeIdStudioRoute,
 }
 

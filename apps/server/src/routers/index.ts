@@ -68,6 +68,7 @@ import { voiceRouter } from './generation/voice.routes';
 import { ttsRouter } from './generation/tts.routes';
 import { threedRouter } from './generation/threed.routes';
 import { tripoRouter } from './generation/tripo.routes';
+import { worldSetsRouter } from './world/worldSets.routes';
 import { audioRouter } from './generation/audio.routes';
 import { editingRouter } from './generation/editing.routes';
 import { editJobsRouter } from './editJobs/editJobs.index';
@@ -204,6 +205,7 @@ export const appRouter = router({
   audio: audioRouter,
   threed: threedRouter,
   tripo: tripoRouter,
+  worldSets: worldSetsRouter,
   characterPipeline: characterPipelineRouter,
   editing: editingRouter,
   editJobs: editJobsRouter,

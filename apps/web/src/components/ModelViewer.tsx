@@ -1,7 +1,8 @@
 /**
  * ModelViewer — interactive 3D model viewer using Google's <model-viewer>.
  *
- * Renders GLB/GLTF files with orbit controls, auto-rotate, and AR support.
+ * Renders GLB/GLTF files with orbit controls, auto-rotate, and AR (WebXR /
+ * Scene Viewer from the GLB; iOS Quick Look when an `iosSrc` USDZ is given).
  * Falls back gracefully if the poster (thumbnail) is provided.
  *
  * A texture/geometry toggle lets viewers strip every material texture to
@@ -94,6 +95,10 @@ interface ModelViewerProps {
   allowFullscreen?: boolean;
   /** Show animation/lighting controls when the model exposes animations or you want a richer preview. */
   testbench?: boolean;
+  /** USDZ twin for iOS AR Quick Look (Android/WebXR AR uses the GLB itself). */
+  iosSrc?: string | null;
+  /** Loop the model's first baked animation as soon as it loads (puppet motion previews). */
+  autoplay?: boolean;
 }
 
 export function ModelViewer({
@@ -103,6 +108,8 @@ export function ModelViewer({
   className = '',
   allowFullscreen = true,
   testbench = false,
+  iosSrc,
+  autoplay = false,
 }: ModelViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -170,6 +177,12 @@ export function ModelViewer({
     el.setAttribute('touch-action', 'pan-y');
     el.setAttribute('interaction-prompt', 'auto');
     el.setAttribute('loading', 'lazy');
+    // "View in your space" on AR-capable phones; the button only renders
+    // where a mode is actually supported.
+    el.setAttribute('ar', '');
+    el.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
+    if (iosSrc) el.setAttribute('ios-src', iosSrc);
+    if (autoplay) el.setAttribute('autoplay', '');
     el.style.width = '100%';
     el.style.height = '100%';
     el.style.minHeight = '300px';
@@ -189,7 +202,10 @@ export function ModelViewer({
       if (available.length > 0) {
         setCurrentAnimation(available[0]);
         el.animationName = available[0];
-        if (testbench) {
+        if (autoplay) {
+          el.play();
+          setIsPlaying(true);
+        } else if (testbench) {
           // Don't autoplay until the user clicks; static-mesh users would just
           // see a frozen model and wonder why the play button is dim.
           setIsPlaying(false);
@@ -216,7 +232,7 @@ export function ModelViewer({
     // We intentionally exclude autoRotate/exposure — those are imperatively
     // applied below so the model doesn't tear down and reload on every tweak.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedSrc, poster, alt, testbench, handleLoadError]);
+  }, [resolvedSrc, poster, alt, testbench, iosSrc, autoplay, handleLoadError]);
 
   // Reflect testbench control changes onto the live element without rebuilding.
   useEffect(() => {

@@ -152,6 +152,14 @@ export interface GenerateConsoleProps {
   initialUniverse?: string;
   /** Surface the world-entity kinds (person, place, faction, …) next to the media modes. */
   enableWorldKinds?: boolean;
+  /** Open on this media mode (e.g. `video` when arriving from a set-builder shot). */
+  initialMode?: 'image' | 'video';
+  /**
+   * Preload a reference image — a set-builder shot becomes the video's start
+   * frame (`animate`); for image mode it is a style reference.
+   */
+  initialImageUrl?: string;
+  initialPrompt?: string;
 }
 
 const WORLD_KINDS: WorldKind[] = [
@@ -181,6 +189,9 @@ export function GenerateConsole({
   variant = 'full',
   initialUniverse,
   enableWorldKinds = false,
+  initialMode,
+  initialImageUrl,
+  initialPrompt,
 }: GenerateConsoleProps) {
   const isConsole = variant === 'console';
   const { isAuthenticated, isAuthenticating, address } = useWalletAuth();
@@ -194,10 +205,12 @@ export function GenerateConsole({
   const queryClient = useQueryClient();
 
   // Form state
-  const [mode, setMode] = useState<SandboxMode>('image');
+  const [mode, setMode] = useState<SandboxMode>(initialMode ?? 'image');
   // Each create type (image, video, person, …) keeps its own prompt draft, so
   // switching type never carries text across or clobbers what you'd typed.
-  const [prompts, setPrompts] = useState<Record<string, string>>({});
+  const [prompts, setPrompts] = useState<Record<string, string>>(() =>
+    initialPrompt ? { [initialMode ?? 'image']: initialPrompt } : {}
+  );
   const [negativePrompt, setNegativePrompt] = useState('');
   const [seed, setSeed] = useState<number | null>(null);
   const [stylePreset, setStylePreset] = useState<StylePresetId | null>(null);
@@ -209,7 +222,11 @@ export function GenerateConsole({
     url: string;
     prompt: string;
     mode: ReferenceMode;
-  } | null>(null);
+  } | null>(() =>
+    initialImageUrl
+      ? { url: initialImageUrl, prompt: '', mode: initialMode === 'video' ? 'animate' : 'style' }
+      : null
+  );
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);

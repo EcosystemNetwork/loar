@@ -56,6 +56,7 @@ import {
   Tag,
 } from 'lucide-react';
 import { MediaGallery } from '@/components/MediaGallery';
+import { Entity3DStudio } from '@/components/world/Entity3DStudio';
 import { CharacterProfileCard } from '@/components/wiki/CharacterProfileCard';
 import { CharacterChips, ClampedText } from '@/components/wiki/CharacterHero';
 import { useMediaAttachments } from '@/hooks/useMediaAttachments';
@@ -811,7 +812,15 @@ function EntityPage() {
   }
 
   const kindLabel = KIND_LABELS[entity.kind] ?? entity.kind;
-  const HIDDEN_METADATA_KEYS = new Set(['characterVariants', 'modelUrl']);
+  // 3D/world data is rendered by Entity3DStudio, not as raw metadata rows.
+  const HIDDEN_METADATA_KEYS = new Set([
+    'characterVariants',
+    'modelUrl',
+    'model3d',
+    'puppet',
+    'environment',
+    'usdzUrl',
+  ]);
   const metadataEntries = Object.entries(entity.metadata ?? {}).filter(
     ([k, v]) => v && !HIDDEN_METADATA_KEYS.has(k)
   );
@@ -861,7 +870,7 @@ function EntityPage() {
       toast.success(`Character pipeline started! ${result.creditsCharged} credits charged.`);
       // Refresh entity data as the pipeline will update imageUrl
       queryClient.invalidateQueries({ queryKey: ['entity', id] });
-      queryClient.invalidateQueries({ queryKey: ['media-attachments', 'entity', id] });
+      queryClient.invalidateQueries({ queryKey: ['mediaAttachments', 'entity', id] });
     } catch (err: any) {
       // The 3D pipeline needs the caller's own Google + Meshy keys (see
       // characterPipeline.launch's pre-flight check) — pop the "connect
@@ -1262,6 +1271,9 @@ function EntityPage() {
           {/* Character pipeline status */}
           {hasPipeline && <PipelineStatus pipelineId={pipelineId!} />}
 
+          {/* 3D model, puppet, environment — Tripo world-building */}
+          <Entity3DStudio entity={entity} isOwner={isOwner} />
+
           {(mediaAttachments.length > 0 || isOwner) && (
             <Card>
               <CardHeader>
@@ -1296,7 +1308,7 @@ function EntityPage() {
                     entityKind={entity.kind}
                     onGenerated={() => {
                       queryClient.invalidateQueries({
-                        queryKey: ['media-attachments', 'entity', id],
+                        queryKey: ['mediaAttachments', 'entity', id],
                       });
                     }}
                   />
@@ -1330,7 +1342,7 @@ function EntityPage() {
           }}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ['entity', id] });
-            queryClient.invalidateQueries({ queryKey: ['media-attachments', 'entity', id] });
+            queryClient.invalidateQueries({ queryKey: ['mediaAttachments', 'entity', id] });
           }}
         />
       )}

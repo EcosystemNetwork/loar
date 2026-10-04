@@ -68,6 +68,7 @@ export type WikiTab =
   | 'gallery'
   | 'collection'
   | '3d-models'
+  | 'world'
   | 'character-profiles'
   | 'episodes'
   | 'audio'
