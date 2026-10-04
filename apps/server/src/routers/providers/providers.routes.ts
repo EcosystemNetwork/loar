@@ -157,12 +157,27 @@ export const providersRouter = router({
   usage: protectedProcedure.query(async ({ ctx }) => {
     if (!db) return { totalCredits: 0, byokCredits: 0, byProvider: [], windowDays: 30 };
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    // Equality-only query + in-memory window filter: userId+createdAt range
+    // needs a composite index that isn't deployed (500'd with
+    // FAILED_PRECONDITION). select() keeps the per-doc payload small.
     const snap = await db
       .collection('creditReservations')
       .where('userId', '==', ctx.user.uid)
-      .where('createdAt', '>=', since)
+      .select('provider', 'actualCredits', 'reservedCredits', 'byok', 'createdAt')
       .get();
-    const rows = snap.docs.map((d) => d.data() as Record<string, unknown>);
+    const sinceMs = since.getTime();
+    const rows = snap.docs
+      .map((d) => d.data() as Record<string, unknown>)
+      .filter((r) => {
+        const c = r.createdAt as { toMillis?: () => number } | string | number | undefined;
+        const ms =
+          typeof c === 'object' && c?.toMillis
+            ? c.toMillis()
+            : c
+              ? new Date(c as string).getTime()
+              : 0;
+        return ms >= sinceMs;
+      });
     const byProviderMap = new Map<
       string,
       { totalCredits: number; calls: number; byokCalls: number }

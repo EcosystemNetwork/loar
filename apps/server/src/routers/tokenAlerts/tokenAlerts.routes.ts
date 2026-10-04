@@ -25,12 +25,16 @@ const addressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid token add
 export const tokenAlertsRouter = router({
   /** The caller's alerts, newest first. */
   list: protectedProcedure.query(async ({ ctx }) => {
-    const snap = await alertsCol()
-      .where('uid', '==', ctx.user.uid)
-      .orderBy('createdAt', 'desc')
-      .limit(100)
-      .get();
-    return snap.docs.map((d) => {
+    // Equality-only query + in-memory sort: uid+createdAt needs a composite
+    // index that isn't deployed (500'd with FAILED_PRECONDITION). Users are
+    // capped at MAX_PER_USER alerts, so the unsorted read stays small.
+    const snap = await alertsCol().where('uid', '==', ctx.user.uid).limit(200).get();
+    const createdMs = (x: FirebaseFirestore.DocumentData) =>
+      x.createdAt?.toMillis?.() ?? (x.createdAt ? new Date(x.createdAt).getTime() : 0);
+    const docs = [...snap.docs]
+      .sort((a, b) => createdMs(b.data()) - createdMs(a.data()))
+      .slice(0, 100);
+    return docs.map((d) => {
       const x = d.data();
       return {
         id: d.id,
