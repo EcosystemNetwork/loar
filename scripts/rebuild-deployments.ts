@@ -48,7 +48,12 @@ const CHAINS: Record<string, ChainCfg> = {
 const APPLY = process.argv.includes('--apply');
 const chainArg = process.argv.find((a) => a.startsWith('--chain='))?.split('=')[1];
 const CHAINS_TO_RUN = chainArg ? [chainArg] : ['sepolia'];
-const UNDEPLOYED_CONTRACTS = ['StoryBounties', 'LoarHookStaticFee'] as const;
+// LoarHookStaticFee on Sepolia (0xF5b2…68CC) is a preserved manifest entry, not
+// from a recent broadcast. Its factory() is the OLD UniverseManager, so tokens
+// launched with it trade on their bonding curve but graduateFromBondingCurve
+// reverts OnlyFactory. Replace via script/DeployHook.s.sol + a new
+// LoarLpLockerMultiple (script/DeployLocker.s.sol), then re-sync.
+const UNDEPLOYED_CONTRACTS = ['StoryBounties'] as const;
 
 // UpgradeableBeacon entries are still skipped — the beacon address itself isn't
 // the user-facing contract. ERC1967Proxy entries are NO LONGER skipped: every

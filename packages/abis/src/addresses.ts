@@ -97,6 +97,12 @@ export const LoarFeeLocker = {
 
 export type LoarFeeLockerChainId = keyof typeof LoarFeeLocker;
 
+export const LoarHookStaticFee = {
+  '11155111': '0xF5b2676E0fbc7551ae3E38f25D87C941C5a968CC',
+} as const;
+
+export type LoarHookStaticFeeChainId = keyof typeof LoarHookStaticFee;
+
 export const LoarLpLockerMultiple = {
   '11155111': '0x7d30fd57e44aB0ca407D312976816E7052905E0A',
 } as const;
@@ -187,14 +193,3 @@ export type UniverseTokenDeployerChainId = keyof typeof UniverseTokenDeployer;
 // resolve; callers guard on the missing address ("not deployed on chain").
 export const StoryBounties: Record<string, `0x${string}`> = {};
 export type StoryBountiesChainId = keyof typeof StoryBounties;
-
-// Sepolia: the only deployed hook. Its factory() is the OLD UniverseManager
-// (0xb82d…5f00), so tokens launched with it can trade on their bonding curve
-// but graduateFromBondingCurve reverts OnlyFactory. Replace with a hook whose
-// factory is the live UniverseManager (script/DeployHook.s.sol + a new
-// LoarLpLockerMultiple via script/DeployLocker.s.sol — the locker is bound to
-// the old manager too).
-export const LoarHookStaticFee: Record<string, `0x${string}`> = {
-  '11155111': '0xF5b2676E0fbc7551ae3E38f25D87C941C5a968CC',
-};
-export type LoarHookStaticFeeChainId = keyof typeof LoarHookStaticFee;

@@ -18,7 +18,7 @@ const ROOT = path.resolve(__dirname, '..');
 
 const DEPLOYMENT_DIR = path.join(ROOT, 'deployments');
 const ADDRESSES_FILE = path.join(ROOT, 'packages/abis/src/addresses.ts');
-const UNDEPLOYED_CONTRACTS = ['StoryBounties', 'LoarHookStaticFee'] as const;
+const UNDEPLOYED_CONTRACTS = ['StoryBounties'] as const;
 
 // ── load all deployment manifests ────────────────────────────────────────────
 const manifests: Array<{ chainId: number; contracts: Record<string, string> }> = [];

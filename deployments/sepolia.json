@@ -2,7 +2,7 @@
   "chainId": 11155111,
   "environment": "sepolia",
   "startBlock": 10638176,
-  "updatedAt": "2026-09-16T17:20:45.967Z",
+  "updatedAt": "2026-10-04T19:25:54.626Z",
   "contracts": {
     "UniverseFactory": "0x94238B14f84f22A2d053bbC93CD7Ca54c6C79E85",
     "LegacyContentBackupRegistry": "0x3708C081320Eb2877Ee5c10e3665514E9682B371",
@@ -33,6 +33,7 @@
     "TokenVesting": "0x5d74D9e42a52D04DEC9F895F2c9D2e14b1DdCD64",
     "Universe": "0x1427Df0998e28DB1b82C4bdBe1B503Bf9b98c76f",
     "UniverseMetadataRenderer": "0x016b0144721e3A3134d52a32F7D712d60829d559",
-    "IdentityNFT": "0x45A5E2816696fE9AF96e2F669cafD376a84E8db7"
+    "IdentityNFT": "0x45A5E2816696fE9AF96e2F669cafD376a84E8db7",
+    "LoarHookStaticFee": "0xF5b2676E0fbc7551ae3E38f25D87C941C5a968CC"
   }
 }
