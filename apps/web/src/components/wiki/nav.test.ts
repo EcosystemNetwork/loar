@@ -12,8 +12,8 @@ describe('wiki nav model', () => {
   it('lists every view exactly once', () => {
     const ids = WIKI_TABS.map((t) => t.id);
     expect(new Set(ids).size).toBe(ids.length);
-    // 12 creator kinds + 6 structural kinds + 16 synthesised/media views
-    expect(ids).toHaveLength(34);
+    // 12 creator kinds + 6 structural kinds + 17 synthesised/media views
+    expect(ids).toHaveLength(35);
   });
 
   it('keeps every group small enough to scan', () => {
@@ -34,8 +34,9 @@ describe('wiki nav model', () => {
   });
 
   it('omits the default view but keeps the universe in the URL', () => {
-    expect(buildWikiSearch('gallery', undefined)).toEqual({});
-    expect(buildWikiSearch('gallery', '0xabc')).toEqual({ universe: '0xabc' });
+    expect(buildWikiSearch('home', undefined)).toEqual({});
+    expect(buildWikiSearch('home', '0xabc')).toEqual({ universe: '0xabc' });
+    expect(buildWikiSearch('gallery', undefined)).toEqual({ tab: 'gallery' });
     expect(buildWikiSearch('person', '0xabc')).toEqual({ universe: '0xabc', tab: 'person' });
   });
 });

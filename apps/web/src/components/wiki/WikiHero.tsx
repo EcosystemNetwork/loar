@@ -92,7 +92,7 @@ export function WikiHero({
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Wiki for
               </p>
-              <h2 className="truncate text-2xl font-bold tracking-tight">
+              <h2 className="truncate font-lore text-2xl font-semibold tracking-tight">
                 {universe.name ?? 'This universe'}
               </h2>
             </div>
@@ -154,7 +154,9 @@ export function WikiHero({
 
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">World Encyclopedia</h1>
+          <h1 className="font-lore text-3xl font-semibold tracking-tight sm:text-5xl">
+            World Encyclopedia
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground sm:text-base">
             {universe
               ? `Everything canon in ${universe.name ?? 'this universe'}.`

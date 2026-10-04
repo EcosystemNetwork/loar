@@ -67,6 +67,7 @@ import { StatsTab } from '@/components/wiki/StatsTab';
 import { CreatorsTab } from '@/components/wiki/CreatorsTab';
 import { BookmarksTab } from '@/components/wiki/BookmarksTab';
 import { AskTab } from '@/components/wiki/AskTab';
+import { WikiFrontPage } from '@/components/wiki/WikiFrontPage';
 import {
   STRUCTURAL_KIND_DESCRIPTIONS,
   type EntityKind,
@@ -1485,6 +1486,13 @@ function WikiPage() {
             <AskTab universeAddress={universeAddress} />
           ) : activeTab === 'bookmarks' ? (
             <BookmarksTab />
+          ) : activeTab === 'home' ? (
+            <WikiFrontPage
+              universeAddress={universeAddress}
+              universes={publicUniverses}
+              onSelectTab={selectTab}
+              onSelectUniverse={selectUniverse}
+            />
           ) : null}
         </>
       )}

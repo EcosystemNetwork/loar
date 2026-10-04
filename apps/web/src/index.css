@@ -6,6 +6,8 @@
 @theme inline {
   --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  /* Serif for wiki article titles — the "series bible" voice. */
+  --font-lore: 'Fraunces', ui-serif, Georgia, serif;
 }
 
 :root {

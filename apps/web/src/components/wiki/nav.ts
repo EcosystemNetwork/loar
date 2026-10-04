@@ -43,6 +43,7 @@ import {
   Library,
   Clapperboard,
   Orbit,
+  Newspaper,
 } from 'lucide-react';
 import type { EntityKind, WikiTab } from './types';
 
@@ -79,6 +80,7 @@ export const WIKI_GROUPS: WikiGroupDef[] = [
     hint: 'Browse, ask and explore',
     icon: Compass,
     tabs: [
+      { id: 'home', label: 'Front page', icon: Newspaper },
       { id: 'gallery', label: 'Gallery', icon: ImageIcon },
       { id: 'ask', label: 'Ask', icon: Sparkles },
       { id: 'az-index', label: 'A–Z', icon: ListOrdered },
@@ -151,7 +153,7 @@ export const WIKI_GROUPS: WikiGroupDef[] = [
 export const WIKI_TABS: WikiTabDef[] = WIKI_GROUPS.flatMap((g) => g.tabs);
 
 /** The view shown when `?tab=` is absent. Omitted from the URL. */
-export const DEFAULT_WIKI_TAB: WikiTab = 'gallery';
+export const DEFAULT_WIKI_TAB: WikiTab = 'home';
 
 /** Resolve a raw `?tab=` value to a known view, falling back to the default. */
 export function resolveWikiTab(raw: string | undefined): WikiTab {

@@ -32,33 +32,32 @@ import {
   Circle,
   XCircle,
   Box,
-  MapPin,
-  Package,
-  Swords,
-  Zap,
-  BookOpen,
-  Dna,
-  Layers,
-  Cpu,
-  Building2,
-  GitBranch,
-  Eye,
-  Hexagon,
-  Castle,
-  Crown,
-  ImageIcon,
   ShieldCheck,
-  Link2,
-  ChevronRight,
   Plus,
   Trash2,
   Search,
   Tag,
+  Settings2,
+  Upload,
 } from 'lucide-react';
 import { MediaGallery } from '@/components/MediaGallery';
 import { Entity3DStudio } from '@/components/world/Entity3DStudio';
 import { CharacterProfileCard } from '@/components/wiki/CharacterProfileCard';
-import { CharacterChips, ClampedText } from '@/components/wiki/CharacterHero';
+import {
+  ArticleSection,
+  EntityArticleHero,
+  EntityInfobox,
+  type InfoboxRow,
+} from '@/components/wiki/EntityArticle';
+import { kindIcon, KIND_LABELS } from '@/components/wiki/kindMeta';
+import { splitMetadata } from '@/components/wiki/frontPage';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useMediaAttachments } from '@/hooks/useMediaAttachments';
 import { MusicGenerationPanel } from '@/components/MusicGenerationPanel';
 import { MintContentDialog } from '@/components/MintContentDialog';
@@ -89,25 +88,6 @@ function formatEntityDate(v: unknown): string {
       : new Date(v as string | number | Date);
   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
 }
-
-const KIND_LABELS: Record<string, string> = {
-  person: 'Person',
-  place: 'Place',
-  thing: 'Thing / Artifact',
-  faction: 'Faction',
-  event: 'Event',
-  lore: 'Lore Page',
-  species: 'Species',
-  vehicle: 'Vehicle',
-  technology: 'Technology',
-  organization: 'Organization',
-  timeline: 'Timeline',
-  reality: 'Reality',
-  dimension: 'Dimension',
-  plane: 'Plane',
-  realm: 'Realm',
-  domain: 'Domain',
-};
 
 const METADATA_LABELS: Record<string, string> = {
   role: 'Role / Archetype',
@@ -170,25 +150,6 @@ const safeUrl = (url: string | null | undefined): string | undefined => {
   } catch {
     return undefined;
   }
-};
-
-const DETAIL_KIND_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  person: Users,
-  place: MapPin,
-  thing: Package,
-  faction: Swords,
-  event: Zap,
-  lore: BookOpen,
-  species: Dna,
-  vehicle: Layers,
-  technology: Cpu,
-  organization: Building2,
-  timeline: GitBranch,
-  reality: Eye,
-  dimension: Box,
-  plane: Hexagon,
-  realm: Castle,
-  domain: Crown,
 };
 
 /** Kinds eligible for the character pipeline (have visual 3D representations). */
@@ -431,27 +392,20 @@ function RelationshipsCard({ entityId, isOwner }: { entityId: string; isOwner: b
   if (relations.length === 0 && !isOwner) return null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            <Link2 className="w-4 h-4" />
-            Relationships
-            {relations.length > 0 && (
-              <Badge variant="secondary" className="text-xs">
-                {relations.length}
-              </Badge>
-            )}
-          </span>
-          {isOwner && !adding && (
-            <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
-              <Plus className="w-3 h-3 mr-1" />
-              Add
-            </Button>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <ArticleSection
+      id="relationships"
+      title="Relationships"
+      count={relations.length}
+      action={
+        isOwner && !adding ? (
+          <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
+            <Plus className="w-3 h-3 mr-1" />
+            Add
+          </Button>
+        ) : undefined
+      }
+    >
+      <div className="space-y-3">
         {/* Add relationship form */}
         {adding && (
           <div className="space-y-3 p-3 rounded-lg border border-dashed">
@@ -543,7 +497,7 @@ function RelationshipsCard({ entityId, isOwner }: { entityId: string; isOwner: b
             No connections yet. Add relationships to build your universe's lore graph.
           </p>
         )}
-        <div className="space-y-2">
+        <ul className="grid gap-2 sm:grid-cols-2">
           {relations.map((rel: any) => {
             const isSource = rel.sourceId === entityId;
             const otherName = isSource ? rel.targetName : rel.sourceName;
@@ -553,43 +507,36 @@ function RelationshipsCard({ entityId, isOwner }: { entityId: string; isOwner: b
             const label = isSource
               ? (RELATION_TYPES.find((rt) => rt.value === rel.type)?.label ?? rel.type)
               : (INVERSE_LABELS[rel.type] ?? rel.type);
+            const Icon = kindIcon(otherKind);
 
             return (
-              <div
+              <li
                 key={rel.id}
-                className="flex items-center gap-3 group p-2 rounded-md hover:bg-muted/50"
+                className="group relative flex items-center gap-3 rounded-lg border bg-card/40 p-2.5 transition-colors hover:border-primary/40"
               >
-                <Link to="/wiki/entity/$id" params={{ id: otherId }} className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center relative overflow-hidden">
-                    {(() => {
-                      const Icon = DETAIL_KIND_ICONS[otherKind] ?? Package;
-                      return <Icon className="w-4 h-4 text-muted-foreground/40" />;
-                    })()}
-                    {otherImage && (
-                      <SmartImage
-                        src={otherImage}
-                        alt=""
-                        className="absolute inset-0 w-full h-full object-cover"
-                      />
-                    )}
-                  </div>
-                </Link>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <Badge variant="outline" className="text-[10px] shrink-0">
-                      {label}
-                    </Badge>
-                    <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
-                    <Link
-                      to="/wiki/entity/$id"
-                      params={{ id: otherId }}
-                      className="text-sm font-medium hover:underline truncate"
-                    >
-                      {otherName}
-                    </Link>
-                  </div>
+                <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+                  <Icon className="h-5 w-5 text-muted-foreground/40" />
+                  {otherImage && (
+                    <SmartImage
+                      src={otherImage}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {label}
+                  </p>
+                  <Link
+                    to="/wiki/entity/$id"
+                    params={{ id: otherId }}
+                    className="block truncate font-medium after:absolute after:inset-0 hover:text-primary"
+                  >
+                    {otherName}
+                  </Link>
                   {rel.description && (
-                    <p className="text-xs text-muted-foreground truncate break-words">
+                    <p className="truncate text-xs text-muted-foreground">
                       <UserText>{rel.description}</UserText>
                     </p>
                   )}
@@ -597,48 +544,62 @@ function RelationshipsCard({ entityId, isOwner }: { entityId: string; isOwner: b
                 {isOwner && (
                   <button
                     onClick={() => handleDelete(rel.id)}
-                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                    className="relative z-10 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
                     title="Remove relationship"
+                    aria-label={`Remove relationship with ${otherName}`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 )}
-              </div>
+              </li>
             );
           })}
-        </div>
-      </CardContent>
-    </Card>
+        </ul>
+      </div>
+    </ArticleSection>
   );
 }
 
-/** Parent chain breadcrumb — walks up the parent hierarchy. */
-function EntityBreadcrumb({ entity }: { entity: any }) {
-  const { data: parent } = useQuery({
-    queryKey: ['entity', entity.parentId],
-    queryFn: () => trpcClient.entities.get.query({ entityId: entity.parentId }),
-    enabled: !!entity.parentId,
-  });
-
-  if (!entity.parentId) return null;
-
+/** Small linked tile used by the "Contains" and "Mentioned in" sections. */
+function EntityLinkTile({
+  id,
+  name,
+  kind,
+  imageUrl,
+  snippet,
+}: {
+  id: string;
+  name: string;
+  kind: string;
+  imageUrl?: string | null;
+  snippet?: string;
+}) {
+  const Icon = kindIcon(kind);
   return (
-    <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-4">
-      {parent && (
-        <>
-          {parent.parentId && <span className="text-muted-foreground/40">... /</span>}
-          <Link
-            to="/wiki/entity/$id"
-            params={{ id: parent.id }}
-            className="hover:underline hover:text-foreground"
-          >
-            {parent.name}
-          </Link>
-          <ChevronRight className="w-3 h-3" />
-        </>
-      )}
-      <span className="text-foreground font-medium">{entity.name}</span>
-    </div>
+    <Link
+      to="/wiki/entity/$id"
+      params={{ id }}
+      className="flex items-start gap-3 rounded-lg border bg-card/40 p-2.5 transition-colors hover:border-primary/40"
+    >
+      <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+        <Icon className="h-4 w-4 text-muted-foreground/40" />
+        {imageUrl && (
+          <SmartImage
+            src={imageUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        )}
+      </div>
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-medium">{name}</span>
+        {snippet ? (
+          <span className="line-clamp-2 text-xs text-muted-foreground">{snippet}</span>
+        ) : (
+          <span className="block text-xs text-muted-foreground">{KIND_LABELS[kind] ?? kind}</span>
+        )}
+      </span>
+    </Link>
   );
 }
 
@@ -653,38 +614,19 @@ function ChildEntities({ entityId }: { entityId: string }) {
   if (children.length === 0) return null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Contains ({children.length})</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {children.map((child: any) => {
-            const Icon = DETAIL_KIND_ICONS[child.kind] ?? Package;
-            return (
-              <Link
-                key={child.id}
-                to="/wiki/entity/$id"
-                params={{ id: child.id }}
-                className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors"
-              >
-                <div className="w-6 h-6 rounded bg-muted flex items-center justify-center relative overflow-hidden shrink-0">
-                  <Icon className="w-4 h-4 text-muted-foreground/40" />
-                  {child.imageUrl && (
-                    <SmartImage
-                      src={child.imageUrl}
-                      alt=""
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
-                  )}
-                </div>
-                <span className="text-sm truncate">{child.name}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+    <ArticleSection id="contains" title="Contains" count={children.length}>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {children.map((child: any) => (
+          <EntityLinkTile
+            key={child.id}
+            id={child.id}
+            name={child.name}
+            kind={child.kind}
+            imageUrl={child.imageUrl}
+          />
+        ))}
+      </div>
+    </ArticleSection>
   );
 }
 
@@ -700,45 +642,20 @@ function MentionedIn({ entityId }: { entityId: string }) {
   if (mentions.length === 0) return null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <Link2 className="w-4 h-4" />
-          Mentioned in ({mentions.length})
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ul className="space-y-2">
-          {mentions.map((m) => {
-            const Icon = DETAIL_KIND_ICONS[m.kind] ?? Package;
-            return (
-              <li key={m.id}>
-                <Link
-                  to="/wiki/entity/$id"
-                  params={{ id: m.id }}
-                  className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors"
-                >
-                  <div className="w-6 h-6 rounded bg-muted flex items-center justify-center relative overflow-hidden shrink-0 mt-0.5">
-                    <Icon className="w-4 h-4 text-muted-foreground/40" />
-                    {m.imageUrl && (
-                      <SmartImage
-                        src={m.imageUrl}
-                        alt=""
-                        className="absolute inset-0 w-full h-full object-cover"
-                      />
-                    )}
-                  </div>
-                  <span className="min-w-0">
-                    <span className="text-sm font-medium block truncate">{m.name}</span>
-                    <span className="text-xs text-muted-foreground line-clamp-2">{m.snippet}</span>
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </CardContent>
-    </Card>
+    <ArticleSection id="mentioned-in" title="Mentioned in" count={mentions.length}>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {mentions.map((m) => (
+          <EntityLinkTile
+            key={m.id}
+            id={m.id}
+            name={m.name}
+            kind={m.kind}
+            imageUrl={m.imageUrl}
+            snippet={m.snippet}
+          />
+        ))}
+      </div>
+    </ArticleSection>
   );
 }
 
@@ -789,24 +706,44 @@ function EntityPage() {
     (entity?.universeAddress as `0x${string}` | undefined) ?? undefined
   );
 
+  // Same key/shape as the wiki hub's scoped-universe query, so it's usually cached.
+  const { data: universeResult } = useQuery({
+    queryKey: ['universe', entity?.universeAddress],
+    queryFn: () => trpcClient.universes.get.query({ id: entity!.universeAddress! }),
+    enabled: !!entity?.universeAddress,
+    staleTime: 5 * 60 * 1000,
+  });
+  const universeName = (universeResult?.data as { name?: string } | undefined)?.name;
+
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="text-center py-16 text-muted-foreground">Loading...</div>
+      <div aria-busy="true" aria-label="Loading entry">
+        <Skeleton className="h-[320px] w-full rounded-none md:h-[440px]" />
+        <div className="container mx-auto grid max-w-6xl gap-10 px-4 py-10 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-11/12" />
+            <Skeleton className="h-4 w-4/5" />
+          </div>
+          <Skeleton className="hidden h-96 rounded-xl lg:block" />
+        </div>
       </div>
     );
   }
 
   if (error || !entity) {
     return (
-      <div className="container mx-auto p-6">
-        <Link to="/wiki">
-          <Button variant="outline" className="mb-6">
+      <div className="container mx-auto max-w-xl px-4 py-24 text-center">
+        <h1 className="font-lore text-3xl font-semibold">This entry doesn't exist</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {error?.message ?? 'It may have been removed, or the link is wrong.'}
+        </p>
+        <Button asChild variant="outline" className="mt-6">
+          <Link to="/wiki">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Wiki
-          </Button>
-        </Link>
-        <div className="text-center py-16 text-red-500">{error?.message ?? 'Entity not found'}</div>
+            Back to the wiki
+          </Link>
+        </Button>
       </div>
     );
   }
@@ -821,9 +758,12 @@ function EntityPage() {
     'environment',
     'usdzUrl',
   ]);
-  const metadataEntries = Object.entries(entity.metadata ?? {}).filter(
-    ([k, v]) => v && !HIDDEN_METADATA_KEYS.has(k)
-  );
+  // Short facts sit in the infobox; long-form fields become article sections.
+  // People get the structured CharacterProfileCard instead.
+  const { facts: metadataFacts, sections: metadataSections } =
+    entity.kind === 'person'
+      ? { facts: [], sections: [] }
+      : splitMetadata(entity.metadata as Record<string, unknown>, HIDDEN_METADATA_KEYS);
   const isCreator = !!address && entity.creator?.toLowerCase() === address.toLowerCase();
   const isOwner = isCreator || isUniverseManager;
 
@@ -953,155 +893,137 @@ function EntityPage() {
   const hasPipeline = !!pipelineId;
   const canMint = entity?.monetized && entity?.rightsDeclaration && entity?.imageUrl && isOwner;
 
+  const heroImage = safeUrl(entity.imageUrl);
+  const variants = (entity.metadata as any)?.characterVariants;
+
+  const infoboxRows: InfoboxRow[] = [
+    {
+      label: 'Type',
+      value: kindLabel,
+    },
+  ];
+  if (entity.universeAddress) {
+    infoboxRows.push({
+      label: 'Universe',
+      value: (
+        <Link
+          to="/universe/$id/watch"
+          params={{ id: entity.universeAddress }}
+          className="text-primary hover:underline"
+        >
+          {universeName ?? `${entity.universeAddress.slice(0, 10)}…`}
+        </Link>
+      ),
+    });
+  }
+  for (const [key, value] of metadataFacts) {
+    infoboxRows.push({ label: METADATA_LABELS[key] ?? key, value: <UserText>{value}</UserText> });
+  }
+  if ((entity as any).unstoppableDomain) {
+    infoboxRows.push({
+      label: 'Domain',
+      value: <span className="text-primary">{(entity as any).unstoppableDomain}</span>,
+    });
+  }
+  if (entity.monetized) {
+    infoboxRows.push({
+      label: 'Rights',
+      value: (
+        <Badge variant="outline" className="text-amber-500 border-amber-500/30">
+          {entity.rightsDeclaration === 'original' ? 'Original' : 'Licensed'}
+        </Badge>
+      ),
+    });
+  }
+  infoboxRows.push({ label: 'Created', value: formatEntityDate(entity.createdAt) });
+
+  const showManageMenu = isOwner;
+
   return (
-    <div className="container mx-auto px-4 py-6 md:py-8 max-w-4xl pb-bottom-nav md:pb-12">
-      <Link to="/wiki">
-        <Button variant="outline" className="mb-4">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Wiki
-        </Button>
-      </Link>
-
-      <EntityBreadcrumb entity={entity} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column — image + metadata */}
-        <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-          <Card>
-            <CardContent className="p-4">
-              <div className="aspect-square w-full overflow-hidden rounded-lg">
-                {safeUrl(entity.imageUrl) ? (
-                  <SmartImage
-                    src={safeUrl(entity.imageUrl)}
-                    alt={entity.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-muted flex flex-col items-center justify-center gap-3">
-                    {(() => {
-                      const Icon = DETAIL_KIND_ICONS[entity.kind] ?? ImageIcon;
-                      return <Icon className="h-16 w-16 text-muted-foreground/20" />;
-                    })()}
-                    <span className="text-xs text-muted-foreground/40">No image yet</span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Character variants — outfits / alternate versions captured during creation. */}
-          {(() => {
-            const variants = (entity.metadata as any)?.characterVariants;
-            if (!Array.isArray(variants) || variants.length === 0) return null;
-            return (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                    Versions & Outfits
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-2 gap-2">
-                  {variants.map((v: any, idx: number) => (
-                    <div
-                      key={`${v.generationId ?? v.label ?? idx}`}
-                      className={`relative rounded-lg border-2 overflow-hidden bg-muted/30 ${
-                        v.isMain ? 'border-primary' : 'border-muted'
-                      }`}
-                    >
-                      <div className="aspect-square w-full bg-muted/50">
-                        {v.imageUrl ? (
-                          <SmartImage
-                            src={v.imageUrl}
-                            alt={v.label ?? `Variant ${idx + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-                            {v.type === '3d' ? '3D' : 'No preview'}
-                          </div>
-                        )}
-                      </div>
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 flex items-center justify-between gap-1">
-                        <span className="text-[11px] text-white font-medium truncate">
-                          {v.label ?? `Variant ${idx + 1}`}
-                        </span>
-                        <span className="text-[9px] uppercase tracking-wider text-white/70 shrink-0">
-                          {v.type ?? '2d'}
-                        </span>
-                      </div>
-                      {safeUrl(v.modelUrl) && (
-                        <a
-                          href={safeUrl(v.modelUrl)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="absolute top-1 left-1 rounded bg-violet-500/90 text-white text-[9px] px-1.5 py-0.5 font-medium hover:bg-violet-600"
-                        >
-                          GLB
-                        </a>
-                      )}
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            );
-          })()}
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                Details
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Type</span>
-                <Badge variant="secondary">{kindLabel}</Badge>
-              </div>
-              {entity.universeAddress && (
-                <div className="flex justify-between items-center gap-2">
-                  <span className="text-muted-foreground">Universe</span>
-                  <Link
-                    to="/universe/$id/watch"
-                    params={{ id: entity.universeAddress }}
-                    className="text-primary text-xs font-mono hover:underline truncate max-w-[120px]"
-                  >
-                    {entity.universeAddress.slice(0, 10)}…
-                  </Link>
-                </div>
-              )}
-              {(entity as any).unstoppableDomain && (
-                <div className="flex justify-between items-center gap-2">
-                  <span className="text-muted-foreground">Domain</span>
-                  <span className="text-xs font-medium text-primary">
-                    {(entity as any).unstoppableDomain}
-                  </span>
-                </div>
-              )}
-              {entity.monetized && (
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Rights</span>
-                  <Badge variant="outline" className="text-amber-500 border-amber-500/30">
-                    {entity.rightsDeclaration === 'original' ? 'Original' : 'Licensed'}
-                  </Badge>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Created</span>
-                <span>{formatEntityDate(entity.createdAt)}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {entity.kind === 'style_pack' && entity.universeAddress && (
-            <CanonStylePackToggle
-              stylePackEntityId={entity.id}
-              universeAddress={entity.universeAddress}
+    <div className="pb-bottom-nav md:pb-12">
+      <EntityArticleHero
+        entity={entity as any}
+        imageUrl={heroImage}
+        universeName={universeName}
+        actions={
+          <>
+            <EndorseButton
+              targetType="entity"
+              targetId={entity.id}
+              universeAddress={entity.universeAddress ?? null}
+              variant="inline"
             />
-          )}
-        </div>
+            {canMint && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleMintEntity}
+                disabled={findingContent}
+                className="bg-amber-600 hover:bg-amber-500"
+              >
+                {findingContent ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <ShieldCheck className="w-4 h-4 mr-2" />
+                )}
+                {findingContent ? 'Preparing...' : 'Mint as NFT'}
+              </Button>
+            )}
+            {showManageMenu && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="bg-background/60 backdrop-blur">
+                    {generating || launchingPipeline ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Settings2 className="w-4 h-4 mr-2" />
+                    )}
+                    Manage entry
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  <DropdownMenuItem onSelect={handleGenerateBio} disabled={generating}>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    {generating ? 'Generating bio…' : 'Generate bio with AI'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setCollaborativeMode(true)}>
+                    <Users className="w-4 h-4 mr-2" />
+                    Edit collaboratively
+                  </DropdownMenuItem>
+                  {isPipelineEligible && !hasPipeline && (
+                    <DropdownMenuItem onSelect={handleLaunchPipeline} disabled={launchingPipeline}>
+                      <Wand2 className="w-4 h-4 mr-2" />
+                      {launchingPipeline ? 'Starting…' : 'Generate 3D character'}
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      navigate({
+                        to: '/sell/new',
+                        search: {
+                          assetRef: entity.id,
+                          universeId: entity.universeAddress ?? undefined,
+                          productType: entity.kind === 'person' ? 'CHARACTER_NFT' : 'ARTIFACT',
+                          title: entity.name,
+                          description: entity.description || undefined,
+                          thumbnailUrl: entity.imageUrl || undefined,
+                        },
+                      })
+                    }
+                  >
+                    <Tag className="w-4 h-4 mr-2" />
+                    List for sale
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </>
+        }
+      />
 
-        {/* Right column — name, description, metadata fields */}
-        <div className="lg:col-span-2 space-y-4">
+      <div className="container mx-auto grid max-w-6xl gap-10 px-4 py-8 md:py-10 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-12">
+        {/* Article body */}
+        <article className="min-w-0 space-y-12">
           {collaborativeMode ? (
             <CollaborativeEntityEditor
               entityId={id}
@@ -1112,109 +1034,33 @@ function EntityPage() {
             />
           ) : (
             <>
-              <Card>
-                <CardHeader className="flex flex-row items-start justify-between gap-4">
-                  <CardTitle className="text-2xl">{entity.name}</CardTitle>
-                  <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                    <EndorseButton
-                      targetType="entity"
-                      targetId={entity.id}
-                      universeAddress={entity.universeAddress ?? null}
-                      variant="inline"
-                    />
-                    {canMint && (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={handleMintEntity}
-                        disabled={findingContent}
-                        className="bg-amber-600 hover:bg-amber-500"
-                      >
-                        {findingContent ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <ShieldCheck className="w-4 h-4 mr-2" />
-                        )}
-                        {findingContent ? 'Preparing...' : 'Mint as NFT'}
-                      </Button>
-                    )}
-                    {isOwner && isPipelineEligible && !hasPipeline && (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={handleLaunchPipeline}
-                        disabled={launchingPipeline}
-                      >
-                        {launchingPipeline ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <Wand2 className="w-4 h-4 mr-2" />
-                        )}
-                        {launchingPipeline ? 'Starting...' : 'Generate 3D Character'}
-                      </Button>
-                    )}
-                    {isOwner && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          navigate({
-                            to: '/sell/new',
-                            search: {
-                              assetRef: entity.id,
-                              universeId: entity.universeAddress ?? undefined,
-                              productType: entity.kind === 'person' ? 'CHARACTER_NFT' : 'ARTIFACT',
-                              title: entity.name,
-                              description: entity.description || undefined,
-                              thumbnailUrl: entity.imageUrl || undefined,
-                            },
-                          })
-                        }
-                      >
-                        <Tag className="w-4 h-4 mr-2" />
-                        List for Sale
-                      </Button>
-                    )}
-                    {isOwner && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCollaborativeMode(true)}
-                      >
-                        <Users className="w-4 h-4 mr-2" />
-                        Collaborate
-                      </Button>
-                    )}
-                    {isOwner && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleGenerateBio}
-                        disabled={generating}
-                      >
-                        {generating ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <Sparkles className="w-4 h-4 mr-2" />
-                        )}
-                        {generating ? 'Generating...' : 'Generate Bio'}
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                {entity.kind === 'person' && <CharacterChips metadata={entity.metadata} />}
-                {entity.description && (
-                  <CardContent>
-                    {entity.kind === 'person' ? (
-                      <ClampedText text={entity.description} />
-                    ) : (
-                      <p className="text-muted-foreground leading-relaxed break-words">
-                        <UserText>{entity.description}</UserText>
-                      </p>
-                    )}
-                  </CardContent>
-                )}
-              </Card>
+              {entity.description ? (
+                <div className="max-w-[70ch] whitespace-pre-line break-words text-[17px] leading-8 text-foreground/85 first-letter:float-left first-letter:mr-2 first-letter:mt-1 first-letter:font-lore first-letter:text-[3.6rem] first-letter:font-semibold first-letter:leading-[0.8] first-letter:text-primary">
+                  <UserText>{entity.description}</UserText>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed px-5 py-8 text-center">
+                  <p className="font-lore text-lg">
+                    Nothing has been written about {entity.name} yet.
+                  </p>
+                  {isOwner && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-4"
+                      onClick={handleGenerateBio}
+                      disabled={generating}
+                    >
+                      {generating ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-4 h-4 mr-2" />
+                      )}
+                      {generating ? 'Generating...' : 'Draft it with AI'}
+                    </Button>
+                  )}
+                </div>
+              )}
 
               {entity.kind === 'person' && (
                 <CharacterProfileCard
@@ -1224,40 +1070,15 @@ function EntityPage() {
                 />
               )}
 
-              {entity.kind !== 'person' && metadataEntries.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">World Details</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {metadataEntries.map(([key, value]) => (
-                      <div key={key}>
-                        <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                          {METADATA_LABELS[key] ?? key}
-                        </dt>
-                        <dd className="text-sm leading-relaxed whitespace-pre-wrap">
-                          {String(value)}
-                        </dd>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
+              {metadataSections.map(([key, value]) => (
+                <ArticleSection key={key} id={`field-${key}`} title={METADATA_LABELS[key] ?? key}>
+                  <div className="max-w-[70ch] whitespace-pre-line break-words leading-7 text-foreground/85">
+                    <UserText>{value}</UserText>
+                  </div>
+                </ArticleSection>
+              ))}
             </>
           )}
-
-          {/* Voice profile — design & preview character voices */}
-          <VoiceProfileCard
-            entityId={id}
-            entityName={entity.name}
-            entityKind={entity.kind}
-            entityDescription={entity.description || ''}
-            universeId={entity.universeAddress || null}
-            isOwner={isOwner}
-          />
-
-          {/* Reference bundle — character identity lock + multi-reference editing */}
-          <ReferenceBundleEditor entityId={id} isOwner={isOwner} />
 
           {/* Relationships */}
           <RelationshipsCard entityId={id} isOwner={isOwner} />
@@ -1268,38 +1089,37 @@ function EntityPage() {
           {/* Backlinks */}
           <MentionedIn entityId={id} />
 
-          {/* Character pipeline status */}
-          {hasPipeline && <PipelineStatus pipelineId={pipelineId!} />}
-
           {/* 3D model, puppet, environment — Tripo world-building */}
           <Entity3DStudio entity={entity} isOwner={isOwner} />
 
           {(mediaAttachments.length > 0 || isOwner) && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center justify-between">
-                  Media &amp; Assets
-                  <div className="flex items-center gap-2">
-                    {isOwner && (
-                      <button
-                        className="text-xs font-normal text-primary hover:underline flex items-center gap-1"
-                        onClick={() => setShowMusicPanel((v) => !v)}
-                      >
-                        <Music className="h-3 w-3" />
-                        {showMusicPanel ? 'Hide Music Gen' : 'Generate Music'}
-                      </button>
-                    )}
-                    {isOwner && (
-                      <Link to="/upload" search={{}}>
-                        <button className="text-xs font-normal text-primary hover:underline">
-                          + Upload &amp; attach
-                        </button>
-                      </Link>
-                    )}
+            <ArticleSection
+              id="media"
+              title="Media & assets"
+              count={mediaAttachments.length}
+              action={
+                isOwner ? (
+                  <div className="flex items-center gap-3">
+                    <button
+                      className="text-xs font-normal text-primary hover:underline flex items-center gap-1"
+                      onClick={() => setShowMusicPanel((v) => !v)}
+                    >
+                      <Music className="h-3 w-3" />
+                      {showMusicPanel ? 'Hide music gen' : 'Generate music'}
+                    </button>
+                    <Link
+                      to="/upload"
+                      search={{}}
+                      className="text-xs font-normal text-primary hover:underline flex items-center gap-1"
+                    >
+                      <Upload className="h-3 w-3" />
+                      Upload &amp; attach
+                    </Link>
                   </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+                ) : undefined
+              }
+            >
+              <div className="space-y-4">
                 {showMusicPanel && isOwner && (
                   <MusicGenerationPanel
                     entityId={id}
@@ -1324,10 +1144,91 @@ function EntityPage() {
                     effects, or design files. Generate 3D models and they'll auto-attach here.
                   </p>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </ArticleSection>
           )}
-        </div>
+
+          {/* Production tools — each card hides itself when it has nothing to show */}
+          <div className="space-y-4 empty:hidden">
+            {/* Character pipeline status */}
+            {hasPipeline && <PipelineStatus pipelineId={pipelineId!} />}
+
+            {/* Voice profile — design & preview character voices */}
+            <VoiceProfileCard
+              entityId={id}
+              entityName={entity.name}
+              entityKind={entity.kind}
+              entityDescription={entity.description || ''}
+              universeId={entity.universeAddress || null}
+              isOwner={isOwner}
+            />
+
+            {/* Reference bundle — character identity lock + multi-reference editing */}
+            <ReferenceBundleEditor entityId={id} isOwner={isOwner} />
+          </div>
+        </article>
+        {/* Infobox — below the article on mobile, pinned beside it on desktop */}
+        <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+          <EntityInfobox entity={entity as any} imageUrl={heroImage} rows={infoboxRows}>
+            {/* Character variants — outfits / alternate versions captured during creation. */}
+            {Array.isArray(variants) && variants.length > 0 && (
+              <div className="border-t px-4 py-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Versions &amp; outfits
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {variants.map((v: any, idx: number) => (
+                    <div
+                      key={`${v.generationId ?? v.label ?? idx}`}
+                      className={`relative overflow-hidden rounded-lg border-2 bg-muted/30 ${
+                        v.isMain ? 'border-primary' : 'border-muted'
+                      }`}
+                    >
+                      <div className="aspect-square w-full bg-muted/50">
+                        {v.imageUrl ? (
+                          <SmartImage
+                            src={v.imageUrl}
+                            alt={v.label ?? `Variant ${idx + 1}`}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                            {v.type === '3d' ? '3D' : 'No preview'}
+                          </div>
+                        )}
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between gap-1 bg-gradient-to-t from-black/80 to-transparent p-2">
+                        <span className="truncate text-[11px] font-medium text-white">
+                          {v.label ?? `Variant ${idx + 1}`}
+                        </span>
+                        <span className="shrink-0 text-[9px] uppercase tracking-wider text-white/70">
+                          {v.type ?? '2d'}
+                        </span>
+                      </div>
+                      {safeUrl(v.modelUrl) && (
+                        <a
+                          href={safeUrl(v.modelUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="absolute left-1 top-1 rounded bg-violet-500/90 px-1.5 py-0.5 text-[9px] font-medium text-white hover:bg-violet-600"
+                        >
+                          GLB
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </EntityInfobox>
+
+          {entity.kind === 'style_pack' && entity.universeAddress && (
+            <CanonStylePackToggle
+              stylePackEntityId={entity.id}
+              universeAddress={entity.universeAddress}
+            />
+          )}
+        </aside>
       </div>
 
       {/* Mint as NFT dialog */}

@@ -94,6 +94,24 @@ describe('CharacterProfileCard', () => {
     expect(screen.queryByText('History')).toBeNull();
   });
 
+  it('renders nothing for visitors when no field is filled, but still shows owners the card', async () => {
+    const empty = {
+      ...profile(),
+      sections: [{ id: 'identity', title: 'Identity', fields: [field('age', 'Age')] }],
+      appearances: [],
+      extra: [],
+    };
+    mocks.profile.mockResolvedValue(empty);
+    const visitor = renderCard(false);
+    await waitFor(() => expect(mocks.profile).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 0));
+    expect(visitor.queryByText('Character Profile')).toBeNull();
+    visitor.unmount();
+
+    renderCard(true);
+    expect(await screen.findByText('Character Profile')).toBeTruthy();
+  });
+
   it('shows owners the completeness bar and asset checklist', async () => {
     renderCard(true);
     expect(await screen.findByText('33%')).toBeTruthy();

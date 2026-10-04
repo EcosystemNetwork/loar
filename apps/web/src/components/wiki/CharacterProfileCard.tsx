@@ -97,6 +97,13 @@ export function CharacterProfileCard({ entityId, metadata, isOwner, onChanged }:
   const { completeness, sections, extra, assets, appearances } = profile;
   const canComplete = isOwner && completeness.missing.length > 0;
 
+  // Visitors only see filled fields — skip the card entirely when there are none.
+  const hasPublicContent =
+    sections.some((s) => s.fields.some((f) => f.filled)) ||
+    appearances.length > 0 ||
+    extra.length > 0;
+  if (!isOwner && !hasPublicContent) return null;
+
   return (
     <Card>
       <CardHeader className="space-y-3">

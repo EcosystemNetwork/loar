@@ -80,7 +80,8 @@ export type WikiTab =
   | 'ask'
   | 'stats'
   | 'creators'
-  | 'bookmarks';
+  | 'bookmarks'
+  | 'home';
 
 export type WikiSort = 'newest' | 'oldest' | 'a-z' | 'z-a';
 
