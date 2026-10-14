@@ -193,9 +193,9 @@ describe('threed generation on Tripo3D', () => {
     expect(post.body).toMatchObject({
       prompt: 'a moss-covered stone golem',
       model: 'P1-20260311',
-      smart_low_poly: true,
       render_video: true,
     });
+    expect(post.body.smart_low_poly).toBeUndefined();
 
     const gen = await waitFor(async () => {
       const d = await genDoc(out.generationId);
@@ -234,11 +234,11 @@ describe('threed generation on Tripo3D', () => {
       ],
     });
     const [post] = posts('/v3/generation/multiview-to-model');
-    expect(post.body.inputs[0]).toEqual({
-      front: { type: 'png', url: 'https://img.example/front.png' },
-      left: { type: 'png', url: 'https://img.example/left.png' },
-      back: { type: 'png', url: 'https://img.example/back.png' },
-    });
+    expect(post.body.inputs).toEqual([
+      { front: 'https://img.example/front.png' },
+      { left: 'https://img.example/left.png' },
+      { back: 'https://img.example/back.png' },
+    ]);
   });
 
   it('refuses to "refine" a Tripo model', async () => {

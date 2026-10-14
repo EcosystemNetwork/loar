@@ -40,9 +40,8 @@ export type TripoRigType =
   | 'avian'
   | 'serpentine'
   | 'aquatic'
-  // Kept for backwards compatibility with our rig-type enum. v3 does not
-  // document `others`; a vehicle/mech rig may fail — the task error surfaces
-  // through `waitForTask`.
+  // Kept for backwards compatibility with our rig-type enum. Not a v3
+  // `rig_type` — `rigModel` rejects it before uploading anything.
   | 'others';
 
 export type TripoRigSpec = 'mixamo' | 'tripo';
@@ -126,6 +125,61 @@ interface UploadResponse {
   data: { file_token: string };
 }
 
+interface TripoErrorBody {
+  code?: number;
+  message?: string;
+  suggestion?: string;
+  request_id?: string;
+}
+
+/**
+ * Codes from Tripo's Error Handling guide that the user (not us) has to act
+ * on — a BYOK key, the user's own credits, or their content.
+ */
+const TRIPO_USER_FACING: Record<number, string> = {
+  2: 'Your Tripo3D API key was rejected — use the secret key (starts with tsk_) from /settings/api-keys',
+  1000: 'Your Tripo3D API key is invalid or was deleted — update it at /settings/api-keys',
+  1001: 'Your Tripo3D API key is missing — add one at /settings/api-keys',
+  2008: 'Tripo3D blocked this input under its content policy — try a different image or prompt',
+  2010: 'Your Tripo3D account is out of credits — top up at platform.tripo3d.ai',
+  2015: 'Tripo3D retired this model version',
+  2018: 'This model is too complex for Tripo3D — reduce its polycount first',
+};
+
+/**
+ * A Tripo HTTP/API error. The message keeps the `Tripo3D API error` prefix
+ * that job failure records and tests match on, and leads with a readable
+ * explanation for the codes a user can fix themselves.
+ */
+export class TripoApiError extends Error {
+  readonly status: number;
+  readonly code?: number;
+  readonly suggestion?: string;
+  readonly requestId?: string;
+
+  constructor(args: {
+    status: number;
+    code?: number;
+    message: string;
+    suggestion?: string;
+    requestId?: string;
+  }) {
+    const friendly = args.code !== undefined ? TRIPO_USER_FACING[args.code] : undefined;
+    const where = args.code !== undefined ? `${args.status}, code ${args.code}` : `${args.status}`;
+    const hint = args.suggestion ? ` — ${args.suggestion}` : '';
+    super(
+      friendly
+        ? `${friendly} (Tripo3D API error ${where})`
+        : `Tripo3D API error ${where}: ${args.message}${hint}`
+    );
+    this.name = 'TripoApiError';
+    this.status = args.status;
+    this.code = args.code;
+    this.suggestion = args.suggestion;
+    this.requestId = args.requestId;
+  }
+}
+
 class Tripo3dService {
   /**
    * Required — no `TRIPO_API_KEY` env fallback. Callers must route through
@@ -144,56 +198,101 @@ class Tripo3dService {
     return key;
   }
 
-  /** Base backoff for 429 retries; tests shrink it. */
+  /** Base backoff for 429/5xx retries; tests shrink it. */
   rateLimitBackoffMs = 5000;
 
   /**
-   * Tripo answers 429 (code 2000, "exceeded the limit of generation") when an
-   * account has too many tasks in flight — e.g. tripo.batchEntityTo3D starting
-   * five jobs at once on a low-tier key. The submit was rejected, so retrying
-   * is safe: wait (Retry-After, else exponential, capped at 60s) and resubmit
-   * instead of failing the job.
+   * One HTTP call with Tripo's documented retry policy (Rate Limits / Error
+   * Handling guides):
+   *  - 429 — code 2000 (account concurrency full for that task category, e.g.
+   *    tripo.batchEntityTo3D starting five jobs on a low-tier key; image
+   *    generation's pool is only 1) or 1007 (per-key request rate). The
+   *    request was rejected, so resubmitting is safe: wait Retry-After, else
+   *    X-RateLimit-Reset, else exponential — capped at 60s.
+   *  - 502/503/504 and network failures — transient. Reads (`idempotent`)
+   *    always retry them. Submits retry them too: a gateway error means
+   *    Tripo never answered, and failing a 20-minute job over one blip is
+   *    worse than the rare duplicate task.
+   *  - 500 — retried only for reads; a 500 on submit may already have
+   *    created (and billed) a task.
+   * Everything else (400/401/403/404) fails immediately.
    */
-  private async post<T>(path: string, body: Record<string, unknown>, apiKey: string): Promise<T> {
-    const MAX_ATTEMPTS = 8;
+  private async send<T>(
+    path: string,
+    init: () => RequestInit,
+    apiKey: string,
+    idempotent: boolean
+  ): Promise<T> {
+    const MAX_RATE_LIMIT_ATTEMPTS = 8;
+    const MAX_TRANSIENT_ATTEMPTS = 4;
+    let transientFailures = 0;
     for (let attempt = 1; ; attempt++) {
-      const res = await fetch(`${BASE_URL}${path}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-      if (res.status !== 429 || attempt >= MAX_ATTEMPTS) return this.parse<T>(res);
-      const retryAfter = Number(res.headers.get('retry-after'));
-      const waitMs =
-        Number.isFinite(retryAfter) && retryAfter > 0
-          ? Math.min(retryAfter * 1000, 60_000)
-          : Math.min(this.rateLimitBackoffMs * 2 ** (attempt - 1), 60_000);
+      const req = init();
+      let res: Response;
+      try {
+        res = await fetch(`${BASE_URL}${path}`, {
+          ...req,
+          headers: { Authorization: `Bearer ${apiKey}`, ...(req.headers ?? {}) },
+        });
+      } catch (err) {
+        if (++transientFailures >= MAX_TRANSIENT_ATTEMPTS) throw err;
+        await sleep(this.backoff(transientFailures));
+        continue;
+      }
+      const transient = res.status === 502 || res.status === 503 || res.status === 504;
+      const retryable =
+        (res.status === 429 && attempt < MAX_RATE_LIMIT_ATTEMPTS) ||
+        ((transient || (idempotent && res.status === 500)) &&
+          ++transientFailures < MAX_TRANSIENT_ATTEMPTS);
+      if (!retryable) return this.parse<T>(res);
+      const waitMs = retryDelayMs(res.headers) ?? this.backoff(attempt);
       await res.body?.cancel().catch(() => undefined);
-      await new Promise((r) => setTimeout(r, waitMs));
+      await sleep(waitMs);
     }
   }
 
-  private async get<T>(path: string, apiKey: string): Promise<T> {
-    const res = await fetch(`${BASE_URL}${path}`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    return this.parse<T>(res);
+  private backoff(attempt: number): number {
+    return Math.min(this.rateLimitBackoffMs * 2 ** (attempt - 1), 60_000);
+  }
+
+  private post<T>(path: string, body: Record<string, unknown>, apiKey: string): Promise<T> {
+    return this.send<T>(
+      path,
+      () => ({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+      apiKey,
+      false
+    );
+  }
+
+  private get<T>(path: string, apiKey: string): Promise<T> {
+    return this.send<T>(path, () => ({ method: 'GET' }), apiKey, true);
   }
 
   /** Shared response handler — surfaces both HTTP errors and `code != 0` bodies. */
   private async parse<T>(res: Response): Promise<T> {
-    if (!res.ok) {
-      const text = await res.text().catch(() => res.statusText);
-      throw new Error(`Tripo3D API error ${res.status}: ${text}`);
+    const text = await res.text().catch(() => res.statusText);
+    let json: (T & TripoErrorBody) | undefined;
+    try {
+      json = JSON.parse(text) as T & TripoErrorBody;
+    } catch {
+      // Non-JSON body (proxy error page) — reported verbatim below.
     }
-    const json = (await res.json()) as T & { code?: number; message?: string; suggestion?: string };
-    if (typeof json.code === 'number' && json.code !== 0) {
-      const hint = json.suggestion ? ` — ${json.suggestion}` : '';
-      throw new Error(`Tripo3D API error (code ${json.code}): ${json.message ?? 'unknown'}${hint}`);
+    const code = typeof json?.code === 'number' ? json.code : undefined;
+    if (!res.ok || (code !== undefined && code !== 0)) {
+      throw new TripoApiError({
+        status: res.status,
+        code,
+        message: json?.message ?? text,
+        suggestion: json?.suggestion,
+        requestId: json?.request_id ?? res.headers.get('x-request-id') ?? undefined,
+      });
     }
+    if (!json)
+      throw new TripoApiError({ status: res.status, message: `Unparseable body: ${text}` });
     return json;
   }
 
@@ -232,12 +331,12 @@ class Tripo3dService {
       new File([blob], inferFilename(url, fallbackName), { type: blob.type || fallbackType })
     );
 
-    const res = await fetch(`${BASE_URL}/files`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}` },
-      body: form,
-    });
-    const json = await this.parse<UploadResponse>(res);
+    const json = await this.send<UploadResponse>(
+      '/files',
+      () => ({ method: 'POST', body: form }),
+      key,
+      false
+    );
     if (!json.data?.file_token) {
       throw new Error('Tripo3D upload returned no file token');
     }
@@ -253,6 +352,12 @@ class Tripo3dService {
     apiKey?: string;
   }): Promise<{ taskId: string }> {
     const key = this.resolveKey(args.apiKey);
+    if (args.rigType === 'others') {
+      throw new Error(
+        'Tripo3D has no skeleton for this shape (vehicles, mechs, props) — it rigs bipeds, ' +
+          'quadrupeds, hexapods, octopods, birds, snakes and fish'
+      );
+    }
     const json = await this.post<CreateTaskResponse>(
       '/animations/rig',
       {
@@ -304,16 +409,23 @@ class Tripo3dService {
     const key = this.resolveKey(apiKey);
     // Drop undefined fields so Tripo applies its own defaults.
     const clean = Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined));
-    // Tripo fetches URL inputs itself, and our dedicated gateway 401s without
-    // its token (code 1004 "input image URL is not accessible") — which failed
-    // every entity cover → 3D job. Upload those through /files instead of
-    // handing the gateway token to a third party.
-    if (typeof clean.input === 'string' && needsGatewayAuth(clean.input)) {
-      clean.input = await this.uploadRemoteFile(clean.input, key, 'image.png', 'image/png');
-    }
+    if (typeof clean.input === 'string') clean.input = await this.fetchableInput(clean.input, key);
     const json = await this.post<CreateTaskResponse>(path, clean, key);
     if (!json.data?.task_id) throw new Error(`Tripo3D ${path} returned no task id`);
     return { taskId: json.data.task_id };
+  }
+
+  /**
+   * Tripo fetches URL inputs itself, and our dedicated gateway 401s without
+   * its token (code 1004 "input image URL is not accessible") — which failed
+   * every entity cover → 3D job. Upload those through /files instead of
+   * handing the gateway token to a third party. Task ids, file tokens and
+   * public URLs pass through untouched.
+   */
+  private async fetchableInput(input: string, key: string): Promise<string> {
+    return needsGatewayAuth(input)
+      ? this.uploadRemoteFile(input, key, 'image.png', 'image/png')
+      : input;
   }
 
   /** Single image → textured mesh. `input` is a public image URL or file token. */
@@ -339,10 +451,14 @@ class Tripo3dService {
   }
 
   /**
-   * Four orthographic-ish views → mesh. Pass a prior `imageToMultiview`
-   * task id (preferred — keeps the views Tripo itself generated) or four URLs.
+   * Front + up to three more views → mesh. Pass a prior `imageToMultiview`
+   * task id (preferred — keeps the views Tripo itself generated) or view URLs.
+   *
+   * v3 `inputs` is either `[{ task_id }]` or view-key objects holding exactly
+   * one view each (`[{ front: url }, { left: url }]`); the front view is
+   * mandatory and at least two images are required.
    */
-  multiviewToModel(
+  async multiviewToModel(
     args: TripoGenerateOptions & {
       multiviewTaskId?: string;
       views?: { front: string; left?: string; back?: string; right?: string };
@@ -351,23 +467,23 @@ class Tripo3dService {
   ) {
     const { multiviewTaskId, views, apiKey, ...opts } = args;
     if (!multiviewTaskId && !views) throw new Error('multiviewToModel needs a task id or views');
+    const key = this.resolveKey(apiKey);
+    let inputs: Array<Record<string, string>>;
+    if (multiviewTaskId) {
+      inputs = [{ task_id: multiviewTaskId }];
+    } else {
+      const present = MULTIVIEW_ORDER.filter((v) => !!views![v]);
+      if (!views!.front || present.length < 2) {
+        throw new Error('multiviewToModel needs a front view plus at least one other view');
+      }
+      inputs = await Promise.all(
+        present.map(async (v) => ({ [v]: await this.fetchableInput(views![v]!, key) }))
+      );
+    }
     return this.createTask(
       '/generation/multiview-to-model',
-      {
-        ...(multiviewTaskId
-          ? { original_model_task_id: multiviewTaskId }
-          : {
-              inputs: [
-                Object.fromEntries(
-                  Object.entries(views!)
-                    .filter(([, url]) => !!url)
-                    .map(([view, url]) => [view, { type: imageExt(url!), url }])
-                ),
-              ],
-            }),
-        ...generateBody(opts),
-      },
-      apiKey
+      { inputs, ...generateBody(opts) },
+      key
     );
   }
 
@@ -379,11 +495,12 @@ class Tripo3dService {
   /**
    * Image edit with a Tripo template — `t_pose` normalises a character
    * cover into a clean A/T-pose full-body render that rigs far better than
-   * an action shot; `asset_extraction` isolates a prop from a busy scene.
+   * an action shot; `3d_enhance` cleans an image up for 3D generation;
+   * `figure` renders a full-body figure from a partial one.
    */
   imageToImage(args: {
     input: string;
-    template?: 't_pose' | 'asset_extraction' | 'character_completion';
+    template?: TripoImageTemplate;
     prompt?: string;
     apiKey?: string;
   }) {
@@ -399,30 +516,48 @@ class Tripo3dService {
     return this.createTask('/generation/image-to-splat', { input: args.input }, args.apiKey);
   }
 
-  /** Re-texture an existing mesh from a text and/or style-image prompt. */
-  textureModel(args: {
+  /**
+   * Re-texture an existing mesh from a text prompt, a reference image, or
+   * both. `texture_prompt` takes exactly one of `text` / `image`; a reference
+   * image rides along with text as `style_image`, alone it is the `image`.
+   */
+  async textureModel(args: {
     input: string;
     text?: string;
     styleImageUrl?: string;
     quality?: 'standard' | 'detailed';
     pbr?: boolean;
+    /** Only retexture these parts (names from a segmentation task). */
+    partNames?: string[];
     apiKey?: string;
   }) {
+    const key = this.resolveKey(args.apiKey);
+    const text = args.text?.trim() ? args.text.slice(0, 1024) : undefined;
+    // Gateway-gated references come back as a file token.
+    const refInput = args.styleImageUrl
+      ? await this.fetchableInput(args.styleImageUrl, key)
+      : undefined;
+    const ref = refInput
+      ? /^https?:\/\//i.test(refInput)
+        ? { url: refInput }
+        : { file_token: refInput }
+      : undefined;
+    const texturePrompt = text
+      ? { text, ...(ref ? { style_image: ref } : {}) }
+      : ref
+        ? { image: ref }
+        : undefined;
     return this.createTask(
       '/models/texture',
       {
         input: args.input,
-        texture: true,
+        model: TRIPO_TEXTURE_MODEL,
         pbr: args.pbr ?? true,
         texture_quality: args.quality ?? 'standard',
-        texture_prompt: {
-          ...(args.text ? { text: args.text.slice(0, 1024) } : {}),
-          ...(args.styleImageUrl
-            ? { style_image: { type: imageExt(args.styleImageUrl), url: args.styleImageUrl } }
-            : {}),
-        },
+        texture_prompt: texturePrompt,
+        part_names: args.partNames,
       },
-      args.apiKey
+      key
     );
   }
 
@@ -552,9 +687,23 @@ class Tripo3dService {
 /** Geometry models: H3.1 maximises fidelity, P1 gives clean engine-ready topology. */
 export const TRIPO_MODEL_HIFI = 'v3.1-20260211';
 export const TRIPO_MODEL_GAME = 'P1-20260311';
+/**
+ * Texture model (2026-09). Pinned on every textured generation and retexture:
+ * same price and output size as the v3.0 default, and its `delight` pass
+ * (on by default) strips lighting baked into the reference image, so assets
+ * don't carry the cover art's shadows into a lit 3D scene.
+ */
+export const TRIPO_TEXTURE_MODEL = 'v3.5-20260815';
 const SEGMENT_MODEL = 'v2.0-20260430';
+const MULTIVIEW_ORDER = ['front', 'left', 'back', 'right'] as const;
 
 export type TripoQuality = 'hifi' | 'game';
+export type TripoImageTemplate =
+  | 't_pose'
+  | 'character_completion'
+  | '3d_enhance'
+  | 'variants'
+  | 'figure';
 export type TripoStylizeStyle = 'lego' | 'voxel' | 'voronoi' | 'minecraft';
 export type TripoConvertFormat = 'GLTF' | 'USDZ' | 'FBX' | 'OBJ' | 'STL' | '3MF';
 
@@ -570,27 +719,38 @@ export interface TripoGenerateOptions {
   renderVideo?: boolean;
 }
 
-function generateBody(o: TripoGenerateOptions): Record<string, unknown> {
+/**
+ * Shared generation fields, respecting what each model series accepts:
+ *  - P series takes no `geometry_quality` / `smart_low_poly` /
+ *    `generate_parts` (P1 is already the clean low-poly model; P1 face_limit
+ *    is 50–20,000).
+ *  - `generate_parts` is rejected (1004) unless texture and PBR are off, so
+ *    parts are untextured meshes — texture them afterwards per part.
+ */
+export function generateBody(o: TripoGenerateOptions): Record<string, unknown> {
   const game = o.quality === 'game';
+  const parts = !game && !!o.generateParts;
   return {
     model: game ? TRIPO_MODEL_GAME : TRIPO_MODEL_HIFI,
-    texture: true,
-    pbr: true,
-    texture_quality: game ? 'standard' : 'detailed',
-    geometry_quality: game ? 'standard' : 'detailed',
+    texture: !parts,
+    pbr: !parts,
+    texture_version: parts ? undefined : TRIPO_TEXTURE_MODEL,
+    texture_quality: parts ? undefined : game ? 'standard' : 'detailed',
+    geometry_quality: game ? undefined : 'detailed',
     // Real-world metres: props and characters drop into a set at sane scale.
     auto_size: true,
-    face_limit: o.faceLimit,
-    smart_low_poly: game ? true : undefined,
+    face_limit:
+      o.faceLimit === undefined
+        ? undefined
+        : game
+          ? Math.min(Math.max(o.faceLimit, 50), 20_000)
+          : o.faceLimit,
+    generate_parts: parts || undefined,
+    // Not in the v3 reference (Tripo ignores unknown fields); kept so a
+    // turntable/multiview comes back if the account still gets one.
     return_multiview: o.returnMultiview,
-    generate_parts: o.generateParts,
     render_video: o.renderVideo,
   };
-}
-
-function imageExt(url: string): string {
-  const m = /\.(png|jpe?g|webp)(?:$|\?)/i.exec(url);
-  return m ? m[1].toLowerCase().replace('jpg', 'jpeg') : 'png';
 }
 
 /**
@@ -612,6 +772,25 @@ export function tripoMultiviewUrls(task: TripoTask): {
     back: o.back_view_url ?? n.back_view_url,
     right: o.right_view_url ?? n.right_view_url,
   };
+}
+
+/**
+ * How long Tripo asked us to wait: `Retry-After` (seconds) on concurrency
+ * 429s, else `X-RateLimit-Reset` (unix seconds) on rate 429s. Capped at 60s.
+ */
+function retryDelayMs(headers: Headers): number | undefined {
+  const retryAfter = Number(headers.get('retry-after'));
+  if (Number.isFinite(retryAfter) && retryAfter > 0) return Math.min(retryAfter * 1000, 60_000);
+  const reset = Number(headers.get('x-ratelimit-reset'));
+  if (Number.isFinite(reset) && reset > 0) {
+    const ms = reset * 1000 - Date.now();
+    if (ms > 0) return Math.min(ms, 60_000);
+  }
+  return undefined;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 function inferFilename(url: string, fallback = 'model.glb'): string {

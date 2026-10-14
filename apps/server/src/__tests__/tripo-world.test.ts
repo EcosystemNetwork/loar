@@ -2,10 +2,13 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { listAnimationNames, listPartNames, readGlbJson } from '../services/tripo-world/glb';
 import { urlExt } from '../services/tripo-world/runner';
 import {
+  generateBody,
   tripo3dService,
+  TripoApiError,
   tripoMultiviewUrls,
   TRIPO_MODEL_GAME,
   TRIPO_MODEL_HIFI,
+  TRIPO_TEXTURE_MODEL,
   type TripoTask,
 } from '../services/tripo3d';
 
@@ -104,7 +107,84 @@ describe('Tripo3D v3 request bodies', () => {
     expect(calls[0].body.auto_size).toBe(true);
     expect('face_limit' in calls[0].body).toBe(false);
     expect(calls[1].body.model).toBe(TRIPO_MODEL_GAME);
-    expect(calls[1].body.smart_low_poly).toBe(true);
+    // P series rejects the H-series-only knobs.
+    expect('smart_low_poly' in calls[1].body).toBe(false);
+    expect('geometry_quality' in calls[1].body).toBe(false);
+    expect(calls[0].body.texture_version).toBe(TRIPO_TEXTURE_MODEL);
+  });
+
+  it('generate_parts turns texture + PBR off (Tripo rejects parts with texture)', () => {
+    const body = generateBody({ generateParts: true });
+    expect(body).toMatchObject({ generate_parts: true, texture: false, pbr: false });
+    expect(body.texture_version).toBeUndefined();
+    expect(body.texture_quality).toBeUndefined();
+    // P series has no parts — the flag is dropped rather than sent.
+    expect(generateBody({ quality: 'game', generateParts: true }).generate_parts).toBeUndefined();
+  });
+
+  it('clamps a P1 face limit to its 50–20,000 range', () => {
+    expect(generateBody({ quality: 'game', faceLimit: 300_000 }).face_limit).toBe(20_000);
+    expect(generateBody({ quality: 'game', faceLimit: 10 }).face_limit).toBe(50);
+    expect(generateBody({ faceLimit: 300_000 }).face_limit).toBe(300_000);
+  });
+
+  it('retries a transient 503 on submit and 500 on a poll', async () => {
+    const ok = (data: unknown) => new Response(JSON.stringify({ code: 0, data }), { status: 200 });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('upstream down', { status: 503 }))
+      .mockResolvedValueOnce(ok({ task_id: 'task-ok' }))
+      .mockResolvedValueOnce(new Response('oops', { status: 500 }))
+      .mockResolvedValueOnce(ok({ task_id: 'task-ok', status: 'success', output: {} }));
+    vi.stubGlobal('fetch', fetchMock);
+    const prev = tripo3dService.rateLimitBackoffMs;
+    tripo3dService.rateLimitBackoffMs = 1;
+    try {
+      const { taskId } = await tripo3dService.imageToModel({
+        input: 'https://x/a.png',
+        apiKey: 'k',
+      });
+      const task = await tripo3dService.getTask(taskId, 'k');
+      expect(task.status).toBe('success');
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+    } finally {
+      tripo3dService.rateLimitBackoffMs = prev;
+    }
+  });
+
+  it('does not retry a 500 on submit — the task may already exist', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('oops', { status: 500 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(
+      tripo3dService.imageToModel({ input: 'https://x/a.png', apiKey: 'k' })
+    ).rejects.toThrow('Tripo3D API error 500');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('explains user-fixable errors (out of credits) and keeps the code', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ code: 2010, message: 'insufficient credit' }), {
+          status: 403,
+        })
+      )
+    );
+    const err = await tripo3dService
+      .imageToModel({ input: 'https://x/a.png', apiKey: 'k' })
+      .catch((e) => e);
+    expect(err).toBeInstanceOf(TripoApiError);
+    expect(err.code).toBe(2010);
+    expect(err.message).toMatch(/out of credits/);
+    expect(err.message).toContain('Tripo3D API error 403');
+  });
+
+  it('refuses an `others` rig before calling Tripo', async () => {
+    const calls = captureFetch();
+    await expect(
+      tripo3dService.rigModel({ input: 't', rigType: 'others', apiKey: 'k' })
+    ).rejects.toThrow(/no skeleton/);
+    expect(calls).toHaveLength(0);
   });
 
   it('retries a 429 (too many tasks in flight) and submits once a slot frees up', async () => {
@@ -187,8 +267,23 @@ describe('Tripo3D v3 request bodies', () => {
       apiKey: 'k',
     });
     expect(taskId).toBe('task-1');
-    expect(calls[0].body.original_model_task_id).toBe('mv-1');
-    expect(calls[0].body.inputs).toBeUndefined();
+    expect(calls[0].body.inputs).toEqual([{ task_id: 'mv-1' }]);
+    expect(calls[0].body.original_model_task_id).toBeUndefined();
+  });
+
+  it('multiview-to-model sends one view per input object, front required', async () => {
+    const calls = captureFetch();
+    await tripo3dService.multiviewToModel({
+      views: { front: 'https://x/f.png', back: 'https://x/b.png' },
+      apiKey: 'k',
+    });
+    expect(calls[0].body.inputs).toEqual([
+      { front: 'https://x/f.png' },
+      { back: 'https://x/b.png' },
+    ]);
+    await expect(
+      tripo3dService.multiviewToModel({ views: { front: 'https://x/f.png' }, apiKey: 'k' })
+    ).rejects.toThrow(/at least one other view/);
   });
 
   it('texture sends a style image as an input-source object', async () => {
@@ -202,8 +297,20 @@ describe('Tripo3D v3 request bodies', () => {
     expect(calls[0].url.endsWith('/models/texture')).toBe(true);
     expect(calls[0].body.texture_prompt).toEqual({
       text: 'weathered brass',
-      style_image: { type: 'jpeg', url: 'https://x/style.jpg' },
+      style_image: { url: 'https://x/style.jpg' },
     });
+    expect(calls[0].body.model).toBe(TRIPO_TEXTURE_MODEL);
+    expect('texture' in calls[0].body).toBe(false);
+  });
+
+  it('texture with only a reference image sends it as `image`', async () => {
+    const calls = captureFetch();
+    await tripo3dService.textureModel({
+      input: 'task-9',
+      styleImageUrl: 'https://x/ref.png',
+      apiKey: 'k',
+    });
+    expect(calls[0].body.texture_prompt).toEqual({ image: { url: 'https://x/ref.png' } });
   });
 
   it('only sends an FBX preset for FBX conversions', async () => {
