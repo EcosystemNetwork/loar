@@ -11,6 +11,7 @@ import { Hono } from 'hono';
 import { SignJWT } from 'jose';
 import * as addresses from '@loar/abis/addresses';
 import { db } from '../lib/firebase';
+import { getAddress } from 'viem';
 
 // Stub the Circle signer before loading tx-proxy so executeTransaction is
 // captured and we can assert on what the proxy asked it to sign.
@@ -233,6 +234,40 @@ describe('/api/tx/write', () => {
     expect(call.value).toBe('1000000000000000000');
     // calldata is the encoded `ping()` selector (4 bytes)
     expect(call.calldata).toMatch(/^0x[0-9a-fA-F]{8}$/);
+  });
+
+  it('resolves a Circle wallet stored lowercase for a checksummed session sub', async () => {
+    // Circle returns lowercase addresses and circle-auth stores them verbatim,
+    // while issueSessionToken checksums `sub`. This mock honors the where()
+    // filter so an exact-case `==` lookup would miss.
+    const sub = getAddress('0x80baf7fffc430cdaced4f1d673f4138d6d493077');
+    const stored = sub.toLowerCase();
+    (db as any).collection = vi.fn().mockImplementation(() => ({
+      where: (_field: string, op: string, value: unknown) => {
+        const hit = op === 'in' ? (value as string[]).includes(stored) : value === stored;
+        const snap = hit
+          ? { empty: false, docs: [{ data: () => ({ walletId: 'w-lc', walletAddress: stored }) }] }
+          : { empty: true, docs: [] };
+        return { limit: () => ({ get: vi.fn().mockResolvedValue(snap) }) };
+      },
+      doc: () => ({ set: vi.fn().mockResolvedValue(undefined) }),
+    }));
+
+    const app = await loadApp();
+    const cookie = await makeSessionCookie(sub);
+    const res = await app.fetch(
+      new Request('http://x/api/tx/write', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', cookie },
+        body: JSON.stringify({
+          address: (addresses as any).PaymentRouter['11155111'],
+          data: '0x12345678',
+          chainId: 11155111,
+        }),
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(executeMock.mock.calls[0][0].walletId).toBe('w-lc');
   });
 
   it('returns immediately with async:true and lets the caller poll status', async () => {

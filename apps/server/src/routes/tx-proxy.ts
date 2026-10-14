@@ -17,7 +17,7 @@ import { executeTransaction, getTransactionStatus } from '../lib/circle-wallets'
 import { isContractAllowed } from '../lib/contract-allowlist';
 import { consumeRateLimit } from '../middleware/rate-limit';
 import { db, firebaseAvailable } from '../lib/firebase';
-import { encodeFunctionData, type Abi } from 'viem';
+import { encodeFunctionData, getAddress, isAddress, type Abi } from 'viem';
 
 export const txProxyRoutes = new Hono();
 
@@ -61,11 +61,23 @@ function selectorOf(calldata: string): string | null {
 async function resolveWallet(
   address: string
 ): Promise<{ walletId: string; address: string } | null> {
+  // The session `sub` is checksummed (issueSessionToken), but Circle returns
+  // lowercase addresses and circle-auth stores them verbatim — an exact `==`
+  // match never resolved, so every Circle-backed tx failed with "No Circle
+  // wallet found". Match every casing the address could have been stored in.
+  const variants = [
+    ...new Set([
+      address,
+      address.toLowerCase(),
+      isAddress(address) ? getAddress(address) : address,
+    ]),
+  ];
+
   // Look up by wallet address → find the user account
   if (firebaseAvailable) {
     const snapshot = await db
       .collection('userAccounts')
-      .where('walletAddress', '==', address)
+      .where('walletAddress', 'in', variants)
       .limit(1)
       .get();
 
@@ -77,7 +89,7 @@ async function resolveWallet(
     // Also check circleWallets collection
     const walletSnapshot = await db
       .collection('circleWallets')
-      .where('address', '==', address)
+      .where('address', 'in', variants)
       .limit(1)
       .get();
 
