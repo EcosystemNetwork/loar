@@ -114,6 +114,45 @@ export async function claimTxHash(params: {
 }
 
 /**
+ * Fetch a tx and its receipt, throwing unless it exists and succeeded. Does NOT
+ * claim the hash — for non-value flows (e.g. registering a freshly minted
+ * universe) whose own record is the idempotency key, where a claim would make
+ * client retries fail.
+ */
+export async function getSuccessfulTx(
+  txHash: string,
+  chainId?: number
+): Promise<{ receipt: any; tx: any }> {
+  if (!txHash || !txHash.startsWith('0x') || txHash.length !== 66) {
+    throw new Error('Invalid transaction hash format');
+  }
+  const normalizedHash = txHash.toLowerCase();
+  const client = getChainClient(chainId);
+  let receipt: any;
+  let tx: any;
+  try {
+    [receipt, tx] = await Promise.all([
+      getCachedOrFetch<any>(
+        `receipt-${normalizedHash}`,
+        () => client.getTransactionReceipt({ hash: normalizedHash as Hash }) as Promise<any>
+      ),
+      getCachedOrFetch<any>(
+        `tx-${normalizedHash}`,
+        () => client.getTransaction({ hash: normalizedHash as Hash }) as Promise<any>
+      ),
+    ]);
+  } catch {
+    throw new Error(
+      `Transaction not found on ${chainId === 1 ? 'Ethereum' : 'Sepolia'}. Confirm it has been broadcast and included in a block.`
+    );
+  }
+  if (receipt.status !== 'success') {
+    throw new Error('Transaction was reverted on-chain.');
+  }
+  return { receipt, tx };
+}
+
+/**
  * Default minimum block confirmations required before a value-bearing tx can be
  * claimed. Closes the reorg gap (audit M3): a freshly-mined (0–1 conf) receipt
  * can still be reorged out, so we wait a few blocks before crediting. This is

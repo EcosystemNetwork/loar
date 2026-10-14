@@ -1,10 +1,12 @@
 /**
  * Universes router — CRUD operations for universe metadata in Firestore.
- * Uses wallet signature verification (not Firebase auth) for create operations.
+ * Create is authorized by the session plus the on-chain mint tx (see verifyMintTx).
  *
  * Renamed from cinematicUniverses to align with domain naming conventions.
  */
 import { z } from 'zod';
+import { decodeEventLog, parseAbi } from 'viem';
+import { UniverseManager } from '@loar/abis/addresses';
 import { TRPCError } from '@trpc/server';
 import {
   publicProcedure,
@@ -32,6 +34,47 @@ import { generateNonce, consumeNonce } from '../../lib/siwe';
 import { getPublicFeatured } from '../../services/platformConfig';
 import { assertFeatureEnabledOrForbidden } from '../../lib/feature-guards';
 import { awardUniverseCreationPoints } from '../../services/points';
+import { getSuccessfulTx } from '../../services/tx-verify';
+
+const universeCreatedAbi = parseAbi(['event UniverseCreated(address universe, address creator)']);
+
+/**
+ * Prove the caller minted `universeAddress`: the tx succeeded, was sent by the
+ * caller, and the live UniverseManager emitted UniverseCreated for that exact
+ * address with the caller as creator. Replaces a wallet-signature check that
+ * Circle DCW users could never pass (they have no client-side signer).
+ */
+export async function verifyMintTx(
+  txHash: string | undefined,
+  chainId: number | undefined,
+  universeAddress: string,
+  caller: string
+): Promise<void> {
+  if (!txHash) throw new Error('Mint transaction hash is required');
+  const manager = (UniverseManager as Record<string, string>)[String(chainId ?? 11155111)];
+  if (!manager) throw new Error(`Chain ID ${chainId} is not supported.`);
+  const { receipt, tx } = await getSuccessfulTx(txHash, chainId);
+  if ((tx.from ?? '').toLowerCase() !== caller) {
+    throw new Error('Mint transaction was not sent by the authenticated wallet');
+  }
+  const minted = (receipt.logs ?? []).some((log: any) => {
+    if ((log.address ?? '').toLowerCase() !== manager.toLowerCase()) return false;
+    try {
+      const { args } = decodeEventLog({
+        abi: universeCreatedAbi,
+        data: log.data,
+        topics: log.topics,
+      });
+      return (
+        args.universe.toLowerCase() === universeAddress.toLowerCase() &&
+        args.creator.toLowerCase() === caller
+      );
+    } catch {
+      return false;
+    }
+  });
+  if (!minted) throw new Error('Mint transaction did not create this universe');
+}
 
 const createUniverseSchema = z.object({
   address: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address'),
@@ -80,28 +123,14 @@ export const universesRouter = router({
   create: protectedProcedure.input(createUniverseSchema).mutation(async ({ input, ctx }) => {
     await assertFeatureEnabledOrForbidden('minting');
 
-    const { verifyMessage } = await import('viem');
-
-    const isValid = await verifyMessage({
-      address: input.creator as `0x${string}`,
-      message: input.message,
-      signature: input.signature as `0x${string}`,
-    });
-
-    if (!isValid) {
-      throw new Error('Invalid wallet signature');
-    }
-
-    if (!input.message.toLowerCase().includes(input.creator.toLowerCase())) {
-      throw new Error('Message must contain creator address');
-    }
-
     // Verify authenticated user matches the claimed creator
     if (input.creator.toLowerCase() !== ctx.user.uid.toLowerCase()) {
       throw new Error('Creator must match authenticated wallet');
     }
 
-    // Verify the server-issued nonce is present in the message and hasn't been used
+    await verifyMintTx(input.mintTxHash, input.chainId, input.address, ctx.user.uid);
+
+    // The nonce still blocks replaying a captured request body.
     if (!input.message.includes(input.nonce)) {
       throw new Error('Message must contain the server-issued nonce');
     }
