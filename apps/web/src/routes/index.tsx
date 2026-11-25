@@ -70,6 +70,7 @@ import {
   CreateBanner,
   HomePitch,
 } from '../components/home/HomeSections';
+import { useWalletAuth } from '@/lib/wallet-auth';
 
 /**
  * Below this catalog size the secondary universe rails (New Arrivals,
@@ -78,11 +79,16 @@ import {
  */
 const SECONDARY_RAILS_MIN_UNIVERSES = 20;
 
+/** Below this, the Top 10 rail would mostly re-list the browse grid below it. */
+const TOP10_MIN_UNIVERSES = 6;
+
 /* ──────────────────────────────────────────
  * Main Home Component
  * ────────────────────────────────────────── */
 function HomeComponent() {
   const [searchOpen, setSearchOpen] = useState(false);
+  const { isAuthenticated, sessionReady } = useWalletAuth();
+  const isVisitor = sessionReady && !isAuthenticated;
 
   // Keyboard shortcut: Cmd/Ctrl + K to open search
   useEffect(() => {
@@ -282,10 +288,16 @@ function HomeComponent() {
       {/* One-time onboarding popup after first login */}
       <GettingStartedPopup />
 
-      {/* Hero: skeleton during load, real billboard once data arrives */}
+      {/*
+        Hero. Visitors get the product pitch first (what LOAR is + one CTA +
+        real universes as proof); signed-in users go straight to the featured
+        billboard. Skeleton until both the catalog and the session are known.
+      */}
       <div className="shrink-0">
-        {universesLoading ? (
+        {universesLoading || !sessionReady ? (
           <HeroSkeleton />
+        ) : isVisitor ? (
+          <HomePitch universes={universes} featuredUniverseIds={featuredUniverseIds} />
         ) : (
           <HeroBillboard universes={universes} featuredUniverseIds={featuredUniverseIds} />
         )}
@@ -298,9 +310,9 @@ function HomeComponent() {
       */}
       {!universesLoading && (
         <div className="flex flex-col">
-          <HomePitch universes={universes} />
           <ContinueWatchingRow />
-          <Top10Strip universes={universes} />
+          {/* A "Top 10" of three is a stub that repeats the browse grid. */}
+          {universes.length >= TOP10_MIN_UNIVERSES && <Top10Strip universes={universes} />}
           <RecentEpisodes />
           <TrendingRow universes={universes} />
           <ForYouRow />

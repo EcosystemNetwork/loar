@@ -56,13 +56,16 @@ export default function Header() {
       <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between px-4 lg:px-6">
         {/* ── Left: Logo + Nav ── */}
         <div className="flex items-center gap-4 min-w-0">
-          <Link to="/" className="shrink min-w-0">
-            <img
-              src="/loarIconTextLogo.png"
-              alt="LOAR"
-              className="h-7 w-auto max-w-full object-contain"
-            />
-          </Link>
+          {/* Auth pages carry their own large logo — don't show two. */}
+          {!onAuthPage && (
+            <Link to="/" className="shrink min-w-0">
+              <img
+                src="/loarIconTextLogo.png"
+                alt="LOAR"
+                className="h-7 w-auto max-w-full object-contain"
+              />
+            </Link>
+          )}
 
           <nav className="hidden lg:flex items-center">
             {primaryLinks.map(({ to, label }) => (
@@ -135,7 +138,10 @@ export default function Header() {
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden ml-0.5 h-8 w-8"
+              // Signed-out phones already have every link in the bottom tab bar —
+              // the menu only earns its place on tablets (no tab bar, no inline nav)
+              // or once there's an account menu's worth of rooms (audit #25).
+              className={`${signedIn ? 'inline-flex' : 'hidden md:inline-flex'} lg:hidden ml-0.5 h-8 w-8`}
               onClick={() => setMobileOpen(!mobileOpen)}
               aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
               aria-expanded={mobileOpen}

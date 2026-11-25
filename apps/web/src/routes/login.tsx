@@ -303,14 +303,12 @@ function LoginPage() {
             </div>
           )}
 
-          {/* Divider */}
-          <div className="flex items-center gap-3 text-xs text-muted-foreground/60">
-            <div className="flex-1 border-t border-border/50" />
-            <span className="uppercase tracking-widest text-[10px]">
-              {CHAIN_NAMES[SUPPORTED_CHAIN_IDS[0]] ?? 'Ethereum'}
-            </span>
-            <div className="flex-1 border-t border-border/50" />
-          </div>
+          {/* Testnet disclosure — a human sentence, not a bare chain name. */}
+          {/testnet|sepolia|devnet/i.test(CHAIN_NAMES[SUPPORTED_CHAIN_IDS[0]] ?? '') && (
+            <p className="text-center text-xs text-muted-foreground">
+              You’re on testnet — nothing here is real money.
+            </p>
+          )}
         </div>
 
         {/* Footer */}

@@ -61,7 +61,10 @@ function AddressRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ className = '' }) => {
+export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({
+  className = '',
+  size,
+}) => {
   const { address, solanaAddress: sessionSolana, isAuthenticated, signOut } = useWalletAuth();
   const { name: udName } = useUnstoppableDomain(address);
   const displayName = formatDisplayName(address, udName);
@@ -187,17 +190,24 @@ export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ classN
     <div className={className}>
       <Link
         to="/login"
-        className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-sm rounded-lg shadow-lg shadow-primary/25 transition-all duration-200 hover:shadow-primary/40"
+        className={
+          size === 'sm'
+            ? // Header: same height as other header controls, no glow (audit #24).
+              'inline-flex h-8 items-center gap-1.5 px-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-[13px] rounded-full transition-colors duration-100'
+            : 'inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-sm rounded-lg shadow-lg shadow-primary/25 transition-all duration-200 hover:shadow-primary/40'
+        }
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-          />
-        </svg>
-        Sign In
+        {size !== 'sm' && (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+            />
+          </svg>
+        )}
+        Sign in
       </Link>
     </div>
   );

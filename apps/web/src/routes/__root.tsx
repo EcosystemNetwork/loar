@@ -71,7 +71,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
       },
     ],
     // No favicon `links` entry here on purpose: index.html already declares
-    // <link rel="icon" href="loarButton_Logo.png"> statically, so it's live
+    // the favicon set (/favicon.ico + PNGs, ?v= cache-busted) statically, so it's live
     // at first paint. A second rel="icon" injected here by HeadContent after
     // hydration raced it and caused the tab icon to flip/disappear depending
     // on browser favicon-cache behavior.

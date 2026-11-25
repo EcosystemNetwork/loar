@@ -1265,45 +1265,98 @@ const PITCH_STEPS = [
   },
 ] as const;
 
-export function HomePitch({ universes }: { universes: EnrichedUniverse[] }) {
+/** Up to `n` universes with real art for the visitor hero — admin-featured
+ *  first, then ones with episodes, so the proof is the best of the catalog. */
+function pickProofUniverses(
+  universes: EnrichedUniverse[],
+  featuredUniverseIds: string[] = [],
+  n = 3
+): EnrichedUniverse[] {
+  const art = (u: EnrichedUniverse) => u.portraitImageURL || u.imageURL || u.tokenData?.imageURL;
+  const withArt = universes.filter((u) => !!art(u));
+  const rank = new Map(featuredUniverseIds.map((id, i) => [id.toLowerCase(), i]));
+  return [...withArt]
+    .sort((a, b) => {
+      const ra = rank.get(a.id.toLowerCase()) ?? Infinity;
+      const rb = rank.get(b.id.toLowerCase()) ?? Infinity;
+      if (ra !== rb) return ra - rb;
+      return (b.nodeCount || 0) - (a.nodeCount || 0);
+    })
+    .slice(0, n);
+}
+
+/**
+ * Visitor hero — the first thing a signed-out visitor sees. One product line,
+ * one primary action, and real universes as proof (audit 2026-09-13 #4).
+ * Signed-in users get the HeroBillboard instead; this renders nothing for them.
+ */
+export function HomePitch({
+  universes,
+  featuredUniverseIds,
+}: {
+  universes: EnrichedUniverse[];
+  featuredUniverseIds?: string[];
+}) {
   const { isAuthenticated, sessionReady } = useWalletAuth();
-  const { mintingEnabled } = useFeatureFlags();
 
   const stats = useMemo(() => {
     const episodes = universes.reduce((n, u) => n + (u.nodeCount || 0), 0);
     const creators = new Set(universes.map((u) => u.creator?.toLowerCase()).filter(Boolean)).size;
     return [
-      { label: 'universes', value: universes.length },
-      { label: 'episodes', value: episodes },
+      { label: 'universes', value: universes.length >= 5 ? universes.length : 0 },
+      { label: 'episodes', value: episodes >= 10 ? episodes : 0 },
       // A handful of creators undersells the platform — only brag once it's real.
       { label: 'creators', value: creators >= 5 ? creators : 0 },
     ].filter((s) => s.value > 0);
   }, [universes]);
 
+  const proof = useMemo(
+    () => pickProofUniverses(universes, featuredUniverseIds),
+    [universes, featuredUniverseIds]
+  );
+  const showProof = proof.length >= 2;
+
   // Signed-in users already know the pitch — go straight to the content.
   if (!sessionReady || isAuthenticated) return null;
 
   return (
-    <section className="px-4 md:px-12 py-10 md:py-16">
-      <div className="grid gap-8 lg:gap-14 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.3fr)] lg:items-center">
+    <section className="relative isolate overflow-hidden px-4 md:px-12 pt-10 pb-12 md:pt-16 md:pb-20">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_15%_0%,color-mix(in_oklch,var(--primary)_14%,transparent),transparent_55%)]"
+      />
+      <div className="mx-auto grid max-w-[1440px] gap-10 lg:gap-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-primary mb-3">
-            What is LOAR
-          </p>
-          <h2 className="font-lore text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-foreground leading-[1.05] text-balance">
-            An AI studio for story universes you can own.
-          </h2>
-          <p className="mt-4 text-base md:text-lg text-muted-foreground max-w-lg leading-relaxed">
+          <h1 className="font-lore text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight text-foreground leading-[1.02] text-balance">
+            Create cinematic universes with AI.{' '}
+            <span className="text-primary">Own them on-chain.</span>
+          </h1>
+          <p className="mt-5 text-base md:text-lg text-muted-foreground max-w-lg leading-relaxed text-pretty">
             Prompt a world into existence, generate its episodes, keep its canon in one place — and
             let the people who love it have a stake in what happens next.
           </p>
 
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Button size="lg" className="h-12 rounded-full px-7 font-semibold" asChild>
+              <Link to="/create">
+                <Sparkles className="h-4 w-4 mr-2" />
+                Start creating — it&apos;s free
+              </Link>
+            </Button>
+            <Link
+              to="/discover"
+              className="inline-flex h-12 items-center px-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-100"
+            >
+              Browse universes →
+            </Link>
+          </div>
+
           {stats.length > 0 && (
-            <dl className="mt-6 flex flex-wrap gap-x-8 gap-y-3">
+            <dl className="mt-8 flex flex-wrap gap-x-8 gap-y-3">
               {stats.map((s) => (
                 <div key={s.label}>
                   <dt className="sr-only">{s.label}</dt>
-                  <dd className="font-lore text-3xl font-semibold text-foreground tabular-nums">
+                  <dd className="font-lore text-2xl font-semibold text-foreground tabular-nums">
                     {s.value.toLocaleString()}
                     <span className="ml-1.5 font-sans text-sm font-normal text-muted-foreground">
                       {s.label}
@@ -1313,45 +1366,82 @@ export function HomePitch({ universes }: { universes: EnrichedUniverse[] }) {
               ))}
             </dl>
           )}
-
-          <div className="mt-7 flex flex-wrap gap-3">
-            <Button size="lg" className="h-12 rounded-full px-7 font-semibold" asChild>
-              <Link to={mintingEnabled ? '/cinematicUniverseCreate' : '/create'}>
-                <Plus className="h-4 w-4 mr-2" />
-                Start your universe
-              </Link>
-            </Button>
-            <Button size="lg" variant="outline" className="h-12 rounded-full px-6" asChild>
-              <a href="#browse">Browse universes</a>
-            </Button>
-          </div>
         </div>
 
-        <ol className="grid gap-3 sm:grid-cols-3">
-          {PITCH_STEPS.map((step, i) => (
-            <li
-              key={step.title}
-              className="flex gap-4 sm:flex-col sm:gap-0 rounded-2xl border border-border bg-card/60 p-4 sm:p-5 md:p-6"
-            >
-              <div className="flex shrink-0 items-start justify-between sm:mb-8 md:mb-10">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/25">
-                  <step.icon className="h-5 w-5 text-primary" />
-                </span>
-                <span className="hidden sm:inline font-lore text-sm text-muted-foreground tabular-nums">
-                  0{i + 1}
-                </span>
-              </div>
-              <div>
-                <h3 className="font-lore text-lg sm:text-xl font-semibold text-foreground mb-1 sm:mb-2">
-                  {step.title}
-                </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{step.body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        {showProof ? (
+          <ul className="grid grid-cols-3 gap-3 sm:gap-4" aria-label="Universes made on LOAR">
+            {proof.map((u, i) => (
+              <li key={u.id} className={i === 1 ? 'translate-y-4 sm:translate-y-8' : undefined}>
+                <Link
+                  to="/universe/$id/watch"
+                  params={{ id: u.id }}
+                  className="group relative block aspect-[2/3] overflow-hidden rounded-2xl bg-muted ring-1 ring-border/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <SmartImage
+                    src={u.portraitImageURL || u.imageURL || u.tokenData?.imageURL}
+                    alt={u.name || 'Universe poster'}
+                    sizes="(min-width: 1024px) 16vw, 30vw"
+                    priority={i < 2}
+                    className="absolute inset-0 h-full w-full transition-transform duration-300 group-hover:scale-[1.02]"
+                  />
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-3 pt-10">
+                    <p className="font-lore text-sm sm:text-base font-semibold text-white line-clamp-1">
+                      {u.name || 'Untitled universe'}
+                    </p>
+                    {u.nodeCount > 0 && (
+                      <p className="text-[11px] text-white/70">
+                        {u.nodeCount} {u.nodeCount === 1 ? 'episode' : 'episodes'}
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <PitchSteps />
+        )}
       </div>
+
+      {showProof && (
+        <div className="mx-auto mt-14 max-w-[1440px] md:mt-20">
+          <PitchSteps compact />
+        </div>
+      )}
     </section>
+  );
+}
+
+/** Imagine → Generate → Own: the three-step "how it works". */
+function PitchSteps({ compact = false }: { compact?: boolean }) {
+  return (
+    <ol className="grid gap-3 sm:grid-cols-3" aria-label="How LOAR works">
+      {PITCH_STEPS.map((step, i) => (
+        <li
+          key={step.title}
+          className={`flex gap-4 rounded-2xl border border-border bg-card/60 ${
+            compact ? 'p-4 md:p-5' : 'sm:flex-col sm:gap-0 p-4 sm:p-5 md:p-6'
+          }`}
+        >
+          <div
+            className={`flex shrink-0 items-start justify-between ${compact ? '' : 'sm:mb-8 md:mb-10'}`}
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/25">
+              <step.icon className="h-5 w-5 text-primary" />
+            </span>
+            {!compact && (
+              <span className="hidden sm:inline font-lore text-sm text-muted-foreground tabular-nums">
+                0{i + 1}
+              </span>
+            )}
+          </div>
+          <div>
+            <h3 className="font-lore text-lg font-semibold text-foreground mb-1">{step.title}</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">{step.body}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }
 
