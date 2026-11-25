@@ -78,7 +78,7 @@ const CHANNEL_TINT: Record<string, string> = {
 };
 
 const GOAL_TINT: Record<string, string> = {
-  awareness: 'bg-zinc-500/15 text-zinc-300',
+  awareness: 'bg-muted-foreground/15 text-foreground/80',
   conversion: 'bg-green-500/15 text-green-300',
   retargeting: 'bg-orange-500/15 text-orange-300',
   launch: 'bg-violet-500/15 text-violet-300',

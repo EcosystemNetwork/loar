@@ -60,9 +60,9 @@ function NodeFilterBarImpl({
   ].filter(Boolean).length;
 
   return (
-    <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-top-2 duration-150">
+    <div className="bg-card/95 backdrop-blur-md border border-border rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-top-2 duration-150">
       <div className="flex items-center gap-2 px-3 py-2">
-        <Search className="h-4 w-4 text-zinc-400 shrink-0" />
+        <Search className="h-4 w-4 text-muted-foreground shrink-0" />
         <input
           ref={inputRef}
           type="text"
@@ -72,7 +72,7 @@ function NodeFilterBarImpl({
             if (e.key === 'Escape') onClose();
           }}
           placeholder="Search nodes..."
-          className="flex-1 bg-transparent text-sm text-white placeholder:text-zinc-500 outline-none min-w-[160px]"
+          className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none min-w-[160px]"
         />
 
         {/* Canon filter */}
@@ -82,7 +82,7 @@ function NodeFilterBarImpl({
               variant="ghost"
               size="sm"
               className={`h-7 px-2 text-xs gap-1 ${
-                filter.canonStatus !== 'all' ? 'text-yellow-400' : 'text-zinc-400'
+                filter.canonStatus !== 'all' ? 'text-yellow-400' : 'text-muted-foreground'
               }`}
             >
               <Sparkles className="h-3 w-3" />
@@ -93,7 +93,7 @@ function NodeFilterBarImpl({
                   : 'Non-Canon'}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="bg-zinc-900 border-zinc-700">
+          <DropdownMenuContent align="start" className="bg-card border-border">
             <DropdownMenuItem onClick={() => onCanonStatusChange('all')}>
               All Nodes
             </DropdownMenuItem>
@@ -113,7 +113,7 @@ function NodeFilterBarImpl({
               variant="ghost"
               size="sm"
               className={`h-7 px-2 text-xs gap-1 ${
-                filter.hasVideo !== 'all' ? 'text-blue-400' : 'text-zinc-400'
+                filter.hasVideo !== 'all' ? 'text-blue-400' : 'text-muted-foreground'
               }`}
             >
               <Film className="h-3 w-3" />
@@ -124,7 +124,7 @@ function NodeFilterBarImpl({
                   : 'No Video'}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="bg-zinc-900 border-zinc-700">
+          <DropdownMenuContent align="start" className="bg-card border-border">
             <DropdownMenuItem onClick={() => onHasVideoChange('all')}>All</DropdownMenuItem>
             <DropdownMenuItem onClick={() => onHasVideoChange('yes')}>Has Video</DropdownMenuItem>
             <DropdownMenuItem onClick={() => onHasVideoChange('no')}>No Video</DropdownMenuItem>
@@ -139,14 +139,14 @@ function NodeFilterBarImpl({
                 variant="ghost"
                 size="sm"
                 className={`h-7 px-2 text-xs gap-1 ${
-                  filter.arcId ? 'text-violet-400' : 'text-zinc-400'
+                  filter.arcId ? 'text-violet-400' : 'text-muted-foreground'
                 }`}
               >
                 <Tag className="h-3 w-3" />
                 {filter.arcId ? arcs.find((a) => a.id === filter.arcId)?.name || 'Arc' : 'Arc'}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="bg-zinc-900 border-zinc-700">
+            <DropdownMenuContent align="start" className="bg-card border-border">
               <DropdownMenuItem onClick={() => onArcIdChange(null)}>All Arcs</DropdownMenuItem>
               <DropdownMenuSeparator />
               {arcs.map((arc) => (
@@ -168,13 +168,13 @@ function NodeFilterBarImpl({
         {/* Status / clear */}
         {isActive && (
           <>
-            <div className="text-[10px] text-zinc-500 shrink-0">
+            <div className="text-[10px] text-muted-foreground shrink-0">
               {matchCount}/{totalCount}
             </div>
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 w-6 p-0 text-zinc-500 hover:text-white"
+              className="h-6 w-6 p-0 text-zinc-500 hover:text-foreground"
               onClick={onClear}
               title="Clear filters"
             >
@@ -183,7 +183,7 @@ function NodeFilterBarImpl({
           </>
         )}
 
-        <kbd className="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded shrink-0">
+        <kbd className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
           ESC
         </kbd>
       </div>

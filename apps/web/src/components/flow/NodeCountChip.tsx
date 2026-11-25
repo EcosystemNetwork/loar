@@ -110,12 +110,12 @@ export function NodeCountChip({
         <button
           data-testid="node-count-chip"
           className={cn(
-            'flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-1.5 bg-zinc-900/80 backdrop-blur-sm border rounded-lg text-sm transition-colors',
+            'flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-1.5 bg-card/80 backdrop-blur-sm border rounded-lg text-sm transition-colors',
             justDropped
               ? 'border-red-500/50 text-red-300 animate-pulse'
               : catchingUp
                 ? 'border-amber-500/40 text-amber-300'
-                : 'border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-white'
+                : 'border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-foreground'
           )}
           title="Node count — click for a breakdown and recent history"
         >
@@ -169,7 +169,10 @@ export function NodeCountChip({
               const prev = history[history.length - 2 - i];
               const dropped = prev && !e.isLoadingAny && e.liveCount < prev.liveCount;
               return (
-                <div key={e.t + '-' + i} className={dropped ? 'text-red-400' : 'text-zinc-400'}>
+                <div
+                  key={e.t + '-' + i}
+                  className={dropped ? 'text-red-400' : 'text-muted-foreground'}
+                >
                   {`${formatClock(e.t)} — ${e.isLoadingAny ? 'loading…' : `${e.liveCount} nodes`} (${SOURCE_LABEL[e.source]})`}
                 </div>
               );

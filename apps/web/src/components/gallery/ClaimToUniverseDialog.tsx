@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Globe, Loader2 } from 'lucide-react';
 import { SmartImage } from '@/components/SmartImage';
+import { SignInPrompt } from '@/components/SignInPrompt';
 
 interface Props {
   open: boolean;
@@ -60,9 +61,7 @@ export function ClaimToUniverseDialog({ open, onOpenChange, contentId, contentTi
         </DialogHeader>
 
         {!isAuthenticated ? (
-          <div className="text-center py-6 text-sm text-muted-foreground">
-            Connect your wallet to claim content.
-          </div>
+          <SignInPrompt variant="inline" title="Sign in to claim content" />
         ) : isLoading ? (
           <div className="flex items-center justify-center py-6">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />

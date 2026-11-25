@@ -48,7 +48,7 @@ function formatRevenue(n: number | undefined | null): string {
 }
 
 const TIER_META: Record<string, { label: string; color: string; icon: typeof Users }> = {
-  FREE: { label: 'Free', color: 'bg-zinc-600', icon: UserCheck },
+  FREE: { label: 'Free', color: 'bg-foreground/20', icon: UserCheck },
   BASIC: { label: 'Basic', color: 'bg-blue-600', icon: Shield },
   PREMIUM: { label: 'Premium', color: 'bg-violet-600', icon: Star },
   VIP: { label: 'VIP', color: 'bg-amber-500', icon: Crown },
@@ -60,11 +60,11 @@ const TIER_META: Record<string, { label: string; color: string; icon: typeof Use
 
 function StatCardSkeleton() {
   return (
-    <Card className="bg-zinc-900 border-zinc-800">
+    <Card className="bg-card border-border">
       <CardContent className="p-6">
         <div className="animate-pulse space-y-3">
-          <div className="h-4 w-24 bg-zinc-700 rounded" />
-          <div className="h-8 w-20 bg-zinc-700 rounded" />
+          <div className="h-4 w-24 bg-foreground/10 rounded" />
+          <div className="h-8 w-20 bg-foreground/10 rounded" />
         </div>
       </CardContent>
     </Card>
@@ -76,10 +76,10 @@ function ListSkeleton({ rows = 5 }: { rows?: number }) {
     <div className="space-y-3">
       {Array.from({ length: rows }).map((_, i) => (
         <div key={i} className="animate-pulse flex items-center gap-3">
-          <div className="h-8 w-8 bg-zinc-700 rounded-full" />
+          <div className="h-8 w-8 bg-foreground/10 rounded-full" />
           <div className="flex-1 space-y-2">
-            <div className="h-4 w-3/4 bg-zinc-700 rounded" />
-            <div className="h-3 w-1/2 bg-zinc-700 rounded" />
+            <div className="h-4 w-3/4 bg-foreground/10 rounded" />
+            <div className="h-3 w-1/2 bg-foreground/10 rounded" />
           </div>
         </div>
       ))}
@@ -230,7 +230,7 @@ function AnalyticsDashboardPage() {
           size="sm"
           onClick={handleExport}
           disabled={isExporting}
-          className="gap-2 border-zinc-700"
+          className="gap-2 border-border"
         >
           {isExporting ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -252,7 +252,7 @@ function AnalyticsDashboardPage() {
             : statCards.map((stat) => {
                 const Icon = stat.icon;
                 return (
-                  <Card key={stat.label} className="bg-zinc-900 border-zinc-800">
+                  <Card key={stat.label} className="bg-card border-border">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">{stat.label}</p>
@@ -269,7 +269,7 @@ function AnalyticsDashboardPage() {
       {/* ---- Two-column layout: Subscribers + Activity ---- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Subscriber Breakdown */}
-        <Card className="bg-zinc-900 border-zinc-800">
+        <Card className="bg-card border-border">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Users className="h-4 w-4 text-violet-400" />
@@ -296,13 +296,13 @@ function AnalyticsDashboardPage() {
                   return (
                     <div
                       key={tier}
-                      className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950 p-3"
+                      className="flex items-center justify-between rounded-lg border border-border bg-background p-3"
                     >
                       <div className="flex items-center gap-3">
                         <div
                           className={`flex h-8 w-8 items-center justify-center rounded-full ${meta.color}`}
                         >
-                          <Icon className="h-4 w-4 text-white" />
+                          <Icon className="h-4 w-4 text-foreground" />
                         </div>
                         <span className="text-sm font-medium">{meta.label}</span>
                       </div>
@@ -318,7 +318,7 @@ function AnalyticsDashboardPage() {
         </Card>
 
         {/* Subscriber Funnel */}
-        <Card className="bg-zinc-900 border-zinc-800 lg:col-span-2">
+        <Card className="bg-card border-border lg:col-span-2">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center justify-between gap-2 text-base">
               <div className="flex items-center gap-2">
@@ -332,7 +332,7 @@ function AnalyticsDashboardPage() {
                     size="sm"
                     variant={funnelDays === d ? 'default' : 'outline'}
                     onClick={() => setFunnelDays(d)}
-                    className="h-7 text-xs px-2 border-zinc-700"
+                    className="h-7 text-xs px-2 border-border"
                   >
                     {d}d
                   </Button>
@@ -355,7 +355,7 @@ function AnalyticsDashboardPage() {
         </Card>
 
         {/* Cohort Retention */}
-        <Card className="bg-zinc-900 border-zinc-800 lg:col-span-2">
+        <Card className="bg-card border-border lg:col-span-2">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center justify-between gap-2 text-base">
               <div className="flex items-center gap-2">
@@ -369,7 +369,7 @@ function AnalyticsDashboardPage() {
                     size="sm"
                     variant={cohortWeeks === w ? 'default' : 'outline'}
                     onClick={() => setCohortWeeks(w)}
-                    className="h-7 text-xs px-2 border-zinc-700"
+                    className="h-7 text-xs px-2 border-border"
                   >
                     {w}w
                   </Button>
@@ -392,7 +392,7 @@ function AnalyticsDashboardPage() {
         </Card>
 
         {/* Recent Activity */}
-        <Card className="bg-zinc-900 border-zinc-800">
+        <Card className="bg-card border-border">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Activity className="h-4 w-4 text-emerald-400" />
@@ -412,10 +412,10 @@ function AnalyticsDashboardPage() {
                   (event: any, i: number) => (
                     <div
                       key={event.id ?? i}
-                      className="flex items-start gap-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3"
+                      className="flex items-start gap-3 rounded-lg border border-border bg-background p-3"
                     >
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-800">
-                        <Activity className="h-4 w-4 text-zinc-400" />
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                        <Activity className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">
@@ -425,13 +425,13 @@ function AnalyticsDashboardPage() {
                           {event.description ?? event.details ?? event.message ?? ''}
                         </p>
                         {event.createdAt && (
-                          <p className="mt-1 text-xs text-zinc-500">
+                          <p className="mt-1 text-xs text-muted-foreground">
                             {new Date(event.createdAt).toLocaleString()}
                           </p>
                         )}
                       </div>
                       {event.type && (
-                        <Badge variant="outline" className="shrink-0 text-xs border-zinc-700">
+                        <Badge variant="outline" className="shrink-0 text-xs border-border">
                           {event.type}
                         </Badge>
                       )}
@@ -469,22 +469,22 @@ function FunnelStages({ funnel }: { funnel: FunnelData }) {
           stage.conversionFromPrev != null ? (stage.conversionFromPrev * 100).toFixed(1) : null;
         return (
           <div key={stage.key} className="flex items-center gap-3">
-            <span className="text-xs font-mono text-zinc-500 w-6">{i + 1}</span>
+            <span className="text-xs font-mono text-muted-foreground w-6">{i + 1}</span>
             <div className="flex-1">
               <div className="flex items-center justify-between text-xs mb-1">
                 <span className="font-medium">{stage.label}</span>
                 <div className="flex items-center gap-3">
                   {convPct !== null && (
-                    <span className="text-zinc-500">
+                    <span className="text-muted-foreground">
                       → <span className="text-amber-400 font-mono">{convPct}%</span>
                     </span>
                   )}
-                  <span className="font-mono text-zinc-300">
+                  <span className="font-mono text-foreground/80">
                     {stage.count.toLocaleString()} wallets
                   </span>
                 </div>
               </div>
-              <div className="h-6 bg-zinc-950 rounded overflow-hidden border border-zinc-800">
+              <div className="h-6 bg-background rounded overflow-hidden border border-border">
                 <div
                   className={`h-full transition-all ${
                     i === 0 ? 'bg-blue-500/60' : i === 1 ? 'bg-violet-500/60' : 'bg-emerald-500/60'
@@ -496,7 +496,7 @@ function FunnelStages({ funnel }: { funnel: FunnelData }) {
           </div>
         );
       })}
-      <div className="pt-2 mt-2 border-t border-zinc-800 flex items-center justify-between text-[10px] text-zinc-500">
+      <div className="pt-2 mt-2 border-t border-border flex items-center justify-between text-[10px] text-muted-foreground">
         <span>
           Unique raw wallets — views {funnel.rawViewedWallets}, engage {funnel.rawEngagedWallets},
           mints {funnel.rawMintedWallets}
@@ -522,7 +522,7 @@ function CohortTable({ cohorts, weeks }: { cohorts: Cohort[]; weeks: number }) {
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
-          <tr className="text-left text-zinc-500 border-b border-zinc-800">
+          <tr className="text-left text-muted-foreground border-b border-border">
             <th className="py-2 pr-3 font-semibold">Cohort</th>
             <th className="py-2 pr-3 font-semibold text-right">Size</th>
             {Array.from({ length: weeks }).map((_, i) => (
@@ -534,8 +534,8 @@ function CohortTable({ cohorts, weeks }: { cohorts: Cohort[]; weeks: number }) {
         </thead>
         <tbody>
           {cohorts.map((c) => (
-            <tr key={c.cohortWeek} className="border-b border-zinc-900">
-              <td className="py-2 pr-3 font-mono text-zinc-300">{c.cohortWeek}</td>
+            <tr key={c.cohortWeek} className="border-b border-border">
+              <td className="py-2 pr-3 font-mono text-foreground/80">{c.cohortWeek}</td>
               <td className="py-2 pr-3 font-mono text-right">{c.size}</td>
               {c.retention.map((r) => (
                 <td key={r.weekOffset} className="py-2 px-2 text-center">
@@ -551,7 +551,7 @@ function CohortTable({ cohorts, weeks }: { cohorts: Cohort[]; weeks: number }) {
 }
 
 function RetentionCell({ rate, count }: { rate: number; count: number }) {
-  if (count === 0) return <span className="text-zinc-700">—</span>;
+  if (count === 0) return <span className="text-muted-foreground/50">—</span>;
   // Color scale: 0% → zinc, 100% → emerald
   const intensity = Math.min(Math.max(rate, 0), 1);
   const bg = `rgba(16, 185, 129, ${(intensity * 0.55).toFixed(2)})`;

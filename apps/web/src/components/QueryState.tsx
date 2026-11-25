@@ -9,9 +9,8 @@
  */
 
 import { type ReactNode } from 'react';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
+import { ErrorState } from '@/components/states';
 
 interface QueryStateProps {
   /** Query is currently loading */
@@ -64,23 +63,7 @@ export function QueryState({
   }
 
   if (isError) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="p-3 rounded-full bg-destructive/10 mb-4">
-          <AlertCircle className="h-8 w-8 text-destructive" />
-        </div>
-        <h3 className="text-lg font-semibold mb-2">Something went wrong</h3>
-        <p className="text-muted-foreground text-sm max-w-md mb-4">
-          {errorMessage || 'Failed to load data. Please check your connection and try again.'}
-        </p>
-        {onRetry && (
-          <Button variant="outline" onClick={onRetry} className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            Try Again
-          </Button>
-        )}
-      </div>
-    );
+    return <ErrorState variant="card" description={errorMessage} onRetry={onRetry} />;
   }
 
   if (isEmpty) {

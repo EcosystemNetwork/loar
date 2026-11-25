@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UserText } from '@/components/user-text';
+import { SignInPrompt } from '@/components/SignInPrompt';
 
 export const Route = createFileRoute('/notifications')({
   component: NotificationsPage,
@@ -89,15 +90,11 @@ function NotificationsPage() {
   if (!isAuthenticated) {
     return (
       <div className="container mx-auto px-4 py-6">
-        <Card className="border-zinc-800 bg-zinc-900/50">
-          <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
-            <Bell className="h-12 w-12 text-zinc-600" />
-            <p className="text-zinc-400 text-lg font-medium">
-              Connect your wallet to view notifications
-            </p>
-            <p className="text-zinc-500 text-sm">Sign in to see activity across your universes</p>
-          </CardContent>
-        </Card>
+        <SignInPrompt
+          icon={Bell}
+          title="Sign in to view notifications"
+          description="See activity across your universes."
+        />
       </div>
     );
   }
@@ -108,9 +105,9 @@ function NotificationsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Bell className="h-6 w-6 text-violet-400" />
-          <h1 className="text-2xl font-bold text-white">Notifications</h1>
+          <h1 className="text-2xl font-bold text-foreground">Notifications</h1>
           {unreadCount > 0 && (
-            <Badge className="bg-violet-600 text-white border-violet-500 hover:bg-violet-600">
+            <Badge className="bg-primary text-primary-foreground border-violet-500 hover:bg-primary">
               {unreadCount} unread
             </Badge>
           )}
@@ -121,7 +118,7 @@ function NotificationsPage() {
             size="sm"
             onClick={() => markRead.mutate({ all: true })}
             disabled={markRead.isPending}
-            className="text-violet-400 hover:text-violet-300 hover:bg-zinc-800"
+            className="text-violet-400 hover:text-violet-300 hover:bg-muted"
           >
             {markRead.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -134,13 +131,13 @@ function NotificationsPage() {
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-1 bg-zinc-900 rounded-lg p-1 w-fit">
+      <div className="flex gap-1 bg-card rounded-lg p-1 w-fit">
         <button
           onClick={() => setFilter('all')}
           className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
             filter === 'all'
-              ? 'bg-zinc-800 text-white shadow-sm'
-              : 'text-zinc-400 hover:text-zinc-200'
+              ? 'bg-muted text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           All
@@ -149,8 +146,8 @@ function NotificationsPage() {
           onClick={() => setFilter('unread')}
           className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
             filter === 'unread'
-              ? 'bg-zinc-800 text-white shadow-sm'
-              : 'text-zinc-400 hover:text-zinc-200'
+              ? 'bg-muted text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           Unread
@@ -163,18 +160,18 @@ function NotificationsPage() {
       </div>
 
       {/* Notification list */}
-      <Card className="border-zinc-800 bg-zinc-900/50 overflow-hidden py-0">
+      <Card className="border-border bg-card/50 overflow-hidden py-0">
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="divide-y divide-zinc-800/50">
+            <div className="divide-y divide-border/50">
               {Array.from({ length: 5 }).map((_, i) => (
                 <NotificationSkeleton key={i} />
               ))}
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
-              <Bell className="h-10 w-10 text-zinc-700" />
-              <p className="text-zinc-500 text-sm">
+              <Bell className="h-10 w-10 text-muted-foreground/50" />
+              <p className="text-muted-foreground text-sm">
                 {filter === 'unread' ? 'No unread notifications' : 'No notifications yet'}
               </p>
               {filter === 'unread' && allNotifications.length > 0 && (
@@ -189,7 +186,7 @@ function NotificationsPage() {
               )}
             </div>
           ) : (
-            <div className="divide-y divide-zinc-800/50">
+            <div className="divide-y divide-border/50">
               {filtered.map((notif: any) => (
                 <button
                   key={notif.id}
@@ -205,18 +202,18 @@ function NotificationsPage() {
                   }`}
                 >
                   {/* Actor avatar */}
-                  <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-sm font-semibold text-violet-300 flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-muted border border-border flex items-center justify-center text-sm font-semibold text-violet-300 flex-shrink-0">
                     {notif.actorDisplayName?.[0]?.toUpperCase() || '?'}
                   </div>
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <p
-                      className={`text-sm leading-snug break-words ${!notif.read ? 'text-zinc-100' : 'text-zinc-400'}`}
+                      className={`text-sm leading-snug break-words ${!notif.read ? 'text-foreground' : 'text-muted-foreground'}`}
                     >
                       <UserText>{notif.message}</UserText>
                     </p>
-                    <p className="text-xs text-zinc-600 mt-1">
+                    <p className="text-xs text-muted-foreground/70 mt-1">
                       {notif.createdAt
                         ? relativeTime(
                             notif.createdAt?.toDate ? notif.createdAt.toDate() : notif.createdAt
@@ -230,7 +227,7 @@ function NotificationsPage() {
                     {!notif.read ? (
                       <div className="w-2.5 h-2.5 rounded-full bg-violet-500" />
                     ) : (
-                      <Check className="h-4 w-4 text-zinc-700" />
+                      <Check className="h-4 w-4 text-muted-foreground/50" />
                     )}
                   </div>
                 </button>
@@ -247,7 +244,7 @@ function NotificationsPage() {
             variant="outline"
             onClick={() => setLimit((prev) => prev + PAGE_SIZE)}
             disabled={isFetching}
-            className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300"
+            className="border-border bg-card hover:bg-muted text-foreground/80"
           >
             {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Load more

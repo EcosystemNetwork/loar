@@ -7,6 +7,8 @@
  */
 
 import Loader from '@/components/loader';
+import { EmptyState, ErrorState, stateActionClass } from '@/components/states';
+import { Compass } from 'lucide-react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AdminToolbarGate } from '@/components/AdminToolbarGate';
 import { CookieConsent } from '@/components/CookieConsent';
@@ -29,6 +31,7 @@ import {
 import { useTrackWalletLogin } from '@/hooks/useTrackWalletLogin';
 import { lazy, Suspense, useRef, useEffect } from 'react';
 import '../index.css';
+import { BRAND } from '@/lib/brand';
 
 // Dev-only. `import.meta.env.DEV` is a build-time constant, so in production
 // the dynamic imports are dead-code-eliminated and the devtools packages
@@ -60,11 +63,11 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
   head: () => ({
     meta: [
       {
-        title: 'LOAR',
+        title: BRAND.title,
       },
       {
         name: 'description',
-        content: 'Decentralized Narrative Control Suite',
+        content: BRAND.tagline,
       },
     ],
     // No favicon `links` entry here on purpose: index.html already declares
@@ -96,32 +99,60 @@ function RootError({ error }: { error: Error }) {
   sessionStorage.removeItem('chunk_reload');
 
   return (
-    <div className="h-svh flex flex-col items-center justify-center gap-4 bg-background text-foreground">
-      <h1 className="text-2xl font-bold">Something went wrong</h1>
-      <p className="text-muted-foreground max-w-md text-center">
-        {error?.message || 'An unexpected error occurred.'}
-      </p>
-      <button
-        onClick={() => window.location.reload()}
-        className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90"
-      >
-        Reload Page
-      </button>
+    <div className="min-h-svh flex flex-col bg-background text-foreground">
+      <BrandBar />
+      <ErrorState
+        variant="page"
+        title="Something went wrong"
+        description="This page hit an error. Reloading usually fixes it — if not, head home and try again."
+        error={error}
+        onRetry={() => window.location.reload()}
+        retryLabel="Reload page"
+        secondaryAction={
+          <a href="/" className={stateActionClass.secondary}>
+            Go home
+          </a>
+        }
+        className="flex-1"
+      />
+    </div>
+  );
+}
+
+/** Logo-only bar for the root error screen, which renders without the app header. */
+function BrandBar() {
+  return (
+    <div className="flex h-14 items-center px-4 lg:px-6">
+      <a href="/" aria-label="LOAR home">
+        <img src="/loarIconTextLogo.png" alt="LOAR" className="h-7 w-auto" />
+      </a>
     </div>
   );
 }
 
 function RootNotFound() {
   return (
-    <div className="h-svh flex flex-col items-center justify-center gap-4 bg-background text-foreground">
-      <h1 className="text-4xl font-bold">404</h1>
-      <p className="text-muted-foreground">This page doesn't exist.</p>
-      <Link
-        to="/"
-        className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90"
-      >
-        Go Home
-      </Link>
+    <div className="flex flex-1 flex-col bg-background text-foreground">
+      <EmptyState
+        variant="page"
+        icon={Compass}
+        title="This world doesn’t exist (yet)"
+        description="The link may be old, or the universe may have moved. Try one of these instead."
+        actions={
+          <>
+            <Link to="/discover" className={stateActionClass.primary}>
+              Discover universes
+            </Link>
+            <Link to="/create" className={stateActionClass.secondary}>
+              Create
+            </Link>
+            <Link to="/" className={stateActionClass.secondary}>
+              Home
+            </Link>
+          </>
+        }
+        className="flex-1"
+      />
     </div>
   );
 }

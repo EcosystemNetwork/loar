@@ -89,24 +89,24 @@ function QuestCard({
           <span className="text-lg">{icon}</span>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-white">{quest.title}</span>
+              <span className="text-sm font-medium text-foreground">{quest.title}</span>
               {quest.repeatable && (
-                <span className="text-[9px] px-1 py-0.5 rounded bg-zinc-800 text-zinc-400">
+                <span className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground">
                   REPEATABLE
                 </span>
               )}
             </div>
-            <p className="text-xs text-zinc-400 mt-0.5">{quest.description}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{quest.description}</p>
 
             {/* Progress bar */}
             <div className="mt-2">
-              <div className="flex items-center justify-between text-[10px] text-zinc-500 mb-1">
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
                 <span>
                   {quest.currentCount}/{quest.targetCount}
                 </span>
                 <span>{quest.progressPercent}%</span>
               </div>
-              <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all ${
                     quest.isClaimable
@@ -154,15 +154,15 @@ function AffiliateSection() {
     queryFn: () => trpcClient.quests.affiliateLeaderboard.query({ limit: 5 }),
   });
 
-  if (isLoading) return <div className="text-xs text-zinc-500 py-2">Loading...</div>;
+  if (isLoading) return <div className="text-xs text-muted-foreground py-2">Loading...</div>;
   if (!affiliate) return null;
 
   return (
     <div className="space-y-3">
       {/* Referral Link */}
-      <div className="bg-zinc-900 rounded-lg p-3">
-        <div className="text-sm font-medium text-white mb-1">Your Referral Link</div>
-        <p className="text-xs text-zinc-400 mb-2">
+      <div className="bg-card rounded-lg p-3">
+        <div className="text-sm font-medium text-foreground mb-1">Your Referral Link</div>
+        <p className="text-xs text-muted-foreground mb-2">
           Earn <span className="text-amber-400 font-bold">100 $LOAR</span> per friend who joins.
           They get <span className="text-amber-400 font-bold">50 $LOAR</span> too.
         </p>
@@ -170,7 +170,7 @@ function AffiliateSection() {
           <input
             readOnly
             value={affiliate.link}
-            className="flex-1 bg-zinc-800 text-zinc-300 text-xs px-2 py-1.5 rounded border border-zinc-700 font-mono"
+            className="flex-1 bg-muted text-foreground/80 text-xs px-2 py-1.5 rounded border border-border font-mono"
           />
           <button
             onClick={() => {
@@ -182,12 +182,12 @@ function AffiliateSection() {
             Copy
           </button>
         </div>
-        <div className="flex items-center gap-4 mt-2 text-xs text-zinc-400">
+        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
           <span>
-            Code: <span className="text-white font-mono">{affiliate.code}</span>
+            Code: <span className="text-foreground font-mono">{affiliate.code}</span>
           </span>
           <span>
-            Referrals: <span className="text-white">{affiliate.totalReferrals}</span>
+            Referrals: <span className="text-foreground">{affiliate.totalReferrals}</span>
           </span>
           <span>
             Earned: <span className="text-amber-400">{affiliate.totalEarned} $LOAR</span>
@@ -198,7 +198,7 @@ function AffiliateSection() {
       {/* Leaderboard */}
       {leaderboard && leaderboard.length > 0 && (
         <div>
-          <div className="text-xs text-zinc-500 font-medium mb-1.5 uppercase tracking-wider">
+          <div className="text-xs text-muted-foreground font-medium mb-1.5 uppercase tracking-wider">
             Top Referrers
           </div>
           <div className="space-y-1">
@@ -211,7 +211,7 @@ function AffiliateSection() {
               }) => (
                 <div
                   key={entry.rank}
-                  className="flex items-center justify-between bg-zinc-900/50 rounded px-2 py-1 text-xs"
+                  className="flex items-center justify-between bg-card/50 rounded px-2 py-1 text-xs"
                 >
                   <div className="flex items-center gap-2">
                     <span
@@ -219,18 +219,18 @@ function AffiliateSection() {
                         entry.rank === 1
                           ? 'text-amber-400'
                           : entry.rank === 2
-                            ? 'text-zinc-300'
+                            ? 'text-foreground/80'
                             : entry.rank === 3
                               ? 'text-orange-400'
-                              : 'text-zinc-500'
+                              : 'text-muted-foreground'
                       }`}
                     >
                       #{entry.rank}
                     </span>
-                    <span className="text-zinc-300 font-mono">{entry.userId}</span>
+                    <span className="text-foreground/80 font-mono">{entry.userId}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-zinc-400">{entry.totalReferrals} refs</span>
+                    <span className="text-muted-foreground">{entry.totalReferrals} refs</span>
                     <span className="text-amber-400 font-bold">{entry.totalEarned} $LOAR</span>
                   </div>
                 </div>
@@ -283,13 +283,13 @@ export function QuestsPanel() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-white">Quests & Rewards</h2>
-          <p className="text-xs text-zinc-400">Complete quests to earn $LOAR tokens</p>
+          <h2 className="text-lg font-bold text-foreground">Quests & Rewards</h2>
+          <p className="text-xs text-muted-foreground">Complete quests to earn $LOAR tokens</p>
         </div>
         {claimableCount > 0 && (
           <div className="text-right">
             <div className="text-amber-400 text-sm font-bold">{claimableCount} claimable</div>
-            <div className="text-xs text-zinc-400">+{totalEarnable} $LOAR</div>
+            <div className="text-xs text-muted-foreground">+{totalEarnable} $LOAR</div>
           </div>
         )}
       </div>
@@ -301,7 +301,7 @@ export function QuestsPanel() {
           className={`px-2 py-1 rounded text-xs ${
             !activeCategory
               ? 'bg-amber-600 text-white'
-              : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+              : 'bg-muted text-muted-foreground hover:bg-foreground/10'
           }`}
         >
           All
@@ -315,7 +315,7 @@ export function QuestsPanel() {
               className={`px-2 py-1 rounded text-xs flex items-center gap-1 ${
                 activeCategory === cat
                   ? 'bg-amber-600 text-white'
-                  : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                  : 'bg-muted text-muted-foreground hover:bg-foreground/10'
               }`}
             >
               {categoryLabels[cat]}
@@ -331,8 +331,8 @@ export function QuestsPanel() {
           onClick={() => setShowAffiliate(!showAffiliate)}
           className={`px-2 py-1 rounded text-xs ml-auto ${
             showAffiliate
-              ? 'bg-purple-600 text-white'
-              : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted text-muted-foreground hover:bg-foreground/10'
           }`}
         >
           Affiliate Program
@@ -344,7 +344,7 @@ export function QuestsPanel() {
 
       {/* Quest List */}
       {isLoading ? (
-        <div className="text-center text-zinc-500 py-8">Loading quests...</div>
+        <div className="text-center text-muted-foreground py-8">Loading quests...</div>
       ) : (
         <div className="space-y-2">
           {filteredQuests.map((quest) => (
@@ -356,7 +356,9 @@ export function QuestsPanel() {
             />
           ))}
           {filteredQuests.length === 0 && (
-            <div className="text-center text-zinc-500 py-4 text-sm">No quests in this category</div>
+            <div className="text-center text-muted-foreground py-4 text-sm">
+              No quests in this category
+            </div>
           )}
         </div>
       )}

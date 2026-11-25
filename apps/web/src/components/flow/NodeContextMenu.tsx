@@ -76,10 +76,10 @@ function MenuItem({
     <button
       className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors ${
         disabled
-          ? 'text-zinc-600 cursor-not-allowed'
+          ? 'text-muted-foreground/70 cursor-not-allowed'
           : variant === 'danger'
             ? 'text-red-400 hover:bg-red-500/10'
-            : 'text-zinc-300 hover:bg-zinc-800'
+            : 'text-foreground/80 hover:bg-muted'
       }`}
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
@@ -87,7 +87,7 @@ function MenuItem({
       {icon}
       <span className="flex-1 text-left">{label}</span>
       {shortcut && (
-        <kbd className="text-[9px] text-zinc-500 bg-zinc-800 px-1 py-0.5 rounded font-mono">
+        <kbd className="text-[9px] text-muted-foreground bg-muted px-1 py-0.5 rounded font-mono">
           {shortcut}
         </kbd>
       )}
@@ -159,12 +159,12 @@ function NodeContextMenuImpl({
   return (
     <div
       ref={menuRef}
-      className="fixed z-[100] bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-lg shadow-2xl py-1 animate-in fade-in zoom-in-95 duration-100"
+      className="fixed z-[100] bg-card/95 backdrop-blur-md border border-border rounded-lg shadow-2xl py-1 animate-in fade-in zoom-in-95 duration-100"
       style={{ left: x, top: y, width: menuWidth }}
     >
       {/* Header */}
-      <div className="px-3 py-1.5 border-b border-zinc-800">
-        <div className="text-xs font-medium text-zinc-200 truncate">
+      <div className="px-3 py-1.5 border-b border-border">
+        <div className="text-xs font-medium text-foreground truncate">
           {node.data.displayName || node.data.label || `Event ${eventId}`}
         </div>
         {node.data.isInCanonChain && <span className="text-[9px] text-yellow-400">Canon</span>}
@@ -220,7 +220,7 @@ function NodeContextMenuImpl({
 
       {/* Swap positions — only for on-chain nodes */}
       {canSwap && (
-        <div className="border-t border-zinc-800 py-1">
+        <div className="border-t border-border py-1">
           {hasOtherMark ? (
             <MenuItem
               icon={<ArrowLeftRight className="h-3.5 w-3.5" />}
@@ -253,7 +253,7 @@ function NodeContextMenuImpl({
         </div>
       )}
 
-      <div className="border-t border-zinc-800 py-1">
+      <div className="border-t border-border py-1">
         <MenuItem
           icon={<Sparkles className="h-3.5 w-3.5" />}
           label={node.data.isInCanonChain ? 'Remove from Canon' : 'Set as Canon'}
@@ -267,13 +267,13 @@ function NodeContextMenuImpl({
         {/* Arc submenu */}
         {arcs.length > 0 && (
           <>
-            <div className="px-3 py-1 text-[9px] text-zinc-500 uppercase tracking-wider">
+            <div className="px-3 py-1 text-[9px] text-muted-foreground uppercase tracking-wider">
               Assign to Arc
             </div>
             {arcs.map((arc) => (
               <button
                 key={arc.id}
-                className="w-full flex items-center gap-2 px-3 py-1 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-1 text-xs text-foreground/80 hover:bg-muted transition-colors"
                 onClick={() => {
                   onAssignToArc(arc.id, [node.id]);
                   onClose();
@@ -293,7 +293,7 @@ function NodeContextMenuImpl({
         )}
       </div>
 
-      <div className="border-t border-zinc-800 py-1">
+      <div className="border-t border-border py-1">
         {isBlockchain && (
           <MenuItem
             icon={<ExternalLink className="h-3.5 w-3.5" />}
@@ -316,7 +316,7 @@ function NodeContextMenuImpl({
         )}
       </div>
 
-      <div className="border-t border-zinc-800 py-1">
+      <div className="border-t border-border py-1">
         <MenuItem
           icon={<Trash2 className="h-3.5 w-3.5" />}
           label="Delete Node"

@@ -61,13 +61,13 @@ export function AgentContractModal({ agentUid, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-xl border border-zinc-700 bg-zinc-900 p-6 shadow-xl">
+      <div className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
             <Handshake className="h-5 w-5 text-violet-400" />
             Propose Contract
           </h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white">
+          <button onClick={onClose} className="text-zinc-400 hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -75,7 +75,7 @@ export function AgentContractModal({ agentUid, onClose }: Props) {
         <div className="space-y-4">
           {/* Commission Rate */}
           <div>
-            <label className="mb-1 block text-sm text-zinc-400">
+            <label className="mb-1 block text-sm text-muted-foreground">
               Commission Rate: {(form.commissionBps / 100).toFixed(1)}%
             </label>
             <input
@@ -87,7 +87,7 @@ export function AgentContractModal({ agentUid, onClose }: Props) {
               onChange={(e) => setForm((p) => ({ ...p, commissionBps: Number(e.target.value) }))}
               className="w-full accent-violet-500"
             />
-            <div className="flex justify-between text-xs text-zinc-500">
+            <div className="flex justify-between text-xs text-muted-foreground">
               <span>1%</span>
               <span>30%</span>
             </div>
@@ -95,7 +95,7 @@ export function AgentContractModal({ agentUid, onClose }: Props) {
 
           {/* Exclusivity */}
           <div>
-            <label className="mb-2 block text-sm text-zinc-400">Exclusivity</label>
+            <label className="mb-2 block text-sm text-muted-foreground">Exclusivity</label>
             <div className="flex gap-2">
               {(['NON_EXCLUSIVE', 'EXCLUSIVE'] as const).map((opt) => (
                 <Button
@@ -112,7 +112,7 @@ export function AgentContractModal({ agentUid, onClose }: Props) {
 
           {/* Scope */}
           <div>
-            <label className="mb-2 block text-sm text-zinc-400">Contract Scope</label>
+            <label className="mb-2 block text-sm text-muted-foreground">Contract Scope</label>
             <div className="flex flex-wrap gap-2">
               {CONTRACT_SCOPES.map((s) => (
                 <Badge
@@ -129,7 +129,7 @@ export function AgentContractModal({ agentUid, onClose }: Props) {
 
           {/* Duration */}
           <div>
-            <label className="mb-1 block text-sm text-zinc-400">Duration (days)</label>
+            <label className="mb-1 block text-sm text-muted-foreground">Duration (days)</label>
             <Input
               type="number"
               min={30}
@@ -141,12 +141,12 @@ export function AgentContractModal({ agentUid, onClose }: Props) {
 
           {/* Terms */}
           <div>
-            <label className="mb-1 block text-sm text-zinc-400">Terms *</label>
+            <label className="mb-1 block text-sm text-muted-foreground">Terms *</label>
             <textarea
               placeholder="Describe the contract terms..."
               value={form.terms}
               onChange={(e) => setForm((p) => ({ ...p, terms: e.target.value }))}
-              className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-white placeholder:text-zinc-500"
+              className="w-full rounded-md border border-border bg-muted px-3 py-2 text-foreground placeholder:text-muted-foreground"
               rows={4}
             />
           </div>

@@ -44,7 +44,7 @@ const CATEGORY_TINT: Record<string, string> = {
   action: 'bg-red-500/10 text-red-300 border-red-500/30',
   cinematic: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
   social: 'bg-pink-500/10 text-pink-300 border-pink-500/30',
-  noir: 'bg-zinc-500/10 text-zinc-300 border-zinc-500/30',
+  noir: 'bg-muted-foreground/10 text-foreground/80 border-muted-foreground/30',
   fantasy: 'bg-violet-500/10 text-violet-300 border-violet-500/30',
   horror: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
   retro: 'bg-fuchsia-500/10 text-fuchsia-300 border-fuchsia-500/30',

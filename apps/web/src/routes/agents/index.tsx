@@ -56,11 +56,11 @@ function AgentDiscoveryPage() {
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
             <Users className="h-8 w-8 text-violet-400" />
             Talent Agents
           </h1>
-          <p className="mt-2 text-zinc-400">
+          <p className="mt-2 text-muted-foreground">
             Discover agents who represent creators, broker deals, and manage IP licensing
           </p>
         </div>
@@ -77,7 +77,7 @@ function AgentDiscoveryPage() {
       {/* Search + Filters */}
       <div className="mb-6 space-y-4">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search agents by name, agency, or expertise..."
             value={search}
@@ -115,7 +115,7 @@ function AgentDiscoveryPage() {
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
         </div>
       ) : !data?.agents?.length ? (
-        <div className="py-20 text-center text-zinc-500">
+        <div className="py-20 text-center text-muted-foreground">
           <Users className="mx-auto mb-4 h-12 w-12 opacity-50" />
           <p>No talent agents found</p>
         </div>
@@ -123,7 +123,7 @@ function AgentDiscoveryPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {data.agents.map((agent: any) => (
             <Link key={agent.uid || agent.id} to={`/agents/${agent.uid || agent.id}` as any}>
-              <Card className="p-5 transition-colors hover:border-violet-500/50 hover:bg-zinc-900/50">
+              <Card className="p-5 transition-colors hover:border-violet-500/50 hover:bg-card/50">
                 <div className="flex items-start gap-4">
                   {agent.avatarUrl ? (
                     <SmartImage
@@ -138,15 +138,17 @@ function AgentDiscoveryPage() {
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-white truncate">{agent.displayName}</h3>
+                      <h3 className="font-semibold text-foreground truncate">
+                        {agent.displayName}
+                      </h3>
                       {agent.verified && <Shield className="h-4 w-4 text-blue-400 flex-shrink-0" />}
                     </div>
-                    <p className="text-sm text-zinc-400 truncate">{agent.agencyName}</p>
+                    <p className="text-sm text-muted-foreground truncate">{agent.agencyName}</p>
                   </div>
                 </div>
 
                 {agent.bio && (
-                  <p className="mt-3 text-sm text-zinc-400 line-clamp-2">{agent.bio}</p>
+                  <p className="mt-3 text-sm text-muted-foreground line-clamp-2">{agent.bio}</p>
                 )}
 
                 <div className="mt-3 flex flex-wrap gap-1">
@@ -157,7 +159,7 @@ function AgentDiscoveryPage() {
                   ))}
                 </div>
 
-                <div className="mt-4 flex items-center gap-4 text-sm text-zinc-500">
+                <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Briefcase className="h-3 w-3" />
                     {agent.totalDeals || 0} deals

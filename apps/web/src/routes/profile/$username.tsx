@@ -66,7 +66,7 @@ const SOCIAL_PLATFORMS: Record<string, { label: string; url: (v: string) => stri
 const THEME_CLASSES: Record<string, string> = {
   default: '',
   minimal: 'font-mono',
-  cinematic: 'bg-gradient-to-b from-background to-zinc-950',
+  cinematic: 'bg-gradient-to-b from-background to-background',
   neon: '',
   retro: 'font-sans',
 };
@@ -402,7 +402,7 @@ function ContentCard({ item, accentColor }: { item: any; accentColor: string }) 
           )}
           {isVideo && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Play className="h-10 w-10 text-white" />
+              <Play className="h-10 w-10 text-foreground" />
             </div>
           )}
           {/* Classification badge */}

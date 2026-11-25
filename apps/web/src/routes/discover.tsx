@@ -58,6 +58,18 @@ import {
   BookOpen,
 } from 'lucide-react';
 
+/** "1 view" / "1.2K views". Zero-view items show nothing — an empty count reads as a dead product. */
+function formatViews(n: number | null | undefined): string {
+  const v = n ?? 0;
+  const num =
+    v >= 1_000_000
+      ? `${(v / 1_000_000).toFixed(1)}M`
+      : v >= 1_000
+        ? `${(v / 1_000).toFixed(1)}K`
+        : String(v);
+  return `${num} ${v === 1 ? 'view' : 'views'}`;
+}
+
 export const Route = createFileRoute('/discover')({
   component: DiscoverPage,
 });
@@ -828,7 +840,9 @@ function MobileShortCard({ item, isActive }: { item: any; isActive: boolean }) {
           <p className="text-white text-sm font-semibold line-clamp-2 leading-tight">
             {item.title}
           </p>
-          <p className="text-white/60 text-xs mt-0.5">{item.views ?? 0} views</p>
+          {(item.views ?? 0) > 0 && (
+            <p className="text-white/60 text-xs mt-0.5">{formatViews(item.views)}</p>
+          )}
         </div>
 
         <div className="absolute top-2 left-2">
@@ -975,7 +989,9 @@ function DesktopShortsPlayer({ items }: { items: any[] }) {
                   </span>
                 ))}
             </div>
-            <span className="text-white/50 text-xs">{item.views ?? 0} views</span>
+            {(item.views ?? 0) > 0 && (
+              <span className="text-white/50 text-xs">{formatViews(item.views)}</span>
+            )}
           </div>
         </div>
 
@@ -1110,7 +1126,9 @@ function LongCard({ item }: { item: any }) {
                 </Badge>
               ))}
           </div>
-          <span className="text-[10px] text-muted-foreground">{item.views ?? 0} views</span>
+          {(item.views ?? 0) > 0 && (
+            <span className="text-[10px] text-muted-foreground">{formatViews(item.views)}</span>
+          )}
         </div>
       </div>
     </OpenableCard>
@@ -1304,7 +1322,9 @@ function ContentFeedCard({ item }: { item: any }) {
                   </Badge>
                 ))}
             </div>
-            <span className="text-xs text-muted-foreground">{item.views ?? 0} views</span>
+            {(item.views ?? 0) > 0 && (
+              <span className="text-xs text-muted-foreground">{formatViews(item.views)}</span>
+            )}
           </div>
         </div>
       </CardContent>
@@ -1379,9 +1399,11 @@ function TrendingCard({ item, rank }: { item: any; rank: number }) {
         <p className="text-white text-xs font-medium line-clamp-2 leading-tight">
           {item.title || 'Untitled'}
         </p>
-        <p className="text-white/50 text-[10px] mt-0.5">
-          {item.totalViews ?? item.views ?? 0} views
-        </p>
+        {(item.totalViews ?? item.views ?? 0) > 0 && (
+          <p className="text-white/50 text-[10px] mt-0.5">
+            {formatViews(item.totalViews ?? item.views)}
+          </p>
+        )}
       </div>
     </>
   );

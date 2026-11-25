@@ -88,8 +88,8 @@ export function LoreVault({ universeId, accessLevel }: LoreVaultProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-white font-semibold">Lore Vault</h3>
-          <p className="text-zinc-500 text-sm">
+          <h3 className="text-foreground font-semibold">Lore Vault</h3>
+          <p className="text-muted-foreground text-sm">
             Hidden worldbuilding — backstories, secrets, unreleased lore
           </p>
         </div>
@@ -101,25 +101,25 @@ export function LoreVault({ universeId, accessLevel }: LoreVaultProps) {
       </div>
 
       {showForm && (
-        <div className="bg-zinc-800/50 rounded-lg p-4 space-y-3 border border-zinc-700">
+        <div className="bg-muted/50 rounded-lg p-4 space-y-3 border border-border">
           <Input
             placeholder="Lore entry title..."
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="bg-zinc-900 border-zinc-600"
+            className="bg-card border-muted-foreground/30"
           />
           <Textarea
             placeholder="The hidden lore... (Markdown supported)"
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            className="bg-zinc-900 border-zinc-600 min-h-[120px]"
+            className="bg-card border-muted-foreground/30 min-h-[120px]"
           />
           <div className="flex items-center gap-3">
-            <label className="text-sm text-zinc-400">Who can see this?</label>
+            <label className="text-sm text-muted-foreground">Who can see this?</label>
             <select
               value={accessTier}
               onChange={(e) => setAccessTier(e.target.value as 'team' | 'holders' | 'admin')}
-              className="bg-zinc-900 border border-zinc-600 rounded-md px-3 py-1.5 text-sm text-white"
+              className="bg-card border border-muted-foreground/30 rounded-md px-3 py-1.5 text-sm text-foreground"
             >
               <option value="holders">Token Holders</option>
               <option value="team">Team Only</option>
@@ -141,7 +141,7 @@ export function LoreVault({ universeId, accessLevel }: LoreVaultProps) {
           <div className="animate-spin w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full" />
         </div>
       ) : items.length === 0 ? (
-        <div className="text-center py-12 text-zinc-500">
+        <div className="text-center py-12 text-muted-foreground">
           <p>The vault is empty.</p>
           {canCreate && (
             <p className="text-sm mt-1">Add hidden lore, character backstories, or plot secrets.</p>
@@ -152,7 +152,7 @@ export function LoreVault({ universeId, accessLevel }: LoreVaultProps) {
           {items.map((item: any) => (
             <div
               key={item.id}
-              className="bg-zinc-800/50 border border-zinc-700 rounded-lg overflow-hidden hover:border-zinc-600 transition-colors"
+              className="bg-muted/50 border border-border rounded-lg overflow-hidden hover:border-muted-foreground/30 transition-colors"
             >
               <button
                 onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
@@ -160,7 +160,7 @@ export function LoreVault({ universeId, accessLevel }: LoreVaultProps) {
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <svg
-                    className={`w-4 h-4 text-zinc-400 transition-transform ${expandedId === item.id ? 'rotate-90' : ''}`}
+                    className={`w-4 h-4 text-muted-foreground transition-transform ${expandedId === item.id ? 'rotate-90' : ''}`}
                     fill="none"
                     viewBox="0 0 24 24"
                     strokeWidth={2}
@@ -172,7 +172,7 @@ export function LoreVault({ universeId, accessLevel }: LoreVaultProps) {
                       d="m8.25 4.5 7.5 7.5-7.5 7.5"
                     />
                   </svg>
-                  <h4 className="text-white font-medium truncate">{item.title}</h4>
+                  <h4 className="text-foreground font-medium truncate">{item.title}</h4>
                   <span
                     className={`text-xs px-2 py-0.5 rounded shrink-0 ${TIER_COLORS[item.accessTier] ?? TIER_COLORS.team}`}
                   >
@@ -196,7 +196,7 @@ export function LoreVault({ universeId, accessLevel }: LoreVaultProps) {
               </button>
               {expandedId === item.id && item.body && (
                 <div className="px-4 pb-4 pt-0">
-                  <div className="text-zinc-300 text-sm whitespace-pre-wrap border-t border-zinc-700 pt-3">
+                  <div className="text-foreground/80 text-sm whitespace-pre-wrap border-t border-border pt-3">
                     {item.body}
                   </div>
                 </div>

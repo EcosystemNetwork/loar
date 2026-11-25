@@ -132,23 +132,23 @@ export function SubscribeDialog({ universeId, universeName, onClose }: Subscribe
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-zinc-900 rounded-2xl border border-zinc-800 w-full max-w-lg p-6">
+      <div className="bg-card rounded-2xl border border-border w-full max-w-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-xl font-bold text-white">Subscribe</h2>
-            {universeName && <p className="text-sm text-zinc-400">{universeName}</p>}
+            <h2 className="text-xl font-bold text-foreground">Subscribe</h2>
+            {universeName && <p className="text-sm text-muted-foreground">{universeName}</p>}
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white">
+          <button onClick={onClose} className="text-zinc-400 hover:text-foreground">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
         ) : !tiers || (tiers as any[]).length === 0 ? (
-          <p className="text-center text-zinc-500 py-8">
+          <p className="text-center text-muted-foreground py-8">
             No subscription tiers configured for this universe yet.
           </p>
         ) : (
@@ -172,13 +172,13 @@ export function SubscribeDialog({ universeId, universeName, onClose }: Subscribe
                   className={`w-full p-4 rounded-xl border text-left transition-all ${
                     isSelected
                       ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                      : 'border-zinc-800 hover:border-zinc-700 bg-gradient-to-r ' + config.gradient
+                      : 'border-border hover:border-border bg-gradient-to-r ' + config.gradient
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <Icon className={`w-5 h-5 ${config.color}`} />
-                      <span className="font-bold text-white">{tier.tier}</span>
+                      <span className="font-bold text-foreground">{tier.tier}</span>
                     </div>
                     <Badge variant="outline" className="text-xs">
                       {tier.pricePerMonth > 0 ? `${tier.pricePerMonth} ETH/mo` : 'Free'}
@@ -202,9 +202,9 @@ export function SubscribeDialog({ universeId, universeName, onClose }: Subscribe
             })}
 
             {selectedTier && (
-              <div className="pt-3 border-t border-zinc-800 space-y-3">
+              <div className="pt-3 border-t border-border space-y-3">
                 <div className="flex items-center gap-3">
-                  <Label className="text-zinc-400 text-sm">Duration</Label>
+                  <Label className="text-muted-foreground text-sm">Duration</Label>
                   <div className="flex gap-2">
                     {[1, 3, 6, 12].map((m) => (
                       <Button

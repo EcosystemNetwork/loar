@@ -62,11 +62,11 @@ export function NotificationBell() {
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
         aria-expanded={isOpen}
         aria-haspopup="true"
-        className="relative p-2 text-zinc-400 hover:text-white transition-colors"
+        className="relative p-2 text-zinc-400 hover:text-foreground transition-colors"
       >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 bg-violet-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+          <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -82,10 +82,10 @@ export function NotificationBell() {
             ref={dropdownRef}
             role="menu"
             aria-label="Notifications"
-            className="absolute right-0 top-full mt-2 w-80 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50 overflow-hidden"
+            className="absolute right-0 top-full mt-2 w-80 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden"
           >
-            <div className="px-4 py-3 border-b border-zinc-800 flex justify-between items-center">
-              <h3 className="font-semibold text-white text-sm">Notifications</h3>
+            <div className="px-4 py-3 border-b border-border flex justify-between items-center">
+              <h3 className="font-semibold text-foreground text-sm">Notifications</h3>
               {unreadCount > 0 && (
                 <button
                   onClick={() => markRead.mutate({ all: true })}
@@ -98,7 +98,7 @@ export function NotificationBell() {
 
             <div className="max-h-80 overflow-y-auto">
               {notificationsData?.notifications.length === 0 ? (
-                <div className="px-4 py-8 text-center text-zinc-500 text-sm">
+                <div className="px-4 py-8 text-center text-muted-foreground text-sm">
                   No notifications yet
                 </div>
               ) : (
@@ -134,13 +134,13 @@ export function NotificationBell() {
                           className="w-8 h-8 rounded-full"
                         />
                       ) : (
-                        <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center text-xs text-zinc-400">
+                        <div className="w-8 h-8 rounded-full bg-foreground/10 flex items-center justify-center text-xs text-muted-foreground">
                           {notif.actorDisplayName?.[0] || '?'}
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-zinc-200">{notif.message}</p>
-                        <p className="text-xs text-zinc-500 mt-0.5">
+                        <p className="text-sm text-foreground">{notif.message}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           {notif.createdAt?.toDate
                             ? new Date(notif.createdAt.toDate()).toLocaleDateString()
                             : ''}

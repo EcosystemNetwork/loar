@@ -46,22 +46,22 @@ export function TreasuryRulesPanel({ universeId }: TreasuryRulesPanelProps) {
   return (
     <div className="space-y-6">
       {/* Revenue Split Configuration */}
-      <Card className="bg-zinc-900/50 border-zinc-800">
+      <Card className="bg-card/50 border-border">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2 text-zinc-300">
+          <CardTitle className="text-sm flex items-center gap-2 text-foreground/80">
             <Settings className="h-4 w-4" />
             Revenue Deposit Split
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-muted-foreground">
             When depositing on-chain revenue, this controls how much goes to the credit pool vs
             staker rewards.
           </p>
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-zinc-400">Credit Pool</Label>
+              <Label className="text-muted-foreground">Credit Pool</Label>
               <Badge variant="outline" className="border-emerald-700 text-emerald-400">
                 {creditSharePct}%
               </Badge>
@@ -74,7 +74,7 @@ export function TreasuryRulesPanel({ universeId }: TreasuryRulesPanelProps) {
               step={5}
               className="[&_[role=slider]]:bg-emerald-500"
             />
-            <div className="flex items-center justify-between text-xs text-zinc-500">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>Credit Pool: {creditSharePct}%</span>
               <span>
                 {v('staker-rewards')}: {100 - creditSharePct}%
@@ -82,7 +82,7 @@ export function TreasuryRulesPanel({ universeId }: TreasuryRulesPanelProps) {
             </div>
           </div>
 
-          <div className="bg-zinc-800/50 rounded-lg p-3 text-xs text-zinc-400 space-y-1">
+          <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground space-y-1">
             <p>This setting applies when you use "Deposit Revenue" from the Overview tab.</p>
             <p>
               Credits fuel AI generation for your team. {v('staker-rewards')} incentivize{' '}
@@ -93,20 +93,20 @@ export function TreasuryRulesPanel({ universeId }: TreasuryRulesPanelProps) {
       </Card>
 
       {/* Member Allowances */}
-      <Card className="bg-zinc-900/50 border-zinc-800">
+      <Card className="bg-card/50 border-border">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2 text-zinc-300">
+          <CardTitle className="text-sm flex items-center gap-2 text-foreground/80">
             <Users className="h-4 w-4" />
             Member Monthly Allowances
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-muted-foreground">
             Set how many credits each team member can draw from the pool per month. 0 = unlimited.
           </p>
 
           {!members || members.length === 0 ? (
-            <div className="text-center py-6 text-zinc-500 text-sm">
+            <div className="text-center py-6 text-muted-foreground text-sm">
               No team members yet. Add members from the Team tab.
             </div>
           ) : (
@@ -114,13 +114,13 @@ export function TreasuryRulesPanel({ universeId }: TreasuryRulesPanelProps) {
               {members.map((m: any) => (
                 <div
                   key={m.id}
-                  className="flex items-center justify-between p-3 rounded-lg border border-zinc-800 bg-zinc-900"
+                  className="flex items-center justify-between p-3 rounded-lg border border-border bg-card"
                 >
                   <div>
-                    <div className="text-sm font-medium text-zinc-200">
+                    <div className="text-sm font-medium text-foreground">
                       {m.memberUid.slice(0, 6)}...{m.memberUid.slice(-4)}
                     </div>
-                    <div className="text-xs text-zinc-500 capitalize">{m.role}</div>
+                    <div className="text-xs text-muted-foreground capitalize">{m.role}</div>
                   </div>
 
                   {editingMember === m.memberUid ? (
@@ -130,7 +130,7 @@ export function TreasuryRulesPanel({ universeId }: TreasuryRulesPanelProps) {
                         min="0"
                         value={editAllowance}
                         onChange={(e) => setEditAllowance(e.target.value)}
-                        className="w-24 h-8 bg-zinc-800 border-zinc-700 text-white text-sm"
+                        className="w-24 h-8 bg-muted border-border text-foreground text-sm"
                         placeholder="0"
                       />
                       <Button
@@ -160,7 +160,7 @@ export function TreasuryRulesPanel({ universeId }: TreasuryRulesPanelProps) {
                         setEditingMember(m.memberUid);
                         setEditAllowance(String(m.monthlyAllowance || 0));
                       }}
-                      className="text-sm text-zinc-400 hover:text-white transition-colors"
+                      className="text-sm text-zinc-400 hover:text-foreground transition-colors"
                     >
                       {m.monthlyAllowance
                         ? `${m.monthlyAllowance.toLocaleString()}/mo`

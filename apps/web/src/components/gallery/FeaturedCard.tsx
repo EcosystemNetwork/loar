@@ -34,7 +34,7 @@ export function FeaturedCard({ item }: FeaturedCardProps) {
     : item.thumbnailUrl || item.mediaUrl || '/placeholder.jpg';
 
   return (
-    <div className="relative aspect-video rounded-lg overflow-hidden group cursor-pointer bg-gradient-to-br from-zinc-900 via-zinc-900/95 to-zinc-800">
+    <div className="relative aspect-video rounded-lg overflow-hidden group cursor-pointer bg-gradient-to-br from-card via-card/95 to-muted">
       {isVideo && item.mediaUrl ? (
         <>
           <video
@@ -66,7 +66,7 @@ export function FeaturedCard({ item }: FeaturedCardProps) {
           {!loaded && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="absolute inset-0 bg-[linear-gradient(110deg,transparent_25%,rgba(255,255,255,0.04)_50%,transparent_75%)] bg-[length:200%_100%] animate-shimmer" />
-              <Film className="h-8 w-8 text-white/30" />
+              <Film className="h-8 w-8 text-foreground/30" />
             </div>
           )}
         </>

@@ -360,7 +360,7 @@ function WatchPage() {
                 <Film className="h-3 w-3" />
                 Universe
               </div>
-              <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-display italic text-white tracking-tight drop-shadow-lg">
+              <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-display font-semibold text-white tracking-tight drop-shadow-lg">
                 {title}
               </h1>
               {description && (
@@ -466,7 +466,7 @@ function WatchPage() {
 
         {description && (
           <section>
-            <h2 className="text-xl md:text-2xl font-display italic mb-3 flex items-center gap-2">
+            <h2 className="text-xl md:text-2xl font-display font-semibold mb-3 flex items-center gap-2">
               <Info className="h-5 w-5 text-primary" />
               About this universe
             </h2>
@@ -726,7 +726,7 @@ function EpisodeRail({
     <section className="relative py-10 -mt-10">
       <div className="max-w-[1440px] mx-auto px-4 md:px-12 mb-4 flex items-end justify-between">
         <div>
-          <h2 className="text-xl md:text-2xl font-display italic">Episodes</h2>
+          <h2 className="text-xl md:text-2xl font-display font-semibold">Episodes</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
             {ordered.length} released
             {curatedCount > 0 && curatedCount < ordered.length && (
@@ -920,7 +920,7 @@ function QuickLinks({
 
   return (
     <section>
-      <h2 className="text-xl md:text-2xl font-display italic mb-4">Explore</h2>
+      <h2 className="text-xl md:text-2xl font-display font-semibold mb-4">Explore</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {tiles.map(({ to, params, search, label, subtitle, Icon }) => (
           <Link

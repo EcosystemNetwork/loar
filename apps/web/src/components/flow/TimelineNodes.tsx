@@ -345,7 +345,7 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
               <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto mb-1"></div>
-                  <p className="text-white text-xs">Loading…</p>
+                  <p className="text-foreground text-xs">Loading…</p>
                 </div>
               </div>
             )}
@@ -412,7 +412,7 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
-                      className="text-white/70 hover:text-white p-0.5 disabled:opacity-30"
+                      className="text-foreground/70 hover:text-foreground p-0.5 disabled:opacity-30"
                       disabled={
                         (data.currentVersionIndex ?? -1) <= 0 &&
                         data.currentVersionIndex !== -1 &&
@@ -432,15 +432,17 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
                     >
                       <ChevronLeft className="h-3.5 w-3.5" />
                     </button>
-                    <span className="text-white text-xs font-medium min-w-[28px] text-center">
+                    <span className="text-foreground text-xs font-medium min-w-[28px] text-center">
                       v
                       {(data.currentVersionIndex ?? -1) === -1
                         ? data.videoVersions.length + 1
                         : (data.currentVersionIndex ?? 0) + 1}
                     </span>
-                    <span className="text-white/50 text-xs">/ {data.videoVersions.length + 1}</span>
+                    <span className="text-foreground/50 text-xs">
+                      / {data.videoVersions.length + 1}
+                    </span>
                     <button
-                      className="text-white/70 hover:text-white p-0.5 disabled:opacity-30"
+                      className="text-foreground/70 hover:text-foreground p-0.5 disabled:opacity-30"
                       disabled={(data.currentVersionIndex ?? -1) === -1}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -497,7 +499,7 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
                   {((data.trimStart ?? 0) > 0 || data.trimEnd != null) && (
                     <Badge
                       variant="secondary"
-                      className="bg-zinc-700/90 text-white text-xs px-1 py-0.5"
+                      className="bg-foreground/90 text-foreground text-xs px-1 py-0.5"
                       title="Clip is trimmed"
                     >
                       <Scissors className="h-3 w-3" />
@@ -564,9 +566,9 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
             ) : data.isPending ? (
               <div className="w-full h-full bg-gradient-to-br from-orange-950 to-slate-900 flex flex-col items-center justify-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-400 mb-3" />
-                <div className="text-white text-sm font-medium">Generating…</div>
+                <div className="text-foreground text-sm font-medium">Generating…</div>
                 {data.pendingPrompt && (
-                  <div className="text-white/50 text-xs mt-1 px-4 text-center line-clamp-2">
+                  <div className="text-foreground/50 text-xs mt-1 px-4 text-center line-clamp-2">
                     {data.pendingPrompt}
                   </div>
                 )}
@@ -579,9 +581,9 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
                   data.onEditScene?.(data.eventId || '');
                 }}
               >
-                <LoarIcon name="clapperboard" size={40} className="text-white mb-2" />
-                <div className="text-white text-sm font-medium">Add Video</div>
-                <div className="text-white/60 text-xs mt-1">Click to upload or paste URL</div>
+                <LoarIcon name="clapperboard" size={40} className="text-foreground mb-2" />
+                <div className="text-foreground text-sm font-medium">Add Video</div>
+                <div className="text-foreground/60 text-xs mt-1">Click to upload or paste URL</div>
               </div>
             )}
           </div>
@@ -671,7 +673,7 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
               className={`w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer transition-all ${
                 data.isSelected
                   ? 'bg-blue-500 border-blue-500 text-white'
-                  : 'bg-card border-zinc-500 hover:border-blue-400'
+                  : 'bg-card border-muted-foreground/40 hover:border-blue-400'
               }`}
             >
               {data.isSelected && <Check className="h-3.5 w-3.5" />}

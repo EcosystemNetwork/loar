@@ -38,27 +38,27 @@ export function VotingPowerCard({ universeId }: { universeId: string }) {
   const isSelfDelegated = delegates && address && delegates.toLowerCase() === address.toLowerCase();
 
   return (
-    <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
-      <h3 className="font-semibold text-white mb-4">Your {v('voting-power')}</h3>
+    <div className="bg-card rounded-xl p-5 border border-border">
+      <h3 className="font-semibold text-foreground mb-4">Your {v('voting-power')}</h3>
 
       <div className="space-y-3">
         <div className="flex justify-between">
-          <span className="text-zinc-400 text-sm">{v('token-balance')}</span>
-          <span className="text-white font-mono text-sm">
+          <span className="text-muted-foreground text-sm">{v('token-balance')}</span>
+          <span className="text-foreground font-mono text-sm">
             {balance ? Number(formatEther(balance)).toLocaleString() : '0'}
           </span>
         </div>
 
         <div className="flex justify-between">
-          <span className="text-zinc-400 text-sm">{v('voting-power')}</span>
-          <span className="text-white font-mono text-sm">
+          <span className="text-muted-foreground text-sm">{v('voting-power')}</span>
+          <span className="text-foreground font-mono text-sm">
             {votes ? Number(formatEther(votes)).toLocaleString() : '0'}
           </span>
         </div>
 
         <div className="flex justify-between">
-          <span className="text-zinc-400 text-sm">Delegated To</span>
-          <span className="text-white text-sm">
+          <span className="text-muted-foreground text-sm">Delegated To</span>
+          <span className="text-foreground text-sm">
             {!delegates
               ? 'None'
               : isSelfDelegated
@@ -69,7 +69,7 @@ export function VotingPowerCard({ universeId }: { universeId: string }) {
       </div>
 
       {!address && (
-        <p className="text-zinc-500 text-sm mt-4">
+        <p className="text-muted-foreground text-sm mt-4">
           {v('connect-wallet')} to see {v('voting-power').toLowerCase()}
         </p>
       )}

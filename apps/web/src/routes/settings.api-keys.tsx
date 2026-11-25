@@ -103,7 +103,7 @@ function ApiKeysPage() {
         </TabsContent>
       </Tabs>
 
-      <Card className="bg-zinc-950/40 border-white/5">
+      <Card className="bg-background/40 border-white/5">
         <CardContent className="pt-6 text-xs text-muted-foreground space-y-2">
           <p className="flex items-center gap-2">
             <ShieldCheck className="h-3.5 w-3.5 text-emerald-400 flex-shrink-0" />

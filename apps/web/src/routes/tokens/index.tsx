@@ -48,6 +48,7 @@ import { Change, TokenAvatar } from '@/components/tokens/launchpad/primitives';
 import { QueryState } from '@/components/QueryState';
 import { cn } from '@/lib/utils';
 import { LayoutGrid, Lock, Rocket, Search, Table2, X } from 'lucide-react';
+import { EmptyState } from '@/components/states';
 
 const SORT_MODES: SortMode[] = [
   'trending',
@@ -301,29 +302,31 @@ function TokenLaunchpad() {
               graduates to Uniswap with liquidity locked forever.
             </p>
           </div>
-          <dl className="grid grid-cols-2 divide-border overflow-hidden rounded-xl border border-border bg-card sm:grid-cols-4 sm:divide-x">
-            <SummaryStat label="Tokens" value={isLoading ? null : String(tokens.length)} />
-            <SummaryStat
-              label="Total mcap"
-              value={
-                isLoading
-                  ? null
-                  : totalMarketCap > 0
-                    ? `${formatCompactEth(totalMarketCap)} ETH`
-                    : '--'
-              }
-            />
-            <SummaryStat label="Up 24h" value={isLoading ? null : String(gainers24h)} />
-            <SummaryStat
-              label="Liquidity"
-              value={
-                <span className="inline-flex items-center gap-1">
-                  <Lock className="h-3.5 w-3.5 text-primary" aria-hidden />
-                  Locked
-                </span>
-              }
-            />
-          </dl>
+          {(isLoading || tokens.length > 0) && (
+            <dl className="grid grid-cols-2 divide-border overflow-hidden rounded-xl border border-border bg-card sm:grid-cols-4 sm:divide-x">
+              <SummaryStat label="Tokens" value={isLoading ? null : String(tokens.length)} />
+              <SummaryStat
+                label="Total mcap"
+                value={
+                  isLoading
+                    ? null
+                    : totalMarketCap > 0
+                      ? `${formatCompactEth(totalMarketCap)} ETH`
+                      : '--'
+                }
+              />
+              <SummaryStat label="Up 24h" value={isLoading ? null : String(gainers24h)} />
+              <SummaryStat
+                label="Liquidity"
+                value={
+                  <span className="inline-flex items-center gap-1">
+                    <Lock className="h-3.5 w-3.5 text-primary" aria-hidden />
+                    Locked
+                  </span>
+                }
+              />
+            </dl>
+          )}
         </header>
 
         {/* King of the Hill — top market cap still on the curve */}
@@ -508,44 +511,46 @@ function TokenLaunchpad() {
               errorMessage="Couldn't load tokens. The indexer may be temporarily unavailable."
               loadingState={<GridSkeleton />}
               emptyState={
-                <div className="rounded-xl border border-dashed border-border px-6 py-16 text-center">
-                  <Rocket className="mx-auto mb-3 h-10 w-10 text-muted-foreground" aria-hidden />
-                  <h3 className="text-lg font-semibold">
-                    {search.tab === 'watchlist'
+                <EmptyState
+                  icon={Rocket}
+                  title={
+                    search.tab === 'watchlist'
                       ? 'Your watchlist is empty'
                       : search.q
                         ? `No tokens match “${search.q}”`
                         : tokens.length === 0
                           ? 'No tokens launched yet'
-                          : 'No tokens match these filters'}
-                  </h3>
-                  <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-                    {search.tab === 'watchlist'
+                          : 'No tokens match these filters'
+                  }
+                  description={
+                    search.tab === 'watchlist'
                       ? 'Star any token to keep an eye on it here.'
                       : tokens.length === 0
                         ? 'Be the first — launching takes one transaction.'
-                        : 'Loosen the filters or clear the preset.'}
-                  </p>
-                  <div className="mt-5 flex justify-center gap-2">
-                    {hasNarrowing && search.tab !== 'watchlist' && (
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setFilters(EMPTY_FILTERS);
-                          setSearch({ q: '', stage: 'all', preset: undefined });
-                        }}
-                      >
-                        Clear filters
+                        : 'Loosen the filters or clear the preset.'
+                  }
+                  actions={
+                    <>
+                      {hasNarrowing && search.tab !== 'watchlist' && (
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setFilters(EMPTY_FILTERS);
+                            setSearch({ q: '', stage: 'all', preset: undefined });
+                          }}
+                        >
+                          Clear filters
+                        </Button>
+                      )}
+                      <Button asChild>
+                        <Link to="/tokens/launch">
+                          <Rocket className="mr-2 h-4 w-4" aria-hidden />
+                          Launch a token
+                        </Link>
                       </Button>
-                    )}
-                    <Button asChild>
-                      <Link to="/tokens/launch">
-                        <Rocket className="mr-2 h-4 w-4" aria-hidden />
-                        Launch a token
-                      </Link>
-                    </Button>
-                  </div>
-                </div>
+                    </>
+                  }
+                />
               }
             >
               <p className="text-xs text-muted-foreground" aria-live="polite">

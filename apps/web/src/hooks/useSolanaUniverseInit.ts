@@ -24,6 +24,8 @@ export interface SolanaUniverseInitInput {
   /** 'fun' = sandbox (private until launched), 'monetized' = launchpad. */
   universeType?: 'fun' | 'monetized';
   visibility?: 'Private' | 'Public';
+  /** App-level launch visibility; omitted → type default (fun private). */
+  isPrivate?: boolean;
 }
 
 export interface SolanaUniverseInitResult {
@@ -66,6 +68,7 @@ export function useSolanaUniverseInit() {
           portraitImageUrl: input.portraitImageUrl || undefined,
           description: input.description,
           universeType: input.universeType ?? 'fun',
+          isPrivate: input.isPrivate,
         }),
       });
 

@@ -84,7 +84,7 @@ function ByokCodesPage() {
       <MintCodeCard onMinted={invalidate} />
       <GrantDirectCard />
 
-      <Card className="bg-zinc-900/40 border-white/10">
+      <Card className="bg-card/40 border-white/10">
         <CardHeader>
           <CardTitle className="text-base">Issued codes</CardTitle>
         </CardHeader>
@@ -136,7 +136,7 @@ function MintCodeCard({ onMinted }: { onMinted: () => void }) {
   });
 
   return (
-    <Card className="bg-gradient-to-br from-amber-950/30 to-zinc-900/40 border-amber-500/30">
+    <Card className="bg-gradient-to-br from-amber-950/30 to-card/40 border-amber-500/30">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-amber-400" />
@@ -242,7 +242,7 @@ function GrantDirectCard() {
   });
 
   return (
-    <Card className="bg-zinc-900/40 border-white/10">
+    <Card className="bg-card/40 border-white/10">
       <CardHeader>
         <CardTitle className="text-base">Grant directly (no code, no payment)</CardTitle>
       </CardHeader>
@@ -306,7 +306,10 @@ function CodeRow({ code, onRevoked }: { code: CodeListEntry; onRevoked: () => vo
     : expired
       ? { label: 'Expired', tone: 'bg-amber-500/20 text-amber-300 border-amber-500/30' }
       : exhausted
-        ? { label: 'Used up', tone: 'bg-zinc-500/20 text-zinc-300 border-zinc-500/30' }
+        ? {
+            label: 'Used up',
+            tone: 'bg-muted-foreground/20 text-foreground/80 border-muted-foreground/30',
+          }
         : { label: 'Active', tone: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' };
 
   const revoke = useMutation({
@@ -319,7 +322,7 @@ function CodeRow({ code, onRevoked }: { code: CodeListEntry; onRevoked: () => vo
   });
 
   return (
-    <div className="rounded-md border border-white/5 bg-zinc-950/30 p-3 flex items-center gap-3 flex-wrap">
+    <div className="rounded-md border border-white/5 bg-background/30 p-3 flex items-center gap-3 flex-wrap">
       <div className="flex-1 min-w-0 space-y-0.5">
         <div className="flex items-center gap-2">
           <span className="font-mono text-sm text-amber-200">{code.code}</span>

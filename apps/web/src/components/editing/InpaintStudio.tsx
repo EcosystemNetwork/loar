@@ -567,7 +567,7 @@ export function InpaintStudio({
                     <SelectItem key={m.id} value={m.id}>
                       {m.displayName}{' '}
                       <span className="text-[10px] text-muted-foreground ml-1">
-                        {m.creditCost} pts
+                        {m.creditCost} credits
                       </span>
                     </SelectItem>
                   ))}
@@ -590,7 +590,7 @@ export function InpaintStudio({
             ) : (
               <>
                 <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                {modeConfig.label} · {creditCost} pts
+                {modeConfig.label} · {creditCost} credits
               </>
             )}
           </Button>

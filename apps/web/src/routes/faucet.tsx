@@ -12,6 +12,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Droplets, Coins, ArrowRight, CheckCircle2, Wallet } from 'lucide-react';
 import { getEvmAddresses, isZeroAddress } from '@/configs/addresses';
+import { SignInPrompt } from '@/components/SignInPrompt';
 
 export const Route = createFileRoute('/faucet')({
   component: FaucetPage,
@@ -135,10 +136,10 @@ function FaucetPage() {
             <Droplets className="w-12 h-12 text-emerald-400" />
           </div>
 
-          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white mb-4">
+          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-foreground mb-4">
             $LOAR Faucet
           </h1>
-          <p className="text-lg text-zinc-400 max-w-md mx-auto">
+          <p className="text-lg text-muted-foreground max-w-md mx-auto">
             Claim free testnet <span className="text-emerald-400 font-semibold">$LOAR</span> tokens
             to explore the platform, generate content, and buy credits.
           </p>
@@ -148,7 +149,7 @@ function FaucetPage() {
       {/* Main Content */}
       <div className="max-w-xl mx-auto px-4 -mt-2 pb-16 space-y-6">
         {/* Claim Card */}
-        <Card className="border-emerald-700/40 bg-zinc-950/80 backdrop-blur-sm overflow-hidden">
+        <Card className="border-emerald-700/40 bg-background/80 backdrop-blur-sm overflow-hidden">
           {/* Claim amount banner */}
           <div className="bg-emerald-600/15 border-b border-emerald-700/30 px-6 py-4 text-center">
             <p className="text-sm text-emerald-400/80 uppercase tracking-wider font-medium mb-1">
@@ -164,16 +165,13 @@ function FaucetPage() {
             {/* Status / Claim button */}
             {!hasFaucet ? (
               <div className="text-center py-6">
-                <p className="text-zinc-400">Faucet contract not configured.</p>
-                <p className="text-xs text-zinc-500 mt-1">
+                <p className="text-muted-foreground">Faucet contract not configured.</p>
+                <p className="text-xs text-muted-foreground mt-1">
                   Set VITE_LOAR_FAUCET_ADDRESS in your environment.
                 </p>
               </div>
             ) : !isConnected ? (
-              <div className="text-center py-6 space-y-4">
-                <Wallet className="w-10 h-10 text-zinc-500 mx-auto" />
-                <p className="text-zinc-400">Connect your wallet to claim tokens</p>
-              </div>
+              <SignInPrompt variant="inline" title="Sign in to claim testnet $LOAR" />
             ) : justClaimed ? (
               <div className="text-center py-6 space-y-4">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/15 border-2 border-emerald-500/40">
@@ -183,7 +181,9 @@ function FaucetPage() {
                   <p className="text-xl font-bold text-emerald-400">
                     {faucetAmount.toLocaleString()} $LOAR Claimed!
                   </p>
-                  <p className="text-sm text-zinc-400 mt-1">Tokens have been sent to your wallet</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Tokens have been sent to your wallet
+                  </p>
                 </div>
                 <Button
                   variant="outline"
@@ -229,10 +229,10 @@ function FaucetPage() {
 
             {/* Your balance */}
             {isConnected && (
-              <div className="flex items-center justify-between bg-zinc-900/60 rounded-lg px-4 py-3 border border-zinc-800">
+              <div className="flex items-center justify-between bg-card/60 rounded-lg px-4 py-3 border border-border">
                 <div className="flex items-center gap-2.5">
                   <Coins className="w-5 h-5 text-amber-400" />
-                  <span className="text-sm text-zinc-400">Your $LOAR Balance</span>
+                  <span className="text-sm text-muted-foreground">Your $LOAR Balance</span>
                 </div>
                 <span className="text-lg font-bold text-emerald-400">
                   {userBalance.toLocaleString()}
@@ -242,9 +242,9 @@ function FaucetPage() {
 
             {/* Faucet supply */}
             {faucetBalance !== null && (
-              <div className="flex items-center justify-between bg-zinc-900/60 rounded-lg px-4 py-3 border border-zinc-800">
-                <span className="text-sm text-zinc-400">Faucet Supply</span>
-                <span className="text-sm font-medium text-zinc-300">
+              <div className="flex items-center justify-between bg-card/60 rounded-lg px-4 py-3 border border-border">
+                <span className="text-sm text-muted-foreground">Faucet Supply</span>
+                <span className="text-sm font-medium text-foreground/80">
                   {faucetBalance.toLocaleString()} $LOAR remaining
                 </span>
               </div>
@@ -253,26 +253,30 @@ function FaucetPage() {
         </Card>
 
         {/* CTA to use tokens */}
-        <Card className="border-zinc-800 bg-zinc-950/60">
+        <Card className="border-border bg-background/60">
           <CardContent className="p-5">
-            <p className="text-sm font-medium text-zinc-300 mb-3">What can you do with $LOAR?</p>
+            <p className="text-sm font-medium text-foreground/80 mb-3">
+              What can you do with $LOAR?
+            </p>
             <div className="space-y-2.5">
               <Link
                 to="/credits"
-                className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/50 border border-zinc-800 hover:border-amber-700/40 hover:bg-amber-950/20 transition-colors group"
+                className="flex items-center justify-between p-3 rounded-lg bg-card/50 border border-border hover:border-amber-700/40 hover:bg-amber-950/20 transition-colors group"
               >
                 <div className="flex items-center gap-3">
                   <Coins className="w-5 h-5 text-amber-400" />
                   <div>
-                    <p className="text-sm font-medium text-zinc-200">Buy Credits</p>
-                    <p className="text-xs text-zinc-500">Generate images, video, music, and more</p>
+                    <p className="text-sm font-medium text-foreground">Buy Credits</p>
+                    <p className="text-xs text-muted-foreground">
+                      Generate images, video, music, and more
+                    </p>
                   </div>
                 </div>
-                <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-amber-400 transition-colors" />
+                <ArrowRight className="w-4 h-4 text-muted-foreground/70 group-hover:text-amber-400 transition-colors" />
               </Link>
               <Link
                 to="/tokens"
-                className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/50 border border-zinc-800 hover:border-purple-700/40 hover:bg-purple-950/20 transition-colors group"
+                className="flex items-center justify-between p-3 rounded-lg bg-card/50 border border-border hover:border-purple-700/40 hover:bg-purple-950/20 transition-colors group"
               >
                 <div className="flex items-center gap-3">
                   <svg
@@ -289,20 +293,20 @@ function FaucetPage() {
                     <path d="M2 12l10 5 10-5" />
                   </svg>
                   <div>
-                    <p className="text-sm font-medium text-zinc-200">Launchpad</p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-sm font-medium text-foreground">Launchpad</p>
+                    <p className="text-xs text-muted-foreground">
                       Trade universe tokens and support creators
                     </p>
                   </div>
                 </div>
-                <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-purple-400 transition-colors" />
+                <ArrowRight className="w-4 h-4 text-muted-foreground/70 group-hover:text-purple-400 transition-colors" />
               </Link>
             </div>
           </CardContent>
         </Card>
 
         {/* Info */}
-        <p className="text-center text-xs text-zinc-600">
+        <p className="text-center text-xs text-muted-foreground/70">
           This faucet distributes testnet $LOAR tokens. Tokens have no monetary value.
           <br />
           No cooldown — claim as often as you need.

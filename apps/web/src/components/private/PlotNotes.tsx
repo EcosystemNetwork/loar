@@ -63,8 +63,10 @@ export function PlotNotes({ universeId, accessLevel }: PlotNotesProps) {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-white font-semibold">Plot Notes</h3>
-        <p className="text-zinc-500 text-sm">Quick notes for plot planning and scene outlines</p>
+        <h3 className="text-foreground font-semibold">Plot Notes</h3>
+        <p className="text-muted-foreground text-sm">
+          Quick notes for plot planning and scene outlines
+        </p>
       </div>
 
       {canCreate && (
@@ -73,7 +75,7 @@ export function PlotNotes({ universeId, accessLevel }: PlotNotesProps) {
             placeholder="Jot down a plot note..."
             value={newNote}
             onChange={(e) => setNewNote(e.target.value)}
-            className="bg-zinc-800/50 border-zinc-700 min-h-[60px] flex-1"
+            className="bg-muted/50 border-border min-h-[60px] flex-1"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && newNote.trim()) {
                 createMutation.mutate(newNote.trim());
@@ -96,13 +98,13 @@ export function PlotNotes({ universeId, accessLevel }: PlotNotesProps) {
           <div className="animate-spin w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full" />
         </div>
       ) : items.length === 0 ? (
-        <div className="text-center py-12 text-zinc-500">
+        <div className="text-center py-12 text-muted-foreground">
           <p>No notes yet.</p>
           {canCreate && (
             <p className="text-sm mt-1">
               Quick-capture plot ideas, scene outlines, or planning notes.
               <br />
-              <span className="text-zinc-600">Ctrl+Enter to save</span>
+              <span className="text-muted-foreground/70">Ctrl+Enter to save</span>
             </p>
           )}
         </div>
@@ -111,23 +113,23 @@ export function PlotNotes({ universeId, accessLevel }: PlotNotesProps) {
           {items.map((item: any) => (
             <div
               key={item.id}
-              className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3 group hover:border-zinc-600 transition-colors"
+              className="bg-muted/50 border border-border rounded-lg p-3 group hover:border-muted-foreground/30 transition-colors"
             >
               <div className="flex items-start justify-between gap-2">
-                <p className="text-zinc-300 text-sm whitespace-pre-wrap flex-1">{item.body}</p>
+                <p className="text-foreground/80 text-sm whitespace-pre-wrap flex-1">{item.body}</p>
                 {canCreate && (
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => deleteMutation.mutate(item.id)}
                     disabled={deleteMutation.isPending}
-                    className="text-xs text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                    className="text-xs text-muted-foreground hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                   >
                     x
                   </Button>
                 )}
               </div>
-              <p className="text-zinc-600 text-xs mt-2">
+              <p className="text-muted-foreground/70 text-xs mt-2">
                 {new Date(item.createdAt).toLocaleDateString()}
               </p>
             </div>

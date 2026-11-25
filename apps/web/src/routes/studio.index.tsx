@@ -25,6 +25,7 @@ import {
 } from '@/utils/ponder-api';
 import type { FirestoreUniverse } from '@/types/firestore';
 import { visibleStudioToolGroups } from '@/lib/navLinks';
+import { EmptyState } from '@/components/states';
 import {
   Plus,
   Settings,
@@ -202,7 +203,7 @@ function StudioPage() {
       <div className="max-w-[1440px] mx-auto px-4 md:px-8 py-8">
         <BuildableUniverses list={buildableList} />
         {enriched.length === 0 ? (
-          <EmptyState onCreate={() => navigate({ to: '/cinematicUniverseCreate' })} />
+          <NoUniverses onCreate={() => navigate({ to: '/cinematicUniverseCreate' })} />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {enriched.map((u) => (
@@ -451,22 +452,19 @@ function StudioCard({ universe: u }: { universe: StudioUniverse }) {
   );
 }
 
-function EmptyState({ onCreate }: { onCreate: () => void }) {
+function NoUniverses({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="text-center py-12 border border-dashed border-border/60 rounded-2xl bg-card/20">
-      <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/30 mx-auto flex items-center justify-center mb-4">
-        <Plus className="h-6 w-6 text-primary" />
-      </div>
-      <h3 className="text-lg font-semibold mb-2">No universes yet</h3>
-      <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
-        Launch your first universe to unlock the timeline editor, token launchpad and revenue tools.
-        The tools below work without one.
-      </p>
-      <Button size="lg" onClick={onCreate} className="rounded-full px-6">
-        <Plus className="h-4 w-4 mr-2" />
-        Create your first universe
-      </Button>
-    </div>
+    <EmptyState
+      icon={Plus}
+      title="No universes yet"
+      description="Launch your first universe to unlock the timeline editor, token launchpad and revenue tools. The tools below work without one."
+      actions={
+        <Button onClick={onCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          Create your first universe
+        </Button>
+      }
+    />
   );
 }
 

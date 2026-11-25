@@ -23,6 +23,7 @@ import {
 import { getExplorerTxUrl } from '@/configs/chains';
 import { useChainId } from 'wagmi';
 import { LaunchpadNav } from '@/components/tokens/launchpad/LaunchpadNav';
+import { SignInPrompt } from '@/components/SignInPrompt';
 
 export const Route = createFileRoute('/tokens/portfolio')({
   component: PortfolioPage,
@@ -46,10 +47,13 @@ function PortfolioPage() {
         <Card className="max-w-md">
           <CardContent className="text-center py-12">
             <Wallet className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-xl font-bold mb-2">Connect Wallet</h2>
+            <h2 className="text-xl font-bold mb-2">Sign in to see your portfolio</h2>
             <p className="text-muted-foreground mb-4">
-              Connect your wallet to view your token portfolio and PnL.
+              Your token holdings and PnL appear here once you're signed in.
             </p>
+            <div className="mb-3">
+              <SignInPrompt variant="inline" title="" className="py-0" />
+            </div>
             <Link to="/tokens">
               <Button variant="outline">
                 <ArrowLeft className="h-4 w-4 mr-2" />

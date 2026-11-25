@@ -41,6 +41,7 @@ import {
   useAdSeedStats,
 } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
+import { SignInPrompt } from '@/components/SignInPrompt';
 
 export const Route = createFileRoute('/adplacements/seeds/')({
   component: SeedDanceHub,
@@ -301,13 +302,7 @@ function MySeedsTab() {
   }
 
   if (!isConnected) {
-    return (
-      <div className="text-center py-16 text-muted-foreground">
-        <Megaphone className="w-10 h-10 mx-auto mb-3 opacity-30" />
-        <p className="font-medium">Connect your wallet</p>
-        <p className="text-sm mt-1">to manage your ad seeds</p>
-      </div>
-    );
+    return <SignInPrompt icon={Megaphone} title="Sign in to manage your ad seeds" />;
   }
 
   if (isLoading) {
@@ -431,13 +426,7 @@ function MyGigsTab() {
   }
 
   if (!isConnected) {
-    return (
-      <div className="text-center py-16 text-muted-foreground">
-        <Film className="w-10 h-10 mx-auto mb-3 opacity-30" />
-        <p className="font-medium">Connect your wallet</p>
-        <p className="text-sm mt-1">to view your placement gigs</p>
-      </div>
-    );
+    return <SignInPrompt icon={Film} title="Sign in to view your placement gigs" />;
   }
 
   if (isLoading) {

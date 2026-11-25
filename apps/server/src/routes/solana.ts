@@ -523,6 +523,8 @@ const universeInitBody = z.object({
   portraitImageUrl: z.string().url().max(2048).optional(),
   description: z.string().min(1).max(1000),
   universeType: z.enum(['fun', 'monetized']).default('fun'),
+  /** App-level (Firestore) launch visibility; omitted → type default. */
+  isPrivate: z.boolean().optional(),
 });
 
 /**
@@ -550,6 +552,7 @@ solanaRoutes.post('/universe/initialize', async (c) => {
       portraitImageUrl: parsed.data.portraitImageUrl,
       description: parsed.data.description,
       universeType: parsed.data.universeType,
+      isPrivate: parsed.data.isPrivate,
     });
     return c.json(result);
   } catch (err) {

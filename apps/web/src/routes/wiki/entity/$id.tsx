@@ -1210,7 +1210,7 @@ function EntityPage() {
                           href={safeUrl(v.modelUrl)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="absolute left-1 top-1 rounded bg-violet-500/90 px-1.5 py-0.5 text-[9px] font-medium text-white hover:bg-violet-600"
+                          className="absolute left-1 top-1 rounded bg-violet-500/90 px-1.5 py-0.5 text-[9px] font-medium text-primary-foreground hover:bg-primary"
                         >
                           GLB
                         </a>

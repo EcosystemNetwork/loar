@@ -201,15 +201,17 @@ function RevenueDashboardPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-10 text-center max-w-md">
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="bg-card border border-border rounded-xl p-10 text-center max-w-md">
           <DollarSign className="h-12 w-12 text-violet-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white mb-2">Revenue Dashboard</h2>
-          <p className="text-zinc-400 mb-6">
+          <h2 className="text-xl font-bold text-foreground mb-2">Revenue Dashboard</h2>
+          <p className="text-muted-foreground mb-6">
             Sign in to view your revenue analytics and earnings breakdown.
           </p>
           <RouterLink to="/login">
-            <Button className="bg-violet-600 hover:bg-violet-700 text-white">Sign In</Button>
+            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              Sign In
+            </Button>
           </RouterLink>
         </div>
       </div>
@@ -233,24 +235,26 @@ function RevenueDashboardPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm">
+      <div className="border-b border-border bg-card/50 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <RouterLink to="/dashboard">
-                <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-white">
+                <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-foreground">
                   <ArrowLeft className="h-4 w-4 mr-1" />
                   Dashboard
                 </Button>
               </RouterLink>
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
                   <BarChart3 className="h-6 w-6 text-violet-400" />
                   Revenue Dashboard
                 </h1>
-                <p className="text-sm text-zinc-400">Track your earnings across all sources</p>
+                <p className="text-sm text-muted-foreground">
+                  Track your earnings across all sources
+                </p>
               </div>
             </div>
 
@@ -259,7 +263,7 @@ function RevenueDashboardPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="border-zinc-700 text-zinc-300 hover:text-white gap-1.5"
+                className="border-zinc-700 text-zinc-300 hover:text-foreground gap-1.5"
                 onClick={() => setShowExportMenu(!showExportMenu)}
                 disabled={exportMutation.isPending}
               >
@@ -272,10 +276,10 @@ function RevenueDashboardPage() {
                 <ChevronDown className="h-3 w-3" />
               </Button>
               {showExportMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-50">
+                <div className="absolute right-0 mt-2 w-48 bg-muted border border-border rounded-lg shadow-xl z-50">
                   <div className="p-1">
                     <button
-                      className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white rounded-md transition-colors"
+                      className="w-full text-left px-3 py-2 text-sm text-foreground/80 hover:bg-foreground/10 hover:text-foreground rounded-md transition-colors"
                       onClick={() => {
                         exportMutation.mutate({ format: 'csv', period });
                         setShowExportMenu(false);
@@ -284,7 +288,7 @@ function RevenueDashboardPage() {
                       Export as CSV
                     </button>
                     <button
-                      className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white rounded-md transition-colors"
+                      className="w-full text-left px-3 py-2 text-sm text-foreground/80 hover:bg-foreground/10 hover:text-foreground rounded-md transition-colors"
                       onClick={() => {
                         exportMutation.mutate({ format: 'json', period });
                         setShowExportMenu(false);
@@ -304,15 +308,15 @@ function RevenueDashboardPage() {
         {/* ── Section 1: Summary Cards ──────────────────────────────── */}
         <div>
           {/* Period selector */}
-          <div className="flex items-center gap-1 mb-4 bg-zinc-900 border border-zinc-800 rounded-lg p-1 w-fit">
+          <div className="flex items-center gap-1 mb-4 bg-card border border-border rounded-lg p-1 w-fit">
             {periods.map((p) => (
               <button
                 key={p.value}
                 onClick={() => setPeriod(p.value)}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                   period === p.value
-                    ? 'bg-violet-600 text-white'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                 }`}
               >
                 {p.label}
@@ -322,28 +326,28 @@ function RevenueDashboardPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Total Revenue */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <div className="bg-card border border-border rounded-xl p-6">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-zinc-400">Total Revenue</span>
+                <span className="text-sm text-muted-foreground">Total Revenue</span>
                 <DollarSign className="h-5 w-5 text-violet-400" />
               </div>
               {summaryLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               ) : (
-                <p className="text-2xl font-bold text-white">
+                <p className="text-2xl font-bold text-foreground">
                   {formatCompact(summaryData.totalRevenue)}
                 </p>
               )}
             </div>
 
             {/* Net Credits */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <div className="bg-card border border-border rounded-xl p-6">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-zinc-400">Net Credits</span>
+                <span className="text-sm text-muted-foreground">Net Credits</span>
                 <Coins className="h-5 w-5 text-emerald-400" />
               </div>
               {summaryLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               ) : (
                 <>
                   <p
@@ -352,7 +356,7 @@ function RevenueDashboardPage() {
                     {summaryData.netCredits >= 0 ? '+' : ''}
                     {summaryData.netCredits.toLocaleString()}
                   </p>
-                  <p className="text-xs text-zinc-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {summaryData.creditsEarned.toLocaleString()} earned /{' '}
                     {summaryData.creditsSpent.toLocaleString()} spent
                   </p>
@@ -361,34 +365,34 @@ function RevenueDashboardPage() {
             </div>
 
             {/* Top Universe */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <div className="bg-card border border-border rounded-xl p-6">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-zinc-400">Top Universe</span>
+                <span className="text-sm text-muted-foreground">Top Universe</span>
                 <Globe className="h-5 w-5 text-blue-400" />
               </div>
               {summaryLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               ) : summaryData.topUniverse ? (
                 <>
-                  <p className="text-lg font-bold text-white truncate">
+                  <p className="text-lg font-bold text-foreground truncate">
                     {summaryData.topUniverse.name}
                   </p>
-                  <p className="text-sm text-zinc-400">
+                  <p className="text-sm text-muted-foreground">
                     {formatUSD(summaryData.topUniverse.revenue)}
                   </p>
                 </>
               ) : (
-                <p className="text-sm text-zinc-500">No universe data yet</p>
+                <p className="text-sm text-muted-foreground">No universe data yet</p>
               )}
             </div>
 
             {/* Period Label */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <div className="bg-card border border-border rounded-xl p-6">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-zinc-400">Period</span>
+                <span className="text-sm text-muted-foreground">Period</span>
                 <Calendar className="h-5 w-5 text-amber-400" />
               </div>
-              <p className="text-2xl font-bold text-white">
+              <p className="text-2xl font-bold text-foreground">
                 {period === 'day'
                   ? 'Today'
                   : period === 'week'
@@ -397,7 +401,7 @@ function RevenueDashboardPage() {
                       ? 'This Month'
                       : 'All Time'}
               </p>
-              <p className="text-xs text-zinc-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {address ? `${address.slice(0, 6)}...${address.slice(-4)}` : ''}
               </p>
             </div>
@@ -405,24 +409,24 @@ function RevenueDashboardPage() {
         </div>
 
         {/* ── Section 2: Revenue by Source ──────────────────────────── */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Revenue by Source</h2>
+        <div className="bg-card border border-border rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">Revenue by Source</h2>
           {sourcesLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : sourceList.length === 0 ? (
-            <p className="text-sm text-zinc-500 py-4">No revenue data for this period.</p>
+            <p className="text-sm text-muted-foreground py-4">No revenue data for this period.</p>
           ) : (
             <div className="space-y-4">
               {/* Stacked bar */}
-              <div className="h-6 rounded-full overflow-hidden flex bg-zinc-800">
+              <div className="h-6 rounded-full overflow-hidden flex bg-muted">
                 {sourceList.map((s) => {
                   const config = SOURCE_CONFIG[s.source];
                   return (
                     <div
                       key={s.source}
-                      className={`${config?.bg ?? 'bg-zinc-600'} transition-all duration-300`}
+                      className={`${config?.bg ?? 'bg-foreground/20'} transition-all duration-300`}
                       style={{ width: `${Math.max(s.percentage, 1)}%` }}
                       title={`${s.source}: ${formatUSD(s.amount)} (${s.percentage.toFixed(1)}%)`}
                     />
@@ -438,18 +442,18 @@ function RevenueDashboardPage() {
                   return (
                     <div
                       key={s.source}
-                      className="flex items-center gap-3 bg-zinc-800/50 rounded-lg px-4 py-3"
+                      className="flex items-center gap-3 bg-muted/50 rounded-lg px-4 py-3"
                     >
                       <div
-                        className={`p-2 rounded-lg bg-zinc-800 ${config?.color ?? 'text-zinc-400'}`}
+                        className={`p-2 rounded-lg bg-muted ${config?.color ?? 'text-muted-foreground'}`}
                       >
                         <Icon className="h-4 w-4" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">{s.source}</p>
-                        <p className="text-xs text-zinc-500">{s.percentage.toFixed(1)}%</p>
+                        <p className="text-sm font-medium text-foreground truncate">{s.source}</p>
+                        <p className="text-xs text-muted-foreground">{s.percentage.toFixed(1)}%</p>
                       </div>
-                      <p className="text-sm font-semibold text-white">{formatUSD(s.amount)}</p>
+                      <p className="text-sm font-semibold text-foreground">{formatUSD(s.amount)}</p>
                     </div>
                   );
                 })}
@@ -459,18 +463,18 @@ function RevenueDashboardPage() {
         </div>
 
         {/* ── Section 3: Revenue Timeline ──────────────────────────── */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+        <div className="bg-card border border-border rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">Revenue Timeline</h2>
-            <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-1">
+            <h2 className="text-lg font-semibold text-foreground">Revenue Timeline</h2>
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
               {chartPeriods.map((cp) => (
                 <button
                   key={cp.value}
                   onClick={() => setChartPeriod(cp.value)}
                   className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
                     chartPeriod === cp.value
-                      ? 'bg-violet-600 text-white'
-                      : 'text-zinc-400 hover:text-white hover:bg-zinc-700'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-foreground/10'
                   }`}
                 >
                   {cp.label}
@@ -481,10 +485,10 @@ function RevenueDashboardPage() {
 
           {timelineLoading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : timelineData.length === 0 ? (
-            <div className="flex items-center justify-center py-16 text-zinc-500 text-sm">
+            <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
               No timeline data for this period.
             </div>
           ) : (
@@ -500,7 +504,7 @@ function RevenueDashboardPage() {
                     >
                       {/* Tooltip */}
                       <div className="absolute bottom-full mb-2 hidden group-hover:block z-10 pointer-events-none">
-                        <div className="bg-zinc-700 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
+                        <div className="bg-foreground/10 text-foreground text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
                           <p className="font-medium">{point.date}</p>
                           <p className="text-violet-300">{formatUSD(point.amount)}</p>
                         </div>
@@ -516,7 +520,7 @@ function RevenueDashboardPage() {
               </div>
               {/* X-axis labels (first, middle, last) */}
               {timelineData.length >= 2 && (
-                <div className="flex justify-between mt-2 text-xs text-zinc-500">
+                <div className="flex justify-between mt-2 text-xs text-muted-foreground">
                   <span>{timelineData[0].date}</span>
                   {timelineData.length >= 3 && (
                     <span>{timelineData[Math.floor(timelineData.length / 2)].date}</span>
@@ -529,18 +533,22 @@ function RevenueDashboardPage() {
         </div>
 
         {/* ── Section 4: Revenue by Universe ───────────────────────── */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Revenue by Universe</h2>
+        <div className="bg-card border border-border rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">Revenue by Universe</h2>
           {universesLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : universeList.length === 0 ? (
             <div className="text-center py-8">
-              <Globe className="h-8 w-8 text-zinc-600 mx-auto mb-2" />
-              <p className="text-sm text-zinc-500">No universes generating revenue yet.</p>
+              <Globe className="h-8 w-8 text-muted-foreground/70 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">No universes generating revenue yet.</p>
               <RouterLink to="/create">
-                <Button variant="outline" size="sm" className="mt-3 border-zinc-700 text-zinc-300">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 border-border text-foreground/80"
+                >
                   Create a Universe
                 </Button>
               </RouterLink>
@@ -549,17 +557,17 @@ function RevenueDashboardPage() {
             <div className="overflow-x-auto -mx-6">
               <table className="w-full min-w-[500px]">
                 <thead>
-                  <tr className="border-b border-zinc-800">
-                    <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider px-6 pb-3">
+                  <tr className="border-b border-border">
+                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 pb-3">
                       Universe
                     </th>
-                    <th className="text-right text-xs font-medium text-zinc-500 uppercase tracking-wider px-6 pb-3">
+                    <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 pb-3">
                       Revenue
                     </th>
-                    <th className="text-right text-xs font-medium text-zinc-500 uppercase tracking-wider px-6 pb-3">
+                    <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 pb-3">
                       Holders
                     </th>
-                    <th className="text-right text-xs font-medium text-zinc-500 uppercase tracking-wider px-6 pb-3">
+                    <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider px-6 pb-3">
                       Subscribers
                     </th>
                   </tr>
@@ -569,26 +577,26 @@ function RevenueDashboardPage() {
                     <tr
                       key={u.id}
                       onClick={() => navigate({ to: '/universe/$id', params: { id: u.id } })}
-                      className="border-b border-zinc-800/50 hover:bg-zinc-800/50 transition-colors cursor-pointer"
+                      className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer"
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-violet-500/10 text-violet-400 text-sm font-bold">
                             {idx + 1}
                           </div>
-                          <span className="text-sm font-medium text-white">{u.name}</span>
+                          <span className="text-sm font-medium text-foreground">{u.name}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right text-sm font-semibold text-white">
+                      <td className="px-6 py-4 text-right text-sm font-semibold text-foreground">
                         {formatUSD(u.revenue)}
                       </td>
-                      <td className="px-6 py-4 text-right text-sm text-zinc-400">
+                      <td className="px-6 py-4 text-right text-sm text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
                           <Users className="h-3.5 w-3.5" />
                           {u.holders.toLocaleString()}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right text-sm text-zinc-400">
+                      <td className="px-6 py-4 text-right text-sm text-muted-foreground">
                         {u.subscribers.toLocaleString()}
                       </td>
                     </tr>

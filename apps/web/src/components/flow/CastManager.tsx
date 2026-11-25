@@ -103,9 +103,9 @@ function CastManagerImpl({ universeId, isOpen, onClose }: CastManagerProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="w-[380px] border-l border-zinc-800 bg-zinc-950 overflow-hidden flex flex-col shrink-0">
+    <div className="w-[380px] border-l border-border bg-background overflow-hidden flex flex-col shrink-0">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-pink-400" />
           <span className="text-sm font-medium">Universe Cast</span>
@@ -130,7 +130,7 @@ function CastManagerImpl({ universeId, isOpen, onClose }: CastManagerProps) {
           <>
             {/* Existing cast members */}
             {castMembers?.map((member: any) => (
-              <Card key={member.id} className="bg-zinc-900 border-zinc-800">
+              <Card key={member.id} className="bg-card border-border">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center justify-between">
                     <span>{member.name}</span>
@@ -160,18 +160,18 @@ function CastManagerImpl({ universeId, isOpen, onClose }: CastManagerProps) {
                         <img
                           src={url}
                           alt={`${member.name} ref ${i + 1}`}
-                          className="w-14 h-14 rounded object-cover border border-zinc-700"
+                          className="w-14 h-14 rounded object-cover border border-border"
                         />
                       </div>
                     ))}
 
                     {/* Add reference image button */}
                     {(member.referenceImageUrls?.length || 0) < 10 && (
-                      <label className="w-14 h-14 rounded border-2 border-dashed border-zinc-700 hover:border-pink-500/50 cursor-pointer flex items-center justify-center transition-colors">
+                      <label className="w-14 h-14 rounded border-2 border-dashed border-border hover:border-pink-500/50 cursor-pointer flex items-center justify-center transition-colors">
                         {uploadingFor === member.id ? (
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-pink-400" />
                         ) : (
-                          <ImagePlus className="h-4 w-4 text-zinc-500" />
+                          <ImagePlus className="h-4 w-4 text-muted-foreground" />
                         )}
                         <input
                           type="file"
@@ -196,7 +196,7 @@ function CastManagerImpl({ universeId, isOpen, onClose }: CastManagerProps) {
 
             {/* Create new cast member form */}
             {isCreating ? (
-              <Card className="bg-zinc-900 border-pink-500/30">
+              <Card className="bg-card border-pink-500/30">
                 <CardContent className="pt-4 space-y-3">
                   <div>
                     <Label className="text-xs">Character Name</Label>

@@ -100,6 +100,12 @@ const createUniverseSchema = z.object({
   unstoppableDomain: z.string().max(100).nullish(),
   /** 'fun' starts private (owner must Launch Publicly); 'monetized' is public from mint. */
   universeType: z.enum(['fun', 'monetized']).default('monetized'),
+  /**
+   * Launch visibility override. Omitted → type default (fun private, monetized
+   * public). `true` launches privately; the owner flips it public later via
+   * `setPrivate({ isPrivate: false })`.
+   */
+  isPrivate: z.boolean().optional(),
 });
 
 const getUniverseSchema = z.object({
@@ -150,6 +156,7 @@ export const universesRouter = router({
       unstoppableDomain: input.unstoppableDomain ?? null,
       chainId: input.chainId,
       universeType: input.universeType,
+      isPrivate: input.isPrivate,
     });
 
     void import('../../lib/analytics').then(({ captureServerEvent }) =>
@@ -732,13 +739,13 @@ export const universesRouter = router({
         throw new Error('Only the universe creator can change privacy');
       }
 
-      // Monetized (launchpad) universes are always public. Letting an admin
-      // flip one private post-launch would unlist a trading token.
+      // A launchpad universe may launch privately, but once public it stays
+      // public — flipping it private post-launch would unlist a trading token.
       const doc = await db.collection('cinematicUniverses').doc(universeId).get();
       const universeType =
         (doc.data()?.universeType as 'fun' | 'monetized' | undefined) ?? 'monetized';
-      if (universeType === 'monetized' && input.isPrivate) {
-        throw new Error('Launchpad universes are always public');
+      if (universeType === 'monetized' && input.isPrivate && !doc.data()?.isPrivate) {
+        throw new Error('Launchpad universes cannot be made private once public');
       }
 
       return await setUniversePrivate(universeId, input.isPrivate, {

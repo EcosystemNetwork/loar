@@ -106,7 +106,6 @@ export function ListingPrice({
   hideChain?: boolean;
   freeLabel?: string;
 }) {
-  const { web3Mode } = useWeb3Mode();
   const { rate } = useEthUsd();
 
   const num = typeof amount === 'string' ? parseFloat(amount) : (amount ?? 0);
@@ -123,13 +122,11 @@ export function ListingPrice({
     return <span className={className}>{formatUsd(num)}</span>;
   }
   if (cur === 'LOAR') {
-    if (!web3Mode) {
-      return <span className={className}>{num.toLocaleString()} points</span>;
-    }
+    // $LOAR is the token in both modes — never relabel it as credits or points.
     return <span className={className}>{num.toLocaleString()} $LOAR</span>;
   }
   if (cur === 'CREDITS') {
-    return <span className={className}>{num.toLocaleString()} points</span>;
+    return <span className={className}>{num.toLocaleString()} credits</span>;
   }
   // Unknown currency — display as-is, but in web2 try to show USD if it parses as a number we can convert via ETH rate (fallback)
   void rate;

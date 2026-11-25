@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
+import { requireSignIn } from '@/components/SignInPrompt';
 
 // Inline ABI for EpisodeEditionCollection.mint — will use generated ABI once contracts deployed
 const EPISODE_EDITION_ABI = [
@@ -85,7 +86,7 @@ export function MintContentDialog({
 
   async function handleMint() {
     if (!isConnected || !address) {
-      toast.error('Please connect your wallet first');
+      requireSignIn('to publish');
       return;
     }
 
@@ -187,9 +188,9 @@ export function MintContentDialog({
   if (!mintingEnabled) {
     return (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 w-full max-w-md p-6 text-center">
-          <h2 className="text-xl font-bold text-white mb-2">Minting Unavailable</h2>
-          <p className="text-sm text-zinc-400 mb-6">
+        <div className="bg-card rounded-2xl border border-border w-full max-w-md p-6 text-center">
+          <h2 className="text-xl font-bold text-foreground mb-2">Minting Unavailable</h2>
+          <p className="text-sm text-muted-foreground mb-6">
             Minting content as an NFT is temporarily disabled. Check back soon.
           </p>
           <Button onClick={onClose} className="w-full">
@@ -203,14 +204,14 @@ export function MintContentDialog({
   if (step === 'done') {
     return (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 w-full max-w-md p-6 text-center">
+        <div className="bg-card rounded-2xl border border-border w-full max-w-md p-6 text-center">
           <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white mb-2">{v('nft-listed')}</h2>
-          <p className="text-sm text-zinc-400 mb-1">
+          <h2 className="text-xl font-bold text-foreground mb-2">{v('nft-listed')}</h2>
+          <p className="text-sm text-muted-foreground mb-1">
             {contentTitle || 'Content'} is now available for {price} ETH
           </p>
           {ipfsUri && (
-            <p className="text-xs text-zinc-500 flex items-center justify-center gap-1">
+            <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
               <Link2 className="w-3 h-3" /> Pinned to IPFS
             </p>
           )}
@@ -224,22 +225,28 @@ export function MintContentDialog({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-zinc-900 rounded-2xl border border-zinc-800 w-full max-w-md p-6">
+      <div className="bg-card rounded-2xl border border-border w-full max-w-md p-6">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-amber-400" />
-            <h2 className="text-xl font-bold text-white">{v('mint-as-nft')}</h2>
+            <h2 className="text-xl font-bold text-foreground">{v('mint-as-nft')}</h2>
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white" aria-label="Close">
+          <button
+            onClick={onClose}
+            className="text-zinc-400 hover:text-foreground"
+            aria-label="Close"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {contentTitle && <p className="text-sm text-zinc-400 mb-4 truncate">{contentTitle}</p>}
+        {contentTitle && (
+          <p className="text-sm text-muted-foreground mb-4 truncate">{contentTitle}</p>
+        )}
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-zinc-300">{v('mint')} Price (ETH)</Label>
+            <Label className="text-foreground/80">{v('mint')} Price (ETH)</Label>
             <Input
               type="number"
               step="0.001"
@@ -247,28 +254,28 @@ export function MintContentDialog({
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               placeholder="0.01"
-              className="bg-zinc-800 border-zinc-700"
+              className="bg-muted border-border"
               disabled={step !== 'form'}
             />
-            <p className="text-xs text-zinc-500">Set to 0 for free mints</p>
+            <p className="text-xs text-muted-foreground">Set to 0 for free mints</p>
           </div>
 
           <div className="space-y-2">
-            <Label className="text-zinc-300">Max Supply</Label>
+            <Label className="text-foreground/80">Max Supply</Label>
             <Input
               type="number"
               min="0"
               value={maxSupply}
               onChange={(e) => setMaxSupply(e.target.value)}
               placeholder="100"
-              className="bg-zinc-800 border-zinc-700"
+              className="bg-muted border-border"
               disabled={step !== 'form'}
             />
-            <p className="text-xs text-zinc-500">0 = unlimited supply</p>
+            <p className="text-xs text-muted-foreground">0 = unlimited supply</p>
           </div>
 
           <div className="space-y-2">
-            <Label className="text-zinc-300">
+            <Label className="text-foreground/80">
               {v('royalty')} ({parseInt(royaltyBps) / 100 || 0}%)
             </Label>
             <Input
@@ -279,19 +286,21 @@ export function MintContentDialog({
               value={royaltyBps}
               onChange={(e) => setRoyaltyBps(e.target.value)}
               placeholder="500"
-              className="bg-zinc-800 border-zinc-700"
+              className="bg-muted border-border"
               disabled={step !== 'form'}
             />
-            <p className="text-xs text-zinc-500">Basis points (500 = 5%) on secondary sales</p>
+            <p className="text-xs text-muted-foreground">
+              Basis points (500 = 5%) on secondary sales
+            </p>
           </div>
         </div>
 
         {/* Progress indicator */}
         {step !== 'form' && (
-          <div className="mt-4 p-3 bg-zinc-800 rounded-lg">
+          <div className="mt-4 p-3 bg-muted rounded-lg">
             <div className="flex items-center gap-2 text-sm">
               <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
-              <span className="text-zinc-300">
+              <span className="text-foreground/80">
                 {step === 'pinning' && 'Pinning to IPFS & creating listing...'}
                 {step === 'minting' && 'Confirming on-chain transaction...'}
               </span>
@@ -317,7 +326,7 @@ export function MintContentDialog({
           </Button>
         </div>
 
-        <p className="text-center text-[10px] text-zinc-500 mt-3">
+        <p className="text-center text-[10px] text-muted-foreground mt-3">
           Content will be pinned to IPFS for permanent storage. 95% of sales go to you.
         </p>
       </div>

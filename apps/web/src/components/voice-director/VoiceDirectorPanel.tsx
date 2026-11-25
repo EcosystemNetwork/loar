@@ -168,18 +168,18 @@ export function VoiceDirectorPanel({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg border-zinc-800 bg-zinc-950 text-zinc-100">
+      <DialogContent className="max-w-lg border-border bg-background text-foreground">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-amber-400">
             <Mic className="size-4" /> LOAR Voice Director
           </DialogTitle>
-          <DialogDescription className="text-zinc-400">
+          <DialogDescription className="text-muted-foreground">
             Talk to this universe — ask about canon, or tell it what to create.
           </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="director">
-          <TabsList className="grid w-full grid-cols-2 bg-zinc-900">
+          <TabsList className="grid w-full grid-cols-2 bg-card">
             <TabsTrigger value="director" className="gap-1.5">
               <Sparkles className="size-3.5" /> Director
             </TabsTrigger>
@@ -326,16 +326,16 @@ function DirectorPushToTalk({ universeId }: { universeId: string }) {
     <div className="flex flex-col gap-3 pt-2">
       <audio ref={audioElRef} className="hidden" />
 
-      <div className="flex max-h-56 flex-col gap-2 overflow-y-auto rounded border border-zinc-800 bg-zinc-900/50 p-3 text-sm">
+      <div className="flex max-h-56 flex-col gap-2 overflow-y-auto rounded border border-border bg-card/50 p-3 text-sm">
         {log.length === 0 ? (
-          <p className="text-zinc-500">
+          <p className="text-muted-foreground">
             {isRecording ? '● Listening…' : 'Press the mic and talk to this universe.'}
           </p>
         ) : (
           log.map((entry) => (
             <p
               key={entry.id}
-              className={entry.role === 'user' ? 'text-zinc-300' : 'text-amber-300'}
+              className={entry.role === 'user' ? 'text-foreground/80' : 'text-amber-300'}
             >
               <span className="font-medium">{entry.role === 'user' ? 'You: ' : 'Director: '}</span>
               {entry.text}
@@ -345,7 +345,7 @@ function DirectorPushToTalk({ universeId }: { universeId: string }) {
       </div>
 
       {steps.length > 0 && (
-        <div className="flex flex-col gap-1 text-xs text-zinc-400">
+        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
           {steps.map((s) => (
             <span key={s.id} className="flex items-center gap-1.5">
               {s.done ? (
@@ -401,7 +401,7 @@ function DirectorPushToTalk({ universeId }: { universeId: string }) {
           <Square className="mr-1.5 size-3.5" /> Stop
         </Button>
       </div>
-      <p className="text-center text-xs text-zinc-600">
+      <p className="text-center text-xs text-muted-foreground/70">
         {isRecording ? 'Recording — press mic again to send' : 'Tap to record, tap again to send'}
       </p>
     </div>
@@ -471,14 +471,14 @@ function CharacterPushToTalk({
     <div className="flex flex-col gap-3 pt-2">
       <audio ref={audioElRef} className="hidden" />
 
-      <div className="flex max-h-56 flex-col gap-2 overflow-y-auto rounded border border-zinc-800 bg-zinc-900/50 p-3 text-sm">
+      <div className="flex max-h-56 flex-col gap-2 overflow-y-auto rounded border border-border bg-card/50 p-3 text-sm">
         {log.length === 0 ? (
-          <p className="text-zinc-500">Ask this character something.</p>
+          <p className="text-muted-foreground">Ask this character something.</p>
         ) : (
           log.map((entry) => (
             <p
               key={entry.id}
-              className={entry.role === 'user' ? 'text-zinc-300' : 'text-amber-300'}
+              className={entry.role === 'user' ? 'text-foreground/80' : 'text-amber-300'}
             >
               <span className="font-medium">{entry.role === 'user' ? 'You: ' : ''}</span>
               {entry.text}
@@ -510,7 +510,7 @@ function ModeSwitch({ live, onChange }: { live: boolean; onChange: (live: boolea
   return (
     <button
       type="button"
-      className="mx-auto mt-1 block text-xs text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
+      className="mx-auto mt-1 block text-xs text-muted-foreground underline-offset-2 hover:text-foreground/80 hover:underline"
       onClick={() => onChange(!live)}
     >
       {live ? 'Prefer to record one message at a time?' : 'Switch to live conversation'}
@@ -559,7 +559,7 @@ function CharacterTab({ universeId }: { universeId: string }) {
   return (
     <div className="flex flex-col gap-3 pt-2">
       <Select value={characterId} onValueChange={setCharacterId}>
-        <SelectTrigger className="border-zinc-800 bg-zinc-900">
+        <SelectTrigger className="border-border bg-card">
           <SelectValue placeholder="Pick a character" />
         </SelectTrigger>
         <SelectContent>
@@ -572,7 +572,7 @@ function CharacterTab({ universeId }: { universeId: string }) {
       </Select>
 
       {!characterId ? (
-        <p className="py-6 text-center text-sm text-zinc-500">
+        <p className="py-6 text-center text-sm text-muted-foreground">
           No characters in this universe yet.
         </p>
       ) : live ? (

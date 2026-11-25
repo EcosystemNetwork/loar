@@ -225,16 +225,16 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-zinc-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-6">
+    <div className="bg-card border border-border rounded-xl p-6 space-y-6">
       {/* Header + lock toggle */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
           <Palette className="h-5 w-5 text-violet-400" />
           Universe Style
         </h2>
@@ -245,7 +245,7 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
             className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
               form.locked
                 ? 'bg-violet-600/20 text-violet-300 border border-violet-500/40'
-                : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                : 'bg-muted text-muted-foreground border border-border'
             }`}
           >
             {form.locked ? (
@@ -266,7 +266,7 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
             className={
               form.locked
                 ? 'bg-violet-600/20 text-violet-300 border-violet-500/40'
-                : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                : 'bg-muted text-muted-foreground border-border'
             }
           >
             {form.locked ? (
@@ -283,7 +283,7 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
       </div>
 
       {form.locked && !isOwner && (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-muted-foreground">
           The universe owner has locked the visual style. All generations will use the settings
           below.
         </p>
@@ -295,10 +295,10 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
         <div className="space-y-5">
           {/* Visual Style */}
           <div className="space-y-1.5">
-            <Label className="text-zinc-300">Visual Style</Label>
+            <Label className="text-foreground/80">Visual Style</Label>
             {isOwner ? (
               <Select value={form.visualStyle} onValueChange={(v) => set('visualStyle', v)}>
-                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white">
+                <SelectTrigger className="bg-muted border-border text-foreground">
                   <SelectValue placeholder="Select a visual style" />
                 </SelectTrigger>
                 <SelectContent>
@@ -316,7 +316,7 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
 
           {/* Cinematic Style */}
           <div className="space-y-1.5 relative">
-            <Label className="text-zinc-300">Cinematic Style</Label>
+            <Label className="text-foreground/80">Cinematic Style</Label>
             {isOwner ? (
               <>
                 <Input
@@ -325,15 +325,15 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
                   onFocus={() => setShowCinematicSuggestions(true)}
                   onBlur={() => setTimeout(() => setShowCinematicSuggestions(false), 150)}
                   placeholder="e.g. Wes Anderson, Blade Runner"
-                  className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                  className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
                 />
                 {showCinematicSuggestions && filteredCinematicSuggestions.length > 0 && (
-                  <div className="absolute z-20 top-full mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                  <div className="absolute z-20 top-full mt-1 w-full bg-muted border border-border rounded-lg shadow-lg max-h-40 overflow-y-auto">
                     {filteredCinematicSuggestions.map((suggestion) => (
                       <button
                         key={suggestion}
                         type="button"
-                        className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-700 transition-colors"
+                        className="w-full text-left px-3 py-2 text-sm text-foreground/80 hover:bg-foreground/10 transition-colors"
                         onMouseDown={() => {
                           set('cinematicStyle', suggestion);
                           setShowCinematicSuggestions(false);
@@ -352,13 +352,13 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
 
           {/* Color Palette */}
           <div className="space-y-1.5">
-            <Label className="text-zinc-300">Color Palette</Label>
+            <Label className="text-foreground/80">Color Palette</Label>
             {isOwner ? (
               <Input
                 value={form.colorPalette}
                 onChange={(e) => set('colorPalette', e.target.value)}
                 placeholder="e.g. muted earth tones, neon cyan and magenta"
-                className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
               />
             ) : (
               <ReadOnlyField value={form.colorPalette} />
@@ -367,10 +367,10 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
 
           {/* Lighting Preset */}
           <div className="space-y-1.5">
-            <Label className="text-zinc-300">Lighting Preset</Label>
+            <Label className="text-foreground/80">Lighting Preset</Label>
             {isOwner ? (
               <Select value={form.lightingPreset} onValueChange={(v) => set('lightingPreset', v)}>
-                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white">
+                <SelectTrigger className="bg-muted border-border text-foreground">
                   <SelectValue placeholder="Select lighting" />
                 </SelectTrigger>
                 <SelectContent>
@@ -388,13 +388,13 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
 
           {/* Era / Setting */}
           <div className="space-y-1.5">
-            <Label className="text-zinc-300">Era / Setting</Label>
+            <Label className="text-foreground/80">Era / Setting</Label>
             {isOwner ? (
               <Input
                 value={form.eraSetting}
                 onChange={(e) => set('eraSetting', e.target.value)}
                 placeholder="e.g. 1920s, cyberpunk 2077, medieval"
-                className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
               />
             ) : (
               <ReadOnlyField value={form.eraSetting} />
@@ -403,8 +403,8 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
 
           {/* Style Prompt */}
           <div className="space-y-1.5">
-            <Label className="text-zinc-300">Style Prompt</Label>
-            <p className="text-xs text-zinc-500">
+            <Label className="text-foreground/80">Style Prompt</Label>
+            <p className="text-xs text-muted-foreground">
               Custom text injected into every generation prompt.
             </p>
             {isOwner ? (
@@ -413,7 +413,7 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
                 onChange={(e) => set('stylePrompt', e.target.value)}
                 placeholder="Detailed style instructions appended to all prompts..."
                 rows={3}
-                className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
               />
             ) : (
               <ReadOnlyField value={form.stylePrompt} multiline />
@@ -422,15 +422,15 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
 
           {/* Negative Prompt */}
           <div className="space-y-1.5">
-            <Label className="text-zinc-300">Negative Prompt</Label>
-            <p className="text-xs text-zinc-500">Terms to exclude from all generations.</p>
+            <Label className="text-foreground/80">Negative Prompt</Label>
+            <p className="text-xs text-muted-foreground">Terms to exclude from all generations.</p>
             {isOwner ? (
               <Textarea
                 value={form.negativePrompt}
                 onChange={(e) => set('negativePrompt', e.target.value)}
                 placeholder="blur, low quality, watermark, text..."
                 rows={2}
-                className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
               />
             ) : (
               <ReadOnlyField value={form.negativePrompt} multiline />
@@ -439,13 +439,13 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
 
           {/* Default Aspect Ratio */}
           <div className="space-y-1.5">
-            <Label className="text-zinc-300">Default Aspect Ratio</Label>
+            <Label className="text-foreground/80">Default Aspect Ratio</Label>
             {isOwner ? (
               <Select
                 value={form.defaultAspectRatio}
                 onValueChange={(v) => set('defaultAspectRatio', v)}
               >
-                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white">
+                <SelectTrigger className="bg-muted border-border text-foreground">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -463,7 +463,7 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
 
           {/* Reference Images */}
           <div className="space-y-2">
-            <Label className="text-zinc-300">
+            <Label className="text-foreground/80">
               Reference Images ({form.referenceImages.length}/{MAX_REFERENCE_IMAGES})
             </Label>
             {form.referenceImages.map((url, idx) => (
@@ -474,12 +474,12 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
                       value={url}
                       onChange={(e) => updateRefImage(idx, e.target.value)}
                       placeholder={`Reference image URL #${idx + 1}`}
-                      className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 flex-1"
+                      className="bg-muted border-border text-foreground placeholder:text-muted-foreground flex-1"
                     />
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-zinc-500 hover:text-red-400 flex-shrink-0"
+                      className="text-muted-foreground hover:text-red-400 flex-shrink-0"
                       onClick={() => removeRefImage(idx)}
                     >
                       <X className="h-4 w-4" />
@@ -490,7 +490,7 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
                 )}
                 {/* Thumbnail preview */}
                 {url && (
-                  <div className="flex-shrink-0 w-10 h-10 rounded border border-zinc-700 overflow-hidden bg-zinc-800">
+                  <div className="flex-shrink-0 w-10 h-10 rounded border border-border overflow-hidden bg-muted">
                     <img
                       src={url}
                       alt=""
@@ -507,7 +507,7 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
               <Button
                 variant="outline"
                 size="sm"
-                className="border-zinc-700 text-zinc-400 hover:bg-zinc-800"
+                className="border-border text-muted-foreground hover:bg-muted"
                 onClick={addRefImage}
               >
                 <Plus className="h-3.5 w-3.5 mr-1" />
@@ -520,21 +520,21 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
         {/* Right column: preview + save */}
         <div className="space-y-5">
           {/* Composed prompt preview */}
-          <Card className="bg-zinc-800/50 border-zinc-700">
+          <Card className="bg-muted/50 border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+              <CardTitle className="text-sm font-medium text-foreground/80 flex items-center gap-2">
                 <Eye className="h-4 w-4" />
                 Composed Style Prompt
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-sm text-zinc-300 leading-relaxed min-h-[4rem]">
+              <div className="bg-card border border-border rounded-lg p-3 text-sm text-foreground/80 leading-relaxed min-h-[4rem]">
                 {composedPrompt}
               </div>
               {form.negativePrompt && (
                 <div className="mt-3">
-                  <p className="text-xs text-zinc-500 mb-1">Negative:</p>
-                  <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-red-300/70">
+                  <p className="text-xs text-muted-foreground mb-1">Negative:</p>
+                  <div className="bg-card border border-border rounded-lg p-2 text-xs text-red-300/70">
                     {form.negativePrompt}
                   </div>
                 </div>
@@ -544,9 +544,9 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
 
           {/* Reference image gallery */}
           {form.referenceImages.filter(Boolean).length > 0 && (
-            <Card className="bg-zinc-800/50 border-zinc-700">
+            <Card className="bg-muted/50 border-border">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+                <CardTitle className="text-sm font-medium text-foreground/80 flex items-center gap-2">
                   <Image className="h-4 w-4" />
                   Reference Images
                 </CardTitle>
@@ -556,7 +556,7 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
                   {form.referenceImages.filter(Boolean).map((url, idx) => (
                     <div
                       key={idx}
-                      className="aspect-square rounded-lg border border-zinc-700 overflow-hidden bg-zinc-900"
+                      className="aspect-square rounded-lg border border-border overflow-hidden bg-card"
                     >
                       <img
                         src={url}
@@ -575,9 +575,9 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
           )}
 
           {/* Aspect ratio preview */}
-          <Card className="bg-zinc-800/50 border-zinc-700">
+          <Card className="bg-muted/50 border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+              <CardTitle className="text-sm font-medium text-foreground/80 flex items-center gap-2">
                 <RectangleHorizontal className="h-4 w-4" />
                 Aspect Ratio Preview
               </CardTitle>
@@ -624,11 +624,11 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
 
       {/* Save button (owner only) */}
       {isOwner && (
-        <div className="flex justify-end pt-2 border-t border-zinc-800">
+        <div className="flex justify-end pt-2 border-t border-border">
           <Button
             onClick={handleSave}
             disabled={saveMutation.isPending}
-            className="bg-violet-600 hover:bg-violet-700 text-white px-6"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-6"
           >
             {saveMutation.isPending ? (
               <>
@@ -654,14 +654,14 @@ export function UniverseStyleManager({ universeAddress, isOwner }: UniverseStyle
 
 function ReadOnlyField({ value, multiline }: { value: string; multiline?: boolean }) {
   if (!value) {
-    return <p className="text-sm text-zinc-600 italic px-4 py-2">Not set</p>;
+    return <p className="text-sm text-muted-foreground/70 italic px-4 py-2">Not set</p>;
   }
   return multiline ? (
-    <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg px-4 py-2 text-sm text-zinc-300 whitespace-pre-wrap">
+    <div className="bg-muted/50 border border-border rounded-lg px-4 py-2 text-sm text-foreground/80 whitespace-pre-wrap">
       {value}
     </div>
   ) : (
-    <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg px-4 py-2 text-sm text-zinc-300">
+    <div className="bg-muted/50 border border-border rounded-lg px-4 py-2 text-sm text-foreground/80">
       {value}
     </div>
   );
@@ -678,7 +678,7 @@ function AspectRatioPreview({ ratio }: { ratio: string }) {
 
   return (
     <div
-      className="border-2 border-dashed border-zinc-600 rounded flex items-center justify-center text-xs text-zinc-500"
+      className="border-2 border-dashed border-muted-foreground/30 rounded flex items-center justify-center text-xs text-muted-foreground"
       style={{ width: d.w, height: d.h }}
     >
       {ratio}

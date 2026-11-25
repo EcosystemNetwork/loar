@@ -319,7 +319,7 @@ export function ArchiveTile({ entity, portrait }: { entity: WikiEntity; portrait
       to="/wiki/entity/$id"
       params={{ id: entity.id }}
       className={cn(
-        'group relative block overflow-hidden rounded-xl border bg-gradient-to-br from-zinc-900 to-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'group relative block overflow-hidden rounded-xl border bg-gradient-to-br from-card to-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         portrait ? 'aspect-[3/4]' : 'aspect-[4/3]'
       )}
     >
@@ -337,7 +337,7 @@ export function ArchiveTile({ entity, portrait }: { entity: WikiEntity; portrait
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
       <span className="absolute inset-x-3 bottom-2.5">
-        <span className="line-clamp-2 font-lore text-base font-semibold leading-snug text-white">
+        <span className="line-clamp-2 font-lore text-base font-semibold leading-snug text-foreground">
           {entity.name}
         </span>
       </span>

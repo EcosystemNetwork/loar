@@ -38,7 +38,7 @@ function AgentProfilePage() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <Card className="p-8 text-center">
-          <h2 className="text-xl font-bold text-white">Agent Not Found</h2>
+          <h2 className="text-xl font-bold text-foreground">Agent Not Found</h2>
           <Button onClick={() => navigate({ to: '/agents' })} className="mt-4">
             Browse Agents
           </Button>
@@ -72,10 +72,10 @@ function AgentProfilePage() {
           )}
           <div className="flex-1">
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-white">{(agent as any).displayName}</h1>
+              <h1 className="text-2xl font-bold text-foreground">{(agent as any).displayName}</h1>
               {(agent as any).verified && <Shield className="h-5 w-5 text-blue-400" />}
             </div>
-            <p className="text-lg text-zinc-400">{(agent as any).agencyName}</p>
+            <p className="text-lg text-muted-foreground">{(agent as any).agencyName}</p>
 
             {(agent as any).website && (
               <a
@@ -108,13 +108,13 @@ function AgentProfilePage() {
 
         {/* Bio */}
         {(agent as any).bio && (
-          <p className="mt-6 text-zinc-300 leading-relaxed">{(agent as any).bio}</p>
+          <p className="mt-6 text-foreground/80 leading-relaxed">{(agent as any).bio}</p>
         )}
 
         {/* Specialties */}
         {(agent as any).specialties?.length > 0 && (
           <div className="mt-6">
-            <h3 className="mb-2 text-sm font-medium text-zinc-400">Specialties</h3>
+            <h3 className="mb-2 text-sm font-medium text-muted-foreground">Specialties</h3>
             <div className="flex flex-wrap gap-2">
               {(agent as any).specialties.map((s: string) => (
                 <Badge key={s} variant="secondary">
@@ -126,32 +126,32 @@ function AgentProfilePage() {
         )}
 
         {/* Stats */}
-        <div className="mt-8 grid grid-cols-3 gap-4 border-t border-zinc-800 pt-6">
+        <div className="mt-8 grid grid-cols-3 gap-4 border-t border-border pt-6">
           <div className="text-center">
-            <p className="text-2xl font-bold text-white">{(agent as any).totalDeals || 0}</p>
-            <p className="text-sm text-zinc-400">Deals Closed</p>
+            <p className="text-2xl font-bold text-foreground">{(agent as any).totalDeals || 0}</p>
+            <p className="text-sm text-muted-foreground">Deals Closed</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-white">
+            <p className="text-2xl font-bold text-foreground">
               {(agent as any).rating ? (agent as any).rating.toFixed(1) : 'N/A'}
             </p>
-            <p className="text-sm text-zinc-400">Rating</p>
+            <p className="text-sm text-muted-foreground">Rating</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-white font-mono">
+            <p className="text-2xl font-bold text-foreground font-mono">
               {(agent as any).totalRevenueGenerated !== '0'
                 ? `${((agent as any).totalRevenueGenerated / 1e18).toFixed(2)} ETH`
                 : '—'}
             </p>
-            <p className="text-sm text-zinc-400">Revenue Generated</p>
+            <p className="text-sm text-muted-foreground">Revenue Generated</p>
           </div>
         </div>
 
         {/* Social Links */}
         {(agent as any).socialLinks &&
           Object.entries((agent as any).socialLinks).some(([_, v]) => v) && (
-            <div className="mt-6 border-t border-zinc-800 pt-6">
-              <h3 className="mb-2 text-sm font-medium text-zinc-400">Social</h3>
+            <div className="mt-6 border-t border-border pt-6">
+              <h3 className="mb-2 text-sm font-medium text-muted-foreground">Social</h3>
               <div className="flex gap-3">
                 {Object.entries((agent as any).socialLinks)
                   .filter(([_, v]) => v)

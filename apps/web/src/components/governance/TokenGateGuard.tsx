@@ -63,7 +63,7 @@ export function TokenGateGuard({ universeId, target = 'view', children }: TokenG
       </div>
 
       {/* Lock overlay */}
-      <div className="absolute inset-0 flex items-center justify-center bg-zinc-950/60 backdrop-blur-sm rounded-xl">
+      <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm rounded-xl">
         <div className="text-center max-w-sm px-6 py-8">
           <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-violet-600/20 flex items-center justify-center">
             <svg
@@ -81,13 +81,13 @@ export function TokenGateGuard({ universeId, target = 'view', children }: TokenG
             </svg>
           </div>
 
-          <h3 className="text-white font-semibold text-lg mb-2">
+          <h3 className="text-foreground font-semibold text-lg mb-2">
             {gate.label || `${targetLabels[target]} — Token Gated`}
           </h3>
 
-          <p className="text-zinc-400 text-sm mb-4">
+          <p className="text-muted-foreground text-sm mb-4">
             {!isConnected ? (
-              'Connect your wallet to access this content.'
+              'Sign in to access this content.'
             ) : (
               <>
                 You need at least{' '}
@@ -112,21 +112,21 @@ export function TokenGateGuard({ universeId, target = 'view', children }: TokenG
           </p>
 
           {isConnected && (
-            <div className="bg-zinc-800/50 rounded-lg p-3 text-sm space-y-1">
+            <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
               <div className="flex justify-between">
-                <span className="text-zinc-500">Your ownership</span>
+                <span className="text-muted-foreground">Your ownership</span>
                 <span
-                  className={`font-mono ${gate.ownershipPercentage > 0 ? 'text-white' : 'text-zinc-500'}`}
+                  className={`font-mono ${gate.ownershipPercentage > 0 ? 'text-foreground' : 'text-zinc-500'}`}
                 >
                   {gate.ownershipPercentage.toFixed(2)}%
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-zinc-500">Required</span>
+                <span className="text-muted-foreground">Required</span>
                 <span className="text-violet-400 font-mono">{gate.minPercentage}%</span>
               </div>
               {/* Progress bar */}
-              <div className="w-full bg-zinc-700 rounded-full h-1.5 mt-2">
+              <div className="w-full bg-foreground/10 rounded-full h-1.5 mt-2">
                 <div
                   className="bg-violet-500 h-1.5 rounded-full transition-all"
                   style={{

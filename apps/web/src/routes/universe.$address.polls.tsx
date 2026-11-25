@@ -60,7 +60,7 @@ function UniversePollsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -69,7 +69,7 @@ function UniversePollsPage() {
               <Vote className="w-7 h-7 text-violet-400" />
               <h1 className="text-2xl font-bold">Community Polls</h1>
             </div>
-            <p className="text-zinc-400 text-sm">
+            <p className="text-muted-foreground text-sm">
               Shape the narrative. Vote on what happens next in this universe.
             </p>
           </div>
@@ -77,7 +77,7 @@ function UniversePollsPage() {
           {isAuthenticated && isUniverseCreator && (
             <Button
               onClick={() => setShowCreateDialog(true)}
-              className="bg-violet-600 hover:bg-violet-700 text-white"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               <Plus className="w-4 h-4 mr-2" />
               Create Poll
@@ -102,9 +102,9 @@ function UniversePollsPage() {
         {/* Empty state */}
         {!isLoading && !error && pollsList.length === 0 && (
           <div className="text-center py-20 space-y-3">
-            <BarChart3 className="w-12 h-12 text-zinc-600 mx-auto" />
-            <h2 className="text-lg font-medium text-zinc-400">No polls yet</h2>
-            <p className="text-sm text-zinc-500 max-w-md mx-auto">
+            <BarChart3 className="w-12 h-12 text-muted-foreground/70 mx-auto" />
+            <h2 className="text-lg font-medium text-muted-foreground">No polls yet</h2>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
               {isUniverseCreator
                 ? 'Create the first poll to let your community shape the story.'
                 : "The universe creator hasn't created any polls yet. Check back later!"}
@@ -116,7 +116,7 @@ function UniversePollsPage() {
         {activePolls.length > 0 && (
           <section className="space-y-4">
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-white">Active</h2>
+              <h2 className="text-lg font-semibold text-foreground">Active</h2>
               <Badge className="bg-green-500/20 text-green-400 border-0 text-xs">
                 {activePolls.length}
               </Badge>
@@ -144,8 +144,8 @@ function UniversePollsPage() {
         {endedPolls.length > 0 && (
           <section className="space-y-4">
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-zinc-400">Ended</h2>
-              <Badge className="bg-zinc-700/50 text-zinc-500 border-0 text-xs">
+              <h2 className="text-lg font-semibold text-muted-foreground">Ended</h2>
+              <Badge className="bg-foreground/50 text-muted-foreground border-0 text-xs">
                 {endedPolls.length}
               </Badge>
             </div>

@@ -313,8 +313,10 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
       <div className="relative w-full h-screen bg-black flex items-center justify-center">
         <div className="text-center max-w-sm px-6">
           <AlertTriangle className="w-10 h-10 text-amber-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-white mb-1">Couldn&apos;t load this story</h3>
-          <p className="text-sm text-zinc-400 mb-5">
+          <h3 className="text-lg font-semibold text-foreground mb-1">
+            Couldn&apos;t load this story
+          </h3>
+          <p className="text-sm text-muted-foreground mb-5">
             {graphErrorReason === 'pagination-unsupported'
               ? "This universe's story graph is too large for its deployed contract to serve, and it doesn't support the newer paginated reader either."
               : 'The on-chain data provider returned an error — this is usually transient.'}
@@ -323,7 +325,7 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
             {graphErrorReason !== 'pagination-unsupported' && (
               <button
                 onClick={() => refetchFullGraph()}
-                className="px-5 py-2.5 bg-violet-600 hover:bg-violet-700 rounded-xl text-white font-medium transition-colors"
+                className="px-5 py-2.5 bg-primary hover:bg-primary/90 rounded-xl text-primary-foreground font-medium transition-colors"
               >
                 Retry
               </button>
@@ -331,7 +333,7 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
             <Link
               to="/universe/$id/watch"
               params={{ id: universeId }}
-              className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-white font-medium transition-colors"
+              className="px-5 py-2.5 bg-muted hover:bg-foreground/10 rounded-xl text-foreground font-medium transition-colors"
             >
               Back to universe
             </Link>
@@ -386,7 +388,7 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
       {isBuffering && !hasError && (
         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
           <div className="bg-black/40 rounded-full p-4 backdrop-blur-sm">
-            <Loader2 className="w-10 h-10 text-white animate-spin" />
+            <Loader2 className="w-10 h-10 text-foreground animate-spin" />
           </div>
         </div>
       )}
@@ -396,13 +398,13 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
         <div className="absolute inset-0 z-20 bg-black/80 flex items-center justify-center">
           <div className="text-center max-w-sm px-6">
             <AlertTriangle className="w-10 h-10 text-amber-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-white mb-1">Playback failed</h3>
-            <p className="text-sm text-zinc-400 mb-5">
+            <h3 className="text-lg font-semibold text-foreground mb-1">Playback failed</h3>
+            <p className="text-sm text-muted-foreground mb-5">
               Couldn't reach any IPFS gateway for this clip.
             </p>
             <button
               onClick={retryPlayback}
-              className="px-5 py-2.5 bg-violet-600 hover:bg-violet-700 rounded-xl text-white font-medium transition-colors"
+              className="px-5 py-2.5 bg-primary hover:bg-primary/90 rounded-xl text-primary-foreground font-medium transition-colors"
             >
               Retry
             </button>
@@ -429,14 +431,14 @@ export function BranchingPlayer({ universeId }: { universeId: string }) {
       {isLeaf && !isPlaying && progress > 90 && (
         <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-20">
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-white mb-4">End of this path</h2>
-            <p className="text-zinc-400 mb-6">You've reached a leaf node in the story</p>
+            <h2 className="text-2xl font-bold text-foreground mb-4">End of this path</h2>
+            <p className="text-muted-foreground mb-6">You've reached a leaf node in the story</p>
             <button
               onClick={() => {
                 setCurrentNodeId(1);
                 setProgress(0);
               }}
-              className="px-6 py-3 bg-violet-600 hover:bg-violet-700 rounded-xl text-white font-medium transition-colors"
+              className="px-6 py-3 bg-primary hover:bg-primary/90 rounded-xl text-primary-foreground font-medium transition-colors"
             >
               Restart from beginning
             </button>

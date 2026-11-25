@@ -10,10 +10,10 @@ export function TreasuryBalanceCard({ universeId }: { universeId: string }) {
     return (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((i) => (
-          <Card key={i} className="bg-zinc-900 border-zinc-800 animate-pulse">
+          <Card key={i} className="bg-card border-border animate-pulse">
             <CardContent className="p-4">
-              <div className="h-4 bg-zinc-800 rounded w-1/2 mb-3" />
-              <div className="h-8 bg-zinc-800 rounded w-3/4" />
+              <div className="h-4 bg-muted rounded w-1/2 mb-3" />
+              <div className="h-8 bg-muted rounded w-3/4" />
             </CardContent>
           </Card>
         ))}
@@ -74,10 +74,10 @@ export function TreasuryBalanceCard({ universeId }: { universeId: string }) {
             <CardContent className="p-4">
               <div className="flex items-center gap-2 mb-2">
                 <m.icon className={`h-4 w-4 ${m.iconColor}`} />
-                <span className="text-xs font-medium text-zinc-400">{m.label}</span>
+                <span className="text-xs font-medium text-muted-foreground">{m.label}</span>
               </div>
               <div className={`text-2xl font-bold ${m.valueColor}`}>{m.value}</div>
-              <div className="text-xs text-zinc-500 mt-1">credits</div>
+              <div className="text-xs text-muted-foreground mt-1">credits</div>
             </CardContent>
           </Card>
         ))}
@@ -89,7 +89,7 @@ export function TreasuryBalanceCard({ universeId }: { universeId: string }) {
           <CardContent className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-amber-400" />
-              <span className="text-sm font-medium text-zinc-300">Your Monthly Budget</span>
+              <span className="text-sm font-medium text-foreground/80">Your Monthly Budget</span>
             </div>
             <div className="text-right">
               <span className="text-lg font-bold text-amber-300">
@@ -98,7 +98,7 @@ export function TreasuryBalanceCard({ universeId }: { universeId: string }) {
                   : 'Unlimited'}
               </span>
               {myAllowance.monthlyAllowance > 0 && (
-                <div className="text-xs text-zinc-500">
+                <div className="text-xs text-muted-foreground">
                   {myAllowance.creditsUsedThisMonth.toLocaleString()} /{' '}
                   {myAllowance.monthlyAllowance.toLocaleString()} used this month
                 </div>

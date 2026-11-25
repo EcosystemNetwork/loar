@@ -47,45 +47,45 @@ export function DepositRevenueCard({ universeId, creditSharePct = 70 }: DepositR
   };
 
   return (
-    <Card className="bg-zinc-900/50 border-zinc-800">
+    <Card className="bg-card/50 border-border">
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm flex items-center gap-2 text-zinc-300">
+        <CardTitle className="text-sm flex items-center gap-2 text-foreground/80">
           <Banknote className="h-4 w-4 text-amber-400" />
           Deposit On-Chain Revenue
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-xs text-zinc-500 mb-4">
+        <p className="text-xs text-muted-foreground mb-4">
           Bridge on-chain ETH revenue into universe credits. The split is {creditSharePct}% credits
           / {100 - creditSharePct}% staker rewards.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-zinc-400">ETH Amount</Label>
+            <Label className="text-muted-foreground">ETH Amount</Label>
             <Input
               type="text"
               value={amountEth}
               onChange={(e) => setAmountEth(e.target.value)}
               placeholder="0.1"
-              className="bg-zinc-900 border-zinc-700 text-white"
+              className="bg-card border-border text-foreground"
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label className="text-zinc-400">Transaction Hash</Label>
+            <Label className="text-muted-foreground">Transaction Hash</Label>
             <Input
               value={txHash}
               onChange={(e) => setTxHash(e.target.value)}
               placeholder="0x..."
-              className="bg-zinc-900 border-zinc-700 text-white"
+              className="bg-card border-border text-foreground"
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label className="text-zinc-400">Revenue Source</Label>
+            <Label className="text-muted-foreground">Revenue Source</Label>
             <div className="flex flex-wrap gap-2">
               {REVENUE_SOURCES.map((s) => (
                 <button
@@ -95,7 +95,7 @@ export function DepositRevenueCard({ universeId, creditSharePct = 70 }: DepositR
                   className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
                     source === s
                       ? 'bg-amber-600 text-white'
-                      : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                      : 'bg-muted text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {s.replace(/_/g, ' ')}
@@ -105,8 +105,8 @@ export function DepositRevenueCard({ universeId, creditSharePct = 70 }: DepositR
           </div>
 
           {amountEth && (
-            <div className="bg-zinc-800/50 rounded-lg p-3 flex items-center justify-between text-xs">
-              <div className="text-zinc-400">
+            <div className="bg-muted/50 rounded-lg p-3 flex items-center justify-between text-xs">
+              <div className="text-muted-foreground">
                 <div>
                   Credits: ~
                   {Math.floor(
@@ -120,7 +120,7 @@ export function DepositRevenueCard({ universeId, creditSharePct = 70 }: DepositR
                   ).toLocaleString()}
                 </div>
               </div>
-              <ArrowRight className="h-4 w-4 text-zinc-500" />
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
               <Badge variant="outline" className="border-emerald-700 text-emerald-400">
                 {amountEth} ETH
               </Badge>

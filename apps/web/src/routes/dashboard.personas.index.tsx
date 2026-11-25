@@ -25,6 +25,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ListPersonaForSaleDialog } from '@/components/likeness-marketplace/ListPersonaForSaleDialog';
+import { SignInPrompt } from '@/components/SignInPrompt';
+import { EmptyState } from '@/components/states';
 
 export const Route = createFileRoute('/dashboard/personas/')({
   component: DashboardPersonasPage,
@@ -60,12 +62,7 @@ function DashboardPersonasPage() {
   if (!isAuthenticated) {
     return (
       <div className="container mx-auto max-w-2xl py-12">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <UserCircle2 className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Connect your wallet to manage personas.</p>
-          </CardContent>
-        </Card>
+        <SignInPrompt icon={UserCircle2} title="Sign in to manage personas" />
       </div>
     );
   }
@@ -95,18 +92,16 @@ function DashboardPersonasPage() {
       )}
 
       {personas.data && personas.data.length === 0 && (
-        <Card>
-          <CardContent className="space-y-3 p-12 text-center">
-            <UserCircle2 className="mx-auto h-12 w-12 text-muted-foreground/50" />
-            <h2 className="text-lg font-semibold">No personas yet</h2>
-            <p className="text-sm text-muted-foreground">
-              Bundle a voice, likeness, 3D model, and personality into a single sellable identity.
-            </p>
+        <EmptyState
+          icon={UserCircle2}
+          title="No personas yet"
+          description="Bundle a voice, likeness, 3D model and personality into one sellable identity."
+          actions={
             <Button asChild>
               <Link to="/create/persona">Create your first persona</Link>
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       )}
 
       {personas.data && personas.data.length > 0 && (

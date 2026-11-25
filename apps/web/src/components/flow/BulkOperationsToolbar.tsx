@@ -90,12 +90,12 @@ function BulkOperationsToolbarImpl({
 
   if (showDeleteConfirm) {
     return (
-      <div className="bg-zinc-900/95 backdrop-blur-md border border-red-900/50 rounded-xl shadow-2xl px-5 py-4 flex flex-col items-center gap-3 animate-in fade-in duration-150">
-        <p className="text-sm text-zinc-300">
-          Delete <span className="font-bold text-white">{selectedNodeIds.size}</span> node
+      <div className="bg-card/95 backdrop-blur-md border border-red-900/50 rounded-xl shadow-2xl px-5 py-4 flex flex-col items-center gap-3 animate-in fade-in duration-150">
+        <p className="text-sm text-foreground/80">
+          Delete <span className="font-bold text-foreground">{selectedNodeIds.size}</span> node
           {selectedNodeIds.size > 1 ? 's' : ''}?
         </p>
-        <p className="text-xs text-zinc-500 max-w-xs text-center">
+        <p className="text-xs text-muted-foreground max-w-xs text-center">
           Blockchain nodes will be hidden from your timeline. Local-only nodes will be permanently
           removed.
         </p>
@@ -121,19 +121,19 @@ function BulkOperationsToolbarImpl({
   }
 
   return (
-    <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-xl shadow-2xl px-4 py-2.5 flex items-center gap-3 animate-in slide-in-from-top-2 duration-200">
+    <div className="bg-card/95 backdrop-blur-md border border-border rounded-xl shadow-2xl px-4 py-2.5 flex items-center gap-3 animate-in slide-in-from-top-2 duration-200">
       {/* Selection count */}
-      <div className="flex items-center gap-2 text-sm text-zinc-300 border-r border-zinc-700 pr-3">
+      <div className="flex items-center gap-2 text-sm text-foreground/80 border-r border-border pr-3">
         <CheckSquare className="h-4 w-4 text-blue-400" />
         <span className="font-medium">{selectedNodeIds.size} selected</span>
       </div>
 
       {/* Selection helpers */}
-      <div className="flex items-center gap-1 border-r border-zinc-700 pr-3">
+      <div className="flex items-center gap-1 border-r border-border pr-3">
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 px-2 text-xs gap-1 text-zinc-400 hover:text-zinc-200"
+          className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
           onClick={onSelectAll}
           title="Select all nodes (Ctrl+A)"
         >
@@ -143,7 +143,7 @@ function BulkOperationsToolbarImpl({
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 px-2 text-xs gap-1 text-zinc-400 hover:text-zinc-200"
+          className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
           onClick={onInvertSelection}
           title="Invert selection"
         >
@@ -218,8 +218,10 @@ function BulkOperationsToolbarImpl({
             Arc
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="bg-zinc-900 border-zinc-700 min-w-[180px]">
-          <DropdownMenuLabel className="text-xs text-zinc-500">Assign to Arc</DropdownMenuLabel>
+        <DropdownMenuContent align="start" className="bg-card border-border min-w-[180px]">
+          <DropdownMenuLabel className="text-xs text-muted-foreground">
+            Assign to Arc
+          </DropdownMenuLabel>
           {arcs.map((arc) => (
             <DropdownMenuItem key={arc.id} onClick={() => onAssignToArc(arc.id)}>
               <div
@@ -248,7 +250,7 @@ function BulkOperationsToolbarImpl({
                 value={newArcName}
                 onChange={(e) => setNewArcName(e.target.value)}
                 placeholder="New arc name..."
-                className="h-7 text-xs bg-zinc-800 border-zinc-600"
+                className="h-7 text-xs bg-muted border-muted-foreground/30"
               />
               <Button
                 type="submit"
@@ -265,7 +267,7 @@ function BulkOperationsToolbarImpl({
       </DropdownMenu>
 
       {/* Audio tools */}
-      <div className="border-l border-zinc-700 pl-3 flex items-center gap-1">
+      <div className="border-l border-border pl-3 flex items-center gap-1">
         <Button
           variant="ghost"
           size="sm"
@@ -338,11 +340,11 @@ function BulkOperationsToolbarImpl({
       </Button>
 
       {/* Clear */}
-      <div className="border-l border-zinc-700 pl-3">
+      <div className="border-l border-border pl-3">
         <Button
           variant="ghost"
           size="sm"
-          className="text-zinc-500 hover:text-zinc-300 text-xs px-2"
+          className="text-muted-foreground hover:text-foreground/80 text-xs px-2"
           onClick={onClearSelection}
         >
           Clear

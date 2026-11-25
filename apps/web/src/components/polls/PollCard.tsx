@@ -43,7 +43,7 @@ const TYPE_STYLES: Record<string, { bg: string; text: string; label: string }> =
   story_direction: { bg: 'bg-violet-500/20', text: 'text-violet-400', label: 'Story Direction' },
   character_fate: { bg: 'bg-red-500/20', text: 'text-red-400', label: 'Character Fate' },
   world_event: { bg: 'bg-amber-500/20', text: 'text-amber-400', label: 'World Event' },
-  general: { bg: 'bg-zinc-500/20', text: 'text-zinc-400', label: 'General' },
+  general: { bg: 'bg-muted-foreground/20', text: 'text-muted-foreground', label: 'General' },
   canon_submission: { bg: 'bg-green-500/20', text: 'text-green-400', label: 'Canon Submission' },
 };
 
@@ -123,13 +123,13 @@ export function PollCard({ poll, universeAddress, onVote }: PollCardProps) {
   }
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4">
+    <div className="bg-card border border-border rounded-xl p-6 space-y-4">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1 min-w-0">
-          <h3 className="text-lg font-semibold text-white truncate">{poll.title}</h3>
+          <h3 className="text-lg font-semibold text-foreground truncate">{poll.title}</h3>
           {poll.description && (
-            <p className="text-sm text-zinc-400 line-clamp-2">{poll.description}</p>
+            <p className="text-sm text-muted-foreground line-clamp-2">{poll.description}</p>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -137,7 +137,7 @@ export function PollCard({ poll, universeAddress, onVote }: PollCardProps) {
             {typeStyle.label}
           </Badge>
           {isEnded && (
-            <Badge className="bg-zinc-700/50 text-zinc-400 border-0 text-xs">Ended</Badge>
+            <Badge className="bg-foreground/50 text-muted-foreground border-0 text-xs">Ended</Badge>
           )}
         </div>
       </div>
@@ -160,7 +160,7 @@ export function PollCard({ poll, universeAddress, onVote }: PollCardProps) {
               className={`
                 w-full relative rounded-lg border p-3 text-left transition-all
                 ${canVote ? 'cursor-pointer hover:border-violet-500/50' : 'cursor-default'}
-                ${isSelected ? 'border-violet-500 bg-violet-500/10' : 'border-zinc-700 bg-zinc-800/50'}
+                ${isSelected ? 'border-violet-500 bg-violet-500/10' : 'border-border bg-muted/50'}
                 ${isWinner ? 'border-amber-500/50 bg-amber-500/5' : ''}
                 ${isUserVote ? 'border-violet-500/30' : ''}
               `}
@@ -178,11 +178,11 @@ export function PollCard({ poll, universeAddress, onVote }: PollCardProps) {
                 <div className="flex items-center gap-2 min-w-0">
                   {isUserVote && <Check className="w-4 h-4 text-violet-400 shrink-0" />}
                   {isWinner && <Trophy className="w-4 h-4 text-amber-400 shrink-0" />}
-                  <span className="text-sm text-white truncate">{option.text}</span>
+                  <span className="text-sm text-foreground truncate">{option.text}</span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-xs text-zinc-400">{option.voteCount} votes</span>
-                  <span className="text-sm font-medium text-zinc-300 w-10 text-right">
+                  <span className="text-xs text-muted-foreground">{option.voteCount} votes</span>
+                  <span className="text-sm font-medium text-foreground/80 w-10 text-right">
                     {percentage}%
                   </span>
                 </div>
@@ -194,7 +194,7 @@ export function PollCard({ poll, universeAddress, onVote }: PollCardProps) {
 
       {/* Footer */}
       <div className="flex items-center justify-between pt-2">
-        <div className="flex items-center gap-4 text-xs text-zinc-500">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <Users className="w-3.5 h-3.5" />
             {poll.totalVotes} vote{poll.totalVotes !== 1 ? 's' : ''}
@@ -210,7 +210,7 @@ export function PollCard({ poll, universeAddress, onVote }: PollCardProps) {
             size="sm"
             onClick={handleVote}
             disabled={voteMutation.isPending}
-            className="bg-violet-600 hover:bg-violet-700 text-white text-xs"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs"
           >
             {voteMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
             Vote

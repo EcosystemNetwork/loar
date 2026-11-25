@@ -10,6 +10,7 @@ import { useWalletAuth, requestEmailOTP } from '@/lib/wallet-auth';
 import { CHAIN_NAMES, SUPPORTED_CHAIN_IDS } from '@/configs/chains';
 import { useState, useEffect, useRef } from 'react';
 import { z } from 'zod';
+import { BRAND } from '@/lib/brand';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID as string | undefined;
 
@@ -175,15 +176,13 @@ function LoginPage() {
         {/* Brand */}
         <div className="text-center space-y-3">
           <img src="/loarIconTextLogo.png" alt="LOAR" className="h-10 w-auto mx-auto" />
-          <p className="text-sm text-muted-foreground font-light">
-            AI cinematic universes, on-chain
-          </p>
+          <p className="text-sm text-muted-foreground font-light">{BRAND.tagline}</p>
         </div>
 
         {/* Sign In Form */}
         <div className="space-y-6">
           <div className="text-center space-y-1.5">
-            <h1 className="text-2xl font-display italic">Sign in</h1>
+            <h1 className="text-2xl font-display font-semibold">Sign in</h1>
             <p className="text-sm text-muted-foreground">
               {step === 'email' ? 'Enter your email to get started' : `We sent a code to ${email}`}
             </p>

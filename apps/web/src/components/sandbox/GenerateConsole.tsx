@@ -2160,28 +2160,10 @@ export function GenerateConsole({
         Detailed entity form
       </Link>
       <Link to="/cinematicUniverseCreate" className="text-muted-foreground hover:text-foreground">
-        New universe (on-chain)
+        New universe
       </Link>
-      <Link to="/create/likeness" className="text-muted-foreground hover:text-foreground">
-        Your Likeness
-      </Link>
-      <Link to="/create/persona" className="text-muted-foreground hover:text-foreground">
-        Persona package
-      </Link>
-      <Link to="/lab/voice-studio" className="text-muted-foreground hover:text-foreground">
-        Voice Studio
-      </Link>
-      <Link to="/lab/zai" className="text-muted-foreground hover:text-foreground">
-        Model Lab
-      </Link>
-      <Link to="/notebook" className="text-muted-foreground hover:text-foreground">
-        Notebook
-      </Link>
-      <Link to="/canvas" className="text-muted-foreground hover:text-foreground">
-        Canvas
-      </Link>
-      <Link to="/upload" search={{}} className="text-muted-foreground hover:text-foreground">
-        Upload media
+      <Link to="/studio" className="font-medium text-primary hover:text-primary/80">
+        All tools in Studio →
       </Link>
     </>
   );
@@ -2339,8 +2321,8 @@ export function GenerateConsole({
                   Images, video, voice, music, 3D — and whole worlds
                 </h2>
                 <p className="text-sm text-muted-foreground sm:text-base">
-                  Connect your wallet to start generating. Everything you make is saved to your
-                  account and can publish straight into a universe's wiki.
+                  Sign in to start generating. Everything you make is saved to your account and can
+                  publish straight into a universe's wiki.
                 </p>
               </div>
               <div className="flex flex-wrap justify-center gap-2">

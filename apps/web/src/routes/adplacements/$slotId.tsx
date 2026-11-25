@@ -37,6 +37,7 @@ import { useAdPlacementWrite } from '@/hooks/useAdPlacement';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import { formatEther, parseEther } from 'viem';
+import { requireSignIn } from '@/components/SignInPrompt';
 
 export const Route = createFileRoute('/adplacements/$slotId')({
   component: SlotDetailPage,
@@ -119,7 +120,7 @@ function SlotDetailPage() {
 
   async function handleBid() {
     if (!isConnected) {
-      toast.error('Connect your wallet');
+      requireSignIn();
       return;
     }
     if (!brandName.trim()) {
@@ -171,7 +172,7 @@ function SlotDetailPage() {
 
   async function handleAccept() {
     if (!isConnected) {
-      toast.error('Connect your wallet');
+      requireSignIn();
       return;
     }
     try {

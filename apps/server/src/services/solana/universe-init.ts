@@ -30,6 +30,8 @@ export interface InitializeUniverseRequest {
   description: string;
   /** 'fun' = sandbox (private until publicly launched); 'monetized' = launchpad. */
   universeType?: 'fun' | 'monetized';
+  /** App-level (Firestore) launch visibility; omitted → type default. */
+  isPrivate?: boolean;
 }
 
 export interface InitializeUniverseResult {
@@ -91,6 +93,7 @@ export async function initializeSolanaUniverse(
     chainNamespace: 'solana',
     solanaCluster: cluster,
     universeType: req.universeType ?? 'fun',
+    isPrivate: req.isPrivate,
   });
 
   return {

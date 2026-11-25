@@ -133,7 +133,7 @@ function ZaiDiagnosticPage() {
 
               <details className="text-xs">
                 <summary className="cursor-pointer text-muted-foreground">Raw JSON</summary>
-                <pre className="mt-2 p-3 rounded bg-zinc-950/60 border border-white/10 overflow-x-auto">
+                <pre className="mt-2 p-3 rounded bg-background/60 border border-white/10 overflow-x-auto">
                   {JSON.stringify(result, null, 2)}
                 </pre>
               </details>
@@ -149,7 +149,7 @@ function Stat({ label, value, good }: { label: string; value: string; good?: boo
   return (
     <div className="rounded border border-white/10 p-2">
       <div className="uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className={good ? 'text-emerald-300' : 'text-zinc-300'}>{value}</div>
+      <div className={good ? 'text-emerald-300' : 'text-foreground/80'}>{value}</div>
     </div>
   );
 }
@@ -162,7 +162,7 @@ function StepRow({ step }: { step: DiagnosticStep }) {
       ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-200'
       : step.status === 'fail'
         ? 'border-rose-500/30 bg-rose-500/5 text-rose-200'
-        : 'border-zinc-700/50 bg-zinc-900/40 text-zinc-300';
+        : 'border-border/50 bg-card/40 text-foreground/80';
   return (
     <div className={`rounded-lg border p-3 ${tone}`}>
       <div className="flex items-center justify-between gap-2">

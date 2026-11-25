@@ -164,7 +164,7 @@ export function ApiKeyManager({ aiAgentId }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+        <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
           <Key className="h-5 w-5 text-amber-400" />
           API Keys
         </h3>
@@ -201,7 +201,7 @@ export function ApiKeyManager({ aiAgentId }: Props) {
               value={newKey}
               onFocusCapture={(e) => e.currentTarget.select()}
               onClick={(e) => e.currentTarget.select()}
-              className="flex-1 rounded bg-zinc-800 px-3 py-2 font-mono text-sm text-white select-all outline-none ring-1 ring-amber-500/30 focus:ring-amber-500/60"
+              className="flex-1 rounded bg-muted px-3 py-2 font-mono text-sm text-foreground select-all outline-none ring-1 ring-amber-500/30 focus:ring-amber-500/60"
               aria-label="Your new API key"
             />
             <Button size="sm" variant="outline" onClick={() => copyKey(newKey)}>
@@ -220,10 +220,10 @@ export function ApiKeyManager({ aiAgentId }: Props) {
                 Copy config
               </Button>
             </div>
-            <p className="mb-2 text-xs text-zinc-400">
+            <p className="mb-2 text-xs text-muted-foreground">
               Paste into your Hermes agent's MCP config (or any MCP client) to give it LOAR tools.
             </p>
-            <pre className="overflow-x-auto rounded bg-zinc-900 px-3 py-2 font-mono text-[11px] leading-relaxed text-zinc-300">
+            <pre className="overflow-x-auto rounded bg-card px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground/80">
               {hermesMcpConfig(newKey)}
             </pre>
           </div>
@@ -231,7 +231,7 @@ export function ApiKeyManager({ aiAgentId }: Props) {
           <Button
             size="sm"
             variant="ghost"
-            className="mt-2 text-zinc-400"
+            className="mt-2 text-muted-foreground"
             onClick={() => setNewKey(null)}
           >
             Dismiss
@@ -250,7 +250,7 @@ export function ApiKeyManager({ aiAgentId }: Props) {
 
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs text-zinc-400">Permissions</p>
+              <p className="text-xs text-muted-foreground">Permissions</p>
               <button
                 type="button"
                 onClick={toggleSelectAll}
@@ -276,7 +276,9 @@ export function ApiKeyManager({ aiAgentId }: Props) {
 
           <div className="flex gap-4">
             <div className="flex-1">
-              <label className="mb-1 block text-xs text-zinc-400">Rate limit (req/min)</label>
+              <label className="mb-1 block text-xs text-muted-foreground">
+                Rate limit (req/min)
+              </label>
               <Input
                 type="number"
                 value={form.rateLimitPerMinute}
@@ -286,7 +288,7 @@ export function ApiKeyManager({ aiAgentId }: Props) {
               />
             </div>
             <div className="flex-1">
-              <label className="mb-1 block text-xs text-zinc-400">
+              <label className="mb-1 block text-xs text-muted-foreground">
                 Expires in (days, optional)
               </label>
               <Input
@@ -316,9 +318,9 @@ export function ApiKeyManager({ aiAgentId }: Props) {
 
       {/* Key list */}
       {isLoading ? (
-        <div className="py-4 text-center text-zinc-500">Loading...</div>
+        <div className="py-4 text-center text-muted-foreground">Loading...</div>
       ) : !(filteredKeys as any[])?.length ? (
-        <Card className="p-4 text-center text-zinc-500">
+        <Card className="p-4 text-center text-muted-foreground">
           <Key className="mx-auto mb-2 h-6 w-6 opacity-50" />
           <p className="text-sm">No API keys yet</p>
         </Card>
@@ -327,11 +329,11 @@ export function ApiKeyManager({ aiAgentId }: Props) {
           {(filteredKeys as any[]).map((key: any) => (
             <Card key={key.id} className="flex items-center gap-3 p-3">
               <Shield
-                className={`h-4 w-4 ${key.status === 'active' ? 'text-green-400' : 'text-zinc-500'}`}
+                className={`h-4 w-4 ${key.status === 'active' ? 'text-green-400' : 'text-muted-foreground'}`}
               />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white">{key.name}</p>
-                <div className="flex items-center gap-2 text-xs text-zinc-400">
+                <p className="text-sm font-medium text-foreground">{key.name}</p>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <code>{key.keyPrefix}...</code>
                   <span>·</span>
                   <span>{key.totalRequests || 0} requests</span>
@@ -367,7 +369,7 @@ export function ApiKeyManager({ aiAgentId }: Props) {
                   disabled={deleteRevoked.isPending}
                   title="Delete permanently"
                   aria-label="Delete revoked key"
-                  className="text-zinc-400 hover:text-red-300"
+                  className="text-muted-foreground hover:text-red-300"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

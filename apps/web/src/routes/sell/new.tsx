@@ -32,6 +32,7 @@ import { useCreateListing } from '@/hooks/useListings';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import { useVocab } from '@/hooks/use-vocab';
+import { requireSignIn, SignInPrompt } from '@/components/SignInPrompt';
 
 export const Route = createFileRoute('/sell/new')({
   beforeLoad: ({ context }) => {
@@ -210,7 +211,7 @@ function CreateListingPage() {
 
   async function handlePublish(immediately: boolean) {
     if (!isConnected) {
-      toast.error('Connect your wallet first');
+      requireSignIn('to create a listing');
       return;
     }
     try {
@@ -247,11 +248,7 @@ function CreateListingPage() {
   if (!isConnected) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center text-muted-foreground">
-          <ShoppingBag className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">Connect your wallet</p>
-          <p className="text-sm mt-1">to create a new listing</p>
-        </div>
+        <SignInPrompt icon={ShoppingBag} title="Sign in to create a new listing" />
       </div>
     );
   }

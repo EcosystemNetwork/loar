@@ -35,6 +35,8 @@ import {
   Link,
   X,
   Crop,
+  Lock,
+  Globe,
 } from 'lucide-react';
 import { ImageCropper } from '@/components/ImageCropper';
 import { Textarea } from '@/components/ui/textarea';
@@ -126,6 +128,10 @@ function CinematicUniverseCreate() {
 
   // Universe mode: 'fun' = free creative playground, 'monetize' = token + LP
   const [universeMode, setUniverseMode] = useState<'fun' | 'monetize' | null>(null);
+  // Launch visibility. null = follow the mode's default (fun → private,
+  // monetize → public) until the creator picks explicitly.
+  const [launchPrivate, setLaunchPrivate] = useState<boolean | null>(null);
+  const isLaunchPrivate = launchPrivate ?? universeMode === 'fun';
 
   // Starting price — slider controls the tick, which sets initial token price
   // tick range: -300000 (very cheap, ~0.01 ETH MC) to -200000 (expensive, ~200 ETH MC)
@@ -622,6 +628,7 @@ function CinematicUniverseCreate() {
               message,
               nonce,
               universeType: universeMode === 'monetize' ? 'monetized' : 'fun',
+              isPrivate: isLaunchPrivate,
             });
 
             // Registration succeeded
@@ -696,6 +703,7 @@ function CinematicUniverseCreate() {
           description,
           portraitImageUrl: portraitImageUrl || undefined,
           universeType: universeMode === 'monetize' ? 'monetized' : 'fun',
+          isPrivate: isLaunchPrivate,
         });
         setSolanaUniversePda(res.universePda);
         setDeployedKind('solana');
@@ -886,9 +894,9 @@ function CinematicUniverseCreate() {
         <Card className="w-full max-w-md">
           <CardContent className="text-center space-y-4 p-8">
             <Sparkles className="h-16 w-16 mx-auto mb-4 text-primary" />
-            <h2 className="text-2xl font-bold">Connect Your Wallet</h2>
+            <h2 className="text-2xl font-bold">Sign in to create a universe</h2>
             <p className="text-muted-foreground">
-              Please connect an Ethereum wallet to create a universe.
+              Your account comes with a wallet, so your universe is yours on-chain from day one.
             </p>
             <WalletConnectButton size="lg" />
           </CardContent>
@@ -1193,6 +1201,68 @@ function CinematicUniverseCreate() {
                     </button>
                   </div>
                 </div>
+
+                {/* Launch visibility — shown once a mode is picked */}
+                {universeMode && (
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold block">Launch visibility</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {(
+                        [
+                          {
+                            value: false,
+                            Icon: Globe,
+                            iconClass: 'text-emerald-400',
+                            title: 'Public',
+                            blurb: 'Discoverable by anyone as soon as it launches.',
+                          },
+                          {
+                            value: true,
+                            Icon: Lock,
+                            iconClass: 'text-amber-400',
+                            title: 'Private',
+                            blurb:
+                              'Only you and your team can see it. Launch publicly whenever you are ready.',
+                          },
+                        ] as const
+                      ).map(({ value, Icon, iconClass, title, blurb }) => {
+                        const selected = isLaunchPrivate === value;
+                        return (
+                          <button
+                            key={title}
+                            type="button"
+                            onClick={() => setLaunchPrivate(value)}
+                            disabled={deploymentStep !== DeploymentStep.IDLE}
+                            aria-pressed={selected}
+                            className={`relative p-4 rounded-lg border-2 text-left transition-all ${
+                              selected
+                                ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                                : 'border-muted hover:border-muted-foreground/30'
+                            } disabled:opacity-50`}
+                          >
+                            {selected && (
+                              <CheckCircle2 className="absolute top-2 right-2 h-4 w-4 text-primary" />
+                            )}
+                            <Icon className={`h-5 w-5 mb-2 ${iconClass}`} />
+                            <p className="text-sm font-bold">{title}</p>
+                            <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
+                              {blurb}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {universeMode === 'monetize' && isLaunchPrivate && (
+                      <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 border text-xs text-muted-foreground">
+                        <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                        <span>
+                          The universe stays hidden in the app, but its token is still deployed
+                          on-chain. Once you launch it publicly it can&apos;t be made private again.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <Label htmlFor="universeName" className="text-sm font-semibold mb-2 block">

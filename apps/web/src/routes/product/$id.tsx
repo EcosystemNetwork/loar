@@ -35,6 +35,7 @@ import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
 import { useResolvedIpfsUrl } from '@/hooks/useResolvedIpfsUrl';
 import { SmartImage } from '@/components/SmartImage';
 import { ListingPrice, usePriceText } from '@/components/Price';
+import { requireSignIn } from '@/components/SignInPrompt';
 
 const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS as Address | undefined;
 
@@ -109,7 +110,7 @@ function ProductDetailPage() {
 
   function handleLike() {
     if (!isConnected) {
-      toast.error('Connect your wallet to like items');
+      requireSignIn('to like items');
       return;
     }
     if (isLiked) {
@@ -161,7 +162,7 @@ function ProductDetailPage() {
 
   async function handleBuy() {
     if (!isConnected) {
-      toast.error('Connect your wallet to purchase');
+      requireSignIn('to purchase');
       return;
     }
     setBuying(true);

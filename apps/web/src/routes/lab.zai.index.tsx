@@ -375,7 +375,7 @@ function SeedFromUrlCard() {
           {mut.isPending ? 'Reading…' : 'Seed universe'}
         </Button>
         {mut.data && (
-          <pre className="text-xs bg-zinc-950/60 p-3 rounded border border-white/10 overflow-x-auto">
+          <pre className="text-xs bg-background/60 p-3 rounded border border-white/10 overflow-x-auto">
             {JSON.stringify(mut.data.universe, null, 2)}
           </pre>
         )}
@@ -714,7 +714,7 @@ function GovernanceCard() {
                     ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                     : mut.data.recommendation === 'against'
                       ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
-                      : 'bg-zinc-500/20 text-zinc-300 border-zinc-500/30'
+                      : 'bg-muted-foreground/20 text-foreground/80 border-muted-foreground/30'
                 }
               >
                 {mut.data.recommendation.toUpperCase()}

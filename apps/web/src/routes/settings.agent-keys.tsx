@@ -49,7 +49,7 @@ function AgentKeysPage() {
       </div>
 
       {/* Disambiguation callout: this is NOT the BYOK page. */}
-      <Card className="bg-zinc-950/40 border-white/5">
+      <Card className="bg-background/40 border-white/5">
         <CardContent className="pt-6 text-sm text-muted-foreground">
           <p className="flex items-start gap-2">
             <KeyRound className="h-4 w-4 text-violet-400 mt-0.5 flex-shrink-0" />

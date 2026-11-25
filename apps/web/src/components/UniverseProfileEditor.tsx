@@ -52,6 +52,9 @@ export function UniverseProfileEditor({ open, onOpenChange, universe }: Props) {
   const queryClient = useQueryClient();
   const universeId = universe.id;
   const isMonetized = (universe.universeType ?? 'monetized') === 'monetized';
+  // Launchpad universes may launch privately, but once public they stay public
+  // (server enforces this in universes.setPrivate).
+  const visibilityLocked = isMonetized && !universe.isPrivate;
 
   const [name, setName] = useState(universe.name ?? '');
   const [description, setDescription] = useState(universe.description ?? '');
@@ -114,7 +117,7 @@ export function UniverseProfileEditor({ open, onOpenChange, universe }: Props) {
         metadataSaved = true;
       }
 
-      if (!isMonetized && isPrivate !== Boolean(universe.isPrivate)) {
+      if (!visibilityLocked && isPrivate !== Boolean(universe.isPrivate)) {
         try {
           await trpcClient.universes.setPrivate.mutate({ universeId, isPrivate });
         } catch (err) {
@@ -264,24 +267,26 @@ export function UniverseProfileEditor({ open, onOpenChange, universe }: Props) {
                   {isPrivate ? 'Private' : 'Public'}
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  {isMonetized
-                    ? 'Launchpad universes are always public — the on-chain token is tradable.'
+                  {visibilityLocked
+                    ? 'Launchpad universes stay public once launched — the on-chain token is tradable.'
                     : isPrivate
                       ? 'Hidden from public listings. Only you can see this universe.'
-                      : 'Listed everywhere. Anyone can find and watch.'}
+                      : isMonetized
+                        ? 'Listed everywhere. For a launchpad universe this is permanent once saved.'
+                        : 'Listed everywhere. Anyone can find and watch.'}
                 </p>
               </div>
               <Button
                 type="button"
                 variant={isPrivate ? 'outline' : 'default'}
                 size="sm"
-                disabled={isMonetized}
+                disabled={visibilityLocked}
                 onClick={() => setIsPrivate((v) => !v)}
               >
                 {isPrivate ? 'Make public' : 'Make private'}
               </Button>
             </div>
-            {isMonetized && (
+            {visibilityLocked && (
               <Badge variant="outline" className="text-[10px]">
                 Launchpad — visibility locked public
               </Badge>

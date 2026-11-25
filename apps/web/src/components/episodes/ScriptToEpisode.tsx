@@ -148,17 +148,17 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
+      <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2">
             <ScrollText className="h-5 w-5 text-emerald-400" />
-            <h2 className="text-lg font-semibold text-white">Script to Episode</h2>
+            <h2 className="text-lg font-semibold text-foreground">Script to Episode</h2>
           </div>
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 w-8 p-0 text-zinc-400 hover:text-white"
+            className="h-8 w-8 p-0 text-zinc-400 hover:text-foreground"
             onClick={onClose}
           >
             <X className="h-4 w-4" />
@@ -171,22 +171,22 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
             <>
               {/* Title */}
               <div>
-                <label className="text-xs font-medium text-zinc-400 mb-1 block">
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">
                   Episode Title
                 </label>
                 <Input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="My Episode"
-                  className="bg-zinc-800 border-zinc-700 text-white"
+                  className="bg-muted border-border text-foreground"
                 />
               </div>
 
               {/* Script textarea */}
               <div>
-                <label className="text-xs font-medium text-zinc-400 mb-1 block">
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">
                   Script
-                  <span className="text-zinc-500 ml-1 font-normal">
+                  <span className="text-muted-foreground ml-1 font-normal">
                     (separate scenes with blank lines)
                   </span>
                 </label>
@@ -195,9 +195,9 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
                   onChange={(e) => setScript(e.target.value)}
                   placeholder={`A wide cinematic shot of a futuristic city at dawn. Flying vehicles weave between towering skyscrapers as the sun rises over the horizon.\n\nInside a dimly lit control room, a team of analysts monitors holographic displays. Alert lights begin flashing red as an anomaly is detected.\n\nA lone figure in a dark coat steps out onto a rain-soaked rooftop, gazing down at the city below. Lightning illuminates their face as they make a fateful decision.`}
                   rows={8}
-                  className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500/50 resize-y min-h-[120px]"
+                  className="w-full rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500/50 resize-y min-h-[120px]"
                 />
-                <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-500">
+                <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
                   <span>
                     {isMultiScene
                       ? `${parsedScenes.length} scenes detected`
@@ -210,7 +210,7 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
               <div className="grid grid-cols-2 gap-4">
                 {/* Clip duration */}
                 <div>
-                  <label className="text-xs font-medium text-zinc-400 mb-1.5 block">
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                     Clip Duration
                   </label>
                   <div className="flex gap-1.5">
@@ -221,7 +221,7 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
                         className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
                           clipDuration === d
                             ? 'bg-emerald-600 text-white'
-                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300'
+                            : 'bg-muted text-muted-foreground hover:bg-foreground/10 hover:text-foreground/80'
                         }`}
                       >
                         {d}s
@@ -233,7 +233,7 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
                 {/* Target duration (single-prompt mode only) */}
                 {!isMultiScene && (
                   <div>
-                    <label className="text-xs font-medium text-zinc-400 mb-1.5 block">
+                    <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                       Target Duration
                     </label>
                     <div className="flex items-center gap-2">
@@ -244,9 +244,9 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
                         step={clipDuration}
                         value={targetDuration}
                         onChange={(e) => setTargetDuration(Number(e.target.value) || clipDuration)}
-                        className="bg-zinc-800 border-zinc-700 text-white w-24"
+                        className="bg-muted border-border text-foreground w-24"
                       />
-                      <span className="text-xs text-zinc-500">
+                      <span className="text-xs text-muted-foreground">
                         seconds ({formatDuration(targetDuration)})
                       </span>
                     </div>
@@ -256,7 +256,7 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
 
               {/* Generation mode */}
               <div>
-                <label className="text-xs font-medium text-zinc-400 mb-1.5 block">
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   Generation Mode
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -265,13 +265,13 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
                     className={`flex items-start gap-2 px-3 py-2.5 rounded-lg text-left transition-colors border ${
                       mode === 'continuity'
                         ? 'bg-emerald-950/40 border-emerald-700/60 text-emerald-100'
-                        : 'bg-zinc-800/50 border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+                        : 'bg-muted/50 border-border text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`}
                   >
                     <Link2 className="h-4 w-4 shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-medium">Continuity</div>
-                      <div className="text-[10px] text-zinc-500 leading-snug mt-0.5">
+                      <div className="text-[10px] text-muted-foreground leading-snug mt-0.5">
                         Each scene seeds the next from its last frame. Pauses on failure — never
                         advances with a stale frame.
                       </div>
@@ -282,13 +282,13 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
                     className={`flex items-start gap-2 px-3 py-2.5 rounded-lg text-left transition-colors border ${
                       mode === 'independent'
                         ? 'bg-emerald-950/40 border-emerald-700/60 text-emerald-100'
-                        : 'bg-zinc-800/50 border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+                        : 'bg-muted/50 border-border text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`}
                   >
                     <Split className="h-4 w-4 shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-medium">Independent</div>
-                      <div className="text-[10px] text-zinc-500 leading-snug mt-0.5">
+                      <div className="text-[10px] text-muted-foreground leading-snug mt-0.5">
                         Scenes generated standalone. Failed scenes are refunded and skipped. Faster,
                         no visual chain.
                       </div>
@@ -298,7 +298,9 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
 
                 {mode === 'continuity' && (
                   <div className="mt-2 flex items-center gap-2">
-                    <label className="text-[11px] text-zinc-500">Auto-retries per scene:</label>
+                    <label className="text-[11px] text-muted-foreground">
+                      Auto-retries per scene:
+                    </label>
                     <Input
                       type="number"
                       min={1}
@@ -307,16 +309,20 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
                       onChange={(e) =>
                         setMaxRetries(Math.max(1, Math.min(50, Number(e.target.value) || 10)))
                       }
-                      className="bg-zinc-800 border-zinc-700 text-white w-16 h-7 text-xs"
+                      className="bg-muted border-border text-foreground w-16 h-7 text-xs"
                     />
-                    <span className="text-[11px] text-zinc-600">then pause for your decision</span>
+                    <span className="text-[11px] text-muted-foreground/70">
+                      then pause for your decision
+                    </span>
                   </div>
                 )}
               </div>
 
               {/* Quality */}
               <div>
-                <label className="text-xs font-medium text-zinc-400 mb-1.5 block">Quality</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                  Quality
+                </label>
                 <div className="flex gap-1.5">
                   {(['draft', 'standard', 'premium'] as const).map((q) => (
                     <button
@@ -325,7 +331,7 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
                       className={`px-3 py-1.5 rounded text-xs font-medium capitalize transition-colors ${
                         qualityTarget === q
                           ? 'bg-emerald-600 text-white'
-                          : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300'
+                          : 'bg-muted text-muted-foreground hover:bg-foreground/10 hover:text-foreground/80'
                       }`}
                     >
                       {q}
@@ -336,29 +342,30 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
 
               {/* Style preset (optional) */}
               <div>
-                <label className="text-xs font-medium text-zinc-400 mb-1 block">
-                  Style Preset <span className="text-zinc-600 font-normal">(optional)</span>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                  Style Preset{' '}
+                  <span className="text-muted-foreground/70 font-normal">(optional)</span>
                 </label>
                 <Input
                   value={stylePreset}
                   onChange={(e) => setStylePreset(e.target.value)}
                   placeholder="e.g. cinematic, anime, photorealistic"
-                  className="bg-zinc-800 border-zinc-700 text-white"
+                  className="bg-muted border-border text-foreground"
                 />
               </div>
 
               {/* Cost preview */}
-              <div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-3 flex items-center justify-between">
+              <div className="bg-muted/50 border border-border/50 rounded-lg p-3 flex items-center justify-between">
                 <div className="flex items-center gap-4 text-sm">
-                  <div className="flex items-center gap-1.5 text-zinc-300">
+                  <div className="flex items-center gap-1.5 text-foreground/80">
                     <Film className="h-4 w-4 text-emerald-400" />
                     <span className="font-medium">{sceneCount}</span>
-                    <span className="text-zinc-500">clips</span>
+                    <span className="text-muted-foreground">clips</span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-zinc-300">
+                  <div className="flex items-center gap-1.5 text-foreground/80">
                     <Clock className="h-4 w-4 text-blue-400" />
                     <span className="font-medium">{formatDuration(estimatedDuration)}</span>
-                    <span className="text-zinc-500">total</span>
+                    <span className="text-muted-foreground">total</span>
                   </div>
                 </div>
               </div>
@@ -369,7 +376,7 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
               {/* Overall progress */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-zinc-300 font-medium">
+                  <span className="text-foreground/80 font-medium">
                     {jobStatus?.status === 'completed'
                       ? 'Episode complete'
                       : jobStatus?.status === 'failed'
@@ -385,9 +392,9 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
                                 ? `Scene ${(jobStatus?.currentSceneIndex ?? 0) + 1} — retry ${currentClip.retryAttempt ?? 0}/${jobStatus?.maxRetries ?? 10}`
                                 : `Generating scene ${(jobStatus?.currentSceneIndex ?? 0) + 1} of ${totalClips}...`}
                   </span>
-                  <span className="text-zinc-500">{progressPct}%</span>
+                  <span className="text-muted-foreground">{progressPct}%</span>
                 </div>
-                <div className="w-full bg-zinc-800 rounded-full h-2">
+                <div className="w-full bg-muted rounded-full h-2">
                   <div
                     className={`h-2 rounded-full transition-all duration-500 ${
                       jobStatus?.status === 'failed' || jobStatus?.status === 'aborted'
@@ -400,7 +407,7 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
                   />
                 </div>
                 {jobStatus?.mode ? (
-                  <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                     {jobStatus.mode === 'continuity' ? (
                       <Link2 className="h-3 w-3" />
                     ) : (
@@ -500,15 +507,17 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
                             : clip.status === 'generating'
                               ? 'bg-emerald-900/20 border border-emerald-800/30'
                               : clip.status === 'completed'
-                                ? 'bg-zinc-800/50'
+                                ? 'bg-muted/50'
                                 : clip.status === 'failed'
                                   ? 'bg-red-900/10 border border-red-900/20'
-                                  : 'bg-zinc-800/30'
+                                  : 'bg-muted/30'
                       }`}
                     >
                       {/* Status icon */}
                       <div className="shrink-0">
-                        {clip.status === 'pending' && <Circle className="h-4 w-4 text-zinc-600" />}
+                        {clip.status === 'pending' && (
+                          <Circle className="h-4 w-4 text-muted-foreground/70" />
+                        )}
                         {clip.status === 'generating' && !isBackingOff && (
                           <Loader2 className="h-4 w-4 text-emerald-400 animate-spin" />
                         )}
@@ -524,11 +533,11 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
 
                       {/* Scene info */}
                       <div className="flex-1 min-w-0">
-                        <span className="text-zinc-400 mr-2 font-mono text-xs">
+                        <span className="text-muted-foreground mr-2 font-mono text-xs">
                           {String(i + 1).padStart(2, '0')}
                         </span>
                         <span
-                          className={`${clip.status === 'completed' ? 'text-zinc-300' : 'text-zinc-500'} truncate`}
+                          className={`${clip.status === 'completed' ? 'text-foreground/80' : 'text-muted-foreground'} truncate`}
                         >
                           {parsedScenes[i]?.slice(0, 60) || `Scene ${i + 1}`}
                           {(parsedScenes[i]?.length ?? 0) > 60 ? '...' : ''}
@@ -595,11 +604,11 @@ export function ScriptToEpisode({ universeId, onClose, onComplete }: ScriptToEpi
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-zinc-800">
+        <div className="flex items-center justify-between px-5 py-3 border-t border-border">
           <Button
             variant="ghost"
             size="sm"
-            className="text-zinc-400 hover:text-white"
+            className="text-zinc-400 hover:text-foreground"
             onClick={onClose}
           >
             {isJobDone ? 'Close' : 'Cancel'}

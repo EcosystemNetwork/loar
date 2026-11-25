@@ -112,7 +112,7 @@ function WikiKindPage() {
           </Button>
         </Link>
         <div className="text-center py-16">
-          <h2 className="text-xl font-semibold text-zinc-300 mb-2">Unknown Kind</h2>
+          <h2 className="text-xl font-semibold text-foreground/80 mb-2">Unknown Kind</h2>
           <p className="text-muted-foreground">
             "{kind}" is not a valid entity kind. Please choose from the wiki categories.
           </p>
@@ -139,14 +139,14 @@ function WikiKindPage() {
       {isLoading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} className="h-full bg-zinc-900 border-zinc-800">
+            <Card key={i} className="h-full bg-card border-border">
               <CardHeader className="pb-2">
-                <div className="h-5 w-3/4 bg-zinc-800 rounded animate-pulse" />
+                <div className="h-5 w-3/4 bg-muted rounded animate-pulse" />
               </CardHeader>
               <CardContent className="space-y-2">
-                <div className="h-4 w-full bg-zinc-800 rounded animate-pulse" />
-                <div className="h-4 w-5/6 bg-zinc-800 rounded animate-pulse" />
-                <div className="h-5 w-16 bg-zinc-800 rounded animate-pulse mt-3" />
+                <div className="h-4 w-full bg-muted rounded animate-pulse" />
+                <div className="h-4 w-5/6 bg-muted rounded animate-pulse" />
+                <div className="h-5 w-16 bg-muted rounded animate-pulse mt-3" />
               </CardContent>
             </Card>
           ))}
@@ -179,8 +179,8 @@ function WikiKindPage() {
               params={{ id: entity.id }}
               className="block"
             >
-              <Card className="h-full bg-zinc-900 border-zinc-800 hover:border-violet-600 hover:shadow-lg hover:shadow-violet-600/10 transition-all cursor-pointer">
-                <div className="aspect-video w-full overflow-hidden rounded-t-lg relative bg-zinc-800">
+              <Card className="h-full bg-card border-border hover:border-violet-600 hover:shadow-lg hover:shadow-violet-600/10 transition-all cursor-pointer">
+                <div className="aspect-video w-full overflow-hidden rounded-t-lg relative bg-muted">
                   <div className="absolute inset-0 flex items-center justify-center">
                     {(() => {
                       const Icon = KIND_ICONS[kind];

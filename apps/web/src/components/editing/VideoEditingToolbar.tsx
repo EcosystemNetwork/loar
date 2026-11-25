@@ -324,7 +324,7 @@ export function VideoEditingToolbar({
                           {m.tier}
                         </Badge>
                         <span className="text-[10px] text-muted-foreground">
-                          {m.creditCost} pts
+                          {m.creditCost} credits
                         </span>
                       </div>
                     </SelectItem>

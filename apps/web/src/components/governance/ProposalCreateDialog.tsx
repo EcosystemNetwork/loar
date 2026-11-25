@@ -119,12 +119,12 @@ export function ProposalCreateDialog({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-zinc-900 rounded-2xl border border-zinc-800 w-full max-w-lg p-6">
+      <div className="bg-card rounded-2xl border border-border w-full max-w-lg p-6">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-white">Create Proposal</h2>
+          <h2 className="text-xl font-bold text-foreground">Create Proposal</h2>
           <button
             onClick={onClose}
-            className="text-zinc-400 hover:text-white"
+            className="text-zinc-400 hover:text-foreground"
             aria-label="Close dialog"
           >
             &times;
@@ -136,7 +136,9 @@ export function ProposalCreateDialog({
           <button
             onClick={() => setTemplate('canonize')}
             className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              template === 'canonize' ? 'bg-violet-600 text-white' : 'bg-zinc-800 text-zinc-400'
+              template === 'canonize'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground'
             }`}
           >
             Canonize Node
@@ -144,7 +146,9 @@ export function ProposalCreateDialog({
           <button
             onClick={() => setTemplate('custom')}
             className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              template === 'custom' ? 'bg-violet-600 text-white' : 'bg-zinc-800 text-zinc-400'
+              template === 'custom'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground'
             }`}
           >
             Custom Action
@@ -154,13 +158,15 @@ export function ProposalCreateDialog({
         <div className="space-y-4">
           {template === 'canonize' && (
             <div>
-              <label className="block text-sm text-zinc-400 mb-1">Node ID to canonize</label>
+              <label className="block text-sm text-muted-foreground mb-1">
+                Node ID to canonize
+              </label>
               <input
                 type="number"
                 value={nodeId}
                 onChange={(e) => setNodeId(e.target.value)}
                 placeholder="42"
-                className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500"
+                className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:border-violet-500"
               />
             </div>
           )}
@@ -168,36 +174,36 @@ export function ProposalCreateDialog({
           {template === 'custom' && (
             <>
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Target Contract</label>
+                <label className="block text-sm text-muted-foreground mb-1">Target Contract</label>
                 <input
                   type="text"
                   value={customTarget}
                   onChange={(e) => setCustomTarget(e.target.value)}
                   placeholder="0x..."
-                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500"
+                  className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:border-violet-500"
                 />
               </div>
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Calldata (hex)</label>
+                <label className="block text-sm text-muted-foreground mb-1">Calldata (hex)</label>
                 <input
                   type="text"
                   value={customCalldata}
                   onChange={(e) => setCustomCalldata(e.target.value)}
                   placeholder="0x..."
-                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500"
+                  className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:border-violet-500"
                 />
               </div>
             </>
           )}
 
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">Description</label>
+            <label className="block text-sm text-muted-foreground mb-1">Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               placeholder="Describe why this proposal should pass..."
-              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 resize-none"
+              className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:border-violet-500 resize-none"
             />
           </div>
         </div>
@@ -212,14 +218,14 @@ export function ProposalCreateDialog({
           <button
             onClick={onClose}
             disabled={busy}
-            className="flex-1 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            className="flex-1 px-4 py-2 bg-muted hover:bg-foreground/10 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={busy || !description}
-            className="flex-1 px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-zinc-700 disabled:text-zinc-500 rounded-lg text-sm font-medium transition-colors"
+            className="flex-1 px-4 py-2 bg-primary hover:bg-primary/90 disabled:bg-foreground/10 disabled:text-muted-foreground rounded-lg text-sm font-medium transition-colors"
           >
             {busy ? 'Submitting...' : 'Submit Proposal'}
           </button>

@@ -66,7 +66,10 @@ interface Arc {
 }
 
 const STATUS_BADGE: Record<ArcStatus, { label: string; tint: string }> = {
-  queued: { label: 'Queued', tint: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30' },
+  queued: {
+    label: 'Queued',
+    tint: 'bg-muted-foreground/15 text-foreground/80 border-muted-foreground/30',
+  },
   running: { label: 'Running', tint: 'bg-blue-500/15 text-blue-300 border-blue-500/30' },
   completed: {
     label: 'Completed',

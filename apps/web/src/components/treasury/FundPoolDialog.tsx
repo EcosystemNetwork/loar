@@ -58,7 +58,7 @@ export function FundPoolDialog({ universeId, open, onOpenChange }: FundPoolDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-zinc-950 border-zinc-800 text-white max-w-md">
+      <DialogContent className="bg-background border-border text-foreground max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Coins className="h-5 w-5 text-emerald-400" />
@@ -69,11 +69,11 @@ export function FundPoolDialog({ universeId, open, onOpenChange }: FundPoolDialo
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Package Selection */}
           <div className="space-y-2">
-            <Label className="text-zinc-300">Credit Package</Label>
+            <Label className="text-foreground/80">Credit Package</Label>
             {packagesLoading ? (
               <div className="grid grid-cols-2 gap-2">
                 {[...Array(4)].map((_, i) => (
-                  <div key={i} className="h-20 bg-zinc-900 animate-pulse rounded-lg" />
+                  <div key={i} className="h-20 bg-card animate-pulse rounded-lg" />
                 ))}
               </div>
             ) : (
@@ -89,11 +89,11 @@ export function FundPoolDialog({ universeId, open, onOpenChange }: FundPoolDialo
                       className={`p-3 rounded-lg border text-left transition-all ${
                         activePkg === pkg.id
                           ? 'border-emerald-500 bg-emerald-950/30'
-                          : 'border-zinc-800 bg-zinc-900 hover:border-zinc-700'
+                          : 'border-border bg-card hover:border-border'
                       }`}
                     >
                       <div className="text-sm font-semibold">{pkg.name}</div>
-                      <div className="text-xs text-zinc-400">
+                      <div className="text-xs text-muted-foreground">
                         {pkg.credits.toLocaleString()} credits
                       </div>
                       <div className="text-xs text-emerald-400 mt-1">
@@ -110,7 +110,7 @@ export function FundPoolDialog({ universeId, open, onOpenChange }: FundPoolDialo
 
           {/* Payment Method */}
           <div className="space-y-2">
-            <Label className="text-zinc-300">Payment Method</Label>
+            <Label className="text-foreground/80">Payment Method</Label>
             <div className="flex gap-2">
               {PAYMENT_METHODS.map((m) => (
                 <button
@@ -119,8 +119,8 @@ export function FundPoolDialog({ universeId, open, onOpenChange }: FundPoolDialo
                   onClick={() => setPaymentMethod(m.value)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     paymentMethod === m.value
-                      ? 'bg-violet-600 text-white'
-                      : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {m.label}
@@ -131,14 +131,14 @@ export function FundPoolDialog({ universeId, open, onOpenChange }: FundPoolDialo
 
           {/* Payment Reference */}
           <div className="space-y-2">
-            <Label className="text-zinc-300">
+            <Label className="text-foreground/80">
               {paymentMethod === 'card' ? 'Payment Intent ID' : 'Transaction Hash'}
             </Label>
             <Input
               value={paymentRef}
               onChange={(e) => setPaymentRef(e.target.value)}
               placeholder={paymentMethod === 'card' ? 'pi_...' : '0x...'}
-              className="bg-zinc-900 border-zinc-700 text-white"
+              className="bg-card border-border text-foreground"
               required
             />
           </div>
@@ -146,12 +146,12 @@ export function FundPoolDialog({ universeId, open, onOpenChange }: FundPoolDialo
           {/* LOAR Amount (conditional) */}
           {paymentMethod === 'loar' && (
             <div className="space-y-2">
-              <Label className="text-zinc-300">$LOAR Amount (wei)</Label>
+              <Label className="text-foreground/80">$LOAR Amount (wei)</Label>
               <Input
                 value={loarAmount}
                 onChange={(e) => setLoarAmount(e.target.value)}
                 placeholder="1000000000000000000"
-                className="bg-zinc-900 border-zinc-700 text-white"
+                className="bg-card border-border text-foreground"
               />
             </div>
           )}

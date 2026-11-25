@@ -8,8 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useSellerStats } from '@/hooks/useListings';
 import { useWalletAuth } from '@/lib/wallet-auth';
-import { useVocab } from '@/hooks/use-vocab';
 import { SmartImage } from '@/components/SmartImage';
+import { SignInPrompt } from '@/components/SignInPrompt';
 
 export const Route = createFileRoute('/sell/earnings')({
   component: SellerEarningsPage,
@@ -17,18 +17,10 @@ export const Route = createFileRoute('/sell/earnings')({
 
 function SellerEarningsPage() {
   const { isAuthenticated, isAuthenticating } = useWalletAuth();
-  const v = useVocab();
   const { data: stats, isLoading } = useSellerStats();
 
   if (!isAuthenticated && !isAuthenticating) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4 px-4">
-        <p className="text-muted-foreground">Connect your wallet to view earnings</p>
-        <Link to="/login">
-          <Button>{v('connect-wallet')}</Button>
-        </Link>
-      </div>
-    );
+    return <SignInPrompt variant="page" title="Sign in to view earnings" />;
   }
 
   return (

@@ -32,6 +32,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useCreateAdSeed } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
+import { requireSignIn } from '@/components/SignInPrompt';
 
 export const Route = createFileRoute('/adplacements/seeds/new')({
   beforeLoad: ({ context }) => {
@@ -198,7 +199,7 @@ function CreateAdSeedPage() {
 
   async function handleCreate() {
     if (!isConnected) {
-      toast.error('Connect your wallet first');
+      requireSignIn('to publish');
       return;
     }
     try {
@@ -513,9 +514,7 @@ function CreateAdSeedPage() {
                 Plant Seed
               </Button>
               {!isConnected && (
-                <p className="text-xs text-center text-muted-foreground">
-                  Connect your wallet to publish
-                </p>
+                <p className="text-xs text-center text-muted-foreground">Sign in to publish</p>
               )}
             </div>
           </div>

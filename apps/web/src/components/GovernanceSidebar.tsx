@@ -46,6 +46,7 @@ import { SafeSignerList } from '@/components/SafeSignerList';
 import { SafeTransactionQueue } from '@/components/SafeTransactionQueue';
 import { toast } from 'sonner';
 import type { UniverseData } from '@/types/universe';
+import { requireSignIn } from '@/components/SignInPrompt';
 
 /** Max characters for on-chain proposal descriptions to limit gas usage */
 const MAX_PROPOSAL_DESCRIPTION = 500;
@@ -262,7 +263,7 @@ export function GovernanceSidebar({
   // Handle token delegation to self
   const handleSelfDelegate = useCallback(async () => {
     if (!address || !tokenAddress) {
-      toast.error('Please connect your wallet');
+      requireSignIn();
       return;
     }
 
@@ -512,7 +513,7 @@ export function GovernanceSidebar({
   const handleVote = useCallback(
     async (proposalId: bigint, support: number) => {
       if (!isConnected || !address) {
-        toast.error('Please connect your wallet');
+        requireSignIn();
         return;
       }
 
@@ -554,7 +555,7 @@ export function GovernanceSidebar({
   const handleExecuteProposal = useCallback(
     async (proposal: Proposal) => {
       if (!isConnected || !address) {
-        toast.error('Please connect your wallet');
+        requireSignIn();
         return;
       }
 

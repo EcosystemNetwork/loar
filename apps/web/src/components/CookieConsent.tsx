@@ -68,16 +68,15 @@ export function CookieConsent() {
     <div
       role="dialog"
       aria-label="Cookie and tracking preferences"
-      className="fixed bottom-0 inset-x-0 z-50 border-t bg-background/95 backdrop-blur px-4 py-4"
+      className="fixed bottom-mobile-nav inset-x-0 z-50 border-t bg-background/95 backdrop-blur px-4 py-3"
     >
       <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-sm">
         <p className="text-muted-foreground leading-snug">
-          We use essential cookies to keep you signed in and remember preferences. With your
-          consent, we also use Sentry error tracking and session replay to debug issues. See our{' '}
+          Essential cookies keep you signed in. With your consent, we also record errors and
+          sessions to fix bugs.{' '}
           <a href="/privacy" className="text-primary underline">
-            Privacy Policy
+            Privacy
           </a>
-          .
         </p>
         <div className="flex gap-2 shrink-0">
           <button

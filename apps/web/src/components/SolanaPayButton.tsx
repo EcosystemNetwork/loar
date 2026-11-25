@@ -182,7 +182,7 @@ export function SolanaPayButton(props: SolanaPayButtonProps) {
         type="button"
         onClick={() => void startPayment()}
         disabled={status === 'creating'}
-        className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-500 disabled:opacity-50"
+        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-purple-500 disabled:opacity-50"
       >
         {status === 'creating'
           ? 'Preparing…'
@@ -249,7 +249,7 @@ export function SolanaPayButton(props: SolanaPayButtonProps) {
               href={ios ? phantomUniversalLink(url) : url}
               target="_blank"
               rel="noopener"
-              className="w-full rounded-md bg-purple-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-purple-500"
+              className="w-full rounded-md bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground hover:bg-purple-500"
             >
               Open in Phantom
             </a>

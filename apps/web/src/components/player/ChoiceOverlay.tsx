@@ -20,9 +20,9 @@ export function ChoiceOverlay({
             onClick={() => onChoose(choice.nodeId)}
             className="flex-1 group relative overflow-hidden rounded-xl border-2 border-white/20 hover:border-violet-500 transition-all duration-300 hover:scale-[1.02]"
           >
-            <div className="bg-zinc-900/80 backdrop-blur-md p-5">
+            <div className="bg-card/80 backdrop-blur-md p-5">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-mono text-zinc-400">
+                <span className="text-xs font-mono text-muted-foreground">
                   {String.fromCharCode(65 + i)}
                 </span>
                 {choice.isCanon && (
@@ -31,12 +31,12 @@ export function ChoiceOverlay({
                   </span>
                 )}
               </div>
-              <p className="text-white font-medium text-left">{choice.label}</p>
-              <p className="text-zinc-400 text-sm mt-1">Node #{choice.nodeId}</p>
+              <p className="text-foreground font-medium text-left">{choice.label}</p>
+              <p className="text-muted-foreground text-sm mt-1">Node #{choice.nodeId}</p>
             </div>
 
             {/* Hover glow */}
-            <div className="absolute inset-0 bg-violet-600/0 group-hover:bg-violet-600/10 transition-colors" />
+            <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/10 transition-colors" />
           </button>
         ))}
       </div>

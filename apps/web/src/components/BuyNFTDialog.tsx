@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { getExplorerTxUrl } from '@/configs/chains';
 import { SmartImage } from '@/components/SmartImage';
 import { Price, usePriceText } from '@/components/Price';
+import { requireSignIn } from '@/components/SignInPrompt';
 
 // EpisodeNFT.mint ABI
 const EPISODE_NFT_MINT_ABI = [
@@ -82,7 +83,7 @@ export function BuyNFTDialog({ listing, onClose, onSuccess }: BuyNFTDialogProps)
 
   async function handleBuy() {
     if (!isConnected || !address) {
-      toast.error('Please connect your wallet');
+      requireSignIn('to buy');
       return;
     }
 

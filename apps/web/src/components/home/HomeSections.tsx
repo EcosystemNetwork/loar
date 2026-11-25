@@ -1574,7 +1574,7 @@ export function SearchOverlay({
                             {u.nodeCount} EP
                           </span>
                         )}
-                        {u.tokenData && (
+                        {u.tokenData?.symbol && (
                           <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded">
                             ${u.tokenData.symbol}
                           </span>

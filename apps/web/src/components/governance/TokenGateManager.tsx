@@ -83,9 +83,9 @@ export function TokenGateManager({ universeId, creatorAddress }: TokenGateManage
   if (!isCreator) return null;
   if (!tokenAddress) {
     return (
-      <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
-        <h3 className="font-semibold text-white mb-2">{v('token-gates')}</h3>
-        <p className="text-zinc-500 text-sm">
+      <div className="bg-card rounded-xl p-5 border border-border">
+        <h3 className="font-semibold text-foreground mb-2">{v('token-gates')}</h3>
+        <p className="text-muted-foreground text-sm">
           Deploy a governance token first to enable token gating.
         </p>
       </div>
@@ -128,9 +128,9 @@ export function TokenGateManager({ universeId, creatorAddress }: TokenGateManage
   const enabledCount = ALL_TARGETS.filter((t) => ruleStates[t.value].enabled).length;
 
   return (
-    <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
+    <div className="bg-card rounded-xl p-5 border border-border">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-white">{v('token-gate-rules')}</h3>
+        <h3 className="font-semibold text-foreground">{v('token-gate-rules')}</h3>
         {enabledCount > 0 && (
           <span className="text-xs bg-violet-600/20 text-violet-400 px-2 py-0.5 rounded-full">
             {enabledCount} active
@@ -141,7 +141,7 @@ export function TokenGateManager({ universeId, creatorAddress }: TokenGateManage
       {isLoading ? (
         <div className="animate-pulse space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-10 bg-zinc-800 rounded" />
+            <div key={i} className="h-10 bg-muted rounded" />
           ))}
         </div>
       ) : (
@@ -154,7 +154,7 @@ export function TokenGateManager({ universeId, creatorAddress }: TokenGateManage
                 className={`rounded-lg border p-3 transition-colors ${
                   state.enabled
                     ? 'border-violet-600/40 bg-violet-950/20'
-                    : 'border-zinc-800 bg-zinc-800/30'
+                    : 'border-border bg-muted/30'
                 }`}
               >
                 {/* Header row: toggle + label */}
@@ -163,11 +163,11 @@ export function TokenGateManager({ universeId, creatorAddress }: TokenGateManage
                     type="checkbox"
                     checked={state.enabled}
                     onChange={(e) => updateRule(t.value, { enabled: e.target.checked })}
-                    className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-violet-600 focus:ring-violet-500 shrink-0"
+                    className="w-4 h-4 rounded border-muted-foreground/30 bg-muted text-violet-600 focus:ring-violet-500 shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <span className="text-sm text-white font-medium">{t.label}</span>
-                    <span className="text-xs text-zinc-500 ml-2 hidden sm:inline">
+                    <span className="text-sm text-foreground font-medium">{t.label}</span>
+                    <span className="text-xs text-muted-foreground ml-2 hidden sm:inline">
                       {t.description}
                     </span>
                   </div>
@@ -184,9 +184,9 @@ export function TokenGateManager({ universeId, creatorAddress }: TokenGateManage
                             minPercentage: parseFloat(e.target.value) || 0,
                           })
                         }
-                        className="w-16 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-white text-xs text-right font-mono focus:border-violet-500 focus:outline-none"
+                        className="w-16 px-2 py-1 bg-muted border border-border rounded text-foreground text-xs text-right font-mono focus:border-violet-500 focus:outline-none"
                       />
-                      <span className="text-xs text-zinc-400">%</span>
+                      <span className="text-xs text-muted-foreground">%</span>
                     </div>
                   )}
                 </div>
@@ -199,7 +199,7 @@ export function TokenGateManager({ universeId, creatorAddress }: TokenGateManage
                       value={state.label}
                       onChange={(e) => updateRule(t.value, { label: e.target.value })}
                       placeholder="Custom label (optional)"
-                      className="w-full px-2 py-1 bg-zinc-800/50 border border-zinc-700/50 rounded text-zinc-300 text-xs placeholder:text-zinc-600 focus:border-violet-500 focus:outline-none"
+                      className="w-full px-2 py-1 bg-muted/50 border border-border/50 rounded text-foreground/80 text-xs placeholder:text-muted-foreground/70 focus:border-violet-500 focus:outline-none"
                     />
                   </div>
                 )}
@@ -211,7 +211,7 @@ export function TokenGateManager({ universeId, creatorAddress }: TokenGateManage
           <button
             onClick={handleSaveAll}
             disabled={bulkUpsert.isPending}
-            className="w-full mt-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
+            className="w-full mt-2 px-4 py-2 bg-primary hover:bg-primary/90 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
           >
             {bulkUpsert.isPending ? 'Saving...' : 'Save Rules'}
           </button>

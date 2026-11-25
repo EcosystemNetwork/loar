@@ -109,13 +109,15 @@ export function AdminModelAnalytics() {
     <div className="space-y-3 text-xs">
       {/* Period Selector */}
       <div className="flex items-center gap-2">
-        <span className="text-zinc-500">Period:</span>
+        <span className="text-muted-foreground">Period:</span>
         {[1, 7, 30].map((d) => (
           <button
             key={d}
             onClick={() => setDays(d)}
             className={`px-2 py-0.5 rounded text-[10px] ${
-              days === d ? 'bg-amber-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+              days === d
+                ? 'bg-amber-600 text-white'
+                : 'bg-muted text-muted-foreground hover:bg-foreground/10'
             }`}
           >
             {d}d
@@ -124,31 +126,31 @@ export function AdminModelAnalytics() {
       </div>
 
       {analyticsLoading ? (
-        <div className="text-zinc-500 py-2">Loading analytics...</div>
+        <div className="text-muted-foreground py-2">Loading analytics...</div>
       ) : a ? (
         <>
           {/* Financial Summary */}
           <div className="grid grid-cols-2 gap-2">
-            <div className="bg-zinc-900 rounded p-2">
-              <div className="text-zinc-500">Provider Cost</div>
+            <div className="bg-card rounded p-2">
+              <div className="text-muted-foreground">Provider Cost</div>
               <div className="text-red-400 font-mono font-bold">
                 {formatUsd(a.financials.totalProviderCostUsd)}
               </div>
             </div>
-            <div className="bg-zinc-900 rounded p-2">
-              <div className="text-zinc-500">User Revenue</div>
+            <div className="bg-card rounded p-2">
+              <div className="text-muted-foreground">User Revenue</div>
               <div className="text-green-400 font-mono font-bold">
                 {formatUsd(a.financials.totalUserRevenueUsd)}
               </div>
             </div>
-            <div className="bg-zinc-900 rounded p-2">
-              <div className="text-zinc-500">Gross Margin</div>
+            <div className="bg-card rounded p-2">
+              <div className="text-muted-foreground">Gross Margin</div>
               <div className={`font-mono font-bold ${pctColor(a.financials.marginPercentage)}`}>
                 {formatUsd(a.financials.totalMarginUsd)} ({a.financials.marginPercentage}%)
               </div>
             </div>
-            <div className="bg-zinc-900 rounded p-2">
-              <div className="text-zinc-500">$LOAR Charged</div>
+            <div className="bg-card rounded p-2">
+              <div className="text-muted-foreground">$LOAR Charged</div>
               <div className="text-amber-400 font-mono font-bold">
                 {a.financials.totalCreditsCharged.toLocaleString()}
               </div>
@@ -156,9 +158,9 @@ export function AdminModelAnalytics() {
           </div>
 
           {/* Generation Stats */}
-          <div className="flex items-center gap-4 text-zinc-400">
+          <div className="flex items-center gap-4 text-muted-foreground">
             <span>
-              Total: <span className="text-white font-bold">{a.totalGenerations}</span>
+              Total: <span className="text-foreground font-bold">{a.totalGenerations}</span>
             </span>
             <span>
               Auto: <span className="text-blue-400">{a.autoPercentage}%</span>
@@ -171,11 +173,11 @@ export function AdminModelAnalytics() {
           {/* Per-Model Breakdown */}
           {a.modelStats.length > 0 && (
             <div className="space-y-1">
-              <div className="text-zinc-500 font-medium">By Model</div>
+              <div className="text-muted-foreground font-medium">By Model</div>
               <div className="overflow-x-auto">
                 <table className="w-full text-[10px]">
                   <thead>
-                    <tr className="text-zinc-500 border-b border-zinc-800">
+                    <tr className="text-muted-foreground border-b border-border">
                       <th className="text-left py-1 pr-2">Model</th>
                       <th className="text-right px-1">Count</th>
                       <th className="text-right px-1">Fail%</th>
@@ -188,14 +190,11 @@ export function AdminModelAnalytics() {
                   </thead>
                   <tbody>
                     {a.modelStats.map((s) => (
-                      <tr
-                        key={s.modelId}
-                        className="border-b border-zinc-800/50 hover:bg-zinc-800/30"
-                      >
-                        <td className="py-1 pr-2 text-white">{s.modelName}</td>
+                      <tr key={s.modelId} className="border-b border-border/50 hover:bg-muted/30">
+                        <td className="py-1 pr-2 text-foreground">{s.modelName}</td>
                         <td className="text-right px-1">{s.count}</td>
                         <td
-                          className={`text-right px-1 ${s.failureRate > 10 ? 'text-red-400' : 'text-zinc-400'}`}
+                          className={`text-right px-1 ${s.failureRate > 10 ? 'text-red-400' : 'text-muted-foreground'}`}
                         >
                           {s.failureRate}%
                         </td>
@@ -209,7 +208,9 @@ export function AdminModelAnalytics() {
                           {formatUsd(s.totalMarginUsd)}
                         </td>
                         <td className="text-right px-1 text-amber-400">{s.totalCreditsCharged}</td>
-                        <td className="text-right pl-1 text-zinc-400">{s.avgLatencyMs}ms</td>
+                        <td className="text-right pl-1 text-muted-foreground">
+                          {s.avgLatencyMs}ms
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -219,13 +220,13 @@ export function AdminModelAnalytics() {
           )}
         </>
       ) : (
-        <div className="text-zinc-500">No generation data yet</div>
+        <div className="text-muted-foreground">No generation data yet</div>
       )}
 
       {/* Model Controls Toggle */}
       <button
         onClick={() => setShowModels(!showModels)}
-        className="flex items-center gap-1 text-zinc-400 hover:text-zinc-300 text-[10px] uppercase tracking-wider"
+        className="flex items-center gap-1 text-muted-foreground hover:text-foreground/80 text-[10px] uppercase tracking-wider"
       >
         <svg
           className={`w-3 h-3 transition-transform ${showModels ? 'rotate-90' : ''}`}
@@ -244,14 +245,14 @@ export function AdminModelAnalytics() {
           {(models as AdminModel[]).map((m) => (
             <div
               key={m.id}
-              className="flex items-center justify-between bg-zinc-900 rounded px-2 py-1.5"
+              className="flex items-center justify-between bg-card rounded px-2 py-1.5"
             >
               <div className="flex items-center gap-2">
                 <span
                   className={`w-2 h-2 rounded-full ${m.isEnabled ? 'bg-green-500' : 'bg-red-500'}`}
                 />
-                <span className="text-white text-[11px]">{m.displayName}</span>
-                <span className="text-zinc-500 text-[10px]">
+                <span className="text-foreground text-[11px]">{m.displayName}</span>
+                <span className="text-muted-foreground text-[10px]">
                   {formatUsd(m.providerCostUsd)} {'\u2192'} {formatUsd(m.fiatPriceUsd)}
                 </span>
                 <span className="text-amber-400 text-[10px]">{m.creditCost} $LOAR</span>
@@ -282,7 +283,7 @@ export function AdminModelAnalytics() {
                   className={`px-2 py-0.5 rounded text-[10px] ${
                     m.isVisibleToUsers
                       ? 'bg-blue-900/50 text-blue-400'
-                      : 'bg-zinc-800 text-zinc-500'
+                      : 'bg-muted text-muted-foreground'
                   }`}
                   title={m.isVisibleToUsers ? 'Visible to users' : 'Hidden from users'}
                 >

@@ -8,7 +8,8 @@
  * Behaviour differs by `universeType`:
  *   - `fun`: universe starts private, owner launches it publicly via this
  *     panel. Canon lives in Firestore only (free, instant).
- *   - `monetized`: universe is public from the launchpad. Canon is on-chain
+ *   - `monetized`: universe is public from the launchpad unless the creator
+ *     chose a private launch (then launched publicly here). Canon is on-chain
  *     (Universe.sol): the creator signs `setCanonForEpisode(tipNodeId,
  *     episodeHash)` with their wallet, then `episodes.publishAsCanon` verifies
  *     the receipt (success + a matching `EpisodeCanonized` event) before
@@ -258,9 +259,10 @@ export function UniversePublishPanel({ universeId, onClose }: UniversePublishPan
           </div>
         ) : (
           <>
-            {/* Launch section — fun universes only. Monetized universes are
-                always public, so we show an info note instead. */}
-            {universeType === 'fun' ? (
+            {/* Launch section — fun universes, plus launchpad universes that
+                were launched privately. A public launchpad universe can't go
+                back to private, so it gets an info note instead. */}
+            {universeType === 'fun' || isPrivate ? (
               <Card className="mb-6 border-zinc-800 bg-zinc-800/50">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-4">

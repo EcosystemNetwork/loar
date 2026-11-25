@@ -33,18 +33,18 @@ export function PrivateSectionGuard({ universeId, children }: PrivateSectionGuar
       {/* Blurred placeholder */}
       <div className="filter blur-lg pointer-events-none select-none opacity-20" aria-hidden>
         <div className="p-8 space-y-4">
-          <div className="h-8 bg-zinc-700 rounded w-48" />
-          <div className="h-4 bg-zinc-700 rounded w-full" />
-          <div className="h-4 bg-zinc-700 rounded w-3/4" />
+          <div className="h-8 bg-foreground/10 rounded w-48" />
+          <div className="h-4 bg-foreground/10 rounded w-full" />
+          <div className="h-4 bg-foreground/10 rounded w-3/4" />
           <div className="grid grid-cols-2 gap-4 mt-6">
-            <div className="h-32 bg-zinc-700 rounded" />
-            <div className="h-32 bg-zinc-700 rounded" />
+            <div className="h-32 bg-foreground/10 rounded" />
+            <div className="h-32 bg-foreground/10 rounded" />
           </div>
         </div>
       </div>
 
       {/* Lock overlay */}
-      <div className="absolute inset-0 flex items-center justify-center bg-zinc-950/70 backdrop-blur-sm rounded-xl">
+      <div className="absolute inset-0 flex items-center justify-center bg-background/70 backdrop-blur-sm rounded-xl">
         <div className="text-center max-w-md px-6 py-10">
           <div className="w-16 h-16 mx-auto mb-5 rounded-full bg-amber-600/20 flex items-center justify-center">
             <svg
@@ -62,8 +62,8 @@ export function PrivateSectionGuard({ universeId, children }: PrivateSectionGuar
             </svg>
           </div>
 
-          <h3 className="text-white font-semibold text-xl mb-2">Creator's Room</h3>
-          <p className="text-zinc-400 text-sm mb-6">
+          <h3 className="text-foreground font-semibold text-xl mb-2">Creator's Room</h3>
+          <p className="text-muted-foreground text-sm mb-6">
             This universe's private workspace is restricted. Here's how to get access:
           </p>
 
@@ -142,10 +142,10 @@ function AccessOption({
   };
 
   return (
-    <div className="flex items-start gap-3 bg-zinc-800/50 rounded-lg p-3">
-      <div className="w-8 h-8 rounded-full bg-zinc-700/50 flex items-center justify-center shrink-0 mt-0.5">
+    <div className="flex items-start gap-3 bg-muted/50 rounded-lg p-3">
+      <div className="w-8 h-8 rounded-full bg-foreground/50 flex items-center justify-center shrink-0 mt-0.5">
         <svg
-          className="w-4 h-4 text-zinc-300"
+          className="w-4 h-4 text-foreground/80"
           fill="none"
           viewBox="0 0 24 24"
           strokeWidth={1.5}
@@ -155,8 +155,8 @@ function AccessOption({
         </svg>
       </div>
       <div>
-        <p className="text-white text-sm font-medium">{title}</p>
-        <p className="text-zinc-500 text-xs">{description}</p>
+        <p className="text-foreground text-sm font-medium">{title}</p>
+        <p className="text-muted-foreground text-xs">{description}</p>
       </div>
     </div>
   );

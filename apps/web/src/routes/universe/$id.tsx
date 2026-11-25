@@ -3569,14 +3569,14 @@ function UniverseTimelineEditorInner() {
 
                         {/* Stats badge — top-left corner */}
                         <div className="absolute top-1 left-1 flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity pointer-events-none">
-                          <div className="flex items-center gap-0.5 bg-zinc-900/90 backdrop-blur-sm rounded px-1 py-0.5 border border-zinc-700/50">
-                            <Layers className="h-2.5 w-2.5 text-zinc-400" />
-                            <span className="text-[9px] font-mono text-zinc-300">
+                          <div className="flex items-center gap-0.5 bg-card/90 backdrop-blur-sm rounded px-1 py-0.5 border border-border/50">
+                            <Layers className="h-2.5 w-2.5 text-muted-foreground" />
+                            <span className="text-[9px] font-mono text-foreground/80">
                               {totalScenes}
                             </span>
                             {canonCount > 0 && (
                               <>
-                                <span className="text-[9px] text-zinc-600">·</span>
+                                <span className="text-[9px] text-muted-foreground/70">·</span>
                                 <span className="text-[9px] font-mono text-amber-400">
                                   {canonCount}
                                 </span>
@@ -3584,7 +3584,7 @@ function UniverseTimelineEditorInner() {
                             )}
                             {branchCount > 0 && (
                               <>
-                                <span className="text-[9px] text-zinc-600">·</span>
+                                <span className="text-[9px] text-muted-foreground/70">·</span>
                                 <span className="text-[9px] font-mono text-orange-400">
                                   {branchCount}
                                 </span>
@@ -3597,21 +3597,21 @@ function UniverseTimelineEditorInner() {
                         <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => setMiniMapShowLegend((v) => !v)}
-                            className={`p-1 rounded transition-colors ${miniMapShowLegend ? 'bg-amber-500/20 text-amber-400' : 'bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white'}`}
+                            className={`p-1 rounded transition-colors ${miniMapShowLegend ? 'bg-amber-500/20 text-amber-400' : 'bg-muted/80 hover:bg-foreground/10 text-muted-foreground hover:text-foreground'}`}
                             title="Toggle legend"
                           >
                             <Eye className="h-3 w-3" />
                           </button>
                           <button
                             onClick={() => setShowMiniMapSettings((v) => !v)}
-                            className="p-1 rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
+                            className="p-1 rounded bg-muted/80 hover:bg-foreground/10 text-muted-foreground hover:text-foreground transition-colors"
                             title="Minimap settings"
                           >
                             <Settings className="h-3 w-3" />
                           </button>
                           <button
                             onClick={() => setShowMiniMap(false)}
-                            className="p-1 rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
+                            className="p-1 rounded bg-muted/80 hover:bg-foreground/10 text-muted-foreground hover:text-foreground transition-colors"
                             title="Hide minimap (M)"
                           >
                             <EyeOff className="h-3 w-3" />
@@ -3620,13 +3620,13 @@ function UniverseTimelineEditorInner() {
 
                         {/* Legend overlay — below minimap */}
                         {miniMapShowLegend && (!miniMapAutoCollapse || isMiniMapHovered) && (
-                          <div className="mt-1 bg-zinc-900/90 backdrop-blur-sm border border-zinc-700/50 rounded-md px-2 py-1.5 space-y-0.5">
+                          <div className="mt-1 bg-card/90 backdrop-blur-sm border border-border/50 rounded-md px-2 py-1.5 space-y-0.5">
                             {/* Canon — rounded rect */}
                             <div className="flex items-center gap-1.5">
                               <svg width="10" height="10" className="flex-shrink-0">
                                 <rect x="1" y="2" width="8" height="6" rx="1.5" fill="#eab308" />
                               </svg>
-                              <span className="text-[9px] text-zinc-400">Canon chain</span>
+                              <span className="text-[9px] text-muted-foreground">Canon chain</span>
                             </div>
                             {/* Branch — diamond */}
                             <div className="flex items-center gap-1.5">
@@ -3641,14 +3641,14 @@ function UniverseTimelineEditorInner() {
                                   transform="rotate(45,5,5)"
                                 />
                               </svg>
-                              <span className="text-[9px] text-zinc-400">Branch</span>
+                              <span className="text-[9px] text-muted-foreground">Branch</span>
                             </div>
                             {/* Scene — rect */}
                             <div className="flex items-center gap-1.5">
                               <svg width="10" height="10" className="flex-shrink-0">
                                 <rect x="1" y="2" width="8" height="6" rx="1.5" fill="#10b981" />
                               </svg>
-                              <span className="text-[9px] text-zinc-400">Scene</span>
+                              <span className="text-[9px] text-muted-foreground">Scene</span>
                             </div>
                             {/* Root — circle with stroke */}
                             <div className="flex items-center gap-1.5">
@@ -3662,7 +3662,9 @@ function UniverseTimelineEditorInner() {
                                   strokeWidth="1.5"
                                 />
                               </svg>
-                              <span className="text-[9px] text-zinc-400">Root (origin)</span>
+                              <span className="text-[9px] text-muted-foreground">
+                                Root (origin)
+                              </span>
                             </div>
                           </div>
                         )}
@@ -3670,7 +3672,7 @@ function UniverseTimelineEditorInner() {
                         {/* Settings panel */}
                         {showMiniMapSettings && (
                           <div
-                            className="absolute z-50 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-lg shadow-2xl p-3 w-60 space-y-3"
+                            className="absolute z-50 bg-card/95 backdrop-blur-md border border-border rounded-lg shadow-2xl p-3 w-60 space-y-3"
                             style={{
                               [miniMapPosition.includes('bottom') ? 'bottom' : 'top']: '100%',
                               [miniMapPosition.includes('right') ? 'right' : 'left']: 0,
@@ -3679,12 +3681,12 @@ function UniverseTimelineEditorInner() {
                             }}
                           >
                             <div className="flex items-center justify-between">
-                              <span className="text-xs font-medium text-zinc-300">
+                              <span className="text-xs font-medium text-foreground/80">
                                 Minimap Settings
                               </span>
                               <button
                                 onClick={() => setShowMiniMapSettings(false)}
-                                className="p-0.5 hover:bg-zinc-700 rounded text-zinc-500 hover:text-white"
+                                className="p-0.5 hover:bg-foreground/10 rounded text-muted-foreground hover:text-foreground"
                               >
                                 <X className="h-3 w-3" />
                               </button>
@@ -3692,7 +3694,10 @@ function UniverseTimelineEditorInner() {
 
                             {/* Size */}
                             <div className="space-y-1">
-                              <label htmlFor="minimap-size" className="text-[11px] text-zinc-400">
+                              <label
+                                htmlFor="minimap-size"
+                                className="text-[11px] text-muted-foreground"
+                              >
                                 Size — {miniMapSize}px
                               </label>
                               <Slider
@@ -3705,7 +3710,7 @@ function UniverseTimelineEditorInner() {
                                 step={10}
                                 className="w-full"
                               />
-                              <div className="flex justify-between text-[10px] text-zinc-500">
+                              <div className="flex justify-between text-[10px] text-muted-foreground">
                                 <span>Small</span>
                                 <span>Large</span>
                               </div>
@@ -3715,7 +3720,7 @@ function UniverseTimelineEditorInner() {
                             <div className="space-y-1">
                               <label
                                 htmlFor="minimap-opacity"
-                                className="text-[11px] text-zinc-400"
+                                className="text-[11px] text-muted-foreground"
                               >
                                 Opacity — {miniMapOpacity}%
                               </label>
@@ -3729,7 +3734,7 @@ function UniverseTimelineEditorInner() {
                                 step={5}
                                 className="w-full"
                               />
-                              <div className="flex justify-between text-[10px] text-zinc-500">
+                              <div className="flex justify-between text-[10px] text-muted-foreground">
                                 <span>Faint</span>
                                 <span>Solid</span>
                               </div>
@@ -3739,7 +3744,7 @@ function UniverseTimelineEditorInner() {
                             <div className="space-y-1">
                               <label
                                 htmlFor="minimap-zoom-step"
-                                className="text-[11px] text-zinc-400"
+                                className="text-[11px] text-muted-foreground"
                               >
                                 Zoom Sensitivity — {miniMapZoomStep}
                               </label>
@@ -3753,7 +3758,7 @@ function UniverseTimelineEditorInner() {
                                 step={1}
                                 className="w-full"
                               />
-                              <div className="flex justify-between text-[10px] text-zinc-500">
+                              <div className="flex justify-between text-[10px] text-muted-foreground">
                                 <span>Fine</span>
                                 <span>Coarse</span>
                               </div>
@@ -3761,7 +3766,9 @@ function UniverseTimelineEditorInner() {
 
                             {/* Toggles */}
                             <div className="space-y-1.5">
-                              <span className="block text-[11px] text-zinc-400">Options</span>
+                              <span className="block text-[11px] text-muted-foreground">
+                                Options
+                              </span>
                               <div className="space-y-1">
                                 <label className="flex items-center gap-2 cursor-pointer">
                                   <input
@@ -3770,9 +3777,9 @@ function UniverseTimelineEditorInner() {
                                     type="checkbox"
                                     checked={miniMapAutoCollapse}
                                     onChange={(e) => setMiniMapAutoCollapse(e.target.checked)}
-                                    className="w-3 h-3 rounded border-zinc-600 bg-zinc-800 accent-amber-500"
+                                    className="w-3 h-3 rounded border-muted-foreground/30 bg-muted accent-amber-500"
                                   />
-                                  <span className="text-[11px] text-zinc-300">
+                                  <span className="text-[11px] text-foreground/80">
                                     Auto-collapse when idle
                                   </span>
                                 </label>
@@ -3783,9 +3790,11 @@ function UniverseTimelineEditorInner() {
                                     type="checkbox"
                                     checked={miniMapShowLegend}
                                     onChange={(e) => setMiniMapShowLegend(e.target.checked)}
-                                    className="w-3 h-3 rounded border-zinc-600 bg-zinc-800 accent-amber-500"
+                                    className="w-3 h-3 rounded border-muted-foreground/30 bg-muted accent-amber-500"
                                   />
-                                  <span className="text-[11px] text-zinc-300">Show legend</span>
+                                  <span className="text-[11px] text-foreground/80">
+                                    Show legend
+                                  </span>
                                 </label>
                                 <label className="flex items-center gap-2 cursor-pointer">
                                   <input
@@ -3794,9 +3803,9 @@ function UniverseTimelineEditorInner() {
                                     type="checkbox"
                                     checked={miniMapShowEdges}
                                     onChange={(e) => setMiniMapShowEdges(e.target.checked)}
-                                    className="w-3 h-3 rounded border-zinc-600 bg-zinc-800 accent-amber-500"
+                                    className="w-3 h-3 rounded border-muted-foreground/30 bg-muted accent-amber-500"
                                   />
-                                  <span className="text-[11px] text-zinc-300">
+                                  <span className="text-[11px] text-foreground/80">
                                     Show connections
                                   </span>
                                 </label>
@@ -3805,7 +3814,9 @@ function UniverseTimelineEditorInner() {
 
                             {/* Position */}
                             <div className="space-y-1">
-                              <span className="block text-[11px] text-zinc-400">Position</span>
+                              <span className="block text-[11px] text-muted-foreground">
+                                Position
+                              </span>
                               <div className="grid grid-cols-2 gap-1">
                                 {(
                                   [
@@ -3821,7 +3832,7 @@ function UniverseTimelineEditorInner() {
                                     className={`text-[11px] px-2 py-1 rounded transition-colors ${
                                       miniMapPosition === pos
                                         ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-                                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white border border-zinc-700'
+                                        : 'bg-muted text-muted-foreground hover:bg-foreground/10 hover:text-foreground border border-border'
                                     }`}
                                   >
                                     {label}
@@ -3873,7 +3884,7 @@ function UniverseTimelineEditorInner() {
               <Panel position="top-left" className="z-40">
                 <button
                   onClick={handleAddSceneFromToolbar}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-zinc-950 font-medium rounded-lg hover:bg-amber-400 transition-colors text-sm shadow-lg"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-background font-medium rounded-lg hover:bg-amber-400 transition-colors text-sm shadow-lg"
                   title="Add a new node (N) — continues after the selected node"
                 >
                   <Plus className="h-4 w-4" />
@@ -3886,7 +3897,7 @@ function UniverseTimelineEditorInner() {
                   {/* Episodes — browse and export saved episodes */}
                   <button
                     onClick={() => setShowEpisodeList(true)}
-                    className="flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-1.5 bg-zinc-900/80 backdrop-blur-sm border border-zinc-700 rounded-lg text-zinc-300 hover:bg-emerald-500/10 hover:text-emerald-300 hover:border-emerald-500/30 transition-colors text-sm"
+                    className="flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-1.5 bg-card/80 backdrop-blur-sm border border-border rounded-lg text-foreground/80 hover:bg-emerald-500/10 hover:text-emerald-300 hover:border-emerald-500/30 transition-colors text-sm"
                     title="Browse & export saved episodes"
                   >
                     <Film className="h-4 w-4" />
@@ -3905,17 +3916,17 @@ function UniverseTimelineEditorInner() {
                   />
 
                   {/* Canvas Tool Mode */}
-                  <div className="flex bg-zinc-900/80 backdrop-blur-sm border border-zinc-700 rounded-lg overflow-hidden">
+                  <div className="flex bg-card/80 backdrop-blur-sm border border-border rounded-lg overflow-hidden">
                     <button
                       onClick={() => setCanvasTool('hand')}
-                      className={`p-1.5 transition-colors ${canvasTool === 'hand' ? 'bg-amber-500/20 text-amber-400' : 'text-zinc-400 hover:bg-zinc-700 hover:text-white'}`}
+                      className={`p-1.5 transition-colors ${canvasTool === 'hand' ? 'bg-amber-500/20 text-amber-400' : 'text-muted-foreground hover:bg-foreground/10 hover:text-foreground'}`}
                       title="Hand tool — drag to pan (H)"
                     >
                       <Hand className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => setCanvasTool('select')}
-                      className={`p-1.5 transition-colors ${canvasTool === 'select' ? 'bg-amber-500/20 text-amber-400' : 'text-zinc-400 hover:bg-zinc-700 hover:text-white'}`}
+                      className={`p-1.5 transition-colors ${canvasTool === 'select' ? 'bg-amber-500/20 text-amber-400' : 'text-muted-foreground hover:bg-foreground/10 hover:text-foreground'}`}
                       title="Select tool — drag to select multiple (V)"
                     >
                       <MousePointer2 className="h-4 w-4" />
@@ -3923,59 +3934,59 @@ function UniverseTimelineEditorInner() {
                   </div>
 
                   {/* Zoom & Layout Controls */}
-                  <div className="flex bg-zinc-900/80 backdrop-blur-sm border border-zinc-700 rounded-lg overflow-hidden">
+                  <div className="flex bg-card/80 backdrop-blur-sm border border-border rounded-lg overflow-hidden">
                     <button
                       onClick={() => zoomIn({ duration: 200 })}
-                      className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white"
+                      className="p-1.5 hover:bg-foreground/10 transition-colors text-muted-foreground hover:text-foreground"
                       title="Zoom in (+)"
                     >
                       <ZoomIn className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => zoomOut({ duration: 200 })}
-                      className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white"
+                      className="p-1.5 hover:bg-foreground/10 transition-colors text-muted-foreground hover:text-foreground"
                       title="Zoom out (-)"
                     >
                       <ZoomOut className="h-4 w-4" />
                     </button>
                     <button
                       onClick={zoomToActualSize}
-                      className="px-1.5 min-w-[3.25rem] text-xs tabular-nums hover:bg-zinc-700 transition-colors text-zinc-300 hover:text-white"
+                      className="px-1.5 min-w-[3.25rem] text-xs tabular-nums hover:bg-foreground/10 transition-colors text-foreground/80 hover:text-foreground"
                       title="Zoom level — click for 100% (1)"
                     >
                       <ZoomPercent />
                     </button>
                     <button
                       onClick={fitSelectionOrAll}
-                      className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white"
+                      className="p-1.5 hover:bg-foreground/10 transition-colors text-muted-foreground hover:text-foreground"
                       title="Fit to view — fits the selection if any (F)"
                     >
                       <Locate className="h-4 w-4" />
                     </button>
                     <button
                       onClick={handleAutoLayout}
-                      className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white"
+                      className="p-1.5 hover:bg-foreground/10 transition-colors text-muted-foreground hover:text-foreground"
                       title="Auto-layout nodes"
                     >
                       <LayoutGrid className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => setShowMiniMap((v) => !v)}
-                      className={`p-1.5 hover:bg-zinc-700 transition-colors ${showMiniMap ? 'text-amber-400' : 'text-zinc-400 hover:text-white'}`}
+                      className={`p-1.5 hover:bg-foreground/10 transition-colors ${showMiniMap ? 'text-amber-400' : 'text-muted-foreground hover:text-foreground'}`}
                       title={showMiniMap ? 'Hide minimap (M)' : 'Show minimap (M)'}
                     >
                       <Map className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => setShowOutlinePanel((v) => !v)}
-                      className={`p-1.5 hover:bg-zinc-700 transition-colors ${showOutlinePanel ? 'text-amber-400' : 'text-zinc-400 hover:text-white'}`}
+                      className={`p-1.5 hover:bg-foreground/10 transition-colors ${showOutlinePanel ? 'text-amber-400' : 'text-muted-foreground hover:text-foreground'}`}
                       title="Node outline (O)"
                     >
                       <List className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => setShowVoiceDirector(true)}
-                      className={`p-1.5 hover:bg-zinc-700 transition-colors ${showVoiceDirector ? 'text-amber-400' : 'text-zinc-400 hover:text-white'}`}
+                      className={`p-1.5 hover:bg-foreground/10 transition-colors ${showVoiceDirector ? 'text-amber-400' : 'text-muted-foreground hover:text-foreground'}`}
                       title="Voice Director"
                     >
                       <Mic className="h-4 w-4" />
@@ -3984,14 +3995,14 @@ function UniverseTimelineEditorInner() {
                       onClick={() => {
                         setShowSearch(true);
                       }}
-                      className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white"
+                      className="p-1.5 hover:bg-foreground/10 transition-colors text-muted-foreground hover:text-foreground"
                       title="Search & filter (Ctrl+K)"
                     >
                       <Search className="h-4 w-4" />
                     </button>
                     <button
                       onClick={handleUndo}
-                      className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white disabled:opacity-30"
+                      className="p-1.5 hover:bg-foreground/10 transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30"
                       title="Undo (Ctrl+Z)"
                       disabled={!canUndo}
                     >
@@ -3999,7 +4010,7 @@ function UniverseTimelineEditorInner() {
                     </button>
                     <button
                       onClick={handleRedo}
-                      className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white disabled:opacity-30"
+                      className="p-1.5 hover:bg-foreground/10 transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30"
                       title="Redo (Ctrl+Shift+Z)"
                       disabled={!canRedo}
                     >
@@ -4007,7 +4018,7 @@ function UniverseTimelineEditorInner() {
                     </button>
                     <button
                       onClick={() => setIsFullscreen(!isFullscreen)}
-                      className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white"
+                      className="p-1.5 hover:bg-foreground/10 transition-colors text-muted-foreground hover:text-foreground"
                       title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen canvas'}
                     >
                       {isFullscreen ? (
@@ -4018,7 +4029,7 @@ function UniverseTimelineEditorInner() {
                     </button>
                     <button
                       onClick={() => setShowShortcutsHelp((v) => !v)}
-                      className="p-1.5 hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white text-xs font-bold"
+                      className="p-1.5 hover:bg-foreground/10 transition-colors text-muted-foreground hover:text-foreground text-xs font-bold"
                       title="Keyboard shortcuts (?)"
                     >
                       ?
@@ -4331,8 +4342,8 @@ function UniverseTimelineEditorInner() {
 
         {/* Music Studio Panel */}
         {showMusicStudio && (
-          <div className="w-[360px] border-l border-zinc-800 bg-zinc-950 overflow-y-auto flex flex-col shrink-0">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
+          <div className="w-[360px] border-l border-border bg-background overflow-y-auto flex flex-col shrink-0">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border">
               <span className="text-sm font-medium flex items-center gap-2">
                 <Music className="h-4 w-4 text-amber-500" />
                 Music Studio
@@ -4372,10 +4383,10 @@ function UniverseTimelineEditorInner() {
           !showGovernanceSidebar &&
           !showCreatorsRoom &&
           !showCastManager && (
-            <div className="w-[320px] border-l border-zinc-800 bg-zinc-950 overflow-hidden flex flex-col shrink-0">
+            <div className="w-[320px] border-l border-border bg-background overflow-hidden flex flex-col shrink-0">
               {/* Identity row */}
-              <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
-                <span className="text-sm font-medium text-zinc-200 truncate">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+                <span className="text-sm font-medium text-foreground truncate">
                   {selectedNode.data.displayName || `Event ${selectedNode.data.eventId}`}
                 </span>
                 <div className="flex items-center gap-1 shrink-0">
@@ -4392,7 +4403,7 @@ function UniverseTimelineEditorInner() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setSelectedNode(null)}
-                    className="text-zinc-500 hover:text-white h-6 w-6 p-0"
+                    className="text-zinc-500 hover:text-foreground h-6 w-6 p-0"
                     title="Close"
                   >
                     <X className="h-4 w-4" />
@@ -4400,12 +4411,12 @@ function UniverseTimelineEditorInner() {
                 </div>
               </div>
               {/* Action toolbar */}
-              <div className="flex items-center gap-1 px-2 py-1.5 border-b border-zinc-800 bg-zinc-900/60">
+              <div className="flex items-center gap-1 px-2 py-1.5 border-b border-border bg-card/60">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => handleEditScene(selectedNode.data.eventId || '')}
-                  className="h-7 px-2 text-xs text-zinc-300 hover:text-white gap-1.5"
+                  className="h-7 px-2 text-xs text-zinc-300 hover:text-foreground gap-1.5"
                   title="Change or trim the video"
                 >
                   <Pencil className="h-3.5 w-3.5" />
@@ -4416,7 +4427,7 @@ function UniverseTimelineEditorInner() {
                   size="sm"
                   onClick={() => handleRegenerateScene(selectedNode.data.eventId || '')}
                   disabled={!!regeneratingEventId}
-                  className="h-7 px-2 text-xs text-zinc-300 hover:text-white gap-1.5"
+                  className="h-7 px-2 text-xs text-zinc-300 hover:text-foreground gap-1.5"
                   title="Regenerate this scene's video"
                 >
                   <RefreshCw
@@ -4431,7 +4442,7 @@ function UniverseTimelineEditorInner() {
                   variant="ghost"
                   size="sm"
                   onClick={() => openSelectedNodeEventPage(selectedNode)}
-                  className="h-7 w-7 p-0 text-zinc-400 hover:text-white"
+                  className="h-7 w-7 p-0 text-zinc-400 hover:text-foreground"
                   title="Open full event page"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
@@ -4491,14 +4502,14 @@ function UniverseTimelineEditorInner() {
 
         {/* Creator's Room Sidebar */}
         {showCreatorsRoom && (
-          <div className="w-[400px] border-l border-zinc-800 bg-zinc-950 overflow-hidden flex flex-col shrink-0">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
-              <span className="text-sm text-zinc-400">Private Section</span>
+          <div className="w-[400px] border-l border-border bg-background overflow-hidden flex flex-col shrink-0">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+              <span className="text-sm text-muted-foreground">Private Section</span>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowCreatorsRoom(false)}
-                className="text-zinc-500 hover:text-white h-6 w-6 p-0"
+                className="text-zinc-500 hover:text-foreground h-6 w-6 p-0"
               >
                 x
               </Button>
@@ -4689,7 +4700,7 @@ function UniverseTimelineEditorInner() {
                                 className={`flex-shrink-0 w-24 rounded-md overflow-hidden border-2 transition-all ${
                                   isCurrent
                                     ? 'border-primary ring-1 ring-primary/50'
-                                    : 'border-transparent hover:border-zinc-500'
+                                    : 'border-transparent hover:border-muted-foreground/40'
                                 }`}
                                 onClick={() => {
                                   handleSwitchVersion(editingEventId, idx);
@@ -4697,7 +4708,7 @@ function UniverseTimelineEditorInner() {
                                 }}
                                 title={`v${v.versionNumber} — ${v.model || 'unknown'} — ${new Date(v.generatedAt).toLocaleDateString()}`}
                               >
-                                <div className="aspect-video bg-zinc-800 relative">
+                                <div className="aspect-video bg-muted relative">
                                   <ResolvedThumbnailVideo
                                     url={v.videoUrl}
                                     className="w-full h-full object-cover"
@@ -4715,7 +4726,7 @@ function UniverseTimelineEditorInner() {
                               eventData.currentVersionIndex === -1 ||
                               eventData.currentVersionIndex === undefined
                                 ? 'border-primary ring-1 ring-primary/50'
-                                : 'border-transparent hover:border-zinc-500'
+                                : 'border-transparent hover:border-muted-foreground/40'
                             }`}
                             onClick={() => {
                               handleSwitchVersion(editingEventId, -1);
@@ -4724,7 +4735,7 @@ function UniverseTimelineEditorInner() {
                             }}
                             title="Latest version"
                           >
-                            <div className="aspect-video bg-zinc-800 relative">
+                            <div className="aspect-video bg-muted relative">
                               <ResolvedThumbnailVideo
                                 url={eventData.latestVideoUrl || eventData.videoUrl}
                                 className="w-full h-full object-cover"

@@ -46,6 +46,7 @@ import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PersonaMeshy3DGenerator } from '@/components/persona/PersonaMeshy3DGenerator';
 import { ModelViewer } from '@/components/ModelViewerLazy';
+import { SignInPrompt } from '@/components/SignInPrompt';
 
 export const Route = createFileRoute('/create/persona')({
   component: CreatePersonaPage,
@@ -233,16 +234,11 @@ function CreatePersonaPage() {
   if (!isAuthenticated) {
     return (
       <div className="container mx-auto max-w-2xl py-12">
-        <Card>
-          <CardContent className="space-y-3 p-8 text-center">
-            <ShieldAlert className="mx-auto h-10 w-10 text-muted-foreground" />
-            <h2 className="text-xl font-semibold">Sign in to create a persona</h2>
-            <p className="text-sm text-muted-foreground">
-              Connect your wallet to bundle your voice, looks, 3D model, and personality into a
-              sellable persona.
-            </p>
-          </CardContent>
-        </Card>
+        <SignInPrompt
+          icon={ShieldAlert}
+          title="Sign in to create a persona"
+          description="Bundle your voice, looks, 3D model and personality into a sellable persona."
+        />
       </div>
     );
   }

@@ -1,8 +1,9 @@
 /**
- * LoarBalance — Compact points widget for the header/navbar. Shows the
- * on-chain $LOAR token balance and the off-chain points score; clicking it
- * opens the points leaderboard. Generation is BYOK, so points are not
- * purchasable — the CreditStore modal is kept only for the QA/admin
+ * LoarBalance — Compact balance widget for the header/navbar. Shows the
+ * credit balance (and, in web3 mode, the on-chain $LOAR token balance);
+ * clicking it opens /credits. Vocabulary: Credits = usage balance,
+ * Points = leaderboard activity score, $LOAR = token. Generation is BYOK, so
+ * credits are not purchasable — the CreditStore modal is kept only for the QA/admin
  * `OPEN_CREDIT_STORE` event, never the user-facing click.
  */
 import { lazy, Suspense, useState, useEffect, useCallback } from 'react';
@@ -73,7 +74,6 @@ export function LoarBalance() {
   });
 
   const credits = balance?.balance ?? 0;
-  const isLow = credits < 10;
 
   // Close modal on Escape key
   const handleKeyDown = useCallback(
@@ -103,28 +103,25 @@ export function LoarBalance() {
   return (
     <>
       <button
-        onClick={() => navigate({ to: '/points-leaderboard' })}
+        onClick={() => navigate({ to: '/credits' })}
         aria-label={
           web3Mode
-            ? `${tokenBalance ?? '—'} $LOAR tokens, ${credits} points. View the leaderboard.`
-            : `${credits} points. View the leaderboard.`
+            ? `${tokenBalance ?? '—'} $LOAR, ${credits} credits. View credit history.`
+            : `${credits} credits. View credit history.`
         }
-        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-          isLow
-            ? 'bg-red-900/30 border border-red-700/50 text-red-400 hover:bg-red-900/50'
-            : 'bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700'
-        }`}
+        className="flex items-center gap-1.5 h-8 px-2.5 rounded-full text-xs font-medium border border-border/60 bg-muted/40 text-foreground/80 hover:bg-muted transition-colors"
       >
         {web3Mode && (
           <>
-            <span className="text-emerald-400 font-bold">{tokenBalance ?? '0'}</span>
-            <span className="text-zinc-500">$LOAR</span>
-            <span className="text-zinc-600 mx-0.5">|</span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {tokenBalance ?? '0'}
+            </span>
+            <span className="text-muted-foreground">$LOAR</span>
+            <span className="text-border mx-0.5">|</span>
           </>
         )}
-        <span className="text-amber-400 font-bold">{credits}</span>
-        <span className="text-zinc-500">points</span>
-        {isLow && <span className="text-[9px] text-red-400">LOW</span>}
+        <span className="font-semibold tabular-nums text-primary">{credits.toLocaleString()}</span>
+        <span className="text-muted-foreground">credits</span>
       </button>
 
       {showStore &&
@@ -133,12 +130,12 @@ export function LoarBalance() {
             className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm"
             role="dialog"
             aria-modal="true"
-            aria-label="Points"
+            aria-label="Credits"
             onClick={(e) => {
               if (e.target === e.currentTarget) setShowStore(false);
             }}
           >
-            <div className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-y-auto p-6 mx-4">
+            <div className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-y-auto p-6 mx-4">
               <Suspense fallback={null}>
                 <CreditStore onClose={() => setShowStore(false)} />
               </Suspense>

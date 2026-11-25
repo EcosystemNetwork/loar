@@ -54,7 +54,7 @@ const STATUS_STYLE: Record<
   active: { label: 'Active', dot: 'bg-emerald-400', text: 'text-emerald-300', icon: CheckCircle2 },
   disabled: { label: 'Disabled', dot: 'bg-amber-400', text: 'text-amber-300', icon: PauseCircle },
   rejected: { label: 'Rejected', dot: 'bg-red-400', text: 'text-red-300', icon: AlertTriangle },
-  locked: { label: 'No key', dot: 'bg-zinc-600', text: 'text-zinc-400', icon: Lock },
+  locked: { label: 'No key', dot: 'bg-foreground/20', text: 'text-muted-foreground', icon: Lock },
 };
 
 const FILTERS: { id: KeyFilter; label: string }[] = [
@@ -192,7 +192,7 @@ export function ProviderKeysPanel({ onAgentKeysClick }: { onAgentKeysClick?: () 
       {isLoading ? (
         <p className="text-sm text-muted-foreground py-8 text-center">Loading your keys…</p>
       ) : visibleCount === 0 ? (
-        <Card className="p-8 text-center text-sm text-muted-foreground bg-zinc-900/40 border-white/10">
+        <Card className="p-8 text-center text-sm text-muted-foreground bg-card/40 border-white/10">
           No providers match.{' '}
           <button
             type="button"
@@ -212,7 +212,7 @@ export function ProviderKeysPanel({ onAgentKeysClick }: { onAgentKeysClick?: () 
               <h3 className="text-sm font-semibold">{g.label}</h3>
               <span className="text-xs text-muted-foreground">{g.blurb}</span>
             </div>
-            <Card className="bg-zinc-900/40 border-white/10 divide-y divide-white/5 overflow-hidden">
+            <Card className="bg-card/40 border-white/10 divide-y divide-white/5 overflow-hidden">
               {g.providers.map((id) => (
                 <ProviderRow
                   key={id}
@@ -259,10 +259,10 @@ function StatTile({
     emerald: 'text-emerald-300',
     red: 'text-red-300',
     violet: 'text-violet-300',
-    zinc: 'text-zinc-200',
+    zinc: 'text-foreground',
   }[tone];
   return (
-    <div className="rounded-lg border border-white/10 bg-zinc-900/40 px-3 py-3">
+    <div className="rounded-lg border border-white/10 bg-card/40 px-3 py-3">
       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className={cn('text-2xl font-semibold tabular-nums mt-0.5', color)}>
         {value.toLocaleString()}

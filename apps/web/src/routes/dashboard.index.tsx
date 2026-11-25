@@ -611,7 +611,7 @@ function UniverseCard({
                 Token Live
               </Badge>
             ) : (
-              <Badge className="bg-zinc-600/80 text-white border-0 text-[9px] px-1.5 py-0">
+              <Badge className="bg-foreground/80 text-foreground border-0 text-[9px] px-1.5 py-0">
                 No Token
               </Badge>
             )}

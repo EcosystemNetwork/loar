@@ -98,9 +98,9 @@ export function EntityCard({ entity, showActions = true }: EntityCardProps) {
         onMouseEnter={() => setLikeQueryEnabled(true)}
       >
         <Link to="/wiki/entity/$id" params={{ id: entity.id }} className="block">
-          <div className="aspect-video w-full overflow-hidden relative bg-gradient-to-br from-zinc-900 via-zinc-900/95 to-zinc-800">
+          <div className="aspect-video w-full overflow-hidden relative bg-gradient-to-br from-card via-card/95 to-muted">
             <div className="absolute inset-0 flex items-center justify-center">
-              <KindIcon className="h-10 w-10 text-white/20" />
+              <KindIcon className="h-10 w-10 text-foreground/20" />
             </div>
             {entity.imageUrl && (
               <SmartImage
@@ -146,7 +146,7 @@ export function EntityCard({ entity, showActions = true }: EntityCardProps) {
               aria-label={isLiked ? 'Remove bookmark' : 'Bookmark'}
             >
               <Heart
-                className={`h-3.5 w-3.5 ${isLiked ? 'fill-red-500 text-red-500' : 'text-white'}`}
+                className={`h-3.5 w-3.5 ${isLiked ? 'fill-red-500 text-red-500' : 'text-foreground'}`}
               />
             </Button>
             <Button
@@ -161,7 +161,7 @@ export function EntityCard({ entity, showActions = true }: EntityCardProps) {
               title="Report"
               aria-label="Report"
             >
-              <Flag className="h-3.5 w-3.5 text-white" />
+              <Flag className="h-3.5 w-3.5 text-foreground" />
             </Button>
           </div>
         )}

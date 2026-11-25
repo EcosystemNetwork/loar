@@ -28,6 +28,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useAdSlots, useMySponsorships } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { formatEther } from 'viem';
+import { SignInPrompt } from '@/components/SignInPrompt';
 
 export const Route = createFileRoute('/adplacements/')({
   component: AdsHubPage,
@@ -294,13 +295,7 @@ function CampaignsTab({
   }
 
   if (!isConnected) {
-    return (
-      <div className="text-center py-16 text-muted-foreground">
-        <Megaphone className="w-10 h-10 mx-auto mb-3 opacity-30" />
-        <p className="font-medium">Connect your wallet</p>
-        <p className="text-sm mt-1">to view your active campaigns</p>
-      </div>
-    );
+    return <SignInPrompt icon={Megaphone} title="Sign in to view your active campaigns" />;
   }
 
   if (isLoading) {

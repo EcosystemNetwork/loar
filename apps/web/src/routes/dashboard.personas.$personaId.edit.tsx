@@ -20,6 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { SignInPrompt } from '@/components/SignInPrompt';
 
 export const Route = createFileRoute('/dashboard/personas/$personaId/edit')({
   component: EditPersonaPage,
@@ -146,8 +147,8 @@ function EditPersonaPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="container mx-auto max-w-2xl py-12 text-center text-muted-foreground">
-        Connect your wallet to edit personas.
+      <div className="container mx-auto max-w-2xl py-12">
+        <SignInPrompt title="Sign in to edit personas" />
       </div>
     );
   }

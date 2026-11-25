@@ -79,8 +79,8 @@ export function DraftWorkspace({ universeId, accessLevel }: DraftWorkspaceProps)
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-white font-semibold">Drafts</h3>
-          <p className="text-zinc-500 text-sm">
+          <h3 className="text-foreground font-semibold">Drafts</h3>
+          <p className="text-muted-foreground text-sm">
             Pre-publication workspace for entities and content
           </p>
         </div>
@@ -92,17 +92,17 @@ export function DraftWorkspace({ universeId, accessLevel }: DraftWorkspaceProps)
       </div>
 
       {showForm && (
-        <div className="bg-zinc-800/50 rounded-lg p-4 space-y-3 border border-zinc-700">
+        <div className="bg-muted/50 rounded-lg p-4 space-y-3 border border-border">
           <Input
             placeholder="Draft title..."
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="bg-zinc-900 border-zinc-600"
+            className="bg-card border-muted-foreground/30"
           />
           <select
             value={kind ?? ''}
             onChange={(e) => setKind(e.target.value || null)}
-            className="w-full bg-zinc-900 border border-zinc-600 rounded-md px-3 py-2 text-sm text-white"
+            className="w-full bg-card border border-muted-foreground/30 rounded-md px-3 py-2 text-sm text-foreground"
           >
             <option value="">No entity kind</option>
             <option value="person">Person</option>
@@ -120,7 +120,7 @@ export function DraftWorkspace({ universeId, accessLevel }: DraftWorkspaceProps)
             placeholder="Write your draft content (Markdown supported)..."
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            className="bg-zinc-900 border-zinc-600 min-h-[120px]"
+            className="bg-card border-muted-foreground/30 min-h-[120px]"
           />
           <Button
             size="sm"
@@ -137,7 +137,7 @@ export function DraftWorkspace({ universeId, accessLevel }: DraftWorkspaceProps)
           <div className="animate-spin w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full" />
         </div>
       ) : items.length === 0 ? (
-        <div className="text-center py-12 text-zinc-500">
+        <div className="text-center py-12 text-muted-foreground">
           <p>No drafts yet.</p>
           {canCreate && (
             <p className="text-sm mt-1">Create your first draft to start worldbuilding.</p>
@@ -148,14 +148,14 @@ export function DraftWorkspace({ universeId, accessLevel }: DraftWorkspaceProps)
           {items.map((item: any) => (
             <div
               key={item.id}
-              className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 hover:border-zinc-600 transition-colors"
+              className="bg-muted/50 border border-border rounded-lg p-4 hover:border-muted-foreground/30 transition-colors"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <h4 className="text-white font-medium truncate">{item.title}</h4>
+                    <h4 className="text-foreground font-medium truncate">{item.title}</h4>
                     {item.kind && (
-                      <span className="text-xs bg-zinc-700 text-zinc-300 px-2 py-0.5 rounded">
+                      <span className="text-xs bg-foreground/10 text-foreground/80 px-2 py-0.5 rounded">
                         {item.kind}
                       </span>
                     )}
@@ -164,7 +164,7 @@ export function DraftWorkspace({ universeId, accessLevel }: DraftWorkspaceProps)
                         item.status === 'published'
                           ? 'bg-green-900/50 text-green-400'
                           : item.status === 'archived'
-                            ? 'bg-zinc-700 text-zinc-400'
+                            ? 'bg-foreground/10 text-muted-foreground'
                             : 'bg-amber-900/50 text-amber-400'
                       }`}
                     >
@@ -172,7 +172,7 @@ export function DraftWorkspace({ universeId, accessLevel }: DraftWorkspaceProps)
                     </span>
                   </div>
                   {item.body && (
-                    <p className="text-zinc-400 text-sm mt-1 line-clamp-2">{item.body}</p>
+                    <p className="text-muted-foreground text-sm mt-1 line-clamp-2">{item.body}</p>
                   )}
                 </div>
                 {canCreate && item.status === 'draft' && (

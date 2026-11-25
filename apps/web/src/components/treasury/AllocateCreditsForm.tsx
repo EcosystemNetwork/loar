@@ -33,9 +33,9 @@ export function AllocateCreditsForm({ universeId }: { universeId: string }) {
     <div className="space-y-6">
       {/* Team Members List */}
       {members && members.length > 0 && (
-        <Card className="bg-zinc-900/50 border-zinc-800">
+        <Card className="bg-card/50 border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2 text-zinc-300">
+            <CardTitle className="text-sm flex items-center gap-2 text-foreground/80">
               <Users className="h-4 w-4" />
               Team Members
             </CardTitle>
@@ -49,20 +49,22 @@ export function AllocateCreditsForm({ universeId }: { universeId: string }) {
                 className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all text-left ${
                   memberUid === m.memberUid
                     ? 'border-violet-500 bg-violet-950/30'
-                    : 'border-zinc-800 bg-zinc-900 hover:border-zinc-700'
+                    : 'border-border bg-card hover:border-border'
                 }`}
               >
                 <div>
-                  <div className="text-sm font-medium text-zinc-200">
+                  <div className="text-sm font-medium text-foreground">
                     {m.memberUid.slice(0, 6)}...{m.memberUid.slice(-4)}
                   </div>
-                  <div className="text-xs text-zinc-500 capitalize">{m.role}</div>
+                  <div className="text-xs text-muted-foreground capitalize">{m.role}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs text-zinc-400">
+                  <div className="text-xs text-muted-foreground">
                     Allowance: {m.monthlyAllowance || 'Unlimited'}
                   </div>
-                  <div className="text-xs text-zinc-500">Used: {m.creditsUsedThisMonth || 0}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Used: {m.creditsUsedThisMonth || 0}
+                  </div>
                 </div>
               </button>
             ))}
@@ -71,9 +73,9 @@ export function AllocateCreditsForm({ universeId }: { universeId: string }) {
       )}
 
       {/* Allocation Form */}
-      <Card className="bg-zinc-900/50 border-zinc-800">
+      <Card className="bg-card/50 border-border">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2 text-zinc-300">
+          <CardTitle className="text-sm flex items-center gap-2 text-foreground/80">
             <Send className="h-4 w-4" />
             Allocate Credits
           </CardTitle>
@@ -81,36 +83,36 @@ export function AllocateCreditsForm({ universeId }: { universeId: string }) {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-zinc-400">Member Address / UID</Label>
+              <Label className="text-muted-foreground">Member Address / UID</Label>
               <Input
                 value={memberUid}
                 onChange={(e) => setMemberUid(e.target.value)}
                 placeholder="0x... or user UID"
-                className="bg-zinc-900 border-zinc-700 text-white"
+                className="bg-card border-border text-foreground"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-zinc-400">Credits to Allocate</Label>
+              <Label className="text-muted-foreground">Credits to Allocate</Label>
               <Input
                 type="number"
                 min="1"
                 value={credits}
                 onChange={(e) => setCredits(e.target.value)}
                 placeholder="1000"
-                className="bg-zinc-900 border-zinc-700 text-white"
+                className="bg-card border-border text-foreground"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-zinc-400">Reason (optional)</Label>
+              <Label className="text-muted-foreground">Reason (optional)</Label>
               <Textarea
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="e.g., Monthly generation budget, bonus for content"
-                className="bg-zinc-900 border-zinc-700 text-white resize-none"
+                className="bg-card border-border text-foreground resize-none"
                 rows={2}
               />
             </div>
@@ -118,7 +120,7 @@ export function AllocateCreditsForm({ universeId }: { universeId: string }) {
             <Button
               type="submit"
               disabled={allocate.isPending || !memberUid.trim() || !credits}
-              className="w-full bg-violet-600 hover:bg-violet-700"
+              className="w-full bg-primary hover:bg-primary/90"
             >
               {allocate.isPending ? (
                 <>

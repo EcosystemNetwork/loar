@@ -22,6 +22,7 @@ import { useVocab } from '@/hooks/use-vocab';
 import { confirmTx } from '@/components/tx-confirm';
 import { getEvmAddresses, isZeroAddress } from '@/configs/addresses';
 import { ListingPrice, usePriceText } from '@/components/Price';
+import { requireSignIn } from '@/components/SignInPrompt';
 
 const TREASURY_ADDRESS = import.meta.env.VITE_TREASURY_ADDRESS as Address | undefined;
 
@@ -98,7 +99,7 @@ function CheckoutPage() {
 
   async function handleConfirm() {
     if (!isAuthenticated) {
-      toast.error('Connect your wallet first');
+      requireSignIn('to check out');
       return;
     }
     setProcessing(true);

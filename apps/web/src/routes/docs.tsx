@@ -21,6 +21,7 @@ import {
   Key,
   Network,
 } from 'lucide-react';
+import { BRAND } from '@/lib/brand';
 
 export const Route = createFileRoute('/docs')({
   component: DocsPage,
@@ -192,7 +193,7 @@ function DocsPage() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2">LOAR Documentation</h1>
             <p className="text-muted-foreground">
-              Complete technical documentation for the LOAR Decentralized Narrative Control Suite.
+              Complete technical documentation for LOAR, the AI cinematic universe studio.
             </p>
           </div>
 
@@ -1890,7 +1891,7 @@ cd packages/abis && pnpm build:ts`}</CodeBlock>
           </Section>
 
           <div className="mt-8 border-t border-border pt-6 text-center text-xs text-muted-foreground">
-            <p>LOAR &mdash; Decentralized Narrative Control Suite</p>
+            <p>{BRAND.title}</p>
             <p className="mt-1">Sepolia Testnet &middot; loar.fun</p>
           </div>
         </main>

@@ -42,22 +42,22 @@ const SHORTCUTS = [
 
 function ShortcutsHelpDialogImpl({ onClose }: ShortcutsHelpDialogProps) {
   return (
-    <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-xl shadow-2xl p-4 animate-in fade-in duration-150 max-w-md">
+    <div className="bg-card/95 backdrop-blur-md border border-border rounded-xl shadow-2xl p-4 animate-in fade-in duration-150 max-w-md">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-medium text-white flex items-center gap-2">
+        <span className="text-sm font-medium text-foreground flex items-center gap-2">
           <Keyboard className="h-4 w-4" /> Keyboard Shortcuts
         </span>
-        <button onClick={onClose} className="text-zinc-500 hover:text-white">
+        <button onClick={onClose} className="text-zinc-500 hover:text-foreground">
           <X className="h-4 w-4" />
         </button>
       </div>
       <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-xs">
         {SHORTCUTS.map(([key, desc]) => (
           <div key={key} className="flex items-center gap-2">
-            <kbd className="text-[10px] text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded font-mono min-w-[60px] text-center">
+            <kbd className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-mono min-w-[60px] text-center">
               {key}
             </kbd>
-            <span className="text-zinc-400">{desc}</span>
+            <span className="text-muted-foreground">{desc}</span>
           </div>
         ))}
       </div>

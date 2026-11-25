@@ -270,7 +270,7 @@ function TrendingTile({ item, onOpen }: { item: any; onOpen: (item: any) => void
       type="button"
       onClick={() => onOpen(item)}
       aria-label={`Open ${item.title || 'trending item'}`}
-      className="relative aspect-video w-full rounded-lg overflow-hidden group cursor-pointer text-left bg-gradient-to-br from-zinc-900 via-zinc-900/95 to-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="relative aspect-video w-full rounded-lg overflow-hidden group cursor-pointer text-left bg-gradient-to-br from-card via-card/95 to-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {isVideo && item.mediaUrl ? (
         <>

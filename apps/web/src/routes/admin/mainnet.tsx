@@ -63,13 +63,13 @@ const CATEGORY_ICON: Record<BlockerCategory, React.ReactNode> = {
 const STATUS_TINT: Record<BlockerStatus, string> = {
   ready: 'bg-green-500/15 text-green-300 border-green-500/40',
   blocked: 'bg-red-500/15 text-red-300 border-red-500/40',
-  unknown: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/40',
+  unknown: 'bg-muted-foreground/15 text-foreground/80 border-muted-foreground/40',
 };
 
 function StatusIcon({ status }: { status: BlockerStatus }) {
   if (status === 'ready') return <CheckCircle2 className="h-4 w-4 text-green-400" />;
   if (status === 'blocked') return <XCircle className="h-4 w-4 text-red-400" />;
-  return <HelpCircle className="h-4 w-4 text-zinc-400" />;
+  return <HelpCircle className="h-4 w-4 text-muted-foreground" />;
 }
 
 function MainnetReadinessPage() {
@@ -137,7 +137,7 @@ function MainnetReadinessPage() {
             style={{ width: `${(data.readyCount / data.totalBlockers) * 100}%` }}
           />
           <div
-            className="bg-zinc-500 transition-all"
+            className="bg-muted-foreground transition-all"
             style={{ width: `${(data.unknownCount / data.totalBlockers) * 100}%` }}
           />
           <div
@@ -150,7 +150,7 @@ function MainnetReadinessPage() {
             <CheckCircle2 className="h-3.5 w-3.5 text-green-400" /> {data.readyCount} ready
           </span>
           <span className="flex items-center gap-1.5">
-            <HelpCircle className="h-3.5 w-3.5 text-zinc-400" /> {data.unknownCount} manual
+            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" /> {data.unknownCount} manual
           </span>
           <span className="flex items-center gap-1.5">
             <XCircle className="h-3.5 w-3.5 text-red-400" /> {data.blockedCount} blocked

@@ -158,7 +158,7 @@ function CompareSlot({
   error: string | null;
 }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-zinc-900/40 p-3 space-y-2 min-h-[200px]">
+    <div className="rounded-lg border border-white/10 bg-card/40 p-3 space-y-2 min-h-[200px]">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="text-[10px]">
@@ -362,7 +362,7 @@ function ScriptSlot({
   error: string | null;
 }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-zinc-900/40 p-4 space-y-3 min-h-[300px]">
+    <div className="rounded-lg border border-white/10 bg-card/40 p-4 space-y-3 min-h-[300px]">
       <div className="flex items-center justify-between border-b border-white/10 pb-2">
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="text-[10px]">

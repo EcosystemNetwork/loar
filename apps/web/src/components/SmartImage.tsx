@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { decode as decodeBlurhash } from 'blurhash';
+import { MediaFallback } from '@/components/states';
 import { cn } from '@/lib/utils';
 import {
   getIpfsUrlCandidatesPreferred,
@@ -162,9 +163,11 @@ export function SmartImage({
   if (!src || errored) {
     return (
       <div className={wrapperClass}>
-        <div className="absolute inset-0 bg-muted flex items-center justify-center text-muted-foreground/40 text-xs">
-          {errored ? 'Couldn’t load image' : ''}
-        </div>
+        {errored ? (
+          <MediaFallback title={alt || undefined} />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-b from-muted to-muted/60" />
+        )}
       </div>
     );
   }

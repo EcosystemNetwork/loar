@@ -1,6 +1,6 @@
 /**
- * Points — full-page points balance and history. Generation is BYOK, so
- * points are informational only; purchasing is disabled (see purchaseEnabled).
+ * Credits — full-page credit balance and history. Generation is BYOK, so
+ * credits are informational only; purchasing is disabled (see purchaseEnabled).
  */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { ArrowLeft, Zap, TrendingUp, TrendingDown, Gift, Coins } from 'lucide-react';
@@ -14,6 +14,7 @@ import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
+import { SignInPrompt } from '@/components/SignInPrompt';
 
 export const Route = createFileRoute('/credits')({
   component: CreditsPage,
@@ -67,18 +68,18 @@ function CreditsPage() {
         </Button>
         <h1 className="font-bold flex items-center gap-2">
           <Zap className="w-4 h-4 text-amber-400" />
-          Points
+          Credits
         </h1>
         {!showStore && purchaseEnabled && (
           <Button size="sm" className="ml-auto" onClick={() => setShowStore(true)}>
-            Buy Points
+            Buy Credits
           </Button>
         )}
       </div>
 
       <div className="flex-1 max-w-2xl mx-auto w-full px-4 py-6 space-y-5">
         {showStore ? (
-          <Card className="bg-zinc-950 border-zinc-800">
+          <Card className="bg-background border-border">
             <CardContent className="p-6">
               <CreditStore onClose={() => setShowStore(false)} />
             </CardContent>
@@ -91,7 +92,7 @@ function CreditsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
-                      Available Points
+                      Available Credits
                     </p>
                     {balanceLoading ? (
                       <div className="h-10 w-24 bg-muted animate-pulse rounded" />
@@ -101,7 +102,7 @@ function CreditsPage() {
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground mt-1">
-                      Points track usage. Generation runs on your own provider keys — no balance
+                      Credits track usage. Generation runs on your own provider keys — no balance
                       required.
                     </p>
                   </div>
@@ -158,7 +159,7 @@ function CreditsPage() {
                           {key.replace(/_/g, ' ')}
                         </span>
                         <Badge variant="outline" className="text-xs ml-2 shrink-0">
-                          {value as number} pts
+                          {value as number} credits
                         </Badge>
                       </div>
                     ))}
@@ -181,9 +182,7 @@ function CreditsPage() {
               </CardHeader>
               <CardContent className="px-5 pb-4">
                 {!isAuthenticated ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">
-                    Connect your wallet to view history
-                  </p>
+                  <SignInPrompt variant="inline" title="Sign in to see your history" />
                 ) : historyLoading ? (
                   <div className="space-y-2">
                     {[...Array(4)].map((_, i) => (
@@ -228,7 +227,7 @@ function CreditsPage() {
                               className={`text-sm font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}
                             >
                               {isPositive ? '+' : '-'}
-                              {totalCredits.toLocaleString()} pts
+                              {totalCredits.toLocaleString()} credits
                             </p>
                             {tx.createdAt && (
                               <p className="text-[10px] text-muted-foreground">

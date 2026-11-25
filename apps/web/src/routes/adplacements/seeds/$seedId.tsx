@@ -45,6 +45,7 @@ import {
 } from '@/hooks/useRevenue';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
+import { requireSignIn } from '@/components/SignInPrompt';
 
 export const Route = createFileRoute('/adplacements/seeds/$seedId')({
   component: SeedDetailPage,
@@ -130,7 +131,7 @@ function SeedDetailPage() {
 
   async function handleSubmit() {
     if (!isConnected) {
-      toast.error('Connect your wallet');
+      requireSignIn();
       return;
     }
     if (!contentUrl.trim()) {

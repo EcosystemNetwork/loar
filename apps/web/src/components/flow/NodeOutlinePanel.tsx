@@ -108,7 +108,7 @@ function TreeNode({
     <div>
       <div
         className={`flex items-center gap-1 py-1 px-2 rounded-md cursor-pointer transition-colors group ${
-          isSelected ? 'bg-blue-500/20 text-blue-300' : 'hover:bg-zinc-800 text-zinc-300'
+          isSelected ? 'bg-blue-500/20 text-blue-300' : 'hover:bg-muted text-foreground/80'
         }`}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={() => onNavigate(node)}
@@ -159,7 +159,7 @@ function TreeNode({
             {arc.name}
           </Badge>
         )}
-        {node.data.videoUrl && <Film className="h-3 w-3 text-zinc-500 shrink-0" />}
+        {node.data.videoUrl && <Film className="h-3 w-3 text-muted-foreground shrink-0" />}
 
         {/* Actions on hover */}
         <button
@@ -170,9 +170,9 @@ function TreeNode({
           }}
           title={isSelected ? 'Deselect' : 'Select'}
         >
-          <Eye className={`h-3 w-3 ${isSelected ? 'text-blue-400' : 'text-zinc-600'}`} />
+          <Eye className={`h-3 w-3 ${isSelected ? 'text-blue-400' : 'text-muted-foreground/70'}`} />
         </button>
-        <Locate className="h-3 w-3 text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+        <Locate className="h-3 w-3 text-muted-foreground/70 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
       </div>
 
       {/* Children */}
@@ -228,13 +228,13 @@ function NodeOutlinePanelImpl({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-80 bg-zinc-950 border-zinc-800 p-0">
+      <SheetContent side="left" className="w-80 bg-background border-border p-0">
         <SheetHeader className="px-4 pt-4 pb-2">
-          <SheetTitle className="text-sm font-medium text-zinc-200">Node Outline</SheetTitle>
+          <SheetTitle className="text-sm font-medium text-foreground">Node Outline</SheetTitle>
         </SheetHeader>
 
         {/* Stats bar */}
-        <div className="px-4 pb-2 flex items-center gap-3 text-[10px] text-zinc-500">
+        <div className="px-4 pb-2 flex items-center gap-3 text-[10px] text-muted-foreground">
           <span>{totalScenes} nodes</span>
           <span>{canonCount} canon</span>
           <span>{withVideo} with video</span>
@@ -244,12 +244,12 @@ function NodeOutlinePanelImpl({
         {/* Search */}
         <div className="px-4 pb-2">
           <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Filter nodes..."
-              className="pl-7 h-7 text-xs bg-zinc-900 border-zinc-700"
+              className="pl-7 h-7 text-xs bg-card border-border"
             />
           </div>
         </div>
@@ -260,7 +260,7 @@ function NodeOutlinePanelImpl({
           style={{ maxHeight: 'calc(100vh - 140px)' }}
         >
           {roots.length === 0 ? (
-            <div className="text-center text-sm text-zinc-500 py-8">No scene nodes</div>
+            <div className="text-center text-sm text-muted-foreground py-8">No scene nodes</div>
           ) : (
             roots.map((root) => (
               <TreeNode

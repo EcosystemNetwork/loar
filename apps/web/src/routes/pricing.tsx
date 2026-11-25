@@ -24,6 +24,7 @@ import {
   Coins,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ErrorState } from '@/components/states';
 
 export const Route = createFileRoute('/pricing')({
   component: PricingPage,
@@ -36,27 +37,14 @@ const TIER_ICONS: Record<string, React.ReactNode> = {
   business: <Building2 className="h-5 w-5" />,
 };
 
-const TIER_COLORS: Record<string, string> = {
-  starter: 'border-zinc-700',
-  plus: 'border-blue-500/50',
-  ultra: 'border-amber-400',
-  business: 'border-pink-500/50',
-};
-
-const TIER_BUTTON_STYLES: Record<string, string> = {
-  starter: 'bg-zinc-700 hover:bg-zinc-600 text-white',
-  plus: 'bg-blue-600 hover:bg-blue-500 text-white',
-  ultra:
-    'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-bold',
-  business: 'bg-pink-600 hover:bg-pink-500 text-white',
-};
-
-const TIER_BADGE_STYLES: Record<string, string> = {
-  starter: 'bg-zinc-700 text-zinc-300',
-  plus: 'bg-blue-600/20 text-blue-400 border border-blue-500/30',
-  ultra: 'bg-amber-500/20 text-amber-400 border border-amber-400/30',
-  business: 'bg-pink-600/20 text-pink-400 border border-pink-500/30',
-};
+// One brand, one highlighted plan: the server-flagged `popular` tier gets the
+// primary accent; every other tier is neutral. No per-tier rainbow.
+const tierBorder = (popular: boolean) => (popular ? 'border-primary' : 'border-border');
+const tierButton = (popular: boolean) =>
+  popular
+    ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
+    : 'border border-border bg-transparent hover:bg-muted text-foreground';
+const TIER_BADGE = 'bg-muted text-foreground/80';
 
 // ERC20 ABI fragment for transfer
 const ERC20_TRANSFER_ABI = [
@@ -84,6 +72,7 @@ function PricingPage() {
     data: tiers,
     isLoading,
     isError,
+    refetch: refetchTiers,
   } = useQuery({
     queryKey: ['subscription-tiers'],
     queryFn: () => trpcClient.platformSubscriptions.getTiers.query(),
@@ -160,7 +149,7 @@ function PricingPage() {
     },
     onSuccess: (data) => {
       toast.success(
-        `Subscribed to ${data.tierName}! ${data.creditsIssued.toLocaleString()} points added.`
+        `Subscribed to ${data.tierName}! ${data.creditsIssued.toLocaleString()} credits added.`
       );
       queryClient.invalidateQueries({ queryKey: ['my-subscription'] });
       queryClient.invalidateQueries({ queryKey: ['credit-balance'] });
@@ -188,9 +177,9 @@ function PricingPage() {
       <div className="max-w-6xl mx-auto px-4 py-12 md:py-20">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-3xl md:text-5xl font-bold mb-3 tracking-tight">PICK YOUR PLAN</h1>
+          <h1 className="text-3xl md:text-5xl font-bold mb-3 tracking-tight">Pick your plan</h1>
           <p className="text-muted-foreground text-sm md:text-base max-w-xl mx-auto">
-            Create AI-powered cinematic universes with monthly points.
+            Create AI-powered cinematic universes with monthly credits.
             <br />
             Upgrade anytime. Cancel anytime.
           </p>
@@ -202,7 +191,7 @@ function PricingPage() {
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 billing === 'monthly'
                   ? 'bg-white text-black'
-                  : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                  : 'bg-muted text-muted-foreground hover:text-foreground'
               }`}
             >
               Monthly
@@ -212,12 +201,12 @@ function PricingPage() {
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
                 billing === 'annual'
                   ? 'bg-white text-black'
-                  : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                  : 'bg-muted text-muted-foreground hover:text-foreground'
               }`}
             >
               Annual
-              <span className="text-[10px] font-bold bg-green-500 text-white px-1.5 py-0.5 rounded-full">
-                SAVE 20%
+              <span className="text-[10px] font-semibold bg-primary/15 text-primary px-1.5 py-0.5 rounded-full">
+                Save 20%
               </span>
             </button>
           </div>
@@ -225,7 +214,7 @@ function PricingPage() {
 
         {/* Tier cards */}
         {isError ? (
-          <div className="p-8 text-center text-red-400">Failed to load data. Please try again.</div>
+          <ErrorState title="Couldn’t load plans" onRetry={() => refetchTiers()} />
         ) : isLoading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -240,22 +229,22 @@ function PricingPage() {
               const loarTokens =
                 billing === 'annual' ? tier.annualLoarTokens : tier.monthlyLoarTokens;
               const totalLoar = billing === 'annual' ? loarTokens * 12 : loarTokens;
-              const borderColor = TIER_COLORS[tier.id] ?? 'border-zinc-700';
+              const borderColor = tierBorder(!!isPopular);
               const isSubscribing = subscribingTier === tier.id;
 
               return (
                 <div
                   key={tier.id}
                   className={`relative rounded-2xl border-2 ${borderColor} bg-zinc-900/80 backdrop-blur p-6 flex flex-col ${
-                    isPopular ? 'lg:-mt-4 lg:mb-0 lg:pb-8 shadow-xl shadow-amber-500/10' : ''
+                    isPopular ? 'lg:-mt-4 lg:mb-0 lg:pb-8 shadow-xl shadow-primary/10' : ''
                   }`}
                 >
                   {/* Popular badge */}
                   {isPopular && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-black text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
+                      <span className="bg-primary text-primary-foreground text-[10px] font-semibold px-3 py-1 rounded-full flex items-center gap-1">
                         <Sparkles className="h-3 w-3" />
-                        Most Popular
+                        Most popular
                       </span>
                     </div>
                   )}
@@ -264,17 +253,17 @@ function PricingPage() {
                   <div className="mb-4">
                     <div className="flex items-center gap-2 mb-1">
                       <span
-                        className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${TIER_BADGE_STYLES[tier.id] ?? 'bg-zinc-700 text-zinc-300'}`}
+                        className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${TIER_BADGE}`}
                       >
                         {TIER_ICONS[tier.id]}
-                        {tier.name.toUpperCase()}
+                        {tier.name}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-2 mt-3 mb-1">
                       <span className="text-sm text-muted-foreground">
                         <Zap className="h-3.5 w-3.5 inline mr-1" />
-                        {tier.monthlyCredits.toLocaleString()} points/mo
+                        {tier.monthlyCredits.toLocaleString()} credits/mo
                       </span>
                     </div>
                   </div>
@@ -291,8 +280,8 @@ function PricingPage() {
                     </div>
                     <span className="text-xs text-muted-foreground">/month</span>
                     <div className="flex items-center gap-1.5 mt-2">
-                      <Coins className="h-3.5 w-3.5 text-amber-400" />
-                      <span className="text-xs text-amber-400 font-medium">
+                      <Coins className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-xs text-primary font-medium">
                         {totalLoar.toLocaleString()} $LOAR
                         {billing === 'annual' ? '/yr' : '/mo'}
                       </span>
@@ -302,7 +291,7 @@ function PricingPage() {
                   {/* CTA */}
                   <div className="mb-6">
                     {isCurrent ? (
-                      <div className="w-full py-2.5 px-4 rounded-lg text-sm font-semibold bg-green-600/20 text-green-400 border border-green-500/30 text-center flex items-center justify-center gap-2">
+                      <div className="w-full py-2.5 px-4 rounded-lg text-sm font-semibold bg-primary/10 text-primary border border-primary/30 text-center flex items-center justify-center gap-2">
                         <Check className="h-4 w-4" />
                         Current Plan
                       </div>
@@ -310,7 +299,7 @@ function PricingPage() {
                       <button
                         onClick={() => handleSubscribe(tier.id)}
                         disabled={isSubscribing || subscribeMutation.isPending}
-                        className={`w-full py-2.5 px-4 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${TIER_BUTTON_STYLES[tier.id] ?? 'bg-zinc-700 text-white'}`}
+                        className={`w-full py-2.5 px-4 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${tierButton(!!isPopular)}`}
                       >
                         {isSubscribing ? (
                           <>
@@ -329,7 +318,7 @@ function PricingPage() {
                   </div>
 
                   {/* Divider */}
-                  <div className="border-t border-zinc-800 mb-4" />
+                  <div className="border-t border-border mb-4" />
 
                   {/* Feature list */}
                   <div className="space-y-2.5 flex-1">
@@ -340,10 +329,10 @@ function PricingPage() {
                       <div key={i} className="flex items-start gap-2">
                         <Check
                           className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${
-                            isPopular ? 'text-amber-400' : 'text-green-400'
+                            isPopular ? 'text-primary' : 'text-muted-foreground'
                           }`}
                         />
-                        <span className="text-xs text-zinc-300">{feature}</span>
+                        <span className="text-xs text-foreground/80">{feature}</span>
                       </div>
                     ))}
                   </div>
@@ -361,15 +350,15 @@ function PricingPage() {
               onClick={() => navigate({ to: '/credits' })}
               className="text-primary underline underline-offset-2 hover:text-primary/80"
             >
-              points balance
+              credit balance
             </button>
             .
           </p>
 
           {mySub && mySub.status === 'active' && (
-            <div className="inline-flex items-center gap-2 bg-zinc-800/50 border border-zinc-700 rounded-lg px-4 py-2 text-sm">
+            <div className="inline-flex items-center gap-2 bg-muted/50 border border-border rounded-lg px-4 py-2 text-sm">
               <Check className="h-4 w-4 text-green-400" />
-              <span className="text-zinc-300">
+              <span className="text-foreground/80">
                 You're on the <strong>{mySub.tier?.name}</strong> plan
                 {mySub.cancelAtPeriodEnd && ' (cancels at period end)'}
               </span>

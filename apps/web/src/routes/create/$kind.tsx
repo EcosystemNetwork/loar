@@ -48,6 +48,7 @@ import { STYLE_PRESETS } from '@/components/sandbox/constants';
 import { RANDOM_NAME_SEEDS, pickRandom, baseArtPromptForKind } from '@/lib/random-entity';
 import { FIELDS_BY_KIND } from '@/lib/entity-kind-fields';
 import { SmartImage } from '@/components/SmartImage';
+import { requireSignIn } from '@/components/SignInPrompt';
 
 type EntityKind =
   | 'person'
@@ -527,7 +528,7 @@ function EntityCreateForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!address) {
-      toast.error('Connect your wallet to create entities');
+      requireSignIn('to create entities');
       return;
     }
 

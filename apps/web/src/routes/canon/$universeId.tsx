@@ -65,6 +65,7 @@ import { useWriteContract } from '@/hooks/useCircleWrite';
 import { canonMarketplaceAbi, governanceErc20Abi } from '@loar/abis/generated';
 import { CanonMarketplace } from '@loar/abis/addresses';
 import { formatEther, parseEther } from 'viem';
+import { requireSignIn } from '@/components/SignInPrompt';
 
 export const Route = createFileRoute('/canon/$universeId')({
   component: CanonPage,
@@ -242,7 +243,7 @@ function SubmissionCard({
 
   async function castVote(support: boolean) {
     if (!isConnected) {
-      toast.error('Connect your wallet to vote');
+      requireSignIn('to vote');
       return;
     }
     if (voted) return;
@@ -262,7 +263,7 @@ function SubmissionCard({
 
   async function finalize() {
     if (!isConnected) {
-      toast.error('Connect your wallet to finalize');
+      requireSignIn('to finalize');
       return;
     }
     setFinalizing(true);

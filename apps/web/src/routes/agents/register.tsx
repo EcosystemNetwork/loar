@@ -55,8 +55,10 @@ function AgentRegisterPage() {
       <div className="flex min-h-[60vh] items-center justify-center">
         <Card className="p-8 text-center">
           <Briefcase className="mx-auto mb-4 h-12 w-12 text-violet-400" />
-          <h2 className="mb-2 text-xl font-bold text-white">{v('connect-wallet-to-register')}</h2>
-          <p className="mb-4 text-zinc-400">You need a wallet to become a talent agent</p>
+          <h2 className="mb-2 text-xl font-bold text-foreground">
+            {v('connect-wallet-to-register')}
+          </h2>
+          <p className="mb-4 text-muted-foreground">You need a wallet to become a talent agent</p>
           <WalletConnectButton />
         </Card>
       </div>
@@ -67,8 +69,8 @@ function AgentRegisterPage() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <Card className="p-8 text-center">
-          <h2 className="mb-2 text-xl font-bold text-white">Already Registered</h2>
-          <p className="mb-4 text-zinc-400">You're already a talent agent on LOAR</p>
+          <h2 className="mb-2 text-xl font-bold text-foreground">Already Registered</h2>
+          <p className="mb-4 text-muted-foreground">You're already a talent agent on LOAR</p>
           <Button onClick={() => navigate({ to: '/agents/dashboard' })}>Go to Dashboard</Button>
         </Card>
       </div>
@@ -114,18 +116,18 @@ function AgentRegisterPage() {
 
       <Card className="p-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
             <Briefcase className="h-7 w-7 text-violet-400" />
             Become a Talent Agent
           </h1>
-          <p className="mt-2 text-zinc-400">
+          <p className="mt-2 text-muted-foreground">
             Represent creators, broker deals, earn commissions on licensing and collabs
           </p>
         </div>
 
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm text-zinc-400">Agency Name *</label>
+            <label className="mb-1 block text-sm text-muted-foreground">Agency Name *</label>
             <Input
               placeholder="e.g. Creative Universe Agency"
               value={form.agencyName}
@@ -134,7 +136,7 @@ function AgentRegisterPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm text-zinc-400">Display Name *</label>
+            <label className="mb-1 block text-sm text-muted-foreground">Display Name *</label>
             <Input
               placeholder="Your public name"
               value={form.displayName}
@@ -143,18 +145,18 @@ function AgentRegisterPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm text-zinc-400">Bio</label>
+            <label className="mb-1 block text-sm text-muted-foreground">Bio</label>
             <textarea
               placeholder="Tell creators what you bring to the table..."
               value={form.bio}
               onChange={(e) => setForm((p) => ({ ...p, bio: e.target.value }))}
-              className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-white placeholder:text-zinc-500"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-foreground placeholder:text-muted-foreground"
               rows={3}
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm text-zinc-400">Website</label>
+            <label className="mb-1 block text-sm text-muted-foreground">Website</label>
             <Input
               placeholder="https://..."
               value={form.website}
@@ -163,7 +165,7 @@ function AgentRegisterPage() {
           </div>
 
           <div>
-            <label className="mb-2 block text-sm text-zinc-400">Specialties</label>
+            <label className="mb-2 block text-sm text-muted-foreground">Specialties</label>
             <div className="flex flex-wrap gap-2">
               {SPECIALTIES.map((s) => (
                 <Badge

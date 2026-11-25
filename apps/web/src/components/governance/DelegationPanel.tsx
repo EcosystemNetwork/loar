@@ -41,30 +41,30 @@ export function DelegationPanel({ universeId }: { universeId: string }) {
   };
 
   return (
-    <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
-      <h3 className="font-semibold text-white mb-4">Delegate Votes</h3>
+    <div className="bg-card rounded-xl p-5 border border-border">
+      <h3 className="font-semibold text-foreground mb-4">Delegate Votes</h3>
 
       <button
         onClick={handleSelfDelegate}
         disabled={isPending || isConfirming || !address}
-        className="w-full px-3 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-zinc-700 disabled:text-zinc-500 rounded-lg text-sm font-medium transition-colors mb-3"
+        className="w-full px-3 py-2 bg-primary hover:bg-primary/90 disabled:bg-foreground/10 disabled:text-muted-foreground rounded-lg text-sm font-medium transition-colors mb-3"
       >
         {isPending || isConfirming ? 'Confirming...' : 'Delegate to Self'}
       </button>
 
       <div className="relative">
-        <p className="text-zinc-500 text-xs mb-2">Or delegate to another address:</p>
+        <p className="text-muted-foreground text-xs mb-2">Or delegate to another address:</p>
         <input
           type="text"
           placeholder="0x..."
           value={delegatee}
           onChange={(e) => setDelegatee(e.target.value)}
-          className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500"
+          className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-violet-500"
         />
         <button
           onClick={handleDelegate}
           disabled={!isAddress(delegatee) || isPending || isConfirming}
-          className="mt-2 w-full px-3 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-lg text-sm font-medium transition-colors"
+          className="mt-2 w-full px-3 py-2 bg-muted hover:bg-foreground/10 disabled:bg-muted disabled:text-muted-foreground/70 rounded-lg text-sm font-medium transition-colors"
         >
           Delegate
         </button>

@@ -33,16 +33,16 @@ export function TreasuryHistoryTable({ universeId }: { universeId: string }) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   if (!history || history.length === 0) {
     return (
-      <div className="bg-zinc-900 rounded-xl p-12 text-center">
-        <p className="text-zinc-400 text-lg">No transactions yet</p>
-        <p className="text-zinc-500 mt-2">Fund the pool to get started</p>
+      <div className="bg-card rounded-xl p-12 text-center">
+        <p className="text-muted-foreground text-lg">No transactions yet</p>
+        <p className="text-muted-foreground mt-2">Fund the pool to get started</p>
       </div>
     );
   }
@@ -61,7 +61,7 @@ export function TreasuryHistoryTable({ universeId }: { universeId: string }) {
         return (
           <Card
             key={tx.id}
-            className="bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 transition-colors"
+            className="bg-card/50 border-border hover:border-border transition-colors"
           >
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -75,11 +75,13 @@ export function TreasuryHistoryTable({ universeId }: { universeId: string }) {
                         {config.label}
                       </Badge>
                       {tx.packageName && (
-                        <span className="text-xs text-zinc-500">{tx.packageName}</span>
+                        <span className="text-xs text-muted-foreground">{tx.packageName}</span>
                       )}
-                      {tx.source && <span className="text-xs text-zinc-500">{tx.source}</span>}
+                      {tx.source && (
+                        <span className="text-xs text-muted-foreground">{tx.source}</span>
+                      )}
                     </div>
-                    <div className="text-xs text-zinc-500 mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       {date.toLocaleDateString()}{' '}
                       {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       {tx.allocatedToUid && (
@@ -87,7 +89,9 @@ export function TreasuryHistoryTable({ universeId }: { universeId: string }) {
                           to {tx.allocatedToUid.slice(0, 6)}...{tx.allocatedToUid.slice(-4)}
                         </span>
                       )}
-                      {tx.reason && <span className="ml-2 text-zinc-600">- {tx.reason}</span>}
+                      {tx.reason && (
+                        <span className="ml-2 text-muted-foreground/70">- {tx.reason}</span>
+                      )}
                     </div>
                   </div>
                 </div>

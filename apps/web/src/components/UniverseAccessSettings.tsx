@@ -223,20 +223,20 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-zinc-900 rounded-2xl border border-zinc-800 w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+      <div className="bg-card rounded-2xl border border-border w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
             <Lock className="w-5 h-5" /> Access Settings
           </h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white text-sm">
+          <button onClick={onClose} className="text-zinc-400 hover:text-foreground text-sm">
             Cancel
           </button>
         </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
-            <span className="ml-2 text-sm text-zinc-400">Loading settings...</span>
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <span className="ml-2 text-sm text-muted-foreground">Loading settings...</span>
           </div>
         ) : (
           <>
@@ -244,22 +244,24 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
                 the access model below: a public-open universe can still be
                 flipped private to pull it + all its content off every public
                 surface (gallery, landing page, search, wiki, lineage). */}
-            <Card className="mb-6 border-zinc-800 bg-zinc-800/50">
+            <Card className="mb-6 border-border bg-muted/50">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <EyeOff
-                        className={`w-4 h-4 ${isPrivate ? 'text-amber-400' : 'text-zinc-500'}`}
+                        className={`w-4 h-4 ${isPrivate ? 'text-amber-400' : 'text-muted-foreground'}`}
                       />
-                      <span className="text-sm font-semibold text-white">Private universe</span>
+                      <span className="text-sm font-semibold text-foreground">
+                        Private universe
+                      </span>
                       {isPrivate && (
                         <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40">
                           On
                         </Badge>
                       )}
                     </div>
-                    <p className="text-xs text-zinc-400 leading-relaxed">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                       Hide this universe and all of its content (gallery, wiki, search, landing
                       page) from the public. You will still see everything. On-chain data is
                       immutable and not affected.
@@ -270,7 +272,7 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
                     aria-checked={isPrivate}
                     onClick={() => setIsPrivate((v) => !v)}
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-zinc-900 ${
-                      isPrivate ? 'bg-amber-500' : 'bg-zinc-700'
+                      isPrivate ? 'bg-amber-500' : 'bg-foreground/10'
                     }`}
                   >
                     <span
@@ -295,14 +297,16 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
                     className={`p-3 rounded-xl border text-left transition-all ${
                       selected
                         ? 'border-primary bg-primary/10'
-                        : 'border-zinc-800 hover:border-zinc-700'
+                        : 'border-border hover:border-border'
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <Icon className={`w-4 h-4 ${selected ? 'text-primary' : 'text-zinc-500'}`} />
-                      <span className="text-sm font-semibold text-white">{opt.label}</span>
+                      <Icon
+                        className={`w-4 h-4 ${selected ? 'text-primary' : 'text-muted-foreground'}`}
+                      />
+                      <span className="text-sm font-semibold text-foreground">{opt.label}</span>
                     </div>
-                    <p className="text-[10px] text-zinc-500">{opt.desc}</p>
+                    <p className="text-[10px] text-muted-foreground">{opt.desc}</p>
                   </button>
                 );
               })}
@@ -310,7 +314,7 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
 
             {/* Token Gate Config */}
             {(accessModel === 'token_gate' || accessModel === 'both') && (
-              <Card className="mb-4 border-zinc-800 bg-zinc-800/50">
+              <Card className="mb-4 border-border bg-muted/50">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Coins className="w-4 h-4 text-amber-500" />
@@ -326,9 +330,11 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
                       max="100"
                       value={tokenThreshold}
                       onChange={(e) => setTokenThreshold(e.target.value)}
-                      className="w-24 bg-zinc-900 border-zinc-700"
+                      className="w-24 bg-card border-border"
                     />
-                    <span className="text-sm text-zinc-400">% of total token supply required</span>
+                    <span className="text-sm text-muted-foreground">
+                      % of total token supply required
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -337,12 +343,12 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
             {/* Subscription Tiers Config */}
             {(accessModel === 'subscription' || accessModel === 'both') && (
               <div className="space-y-3 mb-6">
-                <h3 className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-foreground/80 flex items-center gap-2">
                   <Crown className="w-4 h-4 text-purple-500" />
                   Subscription Tiers
                 </h3>
                 {tiers.map((tier, i) => (
-                  <Card key={tier.tier} className="border-zinc-800 bg-zinc-800/50">
+                  <Card key={tier.tier} className="border-border bg-muted/50">
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <Badge variant="outline">{tier.tier}</Badge>
@@ -353,9 +359,9 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
                             min="0"
                             value={tier.pricePerMonth}
                             onChange={(e) => updateTier(i, 'pricePerMonth', e.target.value)}
-                            className="w-28 h-8 text-xs bg-zinc-900 border-zinc-700"
+                            className="w-28 h-8 text-xs bg-card border-border"
                           />
-                          <span className="text-xs text-zinc-500">ETH/mo</span>
+                          <span className="text-xs text-muted-foreground">ETH/mo</span>
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -373,7 +379,7 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
                             className={`px-2 py-1 rounded text-[10px] border transition-colors ${
                               tier[b]
                                 ? 'border-primary/50 bg-primary/10 text-primary'
-                                : 'border-zinc-700 text-zinc-500 hover:border-zinc-600'
+                                : 'border-border text-muted-foreground hover:border-muted-foreground/30'
                             }`}
                           >
                             {b.replace(/([A-Z])/g, ' $1').trim()}
@@ -381,7 +387,7 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
                         ))}
                       </div>
                       <div className="flex items-center gap-2">
-                        <Label className="text-[10px] text-zinc-500">Credit bonus:</Label>
+                        <Label className="text-[10px] text-muted-foreground">Credit bonus:</Label>
                         <Input
                           type="number"
                           min="0"
@@ -389,7 +395,7 @@ export function UniverseAccessSettings({ universeId, onClose }: UniverseAccessSe
                           onChange={(e) =>
                             updateTier(i, 'creditBonus', parseInt(e.target.value) || 0)
                           }
-                          className="w-20 h-7 text-xs bg-zinc-900 border-zinc-700"
+                          className="w-20 h-7 text-xs bg-card border-border"
                         />
                       </div>
                     </CardContent>

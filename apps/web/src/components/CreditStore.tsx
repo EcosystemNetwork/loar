@@ -83,7 +83,7 @@ function StripeCheckoutForm({
           type="button"
           onClick={onCancel}
           disabled={isSubmitting}
-          className="px-4 py-3 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
+          className="px-4 py-3 bg-foreground/10 hover:bg-foreground/20 disabled:opacity-50 text-foreground font-medium rounded-lg transition-colors"
         >
           Cancel
         </button>
@@ -245,13 +245,13 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-white">Buy Credits</h2>
-          <div className="text-xs text-zinc-400 mt-0.5">
+          <h2 className="text-lg font-bold text-foreground">Buy Credits</h2>
+          <div className="text-xs text-muted-foreground mt-0.5">
             <span className="text-amber-400 font-bold">{balance?.balance || 0}</span> credits
           </div>
         </div>
         {onClose && (
-          <button onClick={onClose} className="text-zinc-400 hover:text-white text-sm">
+          <button onClick={onClose} className="text-zinc-400 hover:text-foreground text-sm">
             Close
           </button>
         )}
@@ -259,11 +259,11 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
 
       {/* Purchasing disabled by admin (/admin/ops "Credit purchase" kill switch) */}
       {!purchaseEnabled ? (
-        <div className="text-center text-zinc-400 text-sm py-8 border border-zinc-700 rounded-lg bg-zinc-800/30">
+        <div className="text-center text-muted-foreground text-sm py-8 border border-border rounded-lg bg-muted/30">
           Credit purchasing is temporarily unavailable. Check back soon.
         </div>
       ) : isLoading ? (
-        <div className="text-center text-zinc-500 py-8">Loading packages...</div>
+        <div className="text-center text-muted-foreground py-8">Loading packages...</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {pkgs.map((pkg) => {
@@ -280,7 +280,7 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
                 className={`text-left p-4 rounded-lg border transition-all relative ${
                   isSelected
                     ? 'border-amber-500 bg-amber-500/10 ring-1 ring-amber-500/30'
-                    : 'border-zinc-700 bg-zinc-800/50 hover:border-zinc-500'
+                    : 'border-border bg-muted/50 hover:border-muted-foreground/40'
                 }`}
               >
                 {pkg.popular && (
@@ -289,19 +289,21 @@ export function CreditStore({ onClose }: { onClose?: () => void }) {
                   </span>
                 )}
 
-                <div className="text-sm font-bold text-white">{pkg.name}</div>
-                <div className="text-2xl font-bold text-white mt-1">
+                <div className="text-sm font-bold text-foreground">{pkg.name}</div>
+                <div className="text-2xl font-bold text-foreground mt-1">
                   {pkg.credits.toLocaleString()}
-                  <span className="text-xs font-normal text-zinc-400 ml-1">credits</span>
+                  <span className="text-xs font-normal text-muted-foreground ml-1">credits</span>
                 </div>
 
                 {bonus > 0 && (
                   <div className="text-xs text-green-400 mt-0.5">+{bonus} bonus credits</div>
                 )}
 
-                <div className="mt-3 pt-2 border-t border-zinc-700/50">
-                  <span className="text-lg font-bold text-white">${price.toFixed(2)}</span>
-                  <div className="text-[10px] text-zinc-500">{perCredit.toFixed(3)}/credit</div>
+                <div className="mt-3 pt-2 border-t border-border/50">
+                  <span className="text-lg font-bold text-foreground">${price.toFixed(2)}</span>
+                  <div className="text-[10px] text-muted-foreground">
+                    {perCredit.toFixed(3)}/credit
+                  </div>
                 </div>
               </button>
             );

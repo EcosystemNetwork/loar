@@ -84,7 +84,7 @@ function kindBadgeColor(kind: AssetEvent['kind']) {
     case 'animation':
       return 'bg-pink-600';
     default:
-      return 'bg-zinc-600';
+      return 'bg-foreground/20';
   }
 }
 
@@ -92,7 +92,7 @@ function rightsColor(rc: AssetEvent['rightsClass']) {
   if (rc === 'original') return 'bg-emerald-600';
   if (rc === 'licensed') return 'bg-amber-600';
   if (rc === 'fan') return 'bg-sky-600';
-  return 'bg-zinc-600';
+  return 'bg-foreground/20';
 }
 
 function formatDate(iso: string | null | undefined) {
@@ -110,7 +110,7 @@ function formatDate(iso: string | null | undefined) {
 function AssetPreview({ event }: { event: AssetEvent }) {
   if (!event.outputUrl) {
     return (
-      <div className="aspect-video rounded-md bg-zinc-900 flex items-center justify-center text-zinc-500">
+      <div className="aspect-video rounded-md bg-card flex items-center justify-center text-muted-foreground">
         {kindIcon(event.outputKind)}
       </div>
     );
@@ -120,7 +120,7 @@ function AssetPreview({ event }: { event: AssetEvent }) {
       <SmartImage
         src={event.outputUrl}
         alt={event.prompt || 'asset'}
-        className="aspect-video w-full object-cover rounded-md bg-zinc-900"
+        className="aspect-video w-full object-cover rounded-md bg-card"
       />
     );
   }
@@ -131,12 +131,12 @@ function AssetPreview({ event }: { event: AssetEvent }) {
         muted
         playsInline
         controls
-        className="aspect-video w-full object-cover rounded-md bg-zinc-900"
+        className="aspect-video w-full object-cover rounded-md bg-card"
       />
     );
   }
   return (
-    <div className="aspect-video rounded-md bg-zinc-900 flex items-center justify-center text-zinc-500">
+    <div className="aspect-video rounded-md bg-card flex items-center justify-center text-muted-foreground">
       {kindIcon(event.outputKind)}
     </div>
   );
@@ -149,12 +149,12 @@ function EventCard({ event, highlighted }: { event: AssetEvent; highlighted?: bo
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge className={`${kindBadgeColor(event.kind)} text-white`}>{event.kind}</Badge>
+          <Badge className={`${kindBadgeColor(event.kind)} text-foreground`}>{event.kind}</Badge>
           <Badge variant="outline" className="font-mono text-xs">
             {event.step}
           </Badge>
           {event.rightsClass && (
-            <Badge className={`${rightsColor(event.rightsClass)} text-white`}>
+            <Badge className={`${rightsColor(event.rightsClass)} text-foreground`}>
               <Shield className="h-3 w-3 mr-1" /> {event.rightsClass}
             </Badge>
           )}
@@ -167,7 +167,7 @@ function EventCard({ event, highlighted }: { event: AssetEvent; highlighted?: bo
         <Link
           to="/lineage/$assetId"
           params={{ assetId: event.assetId }}
-          className="text-xs text-zinc-400 hover:text-cyan-400 flex items-center gap-1"
+          className="text-xs text-muted-foreground hover:text-cyan-400 flex items-center gap-1"
           aria-label="Open this event"
         >
           <ExternalLink className="h-3 w-3" />
@@ -177,12 +177,12 @@ function EventCard({ event, highlighted }: { event: AssetEvent; highlighted?: bo
       <AssetPreview event={event} />
 
       {event.prompt && (
-        <p className="text-sm text-zinc-300 line-clamp-3" title={event.prompt}>
+        <p className="text-sm text-foreground/80 line-clamp-3" title={event.prompt}>
           {event.prompt}
         </p>
       )}
 
-      <div className="flex flex-wrap gap-3 text-xs text-zinc-400">
+      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
         <span className="flex items-center gap-1">
           <Sparkles className="h-3 w-3" /> {event.modelId ?? event.tool}
         </span>
@@ -244,18 +244,18 @@ function LineagePage() {
         <GitBranch className="h-5 w-5 text-cyan-500" />
         <div>
           <h1 className="text-xl font-bold">Asset Provenance</h1>
-          <p className="text-xs text-zinc-400 font-mono">{assetId}</p>
+          <p className="text-xs text-muted-foreground font-mono">{assetId}</p>
         </div>
       </div>
 
       {loading && (
-        <div className="flex items-center justify-center py-20 text-zinc-400 gap-2">
+        <div className="flex items-center justify-center py-20 text-muted-foreground gap-2">
           <Loader2 className="h-5 w-5 animate-spin" /> Loading lineage…
         </div>
       )}
 
       {!loading && ancestors.length === 0 && (
-        <Card className="p-8 text-center text-zinc-400">
+        <Card className="p-8 text-center text-muted-foreground">
           <Sparkles className="h-8 w-8 mx-auto mb-2" />
           <p>No lineage recorded for this asset yet.</p>
           <p className="text-xs mt-2">
@@ -268,7 +268,7 @@ function LineagePage() {
       {!loading && ancestors.length > 0 && (
         <>
           <section className="mb-8">
-            <h2 className="text-sm uppercase tracking-wide text-zinc-500 mb-3">
+            <h2 className="text-sm uppercase tracking-wide text-muted-foreground mb-3">
               Family tree · root → self
             </h2>
             <div className="space-y-3">
@@ -276,7 +276,7 @@ function LineagePage() {
                 <div key={ev.id}>
                   <EventCard event={ev} />
                   {idx < older.length && (
-                    <div className="flex justify-center py-1 text-zinc-600">
+                    <div className="flex justify-center py-1 text-muted-foreground/70">
                       <ArrowRight className="h-4 w-4 rotate-90" />
                     </div>
                   )}
@@ -288,7 +288,7 @@ function LineagePage() {
 
           {descendants.length > 0 && (
             <section>
-              <h2 className="text-sm uppercase tracking-wide text-zinc-500 mb-3">
+              <h2 className="text-sm uppercase tracking-wide text-muted-foreground mb-3">
                 Direct descendants · {descendants.length}
               </h2>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -300,7 +300,7 @@ function LineagePage() {
           )}
 
           {descendants.length === 0 && (
-            <p className="text-xs text-zinc-500 italic">
+            <p className="text-xs text-muted-foreground italic">
               No remixes, edits, or publishes derived from this asset yet.
             </p>
           )}

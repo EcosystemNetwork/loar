@@ -34,6 +34,8 @@ interface CreateUniverseInput {
   /** 'fun' = sandbox, starts private until owner launches it publicly.
    *  'monetized' = launchpad universe, public from mint. */
   universeType?: 'fun' | 'monetized';
+  /** Launch visibility override; omitted → type default (fun private, monetized public). */
+  isPrivate?: boolean;
 }
 
 /** Firestore collection name kept as 'cinematicUniverses' for data continuity. */
@@ -55,10 +57,11 @@ export async function createUniverse(input: CreateUniverseInput) {
     }
 
     const universeType = input.universeType ?? 'monetized';
-    // Fun universes start private and require an explicit "Launch Publicly"
-    // gesture. Monetized universes are always public (they ship via the
-    // launchpad, so hiding them post-mint would unlist a trading token).
-    const isPrivate = universeType === 'fun';
+    // Default: fun universes start private (explicit "Launch Publicly" later);
+    // monetized universes start public. Either can be launched privately via
+    // `isPrivate`. A public monetized universe can't go private afterwards
+    // (see universes.setPrivate) — that would unlist a trading token.
+    const isPrivate = input.isPrivate ?? universeType === 'fun';
 
     const data = {
       address: input.address,

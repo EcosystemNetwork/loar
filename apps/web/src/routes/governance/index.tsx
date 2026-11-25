@@ -6,6 +6,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { trpc } from '@/utils/trpc';
+import { ErrorState } from '@/components/states';
 
 const STATES = ['All', 'Active', 'Pending', 'Succeeded', 'Defeated', 'Queued', 'Executed'] as const;
 type StateTab = (typeof STATES)[number];
@@ -34,8 +35,8 @@ const STATE_STYLE: Record<string, string> = {
   Defeated: 'bg-red-900/30 text-red-400',
   Executed: 'bg-violet-900/30 text-violet-400',
   Queued: 'bg-orange-900/30 text-orange-400',
-  Canceled: 'bg-zinc-800 text-zinc-400',
-  Expired: 'bg-zinc-800 text-zinc-500',
+  Canceled: 'bg-muted text-muted-foreground',
+  Expired: 'bg-muted text-muted-foreground',
 };
 
 function fmtVotes(raw: string): string {
@@ -58,7 +59,7 @@ function GovernanceIndex() {
   const navigate = Route.useNavigate();
   const activeState = (search.state as StateTab) || 'All';
 
-  const { data, isLoading, isError } = useQuery(
+  const { data, isLoading, isError, refetch } = useQuery(
     trpc.governance.listAllProposals.queryOptions({
       state: activeState === 'All' ? undefined : (activeState as Exclude<StateTab, 'All'>),
       limit: 50,
@@ -67,11 +68,11 @@ function GovernanceIndex() {
   const proposals = (data?.proposals ?? []) as unknown as ProposalRow[];
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-4xl px-4 py-6 pb-bottom-nav sm:py-8 md:pb-12">
         <div className="mb-6">
           <h1 className="text-2xl font-bold sm:text-3xl">Governance</h1>
-          <p className="mt-1 text-sm text-zinc-400 sm:text-base">
+          <p className="mt-1 text-sm text-muted-foreground sm:text-base">
             Every open proposal across all universe tokens.
           </p>
         </div>
@@ -85,8 +86,8 @@ function GovernanceIndex() {
               }
               className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 activeState === s
-                  ? 'bg-violet-600 text-white'
-                  : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:text-foreground'
               }`}
             >
               {s}
@@ -95,22 +96,24 @@ function GovernanceIndex() {
         </div>
 
         {isError ? (
-          <div className="rounded-xl border border-red-800 bg-red-900/20 p-6 text-center text-red-400">
-            Failed to load proposals
-          </div>
+          <ErrorState
+            title="Couldn’t load proposals"
+            description="Governance data comes from the indexer, which may be catching up. Try again in a moment."
+            onRetry={() => refetch()}
+          />
         ) : isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="animate-pulse rounded-xl bg-zinc-900 p-5">
-                <div className="mb-3 h-5 w-3/4 rounded bg-zinc-800" />
-                <div className="h-4 w-1/2 rounded bg-zinc-800" />
+              <div key={i} className="animate-pulse rounded-xl bg-card p-5">
+                <div className="mb-3 h-5 w-3/4 rounded bg-muted" />
+                <div className="h-4 w-1/2 rounded bg-muted" />
               </div>
             ))}
           </div>
         ) : proposals.length === 0 ? (
-          <div className="rounded-xl bg-zinc-900 p-12 text-center">
-            <p className="text-lg text-zinc-400">No proposals</p>
-            <p className="mt-2 text-zinc-500">
+          <div className="rounded-xl bg-card p-12 text-center">
+            <p className="text-lg text-muted-foreground">No proposals</p>
+            <p className="mt-2 text-muted-foreground">
               {activeState === 'All'
                 ? 'Nothing has been proposed yet.'
                 : `No ${activeState.toLowerCase()} proposals right now.`}
@@ -129,13 +132,13 @@ function GovernanceIndex() {
                   key={p.id}
                   to="/governance/$universeId"
                   params={{ universeId: p.universeId }}
-                  className="block rounded-xl bg-zinc-900 p-5 transition-colors hover:bg-zinc-800/80"
+                  className="block rounded-xl bg-card p-5 transition-colors hover:bg-muted/80"
                 >
                   <div className="mb-2 flex items-start gap-3">
                     <p className="flex-1 font-medium leading-snug">{title}</p>
                     <span
                       className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                        STATE_STYLE[p.state] ?? 'bg-zinc-800 text-zinc-400'
+                        STATE_STYLE[p.state] ?? 'bg-muted text-muted-foreground'
                       }`}
                     >
                       {p.state}
@@ -144,7 +147,7 @@ function GovernanceIndex() {
                   <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-red-900/40">
                     <div className="h-full bg-green-500" style={{ width: `${forPct}%` }} />
                   </div>
-                  <div className="flex items-center gap-3 text-[11px] text-zinc-500">
+                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                     <span className="text-green-400">For {fmtVotes(p.forVotes)}</span>
                     <span className="text-red-400">Against {fmtVotes(p.againstVotes)}</span>
                     <span>Abstain {fmtVotes(p.abstainVotes)}</span>

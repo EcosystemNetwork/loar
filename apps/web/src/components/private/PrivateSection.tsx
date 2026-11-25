@@ -96,7 +96,7 @@ export function PrivateSection({ universeId }: PrivateSectionProps) {
     <PrivateSectionGuard universeId={universeId}>
       <div className="h-full flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
             <svg
               className="w-5 h-5 text-amber-400"
@@ -111,8 +111,8 @@ export function PrivateSection({ universeId }: PrivateSectionProps) {
                 d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"
               />
             </svg>
-            <h2 className="text-white font-semibold">Creator's Room</h2>
-            <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded">
+            <h2 className="text-foreground font-semibold">Creator's Room</h2>
+            <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded">
               {accessLevel}
             </span>
           </div>
@@ -120,15 +120,15 @@ export function PrivateSection({ universeId }: PrivateSectionProps) {
 
         {/* Tab bar */}
         {visibleTabs.length > 1 && (
-          <div className="flex border-b border-zinc-800">
+          <div className="flex border-b border-border">
             {visibleTabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 ${
                   activeTab === tab.id
-                    ? 'text-white border-violet-500'
-                    : 'text-zinc-500 border-transparent hover:text-zinc-300'
+                    ? 'text-foreground border-violet-500'
+                    : 'text-muted-foreground border-transparent hover:text-foreground/80'
                 }`}
               >
                 {tab.icon}

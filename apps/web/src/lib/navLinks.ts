@@ -78,7 +78,7 @@ export const accountGroups: NavGroup[] = [
   {
     label: 'Balance & billing',
     links: [
-      { to: '/credits', label: 'Points' },
+      { to: '/credits', label: 'Credits' },
       { to: '/pricing', label: 'Pricing' },
       { to: '/subscriptions', label: 'Subscriptions' },
       { to: '/swap', label: 'Swap' },

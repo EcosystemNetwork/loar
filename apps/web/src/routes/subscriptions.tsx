@@ -11,13 +11,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Calendar, Shield, XCircle, Loader2, Crown } from 'lucide-react';
+import { SignInPrompt } from '@/components/SignInPrompt';
 
 export const Route = createFileRoute('/subscriptions')({
   component: SubscriptionsPage,
 });
 
 const TIER_COLORS: Record<string, string> = {
-  BASIC: 'bg-zinc-600 text-zinc-100',
+  BASIC: 'bg-foreground/20 text-foreground',
   PREMIUM: 'bg-violet-600 text-violet-100',
   VIP: 'bg-amber-500 text-amber-950',
 };
@@ -61,11 +62,7 @@ function SubscriptionsPage() {
   // ── Auth guard ──
   if (!isAuthenticated || !sessionReady) {
     return (
-      <div className="container mx-auto px-4 py-20 text-center">
-        <CreditCard className="mx-auto h-12 w-12 text-zinc-500 mb-4" />
-        <h2 className="text-xl font-semibold text-zinc-200 mb-2">Connect your wallet</h2>
-        <p className="text-zinc-400">Sign in to view and manage your subscriptions.</p>
-      </div>
+      <SignInPrompt variant="page" icon={CreditCard} title="Sign in to manage subscriptions" />
     );
   }
 
@@ -74,21 +71,21 @@ function SubscriptionsPage() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <CreditCard className="h-6 w-6 text-violet-400" />
-        <h1 className="text-2xl font-bold text-zinc-100">My Subscriptions</h1>
+        <h1 className="text-2xl font-bold text-foreground">My Subscriptions</h1>
       </div>
 
       {/* Loading skeletons */}
       {isLoading && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i} className="bg-zinc-800 border-zinc-700 animate-pulse">
+            <Card key={i} className="bg-muted border-border animate-pulse">
               <CardHeader>
-                <div className="h-5 w-32 bg-zinc-700 rounded" />
+                <div className="h-5 w-32 bg-foreground/10 rounded" />
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="h-4 w-24 bg-zinc-700 rounded" />
-                <div className="h-4 w-40 bg-zinc-700 rounded" />
-                <div className="h-9 w-full bg-zinc-700 rounded" />
+                <div className="h-4 w-24 bg-foreground/10 rounded" />
+                <div className="h-4 w-40 bg-foreground/10 rounded" />
+                <div className="h-9 w-full bg-foreground/10 rounded" />
               </CardContent>
             </Card>
           ))}
@@ -98,9 +95,9 @@ function SubscriptionsPage() {
       {/* Empty state */}
       {!isLoading && (!subscriptions || subscriptions.length === 0) && (
         <div className="text-center py-16">
-          <CreditCard className="mx-auto h-12 w-12 text-zinc-600 mb-4" />
-          <h2 className="text-lg font-semibold text-zinc-300 mb-1">No active subscriptions</h2>
-          <p className="text-zinc-500 text-sm">
+          <CreditCard className="mx-auto h-12 w-12 text-muted-foreground/70 mb-4" />
+          <h2 className="text-lg font-semibold text-foreground/80 mb-1">No active subscriptions</h2>
+          <p className="text-muted-foreground text-sm">
             Browse universes and subscribe to unlock premium content.
           </p>
         </div>
@@ -123,10 +120,10 @@ function SubscriptionsPage() {
             return (
               <Card
                 key={sub.id}
-                className="bg-zinc-800 border-zinc-700 hover:border-violet-600/40 transition-colors"
+                className="bg-muted border-border hover:border-violet-600/40 transition-colors"
               >
                 <CardHeader>
-                  <CardTitle className="flex items-center justify-between text-zinc-100">
+                  <CardTitle className="flex items-center justify-between text-foreground">
                     <span className="truncate text-base">
                       {sub.universeName || sub.universeAddress}
                     </span>
@@ -150,7 +147,7 @@ function SubscriptionsPage() {
                   </div>
 
                   {/* Expiry */}
-                  <div className="flex items-center gap-2 text-sm text-zinc-400">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Calendar className="h-4 w-4" />
                     <span>
                       {isActive ? 'Renews' : 'Expired'} {expiryDate}
@@ -162,7 +159,7 @@ function SubscriptionsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full border-zinc-600 text-zinc-300 hover:bg-red-900/30 hover:border-red-700 hover:text-red-300"
+                      className="w-full border-muted-foreground/30 text-foreground/80 hover:bg-red-900/30 hover:border-red-700 hover:text-red-300"
                       disabled={cancelMutation.isPending}
                       onClick={() =>
                         handleCancel(

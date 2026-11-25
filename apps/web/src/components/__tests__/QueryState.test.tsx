@@ -33,7 +33,7 @@ describe('QueryState — state selection', () => {
   it('renders the error block with the default copy', () => {
     render(<QueryState {...base} isError />);
     expect(screen.getByText('Something went wrong')).toBeInTheDocument();
-    expect(screen.getByText(/Failed to load data/)).toBeInTheDocument();
+    expect(screen.getByText(/didn’t load/)).toBeInTheDocument();
   });
 
   it('uses a custom errorMessage', () => {

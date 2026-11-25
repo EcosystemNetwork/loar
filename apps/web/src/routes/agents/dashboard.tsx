@@ -66,8 +66,8 @@ function AgentDashboardPage() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <Card className="p-8 text-center">
-          <h2 className="mb-2 text-xl font-bold text-white">Not Registered</h2>
-          <p className="mb-4 text-zinc-400">Register as a talent agent first</p>
+          <h2 className="mb-2 text-xl font-bold text-foreground">Not Registered</h2>
+          <p className="mb-4 text-muted-foreground">Register as a talent agent first</p>
           <Button onClick={() => navigate({ to: '/agents/register' })}>Register Now</Button>
         </Card>
       </div>
@@ -94,28 +94,28 @@ function AgentDashboardPage() {
 
       {/* Header Stats */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+        <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
           <Briefcase className="h-8 w-8 text-violet-400" />
           Agent Dashboard
         </h1>
-        <p className="mt-1 text-zinc-400">{(profile as any).agencyName}</p>
+        <p className="mt-1 text-muted-foreground">{(profile as any).agencyName}</p>
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-4">
         <Card className="p-4">
-          <div className="text-sm text-zinc-400">Active Clients</div>
-          <div className="mt-1 text-2xl font-bold text-white">{clients?.length || 0}</div>
+          <div className="text-sm text-muted-foreground">Active Clients</div>
+          <div className="mt-1 text-2xl font-bold text-foreground">{clients?.length || 0}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-sm text-zinc-400">Active Contracts</div>
-          <div className="mt-1 text-2xl font-bold text-white">{activeCount}</div>
+          <div className="text-sm text-muted-foreground">Active Contracts</div>
+          <div className="mt-1 text-2xl font-bold text-foreground">{activeCount}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-sm text-zinc-400">Pending Proposals</div>
+          <div className="text-sm text-muted-foreground">Pending Proposals</div>
           <div className="mt-1 text-2xl font-bold text-yellow-400">{proposedCount}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-sm text-zinc-400">Total Commissions</div>
+          <div className="text-sm text-muted-foreground">Total Commissions</div>
           <div className="mt-1 text-2xl font-bold text-green-400">
             {commissionStats?.totalCommissions || 0}
           </div>
@@ -123,7 +123,7 @@ function AgentDashboardPage() {
       </div>
 
       {/* Tabs */}
-      <div className="mb-6 flex gap-2 border-b border-zinc-800 pb-2">
+      <div className="mb-6 flex gap-2 border-b border-border pb-2">
         {tabs.map((tab) => (
           <Button
             key={tab.key}
@@ -147,12 +147,12 @@ function AgentDashboardPage() {
       {activeTab === 'clients' && (
         <div className="space-y-3">
           {!clients?.length ? (
-            <p className="py-8 text-center text-zinc-500">No active clients yet</p>
+            <p className="py-8 text-center text-muted-foreground">No active clients yet</p>
           ) : (
             clients.map((client: any) => (
               <Card key={client.id} className="flex items-center justify-between p-4">
                 <div>
-                  <p className="font-medium text-white">
+                  <p className="font-medium text-foreground">
                     {client.creatorUid?.slice(0, 6)}...{client.creatorUid?.slice(-4)}
                   </p>
                   <div className="mt-1 flex gap-2">
@@ -164,7 +164,9 @@ function AgentDashboardPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-zinc-400">{client.commissionBps / 100}% commission</p>
+                  <p className="text-sm text-muted-foreground">
+                    {client.commissionBps / 100}% commission
+                  </p>
                   <Badge variant={client.exclusivity === 'EXCLUSIVE' ? 'default' : 'secondary'}>
                     {client.exclusivity}
                   </Badge>
@@ -178,13 +180,13 @@ function AgentDashboardPage() {
       {activeTab === 'contracts' && (
         <div className="space-y-3">
           {!contractList.length ? (
-            <p className="py-8 text-center text-zinc-500">No contracts yet</p>
+            <p className="py-8 text-center text-muted-foreground">No contracts yet</p>
           ) : (
             contractList.map((contract: any) => (
               <Card key={contract.id} className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-white">
+                    <p className="font-medium text-foreground">
                       {contract.role === 'agent' ? 'Client' : 'Agent'}:{' '}
                       {(contract.role === 'agent' ? contract.creatorUid : contract.agentUid)?.slice(
                         0,
@@ -212,7 +214,7 @@ function AgentDashboardPage() {
                     >
                       {contract.status}
                     </Badge>
-                    <p className="mt-1 text-sm text-zinc-400">
+                    <p className="mt-1 text-sm text-muted-foreground">
                       {contract.commissionBps / 100}% · {contract.dealCount || 0} deals
                     </p>
                   </div>
@@ -229,8 +231,8 @@ function AgentDashboardPage() {
             <div className="flex items-center gap-3">
               <TrendingUp className="h-5 w-5 text-green-400" />
               <div>
-                <p className="text-sm text-zinc-400">Total Earned (Wei)</p>
-                <p className="text-xl font-bold text-white">
+                <p className="text-sm text-muted-foreground">Total Earned (Wei)</p>
+                <p className="text-xl font-bold text-foreground">
                   {commissionStats?.totalEarnedWei || '0'}
                 </p>
               </div>
@@ -241,8 +243,10 @@ function AgentDashboardPage() {
             Object.entries(commissionStats.bySource).map(([source, data]: [string, any]) => (
               <Card key={source} className="flex items-center justify-between p-4">
                 <div>
-                  <p className="font-medium text-white capitalize">{source.replace('_', ' ')}</p>
-                  <p className="text-sm text-zinc-400">{data.count} transactions</p>
+                  <p className="font-medium text-foreground capitalize">
+                    {source.replace('_', ' ')}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{data.count} transactions</p>
                 </div>
                 <p className="font-mono text-green-400">{data.total} wei</p>
               </Card>

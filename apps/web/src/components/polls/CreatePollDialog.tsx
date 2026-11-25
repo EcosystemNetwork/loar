@@ -142,14 +142,14 @@ export function CreatePollDialog({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-card rounded-2xl border border-border p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-white">Create Poll</h2>
+          <h2 className="text-xl font-semibold text-foreground">Create Poll</h2>
           <button
             type="button"
             onClick={onClose}
-            className="text-zinc-400 hover:text-white transition-colors"
+            className="text-zinc-400 hover:text-foreground transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -158,7 +158,7 @@ export function CreatePollDialog({
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Title */}
           <div className="space-y-2">
-            <Label htmlFor="poll-title" className="text-zinc-300">
+            <Label htmlFor="poll-title" className="text-foreground/80">
               Title
             </Label>
             <Input
@@ -166,36 +166,36 @@ export function CreatePollDialog({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="What should happen next?"
-              className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+              className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
               maxLength={200}
             />
           </div>
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="poll-description" className="text-zinc-300">
-              Description <span className="text-zinc-500 font-normal">(optional)</span>
+            <Label htmlFor="poll-description" className="text-foreground/80">
+              Description <span className="text-muted-foreground font-normal">(optional)</span>
             </Label>
             <Textarea
               id="poll-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Provide context for voters..."
-              className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 min-h-[80px]"
+              className="bg-muted border-border text-foreground placeholder:text-muted-foreground min-h-[80px]"
               maxLength={1000}
             />
           </div>
 
           {/* Type */}
           <div className="space-y-2">
-            <Label className="text-zinc-300">Poll Type</Label>
+            <Label className="text-foreground/80">Poll Type</Label>
             <Select value={type} onValueChange={(v) => setType(v as typeof type)}>
-              <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white">
+              <SelectTrigger className="bg-muted border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-zinc-800 border-zinc-700">
+              <SelectContent className="bg-muted border-border">
                 {POLL_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value} className="text-white">
+                  <SelectItem key={t.value} value={t.value} className="text-foreground">
                     {t.label}
                   </SelectItem>
                 ))}
@@ -205,7 +205,7 @@ export function CreatePollDialog({
 
           {/* Options */}
           <div className="space-y-2">
-            <Label className="text-zinc-300">Options</Label>
+            <Label className="text-foreground/80">Options</Label>
             <div className="space-y-2">
               {options.map((option, index) => (
                 <div key={index} className="flex items-center gap-2">
@@ -213,14 +213,14 @@ export function CreatePollDialog({
                     value={option}
                     onChange={(e) => updateOption(index, e.target.value)}
                     placeholder={`Option ${index + 1}`}
-                    className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 flex-1"
+                    className="bg-muted border-border text-foreground placeholder:text-muted-foreground flex-1"
                     maxLength={200}
                   />
                   {options.length > 2 && (
                     <button
                       type="button"
                       onClick={() => removeOption(index)}
-                      className="text-zinc-500 hover:text-red-400 transition-colors p-1"
+                      className="text-muted-foreground hover:text-red-400 transition-colors p-1"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -234,25 +234,25 @@ export function CreatePollDialog({
                 variant="outline"
                 size="sm"
                 onClick={addOption}
-                className="mt-2 border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-600"
+                className="mt-2 border-zinc-700 text-zinc-400 hover:text-foreground hover:border-zinc-600"
               >
                 <Plus className="w-3.5 h-3.5 mr-1" />
                 Add Option
               </Button>
             )}
-            <p className="text-xs text-zinc-500">{options.length}/10 options</p>
+            <p className="text-xs text-muted-foreground">{options.length}/10 options</p>
           </div>
 
           {/* Duration */}
           <div className="space-y-2">
-            <Label className="text-zinc-300">Duration</Label>
+            <Label className="text-foreground/80">Duration</Label>
             <Select value={duration} onValueChange={setDuration}>
-              <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white">
+              <SelectTrigger className="bg-muted border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-zinc-800 border-zinc-700">
+              <SelectContent className="bg-muted border-border">
                 {DURATIONS.map((d) => (
-                  <SelectItem key={d.value} value={d.value} className="text-white">
+                  <SelectItem key={d.value} value={d.value} className="text-foreground">
                     {d.label}
                   </SelectItem>
                 ))}
@@ -267,11 +267,13 @@ export function CreatePollDialog({
                 type="checkbox"
                 checked={tokenWeighted}
                 onChange={(e) => setTokenWeighted(e.target.checked)}
-                className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-violet-500 focus:ring-violet-500 focus:ring-offset-0"
+                className="w-4 h-4 rounded border-muted-foreground/30 bg-muted text-violet-500 focus:ring-violet-500 focus:ring-offset-0"
               />
               <div>
-                <span className="text-sm text-white">Token-weighted voting</span>
-                <p className="text-xs text-zinc-500">Vote power scales with token holdings</p>
+                <span className="text-sm text-foreground">Token-weighted voting</span>
+                <p className="text-xs text-muted-foreground">
+                  Vote power scales with token holdings
+                </p>
               </div>
             </label>
 
@@ -280,11 +282,13 @@ export function CreatePollDialog({
                 type="checkbox"
                 checked={allowMultiple}
                 onChange={(e) => setAllowMultiple(e.target.checked)}
-                className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-violet-500 focus:ring-violet-500 focus:ring-offset-0"
+                className="w-4 h-4 rounded border-muted-foreground/30 bg-muted text-violet-500 focus:ring-violet-500 focus:ring-offset-0"
               />
               <div>
-                <span className="text-sm text-white">Allow multiple selections</span>
-                <p className="text-xs text-zinc-500">Voters can pick more than one option</p>
+                <span className="text-sm text-foreground">Allow multiple selections</span>
+                <p className="text-xs text-muted-foreground">
+                  Voters can pick more than one option
+                </p>
               </div>
             </label>
           </div>
@@ -295,14 +299,14 @@ export function CreatePollDialog({
               type="button"
               variant="outline"
               onClick={onClose}
-              className="flex-1 border-zinc-700 text-zinc-400 hover:text-white"
+              className="flex-1 border-zinc-700 text-zinc-400 hover:text-foreground"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={createMutation.isPending}
-              className="flex-1 bg-violet-600 hover:bg-violet-700 text-white"
+              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Create Poll

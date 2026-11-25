@@ -43,7 +43,7 @@ export function PollResults({ pollId }: PollResultsProps) {
   }
 
   if (!poll) {
-    return <div className="text-center py-12 text-zinc-500">Poll not found</div>;
+    return <div className="text-center py-12 text-muted-foreground">Poll not found</div>;
   }
 
   const isEnded = poll.status === 'ended' || new Date(poll.endsAt).getTime() <= Date.now();
@@ -55,13 +55,13 @@ export function PollResults({ pollId }: PollResultsProps) {
   const maxVotes = sortedOptions[0]?.voteCount ?? 0;
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-5">
+    <div className="bg-card border border-border rounded-xl p-6 space-y-5">
       {/* Header */}
       <div className="space-y-1">
-        <h3 className="text-lg font-semibold text-white">{poll.title}</h3>
-        {poll.description && <p className="text-sm text-zinc-400">{poll.description}</p>}
+        <h3 className="text-lg font-semibold text-foreground">{poll.title}</h3>
+        {poll.description && <p className="text-sm text-muted-foreground">{poll.description}</p>}
         <div className="flex items-center gap-2 pt-1">
-          <Badge className="bg-zinc-700/50 text-zinc-300 border-0 text-xs">
+          <Badge className="bg-foreground/50 text-foreground/80 border-0 text-xs">
             {poll.totalVotes} total vote{poll.totalVotes !== 1 ? 's' : ''}
           </Badge>
           {isEnded && (
@@ -86,19 +86,19 @@ export function PollResults({ pollId }: PollResultsProps) {
                   {index === 0 && !isEnded && <Crown className="w-4 h-4 text-amber-400 shrink-0" />}
                   <span
                     className={`truncate ${
-                      isWinner ? 'text-amber-300 font-medium' : 'text-zinc-300'
+                      isWinner ? 'text-amber-300 font-medium' : 'text-foreground/80'
                     }`}
                   >
                     {option.text}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0 ml-3">
-                  <span className="text-zinc-500 text-xs">
+                  <span className="text-muted-foreground text-xs">
                     {option.voteCount} vote{option.voteCount !== 1 ? 's' : ''}
                   </span>
                   <span
                     className={`font-medium w-12 text-right ${
-                      isWinner ? 'text-amber-400' : 'text-zinc-300'
+                      isWinner ? 'text-amber-400' : 'text-foreground/80'
                     }`}
                   >
                     {percentage}%
@@ -107,7 +107,7 @@ export function PollResults({ pollId }: PollResultsProps) {
               </div>
 
               {/* Animated bar */}
-              <div className="h-2.5 bg-zinc-800 rounded-full overflow-hidden">
+              <div className="h-2.5 bg-muted rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-700 ease-out ${
                     isWinner
@@ -124,7 +124,7 @@ export function PollResults({ pollId }: PollResultsProps) {
 
       {/* Promote to Canon */}
       {isEnded && isCreator && winningOption && (
-        <div className="pt-2 border-t border-zinc-800">
+        <div className="pt-2 border-t border-border">
           <Button
             onClick={() =>
               promoteMutation.mutate({

@@ -56,20 +56,20 @@ function GovernancePage() {
   const filters = ['All', 'Active', 'Pending', 'Succeeded', 'Defeated', 'Executed'] as const;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8 pb-bottom-nav md:pb-12">
         {/* Header */}
         <div className="flex items-start sm:items-center justify-between gap-3 mb-6 sm:mb-8 flex-wrap">
           <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-bold">Governance</h1>
-            <p className="text-zinc-400 mt-1 text-sm sm:text-base">
+            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
               Propose and vote on changes to Universe #{universeId}
             </p>
           </div>
           {isAuthenticated && (
             <button
               onClick={() => setShowCreateDialog(true)}
-              className="px-3 sm:px-4 py-2 bg-violet-600 hover:bg-violet-700 rounded-lg font-medium transition-colors text-sm sm:text-base shrink-0"
+              className="px-3 sm:px-4 py-2 bg-primary hover:bg-primary/90 rounded-lg font-medium transition-colors text-sm sm:text-base shrink-0"
             >
               <span className="sm:hidden">+ Propose</span>
               <span className="hidden sm:inline">New Proposal</span>
@@ -89,8 +89,8 @@ function GovernancePage() {
                     onClick={() => setStateFilter(filter === 'All' ? undefined : filter)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                       (filter === 'All' && !stateFilter) || stateFilter === filter
-                        ? 'bg-violet-600 text-white'
-                        : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     {filter}
@@ -106,16 +106,18 @@ function GovernancePage() {
               ) : isLoading ? (
                 <div className="space-y-4">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-zinc-900 rounded-xl p-6 animate-pulse">
-                      <div className="h-5 bg-zinc-800 rounded w-3/4 mb-3" />
-                      <div className="h-4 bg-zinc-800 rounded w-1/2" />
+                    <div key={i} className="bg-card rounded-xl p-6 animate-pulse">
+                      <div className="h-5 bg-muted rounded w-3/4 mb-3" />
+                      <div className="h-4 bg-muted rounded w-1/2" />
                     </div>
                   ))}
                 </div>
               ) : proposals?.proposals.length === 0 ? (
-                <div className="bg-zinc-900 rounded-xl p-12 text-center">
-                  <p className="text-zinc-400 text-lg">No proposals yet</p>
-                  <p className="text-zinc-500 mt-2">Be the first to create a governance proposal</p>
+                <div className="bg-card rounded-xl p-12 text-center">
+                  <p className="text-muted-foreground text-lg">No proposals yet</p>
+                  <p className="text-muted-foreground mt-2">
+                    Be the first to create a governance proposal
+                  </p>
                 </div>
               ) : (
                 <ProposalList

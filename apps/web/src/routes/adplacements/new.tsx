@@ -29,6 +29,7 @@ import { useAdPlacementWrite } from '@/hooks/useAdPlacement';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { toast } from 'sonner';
 import { parseEther } from 'viem';
+import { requireSignIn } from '@/components/SignInPrompt';
 
 export const Route = createFileRoute('/adplacements/new')({
   beforeLoad: ({ context }) => {
@@ -148,7 +149,7 @@ function CreateAdSlotPage() {
 
   async function handleCreate() {
     if (!isConnected) {
-      toast.error('Connect your wallet first');
+      requireSignIn('to publish');
       return;
     }
     try {
@@ -394,9 +395,7 @@ function CreateAdSlotPage() {
                 Publish Slot
               </Button>
               {!isConnected && (
-                <p className="text-xs text-center text-muted-foreground">
-                  Connect your wallet to publish
-                </p>
+                <p className="text-xs text-center text-muted-foreground">Sign in to publish</p>
               )}
             </div>
           </div>
