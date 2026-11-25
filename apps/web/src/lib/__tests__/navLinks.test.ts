@@ -2,12 +2,19 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  moreGroupsBase,
+  accountGroups,
+  allNavLinks,
+  exploreLinks,
+  mobileTabs,
   needsExactMatch,
-  ownerPrimaryLink,
-  primaryLinksBase,
+  primaryLinks,
+  signedInLinks,
   signedOutLinks,
-  visibleMoreGroups,
+  studioToolGroups,
+  visibleAccountGroups,
+  visibleExploreLinks,
+  visibleStudioToolGroups,
+  type NavLink,
 } from '../navLinks';
 
 /** Route paths registered in the generated route tree. */
@@ -17,57 +24,86 @@ function registeredRoutes(): Set<string> {
   return new Set([...block.matchAll(/^\s*'([^']+)':/gm)].map((m) => m[1]));
 }
 
-const allLinks = () => [
-  ...primaryLinksBase,
-  ownerPrimaryLink,
-  ...visibleMoreGroups(true).flatMap((g) => g.links),
+const isRoute = (routes: Set<string>, to: string) => routes.has(to) || routes.has(`${to}/`);
+const dupes = (xs: string[]) => xs.filter((x, i) => xs.indexOf(x) !== i);
+
+/** Everything a signed-in user can reach from global chrome + the Studio hub. */
+const signedInSurface = (): NavLink[] => [
+  ...signedInLinks,
+  ...exploreLinks,
+  ...accountGroups.flatMap((g) => g.links),
+  ...studioToolGroups.flatMap((g) => g.tools),
 ];
 
-describe('header nav links', () => {
+describe('navigation IA', () => {
   it('every link points at a registered route', () => {
     const routes = registeredRoutes();
     expect(routes.size).toBeGreaterThan(50);
-    const missing = allLinks()
+    const missing = allNavLinks()
       .map((l) => l.to)
-      // Index routes are registered without a trailing slash in FileRoutesByFullPath.
-      .filter((to) => !routes.has(to) && !routes.has(`${to}/`));
+      .filter((to) => !isRoute(routes, to));
     expect(missing).toEqual([]);
   });
 
-  it('has no duplicate targets or labels across the whole nav', () => {
-    const links = allLinks();
-    const dupes = (xs: string[]) => xs.filter((x, i) => xs.indexOf(x) !== i);
+  it('each destination has exactly one home in the signed-in surface', () => {
+    const links = signedInSurface();
     expect(dupes(links.map((l) => l.to))).toEqual([]);
     expect(dupes(links.map((l) => l.label))).toEqual([]);
   });
 
-  it('adds Gallery only for universe owners', () => {
-    const has = (owner: boolean) =>
-      visibleMoreGroups(owner).some((g) => g.links.some((l) => l.to === '/gallery'));
-    expect(has(false)).toBe(false);
-    expect(has(true)).toBe(true);
+  it('keeps global nav short', () => {
+    expect(signedOutLinks.length).toBeLessThanOrEqual(4);
+    expect(signedInLinks.length).toBeLessThanOrEqual(5);
+    expect(exploreLinks.length).toBeLessThanOrEqual(10);
   });
 
-  it('never leaves an empty group', () => {
-    for (const owner of [false, true]) {
-      expect(visibleMoreGroups(owner).every((g) => g.links.length > 0)).toBe(true);
+  it('signed-out visitors see no account-only rooms', () => {
+    const tos = primaryLinks(false).map((l) => l.to);
+    expect(tos).not.toContain('/dashboard');
+    expect(tos).not.toContain('/studio');
+    expect(visibleExploreLinks(false)).toEqual([]);
+  });
+
+  it('Studio is primary for every signed-in user', () => {
+    expect(primaryLinks(true).map((l) => l.to)).toContain('/studio');
+  });
+
+  it('pro tools live in the Studio hub, not in global nav', () => {
+    const global = new Set([...signedInLinks, ...exploreLinks].map((l) => l.to));
+    const leaked = studioToolGroups.flatMap((g) => g.tools).filter((t) => global.has(t.to));
+    expect(leaked).toEqual([]);
+    for (const g of studioToolGroups) {
+      for (const t of g.tools) expect(t.description.length).toBeGreaterThan(0);
     }
   });
 
-  it('requires exact matching only for links that have a nested sibling', () => {
-    const groups = moreGroupsBase;
-    expect(needsExactMatch('/agents', groups)).toBe(true);
-    expect(needsExactMatch('/marketplace/likeness', groups)).toBe(true);
-    expect(needsExactMatch('/agents/discover', groups)).toBe(false);
-    expect(needsExactMatch('/market', groups)).toBe(false); // "/market" is not a parent of "/marketplace/…"
-    expect(needsExactMatch('/docs', groups)).toBe(false);
+  it('beta labels never appear in global nav', () => {
+    expect([...signedInLinks, ...exploreLinks].some((l) => 'beta' in l && l.beta)).toBe(false);
   });
 
-  it('keeps the signed-out nav short and pointed at real, public routes', () => {
-    const routes = registeredRoutes();
-    expect(signedOutLinks.length).toBeLessThanOrEqual(4);
-    expect(signedOutLinks.every((l) => routes.has(l.to) || routes.has(`${l.to}/`))).toBe(true);
-    // Rooms that need an account never appear to signed-out visitors.
-    expect(signedOutLinks.map((l) => l.to)).not.toContain('/dashboard');
+  it('mobile tabs are Home + the desktop primary order', () => {
+    for (const signedIn of [false, true]) {
+      const tabs = mobileTabs(signedIn);
+      expect(tabs.length).toBeLessThanOrEqual(5);
+      expect(tabs[0].to).toBe('/');
+      expect(tabs.slice(1).map((t) => t.to)).toEqual(
+        primaryLinks(signedIn)
+          .slice(0, 4)
+          .map((l) => l.to)
+      );
+    }
+  });
+
+  it('never leaves an empty group', () => {
+    expect(visibleAccountGroups().every((g) => g.links.length > 0)).toBe(true);
+    expect(visibleStudioToolGroups().every((g) => g.tools.length > 0)).toBe(true);
+  });
+
+  it('requires exact matching only for links that have a nested sibling', () => {
+    const account = accountGroups.flatMap((g) => g.links);
+    expect(needsExactMatch('/dashboard', account)).toBe(true);
+    expect(needsExactMatch('/dashboard/personas', account)).toBe(false);
+    expect(needsExactMatch('/marketplace/likeness', exploreLinks)).toBe(false);
+    expect(needsExactMatch('/market', exploreLinks)).toBe(false); // "/market" is not a parent of "/marketplace/…"
   });
 });

@@ -1,9 +1,11 @@
 /**
  * Studio — Producer command center.
  *
- * Lists universes the connected wallet created, with quick entry points
- * into the editor, access settings, analytics, and the public watch page.
- * Separates the producer flow from the consumer (Netflix-style) landing.
+ * The creator hub. Lists universes the connected wallet created, with quick
+ * entry points into the editor, access settings, analytics, and the public
+ * watch page — then every pro tool (Canvas, Notebook, Voice Studio, editors,
+ * growth tools) grouped by job. Global nav links here instead of listing
+ * tools itself; the tool list comes from `studioToolGroups` in navLinks.
  */
 
 import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-router';
@@ -22,6 +24,7 @@ import {
   type Token as PonderToken,
 } from '@/utils/ponder-api';
 import type { FirestoreUniverse } from '@/types/firestore';
+import { visibleStudioToolGroups } from '@/lib/navLinks';
 import {
   Plus,
   Settings,
@@ -34,6 +37,28 @@ import {
   Layers,
   GitBranch,
   Sparkles,
+  LayoutGrid,
+  NotebookPen,
+  ListVideo,
+  Mic,
+  FlaskConical,
+  ImageIcon,
+  UserRound,
+  ScanFace,
+  Upload,
+  Scissors,
+  Eraser,
+  Expand,
+  SunMedium,
+  TrendingUp,
+  Megaphone,
+  Library,
+  ShoppingBag,
+  Tv,
+  Building2,
+  Bot,
+  DollarSign,
+  ArrowRight,
 } from 'lucide-react';
 
 export const Route = createFileRoute('/studio/')({
@@ -147,12 +172,12 @@ function StudioPage() {
           <div className="flex items-start justify-between gap-6 flex-wrap">
             <div>
               <p className="text-xs uppercase tracking-[0.25em] text-primary/80 mb-2">Studio</p>
-              <h1 className="text-3xl md:text-4xl font-display italic text-foreground">
-                Your universes
+              <h1 className="text-3xl md:text-4xl font-display font-semibold text-foreground">
+                Your studio
               </h1>
               <p className="text-sm text-muted-foreground mt-2 max-w-xl">
-                Manage every universe you've launched. Open the editor, tune access, track revenue,
-                or preview the public watch page.
+                Your universes and every tool to build them. Open the editor, tune access, track
+                revenue, or jump into Canvas, Voice Studio and the editors below.
               </p>
             </div>
             <Button asChild size="lg" className="rounded-full px-6">
@@ -185,6 +210,7 @@ function StudioPage() {
             ))}
           </div>
         )}
+        <StudioTools />
       </div>
     </div>
   );
@@ -225,9 +251,9 @@ function BuildableUniverses({ list }: { list: BuildableUniverse[] }) {
     <div className="mb-10">
       <div className="mb-4 flex items-end justify-between">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">Your Universes</h2>
+          <h2 className="text-xl font-semibold tracking-tight">Generate into</h2>
           <p className="text-sm text-muted-foreground">
-            Pick one to generate into, or launch a new one below.
+            Universes you own or co-author. Pick one to generate into.
           </p>
         </div>
       </div>
@@ -427,19 +453,105 @@ function StudioCard({ universe: u }: { universe: StudioUniverse }) {
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="text-center py-24 border border-dashed border-white/10 rounded-2xl bg-white/[0.01]">
+    <div className="text-center py-12 border border-dashed border-border/60 rounded-2xl bg-card/20">
       <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/30 mx-auto flex items-center justify-center mb-4">
         <Plus className="h-6 w-6 text-primary" />
       </div>
       <h3 className="text-lg font-semibold mb-2">No universes yet</h3>
       <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
-        Your studio is empty. Launch your first narrative universe to unlock the editor, token
-        launchpad, and revenue tools.
+        Launch your first universe to unlock the timeline editor, token launchpad and revenue tools.
+        The tools below work without one.
       </p>
       <Button size="lg" onClick={onCreate} className="rounded-full px-6">
         <Plus className="h-4 w-4 mr-2" />
         Create your first universe
       </Button>
     </div>
+  );
+}
+
+const TOOL_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  '/canvas': LayoutGrid,
+  '/notebook': NotebookPen,
+  '/series': ListVideo,
+  '/lab/voice-studio': Mic,
+  '/lab/zai': FlaskConical,
+  '/lab/gpt-image': ImageIcon,
+  '/create/persona': UserRound,
+  '/create/likeness': ScanFace,
+  '/upload': Upload,
+  '/editor': Scissors,
+  '/edit/inpaint': Eraser,
+  '/edit/outpaint': Expand,
+  '/relight': SunMedium,
+  '/virality': TrendingUp,
+  '/marketing': Megaphone,
+  '/ad-reference': Library,
+  '/sell': ShoppingBag,
+  '/adplacements': Tv,
+  '/brand/dashboard': Building2,
+  '/agents': Bot,
+  '/arc': DollarSign,
+};
+
+/** Every pro tool, grouped by job. Replaces the old global "More" lab index. */
+function StudioTools() {
+  const groups = visibleStudioToolGroups();
+  return (
+    <section className="mt-14" aria-labelledby="studio-tools-heading">
+      <div className="mb-5 flex items-end justify-between gap-4">
+        <div>
+          <h2 id="studio-tools-heading" className="text-xl font-semibold tracking-tight">
+            Tools
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Everything beyond the one-prompt{' '}
+            <Link to="/create" className="text-primary hover:underline">
+              Create
+            </Link>{' '}
+            console.
+          </p>
+        </div>
+      </div>
+      <div className="space-y-8">
+        {groups.map((group) => (
+          <div key={group.label}>
+            <h3 className="mb-3 text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+              {group.label}
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+              {group.tools.map((tool) => {
+                const Icon = TOOL_ICONS[tool.to] ?? Sparkles;
+                return (
+                  <Link
+                    key={tool.to}
+                    to={tool.to as any}
+                    className="group flex items-start gap-3 rounded-xl border border-border/60 bg-card/40 p-3 transition-colors duration-100 hover:border-primary/40 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-foreground">{tool.label}</span>
+                        {tool.beta && (
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Beta
+                          </span>
+                        )}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground line-clamp-2">
+                        {tool.description}
+                      </span>
+                    </span>
+                    <ArrowRight className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

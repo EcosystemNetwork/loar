@@ -110,8 +110,29 @@ const { activeGateway: ACTIVE_GATEWAY, activeHost: ACTIVE_HOST } = resolveActive
 // live-primed gateway config (`/api/ipfs/gateway-config`) reports right now
 // — covers a custom domain fronting a dedicated gateway (e.g. `media.loar.fun`)
 // without hardcoding that domain name here.
+// Retired dedicated-gateway domains still baked into stored media URLs. They
+// now 403 everything, so they must be recognized as IPFS URLs (to extract the
+// CID and re-route it) even though the live config points elsewhere.
+const LEGACY_DEDICATED_HOSTS = new Set<string>(['media.loar.fun']);
+
 function isKnownDedicatedHost(host: string): boolean {
-  return host.endsWith('.mypinata.cloud') || (!!dedicatedConfig && host === dedicatedConfig.host);
+  return (
+    host.endsWith('.mypinata.cloud') ||
+    LEGACY_DEDICATED_HOSTS.has(host) ||
+    (!!dedicatedConfig && host === dedicatedConfig.host)
+  );
+}
+
+// Path prefix of the dedicated gateway base, e.g. `/loar-db-ipfs` for the
+// GCS mirror `https://storage.googleapis.com/loar-db-ipfs`. Empty for a
+// host-only gateway.
+function dedicatedBasePath(): string {
+  if (!dedicatedConfig) return '';
+  try {
+    return new URL(dedicatedConfig.base).pathname.replace(/\/$/, '');
+  } catch {
+    return '';
+  }
 }
 
 function appendToken(url: string): string {
@@ -134,6 +155,11 @@ function rewriteBrokenDedicatedGatewayUrl(url: string): string {
   try {
     const parsed = new URL(url);
     if (!isKnownDedicatedHost(parsed.host)) return url;
+    // Re-compose from the extracted CID path rather than copying the pathname:
+    // a gateway base with a path prefix (the GCS mirror's `/loar-db-ipfs`)
+    // otherwise leaked into the public URL as `ipfs.io/loar-db-ipfs/ipfs/<cid>`.
+    const parts = extractIpfsPath(url);
+    if (parts) return `${ACTIVE_GATEWAY}/ipfs/${parts.cidPath}`;
     parsed.searchParams.delete('pinataGatewayToken');
     return `${ACTIVE_GATEWAY}${parsed.pathname}${parsed.search ? parsed.search : ''}`;
   } catch {
@@ -380,7 +406,16 @@ function extractIpfsPath(url: string): { cidPath: string } | null {
       return { cidPath: cidPath + (parsed.search || '') };
     }
 
-    const pathMatch = parsed.pathname.match(/^\/ipfs\/(.+)$/);
+    let pathname = parsed.pathname;
+    const basePath =
+      dedicatedConfig && parsed.host === dedicatedConfig.host ? dedicatedBasePath() : '';
+    if (basePath && pathname.startsWith(`${basePath}/`)) pathname = pathname.slice(basePath.length);
+    // Also repair URLs an earlier build already mangled into
+    // `<public gateway>/<base path>/ipfs/<cid>`.
+    pathname = pathname.replace(/^\/[^/]+(\/ipfs\/)/, (m, ipfs) =>
+      m.startsWith('/ipfs/') ? m : ipfs
+    );
+    const pathMatch = pathname.match(/^\/ipfs\/(.+)$/);
     if (pathMatch) {
       const rest = pathMatch[1];
       const search = new URLSearchParams(parsed.search);

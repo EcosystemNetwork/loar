@@ -356,4 +356,35 @@ describe('primeIpfsGatewayConfig / dedicated-gateway primary', () => {
     await expect(primeIpfsGatewayConfig()).resolves.toBeUndefined();
     expect(resolveIpfsUrl('ipfs://QmX/f.png')).toBe('https://ipfs.io/ipfs/QmX/f.png');
   });
+  it('handles a gateway base with a path prefix (GCS mirror) without leaking it onto ipfs.io', async () => {
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      const href = String(input);
+      if (href.endsWith('/api/ipfs/gateway-config')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            base: 'https://storage.googleapis.com/loar-db-ipfs',
+            host: 'storage.googleapis.com',
+            token: '',
+            isDedicated: true,
+          }),
+        } as Response);
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${href}`));
+    }) as unknown as typeof fetch;
+    const { primeIpfsGatewayConfig, resolveIpfsUrl, getIpfsUrlCandidates } =
+      await import('../ipfs-url');
+    await primeIpfsGatewayConfig();
+
+    const gcs = 'https://storage.googleapis.com/loar-db-ipfs/ipfs/QmGcs';
+    expect(resolveIpfsUrl(gcs)).toBe(gcs);
+    expect(resolveIpfsUrl('ipfs://QmGcs')).toBe(gcs);
+    // Retired custom domain and previously-mangled URLs route back to GCS.
+    expect(resolveIpfsUrl('https://media.loar.fun/ipfs/QmGcs')).toBe(gcs);
+    expect(resolveIpfsUrl('https://ipfs.io/loar-db-ipfs/ipfs/QmGcs')).toBe(gcs);
+    const candidates = getIpfsUrlCandidates(gcs);
+    expect(candidates[0]).toBe(gcs);
+    expect(candidates).toContain('https://ipfs.io/ipfs/QmGcs');
+    expect(candidates.some((c) => c.includes('ipfs.io/loar-db-ipfs'))).toBe(false);
+  });
 });

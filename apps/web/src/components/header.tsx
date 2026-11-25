@@ -1,45 +1,38 @@
 /**
  * Site Header
  *
- * Sticky top navigation bar with logo, primary links, "More" dropdown
- * for secondary pages, wallet connect, and theme toggle.
- * Collapses all links on mobile.
+ * Sticky top navigation: logo, the primary jobs (Discover · Create · Studio ·
+ * Launchpad · Wiki), a short Explore dropdown, and the account menu. Pro tools
+ * live in the Studio hub; personal pages, billing and display toggles live in
+ * the account menu. All link data comes from `@/lib/navLinks`.
  */
 
 import { Link, useMatchRoute, useRouterState } from '@tanstack/react-router';
 import { WalletConnectButton } from '@/components/wallet-connect-button';
 import { LoarBalance } from './LoarBalance';
-import { Web3ModeToggle } from './web3-mode-toggle';
-import { ModeToggle } from './mode-toggle';
 import { NotificationBell } from './social/NotificationBell';
 import { Button } from './ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useWalletAuth } from '@/lib/wallet-auth';
-import { trpcClient } from '@/utils/trpc';
 import {
   AUTH_ROUTES,
-  HIDDEN_ROUTES,
   needsExactMatch,
-  ownerPrimaryLink,
-  primaryLinksBase,
-  signedOutLinks,
-  visibleMoreGroups,
+  primaryLinks as getPrimaryLinks,
+  visibleAccountGroups,
+  visibleExploreLinks,
 } from '@/lib/navLinks';
 
 export default function Header() {
   const matchRoute = useMatchRoute();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { address, isAuthenticated } = useWalletAuth();
+  const { address } = useWalletAuth();
   // `address` hydrates from localStorage synchronously, so keying on it (not
   // `isAuthenticated`, which waits for the /auth/me round-trip) avoids
   // flashing the signed-out nav at returning users.
@@ -48,35 +41,15 @@ export default function Header() {
     select: (s) => AUTH_ROUTES.has(s.location.pathname),
   });
 
-  // Surface the Studio link only for users who actually have universes to manage.
-  const { data: hasUniverses } = useQuery({
-    queryKey: ['header', 'has-universes', address],
-    queryFn: () =>
-      trpcClient.universes.getByCreator
-        .query({ creator: address! })
-        .then((r: any) => ((r?.data ?? r) as unknown[])?.length > 0),
-    enabled: !!address && isAuthenticated,
-    staleTime: 60_000,
-  });
-
-  // Studio is the entry point to the React Flow universe editor — surface it
-  // inline for owners so they don't have to dig through the More dropdown.
-  // Gallery stays in More (less time-critical).
-  const primaryLinks = (
-    onAuthPage
-      ? []
-      : signedIn
-        ? [
-            ...primaryLinksBase.slice(0, 2),
-            ...(hasUniverses ? [ownerPrimaryLink] : []),
-            ...primaryLinksBase.slice(2),
-          ]
-        : [...signedOutLinks]
-  ).filter((l) => !HIDDEN_ROUTES.has(l.to));
-  const moreGroups = signedIn && !onAuthPage ? visibleMoreGroups(!!hasUniverses) : [];
-  const moreIsActive = moreGroups.some((g) =>
-    g.links.some(({ to }) => matchRoute({ to, fuzzy: true }))
-  );
+  const primaryLinks = onAuthPage ? [] : getPrimaryLinks(signedIn);
+  const exploreLinks = onAuthPage ? [] : visibleExploreLinks(signedIn);
+  // Mobile drawer mirrors the account menu so small screens reach the same rooms.
+  const drawerGroups =
+    signedIn && !onAuthPage
+      ? [{ label: 'Explore', links: exploreLinks }, ...visibleAccountGroups()]
+      : [];
+  const drawerLinks = drawerGroups.flatMap((g) => g.links);
+  const exploreIsActive = exploreLinks.some(({ to }) => matchRoute({ to, fuzzy: true }));
 
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-lg">
@@ -110,54 +83,36 @@ export default function Header() {
               </Link>
             ))}
 
-            {moreGroups.length > 0 && (
+            {exploreLinks.length > 0 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     className={`relative inline-flex items-center gap-1 px-2.5 py-1.5 text-[13px] font-medium tracking-wide transition-colors ${
-                      moreIsActive
+                      exploreIsActive
                         ? 'text-foreground'
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    More
+                    Explore
                     <ChevronDown className="h-3 w-3 opacity-50" />
-                    {moreIsActive && (
+                    {exploreIsActive && (
                       <span className="absolute bottom-0 left-2.5 right-2.5 h-[2px] bg-primary rounded-full" />
                     )}
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="w-[640px] grid grid-cols-3 gap-x-2 gap-y-1 p-2"
-                >
-                  {moreGroups.map((group) => {
-                    return (
-                      <DropdownMenuGroup key={group.label} className="min-w-0">
-                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/70 px-2 pb-0.5">
-                          {group.label}
-                        </DropdownMenuLabel>
-                        {group.links.map((link) => (
-                          <DropdownMenuItem key={link.to} asChild>
-                            <Link
-                              to={link.to as any}
-                              activeOptions={{ exact: needsExactMatch(link.to, moreGroups) }}
-                              activeProps={{ className: 'text-primary font-medium' }}
-                              inactiveProps={{ className: 'text-foreground' }}
-                              className="w-full cursor-pointer flex items-center justify-between text-[13px] py-1"
-                            >
-                              <span className="truncate">{link.label}</span>
-                              {'beta' in link && link.beta && (
-                                <span className="ml-2 shrink-0 text-[9px] font-semibold bg-primary/10 text-primary/80 px-1.5 py-0.5 rounded leading-none uppercase tracking-wider">
-                                  Beta
-                                </span>
-                              )}
-                            </Link>
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuGroup>
-                    );
-                  })}
+                <DropdownMenuContent align="start" className="w-56 p-1.5">
+                  {exploreLinks.map((link) => (
+                    <DropdownMenuItem key={link.to} asChild>
+                      <Link
+                        to={link.to as any}
+                        activeOptions={{ exact: needsExactMatch(link.to, exploreLinks) }}
+                        activeProps={{ className: 'text-primary font-medium' }}
+                        className="w-full cursor-pointer text-[13px]"
+                      >
+                        {link.label}
+                      </Link>
+                    </DropdownMenuItem>
+                  ))}
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -177,12 +132,6 @@ export default function Header() {
             {signedIn && <LoarBalance />}
             {signedIn && <NotificationBell />}
             <WalletConnectButton size="sm" />
-            {signedIn && (
-              <div className="hidden sm:flex items-center gap-1 ml-1 pl-1.5 border-l border-border/50">
-                <Web3ModeToggle />
-                <ModeToggle />
-              </div>
-            )}
             <Button
               variant="ghost"
               size="icon"
@@ -222,7 +171,7 @@ export default function Header() {
                 </Link>
               ))}
             </div>
-            {moreGroups.map((group) => {
+            {drawerGroups.map((group) => {
               return (
                 <div key={group.label} className="mb-1">
                   <p className="px-2 pt-2.5 pb-1.5 text-[10px] font-medium text-muted-foreground/60 uppercase tracking-widest border-t border-border/30">
@@ -233,7 +182,7 @@ export default function Header() {
                       <Link
                         key={link.to}
                         to={link.to as any}
-                        activeOptions={{ exact: needsExactMatch(link.to, moreGroups) }}
+                        activeOptions={{ exact: needsExactMatch(link.to, drawerLinks) }}
                         onClick={() => setMobileOpen(false)}
                         activeProps={{ className: 'bg-primary/10 text-primary' }}
                         inactiveProps={{
@@ -254,12 +203,6 @@ export default function Header() {
                 </div>
               );
             })}
-            {signedIn && (
-              <div className="flex items-center gap-1 pt-2 mt-2 border-t border-border/30 sm:hidden">
-                <Web3ModeToggle />
-                <ModeToggle />
-              </div>
-            )}
           </nav>
         </div>
       )}
