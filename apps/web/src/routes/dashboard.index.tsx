@@ -188,7 +188,7 @@ function RouteComponent() {
 
           {/* ── New User Onboarding ───────────────────────────────── */}
           {isNewUser && (
-            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-purple-500/5">
+            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-orange-500/5">
               <CardContent className="py-10 flex flex-col items-center gap-4 text-center">
                 <div className="p-3 rounded-full bg-primary/10">
                   <Wand2 className="h-8 w-8 text-primary" />
@@ -243,7 +243,7 @@ function RouteComponent() {
                 accent="blue"
               />
               <StatCard
-                icon={<Film className="h-4 w-4 text-purple-500" />}
+                icon={<Film className="h-4 w-4 text-orange-500" />}
                 label="Episodes"
                 value={String(episodesListed + nftsCollected)}
                 sub={
@@ -450,7 +450,7 @@ function TokenMiniCard({ token }: { token: EnrichedToken }) {
                 className="w-10 h-10 rounded-lg object-cover"
               />
             ) : (
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-orange-500/20 flex items-center justify-center">
                 <span className="text-xs font-bold text-primary/60">${token.symbol}</span>
               </div>
             )}
@@ -590,7 +590,7 @@ function UniverseCard({
       onClick={() => onSelect(universe.id)}
     >
       <CardContent className="p-0">
-        <div className="h-32 bg-gradient-to-br from-indigo-500/80 to-purple-600/80 relative">
+        <div className="h-32 bg-gradient-to-br from-amber-500/80 to-orange-600/80 relative">
           {(universe.image_url || universe.imageUrl) && (
             <SmartImage
               src={universe.image_url || universe.imageUrl}

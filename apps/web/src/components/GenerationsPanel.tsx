@@ -178,7 +178,7 @@ function GenerationsPanelImpl({
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border">
         <div className="flex items-center gap-2">
-          <Film className="h-5 w-5 text-purple-500" />
+          <Film className="h-5 w-5 text-orange-500" />
           <h2 className="font-semibold text-sm">Generations</h2>
           {allItems.length > 0 && (
             <Badge variant="secondary" className="text-xs">
@@ -279,7 +279,7 @@ function GenerationsPanelImpl({
             key={item.id}
             draggable
             onDragStart={(e) => handleDragStart(e, item)}
-            className="group relative rounded-lg border border-border bg-card hover:border-purple-400 hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing"
+            className="group relative rounded-lg border border-border bg-card hover:border-orange-400 hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing"
           >
             {/* Drag handle */}
             <div className="absolute left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-60 transition-opacity">
@@ -299,7 +299,7 @@ function GenerationsPanelImpl({
                 />
               ) : (
                 <div
-                  className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-950/80 to-slate-950 cursor-pointer"
+                  className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-950/80 to-slate-950 cursor-pointer"
                   onClick={() => setPlayingId(item.id)}
                 >
                   <Play className="h-8 w-8 text-white/70 hover:text-white transition-colors" />
@@ -351,7 +351,7 @@ function GenerationsPanelImpl({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 px-2 text-[10px] text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/30"
+                  className="h-6 px-2 text-[10px] text-orange-600 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-950/30"
                   onClick={() => handleClickAdd(item)}
                 >
                   <Sparkles className="h-3 w-3 mr-1" />

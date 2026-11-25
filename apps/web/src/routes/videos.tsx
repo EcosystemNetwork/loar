@@ -164,7 +164,7 @@ function VideosPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero */}
-      <div className="relative overflow-hidden border-b bg-gradient-to-br from-background via-primary/5 to-purple-900/20">
+      <div className="relative overflow-hidden border-b bg-gradient-to-br from-background via-primary/5 to-orange-900/20">
         <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-14">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 md:gap-6">
             <div>
@@ -473,7 +473,7 @@ function ShortCard({ item }: { item: any }) {
         {/* AI badge */}
         {(item.mediaType === 'ai-video' || item.mediaType === 'ai-image') && (
           <div className="absolute top-2 right-2">
-            <span className="text-[10px] bg-purple-600/80 text-white px-1.5 py-0.5 rounded backdrop-blur-sm">
+            <span className="text-[10px] bg-orange-600/80 text-white px-1.5 py-0.5 rounded backdrop-blur-sm">
               AI
             </span>
           </div>
@@ -577,7 +577,7 @@ function LongCard({ item }: { item: any }) {
         </div>
         {(item.mediaType === 'ai-video' || item.mediaType === 'ai-image') && (
           <div className="absolute top-2 right-2">
-            <span className="text-xs bg-purple-600/80 text-white px-2 py-0.5 rounded backdrop-blur-sm">
+            <span className="text-xs bg-orange-600/80 text-white px-2 py-0.5 rounded backdrop-blur-sm">
               AI
             </span>
           </div>

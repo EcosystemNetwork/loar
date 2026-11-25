@@ -610,8 +610,8 @@ export function GovernanceSidebar({
             {/* Header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-violet-100 dark:bg-violet-900/30">
-                  <Vote className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                  <Vote className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
@@ -634,7 +634,7 @@ export function GovernanceSidebar({
             </div>
 
             {/* Connection & Balance Status */}
-            <Card className="bg-gradient-to-br from-violet-50 to-violet-100 dark:from-violet-950/20 dark:to-violet-900/20 border-violet-200 dark:border-violet-800">
+            <Card className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/20 dark:to-amber-900/20 border-amber-200 dark:border-amber-800">
               <CardContent className="p-4">
                 <div className="space-y-3">
                   {!isGovernanceConfigured ? (
@@ -649,7 +649,7 @@ export function GovernanceSidebar({
                     <>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-violet-700 dark:text-violet-300">
+                          <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
                             Token Balance
                           </span>
                           <Badge
@@ -663,7 +663,7 @@ export function GovernanceSidebar({
                         </div>
 
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-violet-700 dark:text-violet-300">
+                          <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
                             Voting Power
                           </span>
                           <Badge
@@ -942,7 +942,7 @@ export function GovernanceSidebar({
                                   <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
                                     <Button
                                       onClick={() => handleExecuteProposal(proposal)}
-                                      className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white h-8 text-xs"
+                                      className="w-full bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white h-8 text-xs"
                                       size="sm"
                                     >
                                       <CheckCircle className="h-3 w-3 mr-1" />

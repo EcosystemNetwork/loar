@@ -31,6 +31,7 @@ import { Model3DThumbnail } from '@/components/Model3DThumbnailLazy';
 import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
 import { ENVIRONMENT_KINDS, JobList, MODELABLE_KINDS, PUPPET_KINDS } from './Entity3DStudio';
 import { buildAssetPack } from './assetPack';
+import { BuildPicker, type BuildCandidate, type BuildPickerMode } from './BuildPicker';
 import { isActive, useWorldOverview, worldOverviewKey, type TripoJob } from './useTripoJob';
 
 /** Tripo cost estimates (USD) — mirror TRIPO_JOB_COST_USD on the server. */
@@ -55,6 +56,7 @@ export function WorldHub({
   });
   const [newSetName, setNewSetName] = useState('');
   const [packProgress, setPackProgress] = useState<string | null>(null);
+  const [picker, setPicker] = useState<BuildPickerMode | null>(null);
 
   const modelable = rows.filter((r) => MODELABLE_KINDS.includes(r.kind));
   const places = rows.filter((r) => ENVIRONMENT_KINDS.includes(r.kind));
@@ -88,7 +90,15 @@ export function WorldHub({
       !inFlight.has(`rig_model:${r.id}`) &&
       !inFlight.has(`character_puppet:${r.id}`)
   );
-  const buildCost = missing.length * MODEL_COST_USD + missingEnvs.length * ENVIRONMENT_COST_USD;
+  const buildCandidates: BuildCandidate[] = [
+    ...missing.map((row) => ({ row, cost: MODEL_COST_USD, output: '3D model' })),
+    ...missingEnvs.map((row) => ({ row, cost: ENVIRONMENT_COST_USD, output: 'environment' })),
+  ];
+  const rigCandidates: BuildCandidate[] = unrigged.map((row) => ({
+    row,
+    cost: RIG_COST_USD,
+    output: 'rig + clips',
+  }));
 
   // Newest job per entity+kind that failed, retryable, and whose output is still missing.
   const retryableFailures = useMemo(() => {
@@ -122,9 +132,14 @@ export function WorldHub({
   };
 
   const batch = useMutation({
-    mutationFn: () =>
-      trpcClient.tripo.batchEntityTo3D.mutate({ universeId, includeEnvironments: true }),
+    mutationFn: (entityIds: string[]) =>
+      trpcClient.tripo.batchEntityTo3D.mutate({
+        universeId,
+        includeEnvironments: true,
+        entityIds,
+      }),
     onSuccess: (r) => {
+      setPicker(null);
       const models = r.jobs.filter((j) => j.kind === 'entity_model').length;
       const envs = r.jobs.length - models;
       toast.success(
@@ -142,8 +157,10 @@ export function WorldHub({
   });
 
   const batchRig = useMutation({
-    mutationFn: () => trpcClient.tripo.batchRigModels.mutate({ universeId }),
+    mutationFn: (entityIds: string[]) =>
+      trpcClient.tripo.batchRigModels.mutate({ universeId, entityIds }),
     onSuccess: (r) => {
+      setPicker(null);
       toast.success(`Rigging ${r.jobs.length} model${r.jobs.length === 1 ? '' : 's'}`, {
         description: r.remaining
           ? `${r.remaining} more still to go — run again after these finish.`
@@ -256,33 +273,41 @@ export function WorldHub({
 
       <div className="flex flex-wrap items-center gap-2">
         {isManager && missing.length + missingEnvs.length > 0 && (
-          <Button size="sm" onClick={() => batch.mutate()} disabled={batch.isPending}>
+          <Button size="sm" onClick={() => setPicker('build')} disabled={batch.isPending}>
             {batch.isPending ? (
               <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
             ) : (
               <Sparkles className="mr-1 h-3.5 w-3.5" />
             )}
-            Build missing 3D ({missing.length} models
-            {missingEnvs.length ? `, ${missingEnvs.length} environments` : ''}) · ≈$
-            {buildCost.toFixed(2)}
+            Build 3D…
           </Button>
         )}
         {isManager && unrigged.length > 0 && (
           <Button
             size="sm"
             variant="outline"
-            onClick={() => batchRig.mutate()}
+            onClick={() => setPicker('rig')}
             disabled={batchRig.isPending}
-            title="Auto-detected skeleton + idle/walk clips on each character, creature and vehicle model"
+            title="Auto-detected skeleton + idle/walk clips on the characters, creatures and vehicles you pick"
           >
             {batchRig.isPending ? (
               <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
             ) : (
               <Bone className="mr-1 h-3.5 w-3.5" />
             )}
-            Rig {unrigged.length} model{unrigged.length === 1 ? '' : 's'} · ≈$
-            {(unrigged.length * RIG_COST_USD).toFixed(2)}
+            Rig models…
           </Button>
+        )}
+        {isManager && picker && (
+          <BuildPicker
+            open
+            onOpenChange={(o) => !o && setPicker(null)}
+            mode={picker}
+            universeId={universeId}
+            candidates={picker === 'build' ? buildCandidates : rigCandidates}
+            pending={picker === 'build' ? batch.isPending : batchRig.isPending}
+            onConfirm={(ids) => (picker === 'build' ? batch : batchRig).mutate(ids)}
+          />
         )}
         {isManager && retryableFailures.length > 0 && (
           <Button

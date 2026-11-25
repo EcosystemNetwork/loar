@@ -106,7 +106,7 @@ export function AudioTab({ universeAddress }: AudioTabProps) {
           const isPlaying = playingId === item.id;
           return (
             <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-              <div className="aspect-square bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 relative flex items-center justify-center">
+              <div className="aspect-square bg-gradient-to-br from-amber-500/20 to-orange-500/20 relative flex items-center justify-center">
                 {item.thumbnailUrl ? (
                   <SmartImage
                     src={item.thumbnailUrl}

@@ -15,7 +15,7 @@
         "test:cov": "forge coverage --report summary --report lcov --match-path 'test/unit/*'"
     },
     "devDependencies": {
-        "forge-std": "github:foundry-rs/forge-std",
+        "forge-std": "github:foundry-rs/forge-std#c6fa5d82a3a287c4ff23f26c8f7e2958aafd32d9",
         "solhint-community": "4.0.0"
     }
 }

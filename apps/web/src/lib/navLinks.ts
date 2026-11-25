@@ -23,6 +23,20 @@ export const primaryLinksBase = [
   { to: '/dashboard', label: 'Dashboard' },
 ] as const;
 
+/** Signed-out visitors get a short consumer nav (logo + these + Sign In).
+ *  Dashboard, Launchpad, the "More" lab index, notifications and the
+ *  web3/theme toggles only appear once signed in — a first-time visitor
+ *  should not be shown rooms they cannot enter. */
+export const signedOutLinks = [
+  { to: '/discover', label: 'Discover' },
+  { to: '/create', label: 'Create' },
+  { to: '/world', label: '3D World' },
+  { to: '/wiki', label: 'Wiki' },
+] as const;
+
+/** Auth screens are a quiet brand moment: logo + form, no app nav. */
+export const AUTH_ROUTES = new Set<string>(['/login']);
+
 /** Surfaced inline only for users who own universes — Studio is the entry
  *  point to the React Flow universe editor (`/universe/$id`). */
 export const ownerPrimaryLink = { to: '/studio', label: 'My Studio' } as const;

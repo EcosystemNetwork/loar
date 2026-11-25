@@ -113,7 +113,7 @@ function DiscoverPage() {
     <DiscoverViewerContext.Provider value={setViewing}>
       <div className="min-h-screen bg-background">
         {/* Hero — Trending Section */}
-        <div className="border-b bg-gradient-to-br from-primary/5 via-purple-500/5 to-pink-500/5">
+        <div className="border-b bg-gradient-to-br from-primary/5 via-orange-500/5 to-amber-500/5">
           <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-10">
             <div className="flex items-center justify-between mb-4 sm:mb-6">
               <div>
@@ -446,7 +446,7 @@ function UniverseCard({ universe }: { universe: any }) {
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-purple-500/20">
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-orange-500/20">
                 <Globe className="h-16 w-16 text-muted-foreground/50" />
               </div>
             )}
@@ -462,7 +462,7 @@ function UniverseCard({ universe }: { universe: any }) {
                 </Badge>
               )}
               {accessModel === 'subscription' && (
-                <Badge className="bg-purple-600/80 text-white border-0 backdrop-blur-sm text-xs gap-1">
+                <Badge className="bg-sky-600/80 text-white border-0 backdrop-blur-sm text-xs gap-1">
                   <Crown className="h-3 w-3" /> Subscription
                 </Badge>
               )}
@@ -836,7 +836,7 @@ function MobileShortCard({ item, isActive }: { item: any; isActive: boolean }) {
         </div>
         {(item.mediaType === 'ai-video' || item.mediaType === 'ai-image') && (
           <div className="absolute top-2 right-2">
-            <span className="text-[10px] bg-purple-600/80 text-white px-1.5 py-0.5 rounded backdrop-blur-sm">
+            <span className="text-[10px] bg-orange-600/80 text-white px-1.5 py-0.5 rounded backdrop-blur-sm">
               AI
             </span>
           </div>
@@ -938,7 +938,7 @@ function DesktopShortsPlayer({ items }: { items: any[] }) {
         <div className="absolute top-3 left-3 flex gap-1.5">
           <ContentLaneBadge classification={item.classification} size="sm" />
           {(item.mediaType === 'ai-video' || item.mediaType === 'ai-image') && (
-            <span className="text-[10px] bg-purple-600/80 text-white px-1.5 py-0.5 rounded backdrop-blur-sm">
+            <span className="text-[10px] bg-orange-600/80 text-white px-1.5 py-0.5 rounded backdrop-blur-sm">
               AI
             </span>
           )}
@@ -1083,7 +1083,7 @@ function LongCard({ item }: { item: any }) {
         </div>
         {(item.mediaType === 'ai-video' || item.mediaType === 'ai-image') && (
           <div className="absolute top-2 right-2">
-            <span className="text-xs bg-purple-600/80 text-white px-2 py-0.5 rounded backdrop-blur-sm">
+            <span className="text-xs bg-orange-600/80 text-white px-2 py-0.5 rounded backdrop-blur-sm">
               AI
             </span>
           </div>

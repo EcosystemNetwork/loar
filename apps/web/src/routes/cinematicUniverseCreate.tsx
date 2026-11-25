@@ -1964,7 +1964,7 @@ function CinematicUniverseCreate() {
                   />
                 ) : null}
                 <div
-                  className="img-fallback absolute inset-0 items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500"
+                  className="img-fallback absolute inset-0 items-center justify-center bg-gradient-to-br from-amber-500 via-orange-500 to-amber-500"
                   style={{ display: imageUrl ? 'none' : 'flex' }}
                 >
                   {imageUrl ? (

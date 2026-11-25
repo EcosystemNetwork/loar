@@ -324,12 +324,12 @@ export function UniverseSidebar({
 
               {/* Enhanced Contract Info */}
               {!finalUniverse?.isDefault && finalUniverse?.address && (
-                <Card className="bg-gradient-to-br from-violet-50 to-violet-100 dark:from-violet-950/20 dark:to-violet-900/20 border-violet-200 dark:border-violet-800">
+                <Card className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/20 dark:to-amber-900/20 border-amber-200 dark:border-amber-800">
                   <CardContent className="p-3">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <Activity className="h-3 w-3 text-violet-600 dark:text-violet-400" />
-                        <span className="text-xs font-medium text-violet-700 dark:text-violet-300">
+                        <Activity className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                        <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
                           Timeline Contract
                         </span>
                       </div>
@@ -338,23 +338,23 @@ export function UniverseSidebar({
                         size="sm"
                         onClick={() => copyToClipboard(finalUniverse.address!)}
                         aria-label="Copy contract address"
-                        className="h-6 w-6 p-0 hover:bg-violet-200 dark:hover:bg-violet-800"
+                        className="h-6 w-6 p-0 hover:bg-amber-200 dark:hover:bg-amber-800"
                       >
                         {copiedAddress === finalUniverse.address ? (
                           <CheckCircle className="h-3 w-3 text-emerald-500" />
                         ) : (
-                          <Copy className="h-3 w-3 text-violet-600 dark:text-violet-400" />
+                          <Copy className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                         )}
                       </Button>
                     </div>
-                    <code className="block text-xs bg-violet-100 dark:bg-violet-900/50 px-2 py-1 rounded font-mono text-violet-800 dark:text-violet-200">
+                    <code className="block text-xs bg-amber-100 dark:bg-amber-900/50 px-2 py-1 rounded font-mono text-amber-800 dark:text-amber-200">
                       {finalUniverse.address.slice(0, 8)}...{finalUniverse.address.slice(-8)}
                     </code>
                     {isBlockchain && (
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full mt-2 h-7 text-xs border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/50"
+                        className="w-full mt-2 h-7 text-xs border-amber-200 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/50"
                         onClick={() =>
                           openExternal(getExplorerAddressUrl(chainId, finalUniverse.address!))
                         }
@@ -449,9 +449,9 @@ export function UniverseSidebar({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30 hover:from-indigo-100 hover:to-violet-100 dark:hover:from-indigo-950/50 dark:hover:to-violet-950/50 border-indigo-200 dark:border-indigo-800 transition-all duration-300 group/btn h-10"
+                      className="w-full bg-gradient-to-r from-amber-50 to-amber-50 dark:from-amber-950/30 dark:to-amber-950/30 hover:from-amber-100 hover:to-amber-100 dark:hover:from-amber-950/50 dark:hover:to-amber-950/50 border-amber-200 dark:border-amber-800 transition-all duration-300 group/btn h-10"
                     >
-                      <BookPlus className="h-4 w-4 mr-2 group-hover/btn:scale-110 transition-transform duration-300 text-indigo-600 dark:text-indigo-400" />
+                      <BookPlus className="h-4 w-4 mr-2 group-hover/btn:scale-110 transition-transform duration-300 text-amber-600 dark:text-amber-400" />
                       Build World
                     </Button>
                   </Link>
@@ -501,9 +501,9 @@ export function UniverseSidebar({
                     variant="outline"
                     size="sm"
                     onClick={onOpenGenerations}
-                    className="w-full bg-gradient-to-r from-purple-50 to-violet-50 dark:from-purple-950/30 dark:to-violet-950/30 hover:from-purple-100 hover:to-violet-100 dark:hover:from-purple-950/50 dark:hover:to-violet-950/50 border-purple-200 dark:border-purple-800 transition-all duration-300 group/btn h-10"
+                    className="w-full bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 hover:from-orange-100 hover:to-amber-100 dark:hover:from-orange-950/50 dark:hover:to-amber-950/50 border-orange-200 dark:border-orange-800 transition-all duration-300 group/btn h-10"
                   >
-                    <Sparkles className="h-4 w-4 mr-2 group-hover/btn:scale-110 transition-transform duration-300 text-purple-600 dark:text-purple-400" />
+                    <Sparkles className="h-4 w-4 mr-2 group-hover/btn:scale-110 transition-transform duration-300 text-orange-600 dark:text-orange-400" />
                     Generations
                   </Button>
                 )}
@@ -542,9 +542,9 @@ export function UniverseSidebar({
                     size="sm"
                     onClick={() => setShow3DDialog(true)}
                     disabled={!universeIdOrAddress}
-                    className="w-full bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30 hover:from-violet-100 hover:to-purple-100 dark:hover:from-violet-950/50 dark:hover:to-purple-950/50 border-violet-200 dark:border-violet-800 transition-all duration-300 group/btn h-10"
+                    className="w-full bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 hover:from-amber-100 hover:to-orange-100 dark:hover:from-amber-950/50 dark:hover:to-orange-950/50 border-amber-200 dark:border-amber-800 transition-all duration-300 group/btn h-10"
                   >
-                    <Box className="h-4 w-4 mr-2 group-hover/btn:scale-110 transition-transform duration-300 text-violet-600 dark:text-violet-400" />
+                    <Box className="h-4 w-4 mr-2 group-hover/btn:scale-110 transition-transform duration-300 text-amber-600 dark:text-amber-400" />
                     Create 3D Model
                   </Button>
                 </div>
@@ -575,9 +575,9 @@ export function UniverseSidebar({
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full bg-gradient-to-r from-violet-50 to-fuchsia-50 dark:from-violet-950/30 dark:to-fuchsia-950/30 hover:from-violet-100 hover:to-fuchsia-100 dark:hover:from-violet-950/50 dark:hover:to-fuchsia-950/50 border-violet-200 dark:border-violet-800 transition-all duration-300 group/btn h-10"
+                        className="w-full bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 hover:from-amber-100 hover:to-orange-100 dark:hover:from-amber-950/50 dark:hover:to-orange-950/50 border-amber-200 dark:border-amber-800 transition-all duration-300 group/btn h-10"
                       >
-                        <GitBranch className="h-4 w-4 mr-2 group-hover/btn:scale-110 transition-transform duration-300 text-violet-600 dark:text-violet-400" />
+                        <GitBranch className="h-4 w-4 mr-2 group-hover/btn:scale-110 transition-transform duration-300 text-amber-600 dark:text-amber-400" />
                         Lineage
                       </Button>
                     </Link>

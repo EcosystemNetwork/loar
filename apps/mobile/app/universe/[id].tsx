@@ -41,7 +41,8 @@ export default function UniverseDetailScreen() {
   const handleShare = async () => {
     await Share.share({
       message: `Check out this LOAR Universe: ${universe?.description?.slice(0, 80) ?? ''}`,
-      url: `https://loar.fun/universe/${id}`,
+      // Unfurls with a preview card (server /share/universe/:id).
+      url: `https://loar.fun/share/universe/${encodeURIComponent(id)}`,
     });
   };
 

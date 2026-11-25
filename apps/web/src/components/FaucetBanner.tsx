@@ -62,11 +62,11 @@ export function FaucetBanner({ address }: { address: `0x${string}` | undefined }
   };
 
   return (
-    <Card className="border-indigo-500/30 bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-transparent">
+    <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-transparent">
       <CardContent className="p-4 sm:p-5">
         <div className="flex items-start gap-4">
-          <div className="rounded-lg bg-indigo-500/15 p-2.5 shrink-0">
-            <Droplets className="h-5 w-5 text-indigo-400" />
+          <div className="rounded-lg bg-amber-500/15 p-2.5 shrink-0">
+            <Droplets className="h-5 w-5 text-amber-400" />
           </div>
 
           <div className="flex-1 min-w-0">

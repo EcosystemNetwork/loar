@@ -472,6 +472,18 @@ describe('tripo.rigEntityModel / batchRigModels', () => {
       code: 'FORBIDDEN',
     });
   });
+
+  it('batch rig with picked entityIds rigs only those', async () => {
+    const t = await caller();
+    const universe = `0x${randomUUID().replace(/-/g, '').slice(0, 40)}`;
+    const model = { modelUrl: `${HOST}/source.glb` };
+    const picked = await seedEntity({ universeAddress: universe, metadata: model });
+    await seedEntity({ universeAddress: universe, name: 'Extra', metadata: model });
+    const r = await t.batchRigModels({ universeId: universe, entityIds: [picked] });
+    expect(r.jobs.map((j) => j.entityId)).toEqual([picked]);
+    expect(r.remaining).toBe(0);
+    await waitJob(r.jobs[0].jobId);
+  });
 });
 
 describe('tripo.segment / placeEnvironment / convert', () => {
@@ -664,6 +676,71 @@ describe('durable jobs — resume, retry, batch', () => {
     // race in Vitest and can hand back the unmocked lib/firebase.
     for (const j of r.jobs) expect((await waitJob(j.jobId)).status).toBe('completed');
     await ref.delete();
+  });
+
+  it('batch with picked entityIds queues only those, ignoring ineligible picks', async () => {
+    const t = await caller();
+    const universe = `0x${randomUUID().replace(/-/g, '').slice(0, 40)}`;
+    const picked = await seedEntity({
+      universeAddress: universe,
+      name: 'Hero ship',
+      kind: 'vehicle',
+    });
+    await seedEntity({ universeAddress: universe, name: 'Lore trinket', kind: 'thing' });
+    const done = await seedEntity({
+      universeAddress: universe,
+      name: 'Built',
+      kind: 'thing',
+      metadata: { modelUrl: `${HOST}/source.glb` },
+    });
+    const r = await t.batchEntityTo3D({ universeId: universe, entityIds: [picked, done] });
+    expect(r.jobs.map((j) => j.entityId)).toEqual([picked]);
+    expect(r.remaining).toBe(0);
+    expect((await waitJob(r.jobs[0].jobId)).status).toBe('completed');
+  });
+
+  it('buildPlan ranks entities by where the story uses them (managers only)', async () => {
+    const t = await caller();
+    const { db } = await import('../lib/firebase');
+    const universe = `0x${randomUUID().replace(/-/g, '').slice(0, 40)}`;
+    const hero = await seedEntity({ universeAddress: universe, name: 'Captain Vex' });
+    const ship = await seedEntity({
+      universeAddress: universe,
+      name: 'Night Heron',
+      kind: 'vehicle',
+    });
+    const trinket = await seedEntity({
+      universeAddress: universe,
+      name: 'Brass Key',
+      kind: 'thing',
+    });
+    await seedEntity({
+      universeAddress: universe,
+      name: 'Harbor Guild',
+      kind: 'faction',
+      description: 'Sworn to Captain Vex.',
+    });
+    const ep = db!.collection('episodes').doc(`ep-${randomUUID().slice(0, 8)}`);
+    await ep.set({
+      universeId: universe,
+      isCanon: true,
+      title: 'Pilot',
+      description: 'Captain Vex steals the Night Heron.',
+    });
+    const set = db!.collection('worldSets').doc(`set-${randomUUID().slice(0, 8)}`);
+    await set.set({ universeId: universe, objects: [{ entityId: ship }], environment: null });
+
+    const plan = await t.buildPlan({ universeId: universe });
+    expect(plan[hero]).toMatchObject({ episodes: 1, mentions: 1, sets: 0 });
+    expect(plan[ship]).toMatchObject({ episodes: 1, sets: 1 });
+    expect(plan[trinket].score).toBe(0);
+    expect(Object.keys(plan)).toHaveLength(3); // the faction isn't 3D-able
+
+    const bob = await caller(BOB);
+    await expect(bob.buildPlan({ universeId: universe })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    await Promise.all([ep.delete(), set.delete()]);
   });
 
   it('batch is universe-manager only', async () => {

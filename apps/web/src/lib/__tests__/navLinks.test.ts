@@ -6,6 +6,7 @@ import {
   needsExactMatch,
   ownerPrimaryLink,
   primaryLinksBase,
+  signedOutLinks,
   visibleMoreGroups,
 } from '../navLinks';
 
@@ -60,5 +61,13 @@ describe('header nav links', () => {
     expect(needsExactMatch('/agents/discover', groups)).toBe(false);
     expect(needsExactMatch('/market', groups)).toBe(false); // "/market" is not a parent of "/marketplace/…"
     expect(needsExactMatch('/docs', groups)).toBe(false);
+  });
+
+  it('keeps the signed-out nav short and pointed at real, public routes', () => {
+    const routes = registeredRoutes();
+    expect(signedOutLinks.length).toBeLessThanOrEqual(4);
+    expect(signedOutLinks.every((l) => routes.has(l.to) || routes.has(`${l.to}/`))).toBe(true);
+    // Rooms that need an account never appear to signed-out visitors.
+    expect(signedOutLinks.map((l) => l.to)).not.toContain('/dashboard');
   });
 });

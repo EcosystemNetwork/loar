@@ -68,8 +68,8 @@ export function ActivityTab() {
           const inner = (
             <div className="flex items-start gap-3 p-3 hover:bg-muted/30 transition-colors rounded">
               <div className="mt-0.5 flex-shrink-0">
-                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-violet-500/30 to-fuchsia-500/30 flex items-center justify-center">
-                  <Activity className="h-3.5 w-3.5 text-violet-300" />
+                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-amber-500/30 to-orange-500/30 flex items-center justify-center">
+                  <Activity className="h-3.5 w-3.5 text-amber-300" />
                 </div>
               </div>
               <div className="flex-1 min-w-0">

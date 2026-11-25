@@ -219,7 +219,7 @@ export function UniverseCard({
               </span>
             )}
             {universe.holderCount > 0 && (
-              <span className="text-[10px] font-semibold bg-purple-500/90 text-white px-1.5 py-0.5 rounded">
+              <span className="text-[10px] font-semibold bg-primary/90 text-primary-foreground px-1.5 py-0.5 rounded">
                 <Users className="inline h-2.5 w-2.5 mr-0.5" />
                 {universe.holderCount}
               </span>
@@ -871,7 +871,7 @@ export function RecentEpisodes() {
                     </div>
                   </>
                 ) : (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-900/40 to-pink-900/40">
+                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-950/60 to-stone-950/60">
                     <BookOpen className="h-8 w-8 text-white/60" />
                   </div>
                 )}
@@ -901,7 +901,7 @@ export function RecentEpisodes() {
                     className="w-8 h-8 rounded-full flex-shrink-0 mt-0.5"
                   />
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex-shrink-0 mt-0.5" />
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-700 to-stone-800 flex-shrink-0 mt-0.5" />
                 )}
                 <div className="min-w-0">
                   <h4 className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
@@ -1548,7 +1548,7 @@ export function SearchOverlay({
                       }}
                       className="w-full p-3 rounded-xl hover:bg-white/5 transition-colors text-left flex items-center gap-3"
                     >
-                      <div className="w-10 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-600 to-purple-600">
+                      <div className="w-10 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-amber-700 to-stone-800">
                         {(u.portraitImageURL || u.imageURL || u.tokenData?.imageURL) && (
                           <SmartImage
                             src={u.portraitImageURL || u.imageURL || u.tokenData?.imageURL}
@@ -1606,7 +1606,7 @@ export function SearchOverlay({
                       }}
                       className="w-full p-2.5 rounded-lg hover:bg-white/5 transition-colors text-left flex items-center gap-3"
                     >
-                      <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-600 to-purple-600">
+                      <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-amber-700 to-stone-800">
                         {(u.imageURL || u.tokenData?.imageURL) && (
                           <SmartImage
                             src={u.imageURL || u.tokenData?.imageURL}
@@ -1694,7 +1694,7 @@ export function ContinueWatchingRow() {
                     className="w-8 h-8 rounded-full flex-shrink-0 mt-0.5"
                   />
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex-shrink-0 mt-0.5" />
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-700 to-stone-800 flex-shrink-0 mt-0.5" />
                 )}
                 <div className="min-w-0">
                   <h4 className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
@@ -1747,7 +1747,7 @@ export function ForYouRow() {
               {ep.videoUrl ? (
                 <HomeEpisodeVideo videoUrl={ep.videoUrl} thumbnailUrl={ep.thumbnailUrl} />
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-violet-900/40 to-pink-900/40">
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-950/60 to-stone-950/60">
                   <Sparkles className="h-8 w-8 text-white/60" />
                 </div>
               )}
@@ -1763,7 +1763,7 @@ export function ForYouRow() {
                   className="w-8 h-8 rounded-full flex-shrink-0 mt-0.5"
                 />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex-shrink-0 mt-0.5" />
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-700 to-stone-800 flex-shrink-0 mt-0.5" />
               )}
               <div className="min-w-0">
                 <h4 className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">

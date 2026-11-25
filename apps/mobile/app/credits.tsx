@@ -56,7 +56,7 @@ export default function CreditsScreen() {
           <RefreshControl
             refreshing={balanceQuery.isFetching}
             onRefresh={refetchAll}
-            tintColor="#7c3aed"
+            tintColor="#f2823b"
           />
         }
       >

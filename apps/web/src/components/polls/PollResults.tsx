@@ -37,7 +37,7 @@ export function PollResults({ pollId }: PollResultsProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+        <Loader2 className="w-6 h-6 text-amber-400 animate-spin" />
       </div>
     );
   }
@@ -83,9 +83,7 @@ export function PollResults({ pollId }: PollResultsProps) {
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2 min-w-0">
                   {isWinner && <Trophy className="w-4 h-4 text-amber-400 shrink-0" />}
-                  {index === 0 && !isEnded && (
-                    <Crown className="w-4 h-4 text-violet-400 shrink-0" />
-                  )}
+                  {index === 0 && !isEnded && <Crown className="w-4 h-4 text-amber-400 shrink-0" />}
                   <span
                     className={`truncate ${
                       isWinner ? 'text-amber-300 font-medium' : 'text-zinc-300'
@@ -114,7 +112,7 @@ export function PollResults({ pollId }: PollResultsProps) {
                   className={`h-full rounded-full transition-all duration-700 ease-out ${
                     isWinner
                       ? 'bg-gradient-to-r from-amber-500 to-amber-400'
-                      : 'bg-gradient-to-r from-violet-600 to-violet-500'
+                      : 'bg-gradient-to-r from-amber-600 to-amber-500'
                   }`}
                   style={{ width: `${barWidth}%` }}
                 />
@@ -137,7 +135,7 @@ export function PollResults({ pollId }: PollResultsProps) {
               })
             }
             disabled={promoteMutation.isPending}
-            className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white"
+            className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white"
           >
             {promoteMutation.isPending ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />

@@ -76,7 +76,7 @@ function SignalBar({
       </div>
       <div className="h-1.5 rounded-full bg-muted overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all"
+          className="h-full bg-gradient-to-r from-orange-500 to-amber-500 transition-all"
           style={{ width: `${value}%` }}
         />
       </div>
@@ -106,9 +106,9 @@ function ViralityPage() {
             </p>
           </div>
         </div>
-        <Card className="p-3 border-purple-500/30 bg-purple-500/5 max-w-md">
+        <Card className="p-3 border-orange-500/30 bg-orange-500/5 max-w-md">
           <div className="flex items-start gap-2">
-            <Info className="h-4 w-4 text-purple-400 mt-0.5 shrink-0" />
+            <Info className="h-4 w-4 text-orange-400 mt-0.5 shrink-0" />
             <p className="text-[11px] text-muted-foreground">
               We score off actual viewer behaviour on the platform — not a prompt-based guess. Score
               updates as new sessions roll in.
@@ -194,7 +194,7 @@ function ViralityPage() {
                       <Link
                         to="/analytics/$universeId"
                         params={{ universeId: row.universeId }}
-                        className="text-purple-400 hover:underline"
+                        className="text-orange-400 hover:underline"
                       >
                         Universe analytics →
                       </Link>

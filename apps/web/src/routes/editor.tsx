@@ -239,7 +239,7 @@ function EditorPage() {
           </a>
         </Button>
         <div className="h-4 w-px bg-border/40" />
-        <Film className="w-4 h-4 text-purple-400" />
+        <Film className="w-4 h-4 text-orange-400" />
         <h1 className="text-sm font-medium">Video Editor</h1>
         <Badge variant="secondary" className="text-[9px]">
           Beta
@@ -259,7 +259,7 @@ function EditorPage() {
             size="sm"
             onClick={() => setShowPublishDialog(true)}
             disabled={!videoUrl}
-            className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
+            className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white"
           >
             <Rocket className="w-3 h-3 mr-1.5" />
             Publish as Episode
@@ -557,7 +557,7 @@ function EditorPage() {
                 <Card className="p-3">
                   <div className="flex items-center gap-2">
                     {videoUrl ? (
-                      <Film className="w-4 h-4 text-purple-400" />
+                      <Film className="w-4 h-4 text-orange-400" />
                     ) : audioUrl ? (
                       <Mic className="w-4 h-4 text-green-400" />
                     ) : (

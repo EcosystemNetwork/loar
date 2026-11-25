@@ -84,7 +84,7 @@ export default function TokensScreen() {
               void onchainQuery.refetch();
               void launchpadQuery.refetch();
             }}
-            tintColor="#7c3aed"
+            tintColor="#f2823b"
           />
         }
       >

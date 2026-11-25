@@ -680,7 +680,7 @@ function EntityCreateForm() {
       </Link>
 
       {universeInfo && (
-        <div className="mb-6 flex items-center gap-3 rounded-lg border border-violet-500/30 bg-gradient-to-r from-violet-500/10 to-purple-500/10 p-4">
+        <div className="mb-6 flex items-center gap-3 rounded-lg border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-4">
           {universeInfo.image_url && (
             <SmartImage
               src={universeInfo.image_url}
@@ -710,10 +710,10 @@ function EntityCreateForm() {
             random name + random style preset + random image model so a
             creator can click through the kinds and assemble a varied
             universe in minutes. */}
-        <Card className="border-violet-500/30 bg-gradient-to-br from-violet-500/5 to-purple-500/5">
+        <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-orange-500/5">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Wand2 className="w-4 h-4 text-violet-400" />
+              <Wand2 className="w-4 h-4 text-amber-400" />
               Quick Generate
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
@@ -754,8 +754,8 @@ function EntityCreateForm() {
             )}
             {lastRoll && (
               <p className="text-[11px] text-muted-foreground">
-                Rolled <span className="text-violet-300">{lastRoll.style}</span> on{' '}
-                <span className="text-violet-300">{lastRoll.model}</span>
+                Rolled <span className="text-amber-300">{lastRoll.style}</span> on{' '}
+                <span className="text-amber-300">{lastRoll.model}</span>
               </p>
             )}
           </CardContent>
@@ -764,10 +764,10 @@ function EntityCreateForm() {
         {/* Character generation (person only) — sits at the top so creators
             can riff on visuals before committing to details. */}
         {isPerson && (
-          <Card className="border-violet-500/30 bg-gradient-to-br from-violet-500/5 to-purple-500/5">
+          <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-orange-500/5">
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-violet-400" />
+                <Sparkles className="w-4 h-4 text-amber-400" />
                 Character Generation
               </CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
@@ -947,7 +947,7 @@ function EntityCreateForm() {
                               href={g.modelUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="absolute top-1 left-1 rounded bg-violet-500/90 text-white text-[9px] px-1.5 py-0.5 font-medium"
+                              className="absolute top-1 left-1 rounded bg-amber-500/90 text-white text-[9px] px-1.5 py-0.5 font-medium"
                             >
                               GLB
                             </a>

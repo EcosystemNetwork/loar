@@ -126,7 +126,7 @@ export function RoyaltySplitPreview({
                 </Badge>
                 <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-pink-500 to-purple-500"
+                    className="h-full bg-gradient-to-r from-amber-500 to-orange-500"
                     style={{ width: `${bps / 100}%` }}
                   />
                 </div>
@@ -178,7 +178,7 @@ export function RoyaltySplitPreview({
             </span>
             <div className="w-24 h-1.5 rounded-full bg-muted overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-pink-500 to-purple-500"
+                className="h-full bg-gradient-to-r from-amber-500 to-orange-500"
                 style={{ width: `${r.bps / 100}%` }}
               />
             </div>

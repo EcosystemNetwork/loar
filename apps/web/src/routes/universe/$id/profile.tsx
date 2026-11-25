@@ -45,6 +45,7 @@ import {
 } from '@/utils/ponder-api';
 import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
 import { UniverseProfileEditor } from '@/components/UniverseProfileEditor';
+import { universeShareUrl } from '@/lib/share-url';
 
 export const Route = createFileRoute('/universe/$id/profile')({
   component: UniverseProfilePage,
@@ -109,7 +110,7 @@ function UniverseProfilePage() {
   const admin = useIsUniverseAdmin(idLower as `0x${string}`);
 
   const handleShare = async () => {
-    const url = window.location.href;
+    const url = universeShareUrl(idLower);
     if (navigator.share) {
       try {
         await navigator.share({ url, title: universe?.name ?? 'Universe' });

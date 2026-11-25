@@ -253,7 +253,7 @@ function BuildableUniverses({ list }: { list: BuildableUniverse[] }) {
                     className="h-12 w-12 rounded-lg flex-shrink-0"
                   />
                 ) : (
-                  <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-primary/40 to-purple-500/40 flex-shrink-0" />
+                  <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-primary/40 to-orange-500/40 flex-shrink-0" />
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">

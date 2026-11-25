@@ -6,7 +6,7 @@
  * Collapses all links on mobile.
  */
 
-import { Link, useMatchRoute } from '@tanstack/react-router';
+import { Link, useMatchRoute, useRouterState } from '@tanstack/react-router';
 import { WalletConnectButton } from '@/components/wallet-connect-button';
 import { LoarBalance } from './LoarBalance';
 import { Web3ModeToggle } from './web3-mode-toggle';
@@ -27,10 +27,12 @@ import { useQuery } from '@tanstack/react-query';
 import { useWalletAuth } from '@/lib/wallet-auth';
 import { trpcClient } from '@/utils/trpc';
 import {
+  AUTH_ROUTES,
   HIDDEN_ROUTES,
   needsExactMatch,
   ownerPrimaryLink,
   primaryLinksBase,
+  signedOutLinks,
   visibleMoreGroups,
 } from '@/lib/navLinks';
 
@@ -38,6 +40,13 @@ export default function Header() {
   const matchRoute = useMatchRoute();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { address, isAuthenticated } = useWalletAuth();
+  // `address` hydrates from localStorage synchronously, so keying on it (not
+  // `isAuthenticated`, which waits for the /auth/me round-trip) avoids
+  // flashing the signed-out nav at returning users.
+  const signedIn = !!address;
+  const onAuthPage = useRouterState({
+    select: (s) => AUTH_ROUTES.has(s.location.pathname),
+  });
 
   // Surface the Studio link only for users who actually have universes to manage.
   const { data: hasUniverses } = useQuery({
@@ -53,12 +62,18 @@ export default function Header() {
   // Studio is the entry point to the React Flow universe editor — surface it
   // inline for owners so they don't have to dig through the More dropdown.
   // Gallery stays in More (less time-critical).
-  const primaryLinks = [
-    ...primaryLinksBase.slice(0, 2),
-    ...(hasUniverses ? [ownerPrimaryLink] : []),
-    ...primaryLinksBase.slice(2),
-  ].filter((l) => !HIDDEN_ROUTES.has(l.to));
-  const moreGroups = visibleMoreGroups(!!hasUniverses);
+  const primaryLinks = (
+    onAuthPage
+      ? []
+      : signedIn
+        ? [
+            ...primaryLinksBase.slice(0, 2),
+            ...(hasUniverses ? [ownerPrimaryLink] : []),
+            ...primaryLinksBase.slice(2),
+          ]
+        : [...signedOutLinks]
+  ).filter((l) => !HIDDEN_ROUTES.has(l.to));
+  const moreGroups = signedIn && !onAuthPage ? visibleMoreGroups(!!hasUniverses) : [];
   const moreIsActive = moreGroups.some((g) =>
     g.links.some(({ to }) => matchRoute({ to, fuzzy: true }))
   );
@@ -95,81 +110,96 @@ export default function Header() {
               </Link>
             ))}
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className={`relative inline-flex items-center gap-1 px-2.5 py-1.5 text-[13px] font-medium tracking-wide transition-colors ${
-                    moreIsActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
-                  }`}
+            {moreGroups.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className={`relative inline-flex items-center gap-1 px-2.5 py-1.5 text-[13px] font-medium tracking-wide transition-colors ${
+                      moreIsActive
+                        ? 'text-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    More
+                    <ChevronDown className="h-3 w-3 opacity-50" />
+                    {moreIsActive && (
+                      <span className="absolute bottom-0 left-2.5 right-2.5 h-[2px] bg-primary rounded-full" />
+                    )}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-[640px] grid grid-cols-3 gap-x-2 gap-y-1 p-2"
                 >
-                  More
-                  <ChevronDown className="h-3 w-3 opacity-50" />
-                  {moreIsActive && (
-                    <span className="absolute bottom-0 left-2.5 right-2.5 h-[2px] bg-primary rounded-full" />
-                  )}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-[640px] grid grid-cols-3 gap-x-2 gap-y-1 p-2"
-              >
-                {moreGroups.map((group) => {
-                  return (
-                    <DropdownMenuGroup key={group.label} className="min-w-0">
-                      <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/70 px-2 pb-0.5">
-                        {group.label}
-                      </DropdownMenuLabel>
-                      {group.links.map((link) => (
-                        <DropdownMenuItem key={link.to} asChild>
-                          <Link
-                            to={link.to as any}
-                            activeOptions={{ exact: needsExactMatch(link.to, moreGroups) }}
-                            activeProps={{ className: 'text-primary font-medium' }}
-                            inactiveProps={{ className: 'text-foreground' }}
-                            className="w-full cursor-pointer flex items-center justify-between text-[13px] py-1"
-                          >
-                            <span className="truncate">{link.label}</span>
-                            {'beta' in link && link.beta && (
-                              <span className="ml-2 shrink-0 text-[9px] font-semibold bg-primary/10 text-primary/80 px-1.5 py-0.5 rounded leading-none uppercase tracking-wider">
-                                Beta
-                              </span>
-                            )}
-                          </Link>
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuGroup>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  {moreGroups.map((group) => {
+                    return (
+                      <DropdownMenuGroup key={group.label} className="min-w-0">
+                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/70 px-2 pb-0.5">
+                          {group.label}
+                        </DropdownMenuLabel>
+                        {group.links.map((link) => (
+                          <DropdownMenuItem key={link.to} asChild>
+                            <Link
+                              to={link.to as any}
+                              activeOptions={{ exact: needsExactMatch(link.to, moreGroups) }}
+                              activeProps={{ className: 'text-primary font-medium' }}
+                              inactiveProps={{ className: 'text-foreground' }}
+                              className="w-full cursor-pointer flex items-center justify-between text-[13px] py-1"
+                            >
+                              <span className="truncate">{link.label}</span>
+                              {'beta' in link && link.beta && (
+                                <span className="ml-2 shrink-0 text-[9px] font-semibold bg-primary/10 text-primary/80 px-1.5 py-0.5 rounded leading-none uppercase tracking-wider">
+                                  Beta
+                                </span>
+                              )}
+                            </Link>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuGroup>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </nav>
         </div>
 
         {/* ── Right: Actions ── */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <LoarBalance />
-          <NotificationBell />
-          <WalletConnectButton size="sm" />
-          <div className="hidden sm:flex items-center gap-1 ml-1 pl-1.5 border-l border-border/50">
-            <Web3ModeToggle />
-            <ModeToggle />
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden ml-0.5 h-8 w-8"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
-            aria-expanded={mobileOpen}
-            aria-controls="mobile-nav"
+        {onAuthPage ? (
+          <Link
+            to="/"
+            className="text-[13px] text-muted-foreground hover:text-foreground transition-colors"
           >
-            {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </Button>
-        </div>
+            Back to home
+          </Link>
+        ) : (
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {signedIn && <LoarBalance />}
+            {signedIn && <NotificationBell />}
+            <WalletConnectButton size="sm" />
+            {signedIn && (
+              <div className="hidden sm:flex items-center gap-1 ml-1 pl-1.5 border-l border-border/50">
+                <Web3ModeToggle />
+                <ModeToggle />
+              </div>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden ml-0.5 h-8 w-8"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-nav"
+            >
+              {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* ── Mobile Navigation ── */}
-      {mobileOpen && (
+      {mobileOpen && !onAuthPage && (
         <div className="lg:hidden fixed inset-x-0 top-14 bottom-0 z-40 bg-background/95 backdrop-blur-xl border-t border-border/40 overflow-y-auto">
           <nav
             id="mobile-nav"
@@ -224,10 +254,12 @@ export default function Header() {
                 </div>
               );
             })}
-            <div className="flex items-center gap-1 pt-2 mt-2 border-t border-border/30 sm:hidden">
-              <Web3ModeToggle />
-              <ModeToggle />
-            </div>
+            {signedIn && (
+              <div className="flex items-center gap-1 pt-2 mt-2 border-t border-border/30 sm:hidden">
+                <Web3ModeToggle />
+                <ModeToggle />
+              </div>
+            )}
           </nav>
         </div>
       )}

@@ -116,7 +116,7 @@ export default function EarningsScreen() {
           gap: 24,
         }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={refetchAll} tintColor="#7c3aed" />
+          <RefreshControl refreshing={refreshing} onRefresh={refetchAll} tintColor="#f2823b" />
         }
       >
         {/* Summary row */}

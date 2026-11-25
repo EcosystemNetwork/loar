@@ -97,7 +97,7 @@ export default function DraftsScreen() {
           <RefreshControl
             refreshing={draftsQuery.isFetching}
             onRefresh={() => draftsQuery.refetch()}
-            tintColor="#7c3aed"
+            tintColor="#f2823b"
           />
         }
         renderItem={({ item }) => (

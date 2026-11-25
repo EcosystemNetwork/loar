@@ -488,7 +488,7 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
                   {data.isDraft && (
                     <Badge
                       variant="default"
-                      className="bg-purple-500 hover:bg-purple-600 text-white font-bold text-xs px-2 py-1"
+                      className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-2 py-1"
                       title="Generated but not saved on-chain yet — click Save to make it permanent"
                     >
                       Unsaved
@@ -512,7 +512,7 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
                   {data.sceneControls?.cameraPreset && (
                     <Badge
                       variant="secondary"
-                      className="bg-indigo-500/90 text-white text-xs px-1 py-0.5"
+                      className="bg-amber-500/90 text-white text-xs px-1 py-0.5"
                       title={`Camera: ${data.sceneControls.cameraPreset}`}
                     >
                       <Camera className="h-3 w-3" />
@@ -562,8 +562,8 @@ function TimelineEventNodeImpl({ data }: { data: TimelineNodeData }) {
                 )}
               </>
             ) : data.isPending ? (
-              <div className="w-full h-full bg-gradient-to-br from-purple-950 to-slate-900 flex flex-col items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400 mb-3" />
+              <div className="w-full h-full bg-gradient-to-br from-orange-950 to-slate-900 flex flex-col items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-400 mb-3" />
                 <div className="text-white text-sm font-medium">Generating…</div>
                 {data.pendingPrompt && (
                   <div className="text-white/50 text-xs mt-1 px-4 text-center line-clamp-2">

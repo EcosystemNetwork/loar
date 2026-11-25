@@ -101,7 +101,7 @@ export function CreatorsTab() {
           >
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
               <CardContent className="flex gap-3 p-4 items-center">
-                <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-violet-500/30 to-fuchsia-500/30 flex items-center justify-center flex-shrink-0">
+                <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-amber-500/30 to-orange-500/30 flex items-center justify-center flex-shrink-0">
                   {p.avatarUrl ? (
                     <SmartImage
                       src={p.avatarUrl}

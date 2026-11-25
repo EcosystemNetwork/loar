@@ -149,7 +149,12 @@ function pinataOptimizedUrl(upstream: string, width: number, format: OutputForma
   } catch {
     return null;
   }
-  if (!url.host.endsWith('.mypinata.cloud') && url.host !== gatewayHost()) return null;
+  // A custom domain counts as Pinata-backed only when a gateway token is set:
+  // non-Pinata mirrors (e.g. a GCS bucket) ignore img-* params and would
+  // return the full-size original with a 200, skipping the sharp fallback.
+  const isPinataHost =
+    url.host.endsWith('.mypinata.cloud') || (url.host === gatewayHost() && !!gatewayToken());
+  if (!isPinataHost) return null;
   url.searchParams.set('img-width', String(width));
   url.searchParams.set('img-fit', 'scale-down');
   if (format === 'avif' || format === 'webp') url.searchParams.set('img-format', format);

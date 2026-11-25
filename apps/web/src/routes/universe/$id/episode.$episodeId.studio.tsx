@@ -21,6 +21,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createFileRoute, Link, useParams } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { episodeShareUrl } from '@/lib/share-url';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -707,14 +708,14 @@ function EpisodeStudioPage() {
   const exportedUrl = episodeQuery.data?.exportUrl || exportStatus?.outputUrl;
 
   const copyWatchLink = async () => {
+    // Share link (preview card) — it redirects people on to /episode/:id.
+    const link = episodeShareUrl(episodeId);
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}/episode/${episodeId}`);
+      await navigator.clipboard.writeText(link);
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2500);
     } catch {
-      toast.error(
-        'Couldn’t copy — the link is ' + `${window.location.origin}/episode/${episodeId}`
-      );
+      toast.error('Couldn’t copy — the link is ' + link);
     }
   };
 

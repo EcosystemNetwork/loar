@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /settings
+Disallow: /dashboard
+Disallow: /studio
+Disallow: /login
+
+Sitemap: https://loar.fun/sitemap.xml
+Sitemap: https://loar.fun/share/sitemap-universes.xml

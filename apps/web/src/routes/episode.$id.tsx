@@ -22,11 +22,13 @@ import {
   Mic2,
   DownloadCloud,
   Trash2,
+  Share2,
 } from 'lucide-react';
 import { useWatchSession } from '@/hooks/useWatchSession';
 import { isSaved, offlineSupported, removeEpisode, saveEpisode } from '@/lib/offline-cache';
 import { isTrimmed, pastTrimEnd, resolveClipTrim, seekTarget, type ClipTrim } from '@/lib/clipTrim';
 import { toast } from 'sonner';
+import { episodeShareUrl } from '@/lib/share-url';
 
 export const Route = createFileRoute('/episode/$id')({
   component: EpisodePlayer,
@@ -159,6 +161,21 @@ function EpisodePlayer() {
     if (!episode?.id || !canOffline) return;
     void isSaved(episode.id).then(setSavedOffline);
   }, [episode?.id, canOffline]);
+
+  // The /share link unfurls with a preview card on X / Discord / iMessage.
+  const handleShare = async () => {
+    const url = episodeShareUrl(id);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: episode?.title || 'LOAR episode', url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast.success('Link copied');
+      }
+    } catch {
+      /* user cancelled */
+    }
+  };
 
   const handleSaveOffline = async () => {
     if (!episode?.id) return;
@@ -304,7 +321,7 @@ function EpisodePlayer() {
                   className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
                 />
               ) : (
-                <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-violet-500/40 to-purple-500/40 flex-shrink-0" />
+                <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-amber-700/40 to-stone-800/40 flex-shrink-0" />
               )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -336,6 +353,10 @@ function EpisodePlayer() {
                   )}
                 </div>
               </div>
+              <Button size="sm" variant="secondary" onClick={handleShare} className="flex-shrink-0">
+                <Share2 className="mr-1.5 h-3.5 w-3.5" />
+                Share
+              </Button>
               {canOffline && (
                 <Button
                   size="sm"
@@ -422,7 +443,7 @@ function EpisodePlayer() {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 to-pink-900/40" />
+                        <div className="absolute inset-0 bg-gradient-to-br from-amber-950/60 to-stone-950/60" />
                       )}
                       {isActive && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/40">

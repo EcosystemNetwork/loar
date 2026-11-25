@@ -584,7 +584,7 @@ export function FlowCreationPanel({
                     disabled={
                       !quickCharName.trim() || !quickCharDescription.trim() || isCreatingQuickChar
                     }
-                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                    className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700"
                   >
                     {isCreatingQuickChar ? (
                       <>
@@ -1202,7 +1202,7 @@ export function FlowCreationPanel({
                                     onClick={() => toggleCharacterSelection(char.id)}
                                     className={`group relative aspect-square rounded-lg overflow-hidden transition-all duration-200 ${
                                       isSelected
-                                        ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-black scale-95 shadow-lg shadow-purple-500/50'
+                                        ? 'ring-2 ring-orange-500 ring-offset-2 ring-offset-black scale-95 shadow-lg shadow-orange-500/50'
                                         : 'ring-1 ring-white/20 hover:ring-white/40 hover:scale-105'
                                     }`}
                                   >
@@ -1223,7 +1223,7 @@ export function FlowCreationPanel({
 
                                     {/* Selection Badge */}
                                     {isSelected && (
-                                      <div className="absolute top-1 right-1 bg-gradient-to-br from-purple-500 to-purple-600 text-white text-[9px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg border border-purple-300/50">
+                                      <div className="absolute top-1 right-1 bg-gradient-to-br from-orange-500 to-orange-600 text-white text-[9px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg border border-orange-300/50">
                                         {selectionIndex + 1}
                                       </div>
                                     )}
@@ -1237,7 +1237,7 @@ export function FlowCreationPanel({
 
                                     {/* Hover Effect Border */}
                                     <div
-                                      className={`absolute inset-0 rounded-lg bg-gradient-to-tr from-purple-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${
+                                      className={`absolute inset-0 rounded-lg bg-gradient-to-tr from-orange-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${
                                         isSelected ? 'opacity-30' : ''
                                       }`}
                                     />
@@ -1368,7 +1368,7 @@ export function FlowCreationPanel({
                           selectedImageCharacters.length === 0
                         }
                         size="sm"
-                        className="h-10 w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm font-medium"
+                        className="h-10 w-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white text-sm font-medium"
                       >
                         {isGeneratingImage ? (
                           <>

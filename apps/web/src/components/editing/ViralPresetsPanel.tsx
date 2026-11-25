@@ -116,9 +116,9 @@ export function ViralPresetsPanel({ imageUrl, onComplete }: ViralPresetsPanelPro
 
   return (
     <div className="space-y-3">
-      <Card className="p-3 border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-pink-500/5">
+      <Card className="p-3 border-orange-500/30 bg-gradient-to-br from-orange-500/5 to-amber-500/5">
         <div className="flex items-start gap-2">
-          <Sparkles className="h-4 w-4 text-purple-400 mt-0.5" />
+          <Sparkles className="h-4 w-4 text-orange-400 mt-0.5" />
           <div className="flex-1">
             <p className="text-xs font-medium">One-click viral looks</p>
             <p className="text-[10px] text-muted-foreground">
@@ -171,7 +171,7 @@ export function ViralPresetsPanel({ imageUrl, onComplete }: ViralPresetsPanelPro
                 key={p.id}
                 className={
                   generationEnabled
-                    ? 'p-3 hover:border-purple-500/50 transition-colors cursor-pointer'
+                    ? 'p-3 hover:border-orange-500/50 transition-colors cursor-pointer'
                     : 'p-3 opacity-50 cursor-not-allowed'
                 }
                 onClick={() => generationEnabled && !apply.isPending && apply.mutate(p.id)}

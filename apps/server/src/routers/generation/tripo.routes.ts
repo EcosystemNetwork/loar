@@ -2,9 +2,9 @@
  * Tripo world-building router — turns a universe's wiki canon into 3D.
  *
  *   tripo.entityTo3D        entity cover art → textured 3D model on the wiki
- *   tripo.batchEntityTo3D   same, for every modelable entity still missing one
+ *   tripo.batchEntityTo3D   same, for the picked entities still missing one
  *   tripo.rigEntityModel    skeleton + motion clips on the model an entity already has
- *   tripo.batchRigModels    same, for every riggable entity with a model but no rig
+ *   tripo.batchRigModels    same, for the picked riggable entities with a model but no rig
  *   tripo.characterPuppet   character → T-pose → turnaround → body → rig →
  *                           motion library; turnaround feeds the entity's
  *                           reference bundle so video generation stays on-model
@@ -16,6 +16,7 @@
  *   tripo.getJob / listJobs poll + history
  *   tripo.retryJob          re-run a failed job (finished steps are replayed, not re-billed)
  *   tripo.optimizeWebModels web copies for models made before optimisation (CPU only)
+ *   tripo.buildPlan         managers: where the story uses each entity (drives the build/rig pickers)
  *   tripo.worldOverview     public: a universe's 3D coverage for the World tab
  *
  * BYOK only — every dispatch spends the caller's own Tripo key (resolved up
@@ -61,6 +62,7 @@ import {
   type StylizeArgs,
 } from '../../services/tripo-world/pipelines';
 import { webOptimizeUrl } from '../../services/tripo-world/optimize';
+import { entityUsage, type SetUsageSource } from '../../services/tripo-world/build-plan';
 import type { TripoAnimation, TripoRigType } from '../../services/tripo3d';
 
 /** Kinds that read as a physical object/creature and make a sensible mesh. */
@@ -296,11 +298,14 @@ export const tripoRouter = router({
     }),
 
   /**
-   * #1 at universe scale — queue entityTo3D for every modelable entity with
-   * cover art but no model (and, with includeEnvironments, a splat for every
-   * place without one). Entities that already have a job in flight are
-   * skipped, so pressing it twice never double-spends. Jobs queue and run
-   * MAX_ACTIVE_PER_USER at a time. Universe managers only.
+   * #1 at universe scale — queue entityTo3D for the modelable entities the
+   * manager picked (entityIds, chosen in the World tab's build picker from
+   * buildPlan's usage signals) that have cover art but no model; places among
+   * them get a splat when includeEnvironments is set. Without entityIds every
+   * eligible entity is queued (backfill scripts only — the UI always picks).
+   * Entities that already have a job in flight are skipped, so pressing it
+   * twice never double-spends. Jobs queue and run MAX_ACTIVE_PER_USER at a
+   * time. Universe managers only.
    */
   batchEntityTo3D: gen
     .input(
@@ -309,6 +314,7 @@ export const tripoRouter = router({
         quality: z.enum(['hifi', 'game']).default('hifi'),
         limit: z.number().int().min(1).max(BATCH_MAX).default(BATCH_MAX),
         includeEnvironments: z.boolean().default(false),
+        entityIds: z.array(z.string().min(1)).min(1).max(BATCH_MAX).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -316,7 +322,10 @@ export const tripoRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Universe managers only' });
       }
       const apiKey = await requireTripoKey(ctx.user.uid);
-      const { entities } = await getEntitiesByUniverse(input.universeId, undefined, 500);
+      const entities = pickEntities(
+        (await getEntitiesByUniverse(input.universeId, undefined, 500)).entities,
+        input.entityIds
+      );
       const [busyModels, busyEnvs] = await Promise.all([
         entitiesWithActiveJobs(ctx.user.uid, 'entity_model'),
         input.includeEnvironments
@@ -466,8 +475,9 @@ export const tripoRouter = router({
     }),
 
   /**
-   * #2b at universe scale — rig every character/species/vehicle that has a
-   * model but no rig yet. Same in-flight skip + queueing as batchEntityTo3D.
+   * #2b at universe scale — rig the picked characters/species/vehicles
+   * (entityIds; all eligible when omitted) that have a model but no rig yet.
+   * Same in-flight skip + queueing as batchEntityTo3D.
    */
   batchRigModels: gen
     .input(
@@ -475,6 +485,7 @@ export const tripoRouter = router({
         universeId: z.string().min(1),
         rigType: z.enum(['auto', ...RIG_TYPES]).default('auto'),
         limit: z.number().int().min(1).max(BATCH_MAX).default(BATCH_MAX),
+        entityIds: z.array(z.string().min(1)).min(1).max(BATCH_MAX).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -482,7 +493,10 @@ export const tripoRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Universe managers only' });
       }
       const apiKey = await requireTripoKey(ctx.user.uid);
-      const { entities } = await getEntitiesByUniverse(input.universeId, undefined, 500);
+      const entities = pickEntities(
+        (await getEntitiesByUniverse(input.universeId, undefined, 500)).entities,
+        input.entityIds
+      );
       const [busyRigs, busyPuppets] = await Promise.all([
         entitiesWithActiveJobs(ctx.user.uid, 'rig_model'),
         entitiesWithActiveJobs(ctx.user.uid, 'character_puppet'),
@@ -759,6 +773,51 @@ export const tripoRouter = router({
     }),
 
   /**
+   * Managers: where the story uses each 3D-able entity (canon episodes that
+   * name it, world sets that place it, wiki entries that mention it), so the
+   * build/rig pickers can suggest what scenes actually need instead of
+   * everything with a cover.
+   */
+  buildPlan: protectedProcedure
+    .input(z.object({ universeId: z.string().min(1) }))
+    .query(async ({ input, ctx }) => {
+      if (!(await isUniverseAdmin(input.universeId, ctx.user.address ?? ''))) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Universe managers only' });
+      }
+      const { entities } = await getEntitiesByUniverse(input.universeId, undefined, 500);
+      const relevant = new Set<string>([...MODELABLE_KINDS, ...ENVIRONMENT_KINDS]);
+      const universeKey = normalizeUniverseId(input.universeId);
+      const [episodes, sets] = await Promise.all([
+        db
+          .collection('episodes')
+          .where('universeId', '==', entities[0]?.universeAddress ?? universeKey)
+          .where('isCanon', '==', true)
+          .limit(200)
+          .get()
+          .then((s) =>
+            s.docs.map((d) => ({
+              id: d.id,
+              ...(d.data() as { title?: string; description?: string }),
+            }))
+          )
+          .catch(() => []),
+        db
+          .collection('worldSets')
+          .where('universeId', '==', universeKey)
+          .limit(200)
+          .get()
+          .then((s) => s.docs.map((d) => d.data() as SetUsageSource))
+          .catch(() => []),
+      ]);
+      return entityUsage(
+        entities.filter((e) => relevant.has(e.kind)),
+        entities,
+        episodes,
+        sets
+      );
+    }),
+
+  /**
    * Public: a universe's 3D coverage — every modelable/environment entity
    * with whatever 3D it has. Drives the wiki World tab and the set builder's
    * asset shelf.
@@ -809,6 +868,13 @@ export const tripoRouter = router({
         });
     }),
 });
+
+/** Narrow a universe's entities to the picked ids (all of them when none given). */
+function pickEntities(entities: Entity[], ids: string[] | undefined): Entity[] {
+  if (!ids) return entities;
+  const wanted = new Set(ids);
+  return entities.filter((e) => wanted.has(e.id));
+}
 
 /** Has a model (or puppet clip) but no web-delivery copy of it yet. */
 function needsWebCopy(e: Pick<Entity, 'metadata'>): boolean {

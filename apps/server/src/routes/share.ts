@@ -175,3 +175,213 @@ shareRoutes.get('/token/:address', async (c) => {
   c.header('Content-Type', 'text/html; charset=utf-8');
   return c.body(buildSharePage({ token, curve, appUrl: app, shareUrl, appPath }));
 });
+
+// ── Universes ─────────────────────────────────────────────────────────────
+
+export interface ShareUniverse {
+  id: string;
+  name?: string | null;
+  description?: string | null;
+  image_url?: string | null;
+  imageURL?: string | null;
+  isHidden?: boolean;
+  isPrivate?: boolean;
+}
+
+/** EVM address or Solana base58 PDA — nothing that could break out of a path. */
+const UNIVERSE_ID_RE = /^(0x[0-9a-fA-F]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/;
+
+/** Shared OG/Twitter page: escaped tags + meta-refresh into the app. */
+function ogPage(o: {
+  title: string;
+  description: string;
+  image: string;
+  target: string;
+  shareUrl: string;
+  ogType: string;
+}): string {
+  const d = o.description.length > 200 ? `${o.description.slice(0, 197)}…` : o.description;
+  const tags = [
+    `<title>${escapeHtml(o.title)}</title>`,
+    `<meta name="description" content="${escapeHtml(d)}">`,
+    `<link rel="canonical" href="${escapeHtml(o.target)}">`,
+    `<meta property="og:type" content="${escapeHtml(o.ogType)}">`,
+    `<meta property="og:site_name" content="${SITE}">`,
+    `<meta property="og:title" content="${escapeHtml(o.title)}">`,
+    `<meta property="og:description" content="${escapeHtml(d)}">`,
+    `<meta property="og:url" content="${escapeHtml(o.shareUrl)}">`,
+    `<meta property="og:image" content="${escapeHtml(o.image)}">`,
+    `<meta name="twitter:card" content="summary_large_image">`,
+    `<meta name="twitter:title" content="${escapeHtml(o.title)}">`,
+    `<meta name="twitter:description" content="${escapeHtml(d)}">`,
+    `<meta name="twitter:image" content="${escapeHtml(o.image)}">`,
+    `<meta http-equiv="refresh" content="0;url=${escapeHtml(o.target)}">`,
+  ];
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">${tags.join('')}</head><body><p><a href="${escapeHtml(o.target)}">Continue to ${SITE}</a></p></body></html>`;
+}
+
+const DEFAULT_DESC = 'Create cinematic universes with AI. Own them on-chain.';
+
+export function buildUniverseSharePage(opts: {
+  universe: ShareUniverse | null;
+  appUrl: string;
+  shareUrl: string;
+  appPath: string;
+}): string {
+  const { universe, appUrl, shareUrl, appPath } = opts;
+  const visible = universe && !universe.isHidden && !universe.isPrivate ? universe : null;
+  const name = visible?.name?.trim();
+  return ogPage({
+    title: name ? `${name} | ${SITE}` : `${SITE} — AI Cinematic Universe Studio`,
+    description:
+      visible?.description?.trim() ||
+      (name ? `Watch ${name}, a cinematic universe made with AI on ${SITE}.` : DEFAULT_DESC),
+    image: shareImageUrl(visible?.image_url || visible?.imageURL) || `${appUrl}/og-image.png`,
+    target: `${appUrl}${appPath}`,
+    shareUrl,
+    ogType: 'video.tv_show',
+  });
+}
+
+shareRoutes.get('/universe/:id', async (c) => {
+  const id = c.req.param('id');
+  if (!UNIVERSE_ID_RE.test(id)) return c.text('invalid universe id', 400);
+  const app = APP_URL();
+  // Watch links use the lowercased id for EVM; base58 ids keep their case.
+  const pathId = id.startsWith('0x') ? id.toLowerCase() : id;
+  const appPath = `/universe/${pathId}/watch`;
+
+  let universe: ShareUniverse | null = null;
+  try {
+    const { getUniverse } = await import('../routers/universes/universes.handlers');
+    const res = (await getUniverse(id)) as { data?: ShareUniverse };
+    universe = res?.data ?? null;
+  } catch {
+    universe = null; // not found / Firestore hiccup → generic LOAR card, still redirects
+  }
+
+  c.header('Cache-Control', 'public, max-age=300, s-maxage=300');
+  c.header('Content-Type', 'text/html; charset=utf-8');
+  return c.body(
+    buildUniverseSharePage({
+      universe,
+      appUrl: app,
+      shareUrl: `${app}/share/universe/${pathId}`,
+      appPath,
+    })
+  );
+});
+
+// ── Episodes ──────────────────────────────────────────────────────────────
+
+export interface ShareEpisode {
+  id: string;
+  title?: string | null;
+  description?: string | null;
+  thumbnailUrl?: string | null;
+  isCanon?: boolean;
+  universeId?: string | null;
+}
+
+/** Firestore auto-ids and our own slugs: no slashes, quotes or dots. */
+const EPISODE_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+
+/**
+ * Only canon episodes in a visible universe get a real card — drafts are
+ * private to their creator/collaborators (mirrors `episodes.get`), and a
+ * hidden/private universe must not leak through its episodes.
+ */
+export function buildEpisodeSharePage(opts: {
+  episode: ShareEpisode | null;
+  universe: ShareUniverse | null;
+  appUrl: string;
+  shareUrl: string;
+  appPath: string;
+}): string {
+  const { episode, universe, appUrl, shareUrl, appPath } = opts;
+  const uVisible = universe && !universe.isHidden && !universe.isPrivate ? universe : null;
+  const ep = episode?.isCanon && uVisible ? episode : null;
+  const title = ep?.title?.trim();
+  const uName = uVisible?.name?.trim();
+  return ogPage({
+    title: title
+      ? `${title}${uName ? ` — ${uName}` : ''} | ${SITE}`
+      : `${SITE} — AI Cinematic Universe Studio`,
+    description:
+      ep?.description?.trim() ||
+      (title ? `Watch “${title}”${uName ? ` from ${uName}` : ''} on ${SITE}.` : DEFAULT_DESC),
+    image:
+      shareImageUrl(ep?.thumbnailUrl) ||
+      (ep ? shareImageUrl(uVisible?.image_url || uVisible?.imageURL) : null) ||
+      `${appUrl}/og-image.png`,
+    target: `${appUrl}${appPath}`,
+    shareUrl,
+    ogType: 'video.episode',
+  });
+}
+
+shareRoutes.get('/episode/:id', async (c) => {
+  const id = c.req.param('id');
+  if (!EPISODE_ID_RE.test(id)) return c.text('invalid episode id', 400);
+  const app = APP_URL();
+
+  let episode: ShareEpisode | null = null;
+  let universe: ShareUniverse | null = null;
+  try {
+    const { db } = await import('../lib/firebase');
+    const snap = await db.collection('episodes').doc(id).get();
+    episode = snap.exists ? ({ id, ...(snap.data() as object) } as ShareEpisode) : null;
+    if (episode?.isCanon && episode.universeId) {
+      const { getUniverse } = await import('../routers/universes/universes.handlers');
+      const res = (await getUniverse(episode.universeId)) as { data?: ShareUniverse };
+      universe = res?.data ?? null;
+    }
+  } catch {
+    episode = null; // Firestore hiccup → generic card, still redirects
+  }
+
+  c.header('Cache-Control', 'public, max-age=300, s-maxage=300');
+  c.header('Content-Type', 'text/html; charset=utf-8');
+  return c.body(
+    buildEpisodeSharePage({
+      episode,
+      universe,
+      appUrl: app,
+      shareUrl: `${app}/share/episode/${id}`,
+      appPath: `/episode/${id}`,
+    })
+  );
+});
+
+// ── Sitemap of public universes ───────────────────────────────────────────
+// Served at loar.fun/share/sitemap-universes.xml via the Netlify /share/*
+// proxy (robots.txt lists it), so every public universe's watch page is
+// discoverable — the static sitemap.xml only covers fixed routes.
+
+export function buildUniverseSitemap(
+  appUrl: string,
+  universes: Array<{ id: string; isHidden?: boolean; isPrivate?: boolean; updatedAt?: unknown }>
+): string {
+  const urls = universes
+    .filter((u) => u.id && !u.isHidden && !u.isPrivate && UNIVERSE_ID_RE.test(u.id))
+    .map((u) => {
+      const pathId = u.id.startsWith('0x') ? u.id.toLowerCase() : u.id;
+      return `<url><loc>${escapeHtml(`${appUrl}/universe/${pathId}/watch`)}</loc><changefreq>daily</changefreq><priority>0.7</priority></url>`;
+    });
+  return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join('')}</urlset>`;
+}
+
+shareRoutes.get('/sitemap-universes.xml', async (c) => {
+  let universes: Array<{ id: string; isHidden?: boolean; isPrivate?: boolean }> = [];
+  try {
+    const { getAllUniverses } = await import('../routers/universes/universes.handlers');
+    const res = (await getAllUniverses()) as unknown;
+    const list = (res as { data?: unknown })?.data ?? res;
+    universes = Array.isArray(list) ? (list as typeof universes) : [];
+  } catch {
+    universes = [];
+  }
+  c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600');
+  c.header('Content-Type', 'application/xml; charset=utf-8');
+  return c.body(buildUniverseSitemap(APP_URL(), universes));
+});

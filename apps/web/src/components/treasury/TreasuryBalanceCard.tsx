@@ -85,14 +85,14 @@ export function TreasuryBalanceCard({ universeId }: { universeId: string }) {
 
       {/* Member's own monthly budget */}
       {myAllowance && (
-        <Card className="bg-gradient-to-br from-violet-600/20 to-violet-800/10 border-violet-800">
+        <Card className="bg-gradient-to-br from-amber-600/20 to-amber-800/10 border-amber-800">
           <CardContent className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-violet-400" />
+              <User className="h-4 w-4 text-amber-400" />
               <span className="text-sm font-medium text-zinc-300">Your Monthly Budget</span>
             </div>
             <div className="text-right">
-              <span className="text-lg font-bold text-violet-300">
+              <span className="text-lg font-bold text-amber-300">
                 {myAllowance.remaining !== null
                   ? `${myAllowance.remaining.toLocaleString()} remaining`
                   : 'Unlimited'}

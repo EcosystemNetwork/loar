@@ -80,6 +80,8 @@ const TRUSTED_IMG = [
   'blob:',
   // See TRUSTED_MEDIA above — same custom-domain-gateway rationale.
   'https://*.loar.fun',
+  // GCS mirror of the former Pinata pins (PINATA_GATEWAY_URL → gs://loar-db-ipfs).
+  'https://storage.googleapis.com',
   'https://*.pinata.cloud',
   'https://*.mypinata.cloud',
   'https://gateway.pinata.cloud',

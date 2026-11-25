@@ -45,7 +45,7 @@ function UniverseAvatar({ universe, size }: { universe?: SwitcherUniverse; size:
     <div
       className={cn(
         box,
-        'flex flex-shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-violet-500/30 to-purple-500/30'
+        'flex flex-shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-amber-500/30 to-orange-500/30'
       )}
     >
       <Globe className={size === 'sm' ? 'h-3 w-3' : 'h-4 w-4'} aria-hidden="true" />
@@ -154,7 +154,7 @@ export function UniverseSwitcher({ universes, value, current, onChange }: Univer
                     'flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition-colors',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     value === u.id
-                      ? 'border-violet-500 bg-violet-500/10 text-violet-400'
+                      ? 'border-amber-500 bg-amber-500/10 text-amber-400'
                       : 'border-border hover:bg-muted'
                   )}
                 >

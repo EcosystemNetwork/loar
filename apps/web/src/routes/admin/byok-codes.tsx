@@ -71,7 +71,7 @@ function ByokCodesPage() {
     <div className="container mx-auto max-w-4xl px-4 py-10 space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <KeyRound className="h-7 w-7 text-violet-400" />
+          <KeyRound className="h-7 w-7 text-amber-400" />
           BYOK Unlock Codes
         </h1>
         <p className="text-muted-foreground text-sm mt-2">
@@ -136,10 +136,10 @@ function MintCodeCard({ onMinted }: { onMinted: () => void }) {
   });
 
   return (
-    <Card className="bg-gradient-to-br from-violet-950/30 to-zinc-900/40 border-violet-500/30">
+    <Card className="bg-gradient-to-br from-amber-950/30 to-zinc-900/40 border-amber-500/30">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-violet-400" />
+          <Sparkles className="h-5 w-5 text-amber-400" />
           Mint a new code
         </CardTitle>
       </CardHeader>
@@ -192,7 +192,7 @@ function MintCodeCard({ onMinted }: { onMinted: () => void }) {
         <Button
           onClick={() => mint.mutate()}
           disabled={mint.isPending}
-          className="bg-violet-600 hover:bg-violet-500"
+          className="bg-amber-600 hover:bg-amber-500"
         >
           {mint.isPending ? 'Minting…' : 'Mint code'}
         </Button>
@@ -322,7 +322,7 @@ function CodeRow({ code, onRevoked }: { code: CodeListEntry; onRevoked: () => vo
     <div className="rounded-md border border-white/5 bg-zinc-950/30 p-3 flex items-center gap-3 flex-wrap">
       <div className="flex-1 min-w-0 space-y-0.5">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-sm text-violet-200">{code.code}</span>
+          <span className="font-mono text-sm text-amber-200">{code.code}</span>
           <Badge variant="outline" className={status.tone}>
             {status.label}
           </Badge>

@@ -105,7 +105,7 @@ export default function CollectionsScreen() {
             <RefreshControl
               refreshing={nftMintsQuery.isFetching}
               onRefresh={() => nftMintsQuery.refetch()}
-              tintColor="#7c3aed"
+              tintColor="#f2823b"
             />
           }
           renderItem={({ item }) => <NFTCard nft={item} />}

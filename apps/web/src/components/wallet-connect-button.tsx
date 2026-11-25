@@ -103,7 +103,7 @@ export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({ classN
     <div className={className}>
       <Link
         to="/login"
-        className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-medium text-sm rounded-lg shadow-lg shadow-indigo-500/25 transition-all duration-200 hover:shadow-indigo-500/40"
+        className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-sm rounded-lg shadow-lg shadow-primary/25 transition-all duration-200 hover:shadow-primary/40"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path

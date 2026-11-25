@@ -69,7 +69,7 @@ export function WikiHero({
   return (
     <div className="mb-8">
       {universe && (
-        <div className="relative mb-6 overflow-hidden rounded-2xl border border-violet-500/30">
+        <div className="relative mb-6 overflow-hidden rounded-2xl border border-amber-500/30">
           {universe.image_url && (
             <SmartImage
               src={universe.image_url}
@@ -78,7 +78,7 @@ export function WikiHero({
               className="absolute inset-0 h-full w-full scale-110 object-cover opacity-25 blur-2xl"
             />
           )}
-          <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/70 to-violet-500/10" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/70 to-amber-500/10" />
           <div className="relative flex flex-wrap items-center gap-4 p-4 sm:p-5">
             {universe.image_url && (
               <SmartImage

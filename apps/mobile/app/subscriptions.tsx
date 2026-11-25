@@ -73,7 +73,7 @@ export default function SubscriptionsScreen() {
           <RefreshControl
             refreshing={subsQuery.isFetching}
             onRefresh={() => subsQuery.refetch()}
-            tintColor="#7c3aed"
+            tintColor="#f2823b"
           />
         }
       >

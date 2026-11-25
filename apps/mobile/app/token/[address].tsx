@@ -65,7 +65,7 @@ export default function TokenDetailScreen() {
           <RefreshControl
             refreshing={query.isRefetching}
             onRefresh={() => void query.refetch()}
-            tintColor="#7c3aed"
+            tintColor="#f2823b"
           />
         }
       >

@@ -254,7 +254,7 @@ function CreatorProfilePage() {
                           className="w-12 h-12 rounded-lg object-cover"
                         />
                       ) : (
-                        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-orange-500/20 flex items-center justify-center">
                           <span className="text-lg font-bold text-primary/40">
                             ${token.symbol.charAt(0)}
                           </span>

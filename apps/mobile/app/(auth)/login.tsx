@@ -20,6 +20,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   Text,
   TextInput,
@@ -148,13 +149,21 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View className="flex-1 px-6 pt-16 pb-8 gap-8">
+            {/* Watching is public — let people back out of sign-in. */}
+            <Pressable
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
+              className="self-start -mt-8"
+              accessibilityRole="button"
+            >
+              <Text className="text-text-secondary text-sm">← Keep watching</Text>
+            </Pressable>
             {/* Brand */}
             <View className="items-center gap-4 pt-8">
               <View className="w-20 h-20 rounded-2xl bg-primary items-center justify-center">
                 <Text className="text-4xl">⬡</Text>
               </View>
               <View className="items-center gap-2">
-                <Text className="text-text-primary text-3xl font-bold">LOAR Vault</Text>
+                <Text className="text-text-primary text-3xl font-bold">LOAR</Text>
                 <Text className="text-text-secondary text-base text-center">
                   Sign in to manage your universes, collectibles, and earnings
                 </Text>

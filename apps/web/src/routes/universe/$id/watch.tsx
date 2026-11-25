@@ -26,6 +26,7 @@ import {
 } from '@/utils/ponder-api';
 import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
 import { UniverseProfileEditor } from '@/components/UniverseProfileEditor';
+import { universeShareUrl } from '@/lib/share-url';
 import {
   Play,
   ChevronLeft,
@@ -327,7 +328,7 @@ function WatchPage() {
   };
 
   const handleShare = async () => {
-    const url = `${window.location.origin}/universe/${idLower}/watch`;
+    const url = universeShareUrl(idLower);
     try {
       if (navigator.share) {
         await navigator.share({ title, text: description, url });
@@ -601,7 +602,7 @@ function EpisodeCard({
             onLoadedData={() => setPosterReady(true)}
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-900/40 to-pink-900/40">
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-950/60 to-stone-950/60">
             <BookOpen className="h-8 w-8 text-white/60" />
           </div>
         )}
@@ -648,7 +649,7 @@ function EpisodeCard({
           <div
             className={`absolute bottom-2 left-2 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded backdrop-blur-sm ${
               episode.fsStyle === 'animated'
-                ? 'bg-fuchsia-500/90 text-white'
+                ? 'bg-orange-500/90 text-white'
                 : 'bg-amber-500/90 text-black'
             }`}
           >

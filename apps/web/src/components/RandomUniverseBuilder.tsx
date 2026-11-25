@@ -196,17 +196,17 @@ export function RandomUniverseBuilder({
   };
 
   return (
-    <Card className="border-violet-500/30 bg-gradient-to-br from-violet-500/5 to-purple-500/5">
+    <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-orange-500/5">
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
-          <Wand2 className="w-4 h-4 text-violet-400" />
+          <Wand2 className="w-4 h-4 text-amber-400" />
           Random Universe Builder
         </CardTitle>
         <p className="text-xs text-muted-foreground mt-1">
           Pick how many of each kind to roll into{' '}
-          <span className="text-violet-300">{universeName || 'this universe'}</span>. Each roll
-          picks a fresh name, style preset, and image model — so the universe ends up with variety,
-          not 12 versions of the same look.
+          <span className="text-amber-300">{universeName || 'this universe'}</span>. Each roll picks
+          a fresh name, style preset, and image model — so the universe ends up with variety, not 12
+          versions of the same look.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -218,7 +218,7 @@ export function RandomUniverseBuilder({
                 key={kind}
                 className={`flex items-center justify-between rounded-md border px-2 py-1.5 text-xs ${
                   count > 0
-                    ? 'border-violet-500/40 bg-violet-500/10'
+                    ? 'border-amber-500/40 bg-amber-500/10'
                     : 'border-white/10 bg-white/[0.02]'
                 }`}
               >
@@ -307,8 +307,8 @@ export function RandomUniverseBuilder({
                   </div>
                   {item.rolled && (
                     <p className="text-[11px] text-muted-foreground truncate">
-                      <span className="text-violet-300">{item.rolled.styleLabel}</span> on{' '}
-                      <span className="text-violet-300">{item.rolled.modelLabel}</span>
+                      <span className="text-amber-300">{item.rolled.styleLabel}</span> on{' '}
+                      <span className="text-amber-300">{item.rolled.modelLabel}</span>
                     </p>
                   )}
                   {item.status === 'failed' && item.error && (
@@ -321,7 +321,7 @@ export function RandomUniverseBuilder({
                     <Link
                       to="/wiki/entity/$id"
                       params={{ id: item.entityId }}
-                      className="text-violet-300 hover:text-violet-100"
+                      className="text-amber-300 hover:text-amber-100"
                       title="Open entity"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />

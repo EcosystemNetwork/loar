@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://loar.fun/ daily 1.0</loc><changefreq></changefreq><priority></priority></url>
+  <url><loc>https://loar.fun/discover daily 0.9</loc><changefreq></changefreq><priority></priority></url>
+  <url><loc>https://loar.fun/create weekly 0.8</loc><changefreq></changefreq><priority></priority></url>
+  <url><loc>https://loar.fun/world weekly 0.7</loc><changefreq></changefreq><priority></priority></url>
+  <url><loc>https://loar.fun/wiki daily 0.8</loc><changefreq></changefreq><priority></priority></url>
+  <url><loc>https://loar.fun/tokens daily 0.7</loc><changefreq></changefreq><priority></priority></url>
+  <url><loc>https://loar.fun/market daily 0.6</loc><changefreq></changefreq><priority></priority></url>
+  <url><loc>https://loar.fun/pricing monthly 0.6</loc><changefreq></changefreq><priority></priority></url>
+  <url><loc>https://loar.fun/docs weekly 0.5</loc><changefreq></changefreq><priority></priority></url>
+  <url><loc>https://loar.fun/terms yearly 0.2</loc><changefreq></changefreq><priority></priority></url>
+  <url><loc>https://loar.fun/privacy yearly 0.2</loc><changefreq></changefreq><priority></priority></url>
+  <url><loc>https://loar.fun/dmca yearly 0.2</loc><changefreq></changefreq><priority></priority></url>
+</urlset>

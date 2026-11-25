@@ -40,7 +40,7 @@ const TIER_CONFIG: Record<string, { icon: typeof Star; color: string; gradient: 
   PREMIUM: {
     icon: Crown,
     color: 'text-purple-500',
-    gradient: 'from-purple-500/10 to-purple-600/5',
+    gradient: 'from-orange-500/10 to-orange-600/5',
   },
   VIP: { icon: Sparkles, color: 'text-amber-500', gradient: 'from-amber-500/10 to-amber-600/5' },
 };
