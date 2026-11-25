@@ -18,6 +18,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TrendingUp, Eye, Repeat, Zap, CheckCircle2, Loader2, Flame, Info } from 'lucide-react';
+import { EmptyState } from '@/components/states';
 
 export const Route = createFileRoute('/virality')({
   beforeLoad: async ({ context }) => {
@@ -124,16 +125,16 @@ function ViralityPage() {
       )}
 
       {!isLoading && !hasData && (
-        <Card className="p-10 text-center space-y-3">
-          <TrendingUp className="h-10 w-10 mx-auto text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            No watch sessions on your episodes yet. Once viewers start watching, scores will
-            populate here automatically.
-          </p>
-          <Link to="/studio">
-            <Button variant="outline">Open Studio</Button>
-          </Link>
-        </Card>
+        <EmptyState
+          icon={TrendingUp}
+          title="No watch sessions yet"
+          description="Once viewers start watching your episodes, scores appear here automatically."
+          actions={
+            <Button asChild variant="outline">
+              <Link to="/studio">Open Studio</Link>
+            </Button>
+          }
+        />
       )}
 
       {!isLoading && hasData && (

@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, NotebookPen, Sparkles, Tag } from 'lucide-react';
+import { EmptyState } from '@/components/states';
 
 function NotebookList() {
   const navigate = useNavigate();
@@ -148,10 +149,11 @@ function NotebookList() {
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
         </div>
       ) : entries.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-muted-foreground/30 py-16 text-center">
-          <NotebookPen className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
-          <p className="text-muted-foreground">No entries yet. Start with a rough idea.</p>
-        </div>
+        <EmptyState
+          icon={NotebookPen}
+          title="No entries yet"
+          description="Start with a rough idea — a scene, a character, a line of lore."
+        />
       ) : (
         <div className="space-y-3">
           {entries.map((entry: any) => (

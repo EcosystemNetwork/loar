@@ -8,6 +8,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
 import { useWalletAuth } from '@/lib/wallet-auth';
+import { EmptyState } from '@/components/states';
+import { LayoutGrid } from 'lucide-react';
 
 export const Route = createFileRoute('/canvas/')({
   component: CanvasListPage,
@@ -81,9 +83,15 @@ function CanvasListPage() {
       {listQuery.isLoading ? (
         <div className="text-sm text-muted-foreground">Loading…</div>
       ) : !listQuery.data || listQuery.data.length === 0 ? (
-        <div className="text-sm text-muted-foreground border rounded p-8 text-center">
-          {scope === 'mine' ? "You haven't created a canvas yet." : 'No public canvases yet.'}
-        </div>
+        <EmptyState
+          icon={LayoutGrid}
+          title={scope === 'mine' ? 'No canvases yet' : 'No public canvases yet'}
+          description={
+            scope === 'mine'
+              ? 'A canvas chains generations together — image to video to voice — on one board.'
+              : 'When creators share a canvas, it shows up here.'
+          }
+        />
       ) : (
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {listQuery.data.map((canvas) => (
