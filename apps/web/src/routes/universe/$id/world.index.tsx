@@ -2,7 +2,8 @@
  * /universe/$id/world — the universe's 3D world: canon coverage in 3D,
  * sets, and bulk tools. Same hub the wiki's World tab shows.
  */
-import { createFileRoute, Link, useParams } from '@tanstack/react-router';
+import { createFileRoute, Link, redirect, useParams } from '@tanstack/react-router';
+import { WORLD_BUILD_ENABLED } from '@/lib/features';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Globe2 } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
@@ -10,6 +11,11 @@ import { Button } from '@/components/ui/button';
 import { WorldHub } from '@/components/world/WorldHub';
 
 export const Route = createFileRoute('/universe/$id/world/')({
+  // World-building is shelved (lib/features.ts) — send visitors to characters.
+  beforeLoad: ({ params }) => {
+    if (!WORLD_BUILD_ENABLED)
+      throw redirect({ to: '/studio/characters', search: { universe: params.id } });
+  },
   component: UniverseWorldPage,
 });
 

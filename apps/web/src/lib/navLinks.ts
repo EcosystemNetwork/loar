@@ -16,6 +16,8 @@
  * account menu. Pro tools live in the Studio hub, not in global nav.
  */
 
+import { WORLD_BUILD_ENABLED } from './features';
+
 export type NavLink = { to: string; label: string; beta?: boolean };
 export type NavGroup = { label: string; links: NavLink[] };
 export type StudioTool = NavLink & { description: string };
@@ -25,7 +27,7 @@ export type StudioToolGroup = { label: string; tools: StudioTool[] };
  * Routes hidden from navigation (empty = all routes visible).
  * Add paths here to temporarily hide incomplete features.
  */
-export const HIDDEN_ROUTES = new Set<string>([]);
+export const HIDDEN_ROUTES = new Set<string>(WORLD_BUILD_ENABLED ? [] : ['/world']);
 
 /** Auth screens are a quiet brand moment: logo + form, no app nav. */
 export const AUTH_ROUTES = new Set<string>(['/login']);
@@ -100,6 +102,11 @@ export const studioToolGroups: StudioToolGroup[] = [
   {
     label: 'Make',
     tools: [
+      {
+        to: '/studio/characters',
+        label: 'Character Studio',
+        description: 'Wiki characters to 3D: model, rig and animate.',
+      },
       { to: '/canvas', label: 'Canvas', description: 'Node-based board for chaining generations.' },
       {
         to: '/notebook',
@@ -199,7 +206,7 @@ const visible = <T extends NavLink>(links: readonly T[]): T[] =>
 
 /** Inline header links for the current auth state. */
 export function primaryLinks(signedIn: boolean): NavLink[] {
-  return visible(signedIn ? signedInLinks : signedOutLinks);
+  return visible<NavLink>(signedIn ? signedInLinks : signedOutLinks);
 }
 
 /** Explore dropdown — signed-in only. */

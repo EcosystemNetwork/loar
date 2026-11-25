@@ -73,6 +73,7 @@ import { Route as TokensLaunchRouteImport } from './routes/tokens/launch'
 import { Route as TokensHoldersRouteImport } from './routes/tokens/holders'
 import { Route as TokensAlertsRouteImport } from './routes/tokens/alerts'
 import { Route as TokensAddressRouteImport } from './routes/tokens/$address'
+import { Route as StudioCharactersRouteImport } from './routes/studio.characters'
 import { Route as ShopUniverseIdRouteImport } from './routes/shop/$universeId'
 import { Route as SettingsWalletsRouteImport } from './routes/settings.wallets'
 import { Route as SettingsUsageRouteImport } from './routes/settings.usage'
@@ -472,6 +473,11 @@ const TokensAlertsRoute = TokensAlertsRouteImport.update({
 const TokensAddressRoute = TokensAddressRouteImport.update({
   id: '/tokens/$address',
   path: '/tokens/$address',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioCharactersRoute = StudioCharactersRouteImport.update({
+  id: '/studio/characters',
+  path: '/studio/characters',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShopUniverseIdRoute = ShopUniverseIdRouteImport.update({
@@ -975,6 +981,7 @@ export interface FileRoutesByFullPath {
   '/settings/usage': typeof SettingsUsageRoute
   '/settings/wallets': typeof SettingsWalletsRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
+  '/studio/characters': typeof StudioCharactersRoute
   '/tokens/$address': typeof TokensAddressRoute
   '/tokens/alerts': typeof TokensAlertsRoute
   '/tokens/holders': typeof TokensHoldersRoute
@@ -1121,6 +1128,7 @@ export interface FileRoutesByTo {
   '/settings/usage': typeof SettingsUsageRoute
   '/settings/wallets': typeof SettingsWalletsRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
+  '/studio/characters': typeof StudioCharactersRoute
   '/tokens/$address': typeof TokensAddressRoute
   '/tokens/alerts': typeof TokensAlertsRoute
   '/tokens/holders': typeof TokensHoldersRoute
@@ -1268,6 +1276,7 @@ export interface FileRoutesById {
   '/settings/usage': typeof SettingsUsageRoute
   '/settings/wallets': typeof SettingsWalletsRoute
   '/shop/$universeId': typeof ShopUniverseIdRoute
+  '/studio/characters': typeof StudioCharactersRoute
   '/tokens/$address': typeof TokensAddressRoute
   '/tokens/alerts': typeof TokensAlertsRoute
   '/tokens/holders': typeof TokensHoldersRoute
@@ -1416,6 +1425,7 @@ export interface FileRouteTypes {
     | '/settings/usage'
     | '/settings/wallets'
     | '/shop/$universeId'
+    | '/studio/characters'
     | '/tokens/$address'
     | '/tokens/alerts'
     | '/tokens/holders'
@@ -1562,6 +1572,7 @@ export interface FileRouteTypes {
     | '/settings/usage'
     | '/settings/wallets'
     | '/shop/$universeId'
+    | '/studio/characters'
     | '/tokens/$address'
     | '/tokens/alerts'
     | '/tokens/holders'
@@ -1708,6 +1719,7 @@ export interface FileRouteTypes {
     | '/settings/usage'
     | '/settings/wallets'
     | '/shop/$universeId'
+    | '/studio/characters'
     | '/tokens/$address'
     | '/tokens/alerts'
     | '/tokens/holders'
@@ -1855,6 +1867,7 @@ export interface RootRouteChildren {
   SettingsUsageRoute: typeof SettingsUsageRoute
   SettingsWalletsRoute: typeof SettingsWalletsRoute
   ShopUniverseIdRoute: typeof ShopUniverseIdRoute
+  StudioCharactersRoute: typeof StudioCharactersRoute
   TokensAddressRoute: typeof TokensAddressRoute
   TokensAlertsRoute: typeof TokensAlertsRoute
   TokensHoldersRoute: typeof TokensHoldersRoute
@@ -2346,6 +2359,13 @@ declare module '@tanstack/react-router' {
       path: '/tokens/$address'
       fullPath: '/tokens/$address'
       preLoaderRoute: typeof TokensAddressRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio/characters': {
+      id: '/studio/characters'
+      path: '/studio/characters'
+      fullPath: '/studio/characters'
+      preLoaderRoute: typeof StudioCharactersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shop/$universeId': {
@@ -3035,6 +3055,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsUsageRoute: SettingsUsageRoute,
   SettingsWalletsRoute: SettingsWalletsRoute,
   ShopUniverseIdRoute: ShopUniverseIdRoute,
+  StudioCharactersRoute: StudioCharactersRoute,
   TokensAddressRoute: TokensAddressRoute,
   TokensAlertsRoute: TokensAlertsRoute,
   TokensHoldersRoute: TokensHoldersRoute,

@@ -81,7 +81,7 @@ let failPath: string | null = null;
 let rigCheck: Record<string, unknown> = { riggable: true, rig_type: 'quadruped' };
 let server: Server;
 
-function outputFor(path: string, id: string): Record<string, unknown> {
+function outputFor(path: string, id: string, body?: any): Record<string, unknown> {
   const f = (name: string) => `${HOST}/out/${id}/${name}`;
   switch (path) {
     case '/v3/generation/image-to-model':
@@ -104,8 +104,10 @@ function outputFor(path: string, id: string): Record<string, unknown> {
       return rigCheck;
     case '/v3/animations/rig':
       return { model_url: f('rigged.glb') };
-    case '/v3/animations/retarget':
-      return { model_urls: [f('idle.glb'), f('walk.glb'), f('run.glb'), f('turn.glb')] };
+    case '/v3/animations/retarget': {
+      const presets: string[] = body?.animations ?? ['idle', 'walk', 'run', 'turn'];
+      return { model_urls: presets.map((a) => f(`${a.split(':').pop()}.glb`)) };
+    }
     case '/v3/mesh/segment':
       return { seg_model_url: f('seg.glb') };
     case '/v3/mesh/complete':
@@ -142,7 +144,7 @@ beforeAll(async () => {
       }
       if (req.method === 'POST' && req.url?.startsWith('/v3/')) {
         const id = `t-${randomUUID().slice(0, 8)}`;
-        outputs.set(id, req.url === failPath ? { __fail: true } : outputFor(req.url, id));
+        outputs.set(id, req.url === failPath ? { __fail: true } : outputFor(req.url, id, body));
         return res.end(JSON.stringify({ code: 0, data: { task_id: id } }));
       }
       const m = /^\/v3\/tasks\/(.+)$/.exec(req.url ?? '');
@@ -381,6 +383,113 @@ describe('tripo.characterPuppet', () => {
       'preset:idle',
       'preset:quadruped:walk',
     ]);
+  });
+});
+
+describe('tripo animation batching + animateCharacter', () => {
+  const RIGGED = (over: Record<string, unknown> = {}) => ({
+    puppet: {
+      rigType: 'biped',
+      modelUrl: `${HOST}/source.glb`,
+      riggedModelUrl: `${HOST}/source-rigged.glb`,
+      animations: [
+        { preset: 'preset:idle', name: 'idle', url: 'https://x/idle-old.glb', webUrl: null },
+        { preset: 'preset:walk', name: 'walk', url: 'https://x/walk.glb', webUrl: null },
+      ],
+      ...over,
+    },
+  });
+  const SEVEN = [
+    'preset:idle',
+    'preset:walk',
+    'preset:run',
+    'preset:jump',
+    'preset:biped:wave_goodbye_01',
+    'preset:biped:dance_01',
+    'preset:biped:cast_a_spell',
+  ] as const;
+
+  it('splits more than 5 clips into Tripo-sized retarget tasks and stores the rig task id', async () => {
+    const t = await caller();
+    const entityId = await seedEntity();
+    const job = await waitJob(
+      (await t.characterPuppet({ entityId, animations: [...SEVEN] })).jobId
+    );
+    expect(job.status).toBe('completed');
+    expect(job.steps.map((s: any) => s.name).slice(-2)).toEqual(['Animations', 'Animations (2)']);
+    const batches = seen
+      .filter((s) => s.url === '/v3/animations/retarget')
+      .map((s) => s.body.animations);
+    expect(batches).toEqual([SEVEN.slice(0, 5), SEVEN.slice(5)]);
+    const p = (await entityDoc(entityId)).metadata.puppet;
+    expect(p.animations.map((a: any) => a.preset)).toEqual([...SEVEN]);
+    expect(p.rigTaskId).toMatch(/^t-/);
+  });
+
+  it('adds clips onto the live rig and merges them into the motion library', async () => {
+    const t = await caller();
+    const rigTaskId = 't-live-rig';
+    outputs.set(rigTaskId, { model_url: `${HOST}/source-rigged.glb` });
+    const entityId = await seedEntity({ metadata: RIGGED({ rigTaskId }) });
+    const job = await waitJob(
+      (
+        await t.animateCharacter({
+          entityId,
+          animations: ['preset:idle', 'preset:biped:dance_02'],
+        })
+      ).jobId
+    );
+    expect(job.status).toBe('completed');
+    expect(posts()).toEqual(['/v3/animations/retarget']);
+    expect(seen.find((s) => s.url === '/v3/animations/retarget')!.body.input).toBe(rigTaskId);
+    const anims = (await entityDoc(entityId)).metadata.puppet.animations;
+    expect(anims.map((a: any) => a.preset)).toEqual([
+      'preset:idle',
+      'preset:walk',
+      'preset:biped:dance_02',
+    ]);
+    // Same preset → replaced with the new clip.
+    expect(anims[0].url).not.toBe('https://x/idle-old.glb');
+  });
+
+  it('re-rigs from the body when Tripo no longer has the rig task', async () => {
+    const t = await caller();
+    const entityId = await seedEntity({ metadata: RIGGED({ rigTaskId: 't-gone' }) });
+    const job = await waitJob(
+      (await t.animateCharacter({ entityId, animations: ['preset:biped:bow'] })).jobId
+    );
+    expect(job.status).toBe('completed');
+    expect(posts()).toEqual(['/v3/files', '/v3/animations/rig', '/v3/animations/retarget']);
+    expect(seen.find((s) => s.url === '/v3/animations/rig')!.body).toMatchObject({
+      rig_type: 'biped',
+    });
+    const p = (await entityDoc(entityId)).metadata.puppet;
+    expect(p.rigTaskId).not.toBe('t-gone');
+    expect(p.animations).toHaveLength(3);
+  });
+
+  it('refuses clips the skeleton cannot play, and characters with no rig', async () => {
+    const t = await caller();
+    const quad = await seedEntity({
+      kind: 'species',
+      metadata: RIGGED({ rigType: 'quadruped' }),
+    });
+    await expect(
+      t.animateCharacter({ entityId: quad, animations: ['preset:biped:dance_01'] })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(
+      t.animateCharacter({ entityId: await seedEntity(), animations: ['preset:walk'] })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(seen).toHaveLength(0);
+  });
+
+  it('animationCatalog: the full library for bipeds, one gait for other skeletons', async () => {
+    const t = await caller();
+    const biped = await t.animationCatalog({ rigType: 'biped' });
+    expect(biped.groups.map((g) => g.group)).toContain('Dance');
+    expect(biped.groups.flatMap((g) => g.presets)).toContain('preset:biped:cast_a_spell');
+    const quad = await t.animationCatalog({ rigType: 'quadruped' });
+    expect(quad.groups).toEqual([{ group: 'Basics', presets: ['preset:quadruped:walk'] }]);
   });
 });
 

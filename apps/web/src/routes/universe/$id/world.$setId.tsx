@@ -8,7 +8,15 @@
  * linked props open their episode or wiki page.
  */
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { createFileRoute, Link, useNavigate, useParams, useSearch } from '@tanstack/react-router';
+import {
+  createFileRoute,
+  Link,
+  redirect,
+  useNavigate,
+  useParams,
+  useSearch,
+} from '@tanstack/react-router';
+import { WORLD_BUILD_ENABLED } from '@/lib/features';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -62,6 +70,11 @@ const WorldScene = lazy(() =>
 const searchSchema = z.object({ mode: z.enum(['edit', 'explore']).optional() });
 
 export const Route = createFileRoute('/universe/$id/world/$setId')({
+  // World-building is shelved (lib/features.ts) — send visitors to characters.
+  beforeLoad: ({ params }) => {
+    if (!WORLD_BUILD_ENABLED)
+      throw redirect({ to: '/studio/characters', search: { universe: params.id } });
+  },
   component: SetPage,
   validateSearch: searchSchema,
 });

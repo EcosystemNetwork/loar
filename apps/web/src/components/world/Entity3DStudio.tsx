@@ -1,10 +1,13 @@
 /**
- * Entity3DStudio — the wiki entity page's "3D & World" card.
+ * Entity3DStudio — the wiki entity page's 3D card.
  *
  * Everyone sees what the entity already has in 3D (model + AR, puppet
  * turnaround + motion clips, place environment). Managers get the Tripo
- * actions that build it: generate, puppet, parts kit, restyle, stylize,
- * export, environment. Jobs run server-side; progress streams in here.
+ * actions that build it: generate, puppet, rig, add animations, export —
+ * plus, while world-building is enabled (lib/features.ts), parts kit,
+ * restyle, stylize and environments. The Character Studio
+ * (/studio/characters) runs the same character actions in a full-page
+ * workspace. Jobs run server-side; progress streams in here.
  */
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
@@ -37,25 +40,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ModelViewer } from '@/components/ModelViewerLazy';
 import { SmartImage } from '@/components/SmartImage';
 import { resolveIpfsUrlPreferred } from '@/utils/ipfs-url';
+import { WORLD_BUILD_ENABLED } from '@/lib/features';
+import { AnimationPicker } from '@/components/characters/AnimationPicker';
+import { CharacterViewer } from '@/components/characters/CharacterViewer';
+import { RIG_TYPES, type Puppet, type RigType } from '@/components/characters/clips';
 import { JOB_LABELS, jobProgress, useEntityTripoJobs, type TripoJob } from './useTripoJob';
 
 export const MODELABLE_KINDS = ['person', 'species', 'thing', 'vehicle', 'technology'];
 export const PUPPET_KINDS = ['person', 'species', 'vehicle'];
 export const ENVIRONMENT_KINDS = ['place', 'realm', 'plane', 'dimension'];
-
-const RIG_TYPES = [
-  { id: 'biped', label: 'Biped (humanoid)' },
-  { id: 'quadruped', label: 'Quadruped' },
-  { id: 'avian', label: 'Avian' },
-  { id: 'serpentine', label: 'Serpentine' },
-  { id: 'aquatic', label: 'Aquatic' },
-  { id: 'hexapod', label: 'Hexapod (insect)' },
-  { id: 'octopod', label: 'Octopod (spider)' },
-] as const;
-type RigType = (typeof RIG_TYPES)[number]['id'];
 
 const EXPORT_FORMATS = [
   { id: 'USDZ', label: 'USDZ — iPhone AR' },
@@ -65,18 +60,6 @@ const EXPORT_FORMATS = [
   { id: '3MF', label: '3MF — 3D printing' },
 ] as const;
 type ExportFormat = (typeof EXPORT_FORMATS)[number]['id'];
-
-interface Puppet {
-  turnaround?: Partial<Record<'front' | 'left' | 'back' | 'right', string>>;
-  riggedModelUrl?: string;
-  modelUrl?: string;
-  /** Web-optimised copies (meshopt, ~20x smaller) — what the viewer loads. */
-  webModelUrl?: string | null;
-  webRiggedModelUrl?: string | null;
-  thumbnailUrl?: string | null;
-  rigType?: string;
-  animations?: Array<{ preset: string; name: string; url: string; webUrl?: string | null }>;
-}
 
 interface EntityLike {
   id: string;
@@ -106,7 +89,8 @@ export function Entity3DStudio({ entity, isOwner }: { entity: EntityLike; isOwne
 
   const modelable = MODELABLE_KINDS.includes(entity.kind);
   const puppetable = PUPPET_KINDS.includes(entity.kind);
-  const isPlace = ENVIRONMENT_KINDS.includes(entity.kind);
+  // Places only have something to build while world-building is enabled.
+  const isPlace = WORLD_BUILD_ENABLED && ENVIRONMENT_KINDS.includes(entity.kind);
 
   const jobsQuery = useEntityTripoJobs(entity.id, isOwner);
   const jobs = jobsQuery.data ?? [];
@@ -115,7 +99,6 @@ export function Entity3DStudio({ entity, isOwner }: { entity: EntityLike; isOwne
 
   const [rigType, setRigType] = useState<RigType>(entity.kind === 'person' ? 'biped' : 'quadruped');
   const [rigExistingType, setRigExistingType] = useState<RigType | 'auto'>('auto');
-  const [clip, setClip] = useState<string | null>(null);
   const [exportFormat, setExportFormat] = useState<ExportFormat>('USDZ');
   const [restylePrompt, setRestylePrompt] = useState('');
 
@@ -199,6 +182,20 @@ export function Entity3DStudio({ entity, isOwner }: { entity: EntityLike; isOwne
     },
     onError,
   });
+  const animate = useMutation({
+    mutationFn: (animations: string[]) =>
+      trpcClient.tripo.animateCharacter.mutate({
+        entityId: entity.id,
+        animations: animations as Parameters<
+          typeof trpcClient.tripo.animateCharacter.mutate
+        >[0]['animations'],
+      }),
+    onSuccess: () => {
+      onStarted('Animations')();
+      refresh();
+    },
+    onError,
+  });
   const buildEnvironment = useMutation({
     mutationFn: () => trpcClient.tripo.placeEnvironment.mutate({ entityId: entity.id }),
     onSuccess: () => {
@@ -212,8 +209,7 @@ export function Entity3DStudio({ entity, isOwner }: { entity: EntityLike; isOwne
   if (!hasAnything && !isOwner) return null;
   if (!modelable && !isPlace) return null;
 
-  const activeClip = puppet?.animations?.find((a) => a.name === clip) ?? null;
-  const viewerSrc = activeClip ? (activeClip.webUrl ?? activeClip.url) : displayModelUrl;
+  const rigged = !!puppet?.riggedModelUrl && !!puppet.rigType;
   const finishedExports = jobs.filter((j) => j.kind === 'convert' && j.status === 'completed');
   const partsKits = jobs.filter((j) => j.kind === 'segment' && j.status === 'completed');
   const noArt = !entity.imageUrl;
@@ -223,7 +219,7 @@ export function Entity3DStudio({ entity, isOwner }: { entity: EntityLike; isOwne
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Boxes className="h-4 w-4" />
-          3D &amp; World
+          {puppetable ? '3D Character' : WORLD_BUILD_ENABLED ? '3D & World' : '3D Model'}
           {running.length > 0 && (
             <Badge variant="secondary" className="gap-1 font-normal">
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -234,41 +230,16 @@ export function Entity3DStudio({ entity, isOwner }: { entity: EntityLike; isOwne
       </CardHeader>
       <CardContent className="space-y-5">
         {/* ── Model / puppet viewer ─────────────────────────────── */}
-        {modelable && viewerSrc && (
+        {modelable && displayModelUrl && (
           <div className="space-y-2">
-            <ModelViewer
-              key={viewerSrc}
-              src={url(viewerSrc)}
-              poster={activeClip ? undefined : url(posterUrl) || undefined}
-              alt={`${entity.name} 3D model`}
-              iosSrc={activeClip ? null : url(usdzUrl) || null}
-              autoplay={!!activeClip}
-              className="aspect-square max-h-[380px] w-full"
+            <CharacterViewer
+              name={entity.name}
+              modelUrl={displayModelUrl}
+              posterUrl={posterUrl}
+              usdzUrl={usdzUrl}
+              clips={puppet?.animations ?? []}
+              className="max-h-[380px]"
             />
-            {!!puppet?.animations?.length && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-xs text-muted-foreground mr-1">Motion:</span>
-                <Button
-                  size="sm"
-                  variant={clip === null ? 'default' : 'outline'}
-                  className="h-7 px-2 text-xs"
-                  onClick={() => setClip(null)}
-                >
-                  Static
-                </Button>
-                {puppet.animations.map((a) => (
-                  <Button
-                    key={a.name}
-                    size="sm"
-                    variant={clip === a.name ? 'default' : 'outline'}
-                    className="h-7 px-2 text-xs capitalize"
-                    onClick={() => setClip(a.name)}
-                  >
-                    {a.name}
-                  </Button>
-                ))}
-              </div>
-            )}
             {usdzUrl && (
               <p className="text-xs text-muted-foreground">
                 On a phone, tap the AR button to place {entity.name} in your room.
@@ -417,6 +388,28 @@ export function Entity3DStudio({ entity, isOwner }: { entity: EntityLike; isOwne
               </ActionRow>
             )}
 
+            {puppetable && rigged && (
+              <ActionRow
+                icon={<Footprints className="h-4 w-4" />}
+                title="Add animations"
+                hint="Pick clips from Tripo's motion library; they merge into this character's clips."
+              >
+                <div className="w-full">
+                  <AnimationPicker
+                    rigType={puppet!.rigType as RigType}
+                    owned={(puppet?.animations ?? []).map((a) => a.preset)}
+                    busy={
+                      busy('animate_model') ||
+                      busy('rig_model') ||
+                      busy('character_puppet') ||
+                      animate.isPending
+                    }
+                    onAdd={(presets) => animate.mutate(presets)}
+                  />
+                </div>
+              </ActionRow>
+            )}
+
             {isPlace && (
               <ActionRow
                 icon={<MapIcon className="h-4 w-4" />}
@@ -437,54 +430,58 @@ export function Entity3DStudio({ entity, isOwner }: { entity: EntityLike; isOwne
 
             {modelable && modelUrl && (
               <>
-                <ActionRow
-                  icon={<Paintbrush className="h-4 w-4" />}
-                  title="Restyle"
-                  hint="Re-texture to match the universe's canon style pack, or describe a look."
-                >
-                  <Input
-                    value={restylePrompt}
-                    onChange={(e) => setRestylePrompt(e.target.value)}
-                    placeholder="Blank = canon style pack"
-                    className="h-8 w-[220px] text-xs"
-                    maxLength={1024}
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy('restyle') || restyle.isPending}
-                    onClick={() => restyle.mutate()}
-                  >
-                    Restyle
-                  </Button>
-                  {(['lego', 'voxel', 'minecraft'] as const).map((s) => (
-                    <Button
-                      key={s}
-                      size="sm"
-                      variant="ghost"
-                      className="capitalize"
-                      disabled={busy('stylize') || stylize.isPending}
-                      onClick={() => stylize.mutate(s)}
+                {WORLD_BUILD_ENABLED && (
+                  <>
+                    <ActionRow
+                      icon={<Paintbrush className="h-4 w-4" />}
+                      title="Restyle"
+                      hint="Re-texture to match the universe's canon style pack, or describe a look."
                     >
-                      {s}
-                    </Button>
-                  ))}
-                </ActionRow>
+                      <Input
+                        value={restylePrompt}
+                        onChange={(e) => setRestylePrompt(e.target.value)}
+                        placeholder="Blank = canon style pack"
+                        className="h-8 w-[220px] text-xs"
+                        maxLength={1024}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy('restyle') || restyle.isPending}
+                        onClick={() => restyle.mutate()}
+                      >
+                        Restyle
+                      </Button>
+                      {(['lego', 'voxel', 'minecraft'] as const).map((s) => (
+                        <Button
+                          key={s}
+                          size="sm"
+                          variant="ghost"
+                          className="capitalize"
+                          disabled={busy('stylize') || stylize.isPending}
+                          onClick={() => stylize.mutate(s)}
+                        >
+                          {s}
+                        </Button>
+                      ))}
+                    </ActionRow>
 
-                <ActionRow
-                  icon={<Puzzle className="h-4 w-4" />}
-                  title="Split into parts kit"
-                  hint="Segments the model into named parts you can place on their own in sets and remix."
-                >
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy('segment') || segment.isPending}
-                    onClick={() => segment.mutate()}
-                  >
-                    Split into parts
-                  </Button>
-                </ActionRow>
+                    <ActionRow
+                      icon={<Puzzle className="h-4 w-4" />}
+                      title="Split into parts kit"
+                      hint="Segments the model into named parts you can place on their own in sets and remix."
+                    >
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy('segment') || segment.isPending}
+                        onClick={() => segment.mutate()}
+                      >
+                        Split into parts
+                      </Button>
+                    </ActionRow>
+                  </>
+                )}
 
                 <ActionRow
                   icon={<Download className="h-4 w-4" />}
@@ -531,7 +528,7 @@ export function Entity3DStudio({ entity, isOwner }: { entity: EntityLike; isOwne
               </div>
             )}
 
-            {partsKits.length > 0 && (
+            {WORLD_BUILD_ENABLED && partsKits.length > 0 && (
               <div className="text-xs text-muted-foreground">
                 <Puzzle className="mr-1 inline h-3 w-3" />
                 Parts kit: {(partsKits[0].result?.parts as string[] | undefined)?.join(', ')} — add
@@ -541,7 +538,19 @@ export function Entity3DStudio({ entity, isOwner }: { entity: EntityLike; isOwne
 
             {jobs.length > 0 && <JobList jobs={jobs} onRetried={refresh} />}
 
-            {entity.universeAddress && (
+            {puppetable && (
+              <Button asChild size="sm" variant="ghost" className="px-0 text-xs">
+                <Link
+                  to="/studio/characters"
+                  search={{ universe: entity.universeAddress ?? undefined, entity: entity.id }}
+                >
+                  <PersonStanding className="mr-1 h-3.5 w-3.5" />
+                  Open in Character Studio
+                </Link>
+              </Button>
+            )}
+
+            {WORLD_BUILD_ENABLED && entity.universeAddress && (
               <Button asChild size="sm" variant="ghost" className="px-0 text-xs">
                 <Link to="/universe/$id/world" params={{ id: entity.universeAddress }}>
                   <Clapperboard className="mr-1 h-3.5 w-3.5" />

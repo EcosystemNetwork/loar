@@ -7,13 +7,16 @@ import {
   groupForTab,
   resolveWikiTab,
 } from './nav';
+import { WORLD_BUILD_ENABLED } from '@/lib/features';
 
 describe('wiki nav model', () => {
   it('lists every view exactly once', () => {
     const ids = WIKI_TABS.map((t) => t.id);
     expect(new Set(ids).size).toBe(ids.length);
     // 12 creator kinds + 6 structural kinds + 17 synthesised/media views
-    expect(ids).toHaveLength(35);
+    // (16 while the shelved 3D World tab is hidden — lib/features.ts)
+    expect(ids).toHaveLength(WORLD_BUILD_ENABLED ? 35 : 34);
+    expect(ids.includes('world')).toBe(WORLD_BUILD_ENABLED);
   });
 
   it('keeps every group small enough to scan', () => {

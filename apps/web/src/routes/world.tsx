@@ -4,7 +4,8 @@
  * and every public universe after (to explore). Each tile opens
  * /universe/$id/world.
  */
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute, Link, redirect } from '@tanstack/react-router';
+import { WORLD_BUILD_ENABLED } from '@/lib/features';
 import { useQuery } from '@tanstack/react-query';
 import { Box, Clapperboard, Footprints, Globe2, KeyRound, Map as MapIcon } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
@@ -13,6 +14,10 @@ import { Button } from '@/components/ui/button';
 import { SmartImage } from '@/components/SmartImage';
 
 export const Route = createFileRoute('/world')({
+  // World-building is shelved (lib/features.ts) — send visitors to characters.
+  beforeLoad: () => {
+    if (!WORLD_BUILD_ENABLED) throw redirect({ to: '/studio/characters', search: {} });
+  },
   component: WorldLanding,
 });
 

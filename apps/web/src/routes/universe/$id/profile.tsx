@@ -29,6 +29,7 @@ import {
   Share2,
   Sparkles,
   Wand2,
+  PersonStanding,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -46,6 +47,7 @@ import {
 import { useIsUniverseAdmin } from '@/hooks/useIsUniverseAdmin';
 import { UniverseProfileEditor } from '@/components/UniverseProfileEditor';
 import { universeShareUrl } from '@/lib/share-url';
+import { WORLD_BUILD_ENABLED } from '@/lib/features';
 
 export const Route = createFileRoute('/universe/$id/profile')({
   component: UniverseProfilePage,
@@ -280,10 +282,17 @@ function UniverseProfilePage() {
               size="lg"
               className="rounded-full bg-white/10 text-white hover:bg-white/20"
             >
-              <Link to="/universe/$id/world" params={{ id: idLower }}>
-                <Globe2 className="mr-2 h-4 w-4" />
-                World
-              </Link>
+              {WORLD_BUILD_ENABLED ? (
+                <Link to="/universe/$id/world" params={{ id: idLower }}>
+                  <Globe2 className="mr-2 h-4 w-4" />
+                  World
+                </Link>
+              ) : (
+                <Link to="/studio/characters" search={{ universe: idLower }}>
+                  <PersonStanding className="mr-2 h-4 w-4" />
+                  Characters
+                </Link>
+              )}
             </Button>
             <Button
               variant="secondary"

@@ -62,7 +62,138 @@ export type TripoAnimation =
   | 'preset:hexapod:walk'
   | 'preset:octopod:walk'
   | 'preset:serpentine:march'
-  | 'preset:aquatic:march';
+  | 'preset:aquatic:march'
+  | TripoBipedClip;
+
+/**
+ * Tripo's extended motion library — biped rigs built on RIG_MODEL_BIPED
+ * (v1.0) only. Source: developers.tripo3d.ai/en/docs/animations-retarget.
+ * Grouped for the character studio's picker; ids are sent verbatim.
+ */
+export const TRIPO_BIPED_LIBRARY = {
+  Locomotion: [
+    'preset:biped:walk',
+    'preset:biped:run',
+    'preset:biped:swagger',
+    'preset:biped:run_upstairs',
+    'preset:biped:jump',
+    'preset:biped:jump_down',
+    'preset:biped:flip',
+    'preset:biped:climb',
+    'preset:biped:dive',
+    'preset:biped:swim',
+    'preset:biped:surf',
+    'preset:biped:flee_01',
+    'preset:biped:flee_02',
+  ],
+  Idle: [
+    'preset:biped:idle',
+    'preset:biped:wait',
+    'preset:biped:standing_relax',
+    'preset:biped:look_around',
+    'preset:biped:fold_arms',
+    'preset:biped:scratch',
+    'preset:biped:sit',
+    'preset:biped:warm_up',
+  ],
+  Combat: [
+    'preset:biped:slash',
+    'preset:biped:chop',
+    'preset:biped:shoot',
+    'preset:biped:fire',
+    'preset:biped:cast_a_spell',
+    'preset:biped:box_01',
+    'preset:biped:box_02',
+    'preset:biped:box_03',
+    'preset:biped:front_kick_01',
+    'preset:biped:front_kick_02',
+    'preset:biped:hurt',
+    'preset:biped:hit_to_body_01',
+    'preset:biped:hit_to_body_02',
+    'preset:biped:hit_to_head',
+    'preset:biped:hit_to_side',
+    'preset:biped:hit_to_stomach',
+    'preset:biped:fall',
+    'preset:biped:defeat_02',
+    'preset:biped:defeat_03',
+    'preset:biped:victory_celebration',
+  ],
+  Emotes: [
+    'preset:biped:greet_01',
+    'preset:biped:greet_02',
+    'preset:biped:greet_03',
+    'preset:biped:greet_04',
+    'preset:biped:wave_goodbye_01',
+    'preset:biped:wave_goodbye_02',
+    'preset:biped:bow',
+    'preset:biped:agree',
+    'preset:biped:cheer',
+    'preset:biped:clap',
+    'preset:biped:hug',
+    'preset:biped:heart_pose',
+    'preset:biped:laugh_01',
+    'preset:biped:laugh_02',
+    'preset:biped:angry_01',
+    'preset:biped:angry_02',
+    'preset:biped:angry_03',
+    'preset:biped:complain_01',
+    'preset:biped:complain_02',
+    'preset:biped:frustrated_01',
+    'preset:biped:frustrated_02',
+    'preset:biped:afraid',
+    'preset:biped:frightened',
+    'preset:biped:scared_01',
+    'preset:biped:scared_02',
+    'preset:biped:cry',
+    'preset:biped:sob',
+    'preset:biped:depressed',
+    'preset:biped:freaky',
+  ],
+  Dance: [
+    'preset:biped:dance_01',
+    'preset:biped:dance_02',
+    'preset:biped:dance_03',
+    'preset:biped:dance_04',
+    'preset:biped:dance_05',
+    'preset:biped:dance_06',
+    'preset:biped:sing_01',
+    'preset:biped:sing_02',
+    'preset:biped:sing_03',
+    'preset:biped:sing_04',
+  ],
+  Activities: [
+    'preset:biped:dig',
+    'preset:biped:shovel',
+    'preset:biped:lift_heavy',
+    'preset:biped:press-up',
+    'preset:biped:cross_body_crunch',
+    'preset:biped:jump_rope_01',
+    'preset:biped:jump_rope_02',
+    'preset:biped:make_a_call_01',
+    'preset:biped:make_a_call_02',
+    'preset:biped:play_mobile_game',
+    'preset:biped:play_video_game',
+  ],
+  Sports: [
+    'preset:biped:basketball_shot',
+    'preset:biped:dribble',
+    'preset:biped:crossover_dribble',
+    'preset:biped:football_pass',
+    'preset:biped:football_catch',
+    'preset:biped:football_save',
+    'preset:biped:pitch_baseball',
+    'preset:biped:golf',
+    'preset:biped:volleyball',
+  ],
+} as const;
+
+export type TripoBipedClip = (typeof TRIPO_BIPED_LIBRARY)[keyof typeof TRIPO_BIPED_LIBRARY][number];
+
+export const TRIPO_BIPED_CLIPS: readonly TripoBipedClip[] =
+  Object.values(TRIPO_BIPED_LIBRARY).flat();
+
+/** Tripo rejects a retarget request with more than this many `animations`. */
+export const TRIPO_MAX_ANIMATIONS_PER_RETARGET = 5;
 
 /**
  * v3 collapses `banned`/`expired` into `failed` (reported with an
@@ -635,13 +766,21 @@ class Tripo3dService {
     return this.createTask('/animations/rig-check', { input: args.input }, args.apiKey);
   }
 
-  /** Retarget several presets in one task (one output per animation). */
+  /**
+   * Retarget several presets in one task (one output per animation). At most
+   * TRIPO_MAX_ANIMATIONS_PER_RETARGET per call — callers batch larger sets.
+   */
   retargetAnimations(args: {
     input: string;
     animations: TripoAnimation[];
     inPlace?: boolean;
     apiKey?: string;
   }) {
+    if (args.animations.length > TRIPO_MAX_ANIMATIONS_PER_RETARGET) {
+      throw new Error(
+        `Tripo3D retargets at most ${TRIPO_MAX_ANIMATIONS_PER_RETARGET} animations per task`
+      );
+    }
     return this.createTask(
       '/animations/retarget',
       {

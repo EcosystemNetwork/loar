@@ -4,6 +4,8 @@
  *   tripo.entityTo3D        entity cover art → textured 3D model on the wiki
  *   tripo.batchEntityTo3D   same, for the picked entities still missing one
  *   tripo.rigEntityModel    skeleton + motion clips on the model an entity already has
+ *   tripo.animateCharacter  add more motion clips to a character that is already rigged
+ *   tripo.animationCatalog  the motion presets each skeleton type accepts
  *   tripo.batchRigModels    same, for the picked riggable entities with a model but no rig
  *   tripo.characterPuppet   character → T-pose → turnaround → body → rig →
  *                           motion library; turnaround feeds the entity's
@@ -56,6 +58,7 @@ import {
   type EntityRef,
   type ModelSource,
   type PlaceSplatArgs,
+  type AnimateModelArgs,
   type RigModelArgs,
   type RestyleArgs,
   type SegmentArgs,
@@ -63,7 +66,12 @@ import {
 } from '../../services/tripo-world/pipelines';
 import { webOptimizeUrl } from '../../services/tripo-world/optimize';
 import { entityUsage, type SetUsageSource } from '../../services/tripo-world/build-plan';
-import type { TripoAnimation, TripoRigType } from '../../services/tripo3d';
+import {
+  TRIPO_BIPED_CLIPS,
+  TRIPO_BIPED_LIBRARY,
+  type TripoAnimation,
+  type TripoRigType,
+} from '../../services/tripo3d';
 
 /** Kinds that read as a physical object/creature and make a sensible mesh. */
 export const MODELABLE_KINDS = ['person', 'species', 'thing', 'vehicle', 'technology'] as const;
@@ -100,6 +108,49 @@ const PUPPET_ANIMATIONS = [
   'preset:serpentine:march',
   'preset:aquatic:march',
 ] as const satisfies readonly TripoAnimation[];
+
+/** Every preset a request may name: the basics above + the biped library. */
+const ANIMATION_IDS = [...PUPPET_ANIMATIONS, ...TRIPO_BIPED_CLIPS] as [
+  TripoAnimation,
+  ...TripoAnimation[],
+];
+const animationSchema = z.enum(ANIMATION_IDS);
+/** Per request; the pipelines split these into Tripo's 5-per-task batches. */
+const MAX_ANIMATIONS_PER_JOB = 10;
+
+/** Gait clip per non-biped skeleton (Tripo has one motion for each). */
+const NON_BIPED_GAITS: Partial<Record<TripoRigType, TripoAnimation>> = {
+  quadruped: 'preset:quadruped:walk',
+  hexapod: 'preset:hexapod:walk',
+  octopod: 'preset:octopod:walk',
+  serpentine: 'preset:serpentine:march',
+  aquatic: 'preset:aquatic:march',
+};
+
+const BIPED_BASICS = PUPPET_ANIMATIONS.filter((a) => a.split(':').length === 2);
+
+/** Presets a skeleton type accepts, grouped for pickers. */
+export function animationCatalogFor(
+  rigType: string
+): Array<{ group: string; presets: TripoAnimation[] }> {
+  if (rigType === 'biped') {
+    return [
+      { group: 'Basics', presets: [...BIPED_BASICS] },
+      ...Object.entries(TRIPO_BIPED_LIBRARY).map(([group, presets]) => ({
+        group,
+        presets: [...presets] as TripoAnimation[],
+      })),
+    ];
+  }
+  const gait = NON_BIPED_GAITS[rigType as TripoRigType];
+  return gait ? [{ group: 'Basics', presets: [gait] }] : [];
+}
+
+/** Presets in `wanted` the skeleton type can't play. */
+function unsupportedAnimations(rigType: string, wanted: readonly string[]): string[] {
+  const ok = new Set(animationCatalogFor(rigType).flatMap((g) => g.presets as string[]));
+  return wanted.filter((a) => !ok.has(a));
+}
 
 const BATCH_MAX = 50;
 
@@ -400,7 +451,7 @@ export const tripoRouter = router({
       z.object({
         entityId: z.string().min(1),
         rigType: z.enum(RIG_TYPES).default('biped'),
-        animations: z.array(z.enum(PUPPET_ANIMATIONS)).max(8).optional(),
+        animations: z.array(animationSchema).min(1).max(MAX_ANIMATIONS_PER_JOB).optional(),
         imageUrl: z.string().url().optional(),
       })
     )
@@ -409,6 +460,7 @@ export const tripoRouter = router({
       assertPuppetKind(entity.kind);
       const imageUrl = safeUrl(input.imageUrl ?? entity.imageUrl ?? '');
       const apiKey = await requireTripoKey(ctx.user.uid);
+      if (input.animations) assertAnimationsFit(input.rigType, input.animations);
       const animations =
         input.animations ??
         (input.rigType === 'biped'
@@ -442,7 +494,7 @@ export const tripoRouter = router({
       z.object({
         entityId: z.string().min(1),
         rigType: z.enum(['auto', ...RIG_TYPES]).default('auto'),
-        animations: z.array(z.enum(PUPPET_ANIMATIONS)).max(8).optional(),
+        animations: z.array(animationSchema).min(1).max(MAX_ANIMATIONS_PER_JOB).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -454,6 +506,9 @@ export const tripoRouter = router({
           code: 'BAD_REQUEST',
           message: 'This entity has no 3D model yet — generate one first',
         });
+      }
+      if (input.animations && input.rigType !== 'auto') {
+        assertAnimationsFit(input.rigType, input.animations);
       }
       const apiKey = await requireTripoKey(ctx.user.uid);
       return startJob(
@@ -473,6 +528,77 @@ export const tripoRouter = router({
         }
       );
     }),
+
+  /**
+   * #2c — add motion clips to a character that is already rigged. Clips merge
+   * into the puppet's motion library (same preset = replaced). One job per
+   * character at a time so concurrent merges can't drop clips.
+   */
+  animateCharacter: gen
+    .input(
+      z.object({
+        entityId: z.string().min(1),
+        animations: z.array(animationSchema).min(1).max(MAX_ANIMATIONS_PER_JOB),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const entity = await loadManagedEntity(input.entityId, ctx.user.address);
+      assertPuppetKind(entity.kind);
+      const puppet = meta(entity).puppet as Record<string, any> | undefined;
+      const rigType = puppet?.rigType as TripoRigType | undefined;
+      if (!puppet?.riggedModelUrl || !rigType) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Rig this character first — animations play on its skeleton',
+        });
+      }
+      assertAnimationsFit(rigType, input.animations);
+      // Re-rig source if the stored rig task is gone: the unrigged body.
+      const modelUrl = (puppet.riggedFrom ?? puppet.modelUrl ?? entityModelUrl(entity)) as
+        | string
+        | null;
+      if (!modelUrl) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'This character has no 3D body' });
+      }
+      const busy = await entitiesWithActiveJobs(ctx.user.uid, 'animate_model');
+      if (busy.has(entity.id)) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Animations are already being added to this character — wait for that job',
+        });
+      }
+      const rigTaskId =
+        (puppet.rigTaskId as string | undefined) ??
+        (await rigTaskFromJob(puppet.jobId as string | undefined));
+      const animations = [...new Set(input.animations)];
+      const apiKey = await requireTripoKey(ctx.user.uid);
+      return startJob(
+        'animate_model',
+        ctx.user.uid,
+        apiKey,
+        {
+          entity: toRef(entity),
+          rigTaskId,
+          modelUrl,
+          rigType,
+          animations,
+        } satisfies AnimateModelArgs,
+        {
+          entityId: entity.id,
+          universeId: entity.universeAddress,
+          meta: { rigType, clips: animations.length },
+        }
+      );
+    }),
+
+  /** The motion presets each skeleton type accepts (drives the studio's picker). */
+  animationCatalog: publicProcedure
+    .input(z.object({ rigType: z.enum(RIG_TYPES) }))
+    .query(({ input }) => ({
+      rigType: input.rigType,
+      maxPerJob: MAX_ANIMATIONS_PER_JOB,
+      groups: animationCatalogFor(input.rigType),
+    })),
 
   /**
    * #2b at universe scale — rig the picked characters/species/vehicles
@@ -885,6 +1011,26 @@ function needsWebCopy(e: Pick<Entity, 'metadata'>): boolean {
   if (p.modelUrl && !p.webModelUrl) return true;
   if (p.riggedModelUrl && !p.webRiggedModelUrl) return true;
   return Array.isArray(p.animations) && p.animations.some((a: any) => a?.url && !a.webUrl);
+}
+
+function assertAnimationsFit(rigType: string, animations: readonly string[]) {
+  const bad = unsupportedAnimations(rigType, animations);
+  if (bad.length) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `A ${rigType} skeleton can't play: ${bad.join(', ')}`,
+    });
+  }
+}
+
+/** Rig task id of a puppet rigged before `puppet.rigTaskId` was stored. */
+async function rigTaskFromJob(jobId: string | undefined): Promise<string | null> {
+  if (!jobId) return null;
+  const d = (await threeDGenCol().doc(jobId).get()).data();
+  const step = ((d?.steps ?? []) as Array<{ name: string; taskId?: string; status: string }>).find(
+    (st) => st.name === 'Rig skeleton' && st.status === 'success'
+  );
+  return step?.taskId ?? null;
 }
 
 function assertPuppetKind(kind: string) {

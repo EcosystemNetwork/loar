@@ -46,6 +46,7 @@ import {
   Newspaper,
 } from 'lucide-react';
 import type { EntityKind, WikiTab } from './types';
+import { WORLD_BUILD_ENABLED } from '@/lib/features';
 
 type IconComponent = React.ComponentType<{ className?: string }>;
 
@@ -81,7 +82,7 @@ export const WIKI_GROUPS: WikiGroupDef[] = [
     icon: Compass,
     tabs: [
       { id: 'home', label: 'Front page', icon: Newspaper },
-      { id: 'world', label: '3D World', icon: Globe2 },
+      ...(WORLD_BUILD_ENABLED ? [{ id: 'world' as const, label: '3D World', icon: Globe2 }] : []),
       { id: 'gallery', label: 'Gallery', icon: ImageIcon },
       { id: 'ask', label: 'Ask', icon: Sparkles },
       { id: 'az-index', label: 'A–Z', icon: ListOrdered },

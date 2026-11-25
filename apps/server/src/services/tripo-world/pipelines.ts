@@ -24,6 +24,7 @@ import { db } from '../../lib/firebase';
 import { publishToGallery, type PublishGalleryInput } from '../../lib/gallery-publish';
 import { createAttachment, getAttachmentsByTarget } from '../../routers/media/media.handlers';
 import {
+  TRIPO_MAX_ANIMATIONS_PER_RETARGET,
   tripo3dService,
   tripoMultiviewUrls,
   type TripoAnimation,
@@ -301,6 +302,57 @@ export function entityModelPipeline(args: EntityModelArgs) {
   };
 }
 
+// ── Motion clips (shared by puppet / rig / animate) ─────────────────────
+
+export interface PuppetClip {
+  preset: string;
+  /** Last segment of the preset id ("walk", "dance_01"). */
+  name: string;
+  url: string;
+  webUrl: string | null;
+}
+
+export const clipName = (preset: string) => preset.split(':').pop()!;
+
+/**
+ * Retarget `presets` onto a rig, in batches of Tripo's per-call limit, and
+ * rehost every clip. The first batch keeps the historical step name
+ * "Animations" so jobs started before batching still replay on retry.
+ */
+async function retargetClips(
+  ctx: TripoJobContext,
+  rigTaskId: string,
+  presets: readonly TripoAnimation[],
+  base: string
+): Promise<PuppetClip[]> {
+  const clips: PuppetClip[] = [];
+  for (let i = 0; i < presets.length; i += TRIPO_MAX_ANIMATIONS_PER_RETARGET) {
+    const batch = presets.slice(i, i + TRIPO_MAX_ANIMATIONS_PER_RETARGET);
+    const n = i / TRIPO_MAX_ANIMATIONS_PER_RETARGET;
+    const anim = await ctx.step(n === 0 ? 'Animations' : `Animations (${n + 1})`, () =>
+      tripo3dService.retargetAnimations({
+        input: rigTaskId,
+        animations: [...batch],
+        apiKey: ctx.apiKey,
+      })
+    );
+    const urls = anim.output?.model_urls?.length
+      ? anim.output.model_urls
+      : anim.output?.model_url
+        ? [anim.output.model_url]
+        : [];
+    // Sequential: each clip is a full mesh + motion and optimisation is
+    // queued process-wide anyway.
+    for (const [j, preset] of batch.entries()) {
+      if (!urls[j]) continue;
+      const name = clipName(preset);
+      const { url, webUrl } = await keepModel(ctx, urls[j], `${base}-${name}.glb`);
+      clips.push({ preset, name, url, webUrl });
+    }
+  }
+  return clips;
+}
+
 // ── #2 Character puppet ──────────────────────────────────────────────────
 
 export const PUPPET_DEFAULT_ANIMATIONS: TripoAnimation[] = [
@@ -401,30 +453,7 @@ export function characterPuppetPipeline(args: CharacterPuppetArgs) {
     );
 
     // 5. Motion library — one GLB per preset.
-    const animations: Array<{ preset: string; name: string; url: string; webUrl: string | null }> =
-      [];
-    if (args.animations.length) {
-      const anim = await ctx.step('Animations', () =>
-        tripo3dService.retargetAnimations({
-          input: rig.task_id,
-          animations: args.animations,
-          apiKey: ctx.apiKey,
-        })
-      );
-      const urls = anim.output?.model_urls?.length
-        ? anim.output.model_urls
-        : anim.output?.model_url
-          ? [anim.output.model_url]
-          : [];
-      // Sequential: each clip is a full mesh + motion and optimisation is
-      // queued process-wide anyway.
-      for (const [i, preset] of (args.animations as string[]).entries()) {
-        const name = preset.split(':').pop()!;
-        if (!urls[i]) continue;
-        const { url, webUrl } = await keepModel(ctx, urls[i], `${base}-${name}.glb`);
-        animations.push({ preset, name, url, webUrl });
-      }
-    }
+    const animations = await retargetClips(ctx, rig.task_id, args.animations, base);
 
     const puppet = {
       turnaround,
@@ -434,6 +463,8 @@ export function characterPuppetPipeline(args: CharacterPuppetArgs) {
       webRiggedModelUrl: webRiggedUrl,
       thumbnailUrl,
       rigType: args.rigType,
+      /** Retarget input for adding clips later (animateModelPipeline). */
+      rigTaskId: rig.task_id,
       animations,
       jobId: ctx.genId,
       provider: 'tripo',
@@ -543,33 +574,13 @@ export function rigModelPipeline(args: RigModelArgs) {
     );
 
     const presets = args.animations ?? defaultPuppetAnimations(rigType);
-    const animations: Array<{ preset: string; name: string; url: string; webUrl: string | null }> =
-      [];
-    if (presets.length) {
-      const anim = await ctx.step('Animations', () =>
-        tripo3dService.retargetAnimations({
-          input: rig.task_id,
-          animations: presets,
-          apiKey: ctx.apiKey,
-        })
-      );
-      const urls = anim.output?.model_urls?.length
-        ? anim.output.model_urls
-        : anim.output?.model_url
-          ? [anim.output.model_url]
-          : [];
-      for (const [i, preset] of (presets as string[]).entries()) {
-        const name = preset.split(':').pop()!;
-        if (!urls[i]) continue;
-        const { url, webUrl } = await keepModel(ctx, urls[i], `${base}-${name}.glb`);
-        animations.push({ preset, name, url, webUrl });
-      }
-    }
+    const animations = await retargetClips(ctx, rig.task_id, presets, base);
 
     await patchEntityMetadata(entity.id, {
       'puppet.riggedModelUrl': riggedUrl,
       'puppet.webRiggedModelUrl': webRiggedUrl,
       'puppet.rigType': rigType,
+      'puppet.rigTaskId': rig.task_id,
       'puppet.animations': animations,
       'puppet.jobId': ctx.genId,
       'puppet.provider': 'tripo',
@@ -607,6 +618,58 @@ export function rigModelPipeline(args: RigModelArgs) {
       animations,
       entityId: entity.id,
     };
+  };
+}
+
+// ── #2c Add motion clips to an existing rig ─────────────────────────────
+
+export interface AnimateModelArgs {
+  entity: EntityRef;
+  /** The rig task the clips retarget onto, when we still have it. */
+  rigTaskId: string | null;
+  /** Unrigged body to re-rig from if Tripo has garbage-collected that task. */
+  modelUrl: string;
+  rigType: TripoRigType;
+  animations: TripoAnimation[];
+}
+
+/**
+ * Retarget more clips onto a character that is already rigged, and merge
+ * them into `metadata.puppet.animations` (a clip for the same preset is
+ * replaced; every other clip is kept). Rig task ids are the one stored Tripo
+ * id we lean on, because retarget takes nothing else. When it has expired,
+ * the body is re-rigged with the same skeleton type first.
+ */
+export function animateModelPipeline(args: AnimateModelArgs) {
+  return async (ctx: TripoJobContext) => {
+    const { entity } = args;
+    const base = slug(entity.name);
+
+    let rigTaskId: string | null = null;
+    if (args.rigTaskId) {
+      const live = await tripo3dService.getTask(args.rigTaskId, ctx.apiKey).catch(() => null);
+      if (live?.status === 'success') rigTaskId = args.rigTaskId;
+    }
+    if (!rigTaskId) {
+      const fileToken = await tripo3dService.uploadRemoteGlb(args.modelUrl, ctx.apiKey);
+      const rig = await ctx.step('Rig skeleton', () =>
+        tripo3dService.rigModel({ input: fileToken, rigType: args.rigType, apiKey: ctx.apiKey })
+      );
+      rigTaskId = rig.task_id;
+      await patchEntityMetadata(entity.id, { 'puppet.rigTaskId': rigTaskId });
+    }
+
+    const added = await retargetClips(ctx, rigTaskId, args.animations, base);
+    if (!added.length) throw new Error('Tripo returned no animation clips');
+
+    const ref = db.collection('entities').doc(entity.id);
+    const current = ((await ref.get()).data()?.metadata?.puppet?.animations ?? []) as PuppetClip[];
+    const byPreset = new Map(current.map((c) => [c.preset, c]));
+    for (const c of added) byPreset.set(c.preset, c);
+    const animations = [...byPreset.values()];
+    await patchEntityMetadata(entity.id, { 'puppet.animations': animations });
+
+    return { added, animations, rigTaskId, entityId: entity.id };
   };
 }
 
@@ -832,6 +895,7 @@ export const TRIPO_PIPELINES: Partial<Record<TripoJobKind, TripoPipelineFactory>
   entity_model: entityModelPipeline,
   character_puppet: characterPuppetPipeline,
   rig_model: rigModelPipeline,
+  animate_model: animateModelPipeline,
   segment: segmentPipeline,
   restyle: restylePipeline,
   stylize: stylizePipeline,

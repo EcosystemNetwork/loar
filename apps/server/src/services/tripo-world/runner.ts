@@ -45,6 +45,7 @@ export type TripoJobKind =
   | 'entity_model'
   | 'character_puppet'
   | 'rig_model'
+  | 'animate_model'
   | 'segment'
   | 'extract_part'
   | 'restyle'
@@ -62,6 +63,8 @@ export const TRIPO_JOB_COST_USD: Record<TripoJobKind, number> = {
   character_puppet: 1.2,
   // rig-check + rig + retargets on an existing mesh (no body generation)
   rig_model: 0.6,
+  // optional re-rig + one retarget per 5 clips
+  animate_model: 0.4,
   // segment + AI completion
   segment: 0.5,
   extract_part: 0.1,
