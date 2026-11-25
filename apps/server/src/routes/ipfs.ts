@@ -60,8 +60,16 @@ function isDedicatedGateway(): boolean {
   return !KNOWN_GATEWAY_HOSTS.has(gatewayHost());
 }
 
+// Hosts that serve our own CID-addressed content after the Pinata → GCS
+// migration: the bucket mirror and the legacy custom gateway domain.
+const GCS_MIRROR_HOST = 'storage.googleapis.com';
+const GCS_MIRROR_PREFIX = '/loar-db-ipfs';
+const LEGACY_OWN_HOSTS = new Set<string>(['media.loar.fun']);
+
 function isAcceptableSourceHost(host: string): boolean {
   if (!host) return false;
+  if (host === GCS_MIRROR_HOST) return true; // path prefix enforced in extractCidPath
+  if (LEGACY_OWN_HOSTS.has(host)) return true;
   if (host.endsWith('.mypinata.cloud')) return true;
   if (host === gatewayHost()) return true;
   if (KNOWN_GATEWAY_HOSTS.has(host)) return true;
@@ -98,7 +106,13 @@ function extractCidPath(input: string): string | null {
     const cidPath = rest ? `${cid}/${rest}` : cid;
     return CID_PATH_RE.test(cidPath) ? cidPath : null;
   }
-  const pathMatch = parsed.pathname.match(/^\/ipfs\/(.+)$/);
+  let pathname = parsed.pathname;
+  if (parsed.host === GCS_MIRROR_HOST) {
+    // Only our own bucket — never arbitrary GCS objects.
+    if (!pathname.startsWith(`${GCS_MIRROR_PREFIX}/ipfs/`)) return null;
+    pathname = pathname.slice(GCS_MIRROR_PREFIX.length);
+  }
+  const pathMatch = pathname.match(/^\/ipfs\/(.+)$/);
   if (pathMatch) {
     const cidPath = pathMatch[1];
     return CID_PATH_RE.test(cidPath) ? cidPath : null;

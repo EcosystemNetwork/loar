@@ -56,6 +56,15 @@ const contentCol = () => {
   return db.collection('content');
 };
 
+/** Pull an IPFS CID out of `ipfs://<cid>` or any `https://host[/prefix]/ipfs/<cid>` URL. */
+function extractIpfsCid(url: unknown): string | null {
+  if (typeof url !== 'string' || !url) return null;
+  const m =
+    url.match(/^ipfs:\/\/(?:ipfs\/)?([A-Za-z0-9]{46,})/) ||
+    url.match(/^https?:\/\/[^/]+(?:\/[^?#]*)?\/ipfs\/([A-Za-z0-9]{46,})(?:[/?#]|$)/);
+  return m ? m[1] : null;
+}
+
 export const nftRouter = router({
   // ---- Mint Content as NFT (Firebase → IPFS → Listing) ----
 
@@ -112,7 +121,20 @@ export const nftRouter = router({
         let ipfsCid: string;
         let ipfsUrl: string;
 
-        if (content.contentHash) {
+        // Media already addressed by an IPFS CID (e.g. the GCS mirror
+        // storage.googleapis.com/loar-db-ipfs/ipfs/<cid>, media.loar.fun/ipfs/<cid>,
+        // or ipfs://<cid>) is content-addressed already — reuse the CID instead
+        // of re-pinning, which fails now that Pinata has been retired.
+        const existingCid =
+          (typeof content.ipfsCid === 'string' && content.ipfsCid) ||
+          extractIpfsCid(content.mediaUrl);
+        if (existingCid) {
+          ipfsCid = existingCid;
+          ipfsUrl =
+            typeof content.mediaUrl === 'string' && /^https?:\/\//.test(content.mediaUrl)
+              ? content.mediaUrl
+              : `ipfs://${existingCid}`;
+        } else if (content.contentHash) {
           // Content was uploaded via StorageManager — pin existing hash
           const pinResult = await manager.pinToIPFS(content.contentHash);
           ipfsCid = pinResult.cid;
@@ -120,7 +142,9 @@ export const nftRouter = router({
         } else if (content.mediaUrl) {
           // Content has a media URL but no storage hash — upload to IPFS directly
           const manifest = await manager.uploadFromUrl(content.mediaUrl);
-          const ipfsUpload = manifest.uploads.find((u) => u.provider === 'ipfs');
+          const ipfsUpload = manifest.uploads.find(
+            (u) => u.provider === 'pinata' || u.provider === 'lighthouse'
+          );
           if (ipfsUpload) {
             ipfsCid = ipfsUpload.contentId;
             ipfsUrl = ipfsUpload.url;

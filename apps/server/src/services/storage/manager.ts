@@ -359,31 +359,48 @@ export class StorageManager {
       throw new Error(`No manifest found for contentHash: ${contentHash}`);
     }
 
-    // Check if already pinned to IPFS
-    const existingIpfs = manifest.uploads.find((u) => u.provider === 'pinata');
+    // Check if already pinned to IPFS (Pinata or Lighthouse both yield IPFS CIDs)
+    const existingIpfs = manifest.uploads.find(
+      (u) => u.provider === 'pinata' || u.provider === 'lighthouse'
+    );
     if (existingIpfs) {
       return { cid: existingIpfs.contentId, url: existingIpfs.url, manifest };
     }
 
-    // Download from existing provider and re-upload to IPFS
-    const ipfs = this.providers.find((p) => p.name === 'pinata');
-    if (!ipfs?.isAvailable()) {
+    // Download from existing provider and re-upload to IPFS. Pinata first,
+    // Lighthouse as fallback — Pinata was retired in the GCS-mirror migration,
+    // so it may be unconfigured or failing in production.
+    const ipfsProviders = ['pinata', 'lighthouse']
+      .map((name) => this.providers.find((p) => p.name === name))
+      .filter((p): p is StorageProvider => !!p && p.isAvailable());
+    if (ipfsProviders.length === 0) {
       throw new Error('IPFS provider is not available');
     }
 
     const data = await this.download(contentHash);
     const buffer = Buffer.from(data);
-    const result = await ipfs.upload(
-      buffer,
-      manifest.originalFilename || `nft-${contentHash.slice(0, 12)}`,
-      manifest.mimeType
-    );
+    let result: UploadResult | undefined;
+    let lastError: unknown;
+    for (const ipfs of ipfsProviders) {
+      try {
+        result = await ipfs.upload(
+          buffer,
+          manifest.originalFilename || `nft-${contentHash.slice(0, 12)}`,
+          manifest.mimeType
+        );
+        break;
+      } catch (err) {
+        lastError = err;
+        console.warn(`[StorageManager] pinToIPFS via ${ipfs.name} failed:`, err);
+      }
+    }
+    if (!result) throw lastError ?? new Error('IPFS pin failed');
 
     void getCostLedger().record({
       userId,
       contentHash,
       operation: 'pin_ipfs',
-      provider: 'pinata',
+      provider: result.provider,
       bytes: buffer.length,
       estimatedUploadCostUsd: 0,
       estimatedMonthlyCostUsd: (0.000195 * buffer.length) / (1024 * 1024),
