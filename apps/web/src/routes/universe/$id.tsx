@@ -138,6 +138,7 @@ import {
 } from '@/lib/timelineFlowGraph';
 import { useVideoGeneration, type StatusMessage } from '@/hooks/useVideoGeneration';
 import { useCharacterGeneration } from '@/hooks/useCharacterGeneration';
+import { CastStrip } from '@/components/characters/CastStrip';
 import { useContractSave } from '@/hooks/useContractSave';
 import { useUniverseBlockchain } from '@/hooks/useUniverseBlockchain';
 import { useSwapNodes } from '@/hooks/useTimeline';
@@ -3875,6 +3876,13 @@ function UniverseTimelineEditorInner() {
               {showShortcutsHelp && (
                 <Panel position="bottom-center" className="z-50 mb-2">
                   <ShortcutsHelpDialog onClose={() => setShowShortcutsHelp(false)} />
+                </Panel>
+              )}
+
+              {/* Cast — the universe's characters, docked on the canvas */}
+              {!showShortcutsHelp && (
+                <Panel position="bottom-center" className="z-30 mb-2">
+                  <CastStrip universeId={id} />
                 </Panel>
               )}
 
